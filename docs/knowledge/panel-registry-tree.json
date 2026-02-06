@@ -1,0 +1,5457 @@
+{
+  "version": 1,
+  "rootId": "panel-registry-tree",
+  "nodes": [
+    {
+      "id": "panel-registry-tree",
+      "slug": "panel-registry-tree",
+      "title": "Panel Registry Tree",
+      "excerpt": "Panel surfaces and cross-concept joins derived from Helix UI.",
+      "bodyMD": "This tree enumerates Helix panels and their cross-concept joins to keep UI surfaces grounded in the DAG.\n\nMinimal artifact: panel registry map.",
+      "tags": [
+        "ui",
+        "panels",
+        "registry"
+      ],
+      "children": [
+        "panel-viz-diagnostics",
+        "panel-energy-flux",
+        "panel-helix-phoenix",
+        "panel-microscopy",
+        "panel-needle-ipeak-worksheet",
+        "panel-needle-world-roadmap",
+        "panel-electron-orbital",
+        "panel-drive-guards",
+        "panel-mass-provenance",
+        "panel-gr-agent-loop-audit",
+        "panel-gr-agent-loop-kpis",
+        "panel-gr-agent-loop-learning",
+        "panel-math-maturity-tree",
+        "panel-universal-audit-tree",
+        "panel-tsn-sim",
+        "panel-pulsed-power-doc",
+        "panel-bus-voltage",
+        "panel-warp-ledger",
+        "panel-experiment-ladder",
+        "panel-spectrum-tuner",
+        "panel-vacuum-gap-heatmap",
+        "panel-star-hydrostatic",
+        "panel-star-watcher",
+        "panel-tokamak-sim",
+        "panel-vacuum-gap-sweep",
+        "panel-cavity-mechanism",
+        "panel-fractional-coherence-rail",
+        "panel-fractional-coherence-grid",
+        "panel-near-zero",
+        "panel-direction-pad",
+        "panel-nav-system",
+        "panel-deepmix-solar",
+        "panel-solar-globe",
+        "panel-deepmix-sweetspot",
+        "panel-deepmix-globe",
+        "panel-alcubierre-viewer",
+        "panel-shell-outline",
+        "panel-model-silhouette",
+        "panel-hull-metrics-vis",
+        "panel-shift-vector",
+        "panel-curvature-slice",
+        "panel-time-dilation-lattice",
+        "panel-curvature-ledger",
+        "panel-operational-mode",
+        "panel-casimir-tile-grid",
+        "panel-light-speed-strobe",
+        "panel-speed-capability",
+        "panel-helix-casimir-amplifier",
+        "panel-resonance-scheduler",
+        "panel-trip-player",
+        "panel-fuel-gauge",
+        "panel-vacuum-contract",
+        "panel-metric-pocket",
+        "panel-halobank",
+        "panel-qi-widget",
+        "panel-qi-auto-tuner",
+        "panel-sector-legend",
+        "panel-sector-roles",
+        "panel-sweep-replay",
+        "panel-hull-status",
+        "panel-agi-debate-view",
+        "panel-agi-essence-console",
+        "panel-star-coherence",
+        "panel-pipeline-proof",
+        "panel-collapse-monitor",
+        "panel-collapse-benchmark-hud",
+        "panel-agi-task-history",
+        "panel-helix-noise-gens",
+        "panel-constraint-pack-policy",
+        "panel-agi-contribution-workbench",
+        "panel-remove-bg-edges",
+        "panel-dresscode",
+        "panel-stellar-lsr",
+        "panel-essence-proposals"
+      ],
+      "links": [],
+      "summary": "Panel surfaces and cross-concept joins derived from Helix UI.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-viz-diagnostics",
+      "slug": "panel-viz-diagnostics",
+      "title": "Viz Diagnostics HUD",
+      "excerpt": "Panel surface for Viz Diagnostics HUD.",
+      "bodyMD": "Panel viz-diagnostics loaded from helix-core panels registry.\nComponent: client/src/components/warp/VizDiagnosticsPanel.tsx\nEndpoints: none\nKeywords: viz hud, diagnostics overlay, shader debug, fps meter, render stack",
+      "tags": [
+        "panel",
+        "viz-diagnostics",
+        "viz hud",
+        "diagnostics overlay",
+        "shader debug",
+        "fps meter",
+        "render stack"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Viz Diagnostics HUD.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/warp/VizDiagnosticsPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:b4f667ff2e5d0e6d111479d65eb2dd076504c2ae4258f6ba365abda961c447b9"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-energy-flux",
+      "slug": "panel-energy-flux",
+      "title": "Energy Flux Stability",
+      "excerpt": "Panel surface for Energy Flux Stability.",
+      "bodyMD": "Panel energy-flux loaded from helix-core panels registry.\nComponent: client/src/components/EnergyFluxPanel.tsx\nEndpoints: pipelineGet, helixMetrics\nKeywords: flux monitor, stability histogram, |T_ab|, phi_A, R = (phi_A)/(I3 + |T|)",
+      "tags": [
+        "panel",
+        "energy-flux",
+        "flux monitor",
+        "stability histogram",
+        "|T_ab|",
+        "phi_A",
+        "R = (phi_A)/(I3 + |T|)"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Energy Flux Stability.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/EnergyFluxPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:0c5dce864d5b7839cca7931dea563c91369127c6ab912fd5b1b4f28c60c44576"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-helix-phoenix",
+      "slug": "panel-helix-phoenix",
+      "title": "Phoenix Averaging",
+      "excerpt": "Panel surface for Phoenix Averaging.",
+      "bodyMD": "Panel helix-phoenix loaded from helix-core panels registry.\nComponent: client/src/components/PhoenixNeedlePanel.tsx\nEndpoints: none\nKeywords: phoenix averaging, needle hull, light-crossing, kappa_drive, casimir tile, hann window",
+      "tags": [
+        "panel",
+        "helix-phoenix",
+        "phoenix averaging",
+        "needle hull",
+        "light-crossing",
+        "kappa_drive",
+        "casimir tile",
+        "hann window"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "phoenix-averaging"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tiles-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tiles-overview"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tile-mechanism"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tile-roadmap"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tile-schematic-roadmap"
+        }
+      ],
+      "summary": "Panel surface for Phoenix Averaging.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/PhoenixNeedlePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:8a99b1433d177097bd47fad1a4d62375952563de05f867ea886437e6104c06a5"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-microscopy",
+      "slug": "panel-microscopy",
+      "title": "Microscopy Mode",
+      "excerpt": "Panel surface for Microscopy Mode.",
+      "bodyMD": "Panel microscopy loaded from helix-core panels registry.\nComponent: client/src/components/MicroscopyPanel.tsx\nEndpoints: pipelineGet, helixMetrics\nKeywords: microscopy mode, microprobe, phase contrast, nm scale, Coulomb sweep",
+      "tags": [
+        "panel",
+        "microscopy",
+        "microscopy mode",
+        "microprobe",
+        "phase contrast",
+        "nm scale",
+        "Coulomb sweep"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Microscopy Mode.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/MicroscopyPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:9d5ceef2496a0b94000eb542e1119d8771f36ad85b99230d963afb007a6d4ce9"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-needle-ipeak-worksheet",
+      "slug": "panel-needle-ipeak-worksheet",
+      "title": "Needle I_peak Worksheet",
+      "excerpt": "Panel surface for Needle I_peak Worksheet.",
+      "bodyMD": "Panel needle-ipeak-worksheet loaded from helix-core panels registry.\nComponent: client/src/components/NeedleIpeakWorksheetPanel.tsx\nEndpoints: none\nKeywords: pulsed power, i_peak, worksheet, needle hull, blumlein, pfn",
+      "tags": [
+        "panel",
+        "needle-ipeak-worksheet",
+        "pulsed power",
+        "i_peak",
+        "worksheet",
+        "needle hull",
+        "blumlein",
+        "pfn"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "warp-pulsed-power"
+        }
+      ],
+      "summary": "Panel surface for Needle I_peak Worksheet.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/NeedleIpeakWorksheetPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:e4d3d1ebd148cc1f1c0c83dfcb7e0cbb83df4661b1437d75ee45cb3e871d73b1"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-needle-world-roadmap",
+      "slug": "panel-needle-world-roadmap",
+      "title": "Needle World Roadmap",
+      "excerpt": "Panel surface for Needle World Roadmap.",
+      "bodyMD": "Panel needle-world-roadmap loaded from helix-core panels registry.\nComponent: client/src/components/NeedleWorldRoadmap.tsx\nEndpoints: none\nKeywords: needle roadmap, partner map, timeline, capex, opex, world map",
+      "tags": [
+        "panel",
+        "needle-world-roadmap",
+        "needle roadmap",
+        "partner map",
+        "timeline",
+        "capex",
+        "opex",
+        "world map"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-ratio-guardrail"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-ts-ratio-guardrail-casimir-tile-mechanism"
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-bounds-engine"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-quantum-inequality"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-proxy"
+        }
+      ],
+      "summary": "Panel surface for Needle World Roadmap.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/NeedleWorldRoadmap.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:4f1d3e98b1c676c25534de014244a753b9e86b087d82a6659ef8b6cf0c04baa5"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-electron-orbital",
+      "slug": "panel-electron-orbital",
+      "title": "Electron Orbital Simulator",
+      "excerpt": "Panel surface for Electron Orbital Simulator.",
+      "bodyMD": "Panel electron-orbital loaded from helix-core panels registry.\nComponent: client/src/components/ElectronOrbitalPanel.tsx\nEndpoints: pipelineGet, helixSnapshot\nKeywords: orbital density, Bohr k/q/g, toroidal packets, Coulomb probe, iso-surface",
+      "tags": [
+        "panel",
+        "electron-orbital",
+        "orbital density",
+        "Bohr k/q/g",
+        "toroidal packets",
+        "Coulomb probe",
+        "iso-surface"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Electron Orbital Simulator.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/ElectronOrbitalPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:bc920b6db5cf648e031bbd3d24fb5f808b6deb57fdfc1d148460bc2beffa4a38"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-drive-guards",
+      "slug": "panel-drive-guards",
+      "title": "Drive Guards",
+      "excerpt": "Panel surface for Drive Guards.",
+      "bodyMD": "Panel drive-guards loaded from helix-core panels registry.\nComponent: client/src/components/DriveGuardsPanel.tsx\nEndpoints: pipelineGet, helixMetrics\nKeywords: I3_geo, I3_VdB, Q_cavity, guard bands, sector strobing",
+      "tags": [
+        "panel",
+        "drive-guards",
+        "I3_geo",
+        "I3_VdB",
+        "Q_cavity",
+        "guard bands",
+        "sector strobing"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Drive Guards.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/DriveGuardsPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:b38e71642b61739eb7ce2d0a78370669a4cc146994619c286823b66667d2cbe1"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-mass-provenance",
+      "slug": "panel-mass-provenance",
+      "title": "Mass Provenance",
+      "excerpt": "Panel surface for Mass Provenance.",
+      "bodyMD": "Panel mass-provenance loaded from helix-core panels registry.\nComponent: client/src/components/MassProvenancePanel.tsx\nEndpoints: pipelineGet\nKeywords: mass provenance, mass source, dataset id, fit residuals, invariant mass, override warnings",
+      "tags": [
+        "panel",
+        "mass-provenance",
+        "mass provenance",
+        "mass source",
+        "dataset id",
+        "fit residuals",
+        "invariant mass",
+        "override warnings"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Mass Provenance.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/MassProvenancePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:3b51e648c491e897e6bd1c39ee299c542509adcf6c030a25840c4249a305dd05"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-gr-agent-loop-audit",
+      "slug": "panel-gr-agent-loop-audit",
+      "title": "GR Agent Loop Audit",
+      "excerpt": "Panel surface for GR Agent Loop Audit.",
+      "bodyMD": "Panel gr-agent-loop-audit loaded from helix-core panels registry.\nComponent: client/src/components/GrAgentLoopAuditPanel.tsx\nEndpoints: grAgentLoop\nKeywords: gr agent loop, residuals, gate audit, accepted config, warp constraints",
+      "tags": [
+        "panel",
+        "gr-agent-loop-audit",
+        "gr agent loop",
+        "residuals",
+        "gate audit",
+        "accepted config",
+        "warp constraints"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-gr-agent-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-agent-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-agent-loop-schema"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-constraint-network"
+        },
+        {
+          "rel": "see-also",
+          "to": "stage-diagnostic"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-constraint-network"
+        }
+      ],
+      "summary": "Panel surface for GR Agent Loop Audit.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/GrAgentLoopAuditPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:2410b2cb0c7e9bc0df042124719007a2cabdaf6fb92b7fe59081fc84c6552991"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-gr-agent-loop-kpis",
+      "slug": "panel-gr-agent-loop-kpis",
+      "title": "GR Loop KPIs",
+      "excerpt": "Panel surface for GR Loop KPIs.",
+      "bodyMD": "Panel gr-agent-loop-kpis loaded from helix-core panels registry.\nComponent: client/src/components/GrAgentLoopKpiPanel.tsx\nEndpoints: grAgentLoopKpis\nKeywords: gr agent loop, kpi, success rate, time to green, constraint violations, perf trend",
+      "tags": [
+        "panel",
+        "gr-agent-loop-kpis",
+        "gr agent loop",
+        "kpi",
+        "success rate",
+        "time to green",
+        "constraint violations",
+        "perf trend"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-gr-agent-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-agent-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-agent-loop-schema"
+        }
+      ],
+      "summary": "Panel surface for GR Loop KPIs.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/GrAgentLoopKpiPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:bc01b40ce9493f8fc04b22cc0833f0375fa378345007f9a7861a5c6ef549f16d"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-gr-agent-loop-learning",
+      "slug": "panel-gr-agent-loop-learning",
+      "title": "GR Loop Learning",
+      "excerpt": "Panel surface for GR Loop Learning.",
+      "bodyMD": "Panel gr-agent-loop-learning loaded from helix-core panels registry.\nComponent: client/src/components/GrAgentLoopLearningPanel.tsx\nEndpoints: grAgentLoop\nKeywords: learning loop, patch ladder, failure backlog, run comparison, accepted config history, residual trend, gate trend",
+      "tags": [
+        "panel",
+        "gr-agent-loop-learning",
+        "learning loop",
+        "patch ladder",
+        "failure backlog",
+        "run comparison",
+        "accepted config history",
+        "residual trend",
+        "gate trend"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-learning-loop"
+        }
+      ],
+      "summary": "Panel surface for GR Loop Learning.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/GrAgentLoopLearningPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:3f2a86a708cf45fd3f385465653768d94e8a66fc3ca8747dbe5f2d1f3a448030"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-math-maturity-tree",
+      "slug": "panel-math-maturity-tree",
+      "title": "Math Maturity Tree",
+      "excerpt": "Panel surface for Math Maturity Tree.",
+      "bodyMD": "Panel math-maturity-tree loaded from helix-core panels registry.\nComponent: client/src/components/MathMaturityTreePanel.tsx\nEndpoints: mathGraph\nKeywords: math maturity, math graph, stage ladder, unit coverage, repo audit",
+      "tags": [
+        "panel",
+        "math-maturity-tree",
+        "math maturity",
+        "math graph",
+        "stage ladder",
+        "unit coverage",
+        "repo audit"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-math-maturity"
+        },
+        {
+          "rel": "see-also",
+          "to": "math-maturity-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "math-maturity-stages"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-math-maturity-stages-math-evidence-registry"
+        },
+        {
+          "rel": "see-also",
+          "to": "math-pipeline-walk"
+        },
+        {
+          "rel": "see-also",
+          "to": "math-verification-gates"
+        }
+      ],
+      "summary": "Panel surface for Math Maturity Tree.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/MathMaturityTreePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:7406e610220a73f50bbfdef9256421b33220c837b928076831d569266654dc17"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-universal-audit-tree",
+      "slug": "panel-universal-audit-tree",
+      "title": "Universal Audit Tree",
+      "excerpt": "Panel surface for Universal Audit Tree.",
+      "bodyMD": "Panel universal-audit-tree loaded from helix-core panels registry.\nComponent: client/src/components/UniversalAuditTreePanel.tsx\nEndpoints: auditTree\nKeywords: audit tree, ideology tags, repo audit, integrity map, verification map",
+      "tags": [
+        "panel",
+        "universal-audit-tree",
+        "audit tree",
+        "ideology tags",
+        "repo audit",
+        "integrity map",
+        "verification map"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Universal Audit Tree.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/UniversalAuditTreePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:9b2d9bb3207ad3131664ecd215a105264eb4429e3b689791e60fa0168fd59bc0"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-tsn-sim",
+      "slug": "panel-tsn-sim",
+      "title": "TSN Determinism",
+      "excerpt": "Panel surface for TSN Determinism.",
+      "bodyMD": "Panel tsn-sim loaded from helix-core panels registry.\nComponent: client/src/components/HelixTsnPanel.tsx\nEndpoints: POST /api/sim/tsn\nKeywords: tsn, gptp, qbv, deterministic, latency, clock, white rabbit",
+      "tags": [
+        "panel",
+        "tsn-sim",
+        "tsn",
+        "gptp",
+        "qbv",
+        "deterministic",
+        "latency",
+        "clock",
+        "white rabbit"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "simulation-tsn"
+        },
+        {
+          "rel": "see-also",
+          "to": "schema-confidence-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "debate-telemetry"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-telemetry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-page-desktop"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-registry-desktop"
+        }
+      ],
+      "summary": "Panel surface for TSN Determinism.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/HelixTsnPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:6375ab3d8325acfa0fbcd93287d70ab0cd0a88754ad188ebc31a8f896b8d580f"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-pulsed-power-doc",
+      "slug": "panel-pulsed-power-doc",
+      "title": "Warp Pulsed Power",
+      "excerpt": "Panel surface for Warp Pulsed Power.",
+      "bodyMD": "Panel pulsed-power-doc loaded from helix-core panels registry.\nComponent: client/src/components/PulsedPowerDocPanel.tsx\nEndpoints: none\nKeywords: warp, pulsed power, coil, pipeline, hardware",
+      "tags": [
+        "panel",
+        "pulsed-power-doc",
+        "warp",
+        "pulsed power",
+        "coil",
+        "pipeline",
+        "hardware"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "warp-pulsed-power"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-ledger-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-overview"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-pipeline-overview-curvature-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "solar-pipeline"
+        },
+        {
+          "rel": "see-also",
+          "to": "external-hardware-stack"
+        }
+      ],
+      "summary": "Panel surface for Warp Pulsed Power.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/PulsedPowerDocPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:a575bac1c3cdc62d25a20d194828167ca48eaae9e9125042da7be49e4383308b"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-bus-voltage",
+      "slug": "panel-bus-voltage",
+      "title": "Bus Voltage Program",
+      "excerpt": "Panel surface for Bus Voltage Program.",
+      "bodyMD": "Panel bus-voltage loaded from helix-core panels registry.\nComponent: client/src/components/BusVoltagePanel.tsx\nEndpoints: pipelineGet\nKeywords: bus voltage, hv rail, power policy, amps, setpoint",
+      "tags": [
+        "panel",
+        "bus-voltage",
+        "bus voltage",
+        "hv rail",
+        "power policy",
+        "amps",
+        "setpoint"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "guarded-casimir-tile-code-mapped"
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-ratio-guardrail"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-ts-ratio-guardrail-casimir-tile-mechanism"
+        },
+        {
+          "rel": "see-also",
+          "to": "llm-runtime-tokenizer"
+        },
+        {
+          "rel": "see-also",
+          "to": "security-hull-guard-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "security-hull-guard"
+        }
+      ],
+      "summary": "Panel surface for Bus Voltage Program.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/BusVoltagePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:9875bd24f6cd0273c980e5ab139bb05447fd37bddf79a0d621f929b1afbe736a"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-warp-ledger",
+      "slug": "panel-warp-ledger",
+      "title": "KM-Scale Warp Ledger",
+      "excerpt": "Panel surface for KM-Scale Warp Ledger.",
+      "bodyMD": "Panel warp-ledger loaded from helix-core panels registry.\nComponent: client/src/components/WarpLedgerPanel.tsx\nEndpoints: GET /km-scale-warp-ledger\nKeywords: km-scale ledger, warp ledger, bubble log, warp km, ledger bands",
+      "tags": [
+        "panel",
+        "warp-ledger",
+        "km-scale ledger",
+        "warp ledger",
+        "bubble log",
+        "warp km",
+        "ledger bands"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "warp-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-warp-ledger"
+        }
+      ],
+      "summary": "Panel surface for KM-Scale Warp Ledger.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/WarpLedgerPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:409bdbd3345631103e22ca456c4133b6dd8f8e5aa67382e1c006532f34c84b4d"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-experiment-ladder",
+      "slug": "panel-experiment-ladder",
+      "title": "Warp Experiment Ladder",
+      "excerpt": "Panel surface for Warp Experiment Ladder.",
+      "bodyMD": "Panel experiment-ladder loaded from helix-core panels registry.\nComponent: client/src/components/WarpExperimentLadderPanel.tsx\nEndpoints: pipelineGet, helixMetrics\nKeywords: experiment ladder, casimir, phoenix, ford-roman, natario, sector gating",
+      "tags": [
+        "panel",
+        "experiment-ladder",
+        "experiment ladder",
+        "casimir",
+        "phoenix",
+        "ford-roman",
+        "natario",
+        "sector gating"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-bounds-engine"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-quantum-inequality"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-proxy"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tiles-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tiles-overview"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tile-mechanism"
+        }
+      ],
+      "summary": "Panel surface for Warp Experiment Ladder.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/WarpExperimentLadderPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:62932102bbb9306cc13fa5bd6c9b04deda5638ed403931b10bb7f053f30cc4e4"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-spectrum-tuner",
+      "slug": "panel-spectrum-tuner",
+      "title": "Spectrum Tuner",
+      "excerpt": "Panel surface for Spectrum Tuner.",
+      "bodyMD": "Panel spectrum-tuner loaded from helix-core panels registry.\nComponent: client/src/components/SpectrumTunerPanel.tsx\nEndpoints: helixSpectrumRead, helixSpectrumWrite, helixMode\nKeywords: spectrum tuner, FFT, frequency dial, harmonics sweep, waveform tuner",
+      "tags": [
+        "panel",
+        "spectrum-tuner",
+        "spectrum tuner",
+        "FFT",
+        "frequency dial",
+        "harmonics sweep",
+        "waveform tuner"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "external-integrations-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "sdk-integration-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "zen-artifact-integration-ladder"
+        },
+        {
+          "rel": "see-also",
+          "to": "integration-ladder"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-provenance"
+        },
+        {
+          "rel": "see-also",
+          "to": "provenance-protocol"
+        }
+      ],
+      "summary": "Panel surface for Spectrum Tuner.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/SpectrumTunerPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:6c9c07ef5690cbf33d9f599229da5a4bc13e582002f019ddf26c12d07c4c200b"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-vacuum-gap-heatmap",
+      "slug": "panel-vacuum-gap-heatmap",
+      "title": "Vacuum Gap Heatmap",
+      "excerpt": "Panel surface for Vacuum Gap Heatmap.",
+      "bodyMD": "Panel vacuum-gap-heatmap loaded from helix-core panels registry.\nComponent: client/src/components/VacuumGapHeatmap.tsx\nEndpoints: helixSweep\nKeywords: vacuum gap, Casimir gap, nm gap map, heatmap, gap stress",
+      "tags": [
+        "panel",
+        "vacuum-gap-heatmap",
+        "vacuum gap",
+        "Casimir gap",
+        "nm gap map",
+        "heatmap",
+        "gap stress"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-vacuum"
+        }
+      ],
+      "summary": "Panel surface for Vacuum Gap Heatmap.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/VacuumGapHeatmap.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:8d60cbf4bf8c7ec11b7499ff49076697fbf398009c6fdca3305231d2a44dc2ee"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-star-hydrostatic",
+      "slug": "panel-star-hydrostatic",
+      "title": "Hydrostatic Equilibrium (HR)",
+      "excerpt": "Panel surface for Hydrostatic Equilibrium (HR).",
+      "bodyMD": "Panel star-hydrostatic loaded from helix-core panels registry.\nComponent: client/src/pages/star-hydrostatic-panel.tsx\nEndpoints: none\nKeywords: HR map, Gamow window, potato threshold, polytrope, stellar ledger",
+      "tags": [
+        "panel",
+        "star-hydrostatic",
+        "HR map",
+        "Gamow window",
+        "potato threshold",
+        "polytrope",
+        "stellar ledger"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "potato-threshold"
+        },
+        {
+          "rel": "see-also",
+          "to": "stellar-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "stellar-ledger-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "stellar-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-solar-restoration-plan-stellar-ledger-stack"
+        }
+      ],
+      "summary": "Panel surface for Hydrostatic Equilibrium (HR).",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/star-hydrostatic-panel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d7e279c6971f794c4f0378b02e9c6d3e86cde4ceb15215df6788dfc0e65229f4"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-star-watcher",
+      "slug": "panel-star-watcher",
+      "title": "Star Watcher",
+      "excerpt": "Panel surface for Star Watcher.",
+      "bodyMD": "Panel star-watcher loaded from helix-core panels registry.\nComponent: client/src/pages/star-watcher-panel.tsx\nEndpoints: none\nKeywords: Solar feed, Coherence overlay, Motion metrics",
+      "tags": [
+        "panel",
+        "star-watcher",
+        "Solar feed",
+        "Coherence overlay",
+        "Motion metrics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Star Watcher.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/star-watcher-panel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:aeef349c058d84df544080b6458feb2782dc547eacfcf2198252298f506f0763"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-tokamak-sim",
+      "slug": "panel-tokamak-sim",
+      "title": "Tokamak Simulation",
+      "excerpt": "Panel surface for Tokamak Simulation.",
+      "bodyMD": "Panel tokamak-sim loaded from helix-core panels registry.\nComponent: client/src/components/TokamakSimulationPanel.tsx\nEndpoints: tokamakState, tokamakCommand\nKeywords: tokamak, sparc, plasma, coherence diagnostics, k-metrics, ridge tracking, precursor",
+      "tags": [
+        "panel",
+        "tokamak-sim",
+        "tokamak",
+        "sparc",
+        "plasma",
+        "coherence diagnostics",
+        "k-metrics",
+        "ridge tracking",
+        "precursor"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-tokamak"
+        },
+        {
+          "rel": "see-also",
+          "to": "tokamak-energy-field"
+        },
+        {
+          "rel": "see-also",
+          "to": "tokamak-synthetic-diagnostics"
+        },
+        {
+          "rel": "see-also",
+          "to": "tokamak-energy-adapter"
+        }
+      ],
+      "summary": "Panel surface for Tokamak Simulation.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/TokamakSimulationPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:07f3399aab6c7cf69a094f5166f1935c94d6b680c5ee0bb0b4a944307153da97"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-vacuum-gap-sweep",
+      "slug": "panel-vacuum-gap-sweep",
+      "title": "Vacuum Gap Sweep HUD",
+      "excerpt": "Panel surface for Vacuum Gap Sweep HUD.",
+      "bodyMD": "Panel vacuum-gap-sweep loaded from helix-core panels registry.\nComponent: client/src/components/VacuumGapSweepHUD.tsx\nEndpoints: helixSweep\nKeywords: gap sweep, delta gap, scan HUD, nm sweep, sweep HUD",
+      "tags": [
+        "panel",
+        "vacuum-gap-sweep",
+        "gap sweep",
+        "delta gap",
+        "scan HUD",
+        "nm sweep",
+        "sweep HUD"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Vacuum Gap Sweep HUD.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/VacuumGapSweepHUD.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:e8eb461ec5ca9d6f98a2309e4b477e566ba62d02147355756cb592463c4fc787"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-cavity-mechanism",
+      "slug": "panel-cavity-mechanism",
+      "title": "Cavity Mechanism",
+      "excerpt": "Panel surface for Cavity Mechanism.",
+      "bodyMD": "Panel cavity-mechanism loaded from helix-core panels registry.\nComponent: client/src/components/CavityMechanismPanel.tsx\nEndpoints: pipelineGet, helixMetrics\nKeywords: cavity frame, mechanism view, design layers, actuator layout, mechanism CAD",
+      "tags": [
+        "panel",
+        "cavity-mechanism",
+        "cavity frame",
+        "mechanism view",
+        "design layers",
+        "actuator layout",
+        "mechanism CAD"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-ledger-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-overview"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-pipeline-overview-curvature-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "solar-pipeline"
+        }
+      ],
+      "summary": "Panel surface for Cavity Mechanism.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CavityMechanismPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:5038d21151e808312e0f6718ee6eb3dfd35baa30bbb00d2ade472b4433655efe"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-fractional-coherence-rail",
+      "slug": "panel-fractional-coherence-rail",
+      "title": "Fractional Coherence Rail",
+      "excerpt": "Panel surface for Fractional Coherence Rail.",
+      "bodyMD": "Panel fractional-coherence-rail loaded from helix-core panels registry.\nComponent: client/src/components/FractionalCoherenceRail.tsx\nEndpoints: pipelineGet\nKeywords: fractional coherence, xi rail, coherence rail, phase rail, coherence band",
+      "tags": [
+        "panel",
+        "fractional-coherence-rail",
+        "fractional coherence",
+        "xi rail",
+        "coherence rail",
+        "phase rail",
+        "coherence band"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Fractional Coherence Rail.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/FractionalCoherenceRail.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:e5164972d807614527eb46d4a57f7cbc48a75d95af1e7d35f403ff0be3dd65e5"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-fractional-coherence-grid",
+      "slug": "panel-fractional-coherence-grid",
+      "title": "Fractional Coherence Grid",
+      "excerpt": "Panel surface for Fractional Coherence Grid.",
+      "bodyMD": "Panel fractional-coherence-grid loaded from helix-core panels registry.\nComponent: client/src/components/FractionalCoherenceGrid.tsx\nEndpoints: pipelineGet, helixMetrics\nKeywords: coherence grid, xi grid, fractional grid, phase lattice, coherence lattice",
+      "tags": [
+        "panel",
+        "fractional-coherence-grid",
+        "coherence grid",
+        "xi grid",
+        "fractional grid",
+        "phase lattice",
+        "coherence lattice"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Fractional Coherence Grid.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/FractionalCoherenceGrid.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:7e916dff0ecc8adcfff635726787a32d36eec92e5ffa075704cdf42fe33493ca"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-near-zero",
+      "slug": "panel-near-zero",
+      "title": "Near-Zero Widget",
+      "excerpt": "Panel surface for Near-Zero Widget.",
+      "bodyMD": "Panel near-zero loaded from helix-core panels registry.\nComponent: client/src/components/NearZeroWidget.tsx\nEndpoints: pipelineGet, helixMode\nKeywords: near zero widget, delta H, null detection, near-zero pocket, anomaly finder",
+      "tags": [
+        "panel",
+        "near-zero",
+        "near zero widget",
+        "delta H",
+        "null detection",
+        "near-zero pocket",
+        "anomaly finder"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Near-Zero Widget.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/NearZeroWidget.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:4b341685340d14b266e949a0924f2605fab5e6546737807985017677e19716af"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-direction-pad",
+      "slug": "panel-direction-pad",
+      "title": "Direction Pad",
+      "excerpt": "Panel surface for Direction Pad.",
+      "bodyMD": "Panel direction-pad loaded from helix-core panels registry.\nComponent: client/src/components/DirectionPad.tsx\nEndpoints: none\nKeywords: direction pad, flight director, vector pad, nav pad, pose nudge",
+      "tags": [
+        "panel",
+        "direction-pad",
+        "direction pad",
+        "flight director",
+        "vector pad",
+        "nav pad",
+        "pose nudge"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Direction Pad.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/DirectionPad.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:ecd5eecdbebec46d27e68ba0a7276d98c17db514ff83bff31f31ddaf776a031d"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-nav-system",
+      "slug": "panel-nav-system",
+      "title": "Solar Navigation",
+      "excerpt": "Panel surface for Solar Navigation.",
+      "bodyMD": "Panel nav-system loaded from helix-core panels registry.\nComponent: client/src/components/NavPageSection.tsx\nEndpoints: none\nKeywords: nav system, nav pose, waypoints, navigation hud, pose tracking",
+      "tags": [
+        "panel",
+        "nav-system",
+        "nav system",
+        "nav pose",
+        "waypoints",
+        "navigation hud",
+        "pose tracking"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-hud-nav"
+        }
+      ],
+      "summary": "Panel surface for Solar Navigation.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/NavPageSection.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:7787a001914673484958511ed2c49b3c66dc3fba928730f48b46c3ae423923f8"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-deepmix-solar",
+      "slug": "panel-deepmix-solar",
+      "title": "DeepMix Solar View",
+      "excerpt": "Panel surface for DeepMix Solar View.",
+      "bodyMD": "Panel deepmix-solar loaded from helix-core panels registry.\nComponent: client/src/components/DeepMixingSolarView.tsx\nEndpoints: none\nKeywords: deep mix solar, mixing bands, sector solver, solar telemetry, mix heuristics",
+      "tags": [
+        "panel",
+        "deepmix-solar",
+        "deep mix solar",
+        "mixing bands",
+        "sector solver",
+        "solar telemetry",
+        "mix heuristics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for DeepMix Solar View.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/DeepMixingSolarView.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:e7c6d3d0e6f8b2d7f42bb18b0f68c8207eb7838c0ee772b0348af231d8cea0a3"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-solar-globe",
+      "slug": "panel-solar-globe",
+      "title": "Solar Globe",
+      "excerpt": "Panel surface for Solar Globe.",
+      "bodyMD": "Panel solar-globe loaded from helix-core panels registry.\nComponent: client/src/components/SolarGlobePanel.tsx\nEndpoints: none\nKeywords: solar globe, synoptic globe, field lines, magnetogram, solar surface",
+      "tags": [
+        "panel",
+        "solar-globe",
+        "solar globe",
+        "synoptic globe",
+        "field lines",
+        "magnetogram",
+        "solar surface"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-solar-globe"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-constraint-packs"
+        },
+        {
+          "rel": "see-also",
+          "to": "noise-field-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "diffusion-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "constraint-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-analysis-loops-overview-noise-field-loop"
+        }
+      ],
+      "summary": "Panel surface for Solar Globe.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/SolarGlobePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:dd3b785991759eb6698070238f3e31c70ffbe2af394a2409c50d05f8526271eb"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-deepmix-sweetspot",
+      "slug": "panel-deepmix-sweetspot",
+      "title": "DeepMix Sweet Spot",
+      "excerpt": "Panel surface for DeepMix Sweet Spot.",
+      "bodyMD": "Panel deepmix-sweetspot loaded from helix-core panels registry.\nComponent: client/src/components/deepmix/DeepMixSweetSpot.tsx\nEndpoints: none\nKeywords: sweet spot, deep mix target, isoline, mix optimization, duty sweet spot",
+      "tags": [
+        "panel",
+        "deepmix-sweetspot",
+        "sweet spot",
+        "deep mix target",
+        "isoline",
+        "mix optimization",
+        "duty sweet spot"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for DeepMix Sweet Spot.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/deepmix/DeepMixSweetSpot.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:500cd3d52b33cb7d72a866d7c5e6f6de02c380941d1a4cb1e3055f3235345edd"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-deepmix-globe",
+      "slug": "panel-deepmix-globe",
+      "title": "DeepMix Globe",
+      "excerpt": "Panel surface for DeepMix Globe.",
+      "bodyMD": "Panel deepmix-globe loaded from helix-core panels registry.\nComponent: client/src/components/deepmix/DeepMixGlobePanel.tsx\nEndpoints: none\nKeywords: deep mix globe, mix field, global mix, deep mixing globe",
+      "tags": [
+        "panel",
+        "deepmix-globe",
+        "deep mix globe",
+        "mix field",
+        "global mix",
+        "deep mixing globe"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for DeepMix Globe.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/deepmix/DeepMixGlobePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:286b66f0b294a5ba5ba92df2e393081c89b3089508013afd041db9f6e7c996e9"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-alcubierre-viewer",
+      "slug": "panel-alcubierre-viewer",
+      "title": "Alcubierre Viewer",
+      "excerpt": "Panel surface for Alcubierre Viewer.",
+      "bodyMD": "Panel alcubierre-viewer loaded from helix-core panels registry.\nComponent: client/src/components/AlcubierrePanel.tsx\nEndpoints: pipelineGet, helixMetrics, helixDisplacement\nKeywords: Alcubierre metric, warp bubble, metric tensor, warp visualizer, bubble hull",
+      "tags": [
+        "panel",
+        "alcubierre-viewer",
+        "Alcubierre metric",
+        "warp bubble",
+        "metric tensor",
+        "warp visualizer",
+        "bubble hull"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "alcubierre-metric"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-warp-bubble"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-renderer-warp-bubble"
+        },
+        {
+          "rel": "see-also",
+          "to": "warp-bubble"
+        }
+      ],
+      "summary": "Panel surface for Alcubierre Viewer.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/AlcubierrePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:3f3b9b37d5f51c7584349ae0420d76db56260f9e9170b3db87ae7acdebba440f"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-shell-outline",
+      "slug": "panel-shell-outline",
+      "title": "Shell Outline Visualizer",
+      "excerpt": "Panel surface for Shell Outline Visualizer.",
+      "bodyMD": "Panel shell-outline loaded from helix-core panels registry.\nComponent: client/src/components/ShellOutlineVisualizer.tsx\nEndpoints: pipelineGet\nKeywords: shell outline, hull trace, hull shell, outline view, needle shell",
+      "tags": [
+        "panel",
+        "shell-outline",
+        "shell outline",
+        "hull trace",
+        "hull shell",
+        "outline view",
+        "needle shell"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Shell Outline Visualizer.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/ShellOutlineVisualizer.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:860d2b35b12458ba6b0df33b9dca903811b92274d731fdc81d8705a3268f66df"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-model-silhouette",
+      "slug": "panel-model-silhouette",
+      "title": "Silhouette Stretch",
+      "excerpt": "Panel surface for Silhouette Stretch.",
+      "bodyMD": "Panel model-silhouette loaded from helix-core panels registry.\nComponent: client/src/components/ModelSilhouettePanel.tsx\nEndpoints: none\nKeywords: glb, bbox, ellipsoid, scale, axes, grid",
+      "tags": [
+        "panel",
+        "model-silhouette",
+        "glb",
+        "bbox",
+        "ellipsoid",
+        "scale",
+        "axes",
+        "grid"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-ratio-guardrail"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-ts-ratio-guardrail-casimir-tile-mechanism"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-casimir-grid"
+        }
+      ],
+      "summary": "Panel surface for Silhouette Stretch.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/ModelSilhouettePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:438fadc25f7721389f6a1c38035f94de7684d00e10b7498e5de6d1748c0f48e6"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-hull-metrics-vis",
+      "slug": "panel-hull-metrics-vis",
+      "title": "Hull Metrics Vis",
+      "excerpt": "Panel surface for Hull Metrics Vis.",
+      "bodyMD": "Panel hull-metrics-vis loaded from helix-core panels registry.\nComponent: client/src/components/HullMetricsVisPanel.tsx\nEndpoints: none\nKeywords: hull metrics, natario, alcubierre, glb preview, wireframe",
+      "tags": [
+        "panel",
+        "hull-metrics-vis",
+        "hull metrics",
+        "natario",
+        "alcubierre",
+        "glb preview",
+        "wireframe"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-alcubierre"
+        },
+        {
+          "rel": "see-also",
+          "to": "alcubierre-metric"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-natario-metric"
+        },
+        {
+          "rel": "see-also",
+          "to": "natario-metric-engine"
+        },
+        {
+          "rel": "see-also",
+          "to": "natario-zero-expansion"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-natario-bridge"
+        }
+      ],
+      "summary": "Panel surface for Hull Metrics Vis.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/HullMetricsVisPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:ed474de14727f3b9412dd801fdc278f00175671b64735e73713f9c3de52870d9"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-shift-vector",
+      "slug": "panel-shift-vector",
+      "title": "Shift Vector Panel",
+      "excerpt": "Panel surface for Shift Vector Panel.",
+      "bodyMD": "Panel shift-vector loaded from helix-core panels registry.\nComponent: client/src/components/ShiftVectorPanel.tsx\nEndpoints: pipelineGet, helixMetrics\nKeywords: shift vector, beta^i, lapse shift, ADM shift, beta_i",
+      "tags": [
+        "panel",
+        "shift-vector",
+        "shift vector",
+        "beta^i",
+        "lapse shift",
+        "ADM shift",
+        "beta_i"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-shift-vector"
+        },
+        {
+          "rel": "see-also",
+          "to": "shift-vector-expansion-scalar"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-natario-metric"
+        },
+        {
+          "rel": "see-also",
+          "to": "hull-materials"
+        },
+        {
+          "rel": "see-also",
+          "to": "natario-metric-engine"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-tree"
+        }
+      ],
+      "summary": "Panel surface for Shift Vector Panel.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/ShiftVectorPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:0584207e65eceed6f32bd6f6313dbc32f2f3e3c5eb36e846958ac08da498818a"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-curvature-slice",
+      "slug": "panel-curvature-slice",
+      "title": "Equatorial Curvature Slice",
+      "excerpt": "Panel surface for Equatorial Curvature Slice.",
+      "bodyMD": "Panel curvature-slice loaded from helix-core panels registry.\nComponent: client/src/components/CurvatureSlicePanel.tsx\nEndpoints: pipelineGet, helixMetrics\nKeywords: curvature slice, R_ab, Ricci slice, scalar curvature, curvature cut",
+      "tags": [
+        "panel",
+        "curvature-slice",
+        "curvature slice",
+        "R_ab",
+        "Ricci slice",
+        "scalar curvature",
+        "curvature cut"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-curvature-slices"
+        }
+      ],
+      "summary": "Panel surface for Equatorial Curvature Slice.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CurvatureSlicePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:6065fa9695cef41ff93a76906869e1906ac189d7c7f4df650d850612b420a960"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-time-dilation-lattice",
+      "slug": "panel-time-dilation-lattice",
+      "title": "Time Dilation Lattice",
+      "excerpt": "Panel surface for Time Dilation Lattice.",
+      "bodyMD": "Panel time-dilation-lattice loaded from helix-core panels registry.\nComponent: client/src/components/TimeDilationLatticePanel.tsx\nEndpoints: pipelineGet\nKeywords: time dilation, spacetime lattice, clock rate, alpha, grid warp",
+      "tags": [
+        "panel",
+        "time-dilation-lattice",
+        "time dilation",
+        "spacetime lattice",
+        "clock rate",
+        "alpha",
+        "grid warp"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-time-dilation"
+        }
+      ],
+      "summary": "Panel surface for Time Dilation Lattice.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/TimeDilationLatticePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d7ac539257fca79b795d7ac0c88b189438d021681430774fc0df3a6998af14df"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-curvature-ledger",
+      "slug": "panel-curvature-ledger",
+      "title": "Curvature Ledger",
+      "excerpt": "Panel surface for Curvature Ledger.",
+      "bodyMD": "Panel curvature-ledger loaded from helix-core panels registry.\nComponent: client/src/components/CurvatureLedgerPanel.tsx\nEndpoints: pipelineGet\nKeywords: curvature ledger, Weyl bands, tensor ledger, Riemann register, ledger trace",
+      "tags": [
+        "panel",
+        "curvature-ledger",
+        "curvature ledger",
+        "Weyl bands",
+        "tensor ledger",
+        "Riemann register",
+        "ledger trace"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "curvature-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-pipeline-overview-curvature-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-curvature-ledger"
+        }
+      ],
+      "summary": "Panel surface for Curvature Ledger.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CurvatureLedgerPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:9f3e1028952b1a53795ef8f11ac40d517e8ff00fc2c351799e368aad9f30b0e0"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-operational-mode",
+      "slug": "panel-operational-mode",
+      "title": "Operational Mode Switch",
+      "excerpt": "Panel surface for Operational Mode Switch.",
+      "bodyMD": "Panel operational-mode loaded from helix-core panels registry.\nComponent: client/src/components/OperationalModePanel.tsx\nEndpoints: pipelineGet, helixMode\nKeywords: operational mode, station vs desktop, mode toggle, profile switch, mission view",
+      "tags": [
+        "panel",
+        "operational-mode",
+        "operational mode",
+        "station vs desktop",
+        "mode toggle",
+        "profile switch",
+        "mission view"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-constraint-packs"
+        },
+        {
+          "rel": "see-also",
+          "to": "noise-field-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "diffusion-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "constraint-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-analysis-loops-overview-noise-field-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-guard-consolidation"
+        }
+      ],
+      "summary": "Panel surface for Operational Mode Switch.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/OperationalModePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:470b4369689398330a64c4a99b8770c69ed8c2cc248eb1f56cffb56c208b160d"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-casimir-tile-grid",
+      "slug": "panel-casimir-tile-grid",
+      "title": "Casimir Tile Grid",
+      "excerpt": "Panel surface for Casimir Tile Grid.",
+      "bodyMD": "Panel casimir-tile-grid loaded from helix-core panels registry.\nComponent: client/src/components/CasimirTileGridPanel.tsx\nEndpoints: pipelineGet, helixSnapshot\nKeywords: Casimir tile grid, tile spectrum, grid view, tile ledger, Casimir tiles",
+      "tags": [
+        "panel",
+        "casimir-tile-grid",
+        "Casimir tile grid",
+        "tile spectrum",
+        "grid view",
+        "tile ledger",
+        "Casimir tiles"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-casimir-grid"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tiles-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tiles-overview"
+        }
+      ],
+      "summary": "Panel surface for Casimir Tile Grid.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CasimirTileGridPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:6915d8cb497b0848291198ee487f37b766f0790c7c1292f2c87c87616d4186d8"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-light-speed-strobe",
+      "slug": "panel-light-speed-strobe",
+      "title": "Light-Speed Strobe Scale",
+      "excerpt": "Panel surface for Light-Speed Strobe Scale.",
+      "bodyMD": "Panel light-speed-strobe loaded from helix-core panels registry.\nComponent: client/src/components/LightSpeedStrobeScale.tsx\nEndpoints: pipelineGet, helixMetrics\nKeywords: light speed strobe, c strobe, strobes, speed scale, strobe ladder",
+      "tags": [
+        "panel",
+        "light-speed-strobe",
+        "light speed strobe",
+        "c strobe",
+        "strobes",
+        "speed scale",
+        "strobe ladder"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "sector-strobes-duty-cycle"
+        }
+      ],
+      "summary": "Panel surface for Light-Speed Strobe Scale.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/LightSpeedStrobeScale.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:20388c7cf1c91ecf4a99a8e49cce563319396e42efe792d3e9f30c91ac6f27b8"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-speed-capability",
+      "slug": "panel-speed-capability",
+      "title": "Speed Capability",
+      "excerpt": "Panel surface for Speed Capability.",
+      "bodyMD": "Panel speed-capability loaded from helix-core panels registry.\nComponent: client/src/components/SpeedCapabilityPanel.tsx\nEndpoints: pipelineGet\nKeywords: speed capability, beta, v/c, translation speed, power envelope, mode envelope",
+      "tags": [
+        "panel",
+        "speed-capability",
+        "speed capability",
+        "beta",
+        "v/c",
+        "translation speed",
+        "power envelope",
+        "mode envelope"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-refinery"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-trace-memory"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-evaluation"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-chat-sessions"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-contributions"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-constraint-packs"
+        }
+      ],
+      "summary": "Panel surface for Speed Capability.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/SpeedCapabilityPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:f26217dd0735af4cd39356fc71c279a2c298fb34fd21c3798968022554a5c681"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-helix-casimir-amplifier",
+      "slug": "panel-helix-casimir-amplifier",
+      "title": "Helix Casimir Amplifier",
+      "excerpt": "Panel surface for Helix Casimir Amplifier.",
+      "bodyMD": "Panel helix-casimir-amplifier loaded from helix-core panels registry.\nComponent: client/src/components/HelixCasimirAmplifier.tsx\nEndpoints: pipelineGet, helixMetrics, helixDisplacement\nKeywords: Helix amplifier, Casimir amplifier, gain stack, amplifier tile, Casimir gain",
+      "tags": [
+        "panel",
+        "helix-casimir-amplifier",
+        "Helix amplifier",
+        "Casimir amplifier",
+        "gain stack",
+        "amplifier tile",
+        "Casimir gain"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-casimir-amplifier"
+        }
+      ],
+      "summary": "Panel surface for Helix Casimir Amplifier.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/HelixCasimirAmplifier.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:f01d864e50ebb63f96dbfcdcc0930726e7e2c016eb1e4dd615891466c825d1de"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-resonance-scheduler",
+      "slug": "panel-resonance-scheduler",
+      "title": "Resonance Scheduler",
+      "excerpt": "Panel surface for Resonance Scheduler.",
+      "bodyMD": "Panel resonance-scheduler loaded from helix-core panels registry.\nComponent: client/src/components/ResonanceSchedulerTile.tsx\nEndpoints: pipelineGet\nKeywords: resonance scheduler, duty planner, phase scheduler, auto duty, resonance bands",
+      "tags": [
+        "panel",
+        "resonance-scheduler",
+        "resonance scheduler",
+        "duty planner",
+        "phase scheduler",
+        "auto duty",
+        "resonance bands"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "phase-scheduler"
+        }
+      ],
+      "summary": "Panel surface for Resonance Scheduler.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/ResonanceSchedulerTile.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:76c3a40c0e47981083f616b74b9746707efb2336ee04b52d611610b7c0a7f61c"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-trip-player",
+      "slug": "panel-trip-player",
+      "title": "Trip Player",
+      "excerpt": "Panel surface for Trip Player.",
+      "bodyMD": "Panel trip-player loaded from helix-core panels registry.\nComponent: client/src/components/TripPlayer.tsx\nEndpoints: none\nKeywords: trip player, timeline playback, recording, session replay, trip log",
+      "tags": [
+        "panel",
+        "trip-player",
+        "trip player",
+        "timeline playback",
+        "recording",
+        "session replay",
+        "trip log"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-constraint-packs"
+        },
+        {
+          "rel": "see-also",
+          "to": "noise-field-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "diffusion-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "constraint-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-analysis-loops-overview-noise-field-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-guard-consolidation"
+        }
+      ],
+      "summary": "Panel surface for Trip Player.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/TripPlayer.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:19009909b4d98a17d9ee606400b4057239b50f5399503f3088898b9efbd3f161"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-fuel-gauge",
+      "slug": "panel-fuel-gauge",
+      "title": "Fuel Gauge",
+      "excerpt": "Panel surface for Fuel Gauge.",
+      "bodyMD": "Panel fuel-gauge loaded from helix-core panels registry.\nComponent: client/src/components/FuelGauge.tsx\nEndpoints: pipelineGet, helixMetrics\nKeywords: fuel gauge, drive budget, burn rate, energy reserve, fuel burn",
+      "tags": [
+        "panel",
+        "fuel-gauge",
+        "fuel gauge",
+        "drive budget",
+        "burn rate",
+        "energy reserve",
+        "fuel burn"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "schema-confidence-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "debate-telemetry"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-telemetry-tree"
+        }
+      ],
+      "summary": "Panel surface for Fuel Gauge.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/FuelGauge.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:a1fa44a3fffe2a2e502ee06f9b34c99d66b70ee92452e3554e9a6ee1ea61c527"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-vacuum-contract",
+      "slug": "panel-vacuum-contract",
+      "title": "Vacuum Contract",
+      "excerpt": "Panel surface for Vacuum Contract.",
+      "bodyMD": "Panel vacuum-contract loaded from helix-core panels registry.\nComponent: client/src/components/VacuumContractBadge.tsx\nEndpoints: pipelineGet\nKeywords: vacuum contract, negative energy covenant, contract badge, Casimir promise, vacuum pledge",
+      "tags": [
+        "panel",
+        "vacuum-contract",
+        "vacuum contract",
+        "negative energy covenant",
+        "contract badge",
+        "Casimir promise",
+        "vacuum pledge"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-adapter"
+        },
+        {
+          "rel": "see-also",
+          "to": "uncertainty-data-contracts"
+        },
+        {
+          "rel": "see-also",
+          "to": "debate-contracts"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-debate-core-debate-contracts"
+        },
+        {
+          "rel": "see-also",
+          "to": "llm-runtime-contracts"
+        }
+      ],
+      "summary": "Panel surface for Vacuum Contract.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/VacuumContractBadge.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:1a93eaa8c5e0370c8b9b77b96358b07b3ac330538a9b680ff3c7e9ce063ae09c"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-metric-pocket",
+      "slug": "panel-metric-pocket",
+      "title": "Metric Amplification Pocket",
+      "excerpt": "Panel surface for Metric Amplification Pocket.",
+      "bodyMD": "Panel metric-pocket loaded from helix-core panels registry.\nComponent: client/src/components/MetricAmplificationPocket.tsx\nEndpoints: pipelineGet, helixMetrics\nKeywords: metric pocket, amplification pocket, tensor pocket, metric gain, metric amplifier",
+      "tags": [
+        "panel",
+        "metric-pocket",
+        "metric pocket",
+        "amplification pocket",
+        "tensor pocket",
+        "metric gain",
+        "metric amplifier"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "warp-control-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "active-fraction"
+        }
+      ],
+      "summary": "Panel surface for Metric Amplification Pocket.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/MetricAmplificationPocket.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:a0e8280cfb8063a67f049b3b9086dc99f72de91dbb5e011baa604445c1518240"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-halobank",
+      "slug": "panel-halobank",
+      "title": "HaloBank Timeline",
+      "excerpt": "Panel surface for HaloBank Timeline.",
+      "bodyMD": "Panel halobank loaded from helix-core panels registry.\nComponent: client/src/components/HalobankPanel.tsx\nEndpoints: GET /halobank\nKeywords: HaloBank, timeline, halo ledger, bank history, halo archive",
+      "tags": [
+        "panel",
+        "halobank",
+        "HaloBank",
+        "timeline",
+        "halo ledger",
+        "bank history",
+        "halo archive"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "halobank"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-halobank"
+        }
+      ],
+      "summary": "Panel surface for HaloBank Timeline.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/HalobankPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:52a65e35e931733731b0845308c72e0c69d0f1f45945ea2823b4d9a78ada9b36"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-qi-widget",
+      "slug": "panel-qi-widget",
+      "title": "Qi Widget",
+      "excerpt": "Panel surface for Qi Widget.",
+      "bodyMD": "Panel qi-widget loaded from helix-core panels registry.\nComponent: client/src/components/QiWidget.tsx\nEndpoints: pipelineGet\nKeywords: QI widget, quantum inequality, Ford-Roman, QI bounds, rho_min",
+      "tags": [
+        "panel",
+        "qi-widget",
+        "QI widget",
+        "quantum inequality",
+        "Ford-Roman",
+        "QI bounds",
+        "rho_min"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-bounds"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-quantum-inequality"
+        },
+        {
+          "rel": "see-also",
+          "to": "uncertainty-quantum-inequality"
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-bounds-engine"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-proxy"
+        },
+        {
+          "rel": "see-also",
+          "to": "schema-confidence-stack"
+        }
+      ],
+      "summary": "Panel surface for Qi Widget.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/QiWidget.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:81a39554a05f7af500035fa46dd9d64c933bf2818c54ef2122425be66366e0eb"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-qi-auto-tuner",
+      "slug": "panel-qi-auto-tuner",
+      "title": "QI Auto-Tuner",
+      "excerpt": "Panel surface for QI Auto-Tuner.",
+      "bodyMD": "Panel qi-auto-tuner loaded from helix-core panels registry.\nComponent: client/src/components/QiAutoTunerPanel.tsx\nEndpoints: pipelineGet, pipelineUpdate\nKeywords: QI auto tuner, phase auto, QI scheduler, auto duty, quantum inequality tuner",
+      "tags": [
+        "panel",
+        "qi-auto-tuner",
+        "QI auto tuner",
+        "phase auto",
+        "QI scheduler",
+        "auto duty",
+        "quantum inequality tuner"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for QI Auto-Tuner.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/QiAutoTunerPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d1170bc9afb5b6c1d9d61b4965ef35370c83bce853cb6306aaace8457018e7fc"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-sector-legend",
+      "slug": "panel-sector-legend",
+      "title": "Sector Legend",
+      "excerpt": "Panel surface for Sector Legend.",
+      "bodyMD": "Panel sector-legend loaded from helix-core panels registry.\nComponent: client/src/components/SectorLegend.tsx\nEndpoints: none\nKeywords: sector legend, color legend, sector key, legend ring, sector palette",
+      "tags": [
+        "panel",
+        "sector-legend",
+        "sector legend",
+        "color legend",
+        "sector key",
+        "legend ring",
+        "sector palette"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Sector Legend.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/SectorLegend.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:07e7059a9586bf3152cf1155e0dfd56ba2ff5b87e1774b3b7826380b0d501e3a"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-sector-roles",
+      "slug": "panel-sector-roles",
+      "title": "Sector Roles HUD",
+      "excerpt": "Panel surface for Sector Roles HUD.",
+      "bodyMD": "Panel sector-roles loaded from helix-core panels registry.\nComponent: client/src/components/SectorRolesHud.tsx\nEndpoints: pipelineGet\nKeywords: sector roles, sector HUD, role badges, sector overlay, role legend",
+      "tags": [
+        "panel",
+        "sector-roles",
+        "sector roles",
+        "sector HUD",
+        "role badges",
+        "sector overlay",
+        "role legend"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-hud-sector"
+        }
+      ],
+      "summary": "Panel surface for Sector Roles HUD.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/SectorRolesHud.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:2ed492dabe1c6c4073a0c0c4f19ea1acbd0e834c0a2c08f89bd202a7125a6525"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-sweep-replay",
+      "slug": "panel-sweep-replay",
+      "title": "Sweep Replay Controls",
+      "excerpt": "Panel surface for Sweep Replay Controls.",
+      "bodyMD": "Panel sweep-replay loaded from helix-core panels registry.\nComponent: client/src/components/SweepReplayControls.tsx\nEndpoints: helixSweep\nKeywords: sweep replay, sweep telemetry, recorded sweep, sweep log, sweep playback",
+      "tags": [
+        "panel",
+        "sweep-replay",
+        "sweep replay",
+        "sweep telemetry",
+        "recorded sweep",
+        "sweep log",
+        "sweep playback"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Sweep Replay Controls.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/SweepReplayControls.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d0676004177ad240ecf14a6e3363ade5a17e349ea2f49d2c504d542c0b347a57"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-hull-status",
+      "slug": "panel-hull-status",
+      "title": "Runtime Ops",
+      "excerpt": "Panel surface for Runtime Ops.",
+      "bodyMD": "Panel hull-status loaded from helix-core panels registry.\nComponent: client/src/components/hull/RuntimeOps.tsx\nEndpoints: none\nKeywords: runtime ops, plan b, runtime policy, endpoint guard, queue telemetry",
+      "tags": [
+        "panel",
+        "hull-status",
+        "runtime ops",
+        "plan b",
+        "runtime policy",
+        "endpoint guard",
+        "queue telemetry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-solar-restoration-plan-deep-mixing-plan"
+        },
+        {
+          "rel": "see-also",
+          "to": "schema-confidence-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "debate-telemetry"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-telemetry-tree"
+        }
+      ],
+      "summary": "Panel surface for Runtime Ops.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/hull/RuntimeOps.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:3f12fbb9bd6e46062690bc58468b8e8c2a0d2771e03daf0b763c611cd1738963"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-agi-debate-view",
+      "slug": "panel-agi-debate-view",
+      "title": "Debate View",
+      "excerpt": "Panel surface for Debate View.",
+      "bodyMD": "Panel agi-debate-view loaded from helix-core panels registry.\nComponent: client/src/components/agi/DebateView.tsx\nEndpoints: none\nKeywords: AGI debate, debate SSE, argument stream, multi agent debate, debate dashboard",
+      "tags": [
+        "panel",
+        "agi-debate-view",
+        "AGI debate",
+        "debate SSE",
+        "argument stream",
+        "multi agent debate",
+        "debate dashboard"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Debate View.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/agi/DebateView.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:1014e0f3a3b3213ddf02a61d461b45baf74b28dcb60ff2472edbfe71b349ffc1"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-agi-essence-console",
+      "slug": "panel-agi-essence-console",
+      "title": "Essence Console",
+      "excerpt": "Panel surface for Essence Console.",
+      "bodyMD": "Panel agi-essence-console loaded from helix-core panels registry.\nComponent: client/src/components/agi/essence.tsx\nEndpoints: POST /api/agi/plan, POST /api/agi/execute, GET /api/agi/tools/logs/stream\nKeywords: Essence console, AGI console, plan execute, tools logs, command console",
+      "tags": [
+        "panel",
+        "agi-essence-console",
+        "Essence console",
+        "AGI console",
+        "plan execute",
+        "tools logs",
+        "command console"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Essence Console.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/agi/essence.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:7ef356e013fd64485bc1ca58409fd24cdd5df159dafa11cda0eb734815e3aaa5"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-star-coherence",
+      "slug": "panel-star-coherence",
+      "title": "Star Coherence Governor",
+      "excerpt": "Panel surface for Star Coherence Governor.",
+      "bodyMD": "Panel star-coherence loaded from helix-core panels registry.\nComponent: client/src/components/agi/StarCoherencePanel.tsx\nEndpoints: GET /api/agi/star/telemetry\nKeywords: star coherence, coherence governor, tool budget, collapse policy, telemetry",
+      "tags": [
+        "panel",
+        "star-coherence",
+        "star coherence",
+        "coherence governor",
+        "tool budget",
+        "collapse policy",
+        "telemetry"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "coherence-governor"
+        },
+        {
+          "rel": "see-also",
+          "to": "uncertainty-coherence-policy"
+        },
+        {
+          "rel": "see-also",
+          "to": "schema-confidence-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "debate-telemetry"
+        },
+        {
+          "rel": "see-also",
+          "to": "hardware-telemetry-tree"
+        }
+      ],
+      "summary": "Panel surface for Star Coherence Governor.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/agi/StarCoherencePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:a2d4cacf2c38bdaedc23576706969538bcf3746a0dbc151f84b33f01e608099a"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-pipeline-proof",
+      "slug": "panel-pipeline-proof",
+      "title": "Pipeline Proof",
+      "excerpt": "Panel surface for Pipeline Proof.",
+      "bodyMD": "Panel pipeline-proof loaded from helix-core panels registry.\nComponent: client/src/components/PipelineProofPanel.tsx\nEndpoints: GET /api/agi/pipeline/status, GET /api/agi/pipeline/last-plan-debug\nKeywords: warp, pipeline, grounding, proof, resonance",
+      "tags": [
+        "panel",
+        "pipeline-proof",
+        "warp",
+        "pipeline",
+        "grounding",
+        "proof",
+        "resonance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-planner-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-agi-plan-execute-agi-planner-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "resonance-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "code-lattice-core"
+        },
+        {
+          "rel": "see-also",
+          "to": "code-lattice-schema"
+        },
+        {
+          "rel": "see-also",
+          "to": "resonance-runtime"
+        }
+      ],
+      "summary": "Panel surface for Pipeline Proof.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/PipelineProofPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:ee3c3b8246ebd820aae9ee3128083133f766bb30025c9ad5b4e0402197c02779"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-collapse-monitor",
+      "slug": "panel-collapse-monitor",
+      "title": "Collapse Watch",
+      "excerpt": "Panel surface for Collapse Watch.",
+      "bodyMD": "Panel collapse-monitor loaded from helix-core panels registry.\nComponent: client/src/components/agi/CollapseWatcherPanel.tsx\nEndpoints: GET /api/agi/star/telemetry\nKeywords: collapse pressure, collapse watcher, coherence gate, debate collapse, star collapse",
+      "tags": [
+        "panel",
+        "collapse-monitor",
+        "collapse pressure",
+        "collapse watcher",
+        "coherence gate",
+        "debate collapse",
+        "star collapse"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Collapse Watch.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/agi/CollapseWatcherPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:16a87bbae638bc54c37e6a2e77731155064d5566d17dac83fd670b753a28ac27"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-collapse-benchmark-hud",
+      "slug": "panel-collapse-benchmark-hud",
+      "title": "Collapse Benchmark HUD",
+      "excerpt": "Panel surface for Collapse Benchmark HUD.",
+      "bodyMD": "Panel collapse-benchmark-hud loaded from helix-core panels registry.\nComponent: client/src/components/CollapseBenchmarkHUDPanel.tsx\nEndpoints: POST /api/benchmarks/collapse\nKeywords: collapse benchmark, tau, L_present, kappa, lattice hash, relativity",
+      "tags": [
+        "panel",
+        "collapse-benchmark-hud",
+        "collapse benchmark",
+        "tau",
+        "L_present",
+        "kappa",
+        "lattice hash",
+        "relativity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "collapse-benchmark-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "binding-collapse-benchmark"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-hud-collapse"
+        },
+        {
+          "rel": "see-also",
+          "to": "uncertainty-collapse-benchmark"
+        },
+        {
+          "rel": "see-also",
+          "to": "kappa-proxy"
+        }
+      ],
+      "summary": "Panel surface for Collapse Benchmark HUD.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/CollapseBenchmarkHUDPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:52783116b34dd16005cdf3b52789e3b7e4b87ebb9772902cfc3c733daa7586b9"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-agi-task-history",
+      "slug": "panel-agi-task-history",
+      "title": "Task History",
+      "excerpt": "Panel surface for Task History.",
+      "bodyMD": "Panel agi-task-history loaded from helix-core panels registry.\nComponent: client/src/components/agi/TaskHistoryPanel.tsx\nEndpoints: none\nKeywords: task history, AGI trace, task log, history queue, trace timeline",
+      "tags": [
+        "panel",
+        "agi-task-history",
+        "task history",
+        "AGI trace",
+        "task log",
+        "history queue",
+        "trace timeline"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Task History.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/agi/TaskHistoryPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:532196b6cc672c0246e35d5bd9746b37391f59714d6ad049716ae6b354749444"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-helix-noise-gens",
+      "slug": "panel-helix-noise-gens",
+      "title": "Noise Gens",
+      "excerpt": "Panel surface for Noise Gens.",
+      "bodyMD": "Panel helix-noise-gens loaded from helix-core panels registry.\nComponent: client/src/pages/helix-noise-gens.tsx\nEndpoints: GET /api/noise-gens/originals, GET /api/noise-gens/generations, GET /api/noise-gens/moods\nKeywords: noise gen, noisegens, cover, render plan, stems, atoms, moods",
+      "tags": [
+        "panel",
+        "helix-noise-gens",
+        "noise gen",
+        "noisegens",
+        "cover",
+        "render plan",
+        "stems",
+        "atoms",
+        "moods"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-noise-gen"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-noise-gens"
+        },
+        {
+          "rel": "see-also",
+          "to": "coverage-gate"
+        },
+        {
+          "rel": "see-also",
+          "to": "civic-governance-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "interbeing-systems"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-integrity-protocols-stack-civic-governance-stack"
+        }
+      ],
+      "summary": "Panel surface for Noise Gens.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/pages/helix-noise-gens.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:8d700c34404fd8fd41d8fedb2b6ecae0730736355810d38a5dceed842607c7a0"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-constraint-pack-policy",
+      "slug": "panel-constraint-pack-policy",
+      "title": "Constraint Pack Policies",
+      "excerpt": "Panel surface for Constraint Pack Policies.",
+      "bodyMD": "Panel constraint-pack-policy loaded from helix-core panels registry.\nComponent: client/src/components/agi/ConstraintPackPolicyPanel.tsx\nEndpoints: GET /api/agi/constraint-packs, GET /api/agi/constraint-packs/policies, POST /api/agi/constraint-packs/policies\nKeywords: constraint packs, policy profile, budget overrides, thresholds, pack governance",
+      "tags": [
+        "panel",
+        "constraint-pack-policy",
+        "constraint packs",
+        "policy profile",
+        "budget overrides",
+        "thresholds",
+        "pack governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-constraint-packs"
+        },
+        {
+          "rel": "see-also",
+          "to": "constraint-packs"
+        },
+        {
+          "rel": "see-also",
+          "to": "deep-mixing-autopilot"
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-autoscale"
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-autothrottle"
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-autoscale"
+        }
+      ],
+      "summary": "Panel surface for Constraint Pack Policies.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/agi/ConstraintPackPolicyPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:33f2aa26d4069b1e546ba3da7706362ef4feab2ad095b723e9d01cd17524e8b7"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-agi-contribution-workbench",
+      "slug": "panel-agi-contribution-workbench",
+      "title": "Contribution Workbench",
+      "excerpt": "Panel surface for Contribution Workbench.",
+      "bodyMD": "Panel agi-contribution-workbench loaded from helix-core panels registry.\nComponent: client/src/components/agi/ContributionWorkbenchPanel.tsx\nEndpoints: GET /api/agi/contributions/drafts, POST /api/agi/contributions/ingest, POST /api/agi/contributions/drafts/:id/verify, POST /api/agi/contributions/drafts/:id/receipt, GET /api/agi/contributions/receipts, GET /api/agi/contributions/receipts/:id/disputes, POST /api/agi/contributions/receipts/:id/disputes, POST /api/agi/contributions/disputes/:id/resolve, POST /api/agi/contributions/receipts/:id/review, POST /api/agi/contributions/receipts/:id/mint, POST /api/agi/contributions/receipts/:id/revoke\nKeywords: contribution, receipt, VCU, review queue, verification, evidence",
+      "tags": [
+        "panel",
+        "agi-contribution-workbench",
+        "contribution",
+        "receipt",
+        "VCU",
+        "review queue",
+        "verification",
+        "evidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-contributions"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-constraint-packs"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tiles-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tile-schematic-roadmap"
+        },
+        {
+          "rel": "see-also",
+          "to": "certainty-motivation"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-certainty-motivation-platonic-reasoning-bridge"
+        }
+      ],
+      "summary": "Panel surface for Contribution Workbench.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/agi/ContributionWorkbenchPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:dde72fc9354650d017cd1b5062fd302b942e08cd6d6d1a4494012f980f5d3606"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-remove-bg-edges",
+      "slug": "panel-remove-bg-edges",
+      "title": "PNG Edge Cutter",
+      "excerpt": "Panel surface for PNG Edge Cutter.",
+      "bodyMD": "Panel remove-bg-edges loaded from helix-core panels registry.\nComponent: client/src/components/RemoveBgEdgesPanel.tsx\nEndpoints: none\nKeywords: background removal, png alpha, canny, grabcut, opencv, mask",
+      "tags": [
+        "panel",
+        "remove-bg-edges",
+        "background removal",
+        "png alpha",
+        "canny",
+        "grabcut",
+        "opencv",
+        "mask"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "agi-constraint-packs"
+        },
+        {
+          "rel": "see-also",
+          "to": "noise-field-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "diffusion-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "constraint-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-analysis-loops-overview-noise-field-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-guard-consolidation"
+        }
+      ],
+      "summary": "Panel surface for PNG Edge Cutter.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/RemoveBgEdgesPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:9ffb1cb2b8bf361fcaaf150e51e457d8cfe7de818f45989805982ace5ad78a42"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-dresscode",
+      "slug": "panel-dresscode",
+      "title": "Dresscode Drafting",
+      "excerpt": "Panel surface for Dresscode Drafting.",
+      "bodyMD": "Panel dresscode loaded from helix-core panels registry.\nComponent: client/src/components/essence/DresscodePanel.tsx\nEndpoints: none\nKeywords: dresscode, pattern, draft, garment, svg, grid, clip mask",
+      "tags": [
+        "panel",
+        "dresscode",
+        "pattern",
+        "draft",
+        "garment",
+        "svg",
+        "grid",
+        "clip mask"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-casimir-grid"
+        }
+      ],
+      "summary": "Panel surface for Dresscode Drafting.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/essence/DresscodePanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d932d01b2148e71fa29bad3598699388615087a831cb9e0c5604f76b566eee2e"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-stellar-lsr",
+      "slug": "panel-stellar-lsr",
+      "title": "Stellar LSR Viewer",
+      "excerpt": "Panel surface for Stellar LSR Viewer.",
+      "bodyMD": "Panel stellar-lsr loaded from helix-core panels registry.\nComponent: client/src/components/StellarLsrPanel.tsx\nEndpoints: GET /api/stellar/local-rest, GET /api/stellar/local-rest/stream\nKeywords: stars, lsr, local standard of rest, catalog, nav, stellar",
+      "tags": [
+        "panel",
+        "stellar-lsr",
+        "stars",
+        "lsr",
+        "local standard of rest",
+        "catalog",
+        "nav",
+        "stellar"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "stellar-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "stellar-restoration-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "stellar-structure-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "stellar-evolution-stack"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-panel-stellar-lsr"
+        },
+        {
+          "rel": "see-also",
+          "to": "ui-hud-nav"
+        }
+      ],
+      "summary": "Panel surface for Stellar LSR Viewer.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/StellarLsrPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:a99a58febc667588ff3b8aeec234030fbe48b3444ff66576b8984eebd21d8b9e"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "panel-essence-proposals",
+      "slug": "panel-essence-proposals",
+      "title": "Essence Proposals",
+      "excerpt": "Panel surface for Essence Proposals.",
+      "bodyMD": "Panel essence-proposals loaded from helix-core panels registry.\nComponent: client/src/components/agi/EssenceProposalsPanel.tsx\nEndpoints: GET /api/proposals, POST /api/proposals/:id/action, GET /api/essence/events\nKeywords: essence proposals, proposal queue, jobs board, proposal actions, proposal mgr",
+      "tags": [
+        "panel",
+        "essence-proposals",
+        "essence proposals",
+        "proposal queue",
+        "jobs board",
+        "proposal actions",
+        "proposal mgr"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "panel-registry-tree"
+        }
+      ],
+      "summary": "Panel surface for Essence Proposals.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "panel-registry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/agi/EssenceProposalsPanel.tsx",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:33a69966ea7a534e7d81fcfcf4b0ecbde7ebe772a2fc629e6f126371258a589b"
+        },
+        {
+          "type": "doc",
+          "path": "client/src/pages/helix-core.panels.ts",
+          "repo_rev": "b8072cd6b87f437597fd2f8887ba8737f55a14f6",
+          "content_hash": "sha256:d8e764660bfcc3055e8dd3af54ff49de777744dba4ddb419aa172cdbd1ad0732"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}
