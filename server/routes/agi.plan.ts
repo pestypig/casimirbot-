@@ -8835,11 +8835,13 @@ const buildToolResultsFallbackAnswer = (args: {
   treeWalk?: string;
 }): string => {
   const lines: string[] = ["Confirmed:"];
-  if (args.docBlocks.length > 0) {
-    const limit = Math.min(args.docBlocks.length, 3);
+  const fallbackDocBlocks = filterFallbackDocBlocks(args.docBlocks);
+  const docBlocks = fallbackDocBlocks.length > 0 ? fallbackDocBlocks : args.docBlocks;
+  if (docBlocks.length > 0) {
+    const limit = Math.min(docBlocks.length, 3);
     for (let i = 0; i < limit; i += 1) {
       const label = args.definitionFocus && i === 0 ? "Definition" : "Evidence";
-      lines.push(buildDocEvidenceBullet(args.docBlocks[i], label));
+      lines.push(buildDocEvidenceBullet(docBlocks[i], label));
     }
   }
   if (args.codeAlignment?.spans?.length) {
@@ -8857,6 +8859,18 @@ const buildToolResultsFallbackAnswer = (args: {
 
 const stripEvidenceBulletPrefix = (value: string): string =>
   value.replace(/^\s*-\s*/, "").trim();
+
+const filterFallbackDocBlocks = (
+  docBlocks: Array<{ path: string; block: string }>,
+): Array<{ path: string; block: string }> => {
+  if (!docBlocks.length) return docBlocks;
+  return docBlocks.filter((block) => {
+    const normalized = block.path.replace(/\\/g, "/").toLowerCase();
+    if (normalized.includes("/warp-web/")) return false;
+    if (/\.(html?|xhtml)$/i.test(normalized)) return false;
+    return true;
+  });
+};
 
 const SCIENTIFIC_SECTION_HEADINGS = [
   "Confirmed:",
@@ -8919,8 +8933,10 @@ const buildSingleLlmShortAnswerFallback = (args: {
           path: span.filePath,
           block: `${span.filePath}\nSection: Retrieved Span\n${span.span ?? "Span: L?-L?"}\n${span.snippet}`,
         }));
+  const filteredDocBlocks = filterFallbackDocBlocks(derivedDocBlocks);
+  const docBlocksForRanking = filteredDocBlocks.length > 0 ? filteredDocBlocks : derivedDocBlocks;
   const relevanceTokens = tokenizeCoverageRelevance(args.question);
-  const rankedDocBlocks = derivedDocBlocks
+  const rankedDocBlocks = docBlocksForRanking
     .map((block) => ({
       block,
       relevance: scoreCoverageRelevance(
@@ -9333,6 +9349,28 @@ const hasWeakScientificSections = (text: string): boolean => {
   if (confirmedRawBullets.length >= 2 && confirmedBullets.length <= 1) return true;
   if (reasonedBullets.length === 0) return true;
   if (reasonedRawBullets.length >= 2 && reasonedBullets.length <= 1) return true;
+  return false;
+};
+
+const shouldForceScientificFallback = (
+  text: string,
+  docBlocks: Array<unknown>,
+  codeAlignment?: { spans?: Array<unknown> } | null,
+): boolean => {
+  if (!isScientificMicroReport(text)) return false;
+  const confirmedBody = extractScientificSectionBody(text, "Confirmed:");
+  const reasonedBody = extractScientificSectionBody(text, "Reasoned connections (bounded):");
+  const confirmedBullets = extractSectionBullets(confirmedBody).filter(
+    (entry) => !isLowSignalScientificBullet(entry),
+  );
+  const reasonedBullets = extractSectionBullets(reasonedBody).filter(
+    (entry) => !isLowSignalScientificBullet(entry),
+  );
+  const evidenceCount =
+    (docBlocks?.length ?? 0) + (codeAlignment?.spans?.length ?? 0);
+  if (evidenceCount <= 0) return false;
+  if (confirmedBullets.length < 2) return true;
+  if (reasonedBullets.length < 1) return true;
   return false;
 };
 
@@ -21323,7 +21361,12 @@ const executeHelixAsk = async ({
       );
       cleaned = stripTrivialOrdinalBullets(cleaned);
       cleaned = dedupeReportParagraphs(cleaned).text;
-      if (HELIX_ASK_SINGLE_LLM && hasToolEvidence && hasWeakScientificSections(cleaned)) {
+      const scientificFallbackReason = hasWeakScientificSections(cleaned)
+        ? "weak_scientific_sections"
+        : shouldForceScientificFallback(cleaned, docBlocks, codeAlignment)
+          ? "sparse_scientific_sections"
+          : null;
+      if (HELIX_ASK_SINGLE_LLM && hasToolEvidence && scientificFallbackReason) {
         const weakSectionFallback = buildSingleLlmShortAnswerFallback({
           question: baseQuestion,
           definitionFocus,
@@ -21349,10 +21392,10 @@ const executeHelixAsk = async ({
         });
         if (weakSectionFallback.trim()) {
           cleaned = weakSectionFallback.trim();
-          answerPath.push("scientificFallback:weak_sections");
+          answerPath.push(`scientificFallback:${scientificFallbackReason}`);
           if (debugPayload) {
             debugPayload.answer_short_fallback_applied = true;
-            debugPayload.answer_short_fallback_reason = "weak_scientific_sections";
+            debugPayload.answer_short_fallback_reason = scientificFallbackReason;
           }
         }
       }
