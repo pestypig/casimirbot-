@@ -111,6 +111,11 @@ const noteArtifactError = (error: unknown) => {
   artifactHydrationError = message.slice(0, 280);
 };
 
+const noteBootstrapError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  bootstrapError = message.slice(0, 280);
+};
+
 const attemptArtifactHydration = async () => {
   if (artifactHydrationInFlight) return;
   artifactHydrationInFlight = true;
@@ -170,8 +175,22 @@ const healthPayload = () => {
     appReady,
     artifactsReady,
     healthReady,
-    bootstrapError,
     artifactsError: artifactHydrationError,
+    bootstrapError,
+    timestamp: new Date().toISOString(),
+  };
+};
+
+const readyPayload = () => {
+  const ready = appReady;
+  return {
+    status: ready ? "ok" : "starting",
+    ready,
+    appReady,
+    artifactsReady,
+    healthReady,
+    artifactsError: artifactHydrationError,
+    bootstrapError,
     timestamp: new Date().toISOString(),
   };
 };
@@ -228,21 +247,19 @@ app.head("/healthz", (_req, res) => {
   const ready = resolveReadyState();
   res.status(ready ? 200 : 503).end();
 });
+app.get("/api/ready", (_req, res) => {
+  const payload = readyPayload();
+  res.status(payload.ready ? 200 : 503).json(payload);
+});
+app.head("/api/ready", (_req, res) => {
+  const ready = appReady;
+  res.status(ready ? 200 : 503).end();
+});
 app.get("/health", (_req, res) => {
   res.status(200).json({ ok: true });
 });
 app.head("/health", (_req, res) => {
   res.status(200).end();
-});
-app.get("/api/ready", (_req, res) => {
-  const payload = healthPayload();
-  res.setHeader("Cache-Control", "no-store");
-  res.status(payload.ready ? 200 : 503).json(payload);
-});
-app.head("/api/ready", (_req, res) => {
-  const ready = resolveReadyState();
-  res.setHeader("Cache-Control", "no-store");
-  res.status(ready ? 200 : 503).end();
 });
 app.get("/version", (_req, res) => {
   res.status(200).json(versionPayload());
@@ -543,7 +560,7 @@ const renderStartupRetryHtml = (target: string) => `<!doctype html>
       <h1>Starting up…</h1>
       <p>The server is still warming up. This page will auto-refresh when it is ready.</p>
       <p class="muted">Target: <code>${target}</code></p>
-      <p id="boot-error" class="muted" style="color:#f87171"></p>
+      <p class="muted" id="boot-error" style="display:none;"></p>
       <p class="muted">If this persists, check the deploy logs for runtime errors.</p>
     </div>
     <script>
@@ -551,18 +568,19 @@ const renderStartupRetryHtml = (target: string) => `<!doctype html>
         function reload() { window.location.replace(${JSON.stringify(target)}); }
         function poll() {
           fetch("/api/ready", { cache: "no-store" })
-            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (res) { return res.json ? res.json() : null; })
             .then(function (payload) {
               if (payload && payload.ready) {
                 reload();
                 return;
               }
-              var errEl = document.getElementById("boot-error");
-              if (errEl && payload) {
-                var parts = [];
-                if (payload.bootstrapError) parts.push("Bootstrap: " + payload.bootstrapError);
-                if (payload.artifactsError) parts.push("Artifacts: " + payload.artifactsError);
-                if (parts.length) errEl.textContent = parts.join(" | ");
+              var err = payload && (payload.bootstrapError || payload.artifactsError);
+              if (err) {
+                var el = document.getElementById("boot-error");
+                if (el) {
+                  el.textContent = "Last error: " + err;
+                  el.style.display = "block";
+                }
               }
               setTimeout(poll, 2000);
             })
@@ -584,6 +602,7 @@ const renderRootBootHtml = (target: string) => `<!doctype html>
   </head>
   <body>
     <p>Starting up... Redirecting to <a href="${target}">${target}</a> once ready.</p>
+    <p id="boot-error" style="font-family: sans-serif; font-size: 12px; color: #666; display:none;"></p>
     <script>
       (function() {
         var target = ${JSON.stringify(target)};
@@ -600,6 +619,14 @@ const renderRootBootHtml = (target: string) => `<!doctype html>
               if (payload && payload.ready) {
                 window.location.replace(target);
                 return;
+              }
+              var err = payload && (payload.bootstrapError || payload.artifactsError);
+              if (err) {
+                var el = document.getElementById("boot-error");
+                if (el) {
+                  el.textContent = "Last error: " + err;
+                  el.style.display = "block";
+                }
               }
               schedule();
             })
@@ -659,6 +686,22 @@ const handleHealthCheck = (req: HealthCheckRequest, res: ServerResponse): boolea
     const payload = healthPayload();
     const statusCode = payload.ready ? 200 : 503;
     addProbeHeaders(res, "raw-healthz");
+    if (method === "HEAD") {
+      res.statusCode = statusCode;
+      res.setHeader("Cache-Control", "no-store");
+      res.end();
+      return true;
+    }
+    res.statusCode = statusCode;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.end(JSON.stringify(payload));
+    return true;
+  }
+  if (path === "/api/ready") {
+    const payload = readyPayload();
+    const statusCode = payload.ready ? 200 : 503;
+    addProbeHeaders(res, "raw-ready");
     if (method === "HEAD") {
       res.statusCode = statusCode;
       res.setHeader("Cache-Control", "no-store");
@@ -827,8 +870,7 @@ app.use((req, res, next) => {
     if (bootstrapPromise) return;
     log(`bootstrap start (${reason})`);
     bootstrapPromise = bootstrap().catch((error) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      bootstrapError = msg.slice(0, 500);
+      noteBootstrapError(error);
       console.error("[server] bootstrap failed:", error);
     });
   };
@@ -1048,9 +1090,7 @@ app.use((req, res, next) => {
 
   const bootstrap = async () => {
     validateIdeologyVerifierPack();
-    attemptArtifactHydration().catch(() => {
-      log("artifact hydration deferred (will retry in background)");
-    });
+    void attemptArtifactHydration();
 
     if (fastBoot) {
       log("FAST_BOOT=1: skipping module init, API routes, and background services");

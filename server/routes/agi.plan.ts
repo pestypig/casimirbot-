@@ -9320,14 +9320,19 @@ const hasWeakScientificSections = (text: string): boolean => {
   if (!isScientificMicroReport(text)) return false;
   const confirmedBody = extractScientificSectionBody(text, "Confirmed:");
   const reasonedBody = extractScientificSectionBody(text, "Reasoned connections (bounded):");
-  const confirmedBullets = extractSectionBullets(confirmedBody).filter(
+  const confirmedRawBullets = extractSectionBullets(confirmedBody);
+  const reasonedRawBullets = extractSectionBullets(reasonedBody);
+  const confirmedBullets = confirmedRawBullets.filter(
     (entry) => !isLowSignalScientificBullet(entry),
   );
-  const reasonedBullets = extractSectionBullets(reasonedBody).filter(
+  const reasonedBullets = reasonedRawBullets.filter(
     (entry) => !isLowSignalScientificBullet(entry),
   );
   if (confirmedBullets.length === 0) return true;
+  // If most confirmed bullets are numeric/list noise, treat the section as weak.
+  if (confirmedRawBullets.length >= 2 && confirmedBullets.length <= 1) return true;
   if (reasonedBullets.length === 0) return true;
+  if (reasonedRawBullets.length >= 2 && reasonedBullets.length <= 1) return true;
   return false;
 };
 
@@ -12054,15 +12059,14 @@ const collapseRepeatedSentenceBlock = (value: string): string => {
 
 const stripTrivialOrdinalBullets = (value: string): string => {
   if (!value.trim()) return value;
-  const lines = value.split(/\r?\n/);
-  const cleaned = lines.filter((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return true;
-    if (/^[-*]\s*\d+[.)]?\s*$/.test(trimmed)) return false;
-    if (/^\d+[.)]\s*$/.test(trimmed)) return false;
-    return true;
-  });
-  return cleaned.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  const normalized = normalizeScientificSectionLayout(value);
+  let cleaned = normalized;
+  // Drop pure numeric/roman list markers that carry no content.
+  cleaned = cleaned.replace(/^[\t ]*[-*][\t ]*(?:\d+|[ivxlcdm]+)\s*(?:[.)-])?\s*$/gim, "");
+  cleaned = cleaned.replace(/^[\t ]*(?:\d+|[ivxlcdm]+)\s*(?:[.)-])\s*$/gim, "");
+  // Convert bullets like "- 1. Meaningful text" to "- Meaningful text".
+  cleaned = cleaned.replace(/^([\t ]*[-*][\t ]*)(?:\d+|[ivxlcdm]+)\s*[.)-]\s+/gim, "$1");
+  return cleaned.replace(/\n{3,}/g, "\n\n").trim();
 };
 
 const dedupeReportParagraphs = (
