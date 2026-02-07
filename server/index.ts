@@ -70,6 +70,7 @@ let artifactsReady = false;
 let artifactHydrationError: string | null = null;
 let artifactRetryTimer: NodeJS.Timeout | null = null;
 let artifactHydrationInFlight = false;
+let bootstrapError: string | null = null;
 const log = (message: string, source = "express") => {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -169,6 +170,7 @@ const healthPayload = () => {
     appReady,
     artifactsReady,
     healthReady,
+    bootstrapError,
     artifactsError: artifactHydrationError,
     timestamp: new Date().toISOString(),
   };
@@ -231,6 +233,16 @@ app.get("/health", (_req, res) => {
 });
 app.head("/health", (_req, res) => {
   res.status(200).end();
+});
+app.get("/api/ready", (_req, res) => {
+  const payload = healthPayload();
+  res.setHeader("Cache-Control", "no-store");
+  res.status(payload.ready ? 200 : 503).json(payload);
+});
+app.head("/api/ready", (_req, res) => {
+  const ready = resolveReadyState();
+  res.setHeader("Cache-Control", "no-store");
+  res.status(ready ? 200 : 503).end();
 });
 app.get("/version", (_req, res) => {
   res.status(200).json(versionPayload());
@@ -297,6 +309,7 @@ const isPublicHealthRoute = (req: Request): boolean => {
     normalized === "/" ||
     normalized === "/health" ||
     normalized === "/healthz" ||
+    normalized === "/api/ready" ||
     normalized === "/version" ||
     normalized === "/__selfcheck"
   );
@@ -530,18 +543,26 @@ const renderStartupRetryHtml = (target: string) => `<!doctype html>
       <h1>Starting up…</h1>
       <p>The server is still warming up. This page will auto-refresh when it is ready.</p>
       <p class="muted">Target: <code>${target}</code></p>
+      <p id="boot-error" class="muted" style="color:#f87171"></p>
       <p class="muted">If this persists, check the deploy logs for runtime errors.</p>
     </div>
     <script>
       (function retryWhenReady() {
         function reload() { window.location.replace(${JSON.stringify(target)}); }
         function poll() {
-          fetch("/healthz", { cache: "no-store" })
-            .then(function (res) { return res.json ? res.json() : null; })
+          fetch("/api/ready", { cache: "no-store" })
+            .then(function (res) { return res.ok ? res.json() : null; })
             .then(function (payload) {
               if (payload && payload.ready) {
                 reload();
                 return;
+              }
+              var errEl = document.getElementById("boot-error");
+              if (errEl && payload) {
+                var parts = [];
+                if (payload.bootstrapError) parts.push("Bootstrap: " + payload.bootstrapError);
+                if (payload.artifactsError) parts.push("Artifacts: " + payload.artifactsError);
+                if (parts.length) errEl.textContent = parts.join(" | ");
               }
               setTimeout(poll, 2000);
             })
@@ -571,7 +592,7 @@ const renderRootBootHtml = (target: string) => `<!doctype html>
           setTimeout(check, retryMs);
         }
         function check() {
-          fetch("/healthz", { cache: "no-store" })
+          fetch("/api/ready", { cache: "no-store" })
             .then(function(res) {
               return res.ok ? res.json() : null;
             })
@@ -806,6 +827,8 @@ app.use((req, res, next) => {
     if (bootstrapPromise) return;
     log(`bootstrap start (${reason})`);
     bootstrapPromise = bootstrap().catch((error) => {
+      const msg = error instanceof Error ? error.message : String(error);
+      bootstrapError = msg.slice(0, 500);
       console.error("[server] bootstrap failed:", error);
     });
   };
@@ -888,6 +911,7 @@ app.use((req, res, next) => {
     const isProbePath =
       pathname === "/health" ||
       pathname === "/healthz" ||
+      pathname === "/api/ready" ||
       pathname === "/version" ||
       isSelfcheck ||
       (isRootPath && isHealthCheck);
@@ -1024,7 +1048,9 @@ app.use((req, res, next) => {
 
   const bootstrap = async () => {
     validateIdeologyVerifierPack();
-    await attemptArtifactHydration();
+    attemptArtifactHydration().catch(() => {
+      log("artifact hydration deferred (will retry in background)");
+    });
 
     if (fastBoot) {
       log("FAST_BOOT=1: skipping module init, API routes, and background services");
