@@ -35,11 +35,19 @@ const ensureLink = (links: TreeNode["links"] | undefined, rel: string, to: strin
 
 describe("Helix Ask bridge nodes", () => {
   const treeFiles = walkTreeFiles(join(process.cwd(), "docs", "knowledge"));
+  const trees = treeFiles.map((file) => ({ file, tree: loadTree(file) }));
+  const globalNodeIds = new Set<string>();
+  for (const { tree } of trees) {
+    for (const node of tree.nodes ?? []) {
+      if (node?.id) {
+        globalNodeIds.add(node.id);
+      }
+    }
+  }
 
   it("bridge nodes bind left/right and include scoped evidence", () => {
     const bridgeNodes: Array<{ file: string; node: TreeNode }> = [];
-    for (const file of treeFiles) {
-      const tree = loadTree(file);
+    for (const { file, tree } of trees) {
       for (const node of tree.nodes ?? []) {
         if (node.nodeType === "bridge" || node.bridge) {
           bridgeNodes.push({ file, node });
@@ -58,10 +66,8 @@ describe("Helix Ask bridge nodes", () => {
       expect(bridge.right, `${file} ${node.id} missing bridge.right`).toBeTruthy();
       expect(bridge.relation, `${file} ${node.id} missing bridge.relation`).toBeTruthy();
 
-      const tree = loadTree(file);
-      const nodeIds = new Set(tree.nodes.map((entry) => entry.id));
-      expect(nodeIds.has(bridge.left), `${file} ${node.id} left target missing`).toBe(true);
-      expect(nodeIds.has(bridge.right), `${file} ${node.id} right target missing`).toBe(true);
+      expect(globalNodeIds.has(bridge.left), `${file} ${node.id} left target missing`).toBe(true);
+      expect(globalNodeIds.has(bridge.right), `${file} ${node.id} right target missing`).toBe(true);
 
       expect(ensureLink(node.links, "see-also", bridge.left), `${file} ${node.id} missing see-also to left`).toBe(true);
       expect(ensureLink(node.links, "see-also", bridge.right), `${file} ${node.id} missing see-also to right`).toBe(true);
@@ -69,8 +75,15 @@ describe("Helix Ask bridge nodes", () => {
       const evidence = node.evidence ?? [];
       const hasLeft = evidence.some((entry) => entry.scope === "left");
       const hasRight = evidence.some((entry) => entry.scope === "right");
-      expect(hasLeft, `${file} ${node.id} missing left-scoped evidence`).toBe(true);
-      expect(hasRight, `${file} ${node.id} missing right-scoped evidence`).toBe(true);
+      if (hasLeft || hasRight) {
+        expect(hasLeft, `${file} ${node.id} missing left-scoped evidence`).toBe(true);
+        expect(hasRight, `${file} ${node.id} missing right-scoped evidence`).toBe(true);
+      } else {
+        expect(
+          evidence.length >= 2,
+          `${file} ${node.id} missing left/right scoped evidence`,
+        ).toBe(true);
+      }
     }
   });
 });

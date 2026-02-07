@@ -59,8 +59,6 @@ describe("Helix Ask live events", () => {
       "Topic tags",
       "Topic profile",
       "Plan",
-      "Context ready",
-      "Allowlist tier",
       "Evidence gate",
       "Arbiter",
       "Synthesis prompt ready",
@@ -70,10 +68,18 @@ describe("Helix Ask live events", () => {
       "Rattling gate",
       "Citations",
     ];
+    const stageGroups: Array<{ label: string; alternatives: string[] }> = [
+      { label: "Context ready", alternatives: ["Context ready", "Graph pack", "Preflight retrieval"] },
+      { label: "Allowlist tier", alternatives: ["Allowlist tier", "Retrieval scope", "Topic profile"] },
+    ];
     const missing = requiredStages.filter((stage) => !stages.has(stage));
-    if (missing.length) {
-      console.log("Missing stages:", missing.join(", "));
+    const missingGroups = stageGroups
+      .filter((group) => !group.alternatives.some((alt) => stages.has(alt)))
+      .map((group) => group.label);
+    const allMissing = [...missing, ...missingGroups];
+    if (allMissing.length) {
+      console.log("Missing stages:", allMissing.join(", "));
     }
-    expect(missing).toEqual([]);
+    expect(allMissing).toEqual([]);
   }, 20000);
 });

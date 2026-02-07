@@ -1,6 +1,6 @@
 {
   "desktopId": "helix.desktop.main",
-  "capturedAt": "2026-02-05T23:51:00.260Z",
+  "capturedAt": "2026-02-07T20:59:39.329Z",
   "panels": [
     {
       "panelId": "near-zero",
@@ -12,7 +12,7 @@
       "sourceIds": [
         "client/src/components/NearZeroWidget.tsx"
       ],
-      "lastUpdated": "2026-02-05T23:51:00.260Z"
+      "lastUpdated": "2026-02-07T20:59:39.329Z"
     }
   ]
 }

@@ -643,9 +643,19 @@ const readStoreFromFs = async (): Promise<NoisegenStore> => {
 const writeStoreToFs = async (store: NoisegenStore): Promise<void> => {
   await ensureDirectories();
   const { storePath } = getNoisegenPaths();
-  const tmpPath = `${storePath}.tmp`;
-  await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf8");
-  await fs.rename(tmpPath, storePath);
+  const tmpPath = `${storePath}.${process.pid}.${Date.now()}.${Math.random()
+    .toString(36)
+    .slice(2)}.tmp`;
+  try {
+    await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf8");
+    await fs.rename(tmpPath, storePath);
+  } finally {
+    try {
+      await fs.unlink(tmpPath);
+    } catch {
+      // ignore cleanup failures
+    }
+  }
 };
 
 type NoisegenStoreRow = {

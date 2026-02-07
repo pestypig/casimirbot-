@@ -9491,7 +9491,18 @@ const collectTreeFiles = (dir: string): string[] => {
     } catch {
       continue;
     }
-    let parsed: { rootId?: string; nodes?: Array<{ id?: string; title?: string }> } | null = null;
+    let parsed:
+      | {
+          rootId?: string;
+          nodes?: Array<{
+            id?: string;
+            title?: string;
+            label?: string;
+            tags?: string[];
+            aliases?: string[];
+          }>;
+        }
+      | null = null;
     try {
       parsed = JSON.parse(raw);
     } catch {
@@ -15450,7 +15461,9 @@ const executeHelixAsk = async ({
         repoExpectationScore = Math.max(repoExpectationScore, 3);
         repoExpectationSignals.push("file_path");
       }
-      const conceptRepoMatch = Boolean(conceptMatch?.card?.sourcePath);
+      const conceptRepoMatch = Boolean(
+        (conceptMatch as HelixAskConceptMatch | null)?.card?.sourcePath,
+      );
       if (conceptRepoMatch) {
         repoExpectationScore = Math.max(repoExpectationScore, 2);
         repoExpectationSignals.push("concept_match");
@@ -15464,7 +15477,7 @@ const executeHelixAsk = async ({
       repoExpectationScore = Math.max(repoExpectationScore, 1);
       repoExpectationSignals.push("repo_hint");
     }
-    let repoExpectationLevel =
+    let repoExpectationLevel: "low" | "medium" | "high" =
       repoExpectationScore >= 3
         ? "high"
         : repoExpectationScore >= 2
@@ -15785,7 +15798,7 @@ const executeHelixAsk = async ({
       intentReasonBase = `${intentReasonBase}|expectation:${repoExpectationLevel}`;
       logEvent("Fallback", "repo_expectation -> hybrid", `level=${repoExpectationLevel}`);
     }
-    let intentDomain = intentProfile.domain;
+    let intentDomain: HelixAskDomain = intentProfile.domain;
     let intentTier = intentProfile.tier;
     let intentSecondaryTier = intentProfile.secondaryTier;
     let intentStrategy = intentProfile.strategy;
@@ -16067,12 +16080,14 @@ const executeHelixAsk = async ({
       }
     }
     const conceptualFocus = HELIX_ASK_CONCEPTUAL_FOCUS.test(baseQuestion);
+    const intentDomainForConcept: HelixAskDomain = intentDomain;
+    const isRepoDomain = String(intentDomainForConcept) === "repo";
     const wantsConceptMatch =
-      intentDomain === "general" ||
-      intentDomain === "hybrid" ||
-      intentDomain === "repo" ||
+      intentDomainForConcept === "general" ||
+      intentDomainForConcept === "hybrid" ||
+      isRepoDomain ||
       intentProfile.id === "repo.ideology_reference" ||
-      (intentDomain === "repo" && conceptualFocus);
+      (isRepoDomain && conceptualFocus);
     if (wantsConceptMatch && baseQuestion) {
       conceptMatch = findConceptMatch(baseQuestion);
       if (conceptMatch && debugPayload) {
