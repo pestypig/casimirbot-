@@ -70,6 +70,7 @@ let artifactsReady = false;
 let artifactHydrationError: string | null = null;
 let artifactRetryTimer: NodeJS.Timeout | null = null;
 let artifactHydrationInFlight = false;
+let bootstrapError: string | null = null;
 const log = (message: string, source = "express") => {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -108,6 +109,11 @@ const scheduleArtifactRetry = () => {
 const noteArtifactError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   artifactHydrationError = message.slice(0, 280);
+};
+
+const noteBootstrapError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  bootstrapError = message.slice(0, 280);
 };
 
 const attemptArtifactHydration = async () => {
@@ -170,6 +176,21 @@ const healthPayload = () => {
     artifactsReady,
     healthReady,
     artifactsError: artifactHydrationError,
+    bootstrapError,
+    timestamp: new Date().toISOString(),
+  };
+};
+
+const readyPayload = () => {
+  const ready = appReady;
+  return {
+    status: ready ? "ok" : "starting",
+    ready,
+    appReady,
+    artifactsReady,
+    healthReady,
+    artifactsError: artifactHydrationError,
+    bootstrapError,
     timestamp: new Date().toISOString(),
   };
 };
@@ -224,6 +245,14 @@ app.get("/healthz", (_req, res) => {
 });
 app.head("/healthz", (_req, res) => {
   const ready = resolveReadyState();
+  res.status(ready ? 200 : 503).end();
+});
+app.get("/api/ready", (_req, res) => {
+  const payload = readyPayload();
+  res.status(payload.ready ? 200 : 503).json(payload);
+});
+app.head("/api/ready", (_req, res) => {
+  const ready = appReady;
   res.status(ready ? 200 : 503).end();
 });
 app.get("/health", (_req, res) => {
@@ -297,6 +326,7 @@ const isPublicHealthRoute = (req: Request): boolean => {
     normalized === "/" ||
     normalized === "/health" ||
     normalized === "/healthz" ||
+    normalized === "/api/ready" ||
     normalized === "/version" ||
     normalized === "/__selfcheck"
   );
@@ -530,18 +560,27 @@ const renderStartupRetryHtml = (target: string) => `<!doctype html>
       <h1>Starting up…</h1>
       <p>The server is still warming up. This page will auto-refresh when it is ready.</p>
       <p class="muted">Target: <code>${target}</code></p>
+      <p class="muted" id="boot-error" style="display:none;"></p>
       <p class="muted">If this persists, check the deploy logs for runtime errors.</p>
     </div>
     <script>
       (function retryWhenReady() {
         function reload() { window.location.replace(${JSON.stringify(target)}); }
         function poll() {
-          fetch("/healthz", { cache: "no-store" })
+          fetch("/api/ready", { cache: "no-store" })
             .then(function (res) { return res.json ? res.json() : null; })
             .then(function (payload) {
               if (payload && payload.ready) {
                 reload();
                 return;
+              }
+              var err = payload && (payload.bootstrapError || payload.artifactsError);
+              if (err) {
+                var el = document.getElementById("boot-error");
+                if (el) {
+                  el.textContent = "Last error: " + err;
+                  el.style.display = "block";
+                }
               }
               setTimeout(poll, 2000);
             })
@@ -563,6 +602,7 @@ const renderRootBootHtml = (target: string) => `<!doctype html>
   </head>
   <body>
     <p>Starting up... Redirecting to <a href="${target}">${target}</a> once ready.</p>
+    <p id="boot-error" style="font-family: sans-serif; font-size: 12px; color: #666; display:none;"></p>
     <script>
       (function() {
         var target = ${JSON.stringify(target)};
@@ -571,7 +611,7 @@ const renderRootBootHtml = (target: string) => `<!doctype html>
           setTimeout(check, retryMs);
         }
         function check() {
-          fetch("/healthz", { cache: "no-store" })
+          fetch("/api/ready", { cache: "no-store" })
             .then(function(res) {
               return res.ok ? res.json() : null;
             })
@@ -579,6 +619,14 @@ const renderRootBootHtml = (target: string) => `<!doctype html>
               if (payload && payload.ready) {
                 window.location.replace(target);
                 return;
+              }
+              var err = payload && (payload.bootstrapError || payload.artifactsError);
+              if (err) {
+                var el = document.getElementById("boot-error");
+                if (el) {
+                  el.textContent = "Last error: " + err;
+                  el.style.display = "block";
+                }
               }
               schedule();
             })
@@ -638,6 +686,22 @@ const handleHealthCheck = (req: HealthCheckRequest, res: ServerResponse): boolea
     const payload = healthPayload();
     const statusCode = payload.ready ? 200 : 503;
     addProbeHeaders(res, "raw-healthz");
+    if (method === "HEAD") {
+      res.statusCode = statusCode;
+      res.setHeader("Cache-Control", "no-store");
+      res.end();
+      return true;
+    }
+    res.statusCode = statusCode;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.end(JSON.stringify(payload));
+    return true;
+  }
+  if (path === "/api/ready") {
+    const payload = readyPayload();
+    const statusCode = payload.ready ? 200 : 503;
+    addProbeHeaders(res, "raw-ready");
     if (method === "HEAD") {
       res.statusCode = statusCode;
       res.setHeader("Cache-Control", "no-store");
@@ -806,6 +870,7 @@ app.use((req, res, next) => {
     if (bootstrapPromise) return;
     log(`bootstrap start (${reason})`);
     bootstrapPromise = bootstrap().catch((error) => {
+      noteBootstrapError(error);
       console.error("[server] bootstrap failed:", error);
     });
   };
@@ -888,6 +953,7 @@ app.use((req, res, next) => {
     const isProbePath =
       pathname === "/health" ||
       pathname === "/healthz" ||
+      pathname === "/api/ready" ||
       pathname === "/version" ||
       isSelfcheck ||
       (isRootPath && isHealthCheck);
@@ -1024,7 +1090,7 @@ app.use((req, res, next) => {
 
   const bootstrap = async () => {
     validateIdeologyVerifierPack();
-    await attemptArtifactHydration();
+    void attemptArtifactHydration();
 
     if (fastBoot) {
       log("FAST_BOOT=1: skipping module init, API routes, and background services");
