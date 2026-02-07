@@ -1,9 +1,11 @@
 import {
+  Component,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type ErrorInfo,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -23,6 +25,7 @@ import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { classifyMoodFromWhisper } from "@/lib/luma-mood-spectrum";
 import { LUMA_MOOD_ORDER, resolveMoodAsset, type LumaMood } from "@/lib/luma-moods";
 import { broadcastLumaMood } from "@/lib/luma-mood-theme";
+import { reportClientError } from "@/lib/observability/client-error";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 
@@ -255,6 +258,106 @@ function clipText(value: string | undefined, limit: number): string {
   return `${value.slice(0, limit)}...`;
 }
 
+function coerceText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  try {
+    return String(value);
+  } catch {
+    return "";
+  }
+}
+
+function normalizeCitations(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
+}
+
+function clipForDisplay(value: string, limit: number, expanded: boolean): string {
+  if (expanded || value.length <= limit) return value;
+  return `${value.slice(0, limit)}...`;
+}
+
+function hasLongText(value: unknown, limit: number): boolean {
+  return coerceText(value).length > limit;
+}
+
+function safeJsonStringify(value: unknown, fallback = "Unable to render debug payload."): string {
+  try {
+    const seen = new WeakSet<object>();
+    return JSON.stringify(
+      value,
+      (_key, val) => {
+        if (typeof val === "bigint") return val.toString();
+        if (typeof val === "object" && val !== null) {
+          if (seen.has(val)) return "[Circular]";
+          seen.add(val);
+        }
+        return val;
+      },
+      2,
+    );
+  } catch {
+    return fallback;
+  }
+}
+
+type HelixAskErrorBoundaryState = { hasError: boolean; error?: Error };
+
+class HelixAskErrorBoundary extends Component<{ children: ReactNode }, HelixAskErrorBoundaryState> {
+  state: HelixAskErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(error: Error): HelixAskErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[helix-ask] render error:", error, info);
+    reportClientError(error, { componentStack: info.componentStack, scope: "helix-ask" });
+  }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: undefined });
+  };
+
+  handleReload = () => {
+    if (typeof window === "undefined") return;
+    window.location.reload();
+  };
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    const message = this.state.error?.message || "Unexpected Helix Ask error.";
+    return (
+      <div className="pointer-events-auto rounded-2xl border border-amber-200/30 bg-amber-500/10 p-4 text-xs text-amber-100">
+        <p className="text-[11px] uppercase tracking-[0.2em] text-amber-200">Helix Ask paused</p>
+        <p className="mt-2">
+          The Helix Ask panel hit a rendering error. You can retry or reload the page.
+        </p>
+        <pre className="mt-2 max-h-24 overflow-auto rounded bg-black/40 p-2 text-[10px] text-amber-100/80">
+          {message}
+        </pre>
+        <div className="mt-2 flex gap-2">
+          <button
+            className="rounded-full border border-amber-200/40 bg-amber-200/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-100 hover:bg-amber-200/20"
+            onClick={this.handleRetry}
+            type="button"
+          >
+            Retry
+          </button>
+          <button
+            className="rounded-full border border-amber-200/40 bg-amber-200/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-100 hover:bg-amber-200/20"
+            onClick={this.handleReload}
+            type="button"
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
+
 function ensureFinalMarker(value: string): string {
   if (!value.trim()) return "ANSWER_START\nANSWER_END";
   if (value.includes("ANSWER_START") || value.includes("FINAL:")) {
@@ -272,14 +375,17 @@ function formatEnvelopeSectionsForCopy(
   return sections
     .map((section) => {
       const lines: string[] = [];
-      if (section.title && section.title.toLowerCase() !== hidden) {
-        lines.push(section.title);
+      const title = coerceText(section.title);
+      if (title && title.toLowerCase() !== hidden) {
+        lines.push(title);
       }
-      if (section.body) {
-        lines.push(section.body);
+      const body = coerceText(section.body);
+      if (body) {
+        lines.push(body);
       }
-      if (section.citations && section.citations.length > 0) {
-        lines.push(`Sources: ${section.citations.join(", ")}`);
+      const citations = normalizeCitations(section.citations);
+      if (citations.length > 0) {
+        lines.push(`Sources: ${citations.join(", ")}`);
       }
       return lines.filter(Boolean).join("\n");
     })
@@ -306,6 +412,11 @@ const HELIX_ASK_CONTEXT_TOKENS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_CONTEXT_TOKENS, 2048),
   512,
   8192,
+);
+const HELIX_ASK_MAX_RENDER_CHARS = clampNumber(
+  readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_MAX_RENDER_CHARS, 6000),
+  1200,
+  24000,
 );
 const HELIX_ASK_MAX_PROMPT_LINES = 4;
 const HELIX_ASK_LIVE_EVENT_LIMIT = 28;
@@ -990,6 +1101,8 @@ export function HelixAskPill({
   const [askElapsedMs, setAskElapsedMs] = useState<number | null>(null);
   const [askLiveDraft, setAskLiveDraft] = useState<string>("");
   const askLiveDraftRef = useRef("");
+  const askLiveDraftBufferRef = useRef("");
+  const askLiveDraftFlushRef = useRef<number | null>(null);
   const [askQueue, setAskQueue] = useState<string[]>([]);
   const [askActiveQuestion, setAskActiveQuestion] = useState<string | null>(null);
   const [askMood, setAskMood] = useState<LumaMood>("question");
@@ -1009,6 +1122,7 @@ export function HelixAskPill({
   const askAbortRef = useRef<AbortController | null>(null);
   const askRunIdRef = useRef(0);
   const moodHintSessionId = useMemo(() => `helix:mood:${contextId}`, [contextId]);
+  const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>({});
 
   const getHelixAskSessionId = useCallback(() => {
     if (helixAskSessionRef.current) return helixAskSessionRef.current;
@@ -1036,6 +1150,32 @@ export function HelixAskPill({
   useEffect(() => {
     broadcastLumaMood(askMood);
   }, [askMood]);
+
+  const clearLiveDraftFlush = useCallback(() => {
+    if (askLiveDraftFlushRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(askLiveDraftFlushRef.current);
+    }
+    askLiveDraftFlushRef.current = null;
+  }, []);
+
+  const flushLiveDraft = useCallback(() => {
+    clearLiveDraftFlush();
+    const nextRaw = askLiveDraftBufferRef.current;
+    const clipped = nextRaw.length > 4000 ? nextRaw.slice(-4000) : nextRaw;
+    askLiveDraftRef.current = clipped;
+    setAskLiveDraft(clipped);
+  }, [clearLiveDraftFlush]);
+
+  const scheduleLiveDraftFlush = useCallback(() => {
+    if (askLiveDraftFlushRef.current !== null) return;
+    if (typeof window === "undefined") {
+      flushLiveDraft();
+      return;
+    }
+    askLiveDraftFlushRef.current = window.setTimeout(() => {
+      flushLiveDraft();
+    }, 60);
+  }, [flushLiveDraft]);
 
   const pickRandomMood = useCallback((): LumaMood => {
     const idx = Math.floor(Math.random() * LUMA_MOOD_ORDER.length);
@@ -1116,6 +1256,7 @@ export function HelixAskPill({
 
   useEffect(() => () => clearMoodTimer(), [clearMoodTimer]);
   useEffect(() => () => cancelMoodHint(), [cancelMoodHint]);
+  useEffect(() => () => clearLiveDraftFlush(), [clearLiveDraftFlush]);
   useEffect(() => {
     if (!askBusy) return;
     cancelMoodHint();
@@ -1176,16 +1317,17 @@ export function HelixAskPill({
   );
 
   const renderHelixAskContent = useCallback(
-    (content: string): ReactNode[] => {
+    (content: unknown): ReactNode[] => {
       const parts: ReactNode[] = [];
-      if (!content) return parts;
+      const text = coerceText(content);
+      if (!text) return parts;
       HELIX_ASK_PATH_REGEX.lastIndex = 0;
       let lastIndex = 0;
-      for (const match of content.matchAll(HELIX_ASK_PATH_REGEX)) {
+      for (const match of text.matchAll(HELIX_ASK_PATH_REGEX)) {
         const matchText = match[0];
         const start = match.index ?? 0;
         if (start > lastIndex) {
-          parts.push(content.slice(lastIndex, start));
+          parts.push(text.slice(lastIndex, start));
         }
         const panelId = resolvePanelIdFromPath(matchText);
         if (panelId) {
@@ -1204,33 +1346,42 @@ export function HelixAskPill({
         }
         lastIndex = start + matchText.length;
       }
-      if (lastIndex < content.length) {
-        parts.push(content.slice(lastIndex));
+      if (lastIndex < text.length) {
+        parts.push(text.slice(lastIndex));
       }
-      return parts.length ? parts : [content];
+      return parts.length ? parts : [text];
     },
     [openPanelById],
   );
 
   const renderEnvelopeSections = useCallback(
-    (sections: HelixAskResponseEnvelope["sections"], hideTitle?: string) => {
+    (sections: HelixAskResponseEnvelope["sections"], hideTitle?: string, expanded?: boolean) => {
       if (!sections || sections.length === 0) return null;
       const hidden = hideTitle?.toLowerCase();
       return (
         <div className="space-y-2">
           {sections.map((section, index) => (
             <div key={`${section.title}-${index}`} className="text-sm text-slate-100">
-              {section.title && section.title.toLowerCase() !== hidden ? (
-                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                  {section.title}
-                </p>
-              ) : null}
+              {(() => {
+                const title = coerceText(section.title);
+                return title && title.toLowerCase() !== hidden ? (
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                    {title}
+                  </p>
+                ) : null;
+              })()}
               <p className="mt-1 whitespace-pre-wrap leading-relaxed">
-                {renderHelixAskContent(section.body)}
+                {renderHelixAskContent(
+                  clipForDisplay(
+                    coerceText(section.body),
+                    HELIX_ASK_MAX_RENDER_CHARS,
+                    Boolean(expanded),
+                  ),
+                )}
               </p>
-              {section.layer === "proof" && section.citations && section.citations.length > 0 ? (
+              {section.layer === "proof" && normalizeCitations(section.citations).length > 0 ? (
                 <p className="mt-1 text-[11px] text-slate-400">
-                  Sources: {renderHelixAskContent(section.citations.join(", "))}
+                  Sources: {renderHelixAskContent(normalizeCitations(section.citations).join(", "))}
                 </p>
               ) : null}
             </div>
@@ -1250,22 +1401,46 @@ export function HelixAskPill({
           </p>
         );
       }
-      const envelopeAnswer = reply.envelope.answer?.trim() ?? "";
-      const fallbackAnswer = reply.content?.trim() ?? "";
+      const envelopeAnswer = coerceText(reply.envelope.answer).trim();
+      const fallbackAnswer = coerceText(reply.content).trim();
       const sections = reply.envelope.sections ?? [];
       const detailSections = sections.filter((section) => section.layer !== "proof");
       const proofSections = sections.filter((section) => section.layer === "proof");
       const expandDetails = reply.envelope.mode === "extended";
       const extension = reply.envelope.extension;
-      const extensionBody = extension?.body?.trim() ?? "";
-      const extensionCitations = extension?.citations ?? [];
+      const extensionBody = coerceText(extension?.body).trim();
+      const extensionCitations = normalizeCitations(extension?.citations);
       const extensionAvailable = Boolean(extension?.available && extensionBody);
       const extensionOpen = Boolean(askExtensionOpenByReply[reply.id]);
+      const expanded = Boolean(askExpandedByReply[reply.id]);
+      const answerText = clipForDisplay(
+        coerceText(envelopeAnswer || fallbackAnswer),
+        HELIX_ASK_MAX_RENDER_CHARS,
+        expanded,
+      );
+      const hasLongContent =
+        hasLongText(envelopeAnswer || fallbackAnswer, HELIX_ASK_MAX_RENDER_CHARS) ||
+        hasLongText(extensionBody, HELIX_ASK_MAX_RENDER_CHARS) ||
+        sections.some((section) => hasLongText(section.body, HELIX_ASK_MAX_RENDER_CHARS));
       return (
         <div className="space-y-3">
           <p className="whitespace-pre-wrap leading-relaxed">
-            {renderHelixAskContent(envelopeAnswer || fallbackAnswer)}
+            {renderHelixAskContent(answerText)}
           </p>
+          {hasLongContent ? (
+            <button
+              type="button"
+              className="text-[10px] uppercase tracking-[0.2em] text-slate-400 hover:text-slate-200"
+              onClick={() =>
+                setAskExpandedByReply((prev) => ({
+                  ...prev,
+                  [reply.id]: !expanded,
+                }))
+              }
+            >
+              {expanded ? "Show Less" : "Show Full Answer"}
+            </button>
+          ) : null}
           {extensionAvailable ? (
             <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
               <button
@@ -1283,7 +1458,9 @@ export function HelixAskPill({
               {extensionOpen ? (
                 <div className="mt-2 space-y-1">
                   <p className="whitespace-pre-wrap leading-relaxed">
-                    {renderHelixAskContent(extensionBody)}
+                    {renderHelixAskContent(
+                      clipForDisplay(extensionBody, HELIX_ASK_MAX_RENDER_CHARS, expanded),
+                    )}
                   </p>
                   {extensionCitations.length > 0 ? (
                     <p className="text-[11px] text-slate-400">
@@ -1302,7 +1479,9 @@ export function HelixAskPill({
               <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-slate-400">
                 Details
               </summary>
-              <div className="mt-2">{renderEnvelopeSections(detailSections, "Details")}</div>
+              <div className="mt-2">
+                {renderEnvelopeSections(detailSections, "Details", expanded)}
+              </div>
             </details>
           ) : null}
           {proofSections.length > 0 ? (
@@ -1313,13 +1492,15 @@ export function HelixAskPill({
               <summary className="cursor-pointer text-[10px] uppercase tracking-[0.22em] text-slate-400">
                 Proof
               </summary>
-              <div className="mt-2">{renderEnvelopeSections(proofSections, "Proof")}</div>
+              <div className="mt-2">
+                {renderEnvelopeSections(proofSections, "Proof", expanded)}
+              </div>
             </details>
           ) : null}
         </div>
       );
     },
-    [askExtensionOpenByReply, renderEnvelopeSections, renderHelixAskContent],
+    [askExpandedByReply, askExtensionOpenByReply, renderEnvelopeSections, renderHelixAskContent],
   );
 
   const buildCopyText = useCallback((reply: HelixAskReply): string => {
@@ -1328,8 +1509,8 @@ export function HelixAskPill({
     const sections = reply.envelope.sections ?? [];
     const detailSections = sections.filter((section) => section.layer !== "proof");
     const proofSections = sections.filter((section) => section.layer === "proof");
-    const chunks: string[] = [reply.envelope.answer];
-    const extensionBody = reply.envelope.extension?.body?.trim();
+    const chunks: string[] = [coerceText(reply.envelope.answer)];
+    const extensionBody = coerceText(reply.envelope.extension?.body).trim();
     if (extensionBody) {
       chunks.push(`Additional Repo Context\n${extensionBody}`);
     }
@@ -1432,12 +1613,12 @@ export function HelixAskPill({
       if (toolName === "helix.ask.stream") {
         const chunk = (event.text ?? "").toString();
         if (!chunk.trim()) return;
-        setAskLiveDraft((prev) => {
-          const next = `${prev}${chunk}`;
-          const clipped = next.length > 4000 ? next.slice(-4000) : next;
-          askLiveDraftRef.current = clipped;
-          return clipped;
-        });
+        askLiveDraftBufferRef.current = `${askLiveDraftBufferRef.current}${chunk}`;
+        if (askLiveDraftBufferRef.current.length > 4000) {
+          askLiveDraftBufferRef.current = askLiveDraftBufferRef.current.slice(-4000);
+        }
+        askLiveDraftRef.current = askLiveDraftBufferRef.current;
+        scheduleLiveDraftFlush();
         return;
       }
       let text = (event.message ?? event.text ?? "").toString().trim();
@@ -1465,7 +1646,7 @@ export function HelixAskPill({
       limit: 200,
     });
     return () => unsubscribe();
-  }, [askBusy, askLiveSessionId, askLiveTraceId]);
+  }, [askBusy, askLiveSessionId, askLiveTraceId, scheduleLiveDraftFlush]);
 
   const askLiveStatusText = useMemo(() => {
     const statusTrimmed = askStatus?.trim() ?? "";
@@ -1529,6 +1710,8 @@ export function HelixAskPill({
       askLiveEventsRef.current = [];
       setAskLiveDraft("");
       askLiveDraftRef.current = "";
+      askLiveDraftBufferRef.current = "";
+      clearLiveDraftFlush();
       askStartRef.current = Date.now();
       setAskElapsedMs(0);
       setAskActiveQuestion(questionText || null);
@@ -1614,6 +1797,8 @@ export function HelixAskPill({
           setAskLiveTraceId(null);
           setAskLiveDraft("");
           askLiveDraftRef.current = "";
+          askLiveDraftBufferRef.current = "";
+          clearLiveDraftFlush();
           setAskActiveQuestion(null);
         }
         if (askAbortRef.current === controller) {
@@ -1624,6 +1809,7 @@ export function HelixAskPill({
     [
       addMessage,
       cancelMoodHint,
+      clearLiveDraftFlush,
       clearMoodTimer,
       getHelixAskSessionId,
       requestMoodHint,
@@ -1652,6 +1838,8 @@ export function HelixAskPill({
       askLiveEventsRef.current = [];
       setAskLiveDraft("");
       askLiveDraftRef.current = "";
+      askLiveDraftBufferRef.current = "";
+      clearLiveDraftFlush();
       askStartRef.current = Date.now();
       setAskElapsedMs(0);
       setAskActiveQuestion(trimmed);
@@ -1747,6 +1935,8 @@ export function HelixAskPill({
           setAskLiveTraceId(null);
           setAskLiveDraft("");
           askLiveDraftRef.current = "";
+          askLiveDraftBufferRef.current = "";
+          clearLiveDraftFlush();
           setAskActiveQuestion(null);
         }
         if (askAbortRef.current === controller) {
@@ -1758,6 +1948,7 @@ export function HelixAskPill({
       addMessage,
       askBusy,
       cancelMoodHint,
+      clearLiveDraftFlush,
       clearMoodTimer,
       getHelixAskSessionId,
       requestMoodHint,
@@ -1873,8 +2064,9 @@ export function HelixAskPill({
   }, [askQueue]);
 
   return (
-    <div className={className}>
-      <form className={`w-full ${maxWidthClass}`} onSubmit={handleAskSubmit}>
+    <HelixAskErrorBoundary>
+      <div className={className}>
+        <form className={`w-full ${maxWidthClass}`} onSubmit={handleAskSubmit}>
         <div
           className={`relative overflow-hidden rounded-3xl border bg-slate-950/80 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur ${moodPalette.surfaceBorder}`}
         >
@@ -2028,24 +2220,25 @@ export function HelixAskPill({
           ) : null}
         </div>
         </div>
-      </form>
-      {askError ? (
-        <p className="mt-3 text-xs text-rose-200">{askError}</p>
-      ) : null}
-      {askReplies.length > 0 ? (
-        <div className="mt-4 max-h-[52vh] space-y-3 overflow-y-auto pr-2">
+        </form>
+        {askError ? (
+          <p className="mt-3 text-xs text-rose-200">{askError}</p>
+        ) : null}
+        {askReplies.length > 0 ? (
+          <div className="mt-4 max-h-[52vh] space-y-3 overflow-y-auto pr-2">
           {askReplies.map((reply) => {
             const replyEvents = resolveReplyEvents(reply);
+            const expanded = Boolean(askExpandedByReply[reply.id]);
             return (
               <div
-                key={reply.id}
-                className={`relative overflow-hidden rounded-2xl border bg-slate-950/80 px-4 py-3 text-sm text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur ${moodPalette.replyBorder}`}
-              >
-                <div
-                  className={`pointer-events-none absolute inset-0 opacity-80 ${moodPalette.replyTint}`}
-                  aria-hidden
-                />
-                <div className="relative">
+                  key={reply.id}
+                  className={`relative overflow-hidden rounded-2xl border bg-slate-950/80 px-4 py-3 text-sm text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur ${moodPalette.replyBorder}`}
+                >
+                  <div
+                    className={`pointer-events-none absolute inset-0 opacity-80 ${moodPalette.replyTint}`}
+                    aria-hidden
+                  />
+                  <div className="relative">
                 {reply.question ? (
                   <p className="mb-2 text-xs text-slate-300">
                     <span className="text-slate-400">Question:</span> {reply.question}
@@ -2090,7 +2283,13 @@ export function HelixAskPill({
                         Final answer
                       </p>
                       <p className="mt-1 whitespace-pre-wrap text-[11px] text-slate-300">
-                        {renderHelixAskContent(reply.content)}
+                        {renderHelixAskContent(
+                          clipForDisplay(
+                            coerceText(reply.content),
+                            HELIX_ASK_MAX_RENDER_CHARS,
+                            expanded,
+                          ),
+                        )}
                       </p>
                     </div>
                   ) : null}
@@ -2192,7 +2391,7 @@ export function HelixAskPill({
                         Gate summary
                       </p>
                       <pre className="mt-1 whitespace-pre-wrap">
-                        {JSON.stringify(reply.debug.gates, null, 2)}
+                        {safeJsonStringify(reply.debug.gates)}
                       </pre>
                     </div>
                   ) : null}
@@ -2353,10 +2552,11 @@ export function HelixAskPill({
               </div>
                 </div>
               </div>
-          );
-          })}
-        </div>
-      ) : null}
-    </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    </HelixAskErrorBoundary>
   );
 }
