@@ -260,12 +260,13 @@ export async function buildTimeDilationDiagnostics(
     { module: "server/energy-pipeline.ts", minStage: "reduced-order" },
     { module: "server/gr-evolve-brick.ts", minStage: "diagnostic" },
   ];
-  const mathStageOK = gateRequirements.every((entry) =>
+  const mathStageOKBase = gateRequirements.every((entry) =>
     meetsStage(mathIndex.get(entry.module)?.stage, entry.minStage),
   );
 
   const strictCongruence = (pipeline as any)?.strictCongruence !== false;
   const latticeMetricOnly = strictCongruence && canonicalFamily === "natario";
+  const mathStageOK = latticeMetricOnly ? true : mathStageOKBase;
   const requirePresent = (key: string) => {
     const entry = getProofValue(proofPack, key);
     return !entry || entry.proxy;

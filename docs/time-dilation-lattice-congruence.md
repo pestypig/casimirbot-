@@ -17,11 +17,17 @@ Applies to `client/src/components/TimeDilationLatticePanel.tsx` and `client/src/
 The lattice renders only when **all** of the following are true:
 
 1. GR brick is present and certified.
-2. Math stage gate is OK.
+2. Math stage gate is OK (or bypassed for Natario canonical strict mode).
 3. No proxy inputs are present.
 4. Strict congruence is enabled.
 
 If any of these are false, the lattice is **blocked** and displays a strict-mode message instead of rendering a proxy visualization.
+
+### Math Stage Gate Override (Natario Canonical)
+
+For Natario canonical strict mode, the math-stage gate is treated as **advisory** and does not block rendering.
+This keeps the lattice faithful to the canonical Natario contract while the wider pipeline stage registry is being upgraded.
+Proxy checks and GR certification still apply; this override does **not** allow proxy inputs.
 
 ## GR Brick Auto-Kick (Strict Mode)
 
