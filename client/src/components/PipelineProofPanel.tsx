@@ -8,6 +8,8 @@ import { useMathStageGate } from "@/hooks/useMathStageGate";
 import {
   PROOF_PACK_STAGE_REQUIREMENTS,
   mergeProofPackIntoPipeline,
+  isStrictProofPack,
+  hasStrictProxy,
 } from "@/lib/proof-pack";
 import { STAGE_BADGE, STAGE_LABELS } from "@/lib/math-stage-gate";
 import { cn } from "@/lib/utils";
@@ -15,6 +17,7 @@ import { C, G, PI, PLANCK_LUMINOSITY_W } from "@/lib/physics-const";
 import { openDocPanel } from "@/lib/docs/openDocPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import CongruenceLegend from "@/components/common/CongruenceLegend";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -839,6 +842,9 @@ export default function PipelineProofPanel() {
     ? "STAGE..."
     : STAGE_LABELS[stageGate.stage];
   const stageProxy = !stageGate.ok || !proofPack;
+  const strictProof = isStrictProofPack(proofPack);
+  const strictProxy =
+    strictProof && (stageProxy || hasStrictProxy(proofPack));
   const pipelineSnapshot = useMemo(
     () => mergeProofPackIntoPipeline(proofPack, pipelineSnapshotRaw ?? null),
     [proofPack, pipelineSnapshotRaw],
@@ -923,6 +929,12 @@ export default function PipelineProofPanel() {
           <p className="text-[11px] uppercase tracking-wide text-slate-400">Proof surface</p>
           <h1 className="text-xl font-semibold text-white">Pipeline Proof</h1>
           <p className="text-xs text-slate-400">Live pipeline truth + the evidence the planner used.</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
+            <span className="font-mono">proofpack.source=proof-pack</span>
+            <span className="font-mono">proofpack.congruence=conditional</span>
+            <span className="font-mono">pipeline.source=energy-pipeline</span>
+          </div>
+          <CongruenceLegend className="mt-1" compact />
         </div>
         <div className="flex items-center gap-2">
           <Badge
@@ -934,7 +946,11 @@ export default function PipelineProofPanel() {
           >
             {stageLabel}
           </Badge>
-          {stageProxy ? (
+          {strictProxy ? (
+            <Badge className="border px-2 py-0.5 text-[10px] bg-rose-500/10 text-rose-100 border-rose-500/40">
+              NON-ADMISSIBLE (STRICT)
+            </Badge>
+          ) : stageProxy ? (
             <Badge className="border px-2 py-0.5 text-[10px] bg-slate-800 text-slate-200">
               PROXY
             </Badge>
@@ -948,6 +964,12 @@ export default function PipelineProofPanel() {
           </button>
         </div>
       </header>
+      {strictProxy ? (
+        <div className="border-b border-rose-500/20 bg-rose-500/5 px-5 py-3 text-xs text-rose-100">
+          Strict congruence is enabled and proxy proof-pack entries were detected. This panel is informative
+          but not admissible as a metric-derived proof surface.
+        </div>
+      ) : null}
 
       <div className="flex-1 overflow-auto p-5">
         <div className="mb-4">

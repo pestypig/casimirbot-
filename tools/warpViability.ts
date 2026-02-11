@@ -16,21 +16,30 @@ import type {
 } from "../types/warpViability";
 import type { PipelineSnapshot } from "../types/pipeline";
 import { findWarpConstraint, loadWarpAgentsConfig, resolveConstraintSeverity } from "../modules/physics/warpAgents";
+import { SI_TO_GEOM_STRESS } from "../shared/gr-units";
 
 export type { ConstraintResult, ConstraintSeverity, ViabilityResult, ViabilityStatus, WarpConfig };
 
+const parseEnvNumber = (value: string | undefined, fallback: number) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
 
 const CM2_TO_M2 = 1e-4;
 const DEFAULT_TS_MIN = 100;
 const TS_IDLE_JITTER_MIN = 99.5; // certificate-side buffer for rounding jitter when idle
 const DEFAULT_THETA_MAX = 1e12;
-const DEFAULT_MASS_TOL = 0.1; // ±10% band
+const DEFAULT_MASS_TOL = 0.1; // +/-10% band
+const DEFAULT_CL3_RHO_DELTA_MAX = parseEnvNumber(process.env.WARP_CL3_RHO_DELTA_MAX, 0.1);
 const VDB_MIN = 0;
 const VDB_MAX = 1e16;
-
-const parseEnvNumber = (value: string | undefined, fallback: number) => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
+const VDB_BPRIME_MIN_ABS = parseEnvNumber(process.env.WARP_VDB_BPRIME_MIN_ABS, 1e-18);
+const VDB_BDOUBLE_MIN_ABS = parseEnvNumber(process.env.WARP_VDB_BDOUBLE_MIN_ABS, 1e-18);
+const VDB_DFDR_MIN_ABS = parseEnvNumber(process.env.WARP_VDB_DFDR_MIN_ABS, 1e-18);
+const strictCongruenceEnabled = () => process.env.WARP_STRICT_CONGRUENCE !== "0";
+const qiSourceIsMetric = (source: unknown): boolean => {
+  const s = typeof source === "string" ? source.toLowerCase() : "";
+  return s.startsWith("warp.metric") || s.startsWith("gr.rho_constraint") || s.startsWith("gr.metric");
 };
 
 const GR_GUARDRAIL_THRESHOLDS = {
@@ -49,6 +58,243 @@ const toFinite = (value: unknown): number | undefined => {
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
 };
+
+const resolveVdbDerivativeMaxAbs = (
+  region: any,
+  minKey: "bprime_min" | "bdouble_min",
+  maxKey: "bprime_max" | "bdouble_max",
+): number | undefined => {
+  const minValue = toFinite(region?.[minKey]);
+  const maxValue = toFinite(region?.[maxKey]);
+  if (minValue == null && maxValue == null) return undefined;
+  return Math.max(Math.abs(minValue ?? 0), Math.abs(maxValue ?? 0));
+};
+
+const hasVdbRegionIIMetricSupport = (region: any): boolean => {
+  if (region?.support !== true) return false;
+  const t00Mean = toFinite(region?.t00_mean);
+  const sampleCount = toFinite(region?.sampleCount);
+  const bprimeMaxAbs = resolveVdbDerivativeMaxAbs(region, "bprime_min", "bprime_max");
+  const bdoubleMaxAbs = resolveVdbDerivativeMaxAbs(region, "bdouble_min", "bdouble_max");
+  return (
+    t00Mean != null &&
+    sampleCount != null &&
+    sampleCount > 0 &&
+    bprimeMaxAbs != null &&
+    bprimeMaxAbs > VDB_BPRIME_MIN_ABS &&
+    bdoubleMaxAbs != null &&
+    bdoubleMaxAbs > VDB_BDOUBLE_MIN_ABS
+  );
+};
+
+const hasVdbRegionIVMetricSupport = (region: any): boolean => {
+  if (region?.support !== true) return false;
+  const t00Mean = toFinite(region?.t00_mean);
+  const sampleCount = toFinite(region?.sampleCount);
+  const dfdrMaxAbs = toFinite(region?.dfdr_max_abs);
+  return (
+    t00Mean != null &&
+    sampleCount != null &&
+    sampleCount > 0 &&
+    dfdrMaxAbs != null &&
+    Math.abs(dfdrMaxAbs) > VDB_DFDR_MIN_ABS
+  );
+};
+
+type MetricT00GeomRef = {
+  value?: number;
+  source?: string;
+  chart?: string;
+  family?: string;
+  observer?: string;
+  normalization?: string;
+  unitSystem?: string;
+  contractStatus?: string;
+  contractReason?: string;
+  contractOk?: boolean;
+};
+
+const resolveMetricT00GeomFromPipeline = (
+  pipeline: EnergyPipelineState,
+): MetricT00GeomRef => {
+  const warpAdapter = (pipeline as any).warp?.metricAdapter;
+  const warpChart =
+    typeof warpAdapter?.chart?.label === "string" && warpAdapter.chart.label.length > 0
+      ? String(warpAdapter.chart.label)
+      : undefined;
+  const warpFamily =
+    typeof warpAdapter?.family === "string" && warpAdapter.family.length > 0
+      ? String(warpAdapter.family)
+      : undefined;
+  const warpMetricT00 = toFinite((pipeline as any).warp?.metricT00);
+  const warpMetricSource =
+    (pipeline as any).warp?.metricT00Source ??
+    ((pipeline as any).warp?.metricT00 != null ? "metric" : undefined);
+  const warpMetricRef =
+    typeof (pipeline as any).warp?.metricT00Ref === "string" &&
+    (pipeline as any).warp.metricT00Ref.length > 0
+      ? String((pipeline as any).warp.metricT00Ref)
+      : "warp.metric.T00";
+  const warpMetricContract =
+    (pipeline as any).warp?.metricT00Contract &&
+    typeof (pipeline as any).warp.metricT00Contract === "object"
+      ? ((pipeline as any).warp.metricT00Contract as Record<string, unknown>)
+      : undefined;
+  const warpObserverRaw =
+    (pipeline as any).warp?.metricT00Observer ??
+    warpMetricContract?.observer;
+  const warpNormalizationRaw =
+    (pipeline as any).warp?.metricT00Normalization ??
+    warpMetricContract?.normalization;
+  const warpUnitSystemRaw =
+    (pipeline as any).warp?.metricT00UnitSystem ??
+    warpMetricContract?.unitSystem;
+  const warpContractStatusRaw =
+    warpMetricContract?.status ??
+    (pipeline as any).natario?.metricT00ContractStatus;
+  const warpContractReasonRaw =
+    warpMetricContract?.reason ??
+    (pipeline as any).natario?.metricT00ContractReason;
+  const warpObserver =
+    typeof warpObserverRaw === "string" && warpObserverRaw.length > 0
+      ? String(warpObserverRaw)
+      : undefined;
+  const warpNormalization =
+    typeof warpNormalizationRaw === "string" && warpNormalizationRaw.length > 0
+      ? String(warpNormalizationRaw)
+      : undefined;
+  const warpUnitSystem =
+    typeof warpUnitSystemRaw === "string" && warpUnitSystemRaw.length > 0
+      ? String(warpUnitSystemRaw)
+      : undefined;
+  const warpContractStatus =
+    typeof warpContractStatusRaw === "string" && warpContractStatusRaw.length > 0
+      ? String(warpContractStatusRaw)
+      : undefined;
+  const warpContractReason =
+    typeof warpContractReasonRaw === "string" && warpContractReasonRaw.length > 0
+      ? String(warpContractReasonRaw)
+      : undefined;
+  const warpContractOk =
+    warpContractStatus === "ok" &&
+    warpChart !== "unspecified" &&
+    warpObserver != null &&
+    warpNormalization != null &&
+    warpUnitSystem === "SI";
+  if (warpMetricSource === "metric" && warpMetricT00 != null) {
+    return {
+      value: warpMetricT00 * SI_TO_GEOM_STRESS,
+      source: warpMetricRef,
+      chart: warpChart,
+      family: warpFamily,
+      observer: warpObserver,
+      normalization: warpNormalization,
+      unitSystem: warpUnitSystem,
+      contractStatus: warpContractStatus,
+      contractReason: warpContractReason,
+      contractOk: warpContractOk,
+    };
+  }
+
+  const natarioMetricT00 = toFinite((pipeline as any).natario?.metricT00);
+  const natarioMetricSource =
+    (pipeline as any).natario?.metricT00Source ??
+    (pipeline as any).natario?.metricSource;
+  const natarioMetricRef =
+    typeof (pipeline as any).natario?.metricT00Ref === "string" &&
+    (pipeline as any).natario.metricT00Ref.length > 0
+      ? String((pipeline as any).natario.metricT00Ref)
+      : "warp.metric.T00.natario.shift";
+  const natarioChart =
+    typeof (pipeline as any).natario?.chartLabel === "string" &&
+    (pipeline as any).natario.chartLabel.length > 0
+      ? String((pipeline as any).natario.chartLabel)
+      : undefined;
+  const natarioObserver =
+    typeof (pipeline as any).natario?.metricT00Observer === "string" &&
+    (pipeline as any).natario.metricT00Observer.length > 0
+      ? String((pipeline as any).natario.metricT00Observer)
+      : undefined;
+  const natarioNormalization =
+    typeof (pipeline as any).natario?.metricT00Normalization === "string" &&
+    (pipeline as any).natario.metricT00Normalization.length > 0
+      ? String((pipeline as any).natario.metricT00Normalization)
+      : undefined;
+  const natarioUnitSystem =
+    typeof (pipeline as any).natario?.metricT00UnitSystem === "string" &&
+    (pipeline as any).natario.metricT00UnitSystem.length > 0
+      ? String((pipeline as any).natario.metricT00UnitSystem)
+      : undefined;
+  const natarioContractStatus =
+    typeof (pipeline as any).natario?.metricT00ContractStatus === "string" &&
+    (pipeline as any).natario.metricT00ContractStatus.length > 0
+      ? String((pipeline as any).natario.metricT00ContractStatus)
+      : undefined;
+  const natarioContractReason =
+    typeof (pipeline as any).natario?.metricT00ContractReason === "string" &&
+    (pipeline as any).natario.metricT00ContractReason.length > 0
+      ? String((pipeline as any).natario.metricT00ContractReason)
+      : undefined;
+  const natarioContractOk =
+    natarioContractStatus === "ok" &&
+    (natarioChart ?? warpChart) !== "unspecified" &&
+    natarioObserver != null &&
+    natarioNormalization != null &&
+    natarioUnitSystem === "SI";
+  if (natarioMetricSource === "metric" && natarioMetricT00 != null) {
+    return {
+      value: natarioMetricT00 * SI_TO_GEOM_STRESS,
+      source: natarioMetricRef,
+      chart: natarioChart ?? warpChart,
+      family: "natario",
+      observer: natarioObserver,
+      normalization: natarioNormalization,
+      unitSystem: natarioUnitSystem,
+      contractStatus: natarioContractStatus,
+      contractReason: natarioContractReason,
+      contractOk: natarioContractOk,
+    };
+  }
+
+  const vdbRegionII = (pipeline as any).vdbRegionII;
+  const vdbRegionIIT00Mean = toFinite(vdbRegionII?.t00_mean);
+  if (hasVdbRegionIIMetricSupport(vdbRegionII) && vdbRegionIIT00Mean != null) {
+    return {
+      value: vdbRegionIIT00Mean,
+      source: "warp.metric.T00.vdb.regionII",
+      chart: warpChart ?? "comoving_cartesian",
+      family: "vdb",
+      observer: "orthonormal_region_ii",
+      normalization: "si_stress",
+      unitSystem: "SI",
+      contractStatus: "ok",
+      contractReason: undefined,
+      contractOk: true,
+    };
+  }
+
+  const vdbRegionIV = (pipeline as any).vdbRegionIV;
+  const vdbRegionIVT00Mean = toFinite(vdbRegionIV?.t00_mean);
+  if (hasVdbRegionIVMetricSupport(vdbRegionIV) && vdbRegionIVT00Mean != null) {
+    return {
+      value: vdbRegionIVT00Mean,
+      source: "warp.metric.T00.vdb.regionIV",
+      chart: warpChart ?? "comoving_cartesian",
+      family: "vdb",
+      observer: "eulerian_n",
+      normalization: "si_stress",
+      unitSystem: "SI",
+      contractStatus: "ok",
+      contractReason: undefined,
+      contractOk: true,
+    };
+  }
+
+  return {};
+};
+
+const relDelta = (current: number, baseline: number, eps = 1e-12): number =>
+  Math.abs(current - baseline) / Math.max(Math.abs(baseline), eps);
 
 const clamp01 = (value: number | undefined): number | undefined => {
   if (value === undefined) return undefined;
@@ -208,10 +454,74 @@ export async function evaluateWarpViability(
   const dutyEffective = extractDutyEffective(pipeline);
   const gammaGeoCubed = Math.pow(pipeline.gammaGeo ?? 0, 3);
   const gammaVdB = (pipeline as any).gammaVanDenBroeck_mass ?? pipeline.gammaVanDenBroeck;
+  const vdbRegionII = (pipeline as any).vdbRegionII;
+  const vdbRegionIV = (pipeline as any).vdbRegionIV;
+  const vdbRegionIISupport =
+    typeof vdbRegionII?.support === "boolean" ? vdbRegionII.support : undefined;
+  const vdbRegionIVSupport =
+    typeof vdbRegionIV?.support === "boolean" ? vdbRegionIV.support : undefined;
+  const vdbTwoWallSupport =
+    vdbRegionIISupport === true && vdbRegionIVSupport === true
+      ? true
+      : vdbRegionIISupport === false || vdbRegionIVSupport === false
+        ? false
+        : undefined;
+  const vdbBprimeMaxAbs = resolveVdbDerivativeMaxAbs(vdbRegionII, "bprime_min", "bprime_max");
+  const vdbBdoubleMaxAbs = resolveVdbDerivativeMaxAbs(
+    vdbRegionII,
+    "bdouble_min",
+    "bdouble_max",
+  );
+  const vdbRegionIIT00Mean = toFinite(vdbRegionII?.t00_mean);
+  const vdbRegionIVDfdrMaxAbs = toFinite(vdbRegionIV?.dfdr_max_abs);
+  const vdbRegionIIDerivativeSupport = hasVdbRegionIIMetricSupport(vdbRegionII);
+  const vdbRegionIVDerivativeSupport =
+    vdbRegionIVSupport === true &&
+    vdbRegionIVDfdrMaxAbs != null &&
+    Math.abs(vdbRegionIVDfdrMaxAbs) > VDB_DFDR_MIN_ABS;
+  const vdbTwoWallDerivativeSupport =
+    vdbRegionIIDerivativeSupport && vdbRegionIVDerivativeSupport;
   const qiGuard = (liveSnapshot?.qiGuardrail as any) ?? (pipeline as any).qiGuardrail;
   const modeConfig = MODE_CONFIGS[pipeline.currentMode] as { zeta_max?: number } | undefined;
   const zetaMax = modeConfig?.zeta_max ?? 1;
-  const theta = (pipeline as any).thetaCal ?? (pipeline as any).thetaScaleExpected;
+  const strictCongruence = strictCongruenceEnabled();
+  const tsMetricDerived = (pipeline as any).tsMetricDerived === true;
+  const tsMetricSource =
+    typeof (pipeline as any).tsMetricDerivedSource === "string" &&
+    (pipeline as any).tsMetricDerivedSource.length > 0
+      ? String((pipeline as any).tsMetricDerivedSource)
+      : undefined;
+  const tsMetricReason =
+    typeof (pipeline as any).tsMetricDerivedReason === "string" &&
+    (pipeline as any).tsMetricDerivedReason.length > 0
+      ? String((pipeline as any).tsMetricDerivedReason)
+      : undefined;
+  const betaDiagnostics = (pipeline as any).warp?.metricAdapter?.betaDiagnostics;
+  const thetaGeom = toFinite(betaDiagnostics?.thetaMax ?? betaDiagnostics?.thetaRms);
+  const thetaGeomProxy = betaDiagnostics?.method === "not-computed";
+  const thetaMetricDerived = thetaGeom != null && !thetaGeomProxy;
+  const thetaProxySource =
+    (pipeline as any).thetaCal != null
+      ? "pipeline.thetaCal"
+      : (pipeline as any).thetaScaleExpected != null
+        ? "pipeline.thetaScaleExpected"
+        : undefined;
+  const thetaProxy = toFinite(
+    (pipeline as any).thetaCal ?? (pipeline as any).thetaScaleExpected,
+  );
+  const thetaGeomSource =
+    thetaGeom != null
+      ? `warp.metricAdapter.betaDiagnostics.${
+          betaDiagnostics?.thetaMax != null ? "thetaMax" : "thetaRms"
+        }`
+      : undefined;
+  const thetaMetricReason = thetaMetricDerived
+    ? "metric_adapter_divergence"
+    : thetaGeom == null
+      ? "missing_theta_geom"
+      : "theta_geom_proxy";
+  const theta = thetaMetricDerived ? thetaGeom : thetaProxy;
+  const thetaSource = thetaMetricDerived ? thetaGeomSource : thetaProxySource;
   const mTarget = pipeline.exoticMassTarget_kg ?? pipelineState.exoticMassTarget_kg;
   const T00Value =
     (pipeline as any).warp?.stressEnergyTensor?.T00 ??
@@ -339,6 +649,64 @@ export async function evaluateWarpViability(
   const lightCrossing = tsParts.lc ?? {};
   const tauPulse_ms = tsParts.tauPulse_ms;
   const grGuardrails = buildGrGuardrails(pipeline, liveSnapshot);
+  const gr = (liveSnapshot as any)?.gr ?? (pipeline as any)?.gr;
+  const metricConstraint = (pipeline as any)?.metricConstraint?.rho_constraint;
+  const rhoConstraintMean = toFinite(
+    gr?.constraints?.rho_constraint?.mean ?? metricConstraint?.mean,
+  );
+  const matterAvgT00 = toFinite(gr?.matter?.stressEnergy?.avgT00);
+  const pipelineRhoAvg = toFinite(pipeline.rho_avg ?? (pipeline as any).rho_avg);
+  const pipelineRhoAvgGeom =
+    pipelineRhoAvg == null ? undefined : pipelineRhoAvg * SI_TO_GEOM_STRESS;
+  const metricT00Ref = resolveMetricT00GeomFromPipeline(pipeline);
+  const warpMetricT00Geom = metricT00Ref.value;
+  const warpMetricSource = metricT00Ref.source;
+  const warpMetricChart = metricT00Ref.chart;
+  const warpMetricFamily = metricT00Ref.family;
+  const warpMetricObserver = metricT00Ref.observer;
+  const warpMetricNormalization = metricT00Ref.normalization;
+  const warpMetricUnitSystem = metricT00Ref.unitSystem;
+  const warpMetricContractStatus = metricT00Ref.contractStatus;
+  const warpMetricContractReason = metricT00Ref.contractReason;
+  const warpMetricContractOk = metricT00Ref.contractOk === true;
+  const thetaChartContractStatus =
+    typeof (pipeline as any)?.warp?.metricAdapter?.chart?.contractStatus === "string"
+      ? String((pipeline as any).warp.metricAdapter.chart.contractStatus)
+      : "unknown";
+  const thetaContractPass = thetaChartContractStatus === "ok";
+  const cl3DeltaMatter =
+    rhoConstraintMean != null && matterAvgT00 != null
+      ? relDelta(rhoConstraintMean, matterAvgT00)
+      : undefined;
+  const cl3DeltaMetric =
+    rhoConstraintMean != null && warpMetricT00Geom != null
+      ? relDelta(rhoConstraintMean, warpMetricT00Geom)
+      : undefined;
+  const cl3DeltaPipeline =
+    rhoConstraintMean != null && pipelineRhoAvgGeom != null
+      ? relDelta(rhoConstraintMean, pipelineRhoAvgGeom)
+      : undefined;
+  const cl3Delta = cl3DeltaMetric;
+  const cl3Source = cl3DeltaMetric != null ? warpMetricSource : undefined;
+  const cl3MissingParts: string[] = [];
+  if (rhoConstraintMean == null) cl3MissingParts.push("missing_rho_constraint");
+  if (warpMetricT00Geom == null || !warpMetricSource) cl3MissingParts.push("missing_metric_t00");
+  if (
+    strictCongruence &&
+    warpMetricT00Geom != null &&
+    !warpMetricContractOk
+  ) {
+    cl3MissingParts.push("missing_metric_contract");
+  }
+  const cl3MissingReason = cl3MissingParts.join(",");
+  const cl3MissingNote =
+    cl3MissingParts.includes("missing_metric_t00")
+      ? "metric_source_missing"
+      : cl3MissingParts.includes("missing_metric_contract")
+        ? "metric_contract_missing"
+      : cl3MissingParts.includes("missing_rho_constraint")
+        ? "constraint_rho_missing"
+        : undefined;
 
   const snapshot: WarpViabilitySnapshot = {
     bubbleRadius_m: config.bubbleRadius_m ?? pipeline.shipRadius_m,
@@ -352,9 +720,27 @@ export async function evaluateWarpViability(
     TS_ratio: Number.isFinite(TS) ? TS : pipeline.TS_ratio,
     gamma_geo_cubed: gammaGeoCubed,
     gamma_VdB: gammaVdB,
+    vdb_region_ii_support: vdbRegionIISupport,
+    vdb_region_ii_bprime_max_abs: vdbBprimeMaxAbs,
+    vdb_region_ii_bdouble_max_abs: vdbBdoubleMaxAbs,
+    vdb_region_ii_t00_mean: vdbRegionIIT00Mean,
+    vdb_region_iv_support: vdbRegionIVSupport,
+    vdb_region_iv_dfdr_max_abs: vdbRegionIVDfdrMaxAbs,
+    vdb_two_wall_support: vdbTwoWallSupport,
+    vdb_region_ii_derivative_support: vdbRegionIIDerivativeSupport,
+    vdb_region_iv_derivative_support: vdbRegionIVDerivativeSupport,
+    vdb_two_wall_derivative_support: vdbTwoWallDerivativeSupport,
     gammaGeo: pipeline.gammaGeo,
     M_exotic: pipeline.M_exotic,
-    thetaCal: theta,
+    thetaCal: thetaProxy,
+    theta_audit: theta,
+    theta_geom: thetaGeom,
+    theta_proxy: thetaProxy,
+    theta_source: thetaSource,
+    theta_proxy_source: thetaProxySource,
+    theta_metric_derived: thetaMetricDerived,
+    theta_metric_source: thetaMetricDerived ? thetaGeomSource : undefined,
+    theta_metric_reason: thetaMetricReason,
     zeta: (pipeline as any).zeta,
     qiGuardrail: qiGuard?.marginRatio,
     T00_min: (pipeline as any).T00_min ?? T00Value,
@@ -363,20 +749,72 @@ export async function evaluateWarpViability(
     dwell_ms: Number.isFinite(lightCrossing.dwell_ms) ? Number(lightCrossing.dwell_ms) : undefined,
     burst_ms: Number.isFinite(tauPulse_ms) ? Number(tauPulse_ms) : undefined,
     ts: tsTelemetry,
+    ts_metric_derived: tsMetricDerived,
+    ts_metric_source: tsMetricSource,
+    ts_metric_reason: tsMetricReason,
     grGuardrails,
+    rho_constraint_mean: rhoConstraintMean,
+    rho_delta_mean: cl3Delta,
+    rho_delta_metric_mean: cl3DeltaMetric,
+    rho_delta_pipeline_mean: cl3DeltaPipeline,
+    rho_delta_threshold: cl3Delta != null ? DEFAULT_CL3_RHO_DELTA_MAX : undefined,
+    rho_delta_source: cl3Source ?? (strictCongruence ? "metric-missing" : undefined),
+    rho_delta_metric_source: warpMetricT00Geom != null ? warpMetricSource : undefined,
+    rho_delta_metric_chart: warpMetricT00Geom != null ? warpMetricChart : undefined,
+    rho_delta_metric_family: warpMetricT00Geom != null ? warpMetricFamily : undefined,
+    rho_delta_metric_observer: warpMetricT00Geom != null ? warpMetricObserver : undefined,
+    rho_delta_metric_normalization:
+      warpMetricT00Geom != null ? warpMetricNormalization : undefined,
+    rho_delta_metric_unit_system: warpMetricT00Geom != null ? warpMetricUnitSystem : undefined,
+    rho_delta_metric_contract_status:
+      warpMetricT00Geom != null ? warpMetricContractStatus : undefined,
+    rho_delta_metric_contract_reason:
+      warpMetricT00Geom != null ? warpMetricContractReason : undefined,
+    rho_delta_metric_contract_ok:
+      warpMetricT00Geom != null ? warpMetricContractOk : undefined,
+    theta_chart_contract_status: thetaChartContractStatus,
+    theta_chart_contract_ok: thetaContractPass,
     telemetrySource: liveSnapshot ? opts.telemetrySource ?? "pipeline-live" : opts.telemetrySource ?? "solver",
     pipelineHeaders: opts.telemetryHeaders,
   };
 
   const results: ConstraintResult[] = [];
 
-  // Ford–Roman / QI guardrail
+  // Fordâ€“Roman / QI guardrail
   if (qiGuard && Number.isFinite(qiGuard.marginRatio)) {
     const meta = applySpec("FordRomanQI", {
       severity: "HARD",
-      description: "Quantum inequality (Ford–Roman) margin < 1.0",
+      description: "Quantum inequality (Fordâ€“Roman) margin < 1.0",
     });
-    const passed = qiGuard.marginRatio < 1;
+    const curvatureOk = qiGuard.curvatureOk;
+    const curvatureEnforced = qiGuard.curvatureEnforced === true;
+    const curvaturePass = !curvatureEnforced || curvatureOk !== false;
+    const metricRhoSource = qiSourceIsMetric(qiGuard.rhoSource);
+    const qiSourceRaw =
+      typeof qiGuard.rhoSource === "string" ? String(qiGuard.rhoSource).toLowerCase() : "";
+    const qiConstraintSource = qiSourceRaw.startsWith("gr.rho_constraint");
+    const contractPass = qiConstraintSource || warpMetricContractOk;
+    const sourcePass = !strictCongruence || (metricRhoSource && contractPass);
+    const passed = qiGuard.marginRatio < 1 && curvaturePass && sourcePass;
+    const curvatureDetail =
+      curvatureOk === undefined
+        ? "curvature=unknown"
+        : `curvature_ok=${curvatureOk}`;
+    const ratioDetail =
+      qiGuard.curvatureRatio != null
+        ? `curvature_ratio=${qiGuard.curvatureRatio}`
+        : undefined;
+    const curvatureNote = [
+      curvatureDetail,
+      ratioDetail,
+      `rho_source=${qiGuard.rhoSource ?? "unknown"}`,
+      strictCongruence ? `metric_source=${metricRhoSource}` : null,
+      strictCongruence ? `metric_contract=${contractPass}` : null,
+      strictCongruence ? `metric_contract_status=${warpMetricContractStatus ?? "unknown"}` : null,
+      curvatureEnforced ? "curvature_enforced" : null,
+    ]
+      .filter(Boolean)
+      .join("; ");
     results.push(
       constraint(
         "FordRomanQI",
@@ -385,22 +823,33 @@ export async function evaluateWarpViability(
         passed,
         qiGuard.marginRatio,
         1,
-        `lhs=${qiGuard.lhs_Jm3 ?? "n/a"} bound=${qiGuard.bound_Jm3 ?? "n/a"}`,
+        `lhs=${qiGuard.lhs_Jm3 ?? "n/a"} bound=${qiGuard.bound_Jm3 ?? "n/a"} ${curvatureNote}`,
+        !sourcePass
+          ? !metricRhoSource
+            ? "proxy_input"
+            : "contract_missing"
+          : curvatureOk === false
+            ? "curvature_window"
+            : undefined,
       ),
     );
   } else if (pipeline.fordRomanCompliance !== undefined) {
     const meta = applySpec("FordRomanQI", {
       severity: "HARD",
-      description: "Quantum inequality (Ford–Roman) margin < 1.0",
+      description: "Quantum inequality (Fordâ€“Roman) margin < 1.0",
     });
+    const sourcePass = !strictCongruence;
+    const passed = Boolean(pipeline.fordRomanCompliance) && sourcePass;
     results.push(
       constraint(
         "FordRomanQI",
         meta.description,
         meta.severity,
-        Boolean(pipeline.fordRomanCompliance),
+        passed,
         (pipeline as any).zeta,
         zetaMax,
+        `strict=${strictCongruence}; source=${sourcePass ? "legacy_boolean" : "proxy_fallback_blocked"}`,
+        !sourcePass ? "proxy_input" : undefined,
       ),
     );
   }
@@ -414,15 +863,22 @@ export async function evaluateWarpViability(
     });
     const tsDetail = `TS_ratio=${tsValue} required>=${DEFAULT_TS_MIN}`;
     const idleJitterPass = tsAutoscaleGating === "idle" && tsValue >= TS_IDLE_JITTER_MIN;
-    const passed = tsValue >= DEFAULT_TS_MIN || idleJitterPass;
+    const tsBandPass = tsValue >= DEFAULT_TS_MIN || idleJitterPass;
+    const sourcePass = !strictCongruence || tsMetricDerived;
+    const passed = tsBandPass && sourcePass;
     const noteParts = [];
     if (tsAutoscaleEngaged && tsValue < DEFAULT_TS_MIN) noteParts.push("mitigation:ts_autoscale");
     else if (tsAutoscaleEngaged) noteParts.push("TS_autoscale_active");
     if (idleJitterPass) noteParts.push("idle_jitter_buffer");
-    const note = noteParts.length ? noteParts.join(";") : undefined;
+    const note = !sourcePass
+      ? "proxy_input"
+      : noteParts.length
+        ? noteParts.join(";")
+        : undefined;
+    const strictSourceDetail = `strict=${strictCongruence}; metric_source=${sourcePass}; ts_source=${tsMetricSource ?? "unknown"}; ts_reason=${tsMetricReason ?? "n/a"}`;
     const details = tsAutoscaleEngaged
-      ? `${tsDetail}; TS_autoscale_active=true; gating=${tsAutoscaleGating}; resamples=${resampleCount}`
-      : tsDetail;
+      ? `${tsDetail}; ${strictSourceDetail}; TS_autoscale_active=true; gating=${tsAutoscaleGating}; resamples=${resampleCount}`
+      : `${tsDetail}; ${strictSourceDetail}`;
     const tsConstraint = constraint(
       "TS_ratio_min",
       meta.description,
@@ -437,20 +893,91 @@ export async function evaluateWarpViability(
   }
 
   // Theta calibration band
-  if (theta !== undefined) {
+  if (theta !== undefined || strictCongruence) {
     const meta = applySpec("ThetaAudit", {
       severity: "HARD",
       description: "Theta calibration within allowed band",
     });
+    const hasGeometryTheta = thetaMetricDerived;
+    const thetaAbs = theta != null ? Math.abs(theta) : undefined;
+    const thetaBandPass = thetaAbs != null ? thetaAbs <= DEFAULT_THETA_MAX : false;
+    const thetaPass = strictCongruence
+      ? hasGeometryTheta && thetaContractPass && thetaBandPass
+      : thetaBandPass;
     results.push(
       constraint(
         "ThetaAudit",
         meta.description,
         meta.severity,
-        Math.abs(theta) <= DEFAULT_THETA_MAX,
-        Math.abs(theta),
+        thetaPass,
+        thetaAbs,
         DEFAULT_THETA_MAX,
-        `|thetaCal|=${Math.abs(theta)} max=${DEFAULT_THETA_MAX}`,
+        `|theta|=${thetaAbs ?? "n/a"} max=${DEFAULT_THETA_MAX} source=${thetaSource ?? "unknown"} strict=${strictCongruence} geometryTheta=${hasGeometryTheta} chartContract=${thetaChartContractStatus} metricReason=${thetaMetricReason}`,
+        strictCongruence && !hasGeometryTheta
+          ? "proxy_input"
+          : strictCongruence && !thetaContractPass
+            ? "chart_contract_missing"
+            : undefined,
+      ),
+    );
+  }
+
+  if (cl3Delta != null) {
+    const meta = applySpec("CL3_RhoDelta", {
+      severity: "SOFT",
+      description: "CL3 stress-energy congruence (constraint rho vs T00).",
+    });
+    const passed = cl3Delta <= DEFAULT_CL3_RHO_DELTA_MAX;
+    const reference =
+      cl3DeltaMetric != null
+        ? warpMetricT00Geom
+        : cl3Source === "gr.matter.avgT00"
+          ? matterAvgT00
+          : cl3Source === "pipeline.rho_avg"
+            ? pipelineRhoAvgGeom
+            : undefined;
+    const details = `source=${cl3Source ?? "unknown"} chart=${warpMetricChart ?? "n/a"} family=${
+      warpMetricFamily ?? "n/a"
+    } observer=${warpMetricObserver ?? "n/a"} norm=${warpMetricNormalization ?? "n/a"} contract=${
+      warpMetricContractStatus ?? "unknown"
+    } rho_constraint_mean=${rhoConstraintMean ?? "n/a"} T00_ref=${reference ?? "n/a"} delta=${cl3Delta}`;
+    results.push(
+      constraint(
+        "CL3_RhoDelta",
+        meta.description,
+        meta.severity,
+        passed,
+        cl3Delta,
+        DEFAULT_CL3_RHO_DELTA_MAX,
+        details,
+        cl3Source ? `source=${cl3Source}` : undefined,
+      ),
+    );
+  } else {
+    const meta = applySpec("CL3_RhoDelta", {
+      severity: "SOFT",
+      description: "CL3 stress-energy congruence (constraint rho vs T00).",
+    });
+    const details = `source=${warpMetricSource ?? "metric-missing"} chart=${warpMetricChart ?? "n/a"} family=${
+      warpMetricFamily ?? "n/a"
+    } observer=${warpMetricObserver ?? "n/a"} norm=${warpMetricNormalization ?? "n/a"} contract=${
+      warpMetricContractStatus ?? "unknown"
+    } rho_constraint_mean=${
+      rhoConstraintMean ?? "n/a"
+    } T00_ref=${warpMetricT00Geom ?? "n/a"} delta=n/a strict=${strictCongruence} reason=${
+      cl3MissingReason || "missing_inputs"
+    }`;
+    results.push(
+      constraint(
+        "CL3_RhoDelta",
+        meta.description,
+        meta.severity,
+        false,
+        undefined,
+        DEFAULT_CL3_RHO_DELTA_MAX,
+        details,
+        cl3MissingNote ??
+          (strictCongruence ? "missing_inputs" : "missing_inputs_relaxed"),
       ),
     );
   }
@@ -482,15 +1009,40 @@ export async function evaluateWarpViability(
       description: "Van den Broeck compression factor in configured band",
     });
     const inBand = gammaVdB >= VDB_MIN && gammaVdB <= VDB_MAX;
+    const requiresSupport = gammaVdB > 1 + 1e-6;
+    const supportOk =
+      !requiresSupport ||
+      vdbTwoWallDerivativeSupport;
+    const pass = inBand && supportOk;
+    const hasVdbSupport =
+      vdbRegionIISupport !== undefined ||
+      vdbRegionIVSupport !== undefined ||
+      vdbTwoWallSupport !== undefined ||
+      vdbRegionIIDerivativeSupport ||
+      vdbRegionIVDerivativeSupport;
+    const supportLabel = (value: boolean | undefined) =>
+      value === true ? "on" : value === false ? "off" : "n/a";
+    const supportDetail = hasVdbSupport
+      ? `regionII=${supportLabel(vdbRegionIISupport)} regionIV=${supportLabel(vdbRegionIVSupport)} twoWall=${supportLabel(vdbTwoWallSupport)} derivII=${vdbRegionIIDerivativeSupport} derivIV=${vdbRegionIVDerivativeSupport} derivTwoWall=${vdbTwoWallDerivativeSupport} supportOk=${supportOk} requiresSupport=${requiresSupport}`
+      : undefined;
+    const derivativeDetail =
+      hasVdbSupport || requiresSupport
+        ? `bprime_max_abs=${vdbBprimeMaxAbs ?? "n/a"} bdouble_max_abs=${vdbBdoubleMaxAbs ?? "n/a"} dfdr_max_abs=${vdbRegionIVDfdrMaxAbs ?? "n/a"} thresholds=[${VDB_BPRIME_MIN_ABS},${VDB_BDOUBLE_MIN_ABS},${VDB_DFDR_MIN_ABS}]`
+        : undefined;
+    const detailParts = [
+      `gamma_VdB=${gammaVdB} band=[${VDB_MIN}, ${VDB_MAX}]`,
+      supportDetail,
+      derivativeDetail,
+    ].filter(Boolean);
     results.push(
       constraint(
         "VdB_band",
         meta.description,
         meta.severity,
-        inBand,
+        pass,
         gammaVdB,
         VDB_MAX,
-        `gamma_VdB=${gammaVdB} band=[${VDB_MIN}, ${VDB_MAX}]`,
+        detailParts.join(" "),
       ),
     );
   }

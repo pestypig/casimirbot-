@@ -19,6 +19,11 @@ const PANEL_IDEOLOGY_MAP: Record<string, PanelWhisper> = {
     text: "Source essay: return to the vow before you tune the drive.",
     mood: "question",
   },
+  "conformity-launch-rail": {
+    node: "conformity-launch-rail",
+    text: "Conformity Launch Rail: use the stable norms as rails, not destinations.",
+    mood: "friend",
+  },
 
   // Stewardship / craft
   "helix-core": {

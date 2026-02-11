@@ -9,15 +9,18 @@ import { useGrAssistantReport } from "@/hooks/useGrAssistantReport";
 import { useGrBrick } from "@/hooks/useGrBrick";
 import { useGrRegionStats } from "@/hooks/useGrRegionStats";
 import { useCasimirTileSummary } from "@/hooks/useCasimirTileSummary";
+import { useGrConstraintContract } from "@/hooks/useGrConstraintContract";
+import { useProofPack } from "@/hooks/useProofPack";
 import { useLapseBrick } from "@/hooks/useLapseBrick";
 import { computeTimeDilationRenderPlan, type TimeDilationRenderUiToggles } from "@/lib/time-dilation-render-policy";
+import { getProofValue, readProofNumber, readProofString } from "@/lib/proof-pack";
 import type { CurvatureQuality } from "@/lib/curvature-brick";
 import type { GrEvolveBrickChannel, GrEvolveBrickDecoded } from "@/lib/gr-evolve-brick";
 import type { LapseBrickChannel, LapseBrickDecoded } from "@/lib/lapse-brick";
 import { fetchHullAssets, type HullAssetEntry } from "@/lib/hull-assets";
 import { C } from "@/lib/physics-const";
 import { kappaDriveFromPower } from "@/physics/curvature";
-import type { GrRegionStats, HullPreviewPayload, TimeDilationRenderPlan } from "@shared/schema";
+import type { GrRegionStats, HullPreviewPayload, ProofPack, TimeDilationRenderPlan } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -131,7 +134,7 @@ type ClockRateMode = "eulerian" | "static";
 type ViewerChartMode = "adm" | "mp_like";
 type GeometrySource = "pipeline" | "repo" | "upload";
 
-type GuardrailState = "ok" | "fail" | "proxy";
+type GuardrailState = "ok" | "fail" | "proxy" | "missing";
 
 type GuardrailSummary = {
   fordRoman: GuardrailState;
@@ -141,6 +144,7 @@ type GuardrailSummary = {
   multiplier: number;
   proxy: boolean;
   hardPass: boolean;
+  source: "contract" | "pipeline";
 };
 
 type HullBounds = {
@@ -202,6 +206,7 @@ type TimeDilationLatticePanelProps = {
 
 const GRID_DIV = 12;
 const CM2_TO_M2 = 1e-4;
+const THETA_AUDIT_MAX = 1e12;
 const DEFAULT_VISUALS = {
   phiScale: 0.45,
   warpStrength: 0.12,
@@ -985,6 +990,27 @@ const resolveBooleanStatus = (value: unknown): boolean | null => {
   return null;
 };
 
+const FORCE_STRICT_LATTICE = import.meta.env.VITE_LATTICE_STRICT_ONLY !== "0";
+
+const resolveStrictCongruence = (pipeline?: EnergyPipelineState | null): boolean =>
+  FORCE_STRICT_LATTICE || (pipeline as any)?.strictCongruence !== false;
+
+const qiSourceIsMetric = (source: unknown): boolean => {
+  if (typeof source !== "string") return false;
+  const normalized = source.toLowerCase();
+  return (
+    normalized.startsWith("warp.metric") ||
+    normalized.startsWith("gr.metric") ||
+    normalized.startsWith("gr.rho_constraint")
+  );
+};
+
+const isGuardrailState = (value: unknown): value is GuardrailState =>
+  value === "ok" || value === "fail" || value === "proxy" || value === "missing";
+
+const hasGuardrailFailure = (state: GuardrailState): boolean =>
+  state === "fail" || state === "missing";
+
 function getPowerW(pipeline?: EnergyPipelineState | null): number {
   const watts = firstFinite(pipeline?.P_avg_W, (pipeline as any)?.power_W);
   if (Number.isFinite(watts)) return watts as number;
@@ -1168,6 +1194,28 @@ function resolveThetaCal(
   };
 }
 
+function resolveThetaGeom(pipeline?: EnergyPipelineState | null): SourcedNumber {
+  const direct = pickSourcedNumber([
+    {
+      value: (pipeline as any)?.theta_geom,
+      source: "theta_geom",
+      proxy: (pipeline as any)?.theta_geom_proxy,
+    },
+    {
+      value: (pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.thetaMax,
+      source: "warp.metricAdapter.betaDiagnostics.thetaMax",
+      proxy: (pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.method === "not-computed",
+    },
+    {
+      value: (pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.thetaRms,
+      source: "warp.metricAdapter.betaDiagnostics.thetaRms",
+      proxy: (pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.method === "not-computed",
+    },
+  ]);
+  if (direct) return direct;
+  return { value: Number.NaN, source: "missing", proxy: true };
+}
+
 function resolveT00Min(pipeline?: EnergyPipelineState | null): SourcedNumber {
   const direct = pickSourcedNumber([
     { value: (pipeline as any)?.T00_min, source: "T00_min" },
@@ -1192,14 +1240,104 @@ function resolveMExotic(pipeline?: EnergyPipelineState | null): SourcedNumber {
   return { value: Number.NaN, source: "M_exotic", proxy: true };
 }
 
+function resolveProofPackNumber(
+  pack: ProofPack | null | undefined,
+  key: string,
+  fallbackSource?: string,
+): SourcedNumber {
+  if (!pack) {
+    return { value: Number.NaN, source: fallbackSource ?? key, proxy: true };
+  }
+  const entry = getProofValue(pack, key);
+  const value = readProofNumber(pack, key);
+  if (value == null) {
+    return { value: Number.NaN, source: entry?.source ?? fallbackSource ?? key, proxy: true };
+  }
+  return { value, source: entry?.source ?? fallbackSource ?? key, proxy: entry?.proxy ?? false };
+}
+
 function resolveGuardrails(
   pipeline: EnergyPipelineState | null,
   tsRatio: number,
   gammaVdB: number,
+  contractGuardrails?: {
+    fordRoman?: unknown;
+    thetaAudit?: unknown;
+    tsRatio?: unknown;
+    vdbBand?: unknown;
+  } | null,
 ): GuardrailSummary {
+  const contractFordRoman = isGuardrailState(contractGuardrails?.fordRoman)
+    ? contractGuardrails.fordRoman
+    : null;
+  const contractThetaAudit = isGuardrailState(contractGuardrails?.thetaAudit)
+    ? contractGuardrails.thetaAudit
+    : null;
+  const contractTsRatio = isGuardrailState(contractGuardrails?.tsRatio)
+    ? contractGuardrails.tsRatio
+    : null;
+  const contractVdbBand = isGuardrailState(contractGuardrails?.vdbBand)
+    ? contractGuardrails.vdbBand
+    : null;
+  const hasContractGuardrails =
+    contractFordRoman !== null &&
+    contractThetaAudit !== null &&
+    contractTsRatio !== null &&
+    contractVdbBand !== null;
+  if (hasContractGuardrails) {
+    const hardFail =
+      hasGuardrailFailure(contractFordRoman) || hasGuardrailFailure(contractThetaAudit);
+    const tsPenalty = hasGuardrailFailure(contractTsRatio)
+      ? Number.isFinite(tsRatio)
+        ? clamp01(tsRatio / TS_RATIO_MIN)
+        : 0
+      : 1;
+    const vdbPenalty = hasGuardrailFailure(contractVdbBand) ? 0.7 : 1;
+    const multiplier = hardFail ? 0 : tsPenalty * vdbPenalty;
+    const proxy = [contractFordRoman, contractThetaAudit, contractTsRatio, contractVdbBand].some(
+      (status) => status === "proxy" || status === "missing",
+    );
+    return {
+      fordRoman: contractFordRoman,
+      thetaAudit: contractThetaAudit,
+      tsRatio: contractTsRatio,
+      vdbBand: contractVdbBand,
+      multiplier,
+      proxy,
+      hardPass: contractFordRoman === "ok" && contractThetaAudit === "ok",
+      source: "contract",
+    };
+  }
+
+  const strictCongruence = resolveStrictCongruence(pipeline);
+  const qiGuard = (pipeline as any)?.qiGuardrail;
+  const qiHasMargin = Number.isFinite(qiGuard?.marginRatio);
+  const qiBasePass = qiHasMargin
+    ? Number(qiGuard.marginRatio) < 1 &&
+      (qiGuard.curvatureEnforced !== true || qiGuard.curvatureOk !== false)
+    : null;
+  const qiMetricSource = qiSourceIsMetric(qiGuard?.rhoSource);
   const fordRomanFlag = pipeline?.fordRomanCompliance;
-  const fordRoman: GuardrailState =
-    typeof fordRomanFlag === "boolean" ? (fordRomanFlag ? "ok" : "fail") : "proxy";
+  let fordRoman: GuardrailState;
+  if (qiBasePass != null) {
+    if (strictCongruence) {
+      fordRoman = qiBasePass && qiMetricSource ? "ok" : "fail";
+    } else {
+      fordRoman = qiBasePass
+        ? qiMetricSource
+          ? "ok"
+          : "proxy"
+        : "fail";
+    }
+  } else if (typeof fordRomanFlag === "boolean") {
+    fordRoman = strictCongruence
+      ? "fail"
+      : fordRomanFlag
+        ? "ok"
+        : "fail";
+  } else {
+    fordRoman = strictCongruence ? "fail" : "proxy";
+  }
 
   const thetaAuditRaw =
     (pipeline as any)?.uniformsExplain?.thetaAudit ??
@@ -1211,16 +1349,42 @@ function resolveGuardrails(
       (thetaAuditRaw as any)?.pass ??
       (thetaAuditRaw as any)?.admissible,
   );
-  const thetaAudit: GuardrailState =
-    thetaAuditFlag === null ? "proxy" : thetaAuditFlag ? "ok" : "fail";
-
-  const tsRatioState: GuardrailState = Number.isFinite(tsRatio)
-    ? tsRatio >= TS_RATIO_MIN
+  const thetaValue = firstFinite(
+    (pipeline as any)?.theta_audit,
+    (pipeline as any)?.theta_geom,
+    (thetaAuditRaw as any)?.value,
+  );
+  const thetaBandPass = Number.isFinite(thetaValue)
+    ? Math.abs(thetaValue as number) <= THETA_AUDIT_MAX
+    : thetaAuditFlag === true;
+  const thetaMetricDerived = (pipeline as any)?.theta_metric_derived === true;
+  const thetaAudit: GuardrailState = strictCongruence
+    ? thetaMetricDerived && thetaBandPass
       ? "ok"
       : "fail"
+    : thetaBandPass
+      ? thetaMetricDerived
+        ? "ok"
+        : "proxy"
+      : "fail";
+
+  const tsMetricDerived = (pipeline as any)?.tsMetricDerived === true;
+  const tsBandPass = Number.isFinite(tsRatio) && tsRatio >= TS_RATIO_MIN;
+  const tsRatioState: GuardrailState = Number.isFinite(tsRatio)
+    ? strictCongruence
+      ? tsMetricDerived && tsBandPass
+        ? "ok"
+        : "fail"
+      : tsBandPass
+        ? tsMetricDerived
+          ? "ok"
+          : "proxy"
+        : "fail"
     : "proxy";
 
   const vdbGuard = pipeline?.gammaVanDenBroeckGuard;
+  const vdbDerivativeSupport = (pipeline as any)?.vdb_two_wall_derivative_support === true;
+  const vdbRequiresDerivativeSupport = Number.isFinite(gammaVdB) && gammaVdB > 1 + 1e-6;
   let vdbBand: GuardrailState = "proxy";
   if (
     vdbGuard &&
@@ -1231,7 +1395,16 @@ function resolveGuardrails(
     const inBand =
       gammaVdB >= vdbGuard.greenBand.min && gammaVdB <= vdbGuard.greenBand.max;
     const guardPass = vdbGuard.admissible ? vdbGuard.admissible && inBand : inBand;
-    vdbBand = guardPass ? "ok" : "fail";
+    const derivativeMissing = vdbRequiresDerivativeSupport && !vdbDerivativeSupport;
+    if (strictCongruence) {
+      vdbBand = guardPass && !derivativeMissing ? "ok" : "fail";
+    } else if (guardPass && derivativeMissing) {
+      vdbBand = "proxy";
+    } else {
+      vdbBand = guardPass ? "ok" : "fail";
+    }
+  } else if (vdbRequiresDerivativeSupport && !vdbDerivativeSupport) {
+    vdbBand = strictCongruence ? "fail" : "proxy";
   }
 
   const hardFail = fordRoman === "fail" || thetaAudit === "fail";
@@ -1250,6 +1423,7 @@ function resolveGuardrails(
     multiplier,
     proxy,
     hardPass,
+    source: "pipeline",
   };
 }
 
@@ -2242,7 +2416,93 @@ export default function TimeDilationLatticePanel({
     staleTime: 5000,
     refetchOnWindowFocus: false,
   });
+  const contractQuery = useGrConstraintContract({ enabled: true, refetchInterval: 2000 });
+  const { data: proofPack } = useProofPack({ refetchInterval: 1500, staleTime: 5000 });
   const pipelineState = pipeline ?? pipelineSnapshot ?? null;
+  const strictCongruence = resolveStrictCongruence(pipelineState);
+  const proofNum = (key: string) => readProofNumber(proofPack, key);
+  const proofStr = (key: string) => readProofString(proofPack, key);
+  const proofProxyFrom = (keys: string[]) =>
+    !proofPack || keys.some((key) => Boolean(getProofValue(proofPack, key)?.proxy));
+  const canonicalFamily =
+    proofStr("warp_canonical_family") ??
+    (pipelineState as any)?.warp?.metricT00Contract?.family ??
+    "unknown";
+  const latticeMetricOnly = strictCongruence && canonicalFamily === "natario";
+  const wallInvariant = useMemo<"kretschmann" | "ricci4">(
+    () => (latticeMetricOnly ? "ricci4" : "kretschmann"),
+    [latticeMetricOnly],
+  );
+  const strictMetricMissing = useMemo(() => {
+    if (!latticeMetricOnly) return false;
+    const requirePresent = (key: string) => {
+      const entry = getProofValue(proofPack, key);
+      return !entry || entry.proxy;
+    };
+    const requireTrue = (key: string) => {
+      const entry = getProofValue(proofPack, key);
+      if (!entry || entry.proxy) return true;
+      return entry.value !== true;
+    };
+    return (
+      requirePresent("metric_t00_rho_si_mean") ||
+      requirePresent("metric_k_trace_mean") ||
+      requirePresent("metric_k_sq_mean") ||
+      requirePresent("theta_geom") ||
+      requireTrue("metric_t00_contract_ok") ||
+      requireTrue("theta_metric_derived") ||
+      requireTrue("qi_metric_derived") ||
+      requireTrue("ts_metric_derived")
+    );
+  }, [latticeMetricOnly, proofPack]);
+  const contractGuardrails = contractQuery.data?.guardrails ?? null;
+  const contractGuardrailSource = contractQuery.data?.sources?.grDiagnostics ?? "missing";
+  const contractGuardrailBadgeClass = useMemo(() => {
+    if (!contractGuardrails) return "border border-slate-600 bg-slate-900/70 text-slate-200";
+    const statuses: GuardrailState[] = [
+      contractGuardrails.fordRoman,
+      contractGuardrails.thetaAudit,
+      contractGuardrails.tsRatio,
+      contractGuardrails.vdbBand,
+    ];
+    if (statuses.some((status) => status === "fail" || status === "missing")) {
+      return "border border-rose-500/40 bg-rose-500/10 text-rose-200";
+    }
+    if (statuses.some((status) => status === "proxy")) {
+      return "border border-amber-500/40 bg-amber-500/10 text-amber-200";
+    }
+    return "border border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
+  }, [contractGuardrails]);
+  const tsMetricDerived =
+    typeof (pipelineState as any)?.tsMetricDerived === "boolean"
+      ? Boolean((pipelineState as any).tsMetricDerived)
+      : typeof (pipelineState as any)?.clocking?.metricDerived === "boolean"
+        ? Boolean((pipelineState as any).clocking.metricDerived)
+        : typeof (pipelineState as any)?.ts?.metricDerived === "boolean"
+          ? Boolean((pipelineState as any).ts.metricDerived)
+          : null;
+  const tsMetricSource =
+    (pipelineState as any)?.tsMetricSource ??
+    (pipelineState as any)?.clocking?.metricDerivedSource ??
+    (pipelineState as any)?.ts?.metricDerivedSource ??
+    null;
+  const tsMetricReason =
+    (pipelineState as any)?.tsMetricReason ??
+    (pipelineState as any)?.clocking?.metricDerivedReason ??
+    (pipelineState as any)?.ts?.metricDerivedReason ??
+    null;
+  const tsMetricBadgeClass =
+    tsMetricDerived === true
+      ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+      : tsMetricDerived === false
+        ? "border border-rose-500/40 bg-rose-500/10 text-rose-200"
+        : "border border-amber-500/40 bg-amber-500/10 text-amber-200";
+  const tsMetricBadgeLabel =
+    tsMetricDerived === true
+      ? "TS metric-derived"
+      : tsMetricDerived === false
+        ? "TS proxy/hardware"
+        : "TS metric n/a";
   const hullBounds = useMemo(() => resolveHullBounds(pipelineState), [pipelineState]);
   const hullDims = useMemo(
     () => ({
@@ -2281,11 +2541,17 @@ export default function TimeDilationLatticePanel({
   const nodeRegionVboRef = useRef<WebGLBuffer | null>(null);
   const lineRegionGridVboRef = useRef<WebGLBuffer | null>(null);
   const nodeRegionGridVboRef = useRef<WebGLBuffer | null>(null);
+  const renderEnabledRef = useRef(true);
+  const lastDiagnosticsPublishRef = useRef(0);
   const [glStatus, setGlStatus] = useState<"ok" | "no-webgl" | "compile-fail" | "context-lost">("ok");
   const [glError, setGlError] = useState<string | null>(null);
   const [glEpoch, setGlEpoch] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [debugEnabled, setDebugEnabled] = useState(showDebug);
+  const debugBlocked = latticeMetricOnly && strictMetricMissing;
+  const debugAutoPublish = import.meta.env.VITE_LATTICE_DEBUG_PUSH === "1";
+  const debugOverlayEnabled = debugEnabled && !debugBlocked;
+  const debugAllowed = (debugEnabled || debugAutoPublish) && !debugBlocked;
   const [geometryControlsEnabled, setGeometryControlsEnabled] = useState(false);
   const [grControlsEnabled, setGrControlsEnabled] = useState(false);
   const [visualControlsEnabled, setVisualControlsEnabled] = useState(false);
@@ -2312,6 +2578,8 @@ export default function TimeDilationLatticePanel({
   const [grIncludeKij, setGrIncludeKij] = useState(true);
   const [exploratoryOverride, setExploratoryOverride] = useState(false);
   const [cinematicOverride, setCinematicOverride] = useState(false);
+  const [natarioGeometryWarp, setNatarioGeometryWarp] = useState(true);
+  const natarioGeometryWarpEffective = strictCongruence ? true : natarioGeometryWarp;
   const [regionEnabled, setRegionEnabled] = useState(false);
   const [regionAutoRefresh, setRegionAutoRefresh] = useState(false);
   const [regionSource, setRegionSource] = useState<"auto" | "gr" | "stress">("auto");
@@ -2751,6 +3019,7 @@ export default function TimeDilationLatticePanel({
     const regionQuery = useGrRegionStats({
       dims: regionDims,
       source: regionSource,
+      wallInvariant,
       targetRegions: regionTargetRegions,
       thetaBins: regionThetaBins > 0 ? regionThetaBins : undefined,
       longBins: regionLongBins > 0 ? regionLongBins : undefined,
@@ -2796,7 +3065,7 @@ export default function TimeDilationLatticePanel({
   const grAssistantQuery = useGrAssistantReport({
     brick: grQuery.data ?? null,
     pipeline: pipelineState,
-    enabled: grRequested && (grControlsEnabled || debugEnabled),
+    enabled: grRequested && (grControlsEnabled || debugAllowed),
     refetchMs: grAutoRefresh ? 5000 : 0,
     runArtifacts: false,
     runChecks: true,
@@ -3043,12 +3312,14 @@ export default function TimeDilationLatticePanel({
   }, [lineThetaRaw, nodeThetaRaw, thetaPercentile, thetaRange]);
   const wallInvariantSample = useMemo(() => {
     if (!useGrBrickData || !grQuery.data) return null;
-    const kretschmann = buildBrickSample(grQuery.data, latticeBounds, "kretschmann");
-    if (kretschmann) return { sample: kretschmann, source: "kretschmann" as const };
-    const ricci4 = buildBrickSample(grQuery.data, latticeBounds, "ricci4");
-    if (ricci4) return { sample: ricci4, source: "ricci4" as const };
+    const primary = wallInvariant === "ricci4" ? "ricci4" : "kretschmann";
+    const secondary = primary === "ricci4" ? "kretschmann" : "ricci4";
+    const primarySample = buildBrickSample(grQuery.data, latticeBounds, primary);
+    if (primarySample) return { sample: primarySample, source: primary as "ricci4" | "kretschmann" };
+    const secondarySample = buildBrickSample(grQuery.data, latticeBounds, secondary);
+    if (secondarySample) return { sample: secondarySample, source: secondary as "ricci4" | "kretschmann" };
     return null;
-  }, [useGrBrickData, grQuery.data, latticeBounds]);
+  }, [useGrBrickData, grQuery.data, latticeBounds, wallInvariant]);
   const lineWallInvariantRaw = useMemo(
     () =>
       wallInvariantSample
@@ -3358,8 +3629,8 @@ export default function TimeDilationLatticePanel({
       constraintScaleRef.current = constraintScale;
     }, [constraintScale]);
   const grDerived = useMemo(
-    () => (grRequested && grQuery.data ? deriveGrMetrics(grQuery.data, debugEnabled) : null),
-    [grRequested, grQuery.data, debugEnabled],
+    () => (grRequested && grQuery.data ? deriveGrMetrics(grQuery.data, debugAllowed) : null),
+    [grRequested, grQuery.data, debugAllowed],
   );
   const betaField = useMemo(() => {
     const grBetaMaxAbs = firstFinite(grDerived?.betaMaxAbs, (pipelineState as any)?.gr?.gauge?.betaMaxAbs);
@@ -3392,14 +3663,24 @@ export default function TimeDilationLatticePanel({
     const qSpoil = resolveQSpoiling(pipelineState);
     const tsRatio = resolveTSRatio(pipelineState);
     const thetaCal = resolveThetaCal(pipelineState, { gammaGeo, qSpoil, gammaVdB, duty });
+    const thetaGeom = resolveThetaGeom(pipelineState);
+    const thetaActivation =
+      strictCongruence && Number.isFinite(thetaGeom.value) && !thetaGeom.proxy
+        ? thetaGeom
+        : thetaCal;
     const gammaGeoCubed = Math.pow(gammaGeo.value, 3);
 
     const powerNorm = normalizeLog(power.value, 1e6, 1e12);
-    const thetaNorm = normalizeLog(thetaCal.value, 1e8, 1e12);
+    const thetaNorm = normalizeLog(thetaActivation.value, 1e8, 1e12);
     const tsNorm = normalizeLog(tsRatio.value, TS_RATIO_MIN, TS_RATIO_MIN * 1e4);
     const activationBase = averageFinite(powerNorm, thetaNorm, tsNorm);
 
-    const guardrails = resolveGuardrails(pipelineState, tsRatio.value, gammaVdB.value);
+    const guardrails = resolveGuardrails(
+      pipelineState,
+      tsRatio.value,
+      gammaVdB.value,
+      contractGuardrails,
+    );
     const activation = clamp01(activationBase * guardrails.multiplier);
     const activationProxy =
       power.proxy ||
@@ -3408,7 +3689,7 @@ export default function TimeDilationLatticePanel({
       gammaVdB.proxy ||
       qSpoil.proxy ||
       tsRatio.proxy ||
-      thetaCal.proxy ||
+      thetaActivation.proxy ||
       guardrails.proxy;
 
     return {
@@ -3425,18 +3706,82 @@ export default function TimeDilationLatticePanel({
       activationProxy,
       guardrails,
     };
-  }, [pipelineState]);
+  }, [pipelineState, contractGuardrails]);
 
   useEffect(() => {
     activationTargetRef.current = activationState.activation;
   }, [activationState.activation]);
 
   const pipelineProofs = useMemo(() => {
+    const t00Metric = resolveProofPackNumber(
+      proofPack,
+      "metric_t00_rho_si_mean",
+      "metric_t00_rho_si_mean",
+    );
+    const t00Min = Number.isFinite(t00Metric.value)
+      ? t00Metric
+      : resolveT00Min(pipelineState);
+    const mExoticMetric = resolveProofPackNumber(proofPack, "M_exotic_kg", "M_exotic_kg");
+    const mExoticMetricRaw = resolveProofPackNumber(
+      proofPack,
+      "M_exotic_raw_kg",
+      "M_exotic_raw_kg",
+    );
+    const mExotic = Number.isFinite(mExoticMetric.value)
+      ? mExoticMetric
+      : Number.isFinite(mExoticMetricRaw.value)
+        ? mExoticMetricRaw
+        : resolveMExotic(pipelineState);
     return {
-      t00Min: resolveT00Min(pipelineState),
-      mExotic: resolveMExotic(pipelineState),
+      t00Min,
+      mExotic,
+      kTraceMean: resolveProofPackNumber(proofPack, "metric_k_trace_mean"),
+      kSqMean: resolveProofPackNumber(proofPack, "metric_k_sq_mean"),
     };
-  }, [pipelineState]);
+  }, [pipelineState, proofPack]);
+  const t00MinSource = pipelineProofs.t00Min.source ?? "unknown";
+  const t00MinProxy = pipelineProofs.t00Min.proxy === true;
+
+  const modelMode = proofStr("model_mode");
+  const dutyEffective = proofNum("duty_effective");
+  const dutyBurst = proofNum("duty_burst");
+  const sectorsLive = proofNum("sectors_live");
+  const sectorsTotal = proofNum("sectors_total");
+  const tauLcMs = proofNum("tau_lc_ms");
+  const tauPulseMs = proofNum("tau_pulse_ms");
+  const tauDwellMs = proofNum("tau_dwell_ms");
+  const mechGapReqNm = proofNum("mechanical_gap_req_nm");
+  const mechGapEffNm = proofNum("mechanical_gap_eff_nm");
+  const mechNote = proofStr("mechanical_note");
+
+  const telemetryModelLine = formatProxyValue(
+    `model=${modelMode ?? "n/a"}`,
+    proofProxyFrom(["model_mode"]),
+  );
+  const telemetryGapLine = formatProxyValue(
+    `gap_nm ${formatFixed(mechGapReqNm, 1)} -> ${formatFixed(mechGapEffNm, 1)}`,
+    proofProxyFrom(["mechanical_gap_req_nm", "mechanical_gap_eff_nm"]),
+  );
+  const dutyEffPct = dutyEffective == null ? null : dutyEffective * 100;
+  const dutyBurstPct = dutyBurst == null ? null : dutyBurst * 100;
+  const sectorLabel =
+    Number.isFinite(sectorsLive as number) || Number.isFinite(sectorsTotal as number)
+      ? `${formatCount(sectorsLive)} / ${formatCount(sectorsTotal)}`
+      : "n/a";
+  const telemetryDutyLine = formatProxyValue(
+    `duty eff=${formatFixed(dutyEffPct, 2)}% burst=${formatFixed(dutyBurstPct, 2)}% sectors=${sectorLabel}`,
+    proofProxyFrom(["duty_effective", "duty_burst", "sectors_live", "sectors_total"]),
+  );
+  const telemetryTauLine = formatProxyValue(
+    `tau ms lc=${formatFixed(tauLcMs, 2)} pulse=${formatFixed(tauPulseMs, 2)} dwell=${formatFixed(
+      tauDwellMs,
+      2,
+    )}`,
+    proofProxyFrom(["tau_lc_ms", "tau_pulse_ms", "tau_dwell_ms"]),
+  );
+  const telemetryNoteLine = mechNote
+    ? formatProxyValue(`mech ${truncateText(mechNote, 60)}`, proofProxyFrom(["mechanical_note"]))
+    : null;
 
   const hasHull = useMemo(() => {
     const nonDefault = !isDefaultHullAxes(hullBounds.axes);
@@ -3455,16 +3800,18 @@ export default function TimeDilationLatticePanel({
   const wallDetected = wallDiagnostics?.detected ?? null;
   const wallSource = wallDiagnostics?.source;
   const grCertified = Boolean(
-    grGuardrails &&
-      grGuardrails.proxy === false &&
-      grGuardrails.source === "pipeline-gr" &&
-      brickMeta?.status === "CERTIFIED",
+    brickMeta?.status === "CERTIFIED" &&
+      solverStatus === "CERTIFIED" &&
+      (!grGuardrails ||
+        (grGuardrails.proxy === false && grGuardrails.source === "pipeline-gr")),
   );
-  const anyProxy =
-    activationState.activationProxy ||
-    pipelineProofs.t00Min.proxy ||
-    pipelineProofs.mExotic.proxy ||
-    grProxy;
+  const anyProxy = latticeMetricOnly
+    ? grProxy || strictMetricMissing
+    : activationState.activationProxy ||
+      pipelineProofs.t00Min.proxy ||
+      pipelineProofs.mExotic.proxy ||
+      grProxy ||
+      strictMetricMissing;
   const cellSize = useMemo(() => (gridScale * 2) / GRID_DIV, [gridScale]);
   const renderPlan = useMemo(
     () =>
@@ -3481,6 +3828,7 @@ export default function TimeDilationLatticePanel({
         solverStatus,
         exploratoryOverride,
         cinematicOverride,
+        natarioGeometryWarp: natarioGeometryWarpEffective,
         visualTuning,
         betaPercentile,
         thetaPercentile,
@@ -3503,6 +3851,7 @@ export default function TimeDilationLatticePanel({
       solverStatus,
       exploratoryOverride,
       cinematicOverride,
+      natarioGeometryWarpEffective,
       visualTuning,
       betaPercentile,
       thetaPercentile,
@@ -3510,32 +3859,13 @@ export default function TimeDilationLatticePanel({
       shearPercentile,
     ],
   );
+  const bannerBlocked =
+    strictCongruence && renderPlan.banner !== "CERTIFIED" && renderPlan.banner !== "NO_HULL";
   renderPlanRef.current = renderPlan;
   useEffect(() => {
     renderPlanRef.current = renderPlan;
     setRenderPlanVersion((prev) => prev + 1);
   }, [renderPlan]);
-
-  const handleExportDiagnostics = React.useCallback(() => {
-    if (typeof window === "undefined") return;
-    const plan = renderPlanRef.current ?? renderPlan;
-    const payload = {
-      kind: "time_dilation_diagnostics",
-      exported_at: new Date().toISOString(),
-      render_plan: plan,
-      hashes: diagnosticsHashes,
-      training_trace_id: diagnosticsTraceId,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `time-dilation-diagnostics-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }, [renderPlan, diagnosticsHashes, diagnosticsTraceId]);
 
   const warpFieldType = renderPlan.mode;
   const alphaBrick = useMemo(() => {
@@ -4117,6 +4447,8 @@ export default function TimeDilationLatticePanel({
         return "lapse-brick";
       case "analytic-proxy":
         return "analytic";
+      case "none":
+        return "none";
       default:
         return "analytic";
     }
@@ -4259,7 +4591,11 @@ export default function TimeDilationLatticePanel({
     renderPlan.sourceForTheta,
   ]);
 
-  const renderBlocked = !mathGate.allowed;
+  const renderBlocked = bannerBlocked || !mathGate.allowed;
+  const renderEnabled = !renderBlocked;
+  useEffect(() => {
+    renderEnabledRef.current = renderEnabled;
+  }, [renderEnabled]);
   const renderBanner = useMemo(() => {
     if (renderPlan.banner === "CERTIFIED") return null;
     let title = renderPlan.banner === "NO_HULL" ? "NO_HULL / MINKOWSKI" : renderPlan.banner;
@@ -4298,8 +4634,21 @@ export default function TimeDilationLatticePanel({
   }, [renderBanner]);
 
   const debugStats = useMemo(() => {
-    if (!debugEnabled) return null;
+    if (!debugAllowed) return null;
+    const thetaGeom = resolveThetaGeom(pipelineState);
     const ellK = computeKappaLengthScale(kappaDriveValue);
+    const qiGuard = (pipelineState as any)?.qiGuardrail ?? {};
+    const vdbTwoWallDerivativeSupport =
+      (pipelineState as any)?.vdb_two_wall_derivative_support;
+    const vdbTwoWallSupport = (pipelineState as any)?.vdb_two_wall_support;
+    const vdbRegionIIDerivativeSupport =
+      (pipelineState as any)?.vdb_region_ii_derivative_support;
+    const vdbRegionIVDerivativeSupport =
+      (pipelineState as any)?.vdb_region_iv_derivative_support;
+    const qiRhoSource = qiGuard.rhoSource ?? "unknown";
+    const qiCurvatureRatio = Number(qiGuard.curvatureRatio);
+    const qiCurvatureOk = qiGuard.curvatureOk;
+    const qiCurvatureEnforced = qiGuard.curvatureEnforced === true;
     const base = {
       kappaDrive: kappaDriveValue,
       blend: kappaBlend,
@@ -4328,6 +4677,9 @@ export default function TimeDilationLatticePanel({
       tsRatio: activationState.tsRatio.value,
       tsRatioSource: activationState.tsRatio.source,
       tsRatioProxy: activationState.tsRatio.proxy,
+      tsMetricDerived,
+      tsMetricSource,
+      tsMetricReason,
       gammaGeo: activationState.gammaGeo.value,
       gammaGeoCubed: activationState.gammaGeoCubed,
       gammaGeoSource: activationState.gammaGeo.source,
@@ -4338,9 +4690,22 @@ export default function TimeDilationLatticePanel({
       qSpoil: activationState.qSpoil.value,
       qSpoilSource: activationState.qSpoil.source,
       qSpoilProxy: activationState.qSpoil.proxy,
+      thetaGeom: thetaGeom.value,
+      thetaGeomSource: thetaGeom.source,
+      thetaGeomProxy: thetaGeom.proxy,
       thetaCal: activationState.thetaCal.value,
       thetaSource: activationState.thetaCal.source,
       thetaProxy: activationState.thetaCal.proxy,
+      kTraceMean: pipelineProofs.kTraceMean.value,
+      kTraceSource: pipelineProofs.kTraceMean.source,
+      kTraceProxy: pipelineProofs.kTraceMean.proxy,
+      kSqMean: pipelineProofs.kSqMean.value,
+      kSqSource: pipelineProofs.kSqMean.source,
+      kSqProxy: pipelineProofs.kSqMean.proxy,
+      qiRhoSource,
+      qiCurvatureRatio: Number.isFinite(qiCurvatureRatio) ? qiCurvatureRatio : null,
+      qiCurvatureOk,
+      qiCurvatureEnforced,
       t00Min: pipelineProofs.t00Min.value,
       t00Source: pipelineProofs.t00Min.source,
       t00Proxy: pipelineProofs.t00Min.proxy,
@@ -4348,6 +4713,8 @@ export default function TimeDilationLatticePanel({
       mExoticSource: pipelineProofs.mExotic.source,
       mExoticProxy: pipelineProofs.mExotic.proxy,
       guardrails: activationState.guardrails,
+      guardrailsSource: activationState.guardrails.source,
+      contractGuardrailSource,
       viabilityStatus: resolveViabilityLabel(pipelineState, activationState.guardrails.hardPass),
       alphaSource,
       clockMode: clockRateLabel,
@@ -4359,6 +4726,10 @@ export default function TimeDilationLatticePanel({
       hullWallSource: hullWall.source,
       hullWallProxy: hullWall.proxy,
       ellK,
+      vdbTwoWallSupport,
+      vdbTwoWallDerivativeSupport,
+      vdbRegionIIDerivativeSupport,
+      vdbRegionIVDerivativeSupport,
     };
 
     if (kappaBlend === null) {
@@ -4381,7 +4752,7 @@ export default function TimeDilationLatticePanel({
       softening: lerp(tuning.softenMin, tuning.softenMax, 1 - blend),
     };
   }, [
-    debugEnabled,
+    debugAllowed,
     kappaBlend,
     kappaDriveValue,
     tuning,
@@ -4397,9 +4768,10 @@ export default function TimeDilationLatticePanel({
     viewerChart,
     grProxy,
     pipelineState,
+    contractGuardrailSource,
   ]);
   const warpProvenance = useMemo(() => {
-    if (!debugEnabled) return null;
+    if (!debugAllowed) return null;
     const warpStrength = debugStats?.warpStrength ?? DEFAULT_VISUALS.warpStrength;
     return {
       plan: renderPlan,
@@ -4407,7 +4779,7 @@ export default function TimeDilationLatticePanel({
       warpCap: renderPlan.warpCap,
       thetaNormalization,
     };
-  }, [debugEnabled, debugStats, renderPlan, thetaNormalization, viewerChart]);
+  }, [debugAllowed, debugStats, renderPlan, thetaNormalization, viewerChart]);
 
   useEffect(() => {
     if (!renderBlocked) return;
@@ -4416,16 +4788,16 @@ export default function TimeDilationLatticePanel({
   }, [renderBlocked]);
 
   const lapseStats = useMemo(() => {
-    if (!debugEnabled || !lapseQuery.data) return null;
+    if (!debugAllowed || !lapseQuery.data) return null;
     const { dims, stats } = lapseQuery.data;
     return {
       dims,
       ...stats,
     };
-  }, [debugEnabled, lapseQuery.data]);
+  }, [debugAllowed, lapseQuery.data]);
 
   const grStats = useMemo(() => {
-    if (!debugEnabled || !grQuery.data || !grRequested) return null;
+    if (!debugAllowed || !grQuery.data || !grRequested) return null;
     const alpha = grQuery.data.channels.alpha;
     const theta = getBrickChannel(grQuery.data, "theta");
     return {
@@ -4444,10 +4816,10 @@ export default function TimeDilationLatticePanel({
       ),
       proxy: grProxy,
     };
-  }, [debugEnabled, grQuery.data, grDerived, pipelineState, grProxy, grRequested]);
+  }, [debugAllowed, grQuery.data, grDerived, pipelineState, grProxy, grRequested]);
 
   const grPerf = useMemo(() => {
-    if (!debugEnabled || !grRequested) return null;
+    if (!debugAllowed || !grRequested) return null;
     const perf = grQuery.data?.stats?.perf ?? (pipelineState as any)?.gr?.perf;
     if (!perf) return null;
     return {
@@ -4460,7 +4832,7 @@ export default function TimeDilationLatticePanel({
       msPerStep: toFiniteNumber(perf.msPerStep, 0),
       source: grQuery.data?.stats?.perf ? "gr-brick" : (pipelineState as any)?.gr?.perf ? "pipeline-gr" : "missing",
     };
-  }, [debugEnabled, grQuery.data, pipelineState, grRequested]);
+  }, [debugAllowed, grQuery.data, pipelineState, grRequested]);
 
   const grAssistantReport = grAssistantQuery.data ?? null;
   const grAssistantSummary = useMemo(() => {
@@ -4492,7 +4864,7 @@ export default function TimeDilationLatticePanel({
         : "bg-slate-500/20 text-slate-200";
 
   const solverDiagnostics = useMemo(() => {
-    if (!debugEnabled) return null;
+    if (!debugAllowed) return null;
     const H_rms = firstFinite(
       grQuery.data?.stats?.H_rms,
       (pipelineState as any)?.gr?.constraints?.H_constraint?.rms,
@@ -4508,10 +4880,10 @@ export default function TimeDilationLatticePanel({
       source: grQuery.data ? "gr-brick" : (pipelineState as any)?.gr ? "pipeline-gr" : "missing",
       proxy: grProxy,
     };
-  }, [debugEnabled, grQuery.data, pipelineState, grProxy]);
+  }, [debugAllowed, grQuery.data, pipelineState, grProxy]);
 
   const solverHealthDiagnostics = useMemo(() => {
-    if (!debugEnabled) return null;
+    if (!debugAllowed) return null;
     const health =
       grQuery.data?.stats?.solverHealth ?? (pipelineState as any)?.gr?.solver?.health;
     const fixups =
@@ -4524,10 +4896,10 @@ export default function TimeDilationLatticePanel({
       meta,
       source: grQuery.data?.stats?.solverHealth ? "gr-brick" : (pipelineState as any)?.gr ? "pipeline-gr" : "missing",
     };
-  }, [debugEnabled, grQuery.data, pipelineState]);
+  }, [debugAllowed, grQuery.data, pipelineState]);
 
   const shiftStiffnessDiagnostics = useMemo(() => {
-    if (!debugEnabled) return null;
+    if (!debugAllowed) return null;
     const stiffness =
       grQuery.data?.stats?.stiffness ?? (pipelineState as any)?.gr?.stiffness;
     if (!stiffness) return null;
@@ -4589,10 +4961,10 @@ export default function TimeDilationLatticePanel({
       note,
       source: grQuery.data?.stats?.stiffness ? "gr-brick" : (pipelineState as any)?.gr ? "pipeline-gr" : "missing",
     };
-  }, [debugEnabled, grQuery.data, pipelineState]);
+  }, [debugAllowed, grQuery.data, pipelineState]);
 
   const thetaDiagnostics = useMemo(() => {
-    if (!debugEnabled) return null;
+    if (!debugAllowed) return null;
     const stressEnergy =
       grQuery.data?.stats?.stressEnergy ??
       (pipelineState as any)?.gr?.matter?.stressEnergy;
@@ -4631,10 +5003,10 @@ export default function TimeDilationLatticePanel({
           : "missing",
       proxy: grProxy,
     };
-  }, [debugEnabled, grQuery.data, pipelineState, grProxy]);
+  }, [debugAllowed, grQuery.data, pipelineState, grProxy]);
 
   const modeSemantics = useMemo(() => {
-    if (!debugEnabled) return null;
+    if (!debugAllowed) return null;
     if (warpFieldType === "natario") {
       return {
         mode: "natario" as const,
@@ -4651,10 +5023,10 @@ export default function TimeDilationLatticePanel({
       };
     }
     return null;
-  }, [debugEnabled, warpFieldType, thetaDiagnostics, thetaDipoleCheck]);
+  }, [debugAllowed, warpFieldType, thetaDiagnostics, thetaDipoleCheck]);
 
   const diagnostics = useMemo(() => {
-    if (!debugEnabled || !debugStats) return null;
+    if (!debugAllowed || !debugStats) return null;
 
     const lines: string[] = [];
     const alphaMin = useGrBrickData ? grStats?.alphaMin : lapseStats?.alphaMin;
@@ -4771,7 +5143,165 @@ export default function TimeDilationLatticePanel({
         `If beta ~ 0 (near-rest), alpha should still show gradients when the solver field is nontrivial (beta=${betaText}).`,
       ],
     };
-  }, [debugEnabled, debugStats, lapseStats, grStats, useGrBrickData]);
+  }, [debugAllowed, debugStats, lapseStats, grStats, useGrBrickData]);
+
+  const buildDiagnosticsPayload = React.useCallback(
+    (mode: "export" | "auto" = "export") => {
+      const plan = renderPlanRef.current ?? renderPlan;
+      const canonical = {
+        family: proofStr("warp_canonical_family") ?? canonicalFamily,
+        chart: proofStr("warp_canonical_chart"),
+        observer: proofStr("warp_canonical_observer"),
+        normalization: proofStr("warp_canonical_normalization"),
+        unitSystem: proofStr("warp_canonical_unit_system"),
+        match: proofStr("warp_canonical_match"),
+      };
+      const metricContract = {
+        metric_t00_contract_ok: getProofValue(proofPack, "metric_t00_contract_ok")?.value ?? null,
+        metric_chart_contract_status: getProofValue(proofPack, "metric_chart_contract_status")?.value ?? null,
+        metric_chart_notes: getProofValue(proofPack, "metric_chart_notes")?.value ?? null,
+        metric_coordinate_map: getProofValue(proofPack, "metric_coordinate_map")?.value ?? null,
+      };
+
+      return {
+        kind: "time_dilation_diagnostics",
+        source: "time_dilation_lattice",
+        mode,
+        captured_at: new Date().toISOString(),
+        strict: {
+          strictCongruence,
+          latticeMetricOnly,
+          debugBlocked,
+          debugAllowed,
+          renderBlocked,
+          anyProxy,
+          mathStageOK,
+          grRequested,
+          grCertified,
+          banner: plan.banner,
+        },
+        canonical,
+        metric_contract: metricContract,
+        render_plan: plan,
+        gate: {
+          banner: plan.banner,
+          reasons: plan.reasons,
+          flags: plan.flags,
+          math_gate: mathGate,
+          gate_progress: gateProgress,
+        },
+        sources: {
+          alphaSource,
+          betaSource: plan.sourceForBeta,
+          thetaSource: plan.sourceForTheta,
+          clockRateSource: plan.sourceForClockRate,
+          clockRateLabel,
+          warpFieldType,
+          viewerChart,
+        },
+        warp_provenance: warpProvenance,
+        debug_stats: debugAllowed ? debugStats : null,
+        diagnostics: debugAllowed ? diagnostics : null,
+        lapse_stats: debugAllowed ? lapseStats : null,
+        gr_stats: debugAllowed ? grStats : null,
+        solver: debugAllowed
+          ? {
+              solverDiagnostics,
+              solverHealthDiagnostics,
+              shiftStiffnessDiagnostics,
+              thetaDiagnostics,
+              modeSemantics,
+              grAssistant: grAssistantSummary
+                ? {
+                    overallPass: grAssistantSummary.overallPass,
+                    firstFail: grAssistantSummary.firstFail,
+                    gatePass: grAssistantSummary.gate?.pass ?? null,
+                    certificateHash: grAssistantSummary.gate?.certificate?.certificateHash ?? null,
+                  }
+                : null,
+            }
+          : null,
+        hashes: diagnosticsHashes,
+        training_trace_id: diagnosticsTraceId,
+      };
+    },
+    [
+      renderPlan,
+      proofPack,
+      proofStr,
+      canonicalFamily,
+      strictCongruence,
+      latticeMetricOnly,
+      debugBlocked,
+      debugAllowed,
+      renderBlocked,
+      anyProxy,
+      mathStageOK,
+      grRequested,
+      grCertified,
+      alphaSource,
+      clockRateLabel,
+      warpFieldType,
+      viewerChart,
+      warpProvenance,
+      debugStats,
+      diagnostics,
+      lapseStats,
+      grStats,
+      solverDiagnostics,
+      solverHealthDiagnostics,
+      shiftStiffnessDiagnostics,
+      thetaDiagnostics,
+      modeSemantics,
+      grAssistantSummary,
+      diagnosticsHashes,
+      diagnosticsTraceId,
+      gateProgress,
+      mathGate,
+    ],
+  );
+
+  const handleExportDiagnostics = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    const payload = buildDiagnosticsPayload("export");
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `time-dilation-diagnostics-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }, [buildDiagnosticsPayload]);
+
+  const publishDiagnostics = React.useCallback(
+    async (payload: unknown, signal?: AbortSignal) => {
+      try {
+        await fetch("/api/helix/time-dilation/diagnostics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal,
+        });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.warn("[time-dilation] diagnostics publish failed", err);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!debugAutoPublish || !debugAllowed) return;
+    const payload = buildDiagnosticsPayload("auto");
+    const now = Date.now();
+    if (now - lastDiagnosticsPublishRef.current < 5000) return;
+    lastDiagnosticsPublishRef.current = now;
+    const controller = new AbortController();
+    void publishDiagnostics(payload, controller.signal);
+    return () => controller.abort();
+  }, [debugAutoPublish, debugAllowed, buildDiagnosticsPayload, publishDiagnostics]);
 
   useEffect(() => {
     setDebugEnabled(showDebug);
@@ -5043,6 +5573,12 @@ export default function TimeDilationLatticePanel({
         if (!progRef.current || !glRef.current) return;
         if (gl.isContextLost()) {
           setGlStatus("context-lost");
+          return;
+        }
+        if (!renderEnabledRef.current) {
+          gl.clearColor(0, 0, 0, 1);
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+          raf = requestAnimationFrame(draw);
           return;
         }
 
@@ -5498,7 +6034,16 @@ export default function TimeDilationLatticePanel({
   return (
     <div className={cn("space-y-3", className)}>
       <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border border-slate-800 bg-black/60">
-        <canvas ref={canvasRef} className="h-full w-full block" />
+        <canvas
+          ref={canvasRef}
+          className={cn("h-full w-full block", renderBlocked && "opacity-20")}
+        />
+        {renderBlocked ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 px-6 text-center text-xs text-slate-200">
+            Strict metric-only mode: proxy or uncertified inputs detected. Waiting for a certified GR brick and
+            non-proxy telemetry before rendering the lattice.
+          </div>
+        ) : null}
         <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
           <Button
             type="button"
@@ -5590,6 +6135,42 @@ export default function TimeDilationLatticePanel({
               </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
+        <div className="pointer-events-none absolute right-3 top-12 z-10 flex max-w-[320px] flex-col items-end gap-1 text-[10px]">
+          <div className={cn("rounded-full px-2 py-[2px] uppercase tracking-[0.2em]", tsMetricBadgeClass)}>
+            {tsMetricBadgeLabel}
+          </div>
+          <div className="rounded-full border border-slate-600 bg-slate-950/80 px-2 py-[2px] text-slate-200">
+            {`source=${tsMetricSource ?? "n/a"}`}
+          </div>
+          {contractGuardrails ? (
+            <div className={cn("rounded-full px-2 py-[2px]", contractGuardrailBadgeClass)}>
+              {`contract FR=${contractGuardrails.fordRoman} TH=${contractGuardrails.thetaAudit} TS=${contractGuardrails.tsRatio} VdB=${contractGuardrails.vdbBand}`}
+            </div>
+          ) : (
+            <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
+              contract unavailable
+            </div>
+          )}
+          <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
+            {`contract source=${contractGuardrailSource}`}
+          </div>
+          <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
+            {`T00_min source=${t00MinSource}${t00MinProxy ? " (proxy)" : ""}`}
+          </div>
+          <div className="rounded border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-right text-slate-300">
+            <div className="text-[9px] uppercase tracking-[0.2em] text-slate-400">telemetry</div>
+            <div>{telemetryModelLine}</div>
+            <div>{telemetryGapLine}</div>
+            <div>{telemetryDutyLine}</div>
+            <div>{telemetryTauLine}</div>
+            {telemetryNoteLine ? <div>{telemetryNoteLine}</div> : null}
+          </div>
+          {tsMetricReason ? (
+            <div className="rounded border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-right text-slate-300">
+              {tsMetricReason}
+            </div>
+          ) : null}
         </div>
         {showContractionArrow && (
           <div className="pointer-events-none absolute bottom-3 right-3 z-10 rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[10px] text-slate-200">
@@ -5713,14 +6294,14 @@ export default function TimeDilationLatticePanel({
             </div>
           </div>
         )}
-        {(debugEnabled ||
+        {(debugOverlayEnabled ||
           geometryControlsEnabled ||
           casimirControlsEnabled ||
           grControlsEnabled ||
           regionControlsEnabled ||
           visualControlsEnabled) && (
           <div className="absolute left-3 top-3 bottom-3 flex w-[calc(100%-24px)] max-w-[360px] flex-col gap-2 overflow-y-auto overflow-x-hidden break-words pb-16 pr-1 text-[11px] text-slate-200">
-            {debugEnabled && debugStats && (
+            {debugOverlayEnabled && debugStats && (
               <div className="rounded-md border border-white/10 bg-black/70 px-3 py-2">
             <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">kappa drive</div>
             <div>kappa_drive: {formatSci(debugStats.kappaDrive)} m^-2</div>
@@ -5734,10 +6315,56 @@ export default function TimeDilationLatticePanel({
             <div>power_W: {formatProxyValue(formatSci(debugStats.powerW, 2), debugStats.powerProxy, debugStats.powerSource)}</div>
             <div>d_eff: {formatProxyValue(formatFixed(debugStats.dEff, 6), debugStats.dEffProxy, debugStats.dEffSource)}</div>
             <div>TS_ratio: {formatPipelineValue(formatSci(debugStats.tsRatio, 2), debugStats.tsRatioSource, debugStats.tsRatioProxy)}</div>
+            <div>
+              ts_metric_derived:{" "}
+              {debugStats.tsMetricDerived == null ? "n/a" : String(debugStats.tsMetricDerived)}
+            </div>
+            <div>ts_metric_source: {debugStats.tsMetricSource ?? "n/a"}</div>
+            {debugStats.tsMetricReason ? (
+              <div>ts_metric_reason: {debugStats.tsMetricReason}</div>
+            ) : null}
+            <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
+              <span
+                className={cn(
+                  "rounded-full px-2 py-[1px] uppercase tracking-[0.2em]",
+                  debugStats.tsMetricDerived === true
+                    ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                    : debugStats.tsMetricDerived === false
+                      ? "border border-rose-500/40 bg-rose-500/10 text-rose-200"
+                      : "border border-amber-500/40 bg-amber-500/10 text-amber-200",
+                )}
+              >
+                {debugStats.tsMetricDerived === true
+                  ? "ts metric"
+                  : debugStats.tsMetricDerived === false
+                    ? "ts proxy"
+                    : "ts n/a"}
+              </span>
+              <span className="rounded-full border border-slate-600 px-2 py-[1px] text-slate-300">
+                {`source=${debugStats.tsMetricSource ?? "n/a"}`}
+              </span>
+            </div>
             <div>gammaGeo^3: {formatProxyValue(formatSci(debugStats.gammaGeoCubed, 2), debugStats.gammaGeoProxy, debugStats.gammaGeoSource)}</div>
             <div>gammaVdB: {formatPipelineValue(formatSci(debugStats.gammaVdB, 2), debugStats.gammaVdBSource, debugStats.gammaVdBProxy)}</div>
             <div>qSpoil: {formatProxyValue(formatFixed(debugStats.qSpoil, 3), debugStats.qSpoilProxy, debugStats.qSpoilSource)}</div>
+            <div>theta_geom: {formatPipelineValue(formatSci(debugStats.thetaGeom, 2), debugStats.thetaGeomSource, debugStats.thetaGeomProxy)}</div>
             <div>thetaCal: {formatPipelineValue(formatSci(debugStats.thetaCal, 2), debugStats.thetaSource, debugStats.thetaProxy)}</div>
+            <div>K_trace_mean: {formatPipelineValue(formatSci(debugStats.kTraceMean, 2), debugStats.kTraceSource, debugStats.kTraceProxy)}</div>
+            <div>K_sq_mean: {formatPipelineValue(formatSci(debugStats.kSqMean, 2), debugStats.kSqSource, debugStats.kSqProxy)}</div>
+            <div>vdb_two_wall: {debugStats.vdbTwoWallSupport == null ? "n/a" : String(debugStats.vdbTwoWallSupport)}</div>
+            <div>vdb_two_wall_deriv: {debugStats.vdbTwoWallDerivativeSupport == null ? "n/a" : String(debugStats.vdbTwoWallDerivativeSupport)}</div>
+            <div>
+              vdb_region_ii_deriv:{" "}
+              {debugStats.vdbRegionIIDerivativeSupport == null
+                ? "n/a"
+                : String(debugStats.vdbRegionIIDerivativeSupport)}
+            </div>
+            <div>
+              vdb_region_iv_deriv:{" "}
+              {debugStats.vdbRegionIVDerivativeSupport == null
+                ? "n/a"
+                : String(debugStats.vdbRegionIVDerivativeSupport)}
+            </div>
             <div>M_exotic: {formatPipelineValue(formatSci(debugStats.mExotic, 2), debugStats.mExoticSource, debugStats.mExoticProxy)} kg</div>
             <div>T00_min: {formatPipelineValue(formatSci(debugStats.t00Min, 2), debugStats.t00Source, debugStats.t00Proxy)}</div>
             <div>beta: {formatProxyValue(formatFixed(debugStats.beta, 3), debugStats.betaProxy, debugStats.betaSource)}</div>
@@ -5751,6 +6378,16 @@ export default function TimeDilationLatticePanel({
             <div>viewerChart: {debugStats.viewerChart}</div>
             <div>
               guardrails: FR={debugStats.guardrails.fordRoman}, TH={debugStats.guardrails.thetaAudit}, TS={debugStats.guardrails.tsRatio}, VdB={debugStats.guardrails.vdbBand}
+            </div>
+            <div>guardrails_source: {debugStats.guardrailsSource}</div>
+            <div>contract_guardrail_source: {debugStats.contractGuardrailSource}</div>
+            <div>qi_rho_source: {debugStats.qiRhoSource}</div>
+            <div>
+              qi_curvature: {debugStats.qiCurvatureOk == null ? "n/a" : String(debugStats.qiCurvatureOk)}
+              {debugStats.qiCurvatureRatio != null
+                ? ` τ/R=${formatFixed(debugStats.qiCurvatureRatio, 3)}`
+                : ""}
+              {debugStats.qiCurvatureEnforced ? " (enforced)" : ""}
             </div>
             <div>viability_status: {debugStats.viabilityStatus}</div>
             {diagnostics && diagnostics.lines.length > 0 && (
@@ -6055,7 +6692,13 @@ export default function TimeDilationLatticePanel({
                   stage={warpProvenance.plan.flags.mathStageOK ? "ok" : "blocked"},{" "}
                   solver={warpProvenance.plan.flags.solverStatus ?? "n/a"},{" "}
                   override={warpProvenance.plan.flags.exploratoryOverride ? "on" : "off"},{" "}
-                  cinematic={warpProvenance.plan.flags.cinematicOverride ? "on" : "off"}
+                  cinematic={warpProvenance.plan.flags.cinematicOverride ? "on" : "off"},{" "}
+                  natario_warp=
+                  {warpProvenance.plan.flags.natarioGeometryWarp === undefined
+                    ? "n/a"
+                    : warpProvenance.plan.flags.natarioGeometryWarp
+                      ? "on"
+                      : "off"}
                 </div>
                 <div>
                   sources: α={warpProvenance.plan.sourceForAlpha}, β={warpProvenance.plan.sourceForBeta},{" "}
@@ -7103,7 +7746,21 @@ export default function TimeDilationLatticePanel({
                     />
                   </div>
                   <div className="text-[10px] text-amber-300">
-                    Allows geometry warp in Natario mode (debug only).
+                    Forces geometry warp even when Natario is not strict-admissible (debug only).
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                      natario geometry warp
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={natarioGeometryWarp}
+                      onChange={(event) => setNatarioGeometryWarp(event.target.checked)}
+                      className="h-3 w-3"
+                    />
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Enables metric-derived geometry warp in Natario mode when strict criteria pass.
                   </div>
                   <div className="flex items-center justify-between gap-2">     
                       <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">theta scale</span>

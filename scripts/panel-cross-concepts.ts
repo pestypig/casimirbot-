@@ -29,6 +29,8 @@ type TermHit = {
 const PANEL_FILE = path.join("client", "src", "pages", "helix-core.panels.ts");
 const OUTPUT_JSON = path.join("reports", "panel-cross-concepts.json");
 const OUTPUT_MD = path.join("reports", "panel-dag-gaps.md");
+const IDEOLOGY_SOURCE = path.join("docs", "ethos", "ideology.json");
+const IDEOLOGY_TREE_OUTPUT = path.join("docs", "knowledge", "mission-ethos-tree.json");
 const MAX_TERM_PER_PANEL = 12;
 const MAX_HITS_PER_TERM = 8;
 const MAX_FILE_BYTES = 500_000;
@@ -308,10 +310,20 @@ const buildTreeIndex = () => {
     const raw = readText(file);
     if (!raw) continue;
     try {
-      const parsed = JSON.parse(raw) as { rootId?: string; nodes?: Array<{ id?: string; title?: string; tags?: string[]; aliases?: string[] }> };
+      const parsed = JSON.parse(raw) as {
+        rootId?: string;
+        nodes?: Array<{
+          id?: string;
+          title?: string;
+          tags?: string[];
+          aliases?: string[];
+          nodeType?: string;
+        }>;
+      };
       const treeId = parsed.rootId ?? path.basename(file, ".json");
       (parsed.nodes ?? []).forEach((node) => {
         if (!node.id) return;
+        if (node.nodeType === "bridge" || node.id.startsWith("bridge-")) return;
         nodes.push({
           treeId,
           nodeId: node.id,
@@ -348,7 +360,14 @@ const findFilesForTerm = (term: string, fileIndex: Map<string, string>) => {
   return hits;
 };
 
+const syncMissionEthosTree = () => {
+  if (!fs.existsSync(IDEOLOGY_SOURCE)) return;
+  fs.mkdirSync(path.dirname(IDEOLOGY_TREE_OUTPUT), { recursive: true });
+  fs.copyFileSync(IDEOLOGY_SOURCE, IDEOLOGY_TREE_OUTPUT);
+};
+
 const run = () => {
+  syncMissionEthosTree();
   const sourceText = fs.readFileSync(PANEL_FILE, "utf8");
   const sourceFile = ts.createSourceFile(PANEL_FILE, sourceText, ts.ScriptTarget.Latest, true);
   const keywordMap = parsePanelKeywords(sourceFile);

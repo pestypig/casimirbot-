@@ -19,7 +19,10 @@ import {
 } from "./gr/evolution/index.js";
 import { toGeometricTime, toSiTime, type GrUnitSystem } from "../shared/gr-units.js";
 import type { GrPipelineDiagnostics } from "./energy-pipeline";
+import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.js";
 import type { StressEnergyBrickParams, StressEnergyStats } from "./stress-energy-brick";
+
+const SIXTEEN_PI = 16 * Math.PI;
 
 export interface GrEvolveBrickParams {
   dims: [number, number, number];
@@ -69,6 +72,7 @@ export interface GrEvolveBrickStats {
   M_rms: number;
   thetaPeakAbs?: number;
   thetaGrowthPerStep?: number;
+  rhoConstraint?: GrPipelineDiagnostics["constraints"]["H_constraint"];
   invariants?: GrInvariantStatsSet;
   dissipation?: {
     koEpsUsed: number;
@@ -487,6 +491,55 @@ const buildConstraintDiagnostics = (
   };
 };
 
+const buildRhoConstraintDiagnostics = (
+  ricci3?: GrEvolveBrickChannel,
+  K_trace?: GrEvolveBrickChannel,
+  KijKij?: GrEvolveBrickChannel,
+): GrPipelineDiagnostics["constraints"]["H_constraint"] | null => {
+  if (!ricci3 || !K_trace || !KijKij) return null;
+  const total = Math.min(
+    ricci3.data.length,
+    K_trace.data.length,
+    KijKij.data.length,
+  );
+  if (!total) return null;
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  let maxAbs = 0;
+  let sum = 0;
+  let sumSq = 0;
+  let count = 0;
+  for (let i = 0; i < total; i += 1) {
+    const R3 = ricci3.data[i];
+    const K = K_trace.data[i];
+    const K2 = K * K;
+    const KijVal = KijKij.data[i];
+    if (!Number.isFinite(R3) || !Number.isFinite(K2) || !Number.isFinite(KijVal)) {
+      continue;
+    }
+    const rho = (R3 + K2 - KijVal) / SIXTEEN_PI;
+    if (!Number.isFinite(rho)) continue;
+    if (rho < min) min = rho;
+    if (rho > max) max = rho;
+    const abs = Math.abs(rho);
+    if (abs > maxAbs) maxAbs = abs;
+    sum += rho;
+    sumSq += rho * rho;
+    count += 1;
+  }
+  if (!count) return null;
+  const mean = sum / count;
+  const rms = Math.sqrt(sumSq / count);
+  return {
+    min: Number.isFinite(min) ? min : 0,
+    max: Number.isFinite(max) ? max : 0,
+    maxAbs: Number.isFinite(maxAbs) ? maxAbs : 0,
+    mean: Number.isFinite(mean) ? mean : 0,
+    rms: Number.isFinite(rms) ? rms : 0,
+    sampleCount: count,
+  };
+};
+
 const buildSolverHealth = (
   fixups: FixupStats | undefined,
   steps: number,
@@ -612,6 +665,7 @@ const nowMs = () => (typeof performance !== "undefined" ? performance.now() : Da
 
 export const buildGrDiagnostics = (
   brick: GrEvolveBrick,
+  context?: { metricAdapter?: WarpMetricAdapterSnapshot | null },
 ): GrPipelineDiagnostics => {
   const H_constraint = buildConstraintDiagnostics(
     brick.channels.H_constraint,
@@ -634,6 +688,7 @@ export const buildGrDiagnostics = (
   return {
     updatedAt: Date.now(),
     source: "gr-evolve-brick",
+    ...(context?.metricAdapter ? { metricAdapter: context.metricAdapter } : {}),
     ...(brick.meta ? { meta: brick.meta } : {}),
     grid: {
       dims: brick.dims,
@@ -667,7 +722,11 @@ export const buildGrDiagnostics = (
           z: Mz,
         },
       },
+      ...(brick.stats.rhoConstraint
+        ? { rho_constraint: brick.stats.rhoConstraint }
+        : {}),
     },
+    ...(brick.stats.invariants ? { invariants: brick.stats.invariants } : {}),
     ...(brick.stats.stressEnergy ? { matter: { stressEnergy: brick.stats.stressEnergy } } : {}),
     ...(brick.stats.perf ? { perf: brick.stats.perf } : {}),
   };
@@ -841,6 +900,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   const det_gamma = evolutionChannels.det_gamma;
   const ricci3 = evolutionChannels.ricci3;
   const KijKij = evolutionChannels.KijKij;
+  const rhoConstraint = buildRhoConstraintDiagnostics(ricci3, K_trace, KijKij);
   const kretschmann = evolutionChannels.kretschmann;
   const weylI = evolutionChannels.weylI;
   const ricci4 = evolutionChannels.ricci4;
@@ -967,6 +1027,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     stiffness,
     fixups: evolution.fixups,
     solverHealth,
+    ...(rhoConstraint ? { rhoConstraint } : {}),
     ...(invariantStats ? { invariants: invariantStats } : {}),
     stressEnergy: evolution.sourceBrick?.stats,
     perf: {
@@ -996,7 +1057,8 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
 
   const pipelineState = getGlobalPipelineState();
   if (pipelineState?.grEnabled === true) {
-    const diagnostics = buildGrDiagnostics(brick);
+    const metricAdapter = (pipelineState as any)?.warp?.metricAdapter ?? null;
+    const diagnostics = buildGrDiagnostics(brick, { metricAdapter });
     pipelineState.gr = diagnostics;
   }
 

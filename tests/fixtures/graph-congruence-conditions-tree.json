@@ -1,0 +1,69 @@
+{
+  "rootId": "condition-root",
+  "nodes": [
+    {
+      "id": "condition-root",
+      "title": "Condition Root",
+      "tags": [],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "theta-target",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "theta_geom=true"
+        },
+        {
+          "rel": "see-also",
+          "to": "vdb-target",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "vdb_two_wall_support=true"
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-target",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "ts_metric_derived=true"
+        },
+        {
+          "rel": "see-also",
+          "to": "cl3-target",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "cl3_metric_t00_available=true"
+        }
+      ]
+    },
+    {
+      "id": "theta-target",
+      "title": "Theta Target",
+      "tags": [],
+      "children": [],
+      "links": []
+    },
+    {
+      "id": "vdb-target",
+      "title": "VdB Target",
+      "tags": [],
+      "children": [],
+      "links": []
+    },
+    {
+      "id": "ts-target",
+      "title": "TS Target",
+      "tags": [],
+      "children": [],
+      "links": []
+    },
+    {
+      "id": "cl3-target",
+      "title": "CL3 Target",
+      "tags": [],
+      "children": [],
+      "links": []
+    }
+  ]
+}

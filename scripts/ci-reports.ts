@@ -554,13 +554,25 @@ const buildRepoTelemetryFromReports = (): RepoTelemetry => {
 const writeRepoTelemetry = (): void => {
   const fromReports = buildRepoTelemetryFromReports();
   const fromEnv = buildRepoTelemetryFromEnv();
-  const merged = mergeRepoTelemetry(fromReports, fromEnv);
+  const existing = readJson(reportPaths.repoTelemetry);
+  const existingRepo =
+    existing && typeof existing === "object"
+      ? ((existing as { repo?: RepoTelemetry }).repo ?? undefined)
+      : undefined;
+  const merged = mergeRepoTelemetry(
+    mergeRepoTelemetry(existingRepo, fromReports),
+    fromEnv,
+  );
   const payload = {
     generatedAt: new Date().toISOString(),
     repo: merged ?? {},
   };
   ensureDir(reportPaths.repoTelemetry);
-  fs.writeFileSync(reportPaths.repoTelemetry, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  fs.writeFileSync(
+    reportPaths.repoTelemetry,
+    `${JSON.stringify(payload, null, 2)}\n`,
+    "utf8",
+  );
 };
 
 const runStep = async (step: ReportStep): Promise<StepResult> => {

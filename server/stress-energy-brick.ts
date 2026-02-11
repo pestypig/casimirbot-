@@ -21,6 +21,9 @@ export interface StressEnergyBrickParams {
   hullAxes?: Vec3;
   hullWall?: number;
   radialMap?: HullRadialMap | null;
+  metricT00?: number;
+  metricT00Source?: string;
+  metricT00Ref?: string;
 }
 
 export interface StressEnergyChannel {
@@ -90,7 +93,7 @@ export interface StressEnergyMappingStats {
   conservationDamping?: number;
   conservationNetFlux?: boolean;
   conservationScale?: number;
-  source?: "pipeline" | "defaults";
+  source?: "pipeline" | "defaults" | "metric";
   proxy: boolean;
 }
 
@@ -98,6 +101,11 @@ export interface StressEnergyBrick {
   dims: [number, number, number];
   voxelBytes: number;
   format: "r32f";
+  source?: "pipeline" | "metric" | "unknown";
+  proxy?: boolean;
+  congruence?: "proxy-only" | "geometry-derived" | "conditional";
+  metricT00Ref?: string;
+  metricT00Source?: string;
   channels: {
     t00: StressEnergyChannel;
     Sx: StressEnergyChannel;
@@ -371,8 +379,23 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const cavityQ = Math.max(1e5, state?.qCavity ?? state?.QL ?? 1e9);
   const dutyEff = dutyFR;
   const qSpoil = Math.max(1e-6, state?.qSpoilingFactor ?? q);
+  const metricT00Raw =
+    Number.isFinite(input.metricT00) ? Number(input.metricT00) : Number(state?.warp?.metricT00);
+  const metricT00Ref =
+    typeof input.metricT00Ref === "string"
+      ? input.metricT00Ref
+      : typeof (state as any)?.warp?.metricT00Ref === "string"
+        ? String((state as any).warp.metricT00Ref)
+        : undefined;
+  const metricSource =
+    input.metricT00Source ??
+    (state as any)?.warp?.metricT00Source ??
+    (state as any)?.warp?.stressEnergySource;
+  const metricMode =
+    metricSource === "metric" && Number.isFinite(metricT00Raw);
+  const metricT00Source = metricMode ? (typeof metricSource === "string" ? metricSource : "metric") : undefined;
 
-  const { rho_avg, rho_inst } = enhancedAvgEnergyDensity({
+  const { rho_avg: rhoAvgPipeline, rho_inst: rhoInstPipeline } = enhancedAvgEnergyDensity({
     gap_m,
     gammaGeo,
     cavityQ,
@@ -382,13 +405,25 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     deltaAOverA: qSpoil,
     dutyEff,
   });
+  const rho_avg = metricMode ? (metricT00Raw as number) : rhoAvgPipeline;
+  const rho_inst = metricMode ? (metricT00Raw as number) : rhoInstPipeline;
 
   const [nx, ny, nz] = dims;
   const dx = (bounds.max[0] - bounds.min[0]) / nx;
   const dy = (bounds.max[1] - bounds.min[1]) / ny;
   const dz = (bounds.max[2] - bounds.min[2]) / nz;
   const cellVolume = dx * dy * dz;
-  const mappingSource = state ? "pipeline" : "defaults";
+  const mappingSource = metricMode ? "metric" : state ? "pipeline" : "defaults";
+  const stressMeta = state?.stressMeta;
+  const brickSource: StressEnergyBrick["source"] = (stressMeta?.source as StressEnergyBrick["source"])
+    ?? (metricMode ? "metric" : state ? "pipeline" : "unknown");
+  const brickCongruence: StressEnergyBrick["congruence"] =
+    (stressMeta?.congruence as StressEnergyBrick["congruence"])
+    ?? (metricMode ? "conditional" : "proxy-only");
+  const brickProxy =
+    typeof stressMeta?.proxy === "boolean"
+      ? stressMeta.proxy
+      : brickCongruence !== "geometry-derived";
 
   const axesSq: Vec3 = [axes[0] * axes[0], axes[1] * axes[1], axes[2] * axes[2]];
   const wallSigma = Math.max(input.hullWall ?? defaults.wall, 0.1);
@@ -686,7 +721,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
       pressureFactor: -1,
       pressureSource: "proxy",
       source: mappingSource,
-      proxy: true,
+      proxy: !metricMode,
     },
   };
 
@@ -694,6 +729,11 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     dims,
     voxelBytes: 4,
     format: "r32f",
+    source: brickSource,
+    proxy: brickProxy,
+    congruence: brickCongruence,
+    metricT00Ref,
+    metricT00Source,
     channels: {
       t00: { data: t00, min: t00Min, max: t00Max },
       Sx: { data: Sx, min: SxMin, max: SxMax },
@@ -715,6 +755,11 @@ export interface StressEnergyBrickResponse {
   dims: [number, number, number];
   voxelBytes: number;
   format: "r32f";
+  source?: "pipeline" | "metric" | "unknown";
+  proxy?: boolean;
+  congruence?: "proxy-only" | "geometry-derived" | "conditional";
+  metricT00Ref?: string;
+  metricT00Source?: string;
   channels: {
     t00: StressEnergyBrickResponseChannel;
     Sx: StressEnergyBrickResponseChannel;
@@ -731,6 +776,11 @@ export interface StressEnergyBrickBinaryHeader {
   dims: [number, number, number];
   voxelBytes: number;
   format: "r32f";
+  source?: "pipeline" | "metric" | "unknown";
+  proxy?: boolean;
+  congruence?: "proxy-only" | "geometry-derived" | "conditional";
+  metricT00Ref?: string;
+  metricT00Source?: string;
   channelOrder: typeof STRESS_ENERGY_CHANNEL_ORDER;
   channels: {
     t00: { min: number; max: number; bytes: number };
@@ -751,6 +801,11 @@ export const serializeStressEnergyBrick = (brick: StressEnergyBrick): StressEner
   dims: brick.dims,
   voxelBytes: brick.voxelBytes,
   format: brick.format,
+  source: brick.source ?? "pipeline",
+  proxy: brick.proxy ?? true,
+  congruence: brick.congruence ?? "proxy-only",
+  metricT00Ref: brick.metricT00Ref,
+  metricT00Source: brick.metricT00Source,
   channels: {
     t00: { data: encodeFloat32(brick.channels.t00.data), min: brick.channels.t00.min, max: brick.channels.t00.max },
     Sx: { data: encodeFloat32(brick.channels.Sx.data), min: brick.channels.Sx.min, max: brick.channels.Sx.max },
@@ -774,6 +829,11 @@ export const serializeStressEnergyBrickBinary = (brick: StressEnergyBrick): Stre
       dims: brick.dims,
       voxelBytes: brick.voxelBytes,
       format: brick.format,
+      source: brick.source ?? "pipeline",
+      proxy: brick.proxy ?? true,
+      congruence: brick.congruence ?? "proxy-only",
+      metricT00Ref: brick.metricT00Ref,
+      metricT00Source: brick.metricT00Source,
       channelOrder: STRESS_ENERGY_CHANNEL_ORDER,
       channels: {
         t00: { min: t00.min, max: t00.max, bytes: t00.data.byteLength },

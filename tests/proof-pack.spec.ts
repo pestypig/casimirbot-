@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { kappa_drive_from_power } from "../shared/curvature-proxy";
+import { SI_TO_GEOM_STRESS } from "../shared/gr-units";
 import { proofPackSchema } from "../shared/schema";
 
 const loadPipelineModules = async () => {
@@ -118,5 +119,232 @@ describe("proof pack contract", () => {
     if (typeof snapshot.natarioConstraint === "boolean") {
       expect(natario).toBe(snapshot.natarioConstraint);
     }
+  });
+
+  it("uses VdB region II metric fallback for CL3 metric source when warp metric is missing", async () => {
+    const { initializePipelineState, buildProofPack } = await loadPipelineModules();
+
+    const state = initializePipelineState();
+    (state as any).warp = undefined;
+    (state as any).vdbRegionII = {
+      alpha: 1,
+      n: 80,
+      r_tilde_m: 1,
+      delta_tilde_m: 0.1,
+      sampleCount: 16,
+      b_min: 1,
+      b_max: 2,
+      bprime_min: -1,
+      bprime_max: 1,
+      bprime_rms: 0.5,
+      bdouble_min: -2,
+      bdouble_max: 2,
+      bdouble_rms: 1,
+      t00_min: -3,
+      t00_max: -1,
+      t00_mean: -2,
+      t00_rms: 2,
+      support: true,
+    };
+    (state as any).gr = {
+      constraints: {
+        rho_constraint: {
+          mean: -1.9,
+        },
+      },
+    };
+
+    const pack = buildProofPack(state);
+    const metricGeom = pack.values.gr_metric_t00_geom_mean;
+    expect(metricGeom?.value).toBeCloseTo(-2, 9);
+    expect(metricGeom?.proxy).toBe(false);
+    expect(pack.values.gr_cl3_rho_gate_source?.value).toBe(
+      "warp.metric.T00.vdb.regionII",
+    );
+    expect((pack.values.gr_cl3_rho_delta_metric_mean?.value as number) > 0).toBe(
+      true,
+    );
+  });
+
+  it("uses natario metric fallback for CL3 metric source when warp metric is missing", async () => {
+    const { initializePipelineState, buildProofPack } = await loadPipelineModules();
+
+    const state = initializePipelineState();
+    (state as any).warp = undefined;
+    (state as any).natario = {
+      metricT00: -42,
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+    };
+    (state as any).gr = {
+      constraints: {
+        rho_constraint: {
+          mean: -40 * SI_TO_GEOM_STRESS,
+        },
+      },
+    };
+
+    const pack = buildProofPack(state);
+    const metricGeom = pack.values.gr_metric_t00_geom_mean;
+    expect(metricGeom?.value).toBeCloseTo(-42 * SI_TO_GEOM_STRESS, 9);
+    expect(metricGeom?.proxy).toBe(false);
+    expect(pack.values.gr_cl3_rho_gate_source?.value).toBe(
+      "warp.metric.T00.natario_sdf.shift",
+    );
+    expect((pack.values.gr_cl3_rho_delta_metric_mean?.value as number) > 0).toBe(true);
+  });
+
+  it("does not treat VdB region II as metric source when derivative evidence is missing", async () => {
+    const { initializePipelineState, buildProofPack } = await loadPipelineModules();
+
+    const state = initializePipelineState();
+    (state as any).warp = undefined;
+    (state as any).vdbRegionII = {
+      t00_mean: -2,
+      sampleCount: 16,
+      support: true,
+      bprime_min: 0,
+      bprime_max: 0,
+      bdouble_min: 0,
+      bdouble_max: 0,
+    };
+    (state as any).gr = {
+      constraints: {
+        rho_constraint: {
+          mean: -1.9,
+        },
+      },
+    };
+
+    const pack = buildProofPack(state);
+    expect(pack.values.gr_metric_t00_geom_mean?.value).toBeUndefined();
+    expect(pack.values.gr_cl3_rho_gate_source?.value).toBe("metric-missing");
+    expect(pack.values.gr_cl3_rho_gate_reason?.value).toBe("metric_source_missing");
+  });
+
+  it("propagates warp.metricT00Ref into CL3 gate source", async () => {
+    const { initializePipelineState, buildProofPack } = await loadPipelineModules();
+
+    const state = initializePipelineState();
+    (state as any).warp = {
+      metricT00: -10,
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.vdb.regionII",
+    };
+    (state as any).gr = {
+      constraints: {
+        rho_constraint: {
+          mean: -9.5,
+        },
+      },
+    };
+
+    const pack = buildProofPack(state);
+    expect(pack.values.gr_cl3_rho_gate_source?.value).toBe(
+      "warp.metric.T00.vdb.regionII",
+    );
+  });
+
+  it("emits CL3 missing-input reason when metric T00 is unavailable", async () => {
+    const { initializePipelineState, buildProofPack } = await loadPipelineModules();
+
+    const state = initializePipelineState();
+    (state as any).warp = {
+      metricAdapter: {
+        chart: { label: "comoving_cartesian", dtGammaPolicy: "computed", contractStatus: "ok" },
+      },
+    };
+    (state as any).gr = {
+      constraints: {
+        rho_constraint: {
+          mean: -2.1,
+        },
+      },
+    };
+
+    const pack = buildProofPack(state);
+    expect(pack.values.gr_cl3_rho_gate?.value).toBe(false);
+    expect(pack.values.gr_cl3_rho_gate_source?.value).toBe("metric-missing");
+    expect(pack.values.gr_cl3_rho_gate_reason?.value).toBe("metric_source_missing");
+    expect(pack.values.gr_cl3_rho_missing_parts?.value).toContain("missing_metric_t00");
+    expect(pack.values.gr_cl3_rho_delta_mean?.value).toBe(null);
+  });
+
+  it("emits theta strict congruence status fields", async () => {
+    const { initializePipelineState, buildProofPack } = await loadPipelineModules();
+
+    const strictEnv = process.env.WARP_STRICT_CONGRUENCE;
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    const state = initializePipelineState();
+    (state as any).thetaCal = 12;
+    (state as any).warp = {
+      metricAdapter: {
+        betaDiagnostics: {
+          method: "not-computed",
+          thetaMax: 1.23,
+        },
+      },
+    };
+
+    const pack = buildProofPack(state);
+    expect(pack.values.theta_strict_mode?.value).toBe(true);
+    expect(pack.values.theta_strict_ok?.value).toBe(false);
+    expect(pack.values.theta_strict_reason?.value).toBe("theta_geom_proxy");
+    expect(pack.values.theta_audit?.value).toBe(pack.values.theta_pipeline_proxy?.value);
+    expect(pack.values.theta_metric_derived?.value).toBe(false);
+    expect(pack.values.theta_metric_source?.value).toBe("missing");
+    expect(pack.values.theta_metric_reason?.value).toBe("theta_geom_proxy");
+
+    process.env.WARP_STRICT_CONGRUENCE = strictEnv;
+  });
+
+  it("emits qi strict congruence status fields", async () => {
+    const { initializePipelineState, buildProofPack } = await loadPipelineModules();
+
+    const strictEnv = process.env.WARP_STRICT_CONGRUENCE;
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    const state = initializePipelineState();
+    (state as any).qiGuardrail = {
+      rhoSource: "tile-telemetry",
+    };
+
+    const pack = buildProofPack(state);
+    expect(pack.values.qi_rho_source?.value).toBe("tile-telemetry");
+    expect(pack.values.qi_metric_derived?.value).toBe(false);
+    expect(pack.values.qi_metric_source?.value).toBe("tile-telemetry");
+    expect(pack.values.qi_metric_source?.proxy).toBe(true);
+    expect(pack.values.qi_metric_reason?.value).toBe("proxy-or-missing");
+    expect(pack.values.qi_strict_mode?.value).toBe(true);
+    expect(pack.values.qi_strict_ok?.value).toBe(false);
+    expect(pack.values.qi_strict_reason?.value).toBe("qi_rho_proxy");
+
+    process.env.WARP_STRICT_CONGRUENCE = strictEnv;
+  });
+
+  it("emits TS metric-derivation status fields", async () => {
+    const { initializePipelineState, buildProofPack } = await loadPipelineModules();
+
+    const state = initializePipelineState();
+    (state as any).tsMetricDerived = true;
+    (state as any).tsMetricDerivedSource = "warp.metricAdapter+clocking";
+    (state as any).tsMetricDerivedReason =
+      "TS_ratio from proper-distance timing with explicit chart contract";
+    (state as any).qiGuardrail = {
+      rhoSource: "warp.metric.T00.natario.shift",
+      metricDerived: true,
+      metricDerivedSource: "warp.metricAdapter+clocking",
+      metricDerivedReason: "TS_ratio from proper-distance timing with explicit chart contract",
+    };
+
+    const pack = buildProofPack(state);
+    expect(pack.values.ts_metric_derived?.value).toBe(true);
+    expect(pack.values.ts_metric_source?.value).toBe(
+      "warp.metricAdapter+clocking",
+    );
+    expect(pack.values.ts_metric_source?.proxy).toBe(false);
+    expect(pack.values.ts_metric_reason?.proxy).toBe(false);
+    expect(pack.values.qi_metric_derived?.value).toBe(true);
+    expect(pack.values.qi_metric_source?.value).toBe("warp.metricAdapter+clocking");
+    expect(pack.values.qi_metric_source?.proxy).toBe(false);
   });
 });

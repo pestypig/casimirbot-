@@ -1,0 +1,1138 @@
+{
+    "kind":  "proof-pack",
+    "version":  1,
+    "generatedAt":  "2026-02-11T02:46:22.509Z",
+    "pipeline":  {
+                     "mode":  "hover"
+                 },
+    "values":  {
+                   "model_mode":  {
+                                      "value":  "raw",
+                                      "source":  "pipeline.modelMode",
+                                      "proxy":  false
+                                  },
+                   "power_avg_W":  {
+                                       "value":  83300000,
+                                       "unit":  "W",
+                                       "source":  "pipeline.P_avg_W",
+                                       "proxy":  false
+                                   },
+                   "power_avg_MW":  {
+                                        "value":  83.3,
+                                        "unit":  "MW",
+                                        "source":  "derived:power_avg_W",
+                                        "proxy":  false,
+                                        "note":  "converted_from_W"
+                                    },
+                   "duty_effective":  {
+                                          "value":  0.00035000000000000005,
+                                          "unit":  "1",
+                                          "source":  "pipeline.d_eff",
+                                          "proxy":  false
+                                      },
+                   "duty_burst":  {
+                                      "value":  0.14,
+                                      "unit":  "1",
+                                      "source":  "pipeline.dutyBurst",
+                                      "proxy":  false
+                                  },
+                   "sectors_live":  {
+                                        "value":  1,
+                                        "unit":  "1",
+                                        "source":  "pipeline.concurrentSectors",
+                                        "proxy":  false
+                                    },
+                   "sectors_total":  {
+                                         "value":  400,
+                                         "unit":  "1",
+                                         "source":  "pipeline.sectorCount",
+                                         "proxy":  false
+                                     },
+                   "tau_lc_ms":  {
+                                     "value":  0.003358990438645391,
+                                     "unit":  "ms",
+                                     "source":  "pipeline.lightCrossing.tauLC_ms",
+                                     "proxy":  false
+                                 },
+                   "tau_pulse_ms":  {
+                                        "value":  0.000027991586988704513,
+                                        "unit":  "ms",
+                                        "source":  "pipeline.lightCrossing.burst_ms",
+                                        "proxy":  false
+                                    },
+                   "tau_dwell_ms":  {
+                                        "value":  1,
+                                        "unit":  "ms",
+                                        "source":  "pipeline.lightCrossing.dwell_ms",
+                                        "proxy":  false
+                                    },
+                   "gamma_geo":  {
+                                     "value":  26,
+                                     "unit":  "1",
+                                     "source":  "pipeline.gammaGeo",
+                                     "proxy":  false
+                                 },
+                   "gamma_geo_cubed":  {
+                                           "value":  17576,
+                                           "unit":  "1",
+                                           "source":  "derived:gamma_geo^3",
+                                           "proxy":  false
+                                       },
+                   "q_cavity":  {
+                                    "value":  1000000000,
+                                    "unit":  "1",
+                                    "source":  "pipeline.qCavity",
+                                    "proxy":  false
+                                },
+                   "q_gain":  {
+                                  "value":  1,
+                                  "unit":  "1",
+                                  "source":  "pipeline.gammaChain.qGain",
+                                  "proxy":  false
+                              },
+                   "q_spoil":  {
+                                   "value":  1,
+                                   "unit":  "1",
+                                   "source":  "pipeline.qSpoilingFactor",
+                                   "proxy":  false
+                               },
+                   "gamma_vdb":  {
+                                     "value":  432799.41351960227,
+                                     "unit":  "1",
+                                     "source":  "pipeline.gammaVanDenBroeck_mass",
+                                     "proxy":  false
+                                 },
+                   "gamma_vdb_requested":  {
+                                               "value":  432799.41351960227,
+                                               "unit":  "1",
+                                               "source":  "pipeline.gammaVanDenBroeckGuard.requested",
+                                               "proxy":  false
+                                           },
+                   "theta_raw":  {
+                                     "value":  615160000000.0001,
+                                     "unit":  "1",
+                                     "source":  "pipeline.thetaRaw",
+                                     "proxy":  true
+                                 },
+                   "theta_cal":  {
+                                     "value":  2662408.8722071857,
+                                     "unit":  "1",
+                                     "source":  "pipeline.thetaCal",
+                                     "proxy":  true
+                                 },
+                   "theta_geom":  {
+                                      "value":  61.34470444996483,
+                                      "unit":  "1/m",
+                                      "source":  "pipeline.warp.metricAdapter.betaDiagnostics.thetaMax",
+                                      "proxy":  false,
+                                      "note":  "div(beta)"
+                                  },
+                   "theta_strict_mode":  {
+                                             "value":  true,
+                                             "source":  "config:WARP_STRICT_CONGRUENCE",
+                                             "proxy":  false
+                                         },
+                   "theta_strict_ok":  {
+                                           "value":  true,
+                                           "source":  "derived:theta_strict_ok",
+                                           "proxy":  false
+                                       },
+                   "theta_strict_reason":  {
+                                               "value":  "ok",
+                                               "source":  "derived:theta_strict_reason",
+                                               "proxy":  false
+                                           },
+                   "theta_proxy":  {
+                                       "value":  2662408.8722071857,
+                                       "unit":  "1",
+                                       "source":  "pipeline.thetaCal",
+                                       "proxy":  true
+                                   },
+                   "theta_audit":  {
+                                       "value":  61.34470444996483,
+                                       "unit":  "1",
+                                       "source":  "pipeline.warp.metricAdapter.betaDiagnostics.thetaMax",
+                                       "proxy":  false
+                                   },
+                   "theta_metric_derived":  {
+                                                "value":  true,
+                                                "source":  "derived:theta_metric_derived",
+                                                "proxy":  false
+                                            },
+                   "theta_metric_source":  {
+                                               "value":  "warp.metricAdapter.betaDiagnostics.thetaMax",
+                                               "source":  "derived:theta_metric_source",
+                                               "proxy":  false
+                                           },
+                   "theta_metric_reason":  {
+                                               "value":  "metric_adapter_divergence",
+                                               "source":  "derived:theta_metric_reason",
+                                               "proxy":  false
+                                           },
+                   "gamma_chain_note":  {
+                                            "value":  "rho_avg = rho0 * gamma_geo^3 * sqrt(Q/1e9) * gamma_VdB * q_spoil * d_eff",
+                                            "source":  "pipeline.gammaChain.note",
+                                            "proxy":  false
+                                        },
+                   "ts_ratio":  {
+                                    "value":  120.00000000003034,
+                                    "unit":  "1",
+                                    "source":  "pipeline.TS_ratio",
+                                    "proxy":  false
+                                },
+                   "ts_metric_derived":  {
+                                             "value":  true,
+                                             "source":  "derived:ts_metric_derived",
+                                             "proxy":  false
+                                         },
+                   "ts_metric_source":  {
+                                            "value":  "warp.metricAdapter+clocking",
+                                            "source":  "derived:ts_metric_source",
+                                            "proxy":  false
+                                        },
+                   "ts_metric_reason":  {
+                                            "value":  "TS_ratio from proper-distance timing with explicit chart contract",
+                                            "source":  "derived:ts_metric_reason",
+                                            "proxy":  false
+                                        },
+                   "zeta":  {
+                                "value":  1,
+                                "unit":  "1",
+                                "source":  "pipeline.zeta",
+                                "proxy":  false
+                            },
+                   "ford_roman_ok":  {
+                                         "value":  false,
+                                         "source":  "pipeline.fordRomanCompliance",
+                                         "proxy":  false
+                                     },
+                   "qi_rho_source":  {
+                                         "value":  "warp.metric.T00.natario.shift",
+                                         "source":  "pipeline.qiGuardrail.rhoSource",
+                                         "proxy":  false
+                                     },
+                   "qi_metric_derived":  {
+                                             "value":  true,
+                                             "source":  "derived:qi_metric_derived",
+                                             "proxy":  false
+                                         },
+                   "qi_metric_source":  {
+                                            "value":  "warp.metric.T00.natario.shift+warp.metricAdapter+clocking",
+                                            "source":  "derived:qi_metric_source",
+                                            "proxy":  false
+                                        },
+                   "qi_metric_reason":  {
+                                            "value":  "rho_source_metric;timing_metric",
+                                            "source":  "derived:qi_metric_reason",
+                                            "proxy":  false
+                                        },
+                   "qi_strict_mode":  {
+                                          "value":  true,
+                                          "source":  "config:WARP_STRICT_CONGRUENCE",
+                                          "proxy":  false
+                                      },
+                   "qi_strict_ok":  {
+                                        "value":  true,
+                                        "source":  "derived:qi_strict_ok",
+                                        "proxy":  false
+                                    },
+                   "qi_strict_reason":  {
+                                            "value":  "ok",
+                                            "source":  "derived:qi_strict_reason",
+                                            "proxy":  false
+                                        },
+                   "natario_ok":  {
+                                      "value":  true,
+                                      "source":  "pipeline.natarioConstraint",
+                                      "proxy":  false
+                                  },
+                   "gr_rho_constraint_mean":  {
+                                                  "value":  -1.5489982282244845E-27,
+                                                  "unit":  "1",
+                                                  "source":  "pipeline.metricConstraint.warp.metric.T00.natario.shift.mean",
+                                                  "proxy":  false,
+                                                  "note":  "unitSystem=gr"
+                                              },
+                   "gr_rho_constraint_rms":  {
+                                                 "value":  1.5489982282244845E-27,
+                                                 "unit":  "1",
+                                                 "source":  "pipeline.metricConstraint.warp.metric.T00.natario.shift.rms",
+                                                 "proxy":  false,
+                                                 "note":  "unitSystem=gr"
+                                             },
+                   "gr_rho_constraint_max_abs":  {
+                                                     "value":  1.5489982282244845E-27,
+                                                     "unit":  "1",
+                                                     "source":  "pipeline.metricConstraint.warp.metric.T00.natario.shift.maxAbs",
+                                                     "proxy":  false,
+                                                     "note":  "unitSystem=gr"
+                                                 },
+                   "gr_pipeline_t00_geom_mean":  {
+                                                     "value":  -9.5337064767358431E-30,
+                                                     "unit":  "1",
+                                                     "source":  "derived:pipeline.rho_avg*SI_TO_GEOM_STRESS",
+                                                     "proxy":  true,
+                                                     "note":  "unitSystem=gr;source=pipeline_rho_avg_SI"
+                                                 },
+                   "gr_metric_t00_geom_mean":  {
+                                                   "value":  -1.5489982282244845E-27,
+                                                   "unit":  "1",
+                                                   "source":  "derived:gr_metric_t00_geom_mean",
+                                                   "proxy":  false,
+                                                   "note":  "unitSystem=gr;source=warp.metric.T00.natario.shift"
+                                               },
+                   "metric_t00_observer":  {
+                                               "value":  "eulerian_n",
+                                               "source":  "pipeline.warp.metricT00Contract.observer",
+                                               "proxy":  false
+                                           },
+                   "metric_t00_normalization":  {
+                                                    "value":  "si_stress",
+                                                    "source":  "pipeline.warp.metricT00Contract.normalization",
+                                                    "proxy":  false
+                                                },
+                   "metric_t00_unit_system":  {
+                                                  "value":  "SI",
+                                                  "source":  "pipeline.warp.metricT00Contract.unitSystem",
+                                                  "proxy":  false
+                                              },
+                   "metric_t00_contract_status":  {
+                                                      "value":  "ok",
+                                                      "source":  "pipeline.warp.metricT00Contract.status",
+                                                      "proxy":  false
+                                                  },
+                   "metric_t00_contract_reason":  {
+                                                      "value":  "ok",
+                                                      "source":  "pipeline.warp.metricT00Contract.reason",
+                                                      "proxy":  false
+                                                  },
+                   "metric_t00_chart":  {
+                                            "value":  "comoving_cartesian",
+                                            "source":  "pipeline.warp.metricT00Contract.chart",
+                                            "proxy":  false
+                                        },
+                   "metric_t00_family":  {
+                                             "value":  "natario",
+                                             "source":  "pipeline.warp.metricT00Contract.family",
+                                             "proxy":  false
+                                         },
+                   "metric_t00_contract_ok":  {
+                                                  "value":  true,
+                                                  "source":  "pipeline.warp.metricT00Contract.ok",
+                                                  "proxy":  false
+                                              },
+                   "warp_canonical_family":  {
+                                                 "value":  "natario",
+                                                 "source":  "config:warp_canonical_family",
+                                                 "proxy":  false
+                                             },
+                   "warp_canonical_chart":  {
+                                                "value":  "comoving_cartesian",
+                                                "source":  "config:warp_canonical_chart",
+                                                "proxy":  false
+                                            },
+                   "warp_canonical_observer":  {
+                                                   "value":  "eulerian_n",
+                                                   "source":  "config:warp_canonical_observer",
+                                                   "proxy":  false
+                                               },
+                   "warp_canonical_normalization":  {
+                                                        "value":  "si_stress",
+                                                        "source":  "config:warp_canonical_normalization",
+                                                        "proxy":  false
+                                                    },
+                   "warp_canonical_unit_system":  {
+                                                      "value":  "SI",
+                                                      "source":  "config:warp_canonical_unit_system",
+                                                      "proxy":  false
+                                                  },
+                   "warp_canonical_match":  {
+                                                "value":  true,
+                                                "source":  "derived:warp_canonical_match",
+                                                "proxy":  false
+                                            },
+                   "metric_t00_sample_count":  {
+                                                   "value":  9,
+                                                   "unit":  "1",
+                                                   "source":  "pipeline.warp.metricStressDiagnostics.sampleCount",
+                                                   "proxy":  false
+                                               },
+                   "metric_t00_rho_geom_mean":  {
+                                                    "value":  -1.5489982282244845E-27,
+                                                    "unit":  "1",
+                                                    "source":  "pipeline.warp.metricStressDiagnostics.rhoGeomMean",
+                                                    "proxy":  false,
+                                                    "note":  "unitSystem=gr"
+                                                },
+                   "metric_t00_rho_si_mean":  {
+                                                  "value":  -187468372485870530,
+                                                  "unit":  "J/m^3",
+                                                  "source":  "pipeline.warp.metricStressDiagnostics.rhoSiMean",
+                                                  "proxy":  false
+                                              },
+                   "metric_k_trace_mean":  {
+                                               "value":  6.9719076505255408E-14,
+                                               "unit":  "1/m",
+                                               "source":  "pipeline.warp.metricStressDiagnostics.kTraceMean",
+                                               "proxy":  false
+                                           },
+                   "metric_k_sq_mean":  {
+                                            "value":  8.2721898617013747E-26,
+                                            "unit":  "1/m^2",
+                                            "source":  "pipeline.warp.metricStressDiagnostics.kSquaredMean",
+                                            "proxy":  false
+                                        },
+                   "metric_t00_step_m":  {
+                                             "value":  3.5828324597676766,
+                                             "unit":  "m",
+                                             "source":  "pipeline.warp.metricStressDiagnostics.step_m",
+                                             "proxy":  false
+                                         },
+                   "metric_t00_scale_m":  {
+                                              "value":  179.14162298838383,
+                                              "unit":  "m",
+                                              "source":  "pipeline.warp.metricStressDiagnostics.scale_m",
+                                              "proxy":  false
+                                          },
+                   "gr_cl3_rho_threshold":  {
+                                                "value":  0.1,
+                                                "unit":  "1",
+                                                "source":  "config:WARP_CL3_RHO_DELTA_MAX",
+                                                "proxy":  false,
+                                                "note":  "relative_delta_max"
+                                            },
+                   "gr_cl3_rho_delta_pipeline_mean":  {
+                                                          "value":  1.5394645217477487E-15,
+                                                          "unit":  "1",
+                                                          "source":  "derived:gr_cl3_rho_delta.pipeline.mean",
+                                                          "proxy":  true,
+                                                          "note":  "relative_delta"
+                                                      },
+                   "gr_cl3_rho_delta_metric_mean":  {
+                                                        "value":  0,
+                                                        "unit":  "1",
+                                                        "source":  "derived:gr_cl3_rho_delta.metric.mean",
+                                                        "proxy":  false,
+                                                        "note":  "relative_delta"
+                                                    },
+                   "gr_cl3_rho_delta_mean":  {
+                                                 "value":  0,
+                                                 "unit":  "1",
+                                                 "source":  "derived:gr_cl3_rho_delta.gate.mean",
+                                                 "proxy":  false,
+                                                 "note":  "relative_delta"
+                                             },
+                   "gr_cl3_rho_gate":  {
+                                           "value":  true,
+                                           "source":  "derived:gr_cl3_rho_gate",
+                                           "proxy":  false
+                                       },
+                   "gr_cl3_rho_gate_source":  {
+                                                  "value":  "warp.metric.T00.natario.shift",
+                                                  "source":  "derived:gr_cl3_rho_gate_source",
+                                                  "proxy":  false
+                                              },
+                   "gr_cl3_rho_gate_reason":  {
+                                                  "value":  "within_threshold",
+                                                  "source":  "derived:gr_cl3_rho_gate_reason",
+                                                  "proxy":  false
+                                              },
+                   "congruence_missing_count":  {
+                                                    "value":  0,
+                                                    "unit":  "1",
+                                                    "source":  "derived:congruence_missing_count",
+                                                    "proxy":  false,
+                                                    "note":  "count"
+                                                },
+                   "metric_adapter_family":  {
+                                                 "value":  "natario",
+                                                 "source":  "pipeline.warp.metricAdapter.family",
+                                                 "proxy":  false
+                                             },
+                   "metric_chart_label":  {
+                                              "value":  "comoving_cartesian",
+                                              "source":  "pipeline.warp.metricAdapter.chart.label",
+                                              "proxy":  false
+                                          },
+                   "metric_dt_gamma_policy":  {
+                                                  "value":  "assumed_zero",
+                                                  "source":  "pipeline.warp.metricAdapter.chart.dtGammaPolicy",
+                                                  "proxy":  false
+                                              },
+                   "metric_chart_contract_status":  {
+                                                        "value":  "ok",
+                                                        "source":  "pipeline.warp.metricAdapter.chart.contractStatus",
+                                                        "proxy":  false
+                                                    },
+                   "metric_chart_contract_reason":  {
+                                                        "value":  null,
+                                                        "source":  "missing",
+                                                        "proxy":  true
+                                                    },
+                   "metric_requested_field":  {
+                                                  "value":  "natario",
+                                                  "source":  "pipeline.warp.metricAdapter.requestedFieldType",
+                                                  "proxy":  false
+                                              },
+                   "metric_chart_notes":  {
+                                              "value":  null,
+                                              "source":  "missing",
+                                              "proxy":  true
+                                          },
+                   "metric_coordinate_map":  {
+                                                 "value":  "bubble-centered coordinates",
+                                                 "source":  "pipeline.warp.metricAdapter.chart.coordinateMap",
+                                                 "proxy":  true
+                                             },
+                   "metric_alpha":  {
+                                        "value":  1,
+                                        "unit":  "1",
+                                        "source":  "pipeline.warp.metricAdapter.alpha",
+                                        "proxy":  false
+                                    },
+                   "metric_gamma_xx":  {
+                                           "value":  1,
+                                           "unit":  "1",
+                                           "source":  "pipeline.warp.metricAdapter.gammaDiag[0]",
+                                           "proxy":  false
+                                       },
+                   "metric_gamma_yy":  {
+                                           "value":  1,
+                                           "unit":  "1",
+                                           "source":  "pipeline.warp.metricAdapter.gammaDiag[1]",
+                                           "proxy":  false
+                                       },
+                   "metric_gamma_zz":  {
+                                           "value":  1,
+                                           "unit":  "1",
+                                           "source":  "pipeline.warp.metricAdapter.gammaDiag[2]",
+                                           "proxy":  false
+                                       },
+                   "metric_beta_method":  {
+                                              "value":  "finite-diff+conformal",
+                                              "source":  "pipeline.warp.metricAdapter.betaDiagnostics.method",
+                                              "proxy":  false
+                                          },
+                   "metric_beta_theta_max":  {
+                                                 "value":  61.34470444996483,
+                                                 "unit":  "1/m",
+                                                 "source":  "pipeline.warp.metricAdapter.betaDiagnostics.thetaMax",
+                                                 "proxy":  false
+                                             },
+                   "metric_beta_theta_rms":  {
+                                                 "value":  35.41738162752107,
+                                                 "unit":  "1/m",
+                                                 "source":  "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms",
+                                                 "proxy":  false
+                                             },
+                   "metric_beta_curl_max":  {
+                                                "value":  0,
+                                                "unit":  "1/m",
+                                                "source":  "pipeline.warp.metricAdapter.betaDiagnostics.curlMax",
+                                                "proxy":  false
+                                            },
+                   "metric_beta_curl_rms":  {
+                                                "value":  0,
+                                                "unit":  "1/m",
+                                                "source":  "pipeline.warp.metricAdapter.betaDiagnostics.curlRms",
+                                                "proxy":  false
+                                            },
+                   "metric_beta_theta_conformal_max":  {
+                                                           "value":  61.34470444992298,
+                                                           "unit":  "1/m",
+                                                           "source":  "pipeline.warp.metricAdapter.betaDiagnostics.thetaConformalMax",
+                                                           "proxy":  false
+                                                       },
+                   "metric_beta_theta_conformal_rms":  {
+                                                           "value":  35.41738162752107,
+                                                           "unit":  "1/m",
+                                                           "source":  "pipeline.warp.metricAdapter.betaDiagnostics.thetaConformalRms",
+                                                           "proxy":  false
+                                                       },
+                   "metric_beta_bprime_over_b_max":  {
+                                                         "value":  408964696332.8199,
+                                                         "unit":  "1/m",
+                                                         "source":  "pipeline.warp.metricAdapter.betaDiagnostics.bPrimeOverBMax",
+                                                         "proxy":  false
+                                                     },
+                   "metric_beta_bdouble_over_b_max":  {
+                                                          "value":  437366351499110500000,
+                                                          "unit":  "1/m^2",
+                                                          "source":  "pipeline.warp.metricAdapter.betaDiagnostics.bDoubleOverBMax",
+                                                          "proxy":  false
+                                                      },
+                   "metric_beta_sample_count":  {
+                                                    "value":  32,
+                                                    "unit":  "1",
+                                                    "source":  "pipeline.warp.metricAdapter.betaDiagnostics.sampleCount",
+                                                    "proxy":  false
+                                                },
+                   "metric_beta_step_m":  {
+                                              "value":  3.5828324597676766,
+                                              "unit":  "m",
+                                              "source":  "pipeline.warp.metricAdapter.betaDiagnostics.step_m",
+                                              "proxy":  false
+                                          },
+                   "metric_beta_note":  {
+                                            "value":  "Central-difference estimate from shiftVectorField. VdB conformal diagnostics injected from region-II VdB conformal correction (+3 beta*grad ln B) applied with |grad ln B|max=4.090e+11, betaAmp=5.000e-11.",
+                                            "source":  "pipeline.warp.metricAdapter.betaDiagnostics.note",
+                                            "proxy":  false
+                                        },
+                   "U_static_J":  {
+                                      "value":  -0.0010834381443703043,
+                                      "unit":  "J",
+                                      "source":  "pipeline.U_static",
+                                      "proxy":  false
+                                  },
+                   "U_geo_J":  {
+                                   "value":  -19.04250882545247,
+                                   "unit":  "J",
+                                   "source":  "pipeline.U_geo",
+                                   "proxy":  false
+                               },
+                   "U_Q_J":  {
+                                 "value":  -1.2838420239798236,
+                                 "unit":  "J",
+                                 "source":  "pipeline.U_Q",
+                                 "proxy":  false
+                             },
+                   "U_cycle_J":  {
+                                     "value":  -0.00044934470839293834,
+                                     "unit":  "J",
+                                     "source":  "pipeline.U_cycle",
+                                     "proxy":  false
+                                 },
+                   "M_exotic_kg":  {
+                                       "value":  -0.00006312940701385961,
+                                       "unit":  "kg",
+                                       "source":  "pipeline.M_exotic",
+                                       "proxy":  false
+                                   },
+                   "M_exotic_raw_kg":  {
+                                           "value":  -0.00006312940701385961,
+                                           "unit":  "kg",
+                                           "source":  "pipeline.M_exotic_raw",
+                                           "proxy":  false
+                                       },
+                   "mass_calibration":  {
+                                            "value":  0.000004327994135196022,
+                                            "unit":  "1",
+                                            "source":  "pipeline.massCalibration",
+                                            "proxy":  false
+                                        },
+                   "rho_static_J_m3":  {
+                                           "value":  -433375257.7481217,
+                                           "unit":  "J/m^3",
+                                           "source":  "pipeline.rho_static",
+                                           "proxy":  false
+                                       },
+                   "rho_inst_J_m3":  {
+                                         "value":  -3296634660639071000,
+                                         "unit":  "J/m^3",
+                                         "source":  "pipeline.rho_inst",
+                                         "proxy":  false
+                                     },
+                   "rho_avg_J_m3":  {
+                                        "value":  -1153822131223675,
+                                        "unit":  "J/m^3",
+                                        "source":  "pipeline.rho_avg",
+                                        "proxy":  false
+                                    },
+                   "tile_area_cm2":  {
+                                         "value":  25,
+                                         "unit":  "cm^2",
+                                         "source":  "pipeline.tileArea_cm2",
+                                         "proxy":  false
+                                     },
+                   "tile_area_m2":  {
+                                        "value":  0.0025,
+                                        "unit":  "m^2",
+                                        "source":  "derived:tile_area_cm2",
+                                        "proxy":  false,
+                                        "note":  "cm2_to_m2"
+                                    },
+                   "tile_count":  {
+                                      "value":  1966954176,
+                                      "unit":  "1",
+                                      "source":  "pipeline.N_tiles",
+                                      "proxy":  false
+                                  },
+                   "U_static_total_J":  {
+                                            "value":  -2131073.1825068607,
+                                            "unit":  "J",
+                                            "source":  "pipeline.U_static_total",
+                                            "proxy":  false
+                                        },
+                   "hull_Lx_m":  {
+                                     "value":  1007,
+                                     "unit":  "m",
+                                     "source":  "hull.Lx_m",
+                                     "proxy":  false
+                                 },
+                   "hull_Ly_m":  {
+                                     "value":  264,
+                                     "unit":  "m",
+                                     "source":  "hull.Ly_m",
+                                     "proxy":  false
+                                 },
+                   "hull_Lz_m":  {
+                                     "value":  173,
+                                     "unit":  "m",
+                                     "source":  "hull.Lz_m",
+                                     "proxy":  false
+                                 },
+                   "hull_wall_m":  {
+                                       "value":  0.019986163866666667,
+                                       "unit":  "m",
+                                       "source":  "hull.wallThickness_m",
+                                       "proxy":  false
+                                   },
+                   "hull_area_m2":  {
+                                        "value":  558793.8017464621,
+                                        "unit":  "m^2",
+                                        "source":  "pipeline.hullArea_m2",
+                                        "proxy":  false
+                                    },
+                   "gap_nm":  {
+                                  "value":  1,
+                                  "unit":  "nm",
+                                  "source":  "pipeline.gap_nm",
+                                  "proxy":  false
+                              },
+                   "gap_m":  {
+                                 "value":  1E-09,
+                                 "unit":  "m",
+                                 "source":  "derived:gap_nm",
+                                 "proxy":  false,
+                                 "note":  "nm_to_m"
+                             },
+                   "gap_guard_nm":  {
+                                        "value":  8.5,
+                                        "unit":  "nm",
+                                        "source":  "pipeline.mechanical.constrainedGap_nm",
+                                        "proxy":  false
+                                    },
+                   "gap_guard_m":  {
+                                       "value":  8.5E-09,
+                                       "unit":  "m",
+                                       "source":  "derived:gap_guard_nm",
+                                       "proxy":  false,
+                                       "note":  "nm_to_m"
+                                   },
+                   "cavity_volume_m3":  {
+                                            "value":  2.5000000000000003E-12,
+                                            "unit":  "m^3",
+                                            "source":  "derived:tile_area_m2*gap_m",
+                                            "proxy":  false
+                                        },
+                   "rho_tile_J_m3":  {
+                                         "value":  -433375257.7481217,
+                                         "unit":  "J/m^3",
+                                         "source":  "derived:U_static_J/cavity_volume_m3",
+                                         "proxy":  false
+                                     },
+                   "packing":  {
+                                   "value":  0.88,
+                                   "unit":  "1",
+                                   "source":  "pipeline.PAPER_GEO.PACKING",
+                                   "proxy":  false
+                               },
+                   "radial_layers":  {
+                                         "value":  10,
+                                         "unit":  "1",
+                                         "source":  "pipeline.PAPER_GEO.RADIAL_LAYERS",
+                                         "proxy":  false
+                                     },
+                   "coverage_raw":  {
+                                        "value":  8.799999972496355,
+                                        "unit":  "1",
+                                        "source":  "derived:tile_count*tile_area_m2/hull_area_m2",
+                                        "proxy":  false
+                                    },
+                   "coverage":  {
+                                    "value":  0.9999999968745857,
+                                    "unit":  "1",
+                                    "source":  "derived:coverage_raw/(packing*radial_layers)",
+                                    "proxy":  false
+                                },
+                   "R_geom_m":  {
+                                    "value":  358.28324597676766,
+                                    "unit":  "m",
+                                    "source":  "derived:hull_dims",
+                                    "proxy":  false
+                                },
+                   "bubble_R_m":  {
+                                      "value":  280,
+                                      "unit":  "m",
+                                      "source":  "pipeline.bubble.R",
+                                      "proxy":  false
+                                  },
+                   "bubble_sigma":  {
+                                        "value":  35,
+                                        "unit":  "1",
+                                        "source":  "pipeline.bubble.sigma",
+                                        "proxy":  false
+                                    },
+                   "bubble_beta":  {
+                                       "value":  0.15,
+                                       "unit":  "1",
+                                       "source":  "pipeline.bubble.beta",
+                                       "proxy":  false
+                                   },
+                   "warp_t00_avg":  {
+                                        "value":  -187468372485870530,
+                                        "unit":  "J/m^3",
+                                        "source":  "pipeline.warp.stressEnergyTensor.T00",
+                                        "proxy":  false
+                                    },
+                   "warp_t11_avg":  {
+                                        "value":  187468372485870530,
+                                        "unit":  "J/m^3",
+                                        "source":  "pipeline.warp.stressEnergyTensor.T11",
+                                        "proxy":  false
+                                    },
+                   "warp_t22_avg":  {
+                                        "value":  187468372485870530,
+                                        "unit":  "J/m^3",
+                                        "source":  "pipeline.warp.stressEnergyTensor.T22",
+                                        "proxy":  false
+                                    },
+                   "warp_t33_avg":  {
+                                        "value":  187468372485870530,
+                                        "unit":  "J/m^3",
+                                        "source":  "pipeline.warp.stressEnergyTensor.T33",
+                                        "proxy":  false
+                                    },
+                   "curvature_meta_source":  {
+                                                 "value":  "metric",
+                                                 "source":  "derived:curvature_meta_source",
+                                                 "proxy":  true
+                                             },
+                   "curvature_meta_congruence":  {
+                                                     "value":  "conditional",
+                                                     "source":  "derived:curvature_meta_congruence",
+                                                     "proxy":  true
+                                                 },
+                   "curvature_meta_proxy":  {
+                                                "value":  true,
+                                                "source":  "derived:curvature_meta_proxy",
+                                                "proxy":  false
+                                            },
+                   "stress_meta_source":  {
+                                              "value":  "metric",
+                                              "source":  "derived:stress_meta_source",
+                                              "proxy":  true
+                                          },
+                   "stress_meta_congruence":  {
+                                                  "value":  "conditional",
+                                                  "source":  "derived:stress_meta_congruence",
+                                                  "proxy":  true
+                                              },
+                   "stress_meta_proxy":  {
+                                             "value":  true,
+                                             "source":  "derived:stress_meta_proxy",
+                                             "proxy":  false
+                                         },
+                   "vdb_limit":  {
+                                     "value":  432799.41351960227,
+                                     "unit":  "1",
+                                     "source":  "pipeline.gammaVanDenBroeckGuard.limit",
+                                     "proxy":  false
+                                 },
+                   "vdb_pocket_radius_m":  {
+                                               "value":  0.00019986163866666666,
+                                               "unit":  "m",
+                                               "source":  "pipeline.gammaVanDenBroeckGuard.pocketRadius_m",
+                                               "proxy":  false
+                                           },
+                   "vdb_pocket_thickness_m":  {
+                                                  "value":  4.6178814578641882E-08,
+                                                  "unit":  "m",
+                                                  "source":  "pipeline.gammaVanDenBroeckGuard.pocketThickness_m",
+                                                  "proxy":  false
+                                              },
+                   "vdb_planck_margin":  {
+                                             "value":  1.2365724385487849E+31,
+                                             "unit":  "1",
+                                             "source":  "pipeline.gammaVanDenBroeckGuard.planckMargin",
+                                             "proxy":  false
+                                         },
+                   "vdb_admissible":  {
+                                          "value":  true,
+                                          "source":  "pipeline.gammaVanDenBroeckGuard.admissible",
+                                          "proxy":  false
+                                      },
+                   "vdb_reason":  {
+                                      "value":  "+¦_VdB bounded by pocket floor 2.00e-4 m (wall=2.00e-2 m, minRadius=8.65e+1 m)",
+                                      "source":  "pipeline.gammaVanDenBroeckGuard.reason",
+                                      "proxy":  false
+                                  },
+                   "vdb_region_ii_alpha":  {
+                                               "value":  432798.41351960227,
+                                               "unit":  "1",
+                                               "source":  "pipeline.vdbRegionII.alpha",
+                                               "proxy":  false
+                                           },
+                   "vdb_region_ii_n":  {
+                                           "value":  80,
+                                           "unit":  "1",
+                                           "source":  "pipeline.vdbRegionII.n",
+                                           "proxy":  false
+                                       },
+                   "vdb_region_ii_r_tilde_m":  {
+                                                   "value":  0.00019986163866666666,
+                                                   "unit":  "m",
+                                                   "source":  "pipeline.vdbRegionII.r_tilde_m",
+                                                   "proxy":  false
+                                               },
+                   "vdb_region_ii_delta_tilde_m":  {
+                                                       "value":  4.6178814578641882E-08,
+                                                       "unit":  "m",
+                                                       "source":  "pipeline.vdbRegionII.delta_tilde_m",
+                                                       "proxy":  false
+                                                   },
+                   "vdb_region_ii_bprime_max_abs":  {
+                                                        "value":  250993566957796.53,
+                                                        "unit":  "1/m",
+                                                        "source":  "pipeline.vdbRegionII.bprime_max_abs",
+                                                        "proxy":  false
+                                                    },
+                   "vdb_region_ii_bdouble_max_abs":  {
+                                                         "value":  2.6842449144006839E+23,
+                                                         "unit":  "1/m^2",
+                                                         "source":  "pipeline.vdbRegionII.bdouble_max_abs",
+                                                         "proxy":  false
+                                                     },
+                   "vdb_region_ii_t00_min":  {
+                                                 "value":  -36742634491964160,
+                                                 "unit":  "J/m^3",
+                                                 "source":  "pipeline.vdbRegionII.t00_min",
+                                                 "proxy":  false
+                                             },
+                   "vdb_region_ii_t00_max":  {
+                                                 "value":  524249.03316509543,
+                                                 "unit":  "J/m^3",
+                                                 "source":  "pipeline.vdbRegionII.t00_max",
+                                                 "proxy":  false
+                                             },
+                   "vdb_region_ii_t00_mean":  {
+                                                  "value":  -1417151262769726.8,
+                                                  "unit":  "J/m^3",
+                                                  "source":  "pipeline.vdbRegionII.t00_mean",
+                                                  "proxy":  false
+                                              },
+                   "vdb_region_ii_sample_count":  {
+                                                      "value":  64,
+                                                      "unit":  "1",
+                                                      "source":  "pipeline.vdbRegionII.sampleCount",
+                                                      "proxy":  false
+                                                  },
+                   "vdb_region_ii_support":  {
+                                                 "value":  true,
+                                                 "source":  "pipeline.vdbRegionII.support",
+                                                 "proxy":  false
+                                             },
+                   "vdb_region_ii_derivative_support":  {
+                                                            "value":  true,
+                                                            "source":  "pipeline.vdb_region_ii_derivative_support",
+                                                            "proxy":  false
+                                                        },
+                   "vdb_region_ii_note":  {
+                                              "value":  "Region II only; outer f-wall not evaluated.",
+                                              "source":  "pipeline.vdbRegionII.note",
+                                              "proxy":  false
+                                          },
+                   "vdb_region_iv_R_m":  {
+                                             "value":  280,
+                                             "unit":  "m",
+                                             "source":  "pipeline.vdbRegionIV.R_m",
+                                             "proxy":  false
+                                         },
+                   "vdb_region_iv_sigma":  {
+                                               "value":  35,
+                                               "unit":  "1",
+                                               "source":  "pipeline.vdbRegionIV.sigma",
+                                               "proxy":  false
+                                           },
+                   "vdb_region_iv_dfdr_max_abs":  {
+                                                      "value":  17.461604107900172,
+                                                      "unit":  "1/m",
+                                                      "source":  "pipeline.vdbRegionIV.dfdr_max_abs",
+                                                      "proxy":  false
+                                                  },
+                   "vdb_region_iv_dfdr_rms":  {
+                                                  "value":  8.249428925774348,
+                                                  "unit":  "1/m",
+                                                  "source":  "pipeline.vdbRegionIV.dfdr_rms",
+                                                  "proxy":  false
+                                              },
+                   "vdb_region_iv_t00_min":  {
+                                                 "value":  -9.28847724658885E-28,
+                                                 "unit":  "J/m^3",
+                                                 "source":  "pipeline.vdbRegionIV.t00_min",
+                                                 "proxy":  false
+                                             },
+                   "vdb_region_iv_t00_max":  {
+                                                 "value":  -1.0943240200950805E-31,
+                                                 "unit":  "J/m^3",
+                                                 "source":  "pipeline.vdbRegionIV.t00_max",
+                                                 "proxy":  false
+                                             },
+                   "vdb_region_iv_t00_mean":  {
+                                                  "value":  -2.0731179724652278E-28,
+                                                  "unit":  "J/m^3",
+                                                  "source":  "pipeline.vdbRegionIV.t00_mean",
+                                                  "proxy":  false
+                                              },
+                   "vdb_region_iv_k_trace_mean":  {
+                                                      "value":  1.0157923939232641E-13,
+                                                      "unit":  "1/m",
+                                                      "source":  "pipeline.vdbRegionIV.k_trace_mean",
+                                                      "proxy":  false
+                                                  },
+                   "vdb_region_iv_k_squared_mean":  {
+                                                        "value":  3.1261882523144286E-26,
+                                                        "unit":  "1/m^2",
+                                                        "source":  "pipeline.vdbRegionIV.k_squared_mean",
+                                                        "proxy":  false
+                                                    },
+                   "vdb_region_iv_sample_count":  {
+                                                      "value":  64,
+                                                      "unit":  "1",
+                                                      "source":  "pipeline.vdbRegionIV.sampleCount",
+                                                      "proxy":  false
+                                                  },
+                   "vdb_region_iv_support":  {
+                                                 "value":  true,
+                                                 "source":  "pipeline.vdbRegionIV.support",
+                                                 "proxy":  false
+                                             },
+                   "vdb_region_iv_derivative_support":  {
+                                                            "value":  true,
+                                                            "source":  "pipeline.vdb_region_iv_derivative_support",
+                                                            "proxy":  false
+                                                        },
+                   "vdb_region_iv_note":  {
+                                              "value":  "Region IV f-wall derivative sample around R.",
+                                              "source":  "pipeline.vdbRegionIV.note",
+                                              "proxy":  false
+                                          },
+                   "vdb_two_wall_support":  {
+                                                "value":  true,
+                                                "source":  "derived:vdb_two_wall_support",
+                                                "proxy":  false
+                                            },
+                   "vdb_two_wall_derivative_support":  {
+                                                           "value":  true,
+                                                           "source":  "pipeline.vdb_two_wall_derivative_support",
+                                                           "proxy":  false
+                                                       },
+                   "mechanical_gap_req_nm":  {
+                                                 "value":  1,
+                                                 "unit":  "nm",
+                                                 "source":  "pipeline.mechanical.requestedGap_nm",
+                                                 "proxy":  false
+                                             },
+                   "mechanical_gap_eff_nm":  {
+                                                 "value":  8.5,
+                                                 "unit":  "nm",
+                                                 "source":  "pipeline.mechanical.constrainedGap_nm",
+                                                 "proxy":  false
+                                             },
+                   "mechanical_safety_factor":  {
+                                                    "value":  24075.457815461265,
+                                                    "unit":  "1",
+                                                    "source":  "pipeline.mechanical.mechSafetyFactor",
+                                                    "proxy":  false
+                                                },
+                   "mechanical_safety_min":  {
+                                                 "value":  3,
+                                                 "unit":  "1",
+                                                 "source":  "pipeline.mechanical.safetyFactorMin",
+                                                 "proxy":  true
+                                             },
+                   "mechanical_load_pressure_Pa":  {
+                                                       "value":  249216.4446462488,
+                                                       "unit":  "Pa",
+                                                       "source":  "pipeline.mechanical.loadPressure_Pa",
+                                                       "proxy":  false
+                                                   },
+                   "mechanical_sigma_allow_Pa":  {
+                                                     "value":  6000000000,
+                                                     "unit":  "Pa",
+                                                     "source":  "pipeline.mechanical.sigmaAllow_Pa",
+                                                     "proxy":  false
+                                                 },
+                   "mechanical_casimir_pressure_Pa":  {
+                                                          "value":  249063.25800588893,
+                                                          "unit":  "Pa",
+                                                          "source":  "pipeline.mechanical.casimirPressure_Pa",
+                                                          "proxy":  false
+                                                      },
+                   "mechanical_electrostatic_pressure_Pa":  {
+                                                                "value":  153.18664035986166,
+                                                                "unit":  "Pa",
+                                                                "source":  "pipeline.mechanical.electrostaticPressure_Pa",
+                                                                "proxy":  false
+                                                            },
+                   "mechanical_restoring_pressure_Pa":  {
+                                                            "value":  281382.3376306666,
+                                                            "unit":  "Pa",
+                                                            "source":  "pipeline.mechanical.restoringPressure_Pa",
+                                                            "proxy":  false
+                                                        },
+                   "mechanical_margin_Pa":  {
+                                                "value":  32165.89298441782,
+                                                "unit":  "Pa",
+                                                "source":  "pipeline.mechanical.margin_Pa",
+                                                "proxy":  false
+                                            },
+                   "mechanical_max_stroke_pm":  {
+                                                    "value":  857.3537323432972,
+                                                    "unit":  "pm",
+                                                    "source":  "pipeline.mechanical.maxStroke_pm",
+                                                    "proxy":  false
+                                                },
+                   "mechanical_stroke_feasible":  {
+                                                      "value":  true,
+                                                      "source":  "pipeline.mechanical.strokeFeasible",
+                                                      "proxy":  false
+                                                  },
+                   "mechanical_feasible":  {
+                                               "value":  true,
+                                               "source":  "pipeline.mechanical.feasible",
+                                               "proxy":  false
+                                           },
+                   "mechanical_safety_feasible":  {
+                                                      "value":  true,
+                                                      "source":  "pipeline.mechanical.safetyFeasible",
+                                                      "proxy":  false
+                                                  },
+                   "mechanical_note":  {
+                                           "value":  null,
+                                           "source":  "missing",
+                                           "proxy":  true
+                                       },
+                   "kappa_drive":  {
+                                       "value":  9.39673289862567E-52,
+                                       "unit":  "1/m^2",
+                                       "source":  "derived:kappa_drive_from_power",
+                                       "proxy":  true,
+                                       "note":  "curvature_proxy"
+                                   },
+                   "kappa_drive_gain":  {
+                                            "value":  26,
+                                            "unit":  "1",
+                                            "source":  "derived:gamma_geo",
+                                            "proxy":  false
+                                        },
+                   "overall_status":  {
+                                          "value":  "CRITICAL",
+                                          "source":  "pipeline.overallStatus",
+                                          "proxy":  false
+                                      }
+               },
+    "notes":  [
+                  "missing_values=metric_chart_contract_reason,metric_chart_notes,mechanical_note"
+              ]
+}

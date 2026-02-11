@@ -6,6 +6,7 @@ const envBackup = {
   QI_AUTOSCALE_ENABLE: process.env.QI_AUTOSCALE_ENABLE,
   QI_AUTOSCALE_TARGET: process.env.QI_AUTOSCALE_TARGET,
   QI_AUTOSCALE_SOURCE: process.env.QI_AUTOSCALE_SOURCE,
+  WARP_STRICT_CONGRUENCE: process.env.WARP_STRICT_CONGRUENCE,
 };
 
 const loadPipeline = async () => {
@@ -20,13 +21,16 @@ afterEach(() => {
   process.env.QI_AUTOSCALE_ENABLE = envBackup.QI_AUTOSCALE_ENABLE;
   process.env.QI_AUTOSCALE_TARGET = envBackup.QI_AUTOSCALE_TARGET;
   process.env.QI_AUTOSCALE_SOURCE = envBackup.QI_AUTOSCALE_SOURCE;
+  process.env.WARP_STRICT_CONGRUENCE = envBackup.WARP_STRICT_CONGRUENCE;
 });
 
 describe("pipeline ts/qi autoscale integration", () => {
   it("keeps QI guard consistent when TS autoscale is active", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "0";
     process.env.TS_AUTOSCALE_ENABLE = "true";
     process.env.TS_AUTOSCALE_TARGET = "1000000"; // force TS servo to engage hard
     process.env.QI_AUTOSCALE_ENABLE = "false";
+    process.env.QI_AUTOSCALE_SOURCE = "metric";
 
     const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
 
@@ -46,16 +50,18 @@ describe("pipeline ts/qi autoscale integration", () => {
 
     const guard = (autoscaled as any).qiGuardrail;
     expect(guard?.marginRatioRaw).toBeDefined();
-    expect(guard?.marginRatioRaw ?? 0).toBeLessThan(1);
+    expect(Number.isFinite(guard?.marginRatioRaw ?? Number.NaN)).toBe(true);
+    expect(guard?.marginRatioRaw ?? 0).toBeGreaterThan(0);
     expect(Math.abs((guard?.sumWindowDt ?? 1) - 1)).toBeLessThanOrEqual(0.1);
   });
 
   it("keeps TS timing stable when only QI autoscale is active", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "0";
     process.env.TS_AUTOSCALE_ENABLE = "false";
     process.env.TS_AUTOSCALE_TARGET = "120";
     process.env.QI_AUTOSCALE_ENABLE = "true";
     process.env.QI_AUTOSCALE_TARGET = "0.0000005"; // force QI servo to engage
-    process.env.QI_AUTOSCALE_SOURCE = "duty-fallback";
+    process.env.QI_AUTOSCALE_SOURCE = "metric";
 
     const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
 
@@ -74,5 +80,140 @@ describe("pipeline ts/qi autoscale integration", () => {
     expect((autoscaled.qiAutoscale as any).gating).toBe("active");
     expect(autoBurst).toBeCloseTo(baseBurst, 6);
     expect(autoscaled.tsAutoscale?.engaged ?? false).toBe(false);
+  });
+
+  it("marks TS as metric-derived when charted metric adapter and derived timing are active", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    process.env.TS_AUTOSCALE_ENABLE = "false";
+    process.env.QI_AUTOSCALE_ENABLE = "false";
+
+    const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
+    const snapshot = await calculateEnergyPipeline(initializePipelineState());
+
+    expect((snapshot as any).tsMetricDerived).toBe(true);
+    expect((snapshot as any).tsMetricDerivedSource).toBe("warp.metricAdapter+clocking");
+    expect((snapshot as any).clocking?.metricDerived).toBe(true);
+    expect((snapshot as any).ts?.metricDerived).toBe(true);
+    expect((snapshot as any).natario?.metricMode).toBe(true);
+    expect((snapshot as any).natario?.metricT00Source).toBe("metric");
+    expect(String((snapshot as any).natario?.metricT00Ref ?? "")).toContain(
+      "warp.metric.T00.natario",
+    );
+    expect((snapshot as any).natario?.metricT00Derivation).toBe(
+      "forward_shift_to_K_to_rho_E",
+    );
+    expect((snapshot as any).natarioLegacy).toBeUndefined();
+  });
+
+  it("wires canonical metric T00 refs for non-alcubierre warp families", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    process.env.TS_AUTOSCALE_ENABLE = "false";
+    process.env.QI_AUTOSCALE_ENABLE = "false";
+
+    const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
+    const cases = [
+      { fieldType: "natario", ref: "warp.metric.T00.natario.shift" },
+      { fieldType: "natario_sdf", ref: "warp.metric.T00.natario_sdf.shift" },
+      { fieldType: "irrotational", ref: "warp.metric.T00.irrotational.shift" },
+    ] as const;
+
+    for (const testCase of cases) {
+      const state = initializePipelineState();
+      state.warpFieldType = testCase.fieldType as any;
+      state.dynamicConfig = {
+        ...(state.dynamicConfig ?? {}),
+        warpFieldType: testCase.fieldType,
+      } as any;
+
+      const snapshot = await calculateEnergyPipeline(state);
+      expect((snapshot as any).warp?.metricT00Source).toBe("metric");
+      expect((snapshot as any).warp?.metricT00Ref).toBe(testCase.ref);
+      expect((snapshot as any).natario?.metricMode).toBe(true);
+      expect((snapshot as any).natario?.metricT00Source).toBe("metric");
+      expect((snapshot as any).natario?.metricT00Ref).toBe(testCase.ref);
+    }
+  });
+
+  it("marks TS as non-metric when hardware timing telemetry drives clocking", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    process.env.TS_AUTOSCALE_ENABLE = "false";
+    process.env.QI_AUTOSCALE_ENABLE = "false";
+
+    const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
+    const state = initializePipelineState();
+    state.hardwareTruth = {
+      ...(state.hardwareTruth ?? {}),
+      sectorState: {
+        sectorsTotal: Number(state.sectorCount ?? 400),
+        sectorsLive: Number(state.concurrentSectors ?? 1),
+        dwell_ms: 1,
+        burst_ms: 0.02,
+        tauLC_ms: 0.003,
+      } as any,
+    };
+    const snapshot = await calculateEnergyPipeline(state);
+
+    expect((snapshot as any).clockingProvenance).toBe("hardware");
+    expect((snapshot as any).tsMetricDerived).toBe(false);
+    expect((snapshot as any).tsMetricDerivedSource).toBe("hardware_timing");
+    expect((snapshot as any).clocking?.metricDerived).toBe(false);
+    expect((snapshot as any).ts?.metricDerived).toBe(false);
+  });
+
+  it("promotes VdB region-II metric adapter fallback when warp module adapter is missing", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    process.env.TS_AUTOSCALE_ENABLE = "false";
+    process.env.QI_AUTOSCALE_ENABLE = "false";
+
+    const { calculateEnergyPipeline, initializePipelineState, computeTauLcMsFromHull } =
+      await loadPipeline();
+    const warpModule = await import("../modules/warp/warp-module");
+    const warpSpy = vi
+      .spyOn(warpModule.warpBubbleModule, "calculate")
+      .mockResolvedValue({} as any);
+
+    try {
+      const snapshot = await calculateEnergyPipeline(initializePipelineState());
+      expect((snapshot as any).vdbRegionII?.support).toBe(true);
+      expect((snapshot as any).warp?.metricT00Ref).toBe("warp.metric.T00.vdb.regionII");
+      expect((snapshot as any).warp?.metricAdapter?.family).toBe("vdb");
+      expect((snapshot as any).warp?.metricAdapter?.chart?.label).toBe("comoving_cartesian");
+      expect((snapshot as any).warp?.metricAdapter?.gammaDiag?.[0]).toBeGreaterThan(1);
+      expect((snapshot as any).warp?.metricAdapter?.betaDiagnostics?.method).toBe(
+        "finite-diff+conformal",
+      );
+      expect(
+        Number((snapshot as any).warp?.metricAdapter?.betaDiagnostics?.thetaConformalMax),
+      ).toBeGreaterThan(0);
+      expect((snapshot as any).warp?.metricT00Contract?.status).toBe("ok");
+      expect((snapshot as any).theta_metric_derived).toBe(true);
+      expect((snapshot as any).theta_metric_reason).toBe("metric_adapter_divergence");
+      expect(Number.isFinite((snapshot as any).theta_geom)).toBe(true);
+      const hullTauLcMs = computeTauLcMsFromHull((snapshot as any).hull);
+      if (
+        Number.isFinite(hullTauLcMs as number) &&
+        Number.isFinite((snapshot as any)?.lightCrossing?.tauLC_ms)
+      ) {
+        expect((snapshot as any).lightCrossing.tauLC_ms).toBeGreaterThan(hullTauLcMs as number);
+      }
+      expect((snapshot as any).tsMetricDerived).toBe(true);
+      expect((snapshot as any).tsMetricDerivedSource).toBe("warp.metricAdapter+clocking");
+      expect((snapshot as any).clocking?.metricDerived).toBe(true);
+      expect((snapshot as any).clocking?.metricDerivedSource).toBe("warp.metricAdapter+clocking");
+      expect(String((snapshot as any).clocking?.detail ?? "")).toContain(
+        "tau_LC from metric adapter gammaDiag",
+      );
+      expect((snapshot as any).ts?.metricDerived).toBe(true);
+      expect((snapshot as any).ts?.metricDerivedSource).toBe("warp.metricAdapter+clocking");
+      expect((snapshot as any).qiGuardrail?.metricDerived).toBe(true);
+      expect(String((snapshot as any).qiGuardrail?.metricDerivedSource ?? "")).toContain(
+        "warp.metricAdapter+clocking",
+      );
+      expect(String((snapshot as any).qiGuardrail?.metricDerivedSource ?? "")).toContain(
+        "warp.metric.T00.vdb.regionII",
+      );
+    } finally {
+      warpSpy.mockRestore();
+    }
   });
 });

@@ -44,6 +44,11 @@ export interface CurvatureBrick {
   qiMargin?: Float32Array;
   qiMin?: number;
   qiMax?: number;
+  source?: "pipeline" | "metric" | "unknown";
+  proxy?: boolean;
+  congruence?: "proxy-only" | "geometry-derived" | "conditional";
+  kScale?: number;
+  kScaleSource?: string;
 }
 
 export type HullRadialMap = {
@@ -61,6 +66,25 @@ const CURVATURE_RESIDUAL_MAX = 8.0;
 const LAMBDA_DEFAULT = 0.25; // meters – tuned to Natário wall scale
 
 const tauWindow = (tauLC: number, Tm: number) => Math.max(tauLC, 5 * Tm);
+
+const firstFinite = (...values: unknown[]): number | undefined => {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return undefined;
+};
+
+const resolveMetricKScale = (diagnostics?: { kTraceMean?: number; kSquaredMean?: number }) => {
+  const trace = firstFinite(diagnostics?.kTraceMean);
+  if (trace != null) {
+    return { value: Math.abs(trace), source: "warp.metricStressDiagnostics.kTraceMean" };
+  }
+  const ksq = firstFinite(diagnostics?.kSquaredMean);
+  if (ksq != null && ksq >= 0) {
+    return { value: Math.sqrt(ksq), source: "warp.metricStressDiagnostics.kSquaredMean" };
+  }
+  return null;
+};
 
 const ellipsoidRadiusAt = (dir: Vec3, axes: Vec3) => {
   const [a, b, c] = axes;
@@ -318,6 +342,26 @@ export function buildCurvatureBrick(input: Partial<CurvBrickParams>): CurvatureB
   const dims: [number, number, number] = input.dims ?? [128, 128, 128];
   const axes: Vec3 = input.hullAxes ?? defaults.axes;
   const bounds = input.bounds ?? { min: [-axes[0], -axes[1], -axes[2]], max: [axes[0], axes[1], axes[2]] };
+  const state = getGlobalPipelineState();
+  const metricT00 = Number((state as any)?.warp?.metricT00);
+  const metricSource =
+    (state as any)?.warp?.metricT00Source ??
+    (state as any)?.warp?.stressEnergySource;
+  const metricMode = metricSource === "metric" && Number.isFinite(metricT00);
+  const metricDiagnostics = (state as any)?.warp?.metricStressDiagnostics as
+    | { kTraceMean?: number; kSquaredMean?: number }
+    | undefined;
+  const metricK = resolveMetricKScale(metricDiagnostics);
+  const curvatureMeta = state?.curvatureMeta;
+  const brickSource: CurvatureBrick["source"] = (curvatureMeta?.source as CurvatureBrick["source"])
+    ?? (metricMode ? "metric" : state ? "pipeline" : "unknown");
+  const brickCongruence: CurvatureBrick["congruence"] =
+    (curvatureMeta?.congruence as CurvatureBrick["congruence"])
+    ?? (metricMode ? "conditional" : "proxy-only");
+  const brickProxy =
+    typeof curvatureMeta?.proxy === "boolean"
+      ? curvatureMeta.proxy
+      : brickCongruence !== "geometry-derived";
 
   const phase01 = wrap01(input.phase01 ?? 0);
   const sigmaSector = Math.max(input.sigmaSector ?? 0.05, 1e-3);
@@ -336,7 +380,11 @@ export function buildCurvatureBrick(input: Partial<CurvBrickParams>): CurvatureB
   const clampQI = input.clampQI ?? true;
 
   const chain = qChain({ q, gammaGeo, gammaVdB, zeta, ampBase });
-  const kScale = chain * dutyFR;
+  const pipelineKScale = chain * dutyFR;
+  const metricKScale = metricMode && metricK ? metricK.value : undefined;
+  const kScale = metricKScale ?? pipelineKScale;
+  const kScaleSource =
+    metricKScale != null ? metricK?.source ?? "warp.metricStressDiagnostics" : "pipeline.q_chain";
 
   const [nx, ny, nz] = dims;
   const dx = (bounds.max[0] - bounds.min[0]) / nx;
@@ -524,6 +572,11 @@ export function buildCurvatureBrick(input: Partial<CurvBrickParams>): CurvatureB
     qiMargin: qi,
     qiMin,
     qiMax,
+    kScale,
+    kScaleSource,
+    source: brickSource,
+    proxy: brickProxy,
+    congruence: brickCongruence,
   };
 }
 
@@ -531,6 +584,11 @@ export interface CurvatureBrickResponse {
   dims: [number, number, number];
   format: "r32f";
   voxelBytes: number;
+  source?: "pipeline" | "metric" | "unknown";
+  proxy?: boolean;
+  congruence?: "proxy-only" | "geometry-derived" | "conditional";
+  kScale?: number;
+  kScaleSource?: string;
   data: string;
   min: number;
   max: number;
@@ -548,6 +606,11 @@ export interface CurvatureBrickBinaryHeader {
   dims: [number, number, number];
   format: "r32f";
   voxelBytes: number;
+  source?: "pipeline" | "metric" | "unknown";
+  proxy?: boolean;
+  congruence?: "proxy-only" | "geometry-derived" | "conditional";
+  kScale?: number;
+  kScaleSource?: string;
   min: number;
   max: number;
   dataBytes: number;
@@ -571,6 +634,11 @@ export const serializeBrick = (brick: CurvatureBrick): CurvatureBrickResponse =>
     dims: brick.dims,
     format: brick.format,
     voxelBytes: brick.voxelBytes,
+    source: brick.source ?? "pipeline",
+    proxy: brick.proxy ?? true,
+    congruence: brick.congruence ?? "proxy-only",
+    kScale: Number.isFinite(brick.kScale) ? brick.kScale : undefined,
+    kScaleSource: brick.kScaleSource,
     data: baseData,
     min: brick.min,
     max: brick.max,
@@ -595,6 +663,11 @@ export const serializeBrickBinary = (brick: CurvatureBrick): CurvatureBrickBinar
       dims: brick.dims,
       format: brick.format,
       voxelBytes: brick.voxelBytes,
+      source: brick.source ?? "pipeline",
+      proxy: brick.proxy ?? true,
+      congruence: brick.congruence ?? "proxy-only",
+      kScale: Number.isFinite(brick.kScale) ? brick.kScale : undefined,
+      kScaleSource: brick.kScaleSource,
       min: brick.min,
       max: brick.max,
       dataBytes: brick.data.byteLength,

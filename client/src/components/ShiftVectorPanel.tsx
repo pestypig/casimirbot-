@@ -6,6 +6,7 @@ import { useMetrics } from "@/hooks/use-metrics";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { C as c } from "@/lib/physics-const";
+import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
 import {
   CURVATURE_MARGIN_THRESHOLD,
   DEFAULT_SECTOR_SHELL_BASE,
@@ -403,6 +404,11 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
             </Tooltip>
           </TooltipProvider>
         </CardTitle>
+        <PipelineCongruenceBadge
+          label="curvature"
+          meta={pipeline?.curvatureMeta}
+          className="mt-2"
+        />
         <CardDescription>Gentle Natário tilt (β-gradient) for cabin "down".</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">

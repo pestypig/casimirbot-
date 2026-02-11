@@ -20,7 +20,23 @@
         "warp-control-stack",
         "warp-implementation-stack"
       ],
-      "links": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "cl3-rho-delta-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "cl3_metric_t00_available=true",
+          "note": "CL4 guardrail entry: constraint rho vs T00 reference."
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Constraint gate is CL4 when inputs are geometry-derived."
+        }
+      ],
       "summary": "A walkable map of warp geometry, proxies, and control levers.",
       "nodeType": "concept",
       "inputs": [],
@@ -80,7 +96,42 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:98af38a1b7923906d1831f09be59e83327eff443f0b5d2f7984f3b5d8ebd82ee"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "warp-geometry-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "warp-proxy-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "warp-control-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "warp-implementation-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "warp-geometry-stack",
@@ -100,12 +151,27 @@
         "shift-vector-expansion-scalar",
         "bubble-wall-thickness",
         "vdb-compression-factor",
-        "bridge-warp-geometry-stack-stewardship-ledger"
+        "bridge-warp-geometry-stack-stewardship-ledger",
+        "natario-alcubierre-special-case",
+        "vdb-metric",
+        "vdb-region-ii-diagnostics",
+        "vdb-region-iv-diagnostics",
+        "vdb-two-wall-signature"
       ],
       "links": [
         {
           "rel": "parent",
-          "to": "warp-mechanics-tree"
+          "to": "warp-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "cl3-rho-delta-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "cl3_metric_t00_available=true",
+          "note": "CL3_RhoDelta ties constraint rho to a T00 reference; CL4 requires geometry-derived T00."
         }
       ],
       "summary": "Geometry choices define the bubble shape and expansion behavior.",
@@ -151,7 +217,98 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "warp-bubble": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "alcubierre-metric": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "natario-zero-expansion": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "shift-vector-expansion-scalar": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bubble-wall-thickness": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "vdb-compression-factor": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-warp-geometry-stack-stewardship-ledger": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "natario-alcubierre-special-case": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "vdb-metric": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "vdb-region-ii-diagnostics": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "vdb-region-iv-diagnostics": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "vdb-two-wall-signature": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "warp-bubble",
@@ -168,7 +325,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-geometry-stack"
+          "to": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "vdb-band-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Scalar gamma_VdB band is proxy-only until B(r) derivatives are modeled."
         }
       ],
       "summary": "Define the bubble geometry and boundary choices.",
@@ -214,6 +380,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "derived_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -231,7 +402,75 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-geometry-stack"
+          "to": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "congruence",
+          "to": "natario-alcubierre-special-case",
+          "edgeType": "equivalent_metric",
+          "requiresCL": "CL0",
+          "note": "Natario Example 1.8 reproduces Alcubierre metric with X^x = v_s f(r_s)."
+        },
+        {
+          "rel": "congruence",
+          "to": "natario-alcubierre-special-case",
+          "edgeType": "equivalent_adm",
+          "requiresCL": "CL1",
+          "chartDependency": "lab_cartesian",
+          "note": "Natario Example 1.8 reproduces Alcubierre metric with X^x = v_s f(r_s)."
+        },
+        {
+          "rel": "congruence",
+          "to": "natario-alcubierre-special-case",
+          "edgeType": "equivalent_geometry",
+          "requiresCL": "CL2",
+          "chartDependency": "lab_cartesian",
+          "note": "Natario Example 1.8 reproduces Alcubierre metric with X^x = v_s f(r_s)."
+        },
+        {
+          "rel": "congruence",
+          "to": "natario-alcubierre-special-case",
+          "edgeType": "equivalent_stress_energy",
+          "requiresCL": "CL3",
+          "chartDependency": "lab_cartesian",
+          "note": "Natario Example 1.8 reproduces Alcubierre metric with X^x = v_s f(r_s)."
+        },
+        {
+          "rel": "congruence",
+          "to": "vdb-metric",
+          "edgeType": "conditional_region",
+          "requiresCL": "CL0",
+          "condition": "B(r)=1",
+          "note": "VdB reduces to Alcubierre where B=1; region-conditional congruence."
+        },
+        {
+          "rel": "congruence",
+          "to": "vdb-metric",
+          "edgeType": "conditional_region",
+          "requiresCL": "CL1",
+          "condition": "B(r)=1",
+          "chartDependency": "lab_cartesian",
+          "note": "VdB reduces to Alcubierre where B=1; region-conditional congruence."
+        },
+        {
+          "rel": "congruence",
+          "to": "vdb-metric",
+          "edgeType": "conditional_region",
+          "requiresCL": "CL2",
+          "condition": "B(r)=1",
+          "chartDependency": "lab_cartesian",
+          "note": "VdB reduces to Alcubierre where B=1; region-conditional congruence."
+        },
+        {
+          "rel": "congruence",
+          "to": "vdb-metric",
+          "edgeType": "conditional_region",
+          "requiresCL": "CL3",
+          "condition": "B(r)=1",
+          "chartDependency": "lab_cartesian",
+          "note": "VdB reduces to Alcubierre where B=1; region-conditional congruence."
         }
       ],
       "summary": "Classic warp metric with expansion and contraction regions.",
@@ -277,7 +516,21 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "blockedLinks": [
+        {
+          "source": "alcubierre-metric",
+          "target": "natario-zero-expansion",
+          "edgeType": "incompatible",
+          "requiresCL": "none",
+          "reason": "Zero-expansion enforces div X=0; Alcubierre has nonzero expansion on wall (CL2 mismatch)."
+        }
+      ]
     },
     {
       "id": "natario-zero-expansion",
@@ -294,7 +547,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-geometry-stack"
+          "to": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Zero-expansion warp metric variants.",
@@ -340,7 +595,28 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "blockedLinks": [
+        {
+          "source": "natario-zero-expansion",
+          "target": "alcubierre-metric",
+          "edgeType": "incompatible",
+          "requiresCL": "none",
+          "reason": "Zero-expansion enforces div X=0; Alcubierre has nonzero expansion on wall (CL2 mismatch)."
+        },
+        {
+          "source": "natario-zero-expansion",
+          "target": "vdb-metric",
+          "edgeType": "incompatible",
+          "requiresCL": "none",
+          "reason": "Natario class uses flat spatial slices; VdB uses B(r) conformal factor (CL0/CL1 mismatch)."
+        }
+      ]
     },
     {
       "id": "shift-vector-expansion-scalar",
@@ -357,7 +633,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-geometry-stack"
+          "to": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Shift vector choices drive expansion properties.",
@@ -403,7 +681,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "congruence": {
+        "class": "adm_fields",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "blockedLinks": []
     },
     {
       "id": "bubble-wall-thickness",
@@ -420,7 +704,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-geometry-stack"
+          "to": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Wall thickness controls gradients and energy needs.",
@@ -466,6 +752,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "derived_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -483,7 +774,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-geometry-stack"
+          "to": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Compression factor trades bubble interior for reduced energy.",
@@ -508,9 +801,37 @@
           "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
       ],
-      "inputs": [],
-      "outputs": [],
-      "assumptions": [],
+      "inputs": [
+        {
+          "name": "gamma_VdB",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline.gammaVanDenBroeck"
+        },
+        {
+          "name": "vdb_limit",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline.vdbGuard.limit"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "pocketRadius_m",
+          "unit": "m",
+          "type": "float",
+          "source": "pipeline.vdbGuard.pocketRadius_m"
+        },
+        {
+          "name": "pocketThickness_m",
+          "unit": "m",
+          "type": "float",
+          "source": "pipeline.vdbGuard.pocketThickness_m"
+        }
+      ],
+      "assumptions": [
+        "gamma_VdB is a scalar proxy until B(r) derivatives are modeled for CL2/CL3."
+      ],
       "validity": {},
       "deterministic": null,
       "tolerance": null,
@@ -521,14 +842,16 @@
       "predictability": {
         "status": "partial",
         "missing": [
-          "inputs",
-          "outputs",
-          "assumptions",
           "validity",
           "deterministic",
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -536,7 +859,7 @@
       "slug": "warp-proxy-stack",
       "title": "Warp Proxy Stack",
       "excerpt": "Proxies bound energy requirements and feasibility narratives.",
-      "bodyMD": "Proxies translate geometry into energy and constraint estimates.\n\nMinimal artifact: proxy constraint summary.",
+      "bodyMD": "Proxies translate geometry into energy and constraint estimates.\n\nMinimal artifact: proxy constraint summary and CL4 trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
       "tags": [
         "proxies",
         "constraints",
@@ -550,7 +873,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-mechanics-tree"
+          "to": "warp-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Proxies bound energy requirements and feasibility narratives.",
@@ -596,7 +921,35 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "casimir-lattice": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "ford-roman-proxy": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "power-mass-ladders": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "casimir-lattice",
@@ -613,7 +966,17 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-proxy-stack"
+          "to": "warp-proxy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "qi_metric_derived=true",
+          "note": "FordRomanQI is CL4-congruent when strict mode validates metric rho source; otherwise treat as proxy."
         }
       ],
       "summary": "Lattice configurations as negative-energy proxies.",
@@ -659,6 +1022,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -666,7 +1034,7 @@
       "slug": "ford-roman-proxy",
       "title": "Ford-Roman Proxy",
       "excerpt": "Proxy bounds from quantum inequality constraints.",
-      "bodyMD": "Ford-Roman proxies bound negative energy (docs/knowledge/warp/ford-roman-proxy.md).\n\nMinimal artifact: proxy inequality summary.",
+      "bodyMD": "Ford-Roman proxies bound negative energy (docs/knowledge/warp/ford-roman-proxy.md).\n\nMinimal artifact: proxy inequality summary and CL4 trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
       "tags": [
         "ford-roman",
         "proxy",
@@ -676,7 +1044,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-proxy-stack"
+          "to": "warp-proxy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Proxy bounds from quantum inequality constraints.",
@@ -722,6 +1092,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -739,7 +1114,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-proxy-stack"
+          "to": "warp-proxy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Scaling ladders for energy and mass requirements.",
@@ -785,6 +1162,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "pipeline_trace",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -806,7 +1188,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-mechanics-tree"
+          "to": "warp-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Control levers manage duty cycles and active fractions.",
@@ -852,7 +1236,35 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "pipeline_trace",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "sector-strobes-duty-cycle": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "active-fraction": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-warp-control-stack-verification-checklist": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "sector-strobes-duty-cycle",
@@ -869,7 +1281,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-control-stack"
+          "to": "warp-control-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-ratio-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "TS_ratio guardrail is operational/proxy-only unless derived from proper distances."
         }
       ],
       "summary": "Duty cycle controls temporal averaging in warp drives.",
@@ -915,6 +1336,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "pipeline_trace",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -932,7 +1358,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-control-stack"
+          "to": "warp-control-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Active fraction defines how much of the system is energized at once.",
@@ -978,6 +1406,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "pipeline_trace",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1005,7 +1438,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-mechanics-tree"
+          "to": "warp-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Implementation modules and control references.",
@@ -1051,7 +1486,77 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "warp-module": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "natario-warp-implementation": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "casimir-natario-bridge": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "theta-semantics": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "warp-pulsed-power": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "warpfield-mesh-patch-plan": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "warpfield-visualization-roadmap": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "warp-console-architecture": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "warp-llm-contracts": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "casimir-natario-bridge",
@@ -1069,15 +1574,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-implementation-stack"
+          "to": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "casimir-lattice"
+          "to": "casimir-lattice",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "natario-zero-expansion"
+          "to": "natario-zero-expansion",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Connects Casimir lattice proxy inputs to Natario zero-expansion geometry and runtime hooks.",
@@ -1131,7 +1642,7 @@
           "path": "modules/warp/natario-warp.ts",
           "scope": "right",
           "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
-          "content_hash": "sha256:cdcfe2eb1831f0c332a5144617dc482dbd3d713ee2591ded6d97bfda48d0d7f5"
+          "content_hash": "sha256:067381b087ccb8504520c91e0b99f2314e90e99a0f7a5a4d8a40b5c0cbb69efe"
         },
         {
           "type": "code",
@@ -1147,7 +1658,12 @@
           "repo_rev": "9d4a08ee6d51161bfa0f4b514ee840610df03e87",
           "content_hash": "sha256:5f2905bde95cc877b92a221c2ed78e1522fd61b75312cb639108f1da93e9d40e"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "warp-module",
@@ -1164,7 +1680,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-implementation-stack"
+          "to": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "theta-audit-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "ThetaAudit uses metric-adapter divergence when available; proxy fallback remains labeled."
         }
       ],
       "summary": "Module integrating Natario warp calculations.",
@@ -1210,6 +1735,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1227,7 +1757,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-implementation-stack"
+          "to": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Natario zero-expansion warp computations.",
@@ -1273,6 +1805,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1290,7 +1827,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-implementation-stack"
+          "to": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Theta definitions and calibration semantics.",
@@ -1336,7 +1875,13 @@
           "tolerance",
           "environment"
         ]
-      }
+      },
+      "congruence": {
+        "class": "derived_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "blockedLinks": []
     },
     {
       "id": "warp-pulsed-power",
@@ -1353,7 +1898,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-implementation-stack"
+          "to": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Pulsed power assumptions for warp operations.",
@@ -1399,6 +1946,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "pipeline_trace",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1416,7 +1968,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-implementation-stack"
+          "to": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Mesh plan for warpfield sampling.",
@@ -1462,6 +2016,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1479,7 +2038,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-implementation-stack"
+          "to": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Visualization plan for warpfield outputs.",
@@ -1525,6 +2086,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "adm_fields",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1542,7 +2108,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-implementation-stack"
+          "to": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Architecture overview for warp console.",
@@ -1588,6 +2156,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1605,7 +2178,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-implementation-stack"
+          "to": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Contract assumptions for warp LLM interactions.",
@@ -1651,6 +2226,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1671,15 +2251,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-geometry-stack"
+          "to": "warp-geometry-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "stewardship-ledger"
+          "to": "stewardship-ledger",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "warp-geometry-stack"
+          "to": "warp-geometry-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -1723,6 +2309,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1743,15 +2334,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "warp-control-stack"
+          "to": "warp-control-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "verification-checklist"
+          "to": "verification-checklist",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "warp-control-stack"
+          "to": "warp-control-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -1790,6 +2387,471 @@
           "inputs",
           "outputs",
           "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "natario-alcubierre-special-case",
+      "slug": "natario-alcubierre-special-case",
+      "title": "Natario Alcubierre Special Case",
+      "excerpt": "Natario Example 1.8 that reproduces the Alcubierre metric.",
+      "bodyMD": "Natario Example 1.8 chooses X^x = v_s f(r_s) to reproduce the Alcubierre metric.\n\nMinimal artifact: congruence mapping to Alcubierre (see docs/warp-geometry-congruence-report.md).",
+      "tags": [
+        "natario",
+        "alcubierre",
+        "metric",
+        "warp"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "alcubierre-metric",
+          "edgeType": "equivalent_stress_energy",
+          "requiresCL": "CL3",
+          "chartDependency": "lab_cartesian",
+          "note": "Natario Example 1.8 reproduces Alcubierre metric with X^x = v_s f(r_s)."
+        }
+      ],
+      "summary": "Natario Example 1.8 reproduces the Alcubierre metric via X^x = v_s f(r_s).",
+      "nodeType": "concept",
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "vdb-metric",
+      "slug": "vdb-metric",
+      "title": "Van Den Broeck Metric",
+      "excerpt": "Warp metric with conformal factor B(r_s) and pocket region.",
+      "bodyMD": "Van Den Broeck metric introduces a conformal factor B(r_s) and a pocket region to reduce energy cost.\n\nMinimal artifact: metric form and region definitions (see docs/warp-geometry-congruence-report.md).",
+      "tags": [
+        "vdb",
+        "metric",
+        "warp"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "vdb-compression-factor",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "congruence",
+          "to": "alcubierre-metric",
+          "edgeType": "conditional_region",
+          "requiresCL": "CL0",
+          "condition": "B(r)=1",
+          "note": "VdB reduces to Alcubierre where B=1; region-conditional congruence."
+        },
+        {
+          "rel": "congruence",
+          "to": "alcubierre-metric",
+          "edgeType": "conditional_region",
+          "requiresCL": "CL1",
+          "condition": "B(r)=1",
+          "chartDependency": "lab_cartesian",
+          "note": "VdB reduces to Alcubierre where B=1; region-conditional congruence."
+        },
+        {
+          "rel": "congruence",
+          "to": "alcubierre-metric",
+          "edgeType": "conditional_region",
+          "requiresCL": "CL2",
+          "condition": "B(r)=1",
+          "chartDependency": "lab_cartesian",
+          "note": "VdB reduces to Alcubierre where B=1; region-conditional congruence."
+        },
+        {
+          "rel": "congruence",
+          "to": "alcubierre-metric",
+          "edgeType": "conditional_region",
+          "requiresCL": "CL3",
+          "condition": "B(r)=1",
+          "chartDependency": "lab_cartesian",
+          "note": "VdB reduces to Alcubierre where B=1; region-conditional congruence."
+        }
+      ],
+      "summary": "Van Den Broeck metric with conformal factor B(r_s) and pocket region.",
+      "nodeType": "concept",
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "blockedLinks": [
+        {
+          "source": "vdb-metric",
+          "target": "natario-zero-expansion",
+          "edgeType": "incompatible",
+          "requiresCL": "none",
+          "reason": "Natario class uses flat spatial slices; VdB uses B(r) conformal factor (CL0/CL1 mismatch)."
+        }
+      ]
+    },
+    {
+      "id": "vdb-region-ii-diagnostics",
+      "slug": "vdb-region-ii-diagnostics",
+      "title": "VdB Region II Diagnostics",
+      "excerpt": "Region II B(r) derivative diagnostics for VdB two-wall signature.",
+      "bodyMD": "Region II diagnostics sample B(r) transition derivatives (B', B'') and region-II stress-energy proxy from the pipeline.\n\nMinimal artifact: VdB region II diagnostics in proof pack.",
+      "tags": [
+        "vdb",
+        "region-ii",
+        "diagnostics",
+        "warp"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "congruence",
+          "to": "vdb-metric",
+          "edgeType": "equivalent_geometry",
+          "requiresCL": "CL2",
+          "note": "Region II diagnostics tie to B(r) derivatives."
+        }
+      ],
+      "summary": "Region II B(r) derivative diagnostics for VdB two-wall signature.",
+      "nodeType": "concept",
+      "inputs": [
+        {
+          "name": "gamma_VdB",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline.gammaVanDenBroeck"
+        },
+        {
+          "name": "pocketRadius_m",
+          "unit": "m",
+          "type": "float",
+          "source": "pipeline.vdbGuard.pocketRadius_m"
+        },
+        {
+          "name": "pocketThickness_m",
+          "unit": "m",
+          "type": "float",
+          "source": "pipeline.vdbGuard.pocketThickness_m"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "bprime_max_abs",
+          "unit": "1/m",
+          "type": "float",
+          "source": "vdb_region_ii_bprime_max_abs"
+        },
+        {
+          "name": "bdouble_max_abs",
+          "unit": "1/m^2",
+          "type": "float",
+          "source": "vdb_region_ii_bdouble_max_abs"
+        },
+        {
+          "name": "t00_mean",
+          "unit": "J/m^3",
+          "type": "float",
+          "source": "vdb_region_ii_t00_mean"
+        },
+        {
+          "name": "support",
+          "unit": "bool",
+          "type": "boolean",
+          "source": "vdb_region_ii_support"
+        }
+      ],
+      "assumptions": [
+        "Region II diagnostics sample the B(r) transition with the pipeline polynomial profile."
+      ],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "warp-geometry-stack"
+      ],
+      "congruence": {
+        "class": "derived_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/warp-geometry-vdb-region-ii-method.md",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:73f7445427b0df0d5e40ca88d34c8c38f5d4e1caf5085c83d2e22c706a50b80e"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:0cc006b97fc2e02f7a705bc5b0bccd75a000fbbdb97d39ccbfccc43eeddbd3f1"
+        },
+        {
+          "type": "code",
+          "path": "server/helix-proof-pack.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:b818874efe0a52463c6a13fa94401099f516d8f5720af2e333729e6bb29d31eb"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "vdb-region-iv-diagnostics",
+      "slug": "vdb-region-iv-diagnostics",
+      "title": "VdB Region IV Diagnostics",
+      "excerpt": "Region IV f-wall derivative diagnostics for VdB two-wall signature.",
+      "bodyMD": "Region IV diagnostics sample the Alcubierre top-hat derivative df/dr around R for the outer f-wall.\n\nMinimal artifact: VdB region IV diagnostics in proof pack.",
+      "tags": [
+        "vdb",
+        "region-iv",
+        "diagnostics",
+        "warp"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "congruence",
+          "to": "vdb-metric",
+          "edgeType": "equivalent_geometry",
+          "requiresCL": "CL2",
+          "note": "Region IV diagnostics tie to f-wall derivative df/dr."
+        }
+      ],
+      "summary": "Region IV f-wall derivative diagnostics for VdB two-wall signature.",
+      "nodeType": "concept",
+      "inputs": [
+        {
+          "name": "R_m",
+          "unit": "m",
+          "type": "float",
+          "source": "bubble.R"
+        },
+        {
+          "name": "sigma",
+          "unit": "1/m",
+          "type": "float",
+          "source": "bubble.sigma"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "dfdr_max_abs",
+          "unit": "1/m",
+          "type": "float",
+          "source": "vdb_region_iv_dfdr_max_abs"
+        },
+        {
+          "name": "dfdr_rms",
+          "unit": "1/m",
+          "type": "float",
+          "source": "vdb_region_iv_dfdr_rms"
+        },
+        {
+          "name": "support",
+          "unit": "bool",
+          "type": "boolean",
+          "source": "vdb_region_iv_support"
+        }
+      ],
+      "assumptions": [
+        "Region IV diagnostics sample df/dr around R using the Alcubierre top-hat derivative."
+      ],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "warp-geometry-stack"
+      ],
+      "congruence": {
+        "class": "derived_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/warp-geometry-vdb-region-ii-method.md",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:73f7445427b0df0d5e40ca88d34c8c38f5d4e1caf5085c83d2e22c706a50b80e"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:0cc006b97fc2e02f7a705bc5b0bccd75a000fbbdb97d39ccbfccc43eeddbd3f1"
+        },
+        {
+          "type": "code",
+          "path": "server/helix-proof-pack.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:b818874efe0a52463c6a13fa94401099f516d8f5720af2e333729e6bb29d31eb"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "vdb-two-wall-signature",
+      "slug": "vdb-two-wall-signature",
+      "title": "VdB Two-Wall Signature",
+      "excerpt": "Two-wall signature requires region II and region IV derivative support.",
+      "bodyMD": "Two-wall signature combines region II (B', B'') and region IV (df/dr) derivative support to confirm Van Den Broeck's dual-wall geometry.\n\nMinimal artifact: vdb_two_wall_derivative_support proof.",
+      "tags": [
+        "vdb",
+        "two-wall",
+        "signature",
+        "warp"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "congruence",
+          "to": "vdb-metric",
+          "edgeType": "equivalent_geometry",
+          "requiresCL": "CL2",
+          "note": "Two-wall signature confirms region II + IV derivative support."
+        }
+      ],
+      "summary": "Two-wall signature requires region II and region IV derivative support.",
+      "nodeType": "concept",
+      "inputs": [
+        {
+          "name": "regionII_support",
+          "unit": "bool",
+          "type": "boolean",
+          "source": "vdb_region_ii_support"
+        },
+        {
+          "name": "regionII_derivative_support",
+          "unit": "bool",
+          "type": "boolean",
+          "source": "vdb_region_ii_derivative_support"
+        },
+        {
+          "name": "regionIV_support",
+          "unit": "bool",
+          "type": "boolean",
+          "source": "vdb_region_iv_support"
+        },
+        {
+          "name": "regionIV_derivative_support",
+          "unit": "bool",
+          "type": "boolean",
+          "source": "vdb_region_iv_derivative_support"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "two_wall_support",
+          "unit": "bool",
+          "type": "boolean",
+          "source": "vdb_two_wall_support"
+        },
+        {
+          "name": "two_wall_derivative_support",
+          "unit": "bool",
+          "type": "boolean",
+          "source": "vdb_two_wall_derivative_support"
+        }
+      ],
+      "assumptions": [
+        "Two-wall derivative signature requires both region II and region IV derivative support."
+      ],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "warp-geometry-stack"
+      ],
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/warp-geometry-vdb-region-ii-method.md",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:73f7445427b0df0d5e40ca88d34c8c38f5d4e1caf5085c83d2e22c706a50b80e"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:0cc006b97fc2e02f7a705bc5b0bccd75a000fbbdb97d39ccbfccc43eeddbd3f1"
+        },
+        {
+          "type": "code",
+          "path": "server/helix-proof-pack.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:b818874efe0a52463c6a13fa94401099f516d8f5720af2e333729e6bb29d31eb"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
           "validity",
           "deterministic",
           "tolerance",

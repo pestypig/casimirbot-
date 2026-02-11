@@ -1,0 +1,34 @@
+{
+  "createdAt": "2026-02-11T02:50:37.675Z",
+  "source": "url:http://127.0.0.1:5173/api/helix/pipeline/proofs",
+  "summary": {
+    "missingCount": 0,
+    "missingReason": null,
+    "missingParts": []
+  },
+  "metric": {
+    "chart": "comoving_cartesian",
+    "family": "natario",
+    "observer": "eulerian_n",
+    "normalization": "si_stress",
+    "unitSystem": "SI",
+    "contractStatus": "ok",
+    "contractReason": "ok",
+    "chartContractStatus": "ok"
+  },
+  "cl3": {
+    "rhoConstraintMean": -1.5489982282244845e-27,
+    "deltaMean": 0,
+    "deltaMetricMean": 0,
+    "deltaPipelineMean": 1.5394645217477487e-15,
+    "gate": true,
+    "gateSource": "warp.metric.T00.natario.shift",
+    "gateReason": "within_threshold"
+  },
+  "vdb": {
+    "regionIISupport": true,
+    "regionIVSupport": true,
+    "twoWallSupport": true
+  },
+  "remediation": []
+}

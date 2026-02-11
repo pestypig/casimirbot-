@@ -1,10 +1,13 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import { HelpCircle } from "lucide-react";
 import { SliceViewer, type Vec3 } from "@/components/SliceViewer";
 import { useEnergyPipeline, PIPE_CONST } from "@/hooks/use-energy-pipeline";
 import { useMetrics } from "@/hooks/use-metrics";
+import { useCurvatureBrick } from "@/hooks/useCurvatureBrick";
+import { buildCongruenceBadge, resolveCongruenceMeta } from "@/lib/congruence-meta";
 
 const FALLBACK_DRIVE_DIR: Vec3 = [1, 0, 0];
 
@@ -103,6 +106,51 @@ export default function CurvatureSlicePanel() {
     return normalizeVec3Safe(candidate);
   }, [hullMetrics, live?.driveDir]);
 
+  const { sample: curvatureSample } = useCurvatureBrick({ quality: "low", refetchMs: 500 });
+  const curvatureMeta = resolveCongruenceMeta(
+    curvatureSample?.meta,
+    live?.curvatureMeta,
+  );
+  const curvatureSource = curvatureMeta.source ?? "unknown";
+  const curvatureCongruence = curvatureMeta.congruence ?? "unknown";
+  const { label: curvatureBadgeLabel, toneClass: curvatureBadgeTone } =
+    buildCongruenceBadge(curvatureMeta);
+
+  const thetaMeta = useMemo(() => {
+    const thetaGeom = Number(live?.theta_geom);
+    const thetaGeomPresent = Number.isFinite(thetaGeom);
+    const thetaGeomProxy = live?.theta_geom_proxy === true;
+    const thetaMetricDerived = live?.theta_metric_derived === true;
+    const source =
+      thetaMetricDerived || (thetaGeomPresent && !thetaGeomProxy)
+        ? "metric"
+        : "pipeline";
+    const congruence = thetaMetricDerived
+      ? "geometry-derived"
+      : thetaGeomPresent
+        ? "conditional"
+        : "proxy-only";
+    const proxy = congruence !== "geometry-derived";
+    const reason =
+      typeof live?.theta_metric_reason === "string"
+        ? live?.theta_metric_reason
+        : undefined;
+    return { source, congruence, proxy, reason };
+  }, [
+    live?.theta_geom,
+    live?.theta_geom_proxy,
+    live?.theta_metric_derived,
+    live?.theta_metric_reason,
+  ]);
+  const thetaBadgeLabel = thetaMeta.proxy
+    ? thetaMeta.congruence === "conditional"
+      ? "CONDITIONAL"
+      : "PROXY"
+    : "METRIC";
+  const thetaBadgeTone = thetaMeta.proxy
+    ? "border-amber-400/60 text-amber-200"
+    : "border-emerald-400/60 text-emerald-200";
+
   return (
     <Card className="bg-slate-900/50 border-slate-800">
       <CardHeader>
@@ -126,6 +174,21 @@ export default function CurvatureSlicePanel() {
         <CardDescription>
           Uses live pipeline values; curvature goes to zero only in <span className="font-mono">standby</span>.
         </CardDescription>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+          <span className="font-mono">curvature.source={curvatureSource}</span>
+          <span className="font-mono">curvature.congruence={curvatureCongruence}</span>
+          <Badge variant="outline" className={curvatureBadgeTone}>
+            {curvatureBadgeLabel}
+          </Badge>
+          <span className="font-mono">theta.source={thetaMeta.source}</span>
+          <span className="font-mono">theta.congruence={thetaMeta.congruence}</span>
+          {thetaMeta.reason ? (
+            <span className="font-mono">theta.reason={thetaMeta.reason}</span>
+          ) : null}
+          <Badge variant="outline" className={thetaBadgeTone}>
+            {thetaBadgeLabel}
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent ref={hostRef}>
         <SliceViewer

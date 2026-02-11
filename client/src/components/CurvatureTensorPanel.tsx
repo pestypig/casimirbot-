@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { createProgram, makeGrid, resizeCanvasAndViewport } from "@/lib/gl/simple-gl";
 import { registerWebGLContext } from "@/lib/webgl/context-pool";
+import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
 import {
   AlcubierreParams,
   Vec3,
@@ -522,6 +523,12 @@ export default function CurvatureTensorPanel({ className }: Props){
           </span>
         )}
       </div>
+
+      <PipelineCongruenceBadge
+        label="curvature"
+        meta={live?.curvatureMeta}
+        className="mb-2"
+      />
 
       <div className="w-full aspect-[16/9] rounded-lg overflow-hidden border border-slate-800 bg-black/60">
         <canvas ref={canvasRef} data-york-panel className="w-full h-full block" />

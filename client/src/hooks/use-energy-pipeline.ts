@@ -31,6 +31,7 @@ import type {
   QiAutoscaleTelemetry,
   QiAutoscaleClamp,
   QiGuardrail,
+  CongruenceMeta,
 } from "@/types/pipeline";
 import type { StressEnergyBrickStats } from "@/lib/stress-energy-brick";
 import type { FixupStats, GrBrickMeta, GrSolverHealth } from "@/lib/gr-evolve-brick";
@@ -132,6 +133,48 @@ export interface MechanicalGuard {
   status: "ok" | "saturated" | "fail";
 }
 
+export type VdbRegionIIDiagnostics = {
+  alpha: number;
+  n: number;
+  r_tilde_m: number;
+  delta_tilde_m: number;
+  sampleCount: number;
+  b_min: number;
+  b_max: number;
+  bprime_min: number;
+  bprime_max: number;
+  bprime_rms: number;
+  bdouble_min: number;
+  bdouble_max: number;
+  bdouble_rms: number;
+  t00_min: number;
+  t00_max: number;
+  t00_mean: number;
+  t00_rms: number;
+  support: boolean;
+  note?: string;
+};
+
+export type VdbRegionIVDiagnostics = {
+  R_m: number;
+  sigma: number;
+  sampleCount: number;
+  dfdr_max_abs: number;
+  dfdr_rms: number;
+  beta?: number;
+  r_min_m?: number;
+  r_max_m?: number;
+  step_m?: number;
+  t00_min?: number;
+  t00_max?: number;
+  t00_mean?: number;
+  t00_rms?: number;
+  k_trace_mean?: number;
+  k_squared_mean?: number;
+  support: boolean;
+  note?: string;
+};
+
 export type AmpFactors = {
   gammaGeo?: number;
   gammaVanDenBroeck?: number;
@@ -177,6 +220,8 @@ export type GrConstraintDiagnostics = {
   max: number;
   maxAbs: number;
   rms?: number;
+  mean?: number;
+  sampleCount?: number;
 };
 
 export type GrMomentumConstraintDiagnostics = {
@@ -201,6 +246,25 @@ export type GrShiftStiffnessMetrics = {
   shockSeverity?: "ok" | "warn" | "severe";
   shockMode?: "off" | "diagnostic" | "stabilize";
   stabilizersApplied?: string[];
+};
+
+export type GrInvariantStats = {
+  min: number;
+  max: number;
+  mean: number;
+  p98: number;
+  sampleCount: number;
+  abs: boolean;
+  wallFraction: number;
+  bandFraction: number;
+  threshold: number;
+  bandMin: number;
+  bandMax: number;
+};
+
+export type GrInvariantStatsSet = {
+  kretschmann?: GrInvariantStats;
+  ricci4?: GrInvariantStats;
 };
 
 export type GrPipelineDiagnostics = {
@@ -231,7 +295,9 @@ export type GrPipelineDiagnostics = {
   constraints: {
     H_constraint: GrConstraintDiagnostics;
     M_constraint: GrMomentumConstraintDiagnostics;
+    rho_constraint?: GrConstraintDiagnostics;
   };
+  invariants?: GrInvariantStatsSet;
   matter?: {
     stressEnergy?: StressEnergyBrickStats;
   };
@@ -244,6 +310,12 @@ export type GrPipelineDiagnostics = {
     bytesEstimate: number;
     msPerStep: number;
   };
+};
+
+export type GrInvariantBaseline = {
+  invariants?: GrInvariantStatsSet;
+  source?: string;
+  updatedAt?: number;
 };
 
 export type GrRequestPayload = {
@@ -415,14 +487,49 @@ export interface EnergyPipelineState {
   qi?: QiStats;
   qiBadge?: "ok" | "near" | "violation";
   qiInterest?: QuantumInterestBook | null;
+  qiGuardrail?: QiGuardrail;
   clocking?: ClockingSnapshot;
   mechanical?: MechanicalFeasibility;
+  thetaRaw?: number;
+  thetaCal?: number;
+  thetaScaleExpected?: number;
+  theta_audit?: number;
+  theta_audit_source?: string;
+  theta_geom?: number;
+  theta_geom_source?: string;
+  theta_geom_proxy?: boolean;
+  theta_proxy?: number;
+  theta_proxy_source?: string;
+  theta_source?: string;
+  theta_metric_derived?: boolean;
+  theta_metric_source?: string;
+  theta_metric_reason?: string;
+  theta_strict_mode?: boolean;
+  theta_strict_ok?: boolean;
+  theta_strict_reason?: string;
+  metric_k_trace_mean?: number;
+  metric_k_sq_mean?: number;
+  vdb_two_wall_support?: boolean;
+  vdb_two_wall_derivative_support?: boolean;
+  vdb_region_ii_derivative_support?: boolean;
+  vdb_region_iv_derivative_support?: boolean;
+  qi_strict_mode?: boolean;
+  qi_strict_ok?: boolean;
+  qi_strict_reason?: string;
+  qi_rho_source?: string;
+  qi_metric_derived?: boolean;
+  qi_metric_source?: string;
+  qi_metric_reason?: string;
+  ts_metric_derived?: boolean;
+  ts_metric_source?: string;
+  ts_metric_reason?: string;
   mechGuard?: MechanicalGuard;
   phaseSchedule?: PhaseScheduleTelemetry;
 
   // GR diagnostics (optional)
   grEnabled?: boolean;
   gr?: GrPipelineDiagnostics;
+  grBaseline?: GrInvariantBaseline;
   grRequest?: GrRequestPayload;
 
   // Hull parameters for UI overlays
@@ -497,12 +604,13 @@ export interface EnergyPipelineState {
     targetHit?: boolean;
     targetShortfall?: number;
   };
+  vdbRegionII?: VdbRegionIIDiagnostics;
+  vdbRegionIV?: VdbRegionIVDiagnostics;
   TS_ratio: number;
   TS_long?: number;
   TS_geom?: number;
   zeta: number;
   zetaRaw?: number;
-  qiGuardrail?: QiGuardrail;
   N_tiles: number;
   hullAreaOverride_m2?: number;
   hullAreaOverride_uncertainty_m2?: number;
@@ -531,6 +639,8 @@ export interface EnergyPipelineState {
   sweep?: SweepRuntime | null;
   gateAnalytics?: GateAnalytics | null;
   qiAutoscale?: QiAutoscaleTelemetry | null;
+  curvatureMeta?: CongruenceMeta;
+  stressMeta?: CongruenceMeta;
 }
 
 export type EnergyPipelineSnapshot = EnergyPipelineState & PipelineSnapshot;

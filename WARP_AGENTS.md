@@ -24,6 +24,13 @@ constraints pass and the viability oracle has produced an `ADMISSIBLE` status.
       "expression": "|thetaCal| <= theta_max"
     },
     {
+      "id": "CL3_RhoDelta",
+      "severity": "SOFT",
+      "description": "CL3 stress-energy congruence (constraint rho vs T00).",
+      "type": "threshold",
+      "expression": "|rho_constraint - T00| / max(|T00|, eps) <= rho_delta_max"
+    },
+    {
       "id": "TS_ratio_min",
       "severity": "SOFT",
       "description": "Minimum TS_ratio for stable warp bubble.",
@@ -59,7 +66,17 @@ constraints pass and the viability oracle has produced an `ADMISSIBLE` status.
     "tests/gr-agent-loop-baseline.spec.ts",
     "tests/gr-constraint-gate.spec.ts",
     "tests/gr-constraint-network.spec.ts",
-    "tests/stress-energy-matter.spec.ts"
+    "tests/stress-energy-matter.spec.ts",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "tests/natario-metric-t00.spec.ts",
+    "tests/warp-metric-adapter.spec.ts",
+    "tests/warp-viability.spec.ts",
+    "tests/proof-pack.spec.ts",
+    "tests/proof-pack-strict-parity.spec.ts",
+    "tests/pipeline-ts-qi-guard.spec.ts",
+    "tests/qi-guardrail.spec.ts",
+    "tests/lattice-probe-guardrails.spec.ts",
+    "client/src/components/__tests__/warp-proof-ts-strict.spec.tsx"
   ],
   "viabilityPolicy": {
     "admissibleStatus": "ADMISSIBLE",

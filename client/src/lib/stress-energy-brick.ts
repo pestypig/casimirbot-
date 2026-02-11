@@ -60,7 +60,7 @@ export interface StressEnergyMappingStats {
   zeta: number;
   pressureFactor?: number;
   pressureSource?: "pipeline" | "proxy" | "override";
-  source?: "pipeline" | "defaults";
+  source?: "pipeline" | "defaults" | "metric";
   proxy: boolean;
 }
 
@@ -74,6 +74,13 @@ export interface StressEnergyBrickDecoded {
     divS: StressEnergyBrickChannel;
   };
   stats: StressEnergyBrickStats;
+  meta?: {
+    source?: "pipeline" | "metric" | "unknown";
+    proxy?: boolean;
+    congruence?: "proxy-only" | "geometry-derived" | "conditional";
+    metricT00Ref?: string;
+    metricT00Source?: string;
+  };
 }
 
 const BRICK_FORMAT = "raw";
@@ -192,7 +199,7 @@ const normalizeMappingStats = (
       : undefined;
   const sourceRaw = typeof raw.source === "string" ? raw.source : undefined;
   const source =
-    sourceRaw === "pipeline" || sourceRaw === "defaults"
+    sourceRaw === "pipeline" || sourceRaw === "defaults" || sourceRaw === "metric"
       ? sourceRaw
       : undefined;
   const proxy = typeof raw.proxy === "boolean" ? raw.proxy : Boolean(raw.proxy);
@@ -302,11 +309,22 @@ const decodeStressEnergyBrickBinary = (
   const divS = decodeChannel("divS");
   if (!t00 || !Sx || !Sy || !Sz || !divS) return null;
 
+  const meta =
+    header && typeof header === "object"
+      ? {
+          source: header.source as "pipeline" | "metric" | "unknown" | undefined,
+          proxy: typeof header.proxy === "boolean" ? header.proxy : undefined,
+          congruence: header.congruence as "proxy-only" | "geometry-derived" | "conditional" | undefined,
+          metricT00Ref: typeof header.metricT00Ref === "string" ? header.metricT00Ref : undefined,
+          metricT00Source: typeof header.metricT00Source === "string" ? header.metricT00Source : undefined,
+        }
+      : undefined;
   return {
     dims: [Number(dims[0]), Number(dims[1]), Number(dims[2])],
     t00,
     flux: { Sx, Sy, Sz, divS },
     stats: normalizeStats(header.stats, fallbackDutyFR),
+    meta,
   };
 };
 
@@ -391,10 +409,20 @@ export async function fetchStressEnergyBrick(request: StressEnergyBrickRequest, 
   const Sz = decodeChannel(json.channels?.Sz, "Sz");
   const divS = decodeChannel(json.channels?.divS, "divS");
 
+  const meta = json
+    ? {
+        source: json.source as "pipeline" | "metric" | "unknown" | undefined,
+        proxy: typeof json.proxy === "boolean" ? json.proxy : undefined,
+        congruence: json.congruence as "proxy-only" | "geometry-derived" | "conditional" | undefined,
+        metricT00Ref: typeof json.metricT00Ref === "string" ? json.metricT00Ref : undefined,
+        metricT00Source: typeof json.metricT00Source === "string" ? json.metricT00Source : undefined,
+      }
+    : undefined;
   return {
     dims: [dims[0], dims[1], dims[2]],
     t00,
     flux: { Sx, Sy, Sz, divS },
     stats: normalizeStats(json.stats, Number(request.dutyFR ?? 0)),
+    meta,
   };
 }

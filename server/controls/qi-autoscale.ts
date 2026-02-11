@@ -116,7 +116,12 @@ export function stepQiAutoscale(input: StepQiAutoscaleInput): QiAutoscaleState {
     Number.isFinite(input.sumWindowDt) &&
     Math.abs((input.sumWindowDt as number) - 1) <= windowTol;
   const zetaOk = Number.isFinite(input.zetaRaw) && (input.zetaRaw as number) > targetZeta;
-  const sourceOk = (input.rhoSource ?? "") === expectedSource;
+  const rhoSource = input.rhoSource ?? "";
+  const metricSource =
+    rhoSource.startsWith("warp.metric") ||
+    rhoSource.startsWith("gr.rho_constraint") ||
+    rhoSource.startsWith("gr.metric");
+  const sourceOk = expectedSource === "metric" ? metricSource : rhoSource === expectedSource;
 
   const gating: QiAutoscaleGating[] = [];
   if (!input.enable) gating.push("disabled");

@@ -64,12 +64,23 @@ export interface WarpSnapshot {
   T00_min?: number;
   M_exotic?: number;
   thetaCal?: number;
+  theta_geom?: number;
+  theta_proxy?: number;
+  theta_source?: string;
+  theta_proxy_source?: string;
+  theta_audit?: number;
+  theta_metric_derived?: boolean;
+  theta_metric_source?: string;
+  theta_metric_reason?: string;
   gamma_geo_cubed?: number;
   T00_avg?: number;
   sectorPeriod_ms?: number;
   dwell_ms?: number;
   burst_ms?: number;
   ts?: TsSnapshot | null;
+  ts_metric_derived?: boolean;
+  ts_metric_source?: string;
+  ts_metric_reason?: string;
   grGuardrails?: WarpSolverGuardrails;
   [k: string]: unknown;
 }

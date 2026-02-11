@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import WarpBubbleGLPanel, { type WarpPipelineSnapshot } from "./WarpBubbleGLPanel";
+import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
 
 // Build a safe snapshot from pipeline data with sensible defaults
 function n(x: any, d: number){ const v = Number(x); return Number.isFinite(v) ? v : d; }
@@ -72,6 +73,11 @@ export default function WarpBubbleLivePanel({
 
   return (
     <div className="w-full">
+      <PipelineCongruenceBadge
+        label="curvature"
+        meta={data?.curvatureMeta}
+        className="mb-2"
+      />
       <HeaderBar snapshot={snapshot} isLoading={isLoading} isError={isError} />
       <WarpBubbleGLPanel snapshot={snapshot} background={bg} color={color} />
     </div>

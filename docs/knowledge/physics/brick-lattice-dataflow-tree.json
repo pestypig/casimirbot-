@@ -26,7 +26,15 @@
         "brick-constraints-tests",
         "bridge-brick-stress-energy-brick-curvature"
       ],
-      "links": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "CL4 only when constraint inputs are geometry-derived."
+        }
+      ],
       "summary": "Stress-energy, curvature, and lattice bricks from backend to UI.",
       "nodeType": "concept",
       "inputs": [],
@@ -56,7 +64,84 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d929e3315d1aafbff04d4557e6988aed4e7f6004d8dbf14112c2803f66275d36"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "brick-stress-energy": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "brick-curvature": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "brick-gr-evolve": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "brick-gr-initial": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "brick-brick-serialization": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "brick-client-lattice": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "brick-client-hooks": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "brick-ui-panels": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "brick-constraints-tests": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-brick-stress-energy-brick-curvature": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "brick-stress-energy",
@@ -73,7 +158,23 @@
       "links": [
         {
           "rel": "parent",
-          "to": "brick-lattice-dataflow-tree"
+          "to": "brick-lattice-dataflow-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "cl3-rho-delta-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Stress-energy brick uses pipeline snapshot; CL4 only when T00 is geometry-derived."
+        },
+        {
+          "rel": "see-also",
+          "to": "vdb-band-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "gammaVdB weighting is pipeline-based; VdB band remains proxy-only."
         }
       ],
       "summary": "Stress-energy brick build and stats.",
@@ -195,6 +296,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -212,7 +318,23 @@
       "links": [
         {
           "rel": "parent",
-          "to": "brick-lattice-dataflow-tree"
+          "to": "brick-lattice-dataflow-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "QI margin is pipeline-derived; CL4 needs constraint-derived T00."
+        },
+        {
+          "rel": "see-also",
+          "to": "vdb-band-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "gammaVdB weighting feeds curvature brick; VdB band remains proxy-only."
         }
       ],
       "summary": "Curvature brick build and serialization.",
@@ -317,6 +439,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "derived_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -324,7 +451,7 @@
       "slug": "brick-gr-evolve",
       "title": "GR Evolve Brick",
       "excerpt": "GR evolution brick and constraint diagnostics.",
-      "bodyMD": "GR evolve brick packaging and diagnostics (server/gr-evolve-brick.ts) carry constraints, lapse, and shift data.\n\nMinimal artifact: GR evolve brick summary.",
+      "bodyMD": "GR evolve brick packaging and diagnostics (server/gr-evolve-brick.ts) carry constraints, lapse, and shift data.\n\nMinimal artifact: GR evolve brick summary and CL4 trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
       "tags": [
         "brick",
         "gr",
@@ -334,7 +461,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "brick-lattice-dataflow-tree"
+          "to": "brick-lattice-dataflow-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Constraint diagnostics feed the gate when inputs are geometry-derived."
         }
       ],
       "summary": "GR evolution brick and constraint diagnostics.",
@@ -418,7 +554,7 @@
       "deterministic": true,
       "tolerance": {
         "cfl_max": 0.5,
-        "abs": 0.000001
+        "abs": 1e-06
       },
       "environment": {
         "runtime": "node"
@@ -430,6 +566,11 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -447,7 +588,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "brick-lattice-dataflow-tree"
+          "to": "brick-lattice-dataflow-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Initial data constraints are evaluated via the constraint gate."
         }
       ],
       "summary": "Initial conditions brick for GR runs.",
@@ -540,6 +690,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -557,7 +712,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "brick-lattice-dataflow-tree"
+          "to": "brick-lattice-dataflow-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Constraint gate tests validate CL4 guardrail wiring."
         }
       ],
       "summary": "Binary and JSON brick serialization formats.",
@@ -597,6 +761,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -614,7 +783,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "brick-lattice-dataflow-tree"
+          "to": "brick-lattice-dataflow-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Client lattice frame, SDF, and surface adapters.",
@@ -666,6 +837,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -683,7 +859,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "brick-lattice-dataflow-tree"
+          "to": "brick-lattice-dataflow-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Hooks that fetch and hydrate brick payloads.",
@@ -735,6 +913,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -752,7 +935,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "brick-lattice-dataflow-tree"
+          "to": "brick-lattice-dataflow-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Panels rendering bricks and lattice views.",
@@ -800,6 +985,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -807,7 +997,7 @@
       "slug": "brick-constraints-tests",
       "title": "Constraints and Tests",
       "excerpt": "Constraint gates and brick tests.",
-      "bodyMD": "Brick-related constraint tests (tests/stress-energy-brick.spec.ts, tests/gr-constraint-gate.spec.ts, tests/gr-constraint-network.spec.ts) validate the GR brick flow.\n\nMinimal artifact: brick test summary.",
+      "bodyMD": "Brick-related constraint tests (tests/stress-energy-brick.spec.ts, tests/gr-constraint-gate.spec.ts, tests/gr-constraint-network.spec.ts) validate the GR brick flow.\n\nMinimal artifact: brick test summary and CL4 trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
       "tags": [
         "tests",
         "constraints",
@@ -817,7 +1007,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "brick-lattice-dataflow-tree"
+          "to": "brick-lattice-dataflow-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Constraint gates and brick tests.",
@@ -863,6 +1055,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -881,15 +1078,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "brick-lattice-dataflow-tree"
+          "to": "brick-lattice-dataflow-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "brick-stress-energy"
+          "to": "brick-stress-energy",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "brick-curvature"
+          "to": "brick-curvature",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -937,7 +1140,12 @@
         }
       ],
       "slug": "bridge-brick-stress-energy-brick-curvature",
-      "summary": "Bridge between Stress-Energy Brick and Curvature Brick."
+      "summary": "Bridge between Stress-Energy Brick and Curvature Brick.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     }
   ],
   "schema": {

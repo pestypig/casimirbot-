@@ -1,0 +1,298 @@
+{
+  "version": 1,
+  "updated": "2026-02-10",
+  "equationContract": {
+    "adm": [
+      "Baumgarte-Shapiro ADM line element and evolution derivative (gr-qc/9810065)."
+    ],
+    "constraints": [
+      "Baumgarte-Shapiro Hamiltonian and momentum constraints with matter projections (gr-qc/9810065).",
+      "Gourgoulhon 3+1 constraint summary (gr-qc/0703035)."
+    ],
+    "warpSpecializations": [
+      "Alcubierre expansion and Eulerian energy density (gr-qc/0009013).",
+      "Natario K_ij, theta, and rho_E identity (gr-qc/0110086).",
+      "Van Den Broeck B(r) profile and region-II energy density (gr-qc/9905084)."
+    ]
+  },
+  "observerContract": {
+    "defaultObserver": "eulerian",
+    "notes": "Specify u^a for any T00 quantity; track 8pi normalization conventions explicitly."
+  },
+  "needleHullRuntime": {
+    "status": "partial",
+    "strictAuthority": {
+      "metricSource": "warp.metricT00",
+      "canonicalRefs": [
+        "warp.metric.T00.alcubierre.analytic",
+        "warp.metric.T00.natario.shift",
+        "warp.metric.T00.natario_sdf.shift",
+        "warp.metric.T00.irrotational.shift",
+        "warp.metric.T00.vdb.regionII"
+      ],
+      "requiredContractFields": [
+        "metricT00Observer",
+        "metricT00Normalization",
+        "metricT00UnitSystem",
+        "metricT00ContractStatus",
+        "metricT00ContractReason"
+      ],
+      "thetaAuthority": "theta_geom",
+      "thetaFallback": "theta_pipeline_proxy",
+      "vdbDerivativeRequirementWhenGammaGtOne": true
+    },
+    "signals": [
+      {
+        "id": "warp.metricT00",
+        "classification": "geometry-derived (conditional by path)",
+        "clStatus": "CL3/CL4 candidate"
+      },
+      {
+        "id": "metricT00Contract*",
+        "classification": "geometry contract metadata",
+        "clStatus": "CL4 contract"
+      },
+      {
+        "id": "theta_geom",
+        "classification": "geometry-derived (conditional by adapter)",
+        "clStatus": "CL2/CL4 candidate"
+      },
+      {
+        "id": "metric_k_trace_mean",
+        "classification": "geometry-derived diagnostics",
+        "clStatus": "CL2/CL3 audit"
+      },
+      {
+        "id": "metric_k_sq_mean",
+        "classification": "geometry-derived diagnostics",
+        "clStatus": "CL2/CL3 audit"
+      },
+      {
+        "id": "theta_pipeline_proxy",
+        "classification": "proxy-only",
+        "clStatus": "CL4 excluded"
+      },
+      {
+        "id": "T00_avg",
+        "classification": "proxy-only",
+        "clStatus": "CL3 excluded"
+      },
+      {
+        "id": "vdb.derivativeEvidence",
+        "classification": "geometry-derived diagnostics",
+        "clStatus": "CL2/CL3 partial"
+      },
+      {
+        "id": "vdb_region_ii_derivative_support",
+        "classification": "geometry-derived diagnostics",
+        "clStatus": "CL2/CL3 partial"
+      },
+      {
+        "id": "vdb_region_iv_derivative_support",
+        "classification": "geometry-derived diagnostics",
+        "clStatus": "CL2/CL3 partial"
+      },
+      {
+        "id": "vdb_two_wall_support",
+        "classification": "geometry-derived diagnostics",
+        "clStatus": "CL2/CL3 partial"
+      },
+      {
+        "id": "vdb_two_wall_derivative_support",
+        "classification": "geometry-derived diagnostics",
+        "clStatus": "CL2/CL3 partial"
+      }
+    ],
+    "remainingGap": "Universal derivative-rich and constraint-closed coverage across every active chart/surface path is not complete."
+    ,
+    "citationBinding": {
+      "status": "provided_unverified",
+      "sourceDoc": "docs/needle-hull-citation-trace.md",
+      "sourceJson": "docs/needle-hull-citation-trace.json",
+      "items": [
+        {
+          "id": "warp.metric.T00.*",
+          "requiredBinding": "Equation chain from metric/ADM fields to rho_E or equivalent stress projection",
+          "status": "provided_unverified"
+        },
+        {
+          "id": "metricT00ContractObserver",
+          "requiredBinding": "Observer definition in source (Eulerian/comoving/orthonormal)",
+          "status": "provided_unverified"
+        },
+        {
+          "id": "metricT00ContractNormalization",
+          "requiredBinding": "8*pi normalization convention and unit-system mapping",
+          "status": "provided_unverified"
+        },
+        {
+          "id": "theta_geom",
+          "requiredBinding": "Expansion definition and sign convention mapping",
+          "status": "provided_unverified"
+        },
+        {
+          "id": "theta_pipeline_proxy",
+          "requiredBinding": "Explicit heuristic citation or proxy-only non-congruent label",
+          "status": "provided_unverified"
+        }
+      ]
+    }
+  },
+  "guardrails": [
+    {
+      "id": "warp.metric.T00",
+      "inputs": "shift field beta^i(x) -> finite-diff K_ij -> rho_E (stored in metricT00) for alcubierre/natario/natario_sdf/irrotational paths with explicit refs (warp.metric.T00.alcubierre.analytic, warp.metric.T00.natario.shift, warp.metric.T00.natario_sdf.shift, warp.metric.T00.irrotational.shift); fallback promotes VdB Region II derivatives into canonical warp.metricT00 only when derivative evidence is present (finite t00_mean + sampleCount + nonzero B' and B'') with metricT00Ref=warp.metric.T00.vdb.regionII",
+      "codePointers": [
+        "modules/warp/natario-warp.ts",
+        "modules/warp/warp-module.ts"
+      ],
+      "sourceAnchors": [
+        "Natario Thm 1.7 rho_E identity for flat slices (gr-qc/0110086).",
+        "Alcubierre theta/Tr(K) definitions (gr-qc/0009013).",
+        "ADM kinematics for K_ij (gr-qc/9810065)."
+      ],
+      "geometryChain": "(alpha=1,gamma_ij=delta_ij) + beta^i(x) -> K_ij via spatial derivatives -> rho_E = (K^2 - K_ij K^ij)/(16 pi)",
+      "status": "geometry-derived (flat-slice approximation)",
+      "gaps": "Finite-difference estimate for non-VdB paths; VdB fallback promotes region-II mean into canonical warp.metricT00 and upgrades unknown/unspecified adapters to charted vdb adapters, but still requires full B(r)-coupled ADM/K_ij closure for complete CL3 parity.",
+      "falsifier": "Analytic Alcubierre profile should reproduce negative wall-localized rho_E sign structure."
+    },
+    {
+      "id": "ThetaAudit",
+      "inputs": "D_i beta^i from metric adapter (thetaMax/thetaRms); proxy thetaCal fallback",
+      "codePointers": [
+        "modules/warp/warp-metric-adapter.ts",
+        "server/energy-pipeline.ts",
+        "tools/warpViability.ts"
+      ],
+      "sourceAnchors": [
+        "Alcubierre theta = -alpha Tr(K) (gr-qc/0009013).",
+        "Natario theta = div X (gr-qc/0110086).",
+        "ADM kinematics for K_ij (gr-qc/9810065)."
+      ],
+      "geometryChain": "(alpha,beta,gamma_ij) -> K_ij -> theta via Tr(K) or div X (beta=-X)",
+      "status": "geometry-derived when metric adapter present; proxy fallback otherwise",
+      "gaps": "Finite-difference diagnostics on sparse samples; VdB fallback now refreshes theta from a charted adapter, but full B(r)-coupled divergence terms are not yet universal across all charts/surfaces.",
+      "falsifier": "Vary B(r) transition thickness at fixed f-wall and confirm theta responds through B'/B terms, not only shift-wall gradients."
+    },
+    {
+      "id": "CL3_RhoDelta",
+      "inputs": "rho_constraint.mean, metric T00 -> delta; pipeline rho_avg tracked separately",
+      "codePointers": [
+        "tools/warpViability.ts",
+        "server/helix-proof-pack.ts",
+        "server/gr/constraint-evaluator.ts"
+      ],
+      "sourceAnchors": [
+        "ADM constraints and matter projections (gr-qc/9810065).",
+        "Gourgoulhon 3+1 constraint summary (gr-qc/0703035).",
+        "Natario Thm 1.7 rho_E identity for flat slices (gr-qc/0110086)."
+      ],
+      "geometryChain": "(alpha,beta,gamma_ij) -> K_ij -> rho_constraint via Hamiltonian constraint; compare to metric T00 only with explicit observer/normalization; pipeline rho_avg delta is diagnostic only",
+      "status": "mixed",
+      "gaps": "Gate is metric-only; injected T00 remains proxy-only unless tied to the same metric. Runtime viability now emits source/chart/family provenance (rho_delta_metric_source, rho_delta_metric_chart, rho_delta_metric_family).",
+      "falsifier": "Enforce a known analytic metric; rho_constraint should converge and delta should match analytic T00 in the same chart."
+    },
+    {
+      "id": "FordRomanQI",
+      "inputs": "metric T00 (warp.metricT00 preferred), duty/sampling window, zeta",
+      "proofPackSignals": [
+        "zeta",
+        "ford_roman_ok",
+        "qi_rho_source",
+        "qi_metric_derived",
+        "qi_metric_source",
+        "qi_metric_reason",
+        "qi_strict_mode",
+        "qi_strict_ok",
+        "qi_strict_reason"
+      ],
+      "allowedMetricSources": [
+        "warp.metric.*",
+        "gr.metric.*",
+        "gr.rho_constraint.*"
+      ],
+      "codePointers": [
+        "server/qi/qi-bounds.ts",
+        "server/qi/qi-monitor.ts",
+        "server/energy-pipeline.ts"
+      ],
+      "sourceAnchors": [
+        "Ford-Roman Lorentzian sampling bound (gr-qc/9410043).",
+        "Pfenning-Ford warp application (gr-qc/9702026).",
+        "ADM constraints linking geometry to rho (gr-qc/9810065)."
+      ],
+      "geometryChain": "(alpha,beta,gamma_ij) -> K_ij -> rho_E via Hamiltonian constraint -> sampled rho(tau) for declared observer -> QI bound + curvature-window check (tau << curvature radius)",
+      "status": "conditional (strict-metric by default)",
+      "gaps": "Strict mode blocks non-metric inputs using qi_strict_* signals; proxy fallback is only reachable when strict congruence is disabled. qi_metric_* exposes direct metric/proxy provenance, but curvature window remains unknown if invariants are missing.",
+      "falsifier": "Hamiltonian residual nonzero implies T00 not tied to claimed geometry."
+    },
+    {
+      "id": "VdB_band",
+      "inputs": "gammaVdB band + B(r) derivative diagnostics (region II/IV)",
+      "auxDiagnostics": [
+        "vdb_region_ii_*",
+        "vdb_region_ii_derivative_support",
+        "vdb_region_iv_*",
+        "vdb_region_iv_derivative_support",
+        "vdb_two_wall_support",
+        "vdb_two_wall_derivative_support"
+      ],
+      "codePointers": [
+        "server/energy-pipeline.ts",
+        "tools/warpViability.ts"
+      ],
+      "sourceAnchors": [
+        "VdB metric and B(r) structure (gr-qc/9905084).",
+        "Region-II energy density depends on B' and B'' (gr-qc/9905084)."
+      ],
+      "geometryChain": "B(r) function -> gamma_ij = B^2 delta_ij -> region-II evaluation with B', B''",
+      "status": "conditional (derivative-gated)",
+      "gaps": "For gammaVdB > 1, guardrail now requires derivative evidence from region II and region IV; full CL3 closure still requires complete B(r)-coupled ADM/K_ij + observer-consistent stress tensor.",
+      "falsifier": "Vary tildeDelta with fixed B_max; two-wall support should change if derivatives are tracked."
+    },
+    {
+      "id": "TS_ratio_min",
+      "inputs": "hull size, modulation period, light-crossing proxy",
+      "codePointers": [
+        "server/energy-pipeline.ts",
+        "tools/warpViability.ts"
+      ],
+      "sourceAnchors": [
+        "ADM metric provides proper distances (gr-qc/9810065)."
+      ],
+      "geometryChain": "Optional: use proper distances from gamma_ij to compute light-crossing time",
+      "status": "conditional (strict-metric source by default)",
+      "gaps": "Operational metric-proxy quantity. Strict mode requires tsMetricDerived=true; non-metric timing sources are flagged proxy_input.",
+      "falsifier": "In VdB, proper distances scale with B; if TS_ratio ignores B, it is not slice-metric aware."
+    },
+    {
+      "id": "GR_constraint_gate",
+      "inputs": "metric fields, stress-energy fields, residual thresholds",
+      "codePointers": [
+        "server/gr/constraint-evaluator.ts",
+        "server/gr/gr-constraint-policy.ts"
+      ],
+      "sourceAnchors": [
+        "ADM constraints and matter projections (gr-qc/9810065)."
+      ],
+      "geometryChain": "Metric adapter -> K_ij -> constraints -> residuals",
+      "status": "conditionally geometry-derived",
+      "gaps": "Fails if T_ab is injected independently of geometry.",
+      "falsifier": "Run known analytic metric; residuals should converge to zero with resolution."
+    },
+    {
+      "id": "Natario_OK",
+      "inputs": "T00_avg from pipeline, curvature proxy",
+      "codePointers": [
+        "modules/dynamic/natario-metric.ts"
+      ],
+      "sourceAnchors": [
+        "Natario Thm 1.7 rho_E identity (gr-qc/0110086)."
+      ],
+      "geometryChain": "Choose X (beta=-X) -> K_ij, theta -> rho_E",
+      "status": "proxy-only until forward chain used",
+      "gaps": "Inverse mapping (pipeline energy -> T00) is not Natario.",
+      "falsifier": "Compute rho_E from a concrete X and compare; mismatch implies non-alignment."
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import { kappa_drive_from_power } from "../shared/curvature-proxy.js";
+import { GEOM_TO_SI_STRESS, SI_TO_GEOM_STRESS } from "../shared/gr-units.js";
 import type { ProofPack, ProofValue } from "../shared/schema.js";
 import { PAPER_GEO, type EnergyPipelineState } from "./energy-pipeline.js";
 
@@ -20,6 +21,57 @@ type ResolvedNumber = {
 const toFiniteNumber = (value: unknown): number | null => {
   const num = typeof value === "number" ? value : Number(value);
   return Number.isFinite(num) ? num : null;
+};
+
+const resolveCl3Threshold = (): number => {
+  const raw = Number(process.env.WARP_CL3_RHO_DELTA_MAX);
+  return Number.isFinite(raw) ? raw : 0.1;
+};
+
+const strictCongruenceEnabled = (): boolean =>
+  process.env.WARP_STRICT_CONGRUENCE !== "0";
+const VDB_BPRIME_MIN_ABS = Number.isFinite(Number(process.env.WARP_VDB_BPRIME_MIN_ABS))
+  ? Number(process.env.WARP_VDB_BPRIME_MIN_ABS)
+  : 1e-18;
+const VDB_BDOUBLE_MIN_ABS = Number.isFinite(Number(process.env.WARP_VDB_BDOUBLE_MIN_ABS))
+  ? Number(process.env.WARP_VDB_BDOUBLE_MIN_ABS)
+  : 1e-18;
+
+const qiSourceIsMetric = (source: unknown): boolean => {
+  if (typeof source !== "string") return false;
+  return (
+    source.startsWith("warp.metric") ||
+    source.startsWith("gr.metric") ||
+    source.startsWith("gr.rho_constraint")
+  );
+};
+
+const resolveVdbDerivativeMaxAbs = (
+  region: any,
+  minKey: "bprime_min" | "bdouble_min",
+  maxKey: "bprime_max" | "bdouble_max",
+): number | null => {
+  const minValue = toFiniteNumber(region?.[minKey]);
+  const maxValue = toFiniteNumber(region?.[maxKey]);
+  if (minValue == null && maxValue == null) return null;
+  return Math.max(Math.abs(minValue ?? 0), Math.abs(maxValue ?? 0));
+};
+
+const hasVdbRegionIIMetricSupport = (region: any): boolean => {
+  if (region?.support !== true) return false;
+  const t00Mean = toFiniteNumber(region?.t00_mean);
+  const sampleCount = toFiniteNumber(region?.sampleCount);
+  const bprimeMaxAbs = resolveVdbDerivativeMaxAbs(region, "bprime_min", "bprime_max");
+  const bdoubleMaxAbs = resolveVdbDerivativeMaxAbs(region, "bdouble_min", "bdouble_max");
+  return (
+    t00Mean != null &&
+    sampleCount != null &&
+    sampleCount > 0 &&
+    bprimeMaxAbs != null &&
+    bprimeMaxAbs > VDB_BPRIME_MIN_ABS &&
+    bdoubleMaxAbs != null &&
+    bdoubleMaxAbs > VDB_BDOUBLE_MIN_ABS
+  );
 };
 
 const resolveNumber = (candidates: NumberCandidate[]): ResolvedNumber => {
@@ -82,6 +134,128 @@ const makeDerivedNumber = (
   note,
 });
 
+const makeStringValue = (
+  value: unknown,
+  source: string,
+  proxy: boolean,
+  note?: string,
+): ProofValue => ({
+  value: value == null ? null : String(value),
+  source: value == null ? "missing" : source,
+  proxy: value == null ? true : proxy,
+  note,
+});
+
+const emitInvariantStats = (
+  values: Record<string, ProofValue>,
+  prefix: string,
+  stats: {
+    min: number;
+    max: number;
+    mean: number;
+    p98: number;
+    sampleCount: number;
+    abs: boolean;
+    wallFraction: number;
+    bandFraction: number;
+    threshold: number;
+    bandMin: number;
+    bandMax: number;
+  },
+  sourcePrefix: string,
+) => {
+  const note = "unitSystem=gr";
+  values[`${prefix}_min`] = makeDerivedNumber(
+    stats.min,
+    "1",
+    `${sourcePrefix}.min`,
+    false,
+    note,
+  );
+  values[`${prefix}_max`] = makeDerivedNumber(
+    stats.max,
+    "1",
+    `${sourcePrefix}.max`,
+    false,
+    note,
+  );
+  values[`${prefix}_mean`] = makeDerivedNumber(
+    stats.mean,
+    "1",
+    `${sourcePrefix}.mean`,
+    false,
+    note,
+  );
+  values[`${prefix}_p98`] = makeDerivedNumber(
+    stats.p98,
+    "1",
+    `${sourcePrefix}.p98`,
+    false,
+    note,
+  );
+  values[`${prefix}_sample_count`] = makeDerivedNumber(
+    stats.sampleCount,
+    "1",
+    `${sourcePrefix}.sampleCount`,
+    false,
+  );
+  values[`${prefix}_abs`] = {
+    value: stats.abs,
+    source: `${sourcePrefix}.abs`,
+    proxy: false,
+  };
+  values[`${prefix}_wall_fraction`] = makeDerivedNumber(
+    stats.wallFraction,
+    "1",
+    `${sourcePrefix}.wallFraction`,
+    false,
+  );
+  values[`${prefix}_band_fraction`] = makeDerivedNumber(
+    stats.bandFraction,
+    "1",
+    `${sourcePrefix}.bandFraction`,
+    false,
+  );
+  values[`${prefix}_threshold`] = makeDerivedNumber(
+    stats.threshold,
+    "1",
+    `${sourcePrefix}.threshold`,
+    false,
+  );
+  values[`${prefix}_band_min`] = makeDerivedNumber(
+    stats.bandMin,
+    "1",
+    `${sourcePrefix}.bandMin`,
+    false,
+  );
+  values[`${prefix}_band_max`] = makeDerivedNumber(
+    stats.bandMax,
+    "1",
+    `${sourcePrefix}.bandMax`,
+    false,
+  );
+};
+
+const relDelta = (current: number, baseline: number, eps = 1e-12) =>
+  Math.abs(current - baseline) / Math.max(eps, Math.abs(baseline));
+
+const computeInvariantDelta = (
+  current?: {
+    mean: number;
+    p98: number;
+  },
+  baseline?: {
+    mean: number;
+    p98: number;
+  },
+) => {
+  if (!current || !baseline) return null;
+  return {
+    mean: relDelta(current.mean, baseline.mean),
+    p98: relDelta(current.p98, baseline.p98),
+  };
+};
+
 const resolveHullDims = (state: EnergyPipelineState) => {
   const hull = state.hull;
   const Lx = resolveNumber([
@@ -106,6 +280,18 @@ const resolveHullDims = (state: EnergyPipelineState) => {
 export function buildProofPack(state: EnergyPipelineState): ProofPack {
   const values: Record<string, ProofValue> = {};
   const notes: string[] = [];
+
+  const modelMode =
+    typeof state.modelMode === "string"
+      ? state.modelMode
+      : typeof (state as any).modelMode === "string"
+      ? String((state as any).modelMode)
+      : null;
+  values.model_mode = makeStringValue(
+    modelMode,
+    "pipeline.modelMode",
+    modelMode == null,
+  );
 
   const power = resolveNumber([
     { value: (state as any).P_avg_W, source: "pipeline.P_avg_W" },
@@ -151,6 +337,28 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
       { value: (state as any).sectorsTotal, source: "pipeline.sectorsTotal", proxy: true },
     ]),
     "1",
+  );
+
+  const lightCrossing = ((state as any).lightCrossing ?? {}) as Record<string, unknown>;
+  values.tau_lc_ms = makeValue(
+    resolveNumber([
+      { value: lightCrossing.tauLC_ms as number | undefined, source: "pipeline.lightCrossing.tauLC_ms" },
+      { value: (state as any).tauLC_ms as number | undefined, source: "pipeline.tauLC_ms", proxy: true },
+    ]),
+    "ms",
+  );
+  values.tau_pulse_ms = makeValue(
+    resolveNumber([
+      { value: lightCrossing.burst_ms as number | undefined, source: "pipeline.lightCrossing.burst_ms" },
+      { value: (lightCrossing as any).tauPulse_ms as number | undefined, source: "pipeline.lightCrossing.tauPulse_ms", proxy: true },
+    ]),
+    "ms",
+  );
+  values.tau_dwell_ms = makeValue(
+    resolveNumber([
+      { value: lightCrossing.dwell_ms as number | undefined, source: "pipeline.lightCrossing.dwell_ms" },
+    ]),
+    "ms",
   );
 
   const gammaGeo = resolveNumber([
@@ -204,18 +412,119 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     "1",
   );
 
-  values.theta_raw = makeValue(
-    resolveNumber([
-      { value: (state as any).thetaRaw, source: "pipeline.thetaRaw" },
-    ]),
-    "1",
+  const thetaPipelineRaw = resolveNumber([
+    { value: (state as any).thetaRaw, source: "pipeline.thetaRaw", proxy: true },
+  ]);
+  values.theta_pipeline_raw = makeValue(thetaPipelineRaw, "1");
+  const thetaPipelineCal = resolveNumber([
+    { value: (state as any).thetaCal, source: "pipeline.thetaCal", proxy: true },
+    { value: (state as any).thetaScaleExpected, source: "pipeline.thetaScaleExpected", proxy: true },
+  ]);
+  values.theta_pipeline_cal = makeValue(thetaPipelineCal, "1");
+  const metricBeta = (state as any)?.warp?.metricAdapter?.betaDiagnostics;
+  const thetaGeom = toFiniteNumber(metricBeta?.thetaMax ?? metricBeta?.thetaRms);
+  const thetaGeomProxy = metricBeta?.method === "not-computed";
+  const strictThetaEnabled = strictCongruenceEnabled();
+  const thetaGeomUsable = thetaGeom != null && !thetaGeomProxy;
+  const thetaGeomSource =
+    metricBeta?.thetaMax != null
+      ? "pipeline.warp.metricAdapter.betaDiagnostics.thetaMax"
+      : "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms";
+  const thetaPipelineProxyResolved = resolveNumber([
+    { value: (state as any).thetaCal, source: "pipeline.thetaCal", proxy: true },
+    { value: (state as any).thetaScaleExpected, source: "pipeline.thetaScaleExpected", proxy: true },
+    { value: (state as any).theta_proxy, source: "pipeline.theta_proxy", proxy: true },
+  ]);
+  const thetaMetricDerived =
+    typeof (state as any)?.theta_metric_derived === "boolean"
+      ? Boolean((state as any).theta_metric_derived)
+      : thetaGeomUsable;
+  const thetaMetricSource =
+    typeof (state as any)?.theta_metric_source === "string" &&
+    (state as any).theta_metric_source.length > 0
+      ? String((state as any).theta_metric_source)
+      : thetaGeomUsable
+        ? thetaGeomSource
+        : "missing";
+  const thetaMetricReason =
+    typeof (state as any)?.theta_metric_reason === "string" &&
+    (state as any).theta_metric_reason.length > 0
+      ? String((state as any).theta_metric_reason)
+      : thetaGeomUsable
+        ? "metric_adapter_divergence"
+        : thetaGeom == null
+          ? "missing_theta_geom"
+          : "theta_geom_proxy";
+  const thetaAuditResolved = resolveNumber([
+    thetaGeomUsable
+      ? {
+          value: thetaGeom,
+          source: thetaGeomSource,
+          proxy: false,
+        }
+      : {
+          value: undefined,
+          source: "missing",
+          proxy: true,
+        },
+    thetaPipelineProxyResolved,
+  ]);
+  const thetaStrictOk = strictThetaEnabled ? thetaGeomUsable : true;
+  const thetaStrictReason = thetaStrictOk
+    ? "ok"
+    : thetaGeom == null
+      ? "missing_theta_geom"
+      : "theta_geom_proxy";
+  if (thetaGeom != null) {
+    values.theta_geom = makeDerivedNumber(
+      thetaGeom,
+      "1/m",
+      thetaGeomSource,
+      Boolean(thetaGeomProxy),
+      "div(beta)",
+    );
+  }
+  values.theta_strict_mode = {
+    value: strictThetaEnabled,
+    source: "config:WARP_STRICT_CONGRUENCE",
+    proxy: false,
+  };
+  values.theta_strict_ok = {
+    value: thetaStrictOk,
+    source: "derived:theta_strict_ok",
+    proxy: false,
+  };
+  values.theta_strict_reason = {
+    value: thetaStrictReason,
+    source: "derived:theta_strict_reason",
+    proxy: false,
+  };
+  values.theta_pipeline_proxy = makeValue(thetaPipelineProxyResolved, "1");
+  const thetaMetricOverride = makeDerivedNumber(
+    thetaGeomUsable ? thetaGeom : null,
+    "1/m",
+    thetaGeomUsable ? thetaGeomSource : "missing",
+    !thetaGeomUsable,
+    "metric-derived override (div beta)",
   );
-  values.theta_cal = makeValue(
-    resolveNumber([
-      { value: (state as any).thetaCal, source: "pipeline.thetaCal" },
-      { value: (state as any).thetaScaleExpected, source: "pipeline.thetaScaleExpected", proxy: true },
-    ]),
-    "1",
+  values.theta_raw = thetaMetricOverride;
+  values.theta_cal = thetaMetricOverride;
+  values.theta_proxy = thetaMetricOverride;
+  values.theta_audit = makeValue(thetaAuditResolved, "1");
+  values.theta_metric_derived = {
+    value: thetaMetricDerived,
+    source: "derived:theta_metric_derived",
+    proxy: false,
+  };
+  values.theta_metric_source = makeStringValue(
+    thetaMetricSource,
+    "derived:theta_metric_source",
+    !thetaMetricDerived,
+  );
+  values.theta_metric_reason = makeStringValue(
+    thetaMetricReason,
+    "derived:theta_metric_reason",
+    !thetaMetricDerived,
   );
   if (state.gammaChain?.note) {
     values.gamma_chain_note = {
@@ -234,6 +543,35 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     ]),
     "1",
   );
+  const tsMetricDerived = Boolean(
+    (state as any)?.tsMetricDerived === true ||
+      (state as any)?.ts?.metricDerived === true ||
+      (state as any)?.clocking?.metricDerived === true,
+  );
+  const tsMetricSource =
+    (state as any)?.tsMetricDerivedSource ??
+    (state as any)?.ts?.metricDerivedSource ??
+    (state as any)?.clocking?.metricDerivedSource ??
+    "missing";
+  const tsMetricReason =
+    (state as any)?.tsMetricDerivedReason ??
+    (state as any)?.ts?.metricDerivedReason ??
+    (state as any)?.clocking?.metricDerivedReason;
+  values.ts_metric_derived = {
+    value: tsMetricDerived,
+    source: "derived:ts_metric_derived",
+    proxy: false,
+  };
+  values.ts_metric_source = makeStringValue(
+    tsMetricSource,
+    "derived:ts_metric_source",
+    !tsMetricDerived,
+  );
+  values.ts_metric_reason = makeStringValue(
+    tsMetricReason,
+    "derived:ts_metric_reason",
+    !tsMetricDerived,
+  );
 
   values.zeta = makeValue(
     resolveNumber([
@@ -246,10 +584,785 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     state.fordRomanCompliance,
     "pipeline.fordRomanCompliance",
   );
+  const qiGuard = (state as any)?.qiGuardrail ?? {};
+  const qiRhoSource =
+    typeof qiGuard?.rhoSource === "string" ? String(qiGuard.rhoSource) : null;
+  const qiMetricDerived =
+    typeof qiGuard?.metricDerived === "boolean"
+      ? Boolean(qiGuard.metricDerived)
+      : qiSourceIsMetric(qiRhoSource);
+  const qiMetricSource =
+    typeof qiGuard?.metricDerivedSource === "string"
+      ? String(qiGuard.metricDerivedSource)
+      : typeof qiRhoSource === "string"
+      ? qiRhoSource
+      : "missing";
+  const qiMetricReason =
+    typeof qiGuard?.metricDerivedReason === "string"
+      ? String(qiGuard.metricDerivedReason)
+      : qiMetricDerived
+      ? "metric-derived"
+      : "proxy-or-missing";
+  const strictQiEnabled = strictCongruenceEnabled();
+  const qiSourceMetric = qiSourceIsMetric(qiRhoSource);
+  const qiStrictOk = strictQiEnabled ? qiMetricDerived : true;
+  const qiStrictReason = qiStrictOk
+    ? "ok"
+    : qiRhoSource == null
+      ? "missing_qi_rho_source"
+      : qiRhoSource === "metric-missing"
+        ? "missing_metric_rho"
+        : "qi_rho_proxy";
+  values.qi_rho_source = makeStringValue(
+    qiRhoSource,
+    "pipeline.qiGuardrail.rhoSource",
+    qiRhoSource == null || !qiSourceMetric,
+  );
+  values.qi_metric_derived = {
+    value: qiMetricDerived,
+    source: "derived:qi_metric_derived",
+    proxy: !qiMetricDerived,
+  };
+  values.qi_metric_source = makeStringValue(
+    qiMetricSource,
+    "derived:qi_metric_source",
+    !qiMetricDerived,
+  );
+  values.qi_metric_reason = makeStringValue(
+    qiMetricReason,
+    "derived:qi_metric_reason",
+    !qiMetricDerived,
+  );
+  values.qi_strict_mode = {
+    value: strictQiEnabled,
+    source: "config:WARP_STRICT_CONGRUENCE",
+    proxy: false,
+  };
+  values.qi_strict_ok = {
+    value: qiStrictOk,
+    source: "derived:qi_strict_ok",
+    proxy: false,
+  };
+  values.qi_strict_reason = {
+    value: qiStrictReason,
+    source: "derived:qi_strict_reason",
+    proxy: false,
+  };
   values.natario_ok = resolveBoolean(
     (state as any).natarioConstraint,
     "pipeline.natarioConstraint",
   );
+
+  const grInvariants = state.gr?.invariants;
+  if (grInvariants?.kretschmann) {
+    emitInvariantStats(
+      values,
+      "gr_kretschmann",
+      grInvariants.kretschmann,
+      "pipeline.gr.invariants.kretschmann",
+    );
+  }
+  if (grInvariants?.ricci4) {
+    emitInvariantStats(
+      values,
+      "gr_ricci4",
+      grInvariants.ricci4,
+      "pipeline.gr.invariants.ricci4",
+    );
+  }
+
+  const metricConstraint = (state as any)?.metricConstraint as
+    | { rho_constraint?: { mean?: number; rms?: number; maxAbs?: number }; source?: string }
+    | undefined;
+  const rhoConstraint =
+    state.gr?.constraints?.rho_constraint ?? metricConstraint?.rho_constraint;
+  if (rhoConstraint) {
+    const rhoConstraintSource = state.gr?.constraints?.rho_constraint
+      ? "pipeline.gr.constraints.rho_constraint"
+      : metricConstraint?.source
+        ? `pipeline.metricConstraint.${metricConstraint.source}`
+        : "pipeline.metricConstraint.rho_constraint";
+    values.gr_rho_constraint_mean = makeDerivedNumber(
+      toFiniteNumber(rhoConstraint.mean),
+      "1",
+      `${rhoConstraintSource}.mean`,
+      false,
+      "unitSystem=gr",
+    );
+    values.gr_rho_constraint_rms = makeDerivedNumber(
+      toFiniteNumber(rhoConstraint.rms),
+      "1",
+      `${rhoConstraintSource}.rms`,
+      false,
+      "unitSystem=gr",
+    );
+    values.gr_rho_constraint_max_abs = makeDerivedNumber(
+      toFiniteNumber(rhoConstraint.maxAbs),
+      "1",
+      `${rhoConstraintSource}.maxAbs`,
+      false,
+      "unitSystem=gr",
+    );
+  }
+
+  const matterAvgT00 = state.gr?.matter?.stressEnergy?.avgT00;
+  if (Number.isFinite(matterAvgT00 as number)) {
+    values.gr_matter_t00_mean = makeDerivedNumber(
+      Number(matterAvgT00),
+      "1",
+      "pipeline.gr.matter.stressEnergy.avgT00",
+      false,
+      "unitSystem=gr",
+    );
+  }
+
+  const pipelineRhoAvg = toFiniteNumber(state.rho_avg ?? (state as any).rho_avg);
+  const pipelineRhoAvgGeom =
+    pipelineRhoAvg == null ? null : pipelineRhoAvg * SI_TO_GEOM_STRESS;
+  if (pipelineRhoAvgGeom != null) {
+    values.gr_pipeline_t00_geom_mean = makeDerivedNumber(
+      pipelineRhoAvgGeom,
+      "1",
+      "derived:pipeline.rho_avg*SI_TO_GEOM_STRESS",
+      true,
+      "unitSystem=gr;source=pipeline_rho_avg_SI",
+    );
+  }
+
+  const warpMetricSourceRaw =
+    (state as any)?.warp?.metricT00Source ??
+    (state as any)?.warp?.metricStressSource ??
+    (state as any)?.warp?.stressEnergySource;
+  const warpMetricRef =
+    typeof (state as any)?.warp?.metricT00Ref === "string" &&
+    (state as any).warp.metricT00Ref.length > 0
+      ? String((state as any).warp.metricT00Ref)
+      : "warp.metric.T00";
+  const warpMetricT00Raw = toFiniteNumber(
+    (state as any)?.warp?.metricT00 ??
+      (state as any)?.warp?.metricStressEnergy?.T00 ??
+      (state as any)?.warp?.stressEnergyTensor?.T00,
+  );
+  const natarioMetricSourceRaw =
+    (state as any)?.natario?.metricT00Source ??
+    (state as any)?.natario?.metricSource;
+  const natarioMetricRef =
+    typeof (state as any)?.natario?.metricT00Ref === "string" &&
+    (state as any).natario.metricT00Ref.length > 0
+      ? String((state as any).natario.metricT00Ref)
+      : "warp.metric.T00.natario.shift";
+  const natarioMetricT00Raw = toFiniteNumber(
+    (state as any)?.natario?.metricT00 ??
+      (state as any)?.natario?.stressEnergyTensor?.T00,
+  );
+  let warpMetricSource: string | null = null;
+  let warpMetricT00Geom: number | null = null;
+  let warpMetricProxy = true;
+  const warpMetricContract = (state as any)?.warp?.metricT00Contract;
+  const natarioMetricObserver =
+    typeof (state as any)?.natario?.metricT00Observer === "string"
+      ? String((state as any).natario.metricT00Observer)
+      : undefined;
+  const natarioMetricNormalization =
+    typeof (state as any)?.natario?.metricT00Normalization === "string"
+      ? String((state as any).natario.metricT00Normalization)
+      : undefined;
+  const natarioMetricUnitSystem =
+    typeof (state as any)?.natario?.metricT00UnitSystem === "string"
+      ? String((state as any).natario.metricT00UnitSystem)
+      : undefined;
+  const natarioMetricContractStatus =
+    typeof (state as any)?.natario?.metricT00ContractStatus === "string"
+      ? String((state as any).natario.metricT00ContractStatus)
+      : undefined;
+  const natarioMetricContractReason =
+    typeof (state as any)?.natario?.metricT00ContractReason === "string"
+      ? String((state as any).natario.metricT00ContractReason)
+      : undefined;
+  const metricAdapterLocal = (state as any)?.warp?.metricAdapter;
+  const metricObserver =
+    typeof (warpMetricContract as any)?.observer === "string"
+      ? String((warpMetricContract as any).observer)
+      : natarioMetricObserver;
+  const metricNormalization =
+    typeof (warpMetricContract as any)?.normalization === "string"
+      ? String((warpMetricContract as any).normalization)
+      : natarioMetricNormalization;
+  const metricUnitSystem =
+    typeof (warpMetricContract as any)?.unitSystem === "string"
+      ? String((warpMetricContract as any).unitSystem)
+      : natarioMetricUnitSystem;
+  const metricContractStatus =
+    typeof (warpMetricContract as any)?.status === "string"
+      ? String((warpMetricContract as any).status)
+      : natarioMetricContractStatus;
+  let metricContractReason =
+    typeof (warpMetricContract as any)?.reason === "string"
+      ? String((warpMetricContract as any).reason)
+      : natarioMetricContractReason;
+  if (
+    (!metricContractReason || metricContractReason.length === 0) &&
+    metricContractStatus === "ok"
+  ) {
+    metricContractReason = "ok";
+  }
+  const metricChart =
+    typeof (warpMetricContract as any)?.chart === "string"
+      ? String((warpMetricContract as any).chart)
+      : typeof (metricAdapterLocal as any)?.chart?.label === "string"
+        ? String((metricAdapterLocal as any).chart.label)
+        : undefined;
+  const metricFamily =
+    typeof (warpMetricContract as any)?.family === "string"
+      ? String((warpMetricContract as any).family)
+      : typeof (metricAdapterLocal as any)?.family === "string"
+        ? String((metricAdapterLocal as any).family)
+        : undefined;
+  const canonicalContract = {
+    family: "natario",
+    chart: "comoving_cartesian",
+    observer: "eulerian_n",
+    normalization: "si_stress",
+    unitSystem: "SI",
+  };
+
+  if (warpMetricSourceRaw === "metric" && warpMetricT00Raw != null) {
+    warpMetricSource = warpMetricRef;
+    warpMetricT00Geom = warpMetricT00Raw * SI_TO_GEOM_STRESS;
+    warpMetricProxy = false;
+  } else if (natarioMetricSourceRaw === "metric" && natarioMetricT00Raw != null) {
+    warpMetricSource = natarioMetricRef;
+    warpMetricT00Geom = natarioMetricT00Raw * SI_TO_GEOM_STRESS;
+    warpMetricProxy = false;
+  } else {
+    const vdbRegionII = (state as any)?.vdbRegionII;
+    const vdbT00Geom = toFiniteNumber(vdbRegionII?.t00_mean);
+    if (hasVdbRegionIIMetricSupport(vdbRegionII) && vdbT00Geom != null) {
+      warpMetricSource = "warp.metric.T00.vdb.regionII";
+      warpMetricT00Geom = vdbT00Geom;
+      warpMetricProxy = false;
+    }
+  }
+
+  if (warpMetricT00Geom != null) {
+    values.gr_metric_t00_geom_mean = makeDerivedNumber(
+      warpMetricT00Geom,
+      "1",
+      "derived:gr_metric_t00_geom_mean",
+      warpMetricProxy,
+      `unitSystem=gr;source=${warpMetricSource ?? "unknown"}`,
+    );
+    if (warpMetricSource === "warp.metric.T00.vdb.regionII") {
+      values.gr_metric_t00_si_mean = makeDerivedNumber(
+        warpMetricT00Geom * GEOM_TO_SI_STRESS,
+        "J/m^3",
+        "derived:gr_metric_t00_si_mean",
+        warpMetricProxy,
+        "source=warp.metric.T00.vdb.regionII;conversion=GEOM_TO_SI_STRESS",
+      );
+    }
+    const metricContractOk =
+      metricContractStatus === "ok" &&
+      metricChart !== "unspecified" &&
+      metricObserver != null &&
+      metricNormalization != null &&
+      metricUnitSystem === "SI";
+    values.metric_t00_observer = makeStringValue(
+      metricObserver,
+      "pipeline.warp.metricT00Contract.observer",
+      metricContractStatus !== "ok",
+    );
+    values.metric_t00_normalization = makeStringValue(
+      metricNormalization,
+      "pipeline.warp.metricT00Contract.normalization",
+      metricContractStatus !== "ok",
+    );
+    values.metric_t00_unit_system = makeStringValue(
+      metricUnitSystem,
+      "pipeline.warp.metricT00Contract.unitSystem",
+      metricContractStatus !== "ok",
+    );
+    values.metric_t00_contract_status = makeStringValue(
+      metricContractStatus,
+      "pipeline.warp.metricT00Contract.status",
+      metricContractStatus !== "ok",
+    );
+    values.metric_t00_contract_reason = makeStringValue(
+      metricContractReason,
+      "pipeline.warp.metricT00Contract.reason",
+      metricContractStatus !== "ok",
+    );
+    values.metric_t00_chart = makeStringValue(
+      metricChart,
+      "pipeline.warp.metricT00Contract.chart",
+      metricContractStatus !== "ok",
+    );
+    values.metric_t00_family = makeStringValue(
+      metricFamily,
+      "pipeline.warp.metricT00Contract.family",
+      metricContractStatus !== "ok",
+    );
+    values.metric_t00_contract_ok = resolveBoolean(
+      metricContractOk,
+      "pipeline.warp.metricT00Contract.ok",
+    );
+  }
+
+  const canonicalMatch =
+    metricFamily === canonicalContract.family &&
+    metricChart === canonicalContract.chart &&
+    metricObserver === canonicalContract.observer &&
+    metricNormalization === canonicalContract.normalization &&
+    metricUnitSystem === canonicalContract.unitSystem &&
+    metricContractStatus === "ok";
+  values.warp_canonical_family = makeStringValue(
+    canonicalContract.family,
+    "config:warp_canonical_family",
+    false,
+  );
+  values.warp_canonical_chart = makeStringValue(
+    canonicalContract.chart,
+    "config:warp_canonical_chart",
+    false,
+  );
+  values.warp_canonical_observer = makeStringValue(
+    canonicalContract.observer,
+    "config:warp_canonical_observer",
+    false,
+  );
+  values.warp_canonical_normalization = makeStringValue(
+    canonicalContract.normalization,
+    "config:warp_canonical_normalization",
+    false,
+  );
+  values.warp_canonical_unit_system = makeStringValue(
+    canonicalContract.unitSystem,
+    "config:warp_canonical_unit_system",
+    false,
+  );
+  values.warp_canonical_match = resolveBoolean(
+    canonicalMatch,
+    "derived:warp_canonical_match",
+  );
+
+  const metricStressDiagnostics = (state as any)?.warp?.metricStressDiagnostics;
+  if (metricStressDiagnostics) {
+    values.metric_t00_sample_count = makeDerivedNumber(
+      toFiniteNumber(metricStressDiagnostics.sampleCount),
+      "1",
+      "pipeline.warp.metricStressDiagnostics.sampleCount",
+      warpMetricProxy,
+    );
+    values.metric_t00_rho_geom_mean = makeDerivedNumber(
+      toFiniteNumber(metricStressDiagnostics.rhoGeomMean),
+      "1",
+      "pipeline.warp.metricStressDiagnostics.rhoGeomMean",
+      warpMetricProxy,
+      "unitSystem=gr",
+    );
+    values.metric_t00_rho_si_mean = makeDerivedNumber(
+      toFiniteNumber(metricStressDiagnostics.rhoSiMean),
+      "J/m^3",
+      "pipeline.warp.metricStressDiagnostics.rhoSiMean",
+      warpMetricProxy,
+    );
+    values.metric_k_trace_mean = makeDerivedNumber(
+      toFiniteNumber(metricStressDiagnostics.kTraceMean),
+      "1/m",
+      "pipeline.warp.metricStressDiagnostics.kTraceMean",
+      warpMetricProxy,
+    );
+    values.metric_k_sq_mean = makeDerivedNumber(
+      toFiniteNumber(metricStressDiagnostics.kSquaredMean),
+      "1/m^2",
+      "pipeline.warp.metricStressDiagnostics.kSquaredMean",
+      warpMetricProxy,
+    );
+    values.metric_t00_step_m = makeDerivedNumber(
+      toFiniteNumber(metricStressDiagnostics.step_m),
+      "m",
+      "pipeline.warp.metricStressDiagnostics.step_m",
+      warpMetricProxy,
+    );
+    values.metric_t00_scale_m = makeDerivedNumber(
+      toFiniteNumber(metricStressDiagnostics.scale_m),
+      "m",
+      "pipeline.warp.metricStressDiagnostics.scale_m",
+      warpMetricProxy,
+    );
+  }
+
+  const cl3Threshold = resolveCl3Threshold();
+  values.gr_cl3_rho_threshold = makeDerivedNumber(
+    cl3Threshold,
+    "1",
+    "config:WARP_CL3_RHO_DELTA_MAX",
+    false,
+    "relative_delta_max",
+  );
+
+  let cl3DeltaMean: number | null = null;
+  if (
+    typeof rhoConstraint?.mean === "number" &&
+    Number.isFinite(rhoConstraint.mean) &&
+    Number.isFinite(matterAvgT00 as number)
+  ) {
+    const delta = relDelta(rhoConstraint.mean, Number(matterAvgT00));
+    cl3DeltaMean = delta;
+  }
+
+  let cl3DeltaPipelineMean: number | null = null;
+  if (
+    typeof rhoConstraint?.mean === "number" &&
+    Number.isFinite(rhoConstraint.mean) &&
+    pipelineRhoAvgGeom != null
+  ) {
+    const delta = relDelta(rhoConstraint.mean, pipelineRhoAvgGeom);
+    cl3DeltaPipelineMean = delta;
+    values.gr_cl3_rho_delta_pipeline_mean_telemetry = makeDerivedNumber(
+      delta,
+      "1",
+      "derived:gr_cl3_rho_delta.pipeline.mean",
+      true,
+      "pipeline telemetry (relative_delta)",
+    );
+  }
+
+  let cl3DeltaMetricMean: number | null = null;
+  if (
+    typeof rhoConstraint?.mean === "number" &&
+    Number.isFinite(rhoConstraint.mean) &&
+    warpMetricT00Geom != null
+  ) {
+    const delta = relDelta(rhoConstraint.mean, warpMetricT00Geom);
+    cl3DeltaMetricMean = delta;
+    values.gr_cl3_rho_delta_metric_mean = makeDerivedNumber(
+      delta,
+      "1",
+      "derived:gr_cl3_rho_delta.metric.mean",
+      warpMetricProxy,
+      "relative_delta",
+    );
+  }
+
+  values.gr_cl3_rho_delta_pipeline_mean = makeDerivedNumber(
+    cl3DeltaMetricMean,
+    "1",
+    cl3DeltaMetricMean != null
+      ? "derived:gr_cl3_rho_delta.metric.mean"
+      : "missing",
+    cl3DeltaMetricMean == null ? true : warpMetricProxy,
+    "metric-derived override",
+  );
+
+  const cl3MissingParts: string[] = [];
+  if (!(typeof rhoConstraint?.mean === "number" && Number.isFinite(rhoConstraint.mean))) {
+    cl3MissingParts.push("missing_rho_constraint");
+  }
+  if (warpMetricT00Geom == null) {
+    cl3MissingParts.push("missing_metric_t00");
+  }
+  const cl3MissingReason =
+    cl3MissingParts.includes("missing_metric_t00")
+      ? "metric_source_missing"
+      : cl3MissingParts.includes("missing_rho_constraint")
+        ? "constraint_rho_missing"
+        : undefined;
+
+  const cl3GateDelta = cl3DeltaMetricMean;
+  const cl3GateSource =
+    cl3DeltaMetricMean != null ? warpMetricSource : cl3MissingReason === "metric_source_missing"
+      ? "metric-missing"
+      : "constraint-missing";
+  const cl3GateProxy = cl3DeltaMetricMean != null ? warpMetricProxy : true;
+  const cl3GatePass =
+    cl3GateDelta != null ? cl3GateDelta <= cl3Threshold : false;
+  const cl3GateReason =
+    cl3GateDelta != null
+      ? cl3GatePass
+        ? "within_threshold"
+        : "above_threshold"
+      : cl3MissingReason ?? "missing_inputs";
+  values.gr_cl3_rho_delta_mean = makeDerivedNumber(
+    cl3GateDelta,
+    "1",
+    "derived:gr_cl3_rho_delta.gate.mean",
+    cl3GateProxy,
+    cl3GateDelta != null ? "relative_delta" : `missing=${cl3MissingParts.join(",") || "unknown"}`,
+  );
+  values.gr_cl3_rho_gate = {
+    value: cl3GatePass,
+    source: "derived:gr_cl3_rho_gate",
+    proxy: cl3GateProxy,
+  };
+  values.gr_cl3_rho_gate_source = makeStringValue(
+    cl3GateSource ?? "unknown",
+    "derived:gr_cl3_rho_gate_source",
+    cl3GateProxy,
+  );
+  values.gr_cl3_rho_gate_reason = makeStringValue(
+    cl3GateReason,
+    "derived:gr_cl3_rho_gate_reason",
+    cl3GateDelta != null ? cl3GateProxy : false,
+  );
+  if (cl3MissingParts.length) {
+    values.gr_cl3_rho_missing_parts = makeStringValue(
+      cl3MissingParts.join(","),
+      "derived:gr_cl3_rho_missing_parts",
+      false,
+    );
+  }
+
+  const congruenceMissingParts = (state as any).congruence_missing_parts;
+  if (Array.isArray(congruenceMissingParts) && congruenceMissingParts.length) {
+    values.congruence_missing_parts = makeStringValue(
+      congruenceMissingParts.join(","),
+      "pipeline.congruence_missing_parts",
+      false,
+    );
+    values.congruence_missing_count = makeDerivedNumber(
+      congruenceMissingParts.length,
+      "1",
+      "derived:congruence_missing_count",
+      false,
+      "count",
+    );
+    values.congruence_missing_reason = makeStringValue(
+      String((state as any).congruence_missing_reason ?? congruenceMissingParts[0]),
+      "pipeline.congruence_missing_reason",
+      false,
+    );
+  } else {
+    values.congruence_missing_count = makeDerivedNumber(
+      0,
+      "1",
+      "derived:congruence_missing_count",
+      false,
+      "count",
+    );
+  }
+
+  const baselineInvariants = (state as any).grBaseline?.invariants;
+  if (grInvariants && baselineInvariants) {
+    const kDelta = computeInvariantDelta(
+      grInvariants.kretschmann,
+      baselineInvariants.kretschmann,
+    );
+    const rDelta = computeInvariantDelta(
+      grInvariants.ricci4,
+      baselineInvariants.ricci4,
+    );
+    const deltas: number[] = [];
+    if (kDelta) {
+      values.gr_cl0_kretschmann_delta_mean = makeDerivedNumber(
+        kDelta.mean,
+        "1",
+        "derived:gr_cl0_delta.kretschmann.mean",
+        true,
+        "relative_delta",
+      );
+      values.gr_cl0_kretschmann_delta_p98 = makeDerivedNumber(
+        kDelta.p98,
+        "1",
+        "derived:gr_cl0_delta.kretschmann.p98",
+        true,
+        "relative_delta",
+      );
+      deltas.push(kDelta.mean, kDelta.p98);
+    }
+    if (rDelta) {
+      values.gr_cl0_ricci4_delta_mean = makeDerivedNumber(
+        rDelta.mean,
+        "1",
+        "derived:gr_cl0_delta.ricci4.mean",
+        true,
+        "relative_delta",
+      );
+      values.gr_cl0_ricci4_delta_p98 = makeDerivedNumber(
+        rDelta.p98,
+        "1",
+        "derived:gr_cl0_delta.ricci4.p98",
+        true,
+        "relative_delta",
+      );
+      deltas.push(rDelta.mean, rDelta.p98);
+    }
+    if (deltas.length) {
+      values.gr_cl0_delta_max = makeDerivedNumber(
+        Math.max(...deltas),
+        "1",
+        "derived:gr_cl0_delta.max",
+        true,
+        "relative_delta",
+      );
+    }
+
+    const baseline = (state as any).grBaseline ?? {};
+    values.gr_cl0_baseline_source = makeStringValue(
+      baseline.source ?? "pipeline.grBaseline",
+      "pipeline.grBaseline.source",
+      true,
+    );
+    if (typeof baseline.updatedAt === "number") {
+      const age_s = Math.max(0, (Date.now() - baseline.updatedAt) / 1000);
+      values.gr_cl0_baseline_age_s = makeDerivedNumber(
+        age_s,
+        "s",
+        "derived:gr_cl0_baseline_age",
+        true,
+      );
+    }
+  }
+
+  const metricAdapter = (state as any).warp?.metricAdapter;
+  if (metricAdapter && typeof metricAdapter === "object") {
+    const chart = (metricAdapter as any).chart ?? {};
+    const beta = (metricAdapter as any).betaDiagnostics ?? {};
+    const betaMethod = typeof beta.method === "string" ? beta.method : null;
+    const betaProxy = betaMethod === "not-computed";
+    const contractStatus = chart.contractStatus;
+    const contractProxy = contractStatus && contractStatus !== "ok";
+
+    values.metric_adapter_family = makeStringValue(
+      (metricAdapter as any).family,
+      "pipeline.warp.metricAdapter.family",
+      false,
+    );
+    values.metric_chart_label = makeStringValue(
+      chart.label,
+      "pipeline.warp.metricAdapter.chart.label",
+      false,
+    );
+    values.metric_dt_gamma_policy = makeStringValue(
+      chart.dtGammaPolicy,
+      "pipeline.warp.metricAdapter.chart.dtGammaPolicy",
+      contractProxy,
+    );
+    values.metric_chart_contract_status = makeStringValue(
+      contractStatus,
+      "pipeline.warp.metricAdapter.chart.contractStatus",
+      contractProxy,
+    );
+    values.metric_chart_contract_reason = makeStringValue(
+      chart.contractReason,
+      "pipeline.warp.metricAdapter.chart.contractReason",
+      contractProxy,
+    );
+    values.metric_requested_field = makeStringValue(
+      (metricAdapter as any).requestedFieldType,
+      "pipeline.warp.metricAdapter.requestedFieldType",
+      false,
+    );
+    values.metric_chart_notes = makeStringValue(
+      chart.notes,
+      "pipeline.warp.metricAdapter.chart.notes",
+      contractProxy,
+    );
+    values.metric_coordinate_map = makeStringValue(
+      chart.coordinateMap,
+      "pipeline.warp.metricAdapter.chart.coordinateMap",
+      contractProxy,
+    );
+
+    values.metric_alpha = makeDerivedNumber(
+      toFiniteNumber((metricAdapter as any).alpha),
+      "1",
+      "pipeline.warp.metricAdapter.alpha",
+      false,
+    );
+    const gammaDiag = (metricAdapter as any).gammaDiag;
+    if (Array.isArray(gammaDiag) && gammaDiag.length >= 3) {
+      values.metric_gamma_xx = makeDerivedNumber(
+        toFiniteNumber(gammaDiag[0]),
+        "1",
+        "pipeline.warp.metricAdapter.gammaDiag[0]",
+        false,
+      );
+      values.metric_gamma_yy = makeDerivedNumber(
+        toFiniteNumber(gammaDiag[1]),
+        "1",
+        "pipeline.warp.metricAdapter.gammaDiag[1]",
+        false,
+      );
+      values.metric_gamma_zz = makeDerivedNumber(
+        toFiniteNumber(gammaDiag[2]),
+        "1",
+        "pipeline.warp.metricAdapter.gammaDiag[2]",
+        false,
+      );
+    }
+
+    values.metric_beta_method = makeStringValue(
+      betaMethod,
+      "pipeline.warp.metricAdapter.betaDiagnostics.method",
+      betaProxy,
+    );
+    values.metric_beta_theta_max = makeDerivedNumber(
+      toFiniteNumber(beta.thetaMax),
+      "1/m",
+      "pipeline.warp.metricAdapter.betaDiagnostics.thetaMax",
+      betaProxy,
+    );
+    values.metric_beta_theta_rms = makeDerivedNumber(
+      toFiniteNumber(beta.thetaRms),
+      "1/m",
+      "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms",
+      betaProxy,
+    );
+    values.metric_beta_curl_max = makeDerivedNumber(
+      toFiniteNumber(beta.curlMax),
+      "1/m",
+      "pipeline.warp.metricAdapter.betaDiagnostics.curlMax",
+      betaProxy,
+    );
+    values.metric_beta_curl_rms = makeDerivedNumber(
+      toFiniteNumber(beta.curlRms),
+      "1/m",
+      "pipeline.warp.metricAdapter.betaDiagnostics.curlRms",
+      betaProxy,
+    );
+    values.metric_beta_theta_conformal_max = makeDerivedNumber(
+      toFiniteNumber(beta.thetaConformalMax),
+      "1/m",
+      "pipeline.warp.metricAdapter.betaDiagnostics.thetaConformalMax",
+      betaProxy,
+    );
+    values.metric_beta_theta_conformal_rms = makeDerivedNumber(
+      toFiniteNumber(beta.thetaConformalRms),
+      "1/m",
+      "pipeline.warp.metricAdapter.betaDiagnostics.thetaConformalRms",
+      betaProxy,
+    );
+    values.metric_beta_bprime_over_b_max = makeDerivedNumber(
+      toFiniteNumber(beta.bPrimeOverBMax),
+      "1/m",
+      "pipeline.warp.metricAdapter.betaDiagnostics.bPrimeOverBMax",
+      betaProxy,
+    );
+    values.metric_beta_bdouble_over_b_max = makeDerivedNumber(
+      toFiniteNumber(beta.bDoubleOverBMax),
+      "1/m^2",
+      "pipeline.warp.metricAdapter.betaDiagnostics.bDoubleOverBMax",
+      betaProxy,
+    );
+    values.metric_beta_sample_count = makeDerivedNumber(
+      toFiniteNumber(beta.sampleCount),
+      "1",
+      "pipeline.warp.metricAdapter.betaDiagnostics.sampleCount",
+      betaProxy,
+    );
+    values.metric_beta_step_m = makeDerivedNumber(
+      toFiniteNumber(beta.step_m),
+      "m",
+      "pipeline.warp.metricAdapter.betaDiagnostics.step_m",
+      betaProxy,
+    );
+    values.metric_beta_note = makeStringValue(
+      beta.note,
+      "pipeline.warp.metricAdapter.betaDiagnostics.note",
+      betaProxy,
+    );
+  }
 
   values.U_static_J = makeValue(
     resolveNumber([{ value: state.U_static, source: "pipeline.U_static" }]),
@@ -475,6 +1588,90 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     "1",
   );
 
+  const warpStress = (state as any).warp?.stressEnergyTensor ?? (state as any).stressEnergy;
+  values.warp_t00_avg = makeValue(
+    resolveNumber([
+      { value: warpStress?.T00, source: "pipeline.warp.stressEnergyTensor.T00" },
+      { value: (state as any).stressEnergy?.T00, source: "pipeline.stressEnergy.T00", proxy: true },
+    ]),
+    "J/m^3",
+  );
+  values.warp_t11_avg = makeValue(
+    resolveNumber([
+      { value: warpStress?.T11, source: "pipeline.warp.stressEnergyTensor.T11" },
+      { value: (state as any).stressEnergy?.T11, source: "pipeline.stressEnergy.T11", proxy: true },
+    ]),
+    "J/m^3",
+  );
+  values.warp_t22_avg = makeValue(
+    resolveNumber([
+      { value: warpStress?.T22, source: "pipeline.warp.stressEnergyTensor.T22" },
+      { value: (state as any).stressEnergy?.T22, source: "pipeline.stressEnergy.T22", proxy: true },
+    ]),
+    "J/m^3",
+  );
+  values.warp_t33_avg = makeValue(
+    resolveNumber([
+      { value: warpStress?.T33, source: "pipeline.warp.stressEnergyTensor.T33" },
+      { value: (state as any).stressEnergy?.T33, source: "pipeline.stressEnergy.T33", proxy: true },
+    ]),
+    "J/m^3",
+  );
+  const curvatureMetricMode =
+    warpMetricSourceRaw === "metric" && warpMetricT00Raw != null;
+  const curvatureMetaSource = curvatureMetricMode
+    ? "metric"
+    : state
+      ? "pipeline"
+      : "unknown";
+  const curvatureMetaCongruence = curvatureMetricMode
+    ? "conditional"
+    : "proxy-only";
+  const curvatureMetaProxy = curvatureMetaCongruence !== "geometry-derived";
+  values.curvature_meta_source = makeStringValue(
+    curvatureMetaSource,
+    "derived:curvature_meta_source",
+    curvatureMetaProxy,
+  );
+  values.curvature_meta_congruence = makeStringValue(
+    curvatureMetaCongruence,
+    "derived:curvature_meta_congruence",
+    curvatureMetaProxy,
+  );
+  values.curvature_meta_proxy = {
+    value: curvatureMetaProxy,
+    source: "derived:curvature_meta_proxy",
+    proxy: false,
+  };
+
+  const stressSourceRaw =
+    (state as any)?.warp?.stressEnergySource ??
+    (state as any)?.stressEnergySource;
+  const stressMetaSource = stressSourceRaw === "metric"
+    ? "metric"
+    : state
+      ? "pipeline"
+      : "unknown";
+  const stressMetaCongruence = stressMetaSource === "metric"
+    ? "conditional"
+    : "proxy-only";
+  const stressMetaProxy = stressMetaCongruence !== "geometry-derived";
+  values.stress_meta_source = makeStringValue(
+    stressMetaSource,
+    "derived:stress_meta_source",
+    stressMetaProxy,
+  );
+  values.stress_meta_congruence = makeStringValue(
+    stressMetaCongruence,
+    "derived:stress_meta_congruence",
+    stressMetaProxy,
+  );
+  values.stress_meta_proxy = {
+    value: stressMetaProxy,
+    source: "derived:stress_meta_proxy",
+    proxy: false,
+  };
+
   values.vdb_limit = makeValue(
     resolveNumber([
       { value: state.gammaVanDenBroeckGuard?.limit, source: "pipeline.gammaVanDenBroeckGuard.limit" },
@@ -509,6 +1706,153 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
       source: "pipeline.gammaVanDenBroeckGuard.reason",
       proxy: false,
     };
+  }
+
+  const vdbRegion = state.vdbRegionII;
+  values.vdb_region_ii_alpha = makeValue(
+    resolveNumber([{ value: vdbRegion?.alpha, source: "pipeline.vdbRegionII.alpha" }]),
+    "1",
+  );
+  values.vdb_region_ii_n = makeValue(
+    resolveNumber([{ value: vdbRegion?.n, source: "pipeline.vdbRegionII.n" }]),
+    "1",
+  );
+  values.vdb_region_ii_r_tilde_m = makeValue(
+    resolveNumber([{ value: vdbRegion?.r_tilde_m, source: "pipeline.vdbRegionII.r_tilde_m" }]),
+    "m",
+  );
+  values.vdb_region_ii_delta_tilde_m = makeValue(
+    resolveNumber([{ value: vdbRegion?.delta_tilde_m, source: "pipeline.vdbRegionII.delta_tilde_m" }]),
+    "m",
+  );
+  const vdbBprimeMaxAbs = Number.isFinite(vdbRegion?.bprime_min) || Number.isFinite(vdbRegion?.bprime_max)
+    ? Math.max(Math.abs(Number(vdbRegion?.bprime_min ?? 0)), Math.abs(Number(vdbRegion?.bprime_max ?? 0)))
+    : undefined;
+  const vdbBdoubleMaxAbs = Number.isFinite(vdbRegion?.bdouble_min) || Number.isFinite(vdbRegion?.bdouble_max)
+    ? Math.max(Math.abs(Number(vdbRegion?.bdouble_min ?? 0)), Math.abs(Number(vdbRegion?.bdouble_max ?? 0)))
+    : undefined;
+  values.vdb_region_ii_bprime_max_abs = makeValue(
+    resolveNumber([
+      { value: vdbBprimeMaxAbs, source: "pipeline.vdbRegionII.bprime_max_abs" },
+    ]),
+    "1/m",
+  );
+  values.vdb_region_ii_bdouble_max_abs = makeValue(
+    resolveNumber([
+      { value: vdbBdoubleMaxAbs, source: "pipeline.vdbRegionII.bdouble_max_abs" },
+    ]),
+    "1/m^2",
+  );
+  values.vdb_region_ii_t00_min = makeValue(
+    resolveNumber([{ value: vdbRegion?.t00_min, source: "pipeline.vdbRegionII.t00_min" }]),
+    "J/m^3",
+  );
+  values.vdb_region_ii_t00_max = makeValue(
+    resolveNumber([{ value: vdbRegion?.t00_max, source: "pipeline.vdbRegionII.t00_max" }]),
+    "J/m^3",
+  );
+  values.vdb_region_ii_t00_mean = makeValue(
+    resolveNumber([{ value: vdbRegion?.t00_mean, source: "pipeline.vdbRegionII.t00_mean" }]),
+    "J/m^3",
+  );
+  values.vdb_region_ii_sample_count = makeValue(
+    resolveNumber([{ value: vdbRegion?.sampleCount, source: "pipeline.vdbRegionII.sampleCount" }]),
+    "1",
+  );
+  values.vdb_region_ii_support = resolveBoolean(
+    vdbRegion?.support,
+    "pipeline.vdbRegionII.support",
+  );
+  values.vdb_region_ii_derivative_support = resolveBoolean(
+    (state as any).vdb_region_ii_derivative_support,
+    "pipeline.vdb_region_ii_derivative_support",
+  );
+  if (vdbRegion?.note) {
+    values.vdb_region_ii_note = {
+      value: vdbRegion.note,
+      source: "pipeline.vdbRegionII.note",
+      proxy: false,
+    };
+  }
+
+  const vdbRegionIV = state.vdbRegionIV;
+  values.vdb_region_iv_R_m = makeValue(
+    resolveNumber([{ value: vdbRegionIV?.R_m, source: "pipeline.vdbRegionIV.R_m" }]),
+    "m",
+  );
+  values.vdb_region_iv_sigma = makeValue(
+    resolveNumber([{ value: vdbRegionIV?.sigma, source: "pipeline.vdbRegionIV.sigma" }]),
+    "1",
+  );
+  values.vdb_region_iv_dfdr_max_abs = makeValue(
+    resolveNumber([{ value: vdbRegionIV?.dfdr_max_abs, source: "pipeline.vdbRegionIV.dfdr_max_abs" }]),
+    "1/m",
+  );
+  values.vdb_region_iv_dfdr_rms = makeValue(
+    resolveNumber([{ value: vdbRegionIV?.dfdr_rms, source: "pipeline.vdbRegionIV.dfdr_rms" }]),
+    "1/m",
+  );
+  values.vdb_region_iv_t00_min = makeValue(
+    resolveNumber([{ value: vdbRegionIV?.t00_min, source: "pipeline.vdbRegionIV.t00_min" }]),
+    "J/m^3",
+  );
+  values.vdb_region_iv_t00_max = makeValue(
+    resolveNumber([{ value: vdbRegionIV?.t00_max, source: "pipeline.vdbRegionIV.t00_max" }]),
+    "J/m^3",
+  );
+  values.vdb_region_iv_t00_mean = makeValue(
+    resolveNumber([{ value: vdbRegionIV?.t00_mean, source: "pipeline.vdbRegionIV.t00_mean" }]),
+    "J/m^3",
+  );
+  values.vdb_region_iv_k_trace_mean = makeValue(
+    resolveNumber([{ value: vdbRegionIV?.k_trace_mean, source: "pipeline.vdbRegionIV.k_trace_mean" }]),
+    "1/m",
+  );
+  values.vdb_region_iv_k_squared_mean = makeValue(
+    resolveNumber([{ value: vdbRegionIV?.k_squared_mean, source: "pipeline.vdbRegionIV.k_squared_mean" }]),
+    "1/m^2",
+  );
+  values.vdb_region_iv_sample_count = makeValue(
+    resolveNumber([{ value: vdbRegionIV?.sampleCount, source: "pipeline.vdbRegionIV.sampleCount" }]),
+    "1",
+  );
+  values.vdb_region_iv_support = resolveBoolean(
+    vdbRegionIV?.support,
+    "pipeline.vdbRegionIV.support",
+  );
+  values.vdb_region_iv_derivative_support = resolveBoolean(
+    (state as any).vdb_region_iv_derivative_support,
+    "pipeline.vdb_region_iv_derivative_support",
+  );
+  if (vdbRegionIV?.note) {
+    values.vdb_region_iv_note = {
+      value: vdbRegionIV.note,
+      source: "pipeline.vdbRegionIV.note",
+      proxy: false,
+    };
+  }
+
+  const vdbTwoWall =
+    vdbRegion?.support === true && vdbRegionIV?.support === true;
+  values.vdb_two_wall_support = resolveBoolean(
+    vdbTwoWall,
+    "derived:vdb_two_wall_support",
+  );
+  values.vdb_two_wall_derivative_support = resolveBoolean(
+    (state as any).vdb_two_wall_derivative_support,
+    "pipeline.vdb_two_wall_derivative_support",
+  );
+  if (vdbRegion || vdbRegionIV) {
+    const missing: string[] = [];
+    if (!vdbRegion?.support) missing.push("region II");
+    if (!vdbRegionIV?.support) missing.push("region IV");
+    if (missing.length) {
+      values.vdb_two_wall_note = {
+        value: `Missing support in ${missing.join(" + ")}.`,
+        source: "derived:vdb_two_wall_note",
+        proxy: false,
+      };
+    }
   }
 
   const mech = (state as any).mechanical ?? {};
@@ -590,6 +1934,11 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
   values.mechanical_safety_feasible = resolveBoolean(
     mech.safetyFeasible,
     "pipeline.mechanical.safetyFeasible",
+  );
+  values.mechanical_note = makeStringValue(
+    typeof mech.note === "string" ? mech.note : null,
+    "pipeline.mechanical.note",
+    typeof mech.note !== "string",
   );
 
   if (state.qiInterest) {

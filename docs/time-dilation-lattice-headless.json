@@ -1,0 +1,128 @@
+{
+  "kind": "time_dilation_headless",
+  "captured_at": "2026-02-11T07:07:37.651Z",
+  "strict": {
+    "strictCongruence": true,
+    "latticeMetricOnly": true,
+    "strictMetricMissing": false,
+    "anyProxy": false,
+    "mathStageOK": true,
+    "grCertified": true,
+    "banner": "CERTIFIED"
+  },
+  "canonical": {
+    "family": "natario",
+    "chart": "comoving_cartesian",
+    "observer": "eulerian_n",
+    "normalization": "si_stress",
+    "unitSystem": "SI",
+    "match": "true"
+  },
+  "metric_contract": {
+    "metric_t00_contract_ok": true,
+    "metric_chart_contract_status": "ok",
+    "metric_chart_notes": "bubble-centered chart; dt gamma assumed zero",
+    "metric_coordinate_map": "bubble-centered coordinates"
+  },
+  "render_plan": {
+    "mode": "natario",
+    "flags": {
+      "hasHull": true,
+      "hasGrBrick": true,
+      "grCertified": true,
+      "anyProxy": false,
+      "mathStageOK": true,
+      "solverStatus": "CERTIFIED",
+      "exploratoryOverride": false,
+      "cinematicOverride": false,
+      "natarioGeometryWarp": true,
+      "wallDetected": true,
+      "wallSource": "ricci4"
+    },
+    "sourceForAlpha": "gr-brick",
+    "sourceForBeta": "gr-brick",
+    "sourceForTheta": "gr-brick",
+    "sourceForClockRate": "gr-brick",
+    "enableGeometryWarp": true,
+    "geomWarpScale": 0.75,
+    "betaWarpWeight": 0.85,
+    "thetaWarpWeight": 0.7,
+    "shearWeight": 0.175,
+    "metricBlend": 0.225,
+    "warpCap": 0.19999999999999998,
+    "normalization": {
+      "beta": {
+        "mode": "percentile",
+        "scale": 0.5,
+        "percentile": 0.98,
+        "baseScale": 1
+      },
+      "theta": {
+        "mode": "missing",
+        "scale": 0,
+        "percentile": null,
+        "baseScale": 0
+      },
+      "gamma": {
+        "mode": "percentile",
+        "scale": 0.5,
+        "percentile": 0.98,
+        "baseScale": 1
+      },
+      "shear": {
+        "mode": "percentile",
+        "scale": 0.5,
+        "percentile": 0.98,
+        "baseScale": 1
+      }
+    },
+    "banner": "CERTIFIED",
+    "reasons": []
+  },
+  "sources": {
+    "proof_pack_proxy": true,
+    "gr_guardrails_proxy": false
+  },
+  "wall": {
+    "source": "ricci4",
+    "detected": true,
+    "p98": 1.0967947159490787e-22,
+    "threshold": 2.741986789872697e-23,
+    "bandMin": 2.1935894318981575e-23,
+    "bandMax": 3.290384147847236e-23,
+    "sampleCount": 53530,
+    "voxelCount": 30,
+    "voxelFraction": 0.00008006191454724988,
+    "center": [
+      -273.01996699669957,
+      -3.789561257387201e-15,
+      0
+    ],
+    "radiusMin": 119.47076046312762,
+    "radiusMax": 230.7849916113257,
+    "radiusMean": 161.03171865145544,
+    "thickness": 111.31423114819808,
+    "wallFraction": 0.25,
+    "bandFraction": 0.2
+  },
+  "gr": {
+    "dims": [
+      202,
+      53,
+      35
+    ],
+    "meta": {
+      "status": "CERTIFIED",
+      "reasons": []
+    },
+    "solverHealth": {
+      "status": "CERTIFIED",
+      "reasons": [],
+      "alphaClampFraction": 0,
+      "kClampFraction": 0,
+      "totalClampFraction": 0,
+      "maxAlphaBeforeClamp": 1,
+      "maxKBeforeClamp": 0
+    }
+  }
+}

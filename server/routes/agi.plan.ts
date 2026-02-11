@@ -75,6 +75,10 @@ import {
 } from "../skills/noise.gen.fingerprint";
 import { badgeTelemetryHandler, badgeTelemetrySpec } from "../skills/telemetry.badges";
 import { panelSnapshotHandler, panelSnapshotSpec } from "../skills/telemetry.panels";
+import {
+  timeDilationActivateHandler,
+  timeDilationActivateSpec,
+} from "../skills/telemetry.time_dilation.activate";
 import { sttWhisperHandler, sttWhisperSpec } from "../skills/stt.whisper";
 import { readmeHandler, readmeSpec } from "../skills/docs.readme";
 import { essenceMixHandler, essenceMixSpec } from "../skills/essence.mix";
@@ -162,6 +166,7 @@ import {
 } from "../services/helix-ask/math";
 import {
   resolveHelixAskGraphPack,
+  type HelixAskCongruenceWalkOverride,
   type HelixAskGraphEvidence,
   type HelixAskGraphPack,
 } from "../services/helix-ask/graph-resolver";
@@ -13070,6 +13075,9 @@ async function ensureDefaultTools(): Promise<void> {
   if (!getTool(badgeTelemetrySpec.name)) {
     registerTool({ ...badgeTelemetrySpec, handler: badgeTelemetryHandler });
   }
+  if (!getTool(timeDilationActivateSpec.name)) {
+    registerTool({ ...timeDilationActivateSpec, handler: timeDilationActivateHandler });
+  }
   if (process.env.ENABLE_DEBATE === "1") {
     if (!getTool(debateRunSpec.name)) {
       registerTool({ ...debateRunSpec, handler: debateRunHandler });
@@ -14156,6 +14164,8 @@ const executeHelixAsk = async ({
         requested?: string[];
         applied?: string[];
       };
+      graph_congruence_region?: Record<string, boolean>;
+      graph_congruence_chart?: string;
       graph_framework?: {
         primary?: string;
         locked?: string[];
@@ -14165,7 +14175,40 @@ const executeHelixAsk = async ({
           nodes: string[];
           source: string;
           score?: number | null;
+          congruence?: {
+            inventory?: {
+              nodesCount: number;
+              evaluatedEdges: number;
+              blockedLinkCount: number;
+            };
+            allowedEdges?: number;
+            blockedEdges?: number;
+            resolvedInTreeEdges?: number;
+            resolvedCrossTreeEdges?: number;
+            blockedByReason?: Record<string, number>;
+            blockedByCondition?: Record<string, number>;
+            strictSignals?: Record<string, boolean>;
+          } | null;
         }>;
+      };
+      graph_congruence_diagnostics?: {
+        treeCount: number;
+        allowedEdges: number;
+        blockedEdges: number;
+        resolvedInTreeEdges: number;
+        resolvedCrossTreeEdges: number;
+        blockedByReason: Record<string, number>;
+        blockedByCondition: Record<string, number>;
+        strictSignals: {
+          B_equals_1: boolean;
+          qi_metric_derived_equals_true: boolean;
+          qi_strict_ok_equals_true: boolean;
+          theta_geom_equals_true: boolean;
+          vdb_two_wall_support_equals_true: boolean;
+          ts_metric_derived_equals_true: boolean;
+          cl3_metric_t00_available_equals_true: boolean;
+          cl3_rho_gate_equals_true: boolean;
+        };
       };
       graph_framework_applied?: boolean;
       graph_hint_terms?: string[];
@@ -16231,11 +16274,107 @@ const executeHelixAsk = async ({
         debugPayload.topic_must_include_files = topicProfile.mustIncludeFiles?.slice();
       }
     }
+    const strictCongruenceEnabled =
+      String(process.env.WARP_STRICT_CONGRUENCE ?? "1").trim() !== "0";
+    const isMetricQiRhoSource = (value: unknown): boolean =>
+      typeof value === "string" &&
+      (value.startsWith("warp.metric") ||
+        value.startsWith("gr.metric") ||
+        value.startsWith("gr.rho_constraint"));
+    const resolveGraphCongruenceWalkOverride = (): HelixAskCongruenceWalkOverride => {
+      const state = getGlobalPipelineState() as any;
+      const asFiniteNumber = (value: unknown): number | null => {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : null;
+      };
+      const cl3ThresholdFallback = (() => {
+        const parsed = Number(process.env.WARP_CL3_RHO_DELTA_MAX);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 0.1;
+      })();
+      const metricBeta = state?.warp?.metricAdapter?.betaDiagnostics;
+      const thetaCandidate = metricBeta?.thetaMax ?? metricBeta?.thetaRms;
+      const thetaGeom = Number.isFinite(thetaCandidate as number)
+        ? Number(thetaCandidate)
+        : null;
+      const thetaGeomProxy = metricBeta?.method === "not-computed";
+      const thetaGeomUsable = thetaGeom != null && !thetaGeomProxy;
+      const qiRhoSource =
+        typeof state?.qiGuardrail?.rhoSource === "string"
+          ? String(state.qiGuardrail.rhoSource)
+          : null;
+      const qiMetricDerivedFromGuard =
+        typeof state?.qiGuardrail?.metricDerived === "boolean"
+          ? Boolean(state.qiGuardrail.metricDerived)
+          : null;
+      const qiMetricDerived =
+        qiMetricDerivedFromGuard != null
+          ? qiMetricDerivedFromGuard
+          : isMetricQiRhoSource(qiRhoSource);
+      const qiStrictOk = strictCongruenceEnabled
+        ? qiMetricDerived
+        : true;
+      const vdbTwoWallSupport =
+        state?.vdbRegionII?.support === true &&
+        state?.vdbRegionIV?.support === true;
+      const tsMetricDerived = Boolean(
+        state?.tsMetricDerived === true ||
+          state?.clocking?.metricDerived === true ||
+          state?.ts?.metricDerived === true,
+      );
+      const metricT00Source =
+        typeof state?.warp?.metricT00Source === "string"
+          ? String(state.warp.metricT00Source)
+          : null;
+      const metricT00Available =
+        (metricT00Source === "metric" &&
+          asFiniteNumber(state?.warp?.metricT00) != null) ||
+        (state?.vdbRegionII?.support === true &&
+          asFiniteNumber(state?.vdbRegionII?.t00_mean) != null) ||
+        asFiniteNumber(state?.warpViability?.snapshot?.rho_delta_metric_mean) != null;
+      const viabilityConstraints = Array.isArray(state?.warpViability?.constraints)
+        ? (state.warpViability.constraints as Array<{ id?: unknown; passed?: unknown }>)
+        : [];
+      const cl3Constraint = viabilityConstraints.find(
+        (constraint) =>
+          constraint &&
+          typeof constraint.id === "string" &&
+          constraint.id === "CL3_RhoDelta",
+      );
+      const cl3RhoDelta =
+        asFiniteNumber(state?.warpViability?.snapshot?.rho_delta_mean) ??
+        asFiniteNumber(state?.gr?.constraints?.rho_constraint?.deltaMean);
+      const cl3RhoThreshold =
+        asFiniteNumber(state?.warpViability?.snapshot?.rho_delta_threshold) ??
+        cl3ThresholdFallback;
+      const cl3RhoGate =
+        typeof cl3Constraint?.passed === "boolean"
+          ? cl3Constraint.passed
+          : cl3RhoDelta != null && cl3RhoDelta <= cl3RhoThreshold;
+      const chartLabel =
+        typeof state?.warp?.metricAdapter?.chart?.label === "string"
+          ? (state.warp.metricAdapter.chart.label as string)
+          : undefined;
+      return {
+        ...(chartLabel ? { chart: chartLabel } : {}),
+        region: {
+          B_equals_1: true,
+          qi_metric_derived_equals_true: qiMetricDerived,
+          qi_strict_ok_equals_true: qiStrictOk,
+          theta_geom_equals_true: thetaGeomUsable,
+          vdb_two_wall_support_equals_true: vdbTwoWallSupport,
+          ts_metric_derived_equals_true: tsMetricDerived,
+          cl3_metric_t00_available_equals_true: metricT00Available,
+          cl3_rho_gate_equals_true: cl3RhoGate,
+        },
+      };
+    };
+    const graphCongruenceWalkOverride = resolveGraphCongruenceWalkOverride();
     graphPack = resolveHelixAskGraphPack({
       question: baseQuestion,
       topicTags,
       conceptMatch,
       lockedTreeIds: graphTreeLock.length > 0 ? graphTreeLock : undefined,
+      congruenceWalkOverride: graphCongruenceWalkOverride,
     });
     graphResolverPreferred = Boolean(graphPack?.preferGraph);
     graphHintTerms = collectGraphHintTerms(graphPack);
@@ -16245,6 +16384,10 @@ const executeHelixAsk = async ({
         requested: graphTreeLock.length > 0 ? graphTreeLock.slice() : [],
         applied: graphPack?.treeIds ?? [],
       };
+      debugPayload.graph_congruence_region = graphCongruenceWalkOverride.region;
+      if (graphCongruenceWalkOverride.chart) {
+        debugPayload.graph_congruence_chart = graphCongruenceWalkOverride.chart;
+      }
     }
     if (graphPack) {
       const treeCount = graphPack.frameworks.length;
@@ -16262,16 +16405,64 @@ const executeHelixAsk = async ({
         .join(" | ");
       logEvent("Graph pack", "resolved", graphDetail);
       if (debugPayload) {
+        const frameworkTrees = graphPack.frameworks.map((framework) => ({
+          tree: framework.treeId,
+          anchors: framework.anchors.map((node) => node.id),
+          nodes: framework.path.map((node) => node.id),
+          source: framework.sourcePath,
+          score: framework.rankScore ?? null,
+          congruence: framework.congruenceDiagnostics ?? null,
+        }));
+        const blockedByReasonTotal: Record<string, number> = {};
+        const blockedByConditionTotal: Record<string, number> = {};
+        let allowedEdgesTotal = 0;
+        let blockedEdgesTotal = 0;
+        let resolvedInTreeEdgesTotal = 0;
+        let resolvedCrossTreeEdgesTotal = 0;
+        for (const framework of graphPack.frameworks) {
+          const diagnostics = framework.congruenceDiagnostics;
+          if (!diagnostics) continue;
+          allowedEdgesTotal += diagnostics.allowedEdges ?? 0;
+          blockedEdgesTotal += diagnostics.blockedEdges ?? 0;
+          resolvedInTreeEdgesTotal += diagnostics.resolvedInTreeEdges ?? 0;
+          resolvedCrossTreeEdgesTotal += diagnostics.resolvedCrossTreeEdges ?? 0;
+          for (const [reason, count] of Object.entries(diagnostics.blockedByReason ?? {})) {
+            blockedByReasonTotal[reason] = (blockedByReasonTotal[reason] ?? 0) + Number(count || 0);
+          }
+          for (const [condition, count] of Object.entries(diagnostics.blockedByCondition ?? {})) {
+            blockedByConditionTotal[condition] =
+              (blockedByConditionTotal[condition] ?? 0) + Number(count || 0);
+          }
+        }
         debugPayload.graph_framework = {
           primary: graphPack.primaryTreeId,
           locked: graphTreeLock.length > 0 ? graphTreeLock : undefined,
-          trees: graphPack.frameworks.map((framework) => ({
-            tree: framework.treeId,
-            anchors: framework.anchors.map((node) => node.id),
-            nodes: framework.path.map((node) => node.id),
-            source: framework.sourcePath,
-            score: framework.rankScore ?? null,
-          })),
+          trees: frameworkTrees,
+        };
+        debugPayload.graph_congruence_diagnostics = {
+          treeCount: graphPack.frameworks.length,
+          allowedEdges: allowedEdgesTotal,
+          blockedEdges: blockedEdgesTotal,
+          resolvedInTreeEdges: resolvedInTreeEdgesTotal,
+          resolvedCrossTreeEdges: resolvedCrossTreeEdgesTotal,
+          blockedByReason: blockedByReasonTotal,
+          blockedByCondition: blockedByConditionTotal,
+          strictSignals: {
+            B_equals_1: graphCongruenceWalkOverride.region?.B_equals_1 === true,
+            qi_metric_derived_equals_true:
+              graphCongruenceWalkOverride.region?.qi_metric_derived_equals_true === true,
+            qi_strict_ok_equals_true:
+              graphCongruenceWalkOverride.region?.qi_strict_ok_equals_true === true,
+            theta_geom_equals_true: graphCongruenceWalkOverride.region?.theta_geom_equals_true === true,
+            vdb_two_wall_support_equals_true:
+              graphCongruenceWalkOverride.region?.vdb_two_wall_support_equals_true === true,
+            ts_metric_derived_equals_true:
+              graphCongruenceWalkOverride.region?.ts_metric_derived_equals_true === true,
+            cl3_metric_t00_available_equals_true:
+              graphCongruenceWalkOverride.region?.cl3_metric_t00_available_equals_true === true,
+            cl3_rho_gate_equals_true:
+              graphCongruenceWalkOverride.region?.cl3_rho_gate_equals_true === true,
+          },
         };
       }
       if (debugPayload) {
@@ -21938,7 +22129,11 @@ planRouter.post("/plan", async (req, res) => {
     .join(" ");
   const selectedTool = selectToolForGoal(chooserText || goal, manifest);
   // Telemetry tools don't need knowledge context; skip to avoid unnecessary sync/corpus fetch.
-  const telemetryTools = new Set(["telemetry.badges.read", "telemetry.panels.snapshot"]);
+  const telemetryTools = new Set([
+    "telemetry.badges.read",
+    "telemetry.panels.snapshot",
+    "telemetry.time_dilation.activate_natario",
+  ]);
   if (telemetryTools.has(selectedTool)) {
     baseKnowledgeContext = undefined;
     requestedProjects.length = 0;

@@ -35,6 +35,13 @@ export interface CurvatureBrickDecoded {
   emaAlpha?: number;
   residualMin?: number;
   residualMax?: number;
+  meta?: {
+    source?: "pipeline" | "metric" | "unknown";
+    proxy?: boolean;
+    congruence?: "proxy-only" | "geometry-derived" | "conditional";
+    kScale?: number;
+    kScaleSource?: string;
+  };
 }
 
 const BRICK_FORMAT = "raw";
@@ -96,6 +103,16 @@ const decodeCurvatureBrickBinary = (buffer: ArrayBuffer): CurvatureBrickDecoded 
   const emaAlpha = Number(header.emaAlpha);
   const residualMin = Number(header.residualMin);
   const residualMax = Number(header.residualMax);
+  const meta =
+    header && typeof header === "object"
+      ? {
+          source: header.source as "pipeline" | "metric" | "unknown" | undefined,
+          proxy: typeof header.proxy === "boolean" ? header.proxy : undefined,
+          congruence: header.congruence as "proxy-only" | "geometry-derived" | "conditional" | undefined,
+          kScale: Number.isFinite(Number(header.kScale)) ? Number(header.kScale) : undefined,
+          kScaleSource: typeof header.kScaleSource === "string" ? header.kScaleSource : undefined,
+        }
+      : undefined;
   return {
     dims: [Number(dims[0]), Number(dims[1]), Number(dims[2])],
     data,
@@ -107,6 +124,7 @@ const decodeCurvatureBrickBinary = (buffer: ArrayBuffer): CurvatureBrickDecoded 
     emaAlpha: Number.isFinite(emaAlpha) ? emaAlpha : undefined,
     residualMin: Number.isFinite(residualMin) ? residualMin : undefined,
     residualMax: Number.isFinite(residualMax) ? residualMax : undefined,
+    meta,
   };
 };
 
@@ -191,6 +209,15 @@ export async function fetchCurvatureBrick(request: CurvatureBrickRequest, signal
   const emaAlphaRaw = Number(json.emaAlpha);
   const residualMinRaw = Number(json.residualMin);
   const residualMaxRaw = Number(json.residualMax);
+  const meta = json
+    ? {
+        source: json.source as "pipeline" | "metric" | "unknown" | undefined,
+        proxy: typeof json.proxy === "boolean" ? json.proxy : undefined,
+        congruence: json.congruence as "proxy-only" | "geometry-derived" | "conditional" | undefined,
+        kScale: Number.isFinite(Number(json.kScale)) ? Number(json.kScale) : undefined,
+        kScaleSource: typeof json.kScaleSource === "string" ? json.kScaleSource : undefined,
+      }
+    : undefined;
   return {
     dims: [dims[0], dims[1], dims[2]],
     data,
@@ -202,5 +229,6 @@ export async function fetchCurvatureBrick(request: CurvatureBrickRequest, signal
     emaAlpha: Number.isFinite(emaAlphaRaw) ? emaAlphaRaw : undefined,
     residualMin: Number.isFinite(residualMinRaw) ? residualMinRaw : undefined,
     residualMax: Number.isFinite(residualMaxRaw) ? residualMaxRaw : undefined,
+    meta,
   };
 }

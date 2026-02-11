@@ -25,8 +25,10 @@ import { SUB_THRESHOLD_MARGIN, RHO_CUTOFF } from "@/lib/parametric-sweep";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { useProofPack } from "@/hooks/useProofPack";
 import { useMathStageGate } from "@/hooks/useMathStageGate";
+import { useGrConstraintContract } from "@/hooks/useGrConstraintContract";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useCurvatureBrick } from "@/hooks/useCurvatureBrick";
+import { buildCongruenceBadge, resolveCongruenceMeta } from "@/lib/congruence-meta";
 import { useCycleLedger, LEDGER_GUARD_THRESHOLD } from "@/hooks/useCycleLedger";
 import { useNavPoseStore } from "@/store/useNavPoseStore";
 import { computeLaplaceRungeLenz, type LaplaceRungeLenzMeasure } from "@/physics/alcubierre";
@@ -42,7 +44,10 @@ import { HELIX_DEV_MOCK_EVENT, getDevMockStatus, type DevMockStatus } from "@/li
 import {
   PROOF_PACK_STAGE_REQUIREMENTS,
   getProofValue,
-  readProofNumber,
+  readProofBooleanStrict,
+  readProofNumberStrict,
+  readProofStringStrict,
+  isStrictProofPack,
 } from "@/lib/proof-pack";
 import { STAGE_BADGE, STAGE_LABELS } from "@/lib/math-stage-gate";
 
@@ -311,12 +316,32 @@ const firstFinite = (...values: Array<unknown>): number => {
 
 };
 
-const renderProxyBadge = (active?: boolean) =>
+const renderProxyBadge = (active?: boolean, strict?: boolean) =>
   active ? (
-    <Badge className="ml-2 px-2 py-0.5 text-[10px] leading-tight bg-slate-800 text-slate-300">
-      PROXY
+    <Badge
+      className={cn(
+        "ml-2 px-2 py-0.5 text-[10px] leading-tight",
+        strict
+          ? "bg-rose-500/20 text-rose-100 border border-rose-500/40"
+          : "bg-slate-800 text-slate-300",
+      )}
+    >
+      {strict ? "NON-ADMISSIBLE" : "PROXY"}
     </Badge>
   ) : null;
+
+type ContractGuardrailStatus = "ok" | "fail" | "proxy" | "missing";
+
+const contractSummaryClass = (statuses: ContractGuardrailStatus[] | null) => {
+  if (!statuses) return "border-slate-600 bg-slate-900/70 text-slate-200";
+  if (statuses.some((status) => status === "fail" || status === "missing")) {
+    return "border-rose-500/40 bg-rose-500/10 text-rose-200";
+  }
+  if (statuses.some((status) => status === "proxy")) {
+    return "border-amber-500/40 bg-amber-500/10 text-amber-200";
+  }
+  return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
+};
 
 const useHelixDevMockStatus = (): DevMockStatus => {
   const [status, setStatus] = useState<DevMockStatus>(() => getDevMockStatus());
@@ -1195,15 +1220,40 @@ function computeCurvatureProxy(pipeline: any, dEff: number) {
 
 export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = {}) {
   const { data: pipeline, sweepResults } = useEnergyPipeline({ refetchInterval: 1500 });
+  const contractQuery = useGrConstraintContract({ enabled: true, refetchInterval: 2000 });
   const pipe = pipeline as any;
+  const contractGuardrails = contractQuery.data?.guardrails ?? null;
+  const contractStatuses = contractGuardrails
+    ? ([
+        contractGuardrails.fordRoman,
+        contractGuardrails.thetaAudit,
+        contractGuardrails.tsRatio,
+        contractGuardrails.vdbBand,
+      ] as ContractGuardrailStatus[])
+    : null;
+  const contractSource = contractQuery.data?.sources?.grDiagnostics ?? "missing";
+  const contractBadgeClass = contractSummaryClass(contractStatuses);
   const { data: proofPack } = useProofPack({ refetchInterval: 1500, staleTime: 5000 });
   const stageGate = useMathStageGate(PROOF_PACK_STAGE_REQUIREMENTS, { staleTime: 30000 });
   const stageLabel = stageGate.pending ? "STAGE..." : STAGE_LABELS[stageGate.stage];
   const stageProxy = !stageGate.ok || !proofPack;
-  const proofNum = (key: string) => readProofNumber(proofPack, key);
-  const proofProxy = (key: string) => stageProxy || Boolean(getProofValue(proofPack, key)?.proxy);
-  const proofProxyFrom = (keys: string[]) =>
-    stageProxy || keys.some((key) => Boolean(getProofValue(proofPack, key)?.proxy));
+  const strictProof = isStrictProofPack(proofPack);
+  const proofNum = (key: string) => readProofNumberStrict(proofPack, key, strictProof);
+  const proofBool = (key: string) => readProofBooleanStrict(proofPack, key, strictProof);
+  const proofStr = (key: string) => readProofStringStrict(proofPack, key, strictProof);
+  const proofProxy = (key: string) => {
+    if (stageProxy) return true;
+    const entry = getProofValue(proofPack, key);
+    return strictProof ? entry?.proxy === true : Boolean(entry?.proxy);
+  };
+  const proofProxyFrom = (keys: string[]) => {
+    if (stageProxy) return true;
+    return keys.some((key) => {
+      const entry = getProofValue(proofPack, key);
+      return strictProof ? entry?.proxy === true : Boolean(entry?.proxy);
+    });
+  };
+  const renderProxy = (active?: boolean) => renderProxyBadge(active, strictProof);
 
   const [readMode, setReadMode] = useState(false);
   const [helmholtzEnabled, setHelmholtzEnabled] = useState(false);
@@ -1369,6 +1419,44 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
   const dutyBurstPack = proofNum("duty_burst");
   const sectorsLivePack = proofNum("sectors_live");
   const sectorsTotalPack = proofNum("sectors_total");
+  const modelMode = proofStr("model_mode");
+  const tauLcMsPack = proofNum("tau_lc_ms");
+  const tauPulseMsPack = proofNum("tau_pulse_ms");
+  const tauDwellMsPack = proofNum("tau_dwell_ms");
+  const congruenceMissingParts = proofStr("congruence_missing_parts");
+  const congruenceMissingCount = proofNum("congruence_missing_count");
+  const congruenceMissingReason = proofStr("congruence_missing_reason");
+  const congruenceMissingProxy = proofProxyFrom([
+    "congruence_missing_parts",
+    "congruence_missing_count",
+    "congruence_missing_reason",
+  ]);
+  const vdbTwoWallSupport = proofBool("vdb_two_wall_support");
+  const vdbTwoWallDerivativeSupport = proofBool("vdb_two_wall_derivative_support");
+  const vdbRegionIIDerivativeSupport = proofBool("vdb_region_ii_derivative_support");
+  const vdbRegionIVDerivativeSupport = proofBool("vdb_region_iv_derivative_support");
+  const vdbTwoWallProxy = proofProxyFrom([
+    "vdb_two_wall_support",
+    "vdb_two_wall_derivative_support",
+  ]);
+  const vdbRegionDerivProxy = proofProxyFrom([
+    "vdb_region_ii_derivative_support",
+    "vdb_region_iv_derivative_support",
+  ]);
+  const vdbTwoWallLabel =
+    vdbTwoWallSupport == null && vdbTwoWallDerivativeSupport == null
+      ? "VdB two-wall deriv=n/a"
+      : `VdB two-wall deriv=${vdbTwoWallDerivativeSupport === true ? "yes" : vdbTwoWallDerivativeSupport === false ? "no" : "n/a"} support=${
+          vdbTwoWallSupport === true
+            ? "yes"
+            : vdbTwoWallSupport === false
+              ? "no"
+              : "n/a"
+        }`;
+  const kTraceMeanPack = proofNum("metric_k_trace_mean");
+  const kSqMeanPack = proofNum("metric_k_sq_mean");
+  const kTraceTag = proofProxy("metric_k_trace_mean") ? "proxy" : "metric";
+  const kSqTag = proofProxy("metric_k_sq_mean") ? "proxy" : "metric";
   const dEff = dutyEffectivePack ?? dutyFallback.dEff;
   const burstLocal = dutyBurstPack ?? dutyFallback.burstLocal;
   const sectorsLive = sectorsLivePack ?? dutyFallback.sectorsLive;
@@ -1445,6 +1533,13 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
     () => summarizeQiHeadroom(curv?.qiMargin as Float32Array | number[] | undefined),
     [curv?.qiMargin],
   );
+  const curvatureMeta = resolveCongruenceMeta(
+    curv?.meta,
+    pipeline?.curvatureMeta,
+  );
+  const curvatureMetaSource = curvatureMeta.source ?? "unknown";
+  const curvatureMetaCongruence = curvatureMeta.congruence ?? "unknown";
+  const { proxy: curvatureMetaProxy } = buildCongruenceBadge(curvatureMeta);
 
   const ccsOk =
     amp.hasData &&
@@ -1554,6 +1649,80 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
   const zeta = proofNum("zeta") ?? Number(pipe?.zeta ?? pipe?.fordRoman?.value);
   const zetaProxy = proofProxyFrom(["zeta"]);
+  const qiGuard = pipe?.qiGuardrail;
+  const qiCurvatureOk = qiGuard?.curvatureOk;
+  const qiCurvatureEnforced = qiGuard?.curvatureEnforced === true;
+  const qiCurvatureRatio = Number(qiGuard?.curvatureRatio);
+  const qiCurvatureRatioDisplay = Number.isFinite(qiCurvatureRatio)
+    ? toFixed(qiCurvatureRatio, 3)
+    : null;
+  const qiRhoSource = (qiGuard?.rhoSource ?? "unknown").toString();
+  const qiMetricDerived =
+    proofBool("qi_metric_derived") ??
+    qiGuard?.metricDerived ??
+    null;
+  const qiMetricSource = (
+    proofStr("qi_metric_source") ??
+    qiGuard?.metricDerivedSource ??
+    (pipe as any)?.tsMetricDerivedSource ??
+    (pipe as any)?.ts?.metricDerivedSource ??
+    (pipe as any)?.clocking?.metricDerivedSource ??
+    "unknown"
+  ).toString();
+  const qiMetricReason =
+    proofStr("qi_metric_reason") ??
+    qiGuard?.metricDerivedReason ??
+    (pipe as any)?.tsMetricDerivedReason ??
+    (pipe as any)?.ts?.metricDerivedReason ??
+    (pipe as any)?.clocking?.metricDerivedReason ??
+    null;
+  const cl3ConstraintSource =
+    getProofValue(proofPack, "gr_rho_constraint_mean")?.source ??
+    "n/a";
+  const cl3ConstraintProxy = proofProxy("gr_rho_constraint_mean");
+  const cl3DeltaMean = proofNum("gr_cl3_rho_delta_mean");
+  const cl3MetricDeltaMean = proofNum("gr_cl3_rho_delta_metric_mean");
+  const cl3PipelineDeltaMean = proofNum("gr_cl3_rho_delta_pipeline_mean_telemetry");
+  const cl3Threshold = proofNum("gr_cl3_rho_threshold");
+  const cl3Gate = proofBool("gr_cl3_rho_gate");
+  const cl3GateReason = proofStr("gr_cl3_rho_gate_reason");
+  const cl3MissingParts = proofStr("gr_cl3_rho_missing_parts");
+  const cl3GateClass =
+    cl3Gate === true
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+      : cl3Gate === false
+      ? "border-rose-500/40 bg-rose-500/10 text-rose-200"
+      : "border-amber-500/40 bg-amber-500/10 text-amber-200";
+  const qiMetricProxy = proofProxyFrom([
+    "qi_metric_derived",
+    "qi_metric_source",
+    "qi_metric_reason",
+  ]);
+  const qiRhoMetric =
+    qiRhoSource.startsWith("warp.metric") ||
+    qiRhoSource.startsWith("gr.rho_constraint") ||
+    qiRhoSource.startsWith("gr.metric");
+  const qiCurvatureBadgeClass =
+    qiCurvatureOk === true
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+      : qiCurvatureOk === false
+        ? "border-rose-500/40 bg-rose-500/10 text-rose-200"
+        : "border-amber-500/40 bg-amber-500/10 text-amber-200";
+  const qiRhoBadgeClass = qiRhoMetric
+    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+    : "border-amber-500/40 bg-amber-500/10 text-amber-200";
+  const qiMetricBadgeClass =
+    qiMetricDerived === true
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+      : qiMetricDerived === false
+      ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+      : "border-slate-600 bg-slate-900/70 text-slate-200";
+  const qiMetricBadgeLabel =
+    qiMetricDerived === true
+      ? "QI metric path=geometry-derived"
+      : qiMetricDerived === false
+      ? "QI metric path=proxy-only"
+      : "QI metric path=unknown";
 
 
 
@@ -1975,6 +2144,17 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
   const tauLCSeconds = Number.isFinite(tauLCUs) ? tauLCUs * 1e-6 : NaN;
 
+  const tauLcSecondsPack = Number.isFinite(tauLcMsPack) ? (tauLcMsPack as number) / 1000 : NaN;
+  const tauPulseSecondsPack = Number.isFinite(tauPulseMsPack) ? (tauPulseMsPack as number) / 1000 : NaN;
+  const tauDwellSecondsPack = Number.isFinite(tauDwellMsPack) ? (tauDwellMsPack as number) / 1000 : NaN;
+  const tauLcSecondsDisplay = Number.isFinite(tauLcSecondsPack) ? tauLcSecondsPack : tauLCSeconds;
+  const tauPulseSecondsDisplay = Number.isFinite(tauPulseSecondsPack) ? tauPulseSecondsPack : tauPulseSeconds;
+  const tauDwellSecondsDisplay = Number.isFinite(tauDwellSecondsPack)
+    ? tauDwellSecondsPack
+    : Number.isFinite(dwellMsLive)
+    ? (dwellMsLive as number) / 1000
+    : NaN;
+
 
 
   const tsPack = proofNum("ts_ratio");
@@ -2064,6 +2244,36 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
   // TS autoscale telemetry (defaults to target=100, idle)
   const tsProxy = proofProxyFrom(["ts_ratio"]);
+  const tsMetricDerived = proofBool("ts_metric_derived");
+  const tsMetricSource =
+    proofStr("ts_metric_source") ??
+    (pipe as any)?.tsMetricDerivedSource ??
+    (pipe as any)?.ts?.metricDerivedSource ??
+    (pipe as any)?.clocking?.metricDerivedSource ??
+    "unknown";
+  const tsMetricReason =
+    proofStr("ts_metric_reason") ??
+    (pipe as any)?.tsMetricDerivedReason ??
+    (pipe as any)?.ts?.metricDerivedReason ??
+    (pipe as any)?.clocking?.metricDerivedReason ??
+    null;
+  const tsMetricProxy = proofProxyFrom([
+    "ts_metric_derived",
+    "ts_metric_source",
+    "ts_metric_reason",
+  ]);
+  const tsMetricBadgeClass =
+    tsMetricDerived === true
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+      : tsMetricDerived === false
+        ? "border-rose-500/40 bg-rose-500/10 text-rose-200"
+        : "border-amber-500/40 bg-amber-500/10 text-amber-200";
+  const tsMetricBadgeLabel =
+    tsMetricDerived === true
+      ? "TS metric-derived"
+      : tsMetricDerived === false
+        ? "TS proxy/hardware"
+        : "TS metric n/a";
 
   const tsAutoscale = (pipe?.ts as any)?.autoscale ?? (pipe as any)?.tsAutoscale ?? null;
   const tsTarget = (() => {
@@ -2760,7 +2970,17 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
     liftTilesDisplay !== "n/a" && platedLiftDisplay !== "n/a"
       ? `Least-exotic lift envelope assumes constant per-tile physics: keeping roughly ${liftRatioDisplay} of the current tiles (~${liftTilesDisplay}) preserves kappa_drive >= kappa_body with plated area ${platedLiftDisplay} m^2 and exotic mass ${minExoticMassDisplay} kg.`
       : null;
-const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.thetaRaw);
+const natarioThetaGeom = Number(
+  (pipe as any)?.theta_geom ??
+    (pipe as any)?.warp?.metricAdapter?.betaDiagnostics?.thetaMax ??
+    (pipe as any)?.warp?.metricAdapter?.betaDiagnostics?.thetaRms,
+);
+const natarioTheta =
+  Number.isFinite(natarioThetaGeom)
+    ? natarioThetaGeom
+    : Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.thetaRaw);
+const natarioThetaLabel = Number.isFinite(natarioThetaGeom) ? "θ_geom" : "θ_cal";
+const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
@@ -3858,7 +4078,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
           <Badge variant="outline" className={cn("border", STAGE_BADGE[stageGate.stage])}>
             {stageLabel}
           </Badge>
-          {renderProxyBadge(stageProxy)}
+          {renderProxy(stageProxy)}
           <Badge className={`border ${natarioBadgeTone}`}>
             {natarioBadgeLabel}
           </Badge>
@@ -3900,7 +4120,80 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
           </Badge>
-          {renderProxyBadge(zetaProxy)}
+          {renderProxy(zetaProxy)}
+
+
+
+          <Badge className={`border ${qiCurvatureBadgeClass}`}>
+
+
+
+            {qiCurvatureOk === true
+              ? `QI curvature ok${qiCurvatureRatioDisplay ? ` τ/R=${qiCurvatureRatioDisplay}` : ""}`
+              : qiCurvatureOk === false
+                ? `QI curvature window fail${qiCurvatureEnforced ? " (enforced)" : ""}`
+                : "QI curvature n/a"}
+
+
+
+          </Badge>
+
+
+
+          <Badge className={`border ${qiRhoBadgeClass}`}>
+
+
+
+            {`QI rho source=${qiRhoSource}`}
+
+
+
+          </Badge>
+          <Badge className={`border ${qiMetricBadgeClass}`}>
+            {qiMetricBadgeLabel}
+          </Badge>
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {`QI metric source=${qiMetricSource}`}
+          </Badge>
+          {renderProxy(qiMetricProxy)}
+          {qiMetricReason ? (
+            <Badge className="border border-slate-600/60 bg-slate-900/60 text-slate-300">
+              {`QI metric reason=${qiMetricReason}`}
+            </Badge>
+          ) : null}
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {`CL3 rho source=${cl3ConstraintSource}`}
+          </Badge>
+          {renderProxy(cl3ConstraintProxy)}
+          <Badge className={`border ${cl3GateClass}`}>
+            {cl3Gate === true
+              ? "CL3 rho_delta ok"
+              : cl3Gate === false
+              ? "CL3 rho_delta fail"
+              : "CL3 rho_delta pending"}
+          </Badge>
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {`CL3 delta=${cl3DeltaMean != null ? toSci(cl3DeltaMean, 2) : "n/a"}`}
+          </Badge>
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {`CL3 metric=${cl3MetricDeltaMean != null ? toSci(cl3MetricDeltaMean, 2) : "n/a"}`}
+          </Badge>
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {`CL3 pipeline(telemetry)=${cl3PipelineDeltaMean != null ? toSci(cl3PipelineDeltaMean, 2) : "n/a"}`}
+          </Badge>
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {`CL3 threshold=${cl3Threshold != null ? toSci(cl3Threshold, 2) : "n/a"}`}
+          </Badge>
+          {cl3GateReason ? (
+            <Badge className="border border-slate-600/60 bg-slate-900/60 text-slate-300">
+              {`CL3 reason=${cl3GateReason}`}
+            </Badge>
+          ) : null}
+          {cl3MissingParts ? (
+            <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-200">
+              {`CL3 missing=${cl3MissingParts}`}
+            </Badge>
+          ) : null}
 
 
 
@@ -3913,7 +4206,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
           </Badge>
-          {renderProxyBadge(kappaProxy)}
+          {renderProxy(kappaProxy)}
 
 
 
@@ -3925,6 +4218,67 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
+          </Badge>
+          <Badge className={`border ${tsMetricBadgeClass}`}>
+            {tsMetricBadgeLabel}
+          </Badge>
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {`TS source=${tsMetricSource}`}
+          </Badge>
+          {renderProxy(tsMetricProxy)}
+          {tsMetricReason ? (
+            <Badge className="border border-slate-600/60 bg-slate-900/60 text-slate-300">
+              {`TS reason=${tsMetricReason}`}
+            </Badge>
+          ) : null}
+          {contractGuardrails ? (
+            <Badge className={`border ${contractBadgeClass}`}>
+              {`contract FR=${contractGuardrails.fordRoman} TH=${contractGuardrails.thetaAudit} TS=${contractGuardrails.tsRatio} VdB=${contractGuardrails.vdbBand}`}
+            </Badge>
+          ) : (
+            <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+              contract guardrails unavailable
+            </Badge>
+          )}
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {vdbTwoWallLabel}
+          </Badge>
+          {renderProxy(vdbTwoWallProxy)}
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {`VdB region II deriv=${
+              vdbRegionIIDerivativeSupport === true
+                ? "yes"
+                : vdbRegionIIDerivativeSupport === false
+                  ? "no"
+                  : "n/a"
+            }`}
+          </Badge>
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {`VdB region IV deriv=${
+              vdbRegionIVDerivativeSupport === true
+                ? "yes"
+                : vdbRegionIVDerivativeSupport === false
+                  ? "no"
+                  : "n/a"
+            }`}
+          </Badge>
+          {renderProxy(vdbRegionDerivProxy)}
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {`congruence missing=${congruenceMissingCount != null ? congruenceMissingCount : "n/a"}`}
+          </Badge>
+          {renderProxy(congruenceMissingProxy)}
+          {congruenceMissingParts ? (
+            <Badge className="border border-amber-500/40 bg-amber-500/10 text-amber-200">
+              {`congruence parts=${congruenceMissingParts}`}
+            </Badge>
+          ) : null}
+          {congruenceMissingReason ? (
+            <Badge className="border border-slate-600/60 bg-slate-900/60 text-slate-300">
+              {`congruence reason=${congruenceMissingReason}`}
+            </Badge>
+          ) : null}
+          <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
+            {`contract source=${contractSource}`}
           </Badge>
 
 
@@ -4655,7 +5009,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
                           <span className={`font-mono text-[11px] ${item.muted ? "text-slate-500" : "text-slate-200"}`}>
 
-                            {item.value}{renderProxyBadge(item.proxy)}
+                            {item.value}{renderProxy(item.proxy)}
 
                           </span>
 
@@ -4745,7 +5099,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxyBadge(item.proxy)}</span>
+                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxy(item.proxy)}</span>
 
 
 
@@ -4841,7 +5195,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxyBadge(item.proxy)}</span>
+                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxy(item.proxy)}</span>
 
 
 
@@ -4929,7 +5283,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxyBadge(item.proxy)}</span>
+                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxy(item.proxy)}</span>
 
 
 
@@ -5017,7 +5371,7 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
 
-                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxyBadge(item.proxy)}</span>
+                          <span className="font-mono text-[11px] text-slate-200">{item.value}{renderProxy(item.proxy)}</span>
 
 
 
@@ -6404,29 +6758,23 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
                 <li>
-
-
-
                   {readMode
-
-
-
                     ? Number.isFinite(natarioTheta)
+                      ? `Server-calculated ${natarioThetaLabel} ≈ ${natarioTheta.toExponential(3)} (${natarioThetaTag}); this tracks Natario volume targets.`
+                      : `${natarioThetaLabel} estimate unavailable.`
+                    : `${natarioThetaLabel} (server) = ${Number.isFinite(natarioTheta) ? natarioTheta.toExponential(3) : "—"} (${natarioThetaTag})`}
+                </li>
 
+                <li>
+                  {`K_trace_mean = ${
+                    Number.isFinite(kTraceMeanPack) ? kTraceMeanPack.toExponential(3) : "—"
+                  } (${kTraceTag})`}
+                </li>
 
-
-                      ? `Server-calculated ? ?0? ${natarioTheta.toExponential(3)}; this tracks Natario volume targets.`
-
-
-
-                      : "? estimate unavailable."
-
-
-
-                    : `? (server) = ${Number.isFinite(natarioTheta) ? natarioTheta.toExponential(3) : "? "}`}
-
-
-
+                <li>
+                  {`K_sq_mean = ${
+                    Number.isFinite(kSqMeanPack) ? kSqMeanPack.toExponential(3) : "—"
+                  } (${kSqTag})`}
                 </li>
 
 
@@ -6598,6 +6946,13 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
           <div className="mt-3">
             <CurvatureLedgerPanel />
           </div>
+          {curv ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+              <span className="font-mono">curvature.source={curvatureMetaSource}</span>
+              <span className="font-mono">curvature.congruence={curvatureMetaCongruence}</span>
+              {renderProxy(curvatureMetaProxy)}
+            </div>
+          ) : null}
 
           <div className="mt-4 grid gap-3 text-xs text-slate-300 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3">
 
@@ -7138,6 +7493,42 @@ const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.
 
 
               readDescription="Shows how much of the drive cycle is actually contributing to curvature."
+
+
+
+            />
+
+
+
+            <GuardBadge
+
+
+
+              label="Timing telemetry"
+
+
+
+              ok={Number.isFinite(tauLcSecondsDisplay) && Number.isFinite(tauPulseSecondsDisplay)}
+
+
+
+              value={`tau_LC ${formatSecondsFriendly(tauLcSecondsDisplay)} | tau_pulse ${formatSecondsFriendly(tauPulseSecondsDisplay)} | dwell ${formatSecondsFriendly(tauDwellSecondsDisplay)}`}
+
+
+
+              description={`Clocking inputs used by TS/QI guards${modelMode ? ` (mode ${modelMode})` : ""}.`}
+
+
+
+              readMode={readMode}
+
+
+
+              readValue={`tau_LC ${formatSecondsFriendly(tauLcSecondsDisplay)} | tau_pulse ${formatSecondsFriendly(tauPulseSecondsDisplay)} | dwell ${formatSecondsFriendly(tauDwellSecondsDisplay)}${modelMode ? ` · mode ${modelMode}` : ""}`}
+
+
+
+              readDescription="Uses proof-pack timing when available; falls back to live clocking telemetry."
 
 
 

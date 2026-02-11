@@ -25,6 +25,7 @@ export type HelixAskGraphResolvedNode = {
   tolerance?: Record<string, unknown>;
   dependencies?: string[];
   environment?: Record<string, unknown>;
+  sourcePath?: string;
 };
 
 export type HelixAskGraphEvidence = {
@@ -50,6 +51,39 @@ export type HelixAskGraphFramework = {
   rankScore?: number;
   anchorScore?: number;
   pathScore?: number;
+  congruenceDiagnostics?: HelixAskGraphCongruenceDiagnostics;
+};
+
+export type HelixAskGraphCongruenceDiagnostics = {
+  inventory: {
+    nodesCount: number;
+    evaluatedEdges: number;
+    blockedLinkCount: number;
+  };
+  allowedEdges: number;
+  blockedEdges: number;
+  resolvedInTreeEdges: number;
+  resolvedCrossTreeEdges: number;
+  blockedByReason: {
+    blocked_link: number;
+    conceptual_disallowed: number;
+    proxy_disallowed: number;
+    cl_exceeds_allowed: number;
+    chart_mismatch: number;
+    condition_unsatisfied: number;
+    unresolved_target: number;
+  };
+  blockedByCondition: Record<string, number>;
+  strictSignals: {
+    B_equals_1: boolean;
+    qi_metric_derived_equals_true: boolean;
+    qi_strict_ok_equals_true: boolean;
+    theta_geom_equals_true: boolean;
+    vdb_two_wall_support_equals_true: boolean;
+    ts_metric_derived_equals_true: boolean;
+    cl3_metric_t00_available_equals_true: boolean;
+    cl3_rho_gate_equals_true: boolean;
+  };
 };
 
 export type HelixAskGraphPack = {
@@ -90,7 +124,31 @@ type GraphResolverConfig = {
   trees?: GraphResolverTreeConfig[];
 };
 
-type GraphLink = { rel?: string; to?: string };
+type GraphLink = {
+  rel?: string;
+  to?: string;
+  edgeType?: string;
+  requiresCL?: string;
+  condition?: string | null;
+  chartDependency?: string | null;
+  note?: string;
+};
+
+type GraphEdgeMeta = {
+  edgeType?: string;
+  requiresCL?: string;
+  condition?: string | null;
+  chartDependency?: string | null;
+  proxy?: boolean | null;
+};
+
+type BlockedEdge = {
+  source: string;
+  target: string;
+  edgeType?: string;
+  requiresCL?: string;
+  reason?: string;
+};
 
 type GraphNode = {
   id: string;
@@ -111,6 +169,9 @@ type GraphNode = {
   tags: string[];
   children: string[];
   links: GraphLink[];
+  congruence?: { class?: string; chart?: string | null; congruenceLevel?: string | null } | null;
+  childMeta?: Record<string, GraphEdgeMeta>;
+  blockedLinks?: BlockedEdge[];
   evidence?: HelixAskGraphEvidence[];
   searchText: string;
   tagText: string;
@@ -125,6 +186,13 @@ type GraphTree = {
   nodeById: Map<string, GraphNode>;
   neighbors: Map<string, Array<{ id: string; rel: string; weight: number }>>;
   config: GraphResolverTreeConfig;
+  congruenceDiagnostics: HelixAskGraphCongruenceDiagnostics;
+};
+
+type GraphNodeRef = {
+  node: GraphNode;
+  treeId: string;
+  sourcePath: string;
 };
 
 const GRAPH_CONFIG_PATHS = [
@@ -151,10 +219,58 @@ const DEFAULT_PACK_MIN_SCORE_RATIO = 0.25;
 const MAX_PACK_TREES_LIMIT = 6;
 const LOCKED_TREE_SCORE_BONUS = 4;
 
+const DEFAULT_CONGRUENCE_WALK_CONFIG_PATH = "docs/warp-tree-dag-walk-config.json";
+const DEFAULT_CONGRUENCE_WALK_CONFIG = {
+  allowedCL: "CL4" as const,
+  allowConceptual: false,
+  allowProxies: false,
+  chart: "comoving_cartesian",
+  region: {
+    B_equals_1: true,
+    qi_metric_derived_equals_true: true,
+    qi_strict_ok_equals_true: true,
+    theta_geom_equals_true: true,
+    vdb_two_wall_support_equals_true: false,
+    ts_metric_derived_equals_true: false,
+    cl3_metric_t00_available_equals_true: false,
+    cl3_rho_gate_equals_true: false,
+  },
+};
+
 type GraphConfigCache = { config: GraphResolverConfig; path: string; mtimeMs: number };
 let graphConfigCache: GraphConfigCache | null = null;
 
 const graphTreeCache = new Map<string, { tree: GraphTree; mtimeMs: number }>();
+
+type CongruenceWalkConfig = {
+  allowedCL: "CL0" | "CL1" | "CL2" | "CL3" | "CL4";
+  allowConceptual?: boolean;
+  allowProxies?: boolean;
+  chart?: string | null;
+  region?: Record<string, boolean>;
+};
+
+type GraphFilterReason =
+  | "blocked_link"
+  | "conceptual_disallowed"
+  | "proxy_disallowed"
+  | "cl_exceeds_allowed"
+  | "chart_mismatch"
+  | "condition_unsatisfied"
+  | "unresolved_target";
+
+type GraphEdgeDecision = {
+  allowed: boolean;
+  reason?: GraphFilterReason;
+  condition?: string | null;
+  conditionKey?: string | null;
+};
+
+export type HelixAskCongruenceWalkOverride = Partial<
+  Pick<CongruenceWalkConfig, "allowedCL" | "allowConceptual" | "allowProxies" | "chart" | "region">
+>;
+
+let congruenceWalkConfigCache: { config: CongruenceWalkConfig; mtimeMs: number } | null = null;
 
 const normalizeText = (value: string): string =>
   value
@@ -176,6 +292,42 @@ const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 const coerceNumber = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+const cloneCongruenceWalkConfig = (config: CongruenceWalkConfig): CongruenceWalkConfig => ({
+  ...config,
+  region: config.region ? { ...config.region } : undefined,
+});
+
+const applyCongruenceWalkOverride = (
+  base: CongruenceWalkConfig,
+  override?: HelixAskCongruenceWalkOverride,
+): CongruenceWalkConfig => {
+  if (!override) return cloneCongruenceWalkConfig(base);
+  const mergedRegion = {
+    ...(base.region ?? {}),
+    ...(override.region ?? {}),
+  };
+  return {
+    allowedCL: override.allowedCL ?? base.allowedCL,
+    allowConceptual: override.allowConceptual ?? base.allowConceptual,
+    allowProxies: override.allowProxies ?? base.allowProxies,
+    chart: override.chart ?? base.chart,
+    region: Object.keys(mergedRegion).length > 0 ? mergedRegion : undefined,
+  };
+};
+
+const serializeCongruenceWalkConfig = (config: CongruenceWalkConfig): string => {
+  const regionPairs = Object.entries(config.region ?? {})
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}:${value ? "1" : "0"}`);
+  return [
+    `cl=${config.allowedCL}`,
+    `conceptual=${config.allowConceptual ? "1" : "0"}`,
+    `proxies=${config.allowProxies ? "1" : "0"}`,
+    `chart=${config.chart ?? ""}`,
+    `region=${regionPairs.join("|")}`,
+  ].join(";");
+};
 
 const resolveConfigPath = (): string | null => {
   for (const candidate of GRAPH_CONFIG_PATHS) {
@@ -279,6 +431,17 @@ const coerceNode = (raw: any): GraphNode | null => {
   const tags = ensureArray<string>(raw.tags).filter((entry) => typeof entry === "string");
   const children = ensureArray<string>(raw.children).filter((entry) => typeof entry === "string");
   const links = ensureArray<GraphLink>(raw.links).filter((link) => link && typeof link === "object");
+  const congruence =
+    raw.congruence && typeof raw.congruence === "object" && !Array.isArray(raw.congruence)
+      ? (raw.congruence as { class?: string; chart?: string | null; congruenceLevel?: string | null })
+      : undefined;
+  const childMeta =
+    raw.childMeta && typeof raw.childMeta === "object" && !Array.isArray(raw.childMeta)
+      ? (raw.childMeta as Record<string, GraphEdgeMeta>)
+      : undefined;
+  const blockedLinks = Array.isArray(raw.blockedLinks)
+    ? (raw.blockedLinks as BlockedEdge[])
+    : undefined;
   const evidence = normalizeEvidenceList(raw.evidence);
   const node: GraphNode = {
     id,
@@ -299,6 +462,9 @@ const coerceNode = (raw: any): GraphNode | null => {
     tags,
     children,
     links,
+    congruence,
+    childMeta,
+    blockedLinks,
     evidence: evidence.length > 0 ? evidence : undefined,
     searchText: "",
     tagText: "",
@@ -308,14 +474,125 @@ const coerceNode = (raw: any): GraphNode | null => {
   return node;
 };
 
-const loadGraphTree = (config: GraphResolverTreeConfig): GraphTree | null => {
+const resolveCongruenceWalkConfig = (
+  override?: HelixAskCongruenceWalkOverride,
+): CongruenceWalkConfig => {
+  const configPath = process.env.HELIX_ASK_CONGRUENCE_WALK_CONFIG ?? DEFAULT_CONGRUENCE_WALK_CONFIG_PATH;
+  const fullPath = path.resolve(process.cwd(), configPath);
+  let baseConfig: CongruenceWalkConfig;
+  if (!fs.existsSync(fullPath)) {
+    baseConfig = cloneCongruenceWalkConfig(DEFAULT_CONGRUENCE_WALK_CONFIG);
+    return applyCongruenceWalkOverride(baseConfig, override);
+  }
+  try {
+    const stats = fs.statSync(fullPath);
+    if (congruenceWalkConfigCache && congruenceWalkConfigCache.mtimeMs === stats.mtimeMs) {
+      return applyCongruenceWalkOverride(congruenceWalkConfigCache.config, override);
+    }
+    const raw = fs.readFileSync(fullPath, "utf8");
+    const parsed = JSON.parse(raw) as CongruenceWalkConfig;
+    baseConfig = {
+      allowedCL: parsed.allowedCL ?? DEFAULT_CONGRUENCE_WALK_CONFIG.allowedCL,
+      allowConceptual: parsed.allowConceptual ?? DEFAULT_CONGRUENCE_WALK_CONFIG.allowConceptual,
+      allowProxies: parsed.allowProxies ?? DEFAULT_CONGRUENCE_WALK_CONFIG.allowProxies,
+      chart: parsed.chart ?? DEFAULT_CONGRUENCE_WALK_CONFIG.chart,
+      region: parsed.region ?? DEFAULT_CONGRUENCE_WALK_CONFIG.region,
+    };
+    congruenceWalkConfigCache = {
+      config: cloneCongruenceWalkConfig(baseConfig),
+      mtimeMs: stats.mtimeMs,
+    };
+    return applyCongruenceWalkOverride(baseConfig, override);
+  } catch (error) {
+    console.warn(`[helix-ask] congruence walk config failed: ${error instanceof Error ? error.message : error}`);
+    baseConfig = cloneCongruenceWalkConfig(DEFAULT_CONGRUENCE_WALK_CONFIG);
+    return applyCongruenceWalkOverride(baseConfig, override);
+  }
+};
+
+const normalizeConditionKey = (condition: string): string =>
+  condition.replace(/\s+/g, "").replace(/=+/g, "_equals_").replace(/[()]/g, "");
+
+const conditionSatisfied = (
+  condition: string | null | undefined,
+  region?: Record<string, boolean>,
+): { ok: boolean; key?: string | null } => {
+  if (!condition) return { ok: true };
+  if (!region) return { ok: false, key: null };
+  if (condition.includes("B(r)=1") || condition.includes("B=1")) {
+    return { ok: Boolean(region.B_equals_1 === true), key: "B_equals_1" };
+  }
+  const normalized = normalizeConditionKey(condition);
+  return { ok: Boolean(region[normalized] === true), key: normalized };
+};
+
+const resolveCLIndex = (value: string | undefined): number => {
+  if (!value || value === "none") return -1;
+  const idx = CL_ORDER.indexOf(value as CongruenceWalkConfig["allowedCL"]);
+  return idx >= 0 ? idx : -1;
+};
+
+const CL_ORDER: CongruenceWalkConfig["allowedCL"][] = ["CL0", "CL1", "CL2", "CL3", "CL4"];
+
+const evaluateCongruenceEdge = (
+  meta: GraphEdgeMeta | undefined,
+  config: CongruenceWalkConfig,
+  blockedSet: Set<string>,
+  edge: { source: string; target: string },
+): GraphEdgeDecision => {
+  if (blockedSet.has(`${edge.source}::${edge.target}`)) {
+    return { allowed: false, reason: "blocked_link" };
+  }
+
+  const edgeType = meta?.edgeType ?? "association";
+  if (edgeType === "hierarchy" || edgeType === "association") {
+    return config.allowConceptual
+      ? { allowed: true }
+      : { allowed: false, reason: "conceptual_disallowed" };
+  }
+  if (edgeType === "proxy_only") {
+    return config.allowProxies
+      ? { allowed: true }
+      : { allowed: false, reason: "proxy_disallowed" };
+  }
+  const requiredIdx = resolveCLIndex(meta?.requiresCL);
+  const allowedIdx = resolveCLIndex(config.allowedCL);
+  if (requiredIdx > allowedIdx) return { allowed: false, reason: "cl_exceeds_allowed" };
+  if (meta?.chartDependency && config.chart && meta.chartDependency !== config.chart) {
+    return { allowed: false, reason: "chart_mismatch" };
+  }
+  const condition = conditionSatisfied(meta?.condition, config.region);
+  if (!condition.ok) {
+    return {
+      allowed: false,
+      reason: "condition_unsatisfied",
+      condition: meta?.condition ?? null,
+      conditionKey: condition.key ?? null,
+    };
+  }
+  return { allowed: true };
+};
+
+const shouldIncludeEdge = (
+  meta: GraphEdgeMeta | undefined,
+  config: CongruenceWalkConfig,
+  blockedSet: Set<string>,
+  edge: { source: string; target: string },
+): boolean => evaluateCongruenceEdge(meta, config, blockedSet, edge).allowed;
+
+const loadGraphTree = (
+  config: GraphResolverTreeConfig,
+  congruenceWalkOverride?: HelixAskCongruenceWalkOverride,
+): GraphTree | null => {
   const sourcePath = config.path;
   if (!sourcePath) return null;
   const fullPath = path.resolve(process.cwd(), sourcePath);
   if (!fs.existsSync(fullPath)) return null;
   try {
+    const congruenceConfig = resolveCongruenceWalkConfig(congruenceWalkOverride);
+    const congruenceKey = serializeCongruenceWalkConfig(congruenceConfig);
     const stats = fs.statSync(fullPath);
-    const cacheKey = `${config.id}:${fullPath}`;
+    const cacheKey = `${config.id}:${fullPath}:${congruenceKey}`;
     const cached = graphTreeCache.get(cacheKey);
     if (cached && cached.mtimeMs === stats.mtimeMs) {
       return cached.tree;
@@ -327,25 +604,130 @@ const loadGraphTree = (config: GraphResolverTreeConfig): GraphTree | null => {
     nodes.forEach((node) => nodeById.set(node.id, node));
     const neighbors = new Map<string, Array<{ id: string; rel: string; weight: number }>>();
     const edgePriority = { ...DEFAULT_EDGE_PRIORITY, ...(config.edgePriority ?? {}) };
-    const addNeighbor = (from: string, to: string, rel: string): void => {
-      if (!nodeById.has(from) || !nodeById.has(to)) return;
+    const blockedSet = new Set<string>();
+    for (const node of nodes) {
+      for (const blocked of node.blockedLinks ?? []) {
+        if (blocked?.source && blocked?.target) {
+          blockedSet.add(`${blocked.source}::${blocked.target}`);
+        }
+      }
+    }
+    const blockedByReason: HelixAskGraphCongruenceDiagnostics["blockedByReason"] = {
+      blocked_link: 0,
+      conceptual_disallowed: 0,
+      proxy_disallowed: 0,
+      cl_exceeds_allowed: 0,
+      chart_mismatch: 0,
+      condition_unsatisfied: 0,
+      unresolved_target: 0,
+    };
+    const blockedByCondition: Record<string, number> = {};
+    let allowedEdges = 0;
+    let blockedEdges = 0;
+    let resolvedInTreeEdges = 0;
+    let resolvedCrossTreeEdges = 0;
+    let evaluatedEdges = 0;
+    const addNeighbor = (
+      from: string,
+      to: string,
+      rel: string,
+      opts?: { allowExternalTarget?: boolean },
+    ): boolean => {
+      if (!nodeById.has(from)) return false;
+      if (!nodeById.has(to) && !opts?.allowExternalTarget) return false;
       const list = neighbors.get(from) ?? [];
       list.push({ id: to, rel, weight: edgePriority[rel] ?? 1 });
       neighbors.set(from, list);
+      return true;
     };
     for (const node of nodes) {
       for (const child of node.children) {
-        addNeighbor(node.id, child, "child");
-        addNeighbor(child, node.id, "parent");
+        const meta = node.childMeta?.[child];
+        evaluatedEdges += 1;
+        const decision = evaluateCongruenceEdge(meta, congruenceConfig, blockedSet, {
+          source: node.id,
+          target: child,
+        });
+        if (decision.allowed) {
+          const forwardAdded = addNeighbor(node.id, child, "child");
+          const reverseAdded = addNeighbor(child, node.id, "parent");
+          if (forwardAdded && reverseAdded) {
+            allowedEdges += 1;
+            resolvedInTreeEdges += 1;
+          } else {
+            blockedEdges += 1;
+            blockedByReason.unresolved_target += 1;
+          }
+        } else {
+          blockedEdges += 1;
+          if (decision.reason) blockedByReason[decision.reason] += 1;
+          if (decision.reason === "condition_unsatisfied") {
+            const key = decision.conditionKey ?? decision.condition ?? "unknown_condition";
+            blockedByCondition[key] = (blockedByCondition[key] ?? 0) + 1;
+          }
+        }
       }
       for (const link of node.links) {
         const target = typeof link.to === "string" ? link.to : "";
         const rel = typeof link.rel === "string" ? link.rel : "see-also";
-        if (target) {
-          addNeighbor(node.id, target, rel);
+        if (!target) continue;
+        const meta: GraphEdgeMeta | undefined = {
+          edgeType: link.edgeType,
+          requiresCL: link.requiresCL,
+          condition: link.condition ?? null,
+          chartDependency: link.chartDependency ?? null,
+        };
+        evaluatedEdges += 1;
+        const decision = evaluateCongruenceEdge(meta, congruenceConfig, blockedSet, {
+          source: node.id,
+          target,
+        });
+        if (decision.allowed) {
+          if (addNeighbor(node.id, target, rel, { allowExternalTarget: true })) {
+            allowedEdges += 1;
+            if (nodeById.has(target)) {
+              resolvedInTreeEdges += 1;
+            } else {
+              resolvedCrossTreeEdges += 1;
+            }
+          } else {
+            blockedEdges += 1;
+            blockedByReason.unresolved_target += 1;
+          }
+        } else {
+          blockedEdges += 1;
+          if (decision.reason) blockedByReason[decision.reason] += 1;
+          if (decision.reason === "condition_unsatisfied") {
+            const key = decision.conditionKey ?? decision.condition ?? "unknown_condition";
+            blockedByCondition[key] = (blockedByCondition[key] ?? 0) + 1;
+          }
         }
       }
     }
+    const congruenceDiagnostics: HelixAskGraphCongruenceDiagnostics = {
+      inventory: {
+        nodesCount: nodes.length,
+        evaluatedEdges,
+        blockedLinkCount: blockedSet.size,
+      },
+      allowedEdges,
+      blockedEdges,
+      resolvedInTreeEdges,
+      resolvedCrossTreeEdges,
+      blockedByReason,
+      blockedByCondition,
+      strictSignals: {
+        B_equals_1: congruenceConfig.region?.B_equals_1 === true,
+        qi_metric_derived_equals_true: congruenceConfig.region?.qi_metric_derived_equals_true === true,
+        qi_strict_ok_equals_true: congruenceConfig.region?.qi_strict_ok_equals_true === true,
+        theta_geom_equals_true: congruenceConfig.region?.theta_geom_equals_true === true,
+        vdb_two_wall_support_equals_true: congruenceConfig.region?.vdb_two_wall_support_equals_true === true,
+        ts_metric_derived_equals_true: congruenceConfig.region?.ts_metric_derived_equals_true === true,
+        cl3_metric_t00_available_equals_true:
+          congruenceConfig.region?.cl3_metric_t00_available_equals_true === true,
+        cl3_rho_gate_equals_true: congruenceConfig.region?.cl3_rho_gate_equals_true === true,
+      },
+    };
     const tree: GraphTree = {
       id: config.id,
       label: config.label,
@@ -355,6 +737,7 @@ const loadGraphTree = (config: GraphResolverTreeConfig): GraphTree | null => {
       nodeById,
       neighbors,
       config,
+      congruenceDiagnostics,
     };
     graphTreeCache.set(cacheKey, { tree, mtimeMs: stats.mtimeMs });
     return tree;
@@ -363,6 +746,27 @@ const loadGraphTree = (config: GraphResolverTreeConfig): GraphTree | null => {
     console.warn(`[helix-ask] graph resolver tree load failed (${config.path}): ${message}`);
     return null;
   }
+};
+
+const buildCrossTreeNodeIndex = (
+  treeConfigs: GraphResolverTreeConfig[],
+  congruenceWalkOverride?: HelixAskCongruenceWalkOverride,
+): Map<string, GraphNodeRef> => {
+  const index = new Map<string, GraphNodeRef>();
+  for (const treeConfig of treeConfigs) {
+    const tree = loadGraphTree(treeConfig, congruenceWalkOverride);
+    if (!tree) continue;
+    for (const node of tree.nodes) {
+      if (!index.has(node.id)) {
+        index.set(node.id, {
+          node,
+          treeId: tree.id,
+          sourcePath: tree.sourcePath,
+        });
+      }
+    }
+  }
+  return index;
 };
 
 const parseMatcher = (value: string): RegExp => {
@@ -482,7 +886,14 @@ const resolveRoles = (
   const next = [...selected];
   for (const [role, terms] of Object.entries(roleMatchers)) {
     if (next.some((node) => node.role === role)) continue;
-    if (next.some((node) => scoreRoleMatch(tree.nodeById.get(node.id)!, terms) > 0)) continue;
+    if (
+      next.some((entry) => {
+        const node = tree.nodeById.get(entry.id);
+        return node ? scoreRoleMatch(node, terms) > 0 : false;
+      })
+    ) {
+      continue;
+    }
     let best: GraphNode | null = null;
     let bestScore = 0;
     for (const node of tree.nodes) {
@@ -516,6 +927,7 @@ const resolveRoles = (
         tolerance: best.tolerance,
         dependencies: best.dependencies,
         environment: best.environment,
+        sourcePath: tree.sourcePath,
       });
     }
   }
@@ -543,7 +955,7 @@ const buildScaffoldLines = (
     if (artifact) {
       parts.push(`Minimal artifact: ${artifact}.`);
     }
-    parts.push(`(${tree.sourcePath})`);
+    parts.push(`(${node.sourcePath ?? tree.sourcePath})`);
     return `- ${parts.join(" ")}`;
   });
 };
@@ -594,6 +1006,7 @@ const resolveTreeWeight = (value: unknown): number =>
 
 const buildFrameworkCandidate = (
   tree: GraphTree,
+  crossTreeNodeIndex: Map<string, GraphNodeRef>,
   tokens: string[],
   questionNorm: string,
   conceptBoosts: string[],
@@ -636,7 +1049,19 @@ const buildFrameworkCandidate = (
     tolerance: entry.node.tolerance,
     dependencies: entry.node.dependencies,
     environment: entry.node.environment,
+    sourcePath: tree.sourcePath,
   }));
+  const resolveNodeRef = (id: string): GraphNodeRef | null => {
+    const local = tree.nodeById.get(id);
+    if (local) {
+      return {
+        node: local,
+        treeId: tree.id,
+        sourcePath: tree.sourcePath,
+      };
+    }
+    return crossTreeNodeIndex.get(id) ?? null;
+  };
   const maxDepth = treeConfig.maxDepth ?? DEFAULT_MAX_DEPTH;
   const maxNodes = treeConfig.maxNodes ?? DEFAULT_MAX_NODES;
   const ordered: HelixAskGraphResolvedNode[] = [...resolvedAnchors];
@@ -653,9 +1078,10 @@ const buildFrameworkCandidate = (
     const sortedNeighbors = neighbors
       .map((neighbor) => ({
         neighbor,
-        score: tree.nodeById.get(neighbor.id)
-          ? scoreNode(tree.nodeById.get(neighbor.id)!, tokens, questionNorm, conceptBoosts)
-          : 0,
+        score: (() => {
+          const ref = resolveNodeRef(neighbor.id);
+          return ref ? scoreNode(ref.node, tokens, questionNorm, conceptBoosts) : 0;
+        })(),
       }))
       .sort((a, b) => {
         if (a.neighbor.weight !== b.neighbor.weight) {
@@ -667,8 +1093,9 @@ const buildFrameworkCandidate = (
       if (ordered.length >= maxNodes) break;
       const neighbor = entry.neighbor;
       if (visited.has(neighbor.id)) continue;
-      const node = tree.nodeById.get(neighbor.id);
-      if (!node) continue;
+      const ref = resolveNodeRef(neighbor.id);
+      if (!ref) continue;
+      const node = ref.node;
       visited.add(neighbor.id);
       ordered.push({
         id: node.id,
@@ -690,6 +1117,7 @@ const buildFrameworkCandidate = (
         tolerance: node.tolerance,
         dependencies: node.dependencies,
         environment: node.environment,
+        sourcePath: ref.sourcePath,
       });
       queue.push({ id: neighbor.id, depth: current.depth + 1 });
     }
@@ -719,6 +1147,7 @@ const buildFrameworkCandidate = (
     rankScore: weightedScore,
     anchorScore,
     pathScore,
+    congruenceDiagnostics: tree.congruenceDiagnostics,
   };
   return { framework, score: weightedScore, anchorScore, pathScore, hitCount };
 };
@@ -728,6 +1157,7 @@ export function resolveHelixAskGraphPack(input: {
   topicTags: HelixAskTopicTag[];
   conceptMatch?: HelixAskConceptMatch | null;
   lockedTreeIds?: string[];
+  congruenceWalkOverride?: HelixAskCongruenceWalkOverride;
 }): HelixAskGraphPack | null {
   const config = loadGraphResolverConfig();
   if (!config?.trees?.length) return null;
@@ -764,14 +1194,15 @@ export function resolveHelixAskGraphPack(input: {
   }
   const selectedTrees = Array.from(combinedTrees.values());
   if (selectedTrees.length === 0) return null;
+  const crossTreeNodeIndex = buildCrossTreeNodeIndex(trees, input.congruenceWalkOverride);
   const questionNorm = normalizeText(question);
   const tokens = extractQuestionTokens(question);
   const conceptBoosts = extractConceptBoosts(input.conceptMatch);
   const candidates: GraphFrameworkCandidate[] = [];
   for (const treeConfig of selectedTrees) {
-    const tree = loadGraphTree(treeConfig);
+    const tree = loadGraphTree(treeConfig, input.congruenceWalkOverride);
     if (!tree) continue;
-    const candidate = buildFrameworkCandidate(tree, tokens, questionNorm, conceptBoosts, {
+    const candidate = buildFrameworkCandidate(tree, crossTreeNodeIndex, tokens, questionNorm, conceptBoosts, {
       locked: lockedTreeIds.has(treeConfig.id),
     });
     if (candidate) candidates.push(candidate);
@@ -837,7 +1268,27 @@ export function resolveHelixAskGraphFramework(input: {
   question: string;
   topicTags: HelixAskTopicTag[];
   conceptMatch?: HelixAskConceptMatch | null;
+  congruenceWalkOverride?: HelixAskCongruenceWalkOverride;
 }): HelixAskGraphFramework | null {
   const pack = resolveHelixAskGraphPack(input);
   return pack?.frameworks[0] ?? null;
+}
+
+export function __testOnlyResolveTreeNeighborIds(input: {
+  treeId: string;
+  treePath: string;
+  nodeId: string;
+  congruenceWalkOverride?: HelixAskCongruenceWalkOverride;
+}): string[] {
+  const tree = loadGraphTree(
+    {
+      id: input.treeId,
+      path: input.treePath,
+      label: input.treeId,
+    },
+    input.congruenceWalkOverride,
+  );
+  if (!tree) return [];
+  const neighborIds = (tree.neighbors.get(input.nodeId) ?? []).map((entry) => entry.id);
+  return Array.from(new Set(neighborIds)).sort((a, b) => a.localeCompare(b));
 }

@@ -119,6 +119,18 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "integrity map",
     "verification map"
   ],
+  "conformity-launch-rail": [
+    "conformity",
+    "self alignment",
+    "gravity wells",
+    "expansion contraction",
+    "deterministic rails",
+    "resource allocation",
+    "leadership",
+    "actualization",
+    "frontier",
+    "constraint ladder"
+  ],
   "warp-ledger": ["km-scale ledger", "warp ledger", "bubble log", "warp km", "ledger bands"],
   "spectrum-tuner": ["spectrum tuner", "FFT", "frequency dial", "harmonics sweep", "waveform tuner"],
   "experiment-ladder": ["experiment ladder", "casimir", "phoenix", "ford-roman", "natario", "sector gating"],
@@ -346,6 +358,19 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     mobileReady: true,
     endpoints: [API.auditTree],
     keywords: PANEL_KEYWORDS["universal-audit-tree"]
+  },
+  {
+    id: "conformity-launch-rail",
+    title: "Conformity Launch Rail",
+    icon: Target,
+    loader: lazyPanel(
+      () => import("@/components/ideology/ConformityLaunchRailPanel"),
+      "ConformityLaunchRailPanel"
+    ),
+    defaultSize: { w: 960, h: 680 },
+    defaultPosition: { x: 340, y: 220 },
+    mobileReady: true,
+    keywords: PANEL_KEYWORDS["conformity-launch-rail"]
   },
   {
     id: "tsn-sim",

@@ -938,6 +938,37 @@ const hullBrickSchema = z
     }
   });
 
+const grInvariantStatsSchema = z
+  .object({
+    min: z.number().finite(),
+    max: z.number().finite(),
+    mean: z.number().finite(),
+    p98: z.number().finite(),
+    sampleCount: z.number().int().nonnegative(),
+    abs: z.boolean(),
+    wallFraction: z.number().finite(),
+    bandFraction: z.number().finite(),
+    threshold: z.number().finite(),
+    bandMin: z.number().finite(),
+    bandMax: z.number().finite(),
+  })
+  .partial();
+
+const grInvariantStatsSetSchema = z
+  .object({
+    kretschmann: grInvariantStatsSchema.optional(),
+    ricci4: grInvariantStatsSchema.optional(),
+  })
+  .partial();
+
+const grBaselineSchema = z
+  .object({
+    invariants: grInvariantStatsSetSchema.optional(),
+    source: z.string().optional(),
+    updatedAt: z.number().finite().optional(),
+  })
+  .partial();
+
 const UpdateSchema = z.object({
   tileArea_cm2: z.number().min(0.01).max(10_000).optional(),
   gap_nm: z.number().min(0.1).max(1000).optional(),
@@ -962,6 +993,7 @@ const UpdateSchema = z.object({
   previewLattice: cardLatticeMetadataSchema.nullable().optional(),
   lattice: cardLatticeMetadataSchema.nullable().optional(),
   hullBrick: hullBrickSchema.nullable().optional(),
+  grBaseline: grBaselineSchema.optional(),
   beta_trans: z.number().min(0).max(1).optional(),
   powerFillCmd: z.number().min(0).max(1).optional(),
   grEnabled: z.boolean().optional(),
@@ -2269,10 +2301,10 @@ export async function updatePipelineParams(req: Request, res: Response) {
             | null;
         })
       | null;
-  type PipelineParamInput = Partial<Omit<EnergyPipelineState, "hull" | "warpGeometry">> & {
+  type PipelineParamInput = Record<string, any> & {
     hull?: Partial<EnergyPipelineState["hull"]>;
     warpGeometry?: WarpGeometryInput;
-  } & Record<string, any>;
+  };
   const params: PipelineParamInput = { ...parsed.data };
   if (typeof params.phase01 === "number" && Number.isFinite(params.phase01)) {
     params.phase01 = wrap01(params.phase01);
@@ -3265,6 +3297,7 @@ const LATTICE_PROBE_KAPPA_TUNING = {
 } as const;
 const LATTICE_PROBE_BETA_NEAR_REST_MAX = 0.25;
 const LATTICE_PROBE_TS_RATIO_MIN = 1.5;
+const LATTICE_PROBE_THETA_MAX = 1e12;
 const LATTICE_PROBE_NATARIO_GEOM_WARP_SCALE = 0.05;
 const LATTICE_PROBE_METRIC_BLEND = 0.45;
 const LATTICE_PROBE_SHEAR_STRENGTH = 0.35;
@@ -3324,6 +3357,19 @@ const probeResolveBooleanStatus = (value: unknown): boolean | null => {
     if (["fail", "failed", "false", "inadmissible"].includes(norm)) return false;
   }
   return null;
+};
+
+const probeStrictCongruenceEnabled = (pipeline?: EnergyPipelineState | null): boolean =>
+  (pipeline as any)?.strictCongruence !== false;
+
+const probeQiSourceIsMetric = (source: unknown): boolean => {
+  if (typeof source !== "string") return false;
+  const normalized = source.toLowerCase();
+  return (
+    normalized.startsWith("warp.metric") ||
+    normalized.startsWith("gr.metric") ||
+    normalized.startsWith("gr.rho_constraint")
+  );
 };
 
 const probeNormalizeLog = (value: number, min: number, max: number) => {
@@ -3663,9 +3709,36 @@ const probeResolveGuardrails = (
   tsRatio: number,
   gammaVdB: number,
 ): ProbeGuardrails => {
+  const strictCongruence = probeStrictCongruenceEnabled(pipeline);
+  const qiGuard = (pipeline as any)?.qiGuardrail;
+  const qiHasMargin = Number.isFinite(qiGuard?.marginRatio);
+  const qiBasePass = qiHasMargin
+    ? Number(qiGuard.marginRatio) < 1 &&
+      (qiGuard.curvatureEnforced !== true || qiGuard.curvatureOk !== false)
+    : null;
+  const qiMetricSource = probeQiSourceIsMetric(qiGuard?.rhoSource);
   const fordRomanFlag = pipeline?.fordRomanCompliance;
-  const fordRoman: ProbeGuardrailState =
-    typeof fordRomanFlag === "boolean" ? (fordRomanFlag ? "ok" : "fail") : "proxy";
+  let fordRoman: ProbeGuardrailState;
+  if (qiBasePass != null) {
+    if (strictCongruence) {
+      fordRoman = qiBasePass && qiMetricSource ? "ok" : "fail";
+    } else {
+      fordRoman = qiBasePass
+        ? qiMetricSource
+          ? "ok"
+          : "proxy"
+        : "fail";
+    }
+  } else if (typeof fordRomanFlag === "boolean") {
+    fordRoman = strictCongruence
+      ? "fail"
+      : fordRomanFlag
+        ? "ok"
+        : "fail";
+  } else {
+    fordRoman = strictCongruence ? "fail" : "proxy";
+  }
+
   const thetaAuditRaw =
     (pipeline as any)?.uniformsExplain?.thetaAudit ??
     (pipeline as any)?.thetaAudit ??
@@ -3676,14 +3749,42 @@ const probeResolveGuardrails = (
       (thetaAuditRaw as any)?.pass ??
       (thetaAuditRaw as any)?.admissible,
   );
-  const thetaAudit: ProbeGuardrailState =
-    thetaAuditFlag === null ? "proxy" : thetaAuditFlag ? "ok" : "fail";
-  const tsRatioState: ProbeGuardrailState = Number.isFinite(tsRatio)
-    ? tsRatio >= LATTICE_PROBE_TS_RATIO_MIN
+  const thetaValue = probeFirstFinite(
+    (pipeline as any)?.theta_audit,
+    (pipeline as any)?.theta_geom,
+    (thetaAuditRaw as any)?.value,
+  );
+  const thetaBandPass = Number.isFinite(thetaValue)
+    ? Math.abs(thetaValue as number) <= LATTICE_PROBE_THETA_MAX
+    : thetaAuditFlag === true;
+  const thetaMetricDerived = (pipeline as any)?.theta_metric_derived === true;
+  const thetaAudit: ProbeGuardrailState = strictCongruence
+    ? thetaMetricDerived && thetaBandPass
       ? "ok"
       : "fail"
+    : thetaBandPass
+      ? thetaMetricDerived
+        ? "ok"
+        : "proxy"
+      : "fail";
+
+  const tsMetricDerived = (pipeline as any)?.tsMetricDerived === true;
+  const tsBandPass = Number.isFinite(tsRatio) && tsRatio >= LATTICE_PROBE_TS_RATIO_MIN;
+  const tsRatioState: ProbeGuardrailState = Number.isFinite(tsRatio)
+    ? strictCongruence
+      ? tsMetricDerived && tsBandPass
+        ? "ok"
+        : "fail"
+      : tsBandPass
+        ? tsMetricDerived
+          ? "ok"
+          : "proxy"
+        : "fail"
     : "proxy";
+
   const vdbGuard = pipeline?.gammaVanDenBroeckGuard;
+  const vdbDerivativeSupport = (pipeline as any)?.vdb_two_wall_derivative_support === true;
+  const vdbRequiresDerivativeSupport = Number.isFinite(gammaVdB) && gammaVdB > 1 + 1e-6;
   let vdbBand: ProbeGuardrailState = "proxy";
   if (
     vdbGuard &&
@@ -3694,8 +3795,18 @@ const probeResolveGuardrails = (
     const inBand =
       gammaVdB >= vdbGuard.greenBand.min && gammaVdB <= vdbGuard.greenBand.max;
     const guardPass = vdbGuard.admissible ? vdbGuard.admissible && inBand : inBand;
-    vdbBand = guardPass ? "ok" : "fail";
+    const derivativeMissing = vdbRequiresDerivativeSupport && !vdbDerivativeSupport;
+    if (strictCongruence) {
+      vdbBand = guardPass && !derivativeMissing ? "ok" : "fail";
+    } else if (guardPass && derivativeMissing) {
+      vdbBand = "proxy";
+    } else {
+      vdbBand = guardPass ? "ok" : "fail";
+    }
+  } else if (vdbRequiresDerivativeSupport && !vdbDerivativeSupport) {
+    vdbBand = strictCongruence ? "fail" : "proxy";
   }
+
   const hardFail = fordRoman === "fail" || thetaAudit === "fail";
   const tsPenalty =
     tsRatioState === "fail" && Number.isFinite(tsRatio)
@@ -5025,7 +5136,8 @@ export async function getLatticeProbe(req: Request, res: Response) {
         ].map((value) => (Number.isFinite(value) ? value : 0)) as Vec3
       : [0, 0, 0];
 
-    const grDiagnostics = grBrick ? buildGrDiagnostics(grBrick) : null;
+    const metricAdapter = (state as any)?.warp?.metricAdapter ?? null;
+    const grDiagnostics = grBrick ? buildGrDiagnostics(grBrick, { metricAdapter }) : null;
     const betaMaxAbs = grDiagnostics?.gauge?.betaMaxAbs;
     const betaFromGr =
       Number.isFinite(betaMaxAbs) ? Math.abs(betaMaxAbs as number) : Number.NaN;
@@ -6260,12 +6372,17 @@ const computeInvariantWallMetrics = (input: {
   const wallFraction = clamp01(input.wallFraction);
   const bandFraction = Math.max(0, clamp01(input.bandFraction));
   const samples: number[] = [];
+  const nonZeroSamples: number[] = [];
   for (let i = 0; i < total; i += sampleStride) {
     const raw = input.values[i];
     if (!Number.isFinite(raw)) continue;
-    samples.push(input.useAbs ? Math.abs(raw) : raw);
+    const value = input.useAbs ? Math.abs(raw) : raw;
+    samples.push(value);
+    if (value > 0) nonZeroSamples.push(value);
   }
-  const p98 = percentileSamples(samples, 0.98);
+  const samplePool =
+    nonZeroSamples.length >= 16 ? nonZeroSamples : samples;
+  const p98 = percentileSamples(samplePool, 0.98);
   const threshold = p98 * wallFraction;
   const bandMin = threshold > 0 ? threshold * (1 - bandFraction) : 0;
   const bandMax = threshold > 0 ? threshold * (1 + bandFraction) : 0;
@@ -7251,7 +7368,8 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
     }
 
     if (state.grEnabled === true) {
-      state.gr = buildGrDiagnostics(brick);
+      const metricAdapter = (state as any)?.warp?.metricAdapter ?? null;
+      state.gr = buildGrDiagnostics(brick, { metricAdapter });
     }
     if (wantsBinary) {
       const binary = serializeGrEvolveBrickBinary(brick);
@@ -7890,26 +8008,124 @@ export async function getGrConstraintContract(req: Request, res: Response) {
       (state as any)?.qiAutoscale?.rawZeta,
       (state as any)?.qiAutoscale?.zeta,
     );
-    const thetaCal = firstFinite((state as any)?.thetaCal);
+    const qiGuard = (state as any)?.qiGuardrail;
+    const qiMarginRatio = firstFinite(qiGuard?.marginRatio, zetaValue);
+    const qiHasMargin = qiMarginRatio !== null;
+    const qiCurvaturePass =
+      qiGuard?.curvatureEnforced === true ? qiGuard?.curvatureOk !== false : true;
+    const qiMetricSource = probeQiSourceIsMetric(qiGuard?.rhoSource);
+    const qiBandPass =
+      qiHasMargin && qiMarginRatio !== null
+        ? qiMarginRatio < 1 && qiCurvaturePass
+        : null;
+    const strictCongruence = probeStrictCongruenceEnabled(state as any);
+    const thetaGeom = firstFinite(
+      (state as any)?.theta_geom,
+      (state as any)?.warp?.metricAdapter?.betaDiagnostics?.thetaMax,
+      (state as any)?.warp?.metricAdapter?.betaDiagnostics?.thetaRms,
+    );
+    const thetaProxy = firstFinite(
+      (state as any)?.thetaCal,
+      (state as any)?.thetaScaleExpected,
+    );
+    const thetaMetricDerived =
+      (state as any)?.theta_metric_derived === true ||
+      (thetaGeom !== null &&
+        (state as any)?.warp?.metricAdapter?.betaDiagnostics?.method !== "not-computed");
+    const thetaLimit = LATTICE_PROBE_THETA_MAX;
+    const thetaBandPass =
+      thetaGeom !== null && Number.isFinite(thetaGeom)
+        ? Math.abs(thetaGeom) <= thetaLimit
+        : false;
+    const thetaStatus: "pass" | "fail" | "unknown" = thetaMetricDerived
+      ? thetaBandPass
+        ? "pass"
+        : "fail"
+      : strictCongruence
+        ? "fail"
+        : thetaProxy === null
+          ? "unknown"
+          : "unknown";
     const tsRatio = firstFinite(
       (state as any)?.TS_ratio,
       (state as any)?.TS_long,
       (state as any)?.TS_geom,
     );
+    const tsMetricDerived = (state as any)?.tsMetricDerived === true;
     const gammaVdB = firstFinite(
       (state as any)?.gammaVanDenBroeck,
       (state as any)?.gammaVdB,
     );
+    const vdbGuard = (state as any)?.gammaVanDenBroeckGuard;
+    const vdbDerivativeSupport = (state as any)?.vdb_two_wall_derivative_support === true;
+    const vdbRequiresDerivativeSupport =
+      gammaVdB !== null && Number.isFinite(gammaVdB) && gammaVdB > 1 + 1e-6;
 
     const tsLimit = 1.5;
-    const tsStatus = tsRatio === null ? "unknown" : tsRatio >= tsLimit ? "pass" : "fail";
+    const tsBandPass = tsRatio !== null && tsRatio >= tsLimit;
 
     type GuardrailsState = NonNullable<GrConstraintContract["guardrails"]>;
+    const fordRoman: GuardrailsState["fordRoman"] =
+      qiBandPass == null
+        ? "missing"
+        : strictCongruence
+          ? qiBandPass && qiMetricSource
+            ? "ok"
+            : "fail"
+          : qiBandPass
+            ? qiMetricSource
+              ? "ok"
+              : "proxy"
+            : "fail";
+    const tsRatioState: GuardrailsState["tsRatio"] =
+      tsRatio === null
+        ? "missing"
+        : strictCongruence
+          ? tsBandPass && tsMetricDerived
+            ? "ok"
+            : "fail"
+          : tsBandPass
+            ? tsMetricDerived
+              ? "ok"
+              : "proxy"
+            : "fail";
+    let vdbBand: GuardrailsState["vdbBand"] = "missing";
+    if (
+      vdbGuard &&
+      gammaVdB !== null &&
+      Number.isFinite(vdbGuard.greenBand?.min) &&
+      Number.isFinite(vdbGuard.greenBand?.max)
+    ) {
+      const inBand =
+        gammaVdB >= Number(vdbGuard.greenBand.min) &&
+        gammaVdB <= Number(vdbGuard.greenBand.max);
+      const guardPass = vdbGuard.admissible ? Boolean(vdbGuard.admissible) && inBand : inBand;
+      const derivativeMissing = Boolean(vdbRequiresDerivativeSupport && !vdbDerivativeSupport);
+      if (strictCongruence) {
+        vdbBand = guardPass && !derivativeMissing ? "ok" : "fail";
+      } else if (guardPass && derivativeMissing) {
+        vdbBand = "proxy";
+      } else {
+        vdbBand = guardPass ? "ok" : "fail";
+      }
+    } else if (vdbRequiresDerivativeSupport && !vdbDerivativeSupport) {
+      vdbBand = strictCongruence ? "fail" : "proxy";
+    } else if (gammaVdB !== null) {
+      vdbBand = "proxy";
+    }
     const guardrails: GuardrailsState = {
-      fordRoman: zetaValue === null ? "missing" : "proxy",
-      thetaAudit: thetaCal === null ? "missing" : "proxy",
-      tsRatio: tsRatio === null ? "missing" : tsRatio >= tsLimit ? "ok" : "fail",
-      vdbBand: gammaVdB === null ? "missing" : "proxy",
+      fordRoman,
+      thetaAudit: thetaMetricDerived
+        ? thetaBandPass
+          ? "ok"
+          : "fail"
+        : strictCongruence
+          ? "fail"
+          : thetaProxy === null
+            ? "missing"
+            : "proxy",
+      tsRatio: tsRatioState,
+      vdbBand,
     };
 
     const constraints: GrConstraintContract["constraints"] = [];
@@ -7932,46 +8148,84 @@ export async function getGrConstraintContract(req: Request, res: Response) {
     pushConstraint({
       id: "FordRomanQI",
       severity: "HARD",
-      status: "unknown",
+      status:
+        guardrails.fordRoman === "ok"
+          ? "pass"
+          : guardrails.fordRoman === "fail"
+            ? "fail"
+            : "unknown",
       limit: "int_T00_dt >= -K / tau^4",
-      ...(zetaValue !== null ? { value: zetaValue } : {}),
-      proxy: true,
+      ...(qiMarginRatio !== null ? { value: qiMarginRatio } : {}),
+      proxy: guardrails.fordRoman === "proxy",
       note:
-        zetaValue === null
+        qiMarginRatio === null
           ? "Missing zeta/qi metric; cannot evaluate."
-          : "Proxy: using zeta margin ratio.",
+          : guardrails.fordRoman === "proxy"
+            ? "Proxy: using non-metric rho source."
+            : guardrails.fordRoman === "fail" && strictCongruence && !qiMetricSource
+              ? "Strict congruence requires metric-derived rho source for FordRomanQI."
+              : "Using qiGuardrail margin ratio with source/curvature checks.",
     });
     pushConstraint({
       id: "ThetaAudit",
       severity: "HARD",
-      status: "unknown",
-      limit: "|thetaCal| <= theta_max",
-      ...(thetaCal !== null ? { value: thetaCal } : {}),
-      proxy: true,
+      status: thetaStatus,
+      limit: "|theta_geom| <= theta_max",
+      ...(thetaMetricDerived && thetaGeom !== null
+        ? { value: thetaGeom }
+        : thetaProxy !== null
+          ? { value: thetaProxy }
+          : {}),
+      proxy: !thetaMetricDerived,
       note:
-        thetaCal === null
-          ? "Missing thetaCal; cannot evaluate."
-          : "Proxy: threshold not configured.",
+        thetaMetricDerived
+          ? thetaBandPass
+            ? `Geometry-derived theta within threshold (|theta_geom| <= ${thetaLimit}).`
+            : `Geometry-derived theta exceeded threshold (|theta_geom| > ${thetaLimit}).`
+          : strictCongruence
+            ? "Strict congruence requires geometry-derived theta_geom; proxy theta is not admissible."
+            : thetaProxy === null
+              ? "Missing theta_geom/theta proxy; cannot evaluate."
+              : "Proxy: using thetaCal/thetaScaleExpected fallback.",
     });
     pushConstraint({
       id: "TS_ratio_min",
       severity: "SOFT",
-      status: tsStatus,
+      status:
+        guardrails.tsRatio === "ok"
+          ? "pass"
+          : guardrails.tsRatio === "fail"
+            ? "fail"
+            : "unknown",
       limit: ">= 1.5",
       ...(tsRatio !== null ? { value: tsRatio } : {}),
-      ...(tsRatio === null ? { note: "Missing TS_ratio; cannot evaluate." } : {}),
+      proxy: guardrails.tsRatio === "proxy",
+      ...(tsRatio === null
+        ? { note: "Missing TS_ratio; cannot evaluate." }
+        : strictCongruence && !tsMetricDerived
+          ? { note: "Strict congruence requires metric-derived TS ratio source." }
+          : {}),
     });
     pushConstraint({
       id: "VdB_band",
       severity: "SOFT",
-      status: "unknown",
+      status:
+        guardrails.vdbBand === "ok"
+          ? "pass"
+          : guardrails.vdbBand === "fail"
+            ? "fail"
+            : "unknown",
       limit: "gamma_VdB in [gamma_min, gamma_max]",
       ...(gammaVdB !== null ? { value: gammaVdB } : {}),
-      proxy: true,
+      proxy: guardrails.vdbBand === "proxy",
       note:
         gammaVdB === null
           ? "Missing gamma_VdB; cannot evaluate."
-          : "Proxy: band not configured.",
+          : guardrails.vdbBand === "proxy"
+            ? "Proxy: derivative support unavailable for VdB two-wall check."
+            : vdbRequiresDerivativeSupport && !vdbDerivativeSupport
+              ? "Derivative support required for gamma_VdB > 1."
+              : "Using configured VdB band and derivative support checks.",
     });
 
     const certAvailable = Boolean(certificate) && integrityOk !== false;
@@ -8022,7 +8276,10 @@ export async function getGrConstraintContract(req: Request, res: Response) {
       notes.push("FordRomanQI uses proxy zeta; not a full QI integral.");
     }
     if (guardrails.thetaAudit === "proxy") {
-      notes.push("ThetaAudit uses thetaCal proxy; threshold not configured.");
+      notes.push("ThetaAudit uses theta proxy (thetaCal/thetaScaleExpected).");
+    }
+    if (guardrails.thetaAudit === "fail" && !thetaMetricDerived && strictCongruence) {
+      notes.push("ThetaAudit strict mode requires geometry-derived theta_geom.");
     }
     if (guardrails.vdbBand === "proxy") {
       notes.push("VdB band uses gamma_VdB proxy; band not configured.");

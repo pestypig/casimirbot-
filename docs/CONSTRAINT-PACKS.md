@@ -193,6 +193,8 @@ Notes
   provided, or when `CASIMIR_AUTO_TELEMETRY=1` / `CASIMIR_AUTO_CI_REPORTS=1`.
 - When enabled, auto-ingest scans `reports/` for junit/vitest/eslint/tsc outputs
   by default (override dirs via `CASIMIR_AUTO_CI_REPORTS_DIRS`).
+- Local helper: run `npm run casimir:verify:ci` to refresh repo telemetry and
+  verify in one step.
 - Auto-ingest reads JSON telemetry (`telemetryPath`, `CASIMIR_TELEMETRY_PATH`,  
   `CASIMIR_REPO_TELEMETRY_PATH`, `CASIMIR_TOOL_TELEMETRY_PATH`,
   `CASIMIR_AUDIT_TELEMETRY_PATH`) and JUnit XML (`junitPath`,

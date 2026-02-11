@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
 
 const fmtSci = (v: number) =>
   (Math.abs(v) >= 1e6 || (Math.abs(v) > 0 && Math.abs(v) < 1e-3))
@@ -105,6 +106,11 @@ export default function AmplificationPanel({ readOnly = false }: { readOnly?: bo
           <h3 className="text-sm font-semibold">Amplification Chain</h3>
           <span className="text-xs opacity-70">{readOnly ? "read-only" : "live"}</span>
         </div>
+        <PipelineCongruenceBadge
+          label="stress"
+          meta={(data as any)?.stressMeta}
+          className="mb-3"
+        />
 
         {/* Equation line */}
         <div className="flex flex-wrap items-center gap-2 text-sm">

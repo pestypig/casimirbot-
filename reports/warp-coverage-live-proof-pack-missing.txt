@@ -1,0 +1,3 @@
+mechanical_note
+metric_chart_contract_reason
+metric_chart_notes

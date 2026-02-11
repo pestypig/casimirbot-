@@ -2,15 +2,17 @@ import * as React from "react";
 import type { ProofPack } from "@shared/schema";
 import { useProofPack } from "@/hooks/useProofPack";
 import { useMathStageGate } from "@/hooks/useMathStageGate";
+import { useGrConstraintContract } from "@/hooks/useGrConstraintContract";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   PROOF_PACK_STAGE_REQUIREMENTS,
   getProofValue,
-  readProofBoolean,
-  readProofNumber,
-  readProofString,
+  isStrictProofPack,
+  readProofBooleanStrict,
+  readProofNumberStrict,
+  readProofStringStrict,
 } from "@/lib/proof-pack";
 import { STAGE_BADGE, STAGE_LABELS } from "@/lib/math-stage-gate";
 
@@ -25,6 +27,7 @@ function fmtFixed(v: number | null | undefined, digits = 3): string {
 }
 
 type GuardStatus = "pass" | "warn" | "fail" | "na";
+type ContractGuardrailStatus = "ok" | "fail" | "proxy" | "missing";
 
 interface LedgerRow {
   id: string;
@@ -52,27 +55,47 @@ function guardBadge(status: GuardStatus | undefined, label?: string) {
   );
 }
 
-function proxyBadge(proxy?: boolean) {
+function proxyBadge(proxy?: boolean, strict?: boolean) {
   if (!proxy) return null;
   return (
-    <Badge className="ml-2 px-2 py-0.5 text-[10px] leading-tight bg-slate-800 text-slate-300">
-      PROXY
+    <Badge
+      className={cn(
+        "ml-2 px-2 py-0.5 text-[10px] leading-tight",
+        strict ? "bg-rose-900/40 text-rose-200" : "bg-slate-800 text-slate-300",
+      )}
+    >
+      {strict ? "NON-ADMISSIBLE" : "PROXY"}
     </Badge>
   );
+}
+
+function contractSummaryClass(statuses: ContractGuardrailStatus[] | null): string {
+  if (!statuses) return "border-slate-600 bg-slate-900/70 text-slate-200";
+  if (statuses.some((status) => status === "fail" || status === "missing")) {
+    return "border-rose-500/40 bg-rose-500/10 text-rose-200";
+  }
+  if (statuses.some((status) => status === "proxy")) {
+    return "border-amber-500/40 bg-amber-500/10 text-amber-200";
+  }
+  return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
 }
 
 function buildLedgerRows(
   pack?: ProofPack | null,
   stageProxy = false,
+  strictMode = false,
 ): LedgerRow[] {
   if (!pack) return [];
 
   const eq = pack.equations ?? {};
   const isProxy = (key: string) =>
     Boolean(getProofValue(pack, key)?.proxy) || stageProxy;
-  const readNum = (key: string) => readProofNumber(pack, key);
-  const readBool = (key: string) => readProofBoolean(pack, key);
-  const readStr = (key: string) => readProofString(pack, key);
+  const readNum = (key: string) =>
+    readProofNumberStrict(pack, key, strictMode);
+  const readBool = (key: string) =>
+    readProofBooleanStrict(pack, key, strictMode);
+  const readStr = (key: string) =>
+    readProofStringStrict(pack, key, strictMode);
   const proxyFrom = (keys: string[]) => keys.some(isProxy);
 
   // Hull / geometry
@@ -90,8 +113,31 @@ function buildLedgerRows(
   const gammaVdb = readNum("gamma_vdb");
   const dutyEff = readNum("duty_effective");
   const dutyBurst = readNum("duty_burst");
-  const thetaRaw = readNum("theta_raw");
-  const thetaCal = readNum("theta_cal");
+  const thetaRaw = readNum("theta_pipeline_raw");
+  const thetaCal = readNum("theta_pipeline_cal");
+  const thetaGeom = readNum("theta_geom");
+  const thetaProxy = readNum("theta_pipeline_proxy") ?? thetaCal;
+  const thetaStrictMode = readBool("theta_strict_mode");
+  const thetaStrictOk = readBool("theta_strict_ok");
+  const thetaStrictReason = readStr("theta_strict_reason");
+  const metricT00 = {
+    sampleCount: readNum("metric_t00_sample_count"),
+    rhoGeomMean: readNum("metric_t00_rho_geom_mean"),
+    rhoSiMean: readNum("metric_t00_rho_si_mean"),
+    kTraceMean: readNum("metric_k_trace_mean"),
+    kSquaredMean: readNum("metric_k_sq_mean"),
+    step_m: readNum("metric_t00_step_m"),
+    scale_m: readNum("metric_t00_scale_m"),
+  };
+  const metricT00Proxy = proxyFrom([
+    "metric_t00_sample_count",
+    "metric_t00_rho_geom_mean",
+    "metric_t00_rho_si_mean",
+    "metric_k_trace_mean",
+    "metric_k_sq_mean",
+    "metric_t00_step_m",
+    "metric_t00_scale_m",
+  ]);
 
   // Guards
   const vdb = {
@@ -103,6 +149,8 @@ function buildLedgerRows(
     reason: readStr("vdb_reason") ?? null,
     admissible: readBool("vdb_admissible"),
   };
+  const vdbTwoWallSupport = readBool("vdb_two_wall_support");
+  const vdbTwoWallDerivativeSupport = readBool("vdb_two_wall_derivative_support");
   const mech = {
     requestedGap_nm: readNum("mechanical_gap_req_nm"),
     constrainedGap_nm: readNum("mechanical_gap_eff_nm"),
@@ -121,7 +169,32 @@ function buildLedgerRows(
   const qiGuard = readNum("qi_interest_margin_Jm3") != null;
   const zeta = readNum("zeta");
   const TS = readNum("ts_ratio");
+  const tsMetricDerived = readBool("ts_metric_derived");
+  const tsMetricSource = readStr("ts_metric_source");
+  const tsMetricReason = readStr("ts_metric_reason");
   const fordOk = readBool("ford_roman_ok");
+  const qiStrictMode = readBool("qi_strict_mode");
+  const qiStrictOk = readBool("qi_strict_ok");
+  const qiStrictReason = readStr("qi_strict_reason");
+  const qiRhoSource = readStr("qi_rho_source");
+  const qiMetricDerived = readBool("qi_metric_derived");
+  const qiMetricSource = readStr("qi_metric_source");
+  const qiMetricReason = readStr("qi_metric_reason");
+  const qiStrictBlocked = qiStrictMode === true && qiStrictOk === false;
+  const metricT00Geom = readNum("gr_metric_t00_geom_mean");
+  const pipelineT00Geom = readNum("gr_pipeline_t00_geom_mean");
+  const cl3Threshold = readNum("gr_cl3_rho_threshold");
+  const cl3Gate = readBool("gr_cl3_rho_gate");
+  const cl3GateSource = readStr("gr_cl3_rho_gate_source");
+  const cl3GateReason = readStr("gr_cl3_rho_gate_reason");
+  const cl3MissingParts = readStr("gr_cl3_rho_missing_parts");
+  const cl3ConstraintSource = getProofValue(pack, "gr_rho_constraint_mean")?.source;
+  const metricDelta =
+    typeof metricT00Geom === "number" &&
+    typeof pipelineT00Geom === "number"
+      ? Math.abs(metricT00Geom - pipelineT00Geom) /
+        Math.max(1e-12, Math.abs(pipelineT00Geom))
+      : null;
 
   const rows: LedgerRow[] = [];
 
@@ -156,6 +229,41 @@ function buildLedgerRows(
   });
 
   // Amplification ladder (theta)
+  const thetaRowProxy =
+    thetaGeom != null ? isProxy("theta_geom") : proxyFrom(
+      [
+        "gamma_geo",
+        "gamma_geo_cubed",
+        "q_gain",
+        "q_cavity",
+        "q_spoil",
+        "gamma_vdb",
+        "duty_effective",
+        "theta_pipeline_raw",
+        "theta_pipeline_cal",
+        "theta_pipeline_proxy",
+      ],
+    );
+  const thetaGuard: GuardStatus =
+    thetaStrictMode === true
+      ? thetaStrictOk === true
+        ? "pass"
+        : "fail"
+      : fordOk === true
+        ? "pass"
+        : fordOk === false
+          ? "fail"
+          : "na";
+  const thetaGuardLabel =
+    thetaStrictMode === true
+      ? thetaStrictOk === true
+        ? "strict theta OK"
+        : "strict theta blocked"
+      : fordOk === true
+        ? "FR OK"
+        : fordOk === false
+          ? "FR FAIL"
+          : undefined;
   rows.push({
     id: "theta",
     label: "Amplification theta",
@@ -167,25 +275,119 @@ function buildLedgerRows(
       `sqrt(Q/1e9) = ${fmtFixed(qGain, 3)}`,
       `gamma_VdB = ${fmtExp(gammaVdb, 3)}`,
       `d_eff = ${fmtExp(dutyEff, 3)}`,
-      `=> theta_raw = ${fmtExp(thetaRaw, 3)}, theta_cal = ${fmtExp(thetaCal, 3)}`,
-    ].join(" * "),
-    guard: fordOk === true ? "pass" : fordOk === false ? "fail" : "na",
-    guardLabel:
-      fordOk === true ? "FR OK" : fordOk === false ? "FR FAIL" : undefined,
-    proxy: proxyFrom(
-      [
-        "gamma_geo",
-        "gamma_geo_cubed",
-        "q_gain",
-        "q_cavity",
-        "q_spoil",
-        "gamma_vdb",
-        "duty_effective",
-        "theta_raw",
-        "theta_cal",
-      ],
-    ),
+      thetaGeom != null
+        ? `=> theta_geom = ${fmtExp(thetaGeom, 3)} (metric)`
+        : `=> theta_pipeline_cal = ${fmtExp(thetaCal, 3)} (proxy)`,
+      thetaProxy != null && thetaGeom != null
+        ? `theta_pipeline_proxy = ${fmtExp(thetaProxy, 3)}`
+        : null,
+      thetaRaw != null ? `theta_pipeline_raw = ${fmtExp(thetaRaw, 3)}` : null,
+      thetaStrictMode === true
+        ? `strict=${thetaStrictOk === true ? "on:ok" : `on:fail(${thetaStrictReason ?? "unknown"})`}`
+        : "strict=off",
+    ].filter(Boolean).join(" * "),
+    guard: thetaGuard,
+    guardLabel: thetaGuardLabel,
+    proxy: thetaRowProxy,
   });
+
+  if (metricDelta != null) {
+    const guard =
+      typeof cl3Threshold === "number"
+        ? metricDelta <= cl3Threshold
+          ? "pass"
+          : metricDelta <= cl3Threshold * 2
+            ? "warn"
+            : "fail"
+        : "na";
+    const guardLabel =
+      guard === "pass"
+        ? "within CL3 threshold"
+        : guard === "warn"
+          ? "above CL3 threshold"
+          : guard === "fail"
+            ? "far above CL3"
+            : undefined;
+    rows.push({
+      id: "metric_vs_pipeline_t00",
+      label: "Metric vs pipeline T00",
+      equation: "delta = |T00_metric - T00_pipeline| / |T00_pipeline|",
+      value: [
+        `T00_metric = ${fmtExp(metricT00Geom, 3)} (gr)`,
+        `T00_pipeline = ${fmtExp(pipelineT00Geom, 3)} (gr)`,
+        `delta = ${fmtExp(metricDelta, 3)}`,
+      ].join("  |  "),
+      guard,
+      guardLabel,
+      proxy: proxyFrom([
+        "gr_metric_t00_geom_mean",
+        "gr_pipeline_t00_geom_mean",
+        "gr_cl3_rho_threshold",
+      ]),
+    });
+  }
+
+  rows.push({
+    id: "cl3_gate_source",
+    label: "CL3 metric source",
+    equation: "strict CL3 gate compares rho_constraint against metric-derived T00",
+    value: [
+      `gate=${cl3Gate == null ? "n/a" : cl3Gate ? "pass" : "fail"}`,
+      `source=${cl3GateSource ?? "n/a"}`,
+      `reason=${cl3GateReason ?? "n/a"}`,
+      `missing=${cl3MissingParts ?? "n/a"}`,
+    ].join("  |  "),
+    guard:
+      cl3Gate == null
+        ? "na"
+        : cl3Gate
+          ? "pass"
+          : "fail",
+    guardLabel:
+      cl3Gate == null
+        ? undefined
+        : cl3Gate
+          ? "metric source"
+          : "strict blocked",
+    proxy: proxyFrom([
+      "gr_cl3_rho_gate",
+      "gr_cl3_rho_gate_source",
+      "gr_cl3_rho_gate_reason",
+      "gr_cl3_rho_missing_parts",
+    ]),
+  });
+
+  rows.push({
+    id: "cl3_constraint_source",
+    label: "CL3 constraint rho source",
+    equation: "rho_constraint provenance (GR gate vs metric fallback)",
+    value: `source=${cl3ConstraintSource ?? "n/a"}`,
+    guard: "na",
+    proxy: proxyFrom(["gr_rho_constraint_mean"]),
+  });
+
+  if (
+    metricT00.sampleCount != null ||
+    metricT00.rhoGeomMean != null ||
+    metricT00.rhoSiMean != null
+  ) {
+    rows.push({
+      id: "metric_t00_diag",
+      label: "Metric T00 diagnostics",
+      equation: "rho_E = (K^2 - K_ij K^ij)/(16π) (flat-slice)",
+      value: [
+        `samples = ${fmtExp(metricT00.sampleCount, 3)}`,
+        `rho_geom = ${fmtExp(metricT00.rhoGeomMean, 3)}`,
+        `rho_SI = ${fmtExp(metricT00.rhoSiMean, 3)} J/m^3`,
+        `K_trace = ${fmtExp(metricT00.kTraceMean, 3)} 1/m`,
+        `K_sq = ${fmtExp(metricT00.kSquaredMean, 3)} 1/m^2`,
+        `step = ${fmtExp(metricT00.step_m, 3)} m`,
+        `scale = ${fmtExp(metricT00.scale_m, 3)} m`,
+      ].join("  |  "),
+      guard: "na",
+      proxy: metricT00Proxy,
+    });
+  }
 
   // Static -> geo -> Q -> duty chain
   rows.push({
@@ -249,16 +451,141 @@ function buildLedgerRows(
     proxy: proxyFrom(["ts_ratio"]),
   });
 
+  rows.push({
+    id: "ts_metric_strict",
+    label: "TS strict congruence",
+    equation: "strict mode requires metric-derived TS timing source",
+    value: [
+      `metric_derived = ${
+        tsMetricDerived == null ? "n/a" : tsMetricDerived ? "true" : "false"
+      }`,
+      `source = ${tsMetricSource ?? "n/a"}`,
+      `reason = ${tsMetricReason ?? "n/a"}`,
+    ].join("  |  "),
+    guard:
+      tsMetricDerived == null
+        ? "na"
+        : tsMetricDerived
+          ? "pass"
+          : "fail",
+    guardLabel:
+      tsMetricDerived == null
+        ? undefined
+        : tsMetricDerived
+          ? "metric source"
+          : "proxy timing",
+    proxy: proxyFrom(["ts_metric_derived", "ts_metric_source", "ts_metric_reason"]),
+  });
+
   // Ford-Roman / QI zeta
   rows.push({
     id: "zeta",
     label: "Ford-Roman (QI) scalar",
     equation: "zeta = sampledIntegral / bound  (require zeta <= 1)",
-    value: `zeta = ${fmtFixed(zeta, 3)} (${fordOk === true ? "<= 1" : fordOk === false ? "> 1" : "n/a"})`,
-    guard: fordOk === true ? "pass" : fordOk === false ? "fail" : "na",
+    value: [
+      `zeta = ${fmtFixed(zeta, 3)} (${fordOk === true ? "<= 1" : fordOk === false ? "> 1" : "n/a"})`,
+      `source=${qiRhoSource ?? "n/a"}`,
+      `metric=${qiMetricDerived == null ? "n/a" : qiMetricDerived ? "derived" : "proxy"}`,
+      qiStrictMode === true
+        ? `strict=${qiStrictOk === true ? "on:ok" : `on:fail(${qiStrictReason ?? "unknown"})`}`
+        : "strict=off",
+    ].join("  |  "),
+    guard: qiStrictBlocked
+      ? "fail"
+      : fordOk === true
+        ? "pass"
+        : fordOk === false
+          ? "fail"
+          : "na",
     guardLabel:
-      fordOk === true ? "FR OK" : fordOk === false ? "FR FAIL" : undefined,
-    proxy: proxyFrom(["zeta", "ford_roman_ok"]),
+      qiStrictBlocked
+        ? "strict metric blocked"
+        : fordOk === true
+          ? "FR OK"
+          : fordOk === false
+            ? "FR FAIL"
+            : undefined,
+    proxy: proxyFrom([
+      "zeta",
+      "ford_roman_ok",
+      "qi_rho_source",
+      "qi_metric_derived",
+      "qi_metric_source",
+      "qi_metric_reason",
+      "qi_strict_mode",
+      "qi_strict_ok",
+      "qi_strict_reason",
+    ]),
+  });
+
+  rows.push({
+    id: "qi_metric_path",
+    label: "QI metric path",
+    equation: "metric-derived QI rho source provenance",
+    value: [
+      `metric_derived=${
+        qiMetricDerived == null ? "n/a" : qiMetricDerived ? "true" : "false"
+      }`,
+      `source=${qiMetricSource ?? "n/a"}`,
+      `reason=${qiMetricReason ?? "n/a"}`,
+      `rho_source=${qiRhoSource ?? "n/a"}`,
+    ].join("  |  "),
+    guard:
+      qiMetricDerived == null
+        ? "na"
+        : qiMetricDerived
+          ? "pass"
+          : "fail",
+    guardLabel:
+      qiMetricDerived == null
+        ? undefined
+        : qiMetricDerived
+          ? "geometry-derived"
+          : "proxy-only",
+    proxy: proxyFrom([
+      "qi_metric_derived",
+      "qi_metric_source",
+      "qi_metric_reason",
+      "qi_rho_source",
+    ]),
+  });
+
+  rows.push({
+    id: "qi_strict",
+    label: "QI strict congruence",
+    equation: "strict mode requires metric-derived QI rho source",
+    value: [
+      `mode=${qiStrictMode == null ? "n/a" : qiStrictMode ? "on" : "off"}`,
+      `ok=${qiStrictOk == null ? "n/a" : qiStrictOk ? "true" : "false"}`,
+      `reason=${qiStrictReason ?? "n/a"}`,
+      `metric_derived=${
+        qiMetricDerived == null ? "n/a" : qiMetricDerived ? "true" : "false"
+      }`,
+      `metric_source=${qiMetricSource ?? "n/a"}`,
+      `metric_reason=${qiMetricReason ?? "n/a"}`,
+      `rho_source=${qiRhoSource ?? "n/a"}`,
+    ].join("  |  "),
+    guard:
+      qiStrictMode === true
+        ? qiStrictOk === true
+          ? "pass"
+          : "fail"
+        : "na",
+    guardLabel:
+      qiStrictMode === true
+        ? qiStrictOk === true
+          ? "metric source"
+          : "proxy blocked"
+        : undefined,
+    proxy: proxyFrom([
+      "qi_strict_mode",
+      "qi_strict_ok",
+      "qi_strict_reason",
+      "qi_metric_derived",
+      "qi_metric_source",
+      "qi_metric_reason",
+      "qi_rho_source",
+    ]),
   });
 
   // Quantum Interest book (debt / credit)
@@ -336,6 +663,24 @@ function buildLedgerRows(
       ],
     ),
   });
+  if (vdbTwoWallSupport != null || vdbTwoWallDerivativeSupport != null) {
+    const supportLabel =
+      vdbTwoWallSupport === true ? "yes" : vdbTwoWallSupport === false ? "no" : "n/a";
+    const derivLabel =
+      vdbTwoWallDerivativeSupport === true
+        ? "yes"
+        : vdbTwoWallDerivativeSupport === false
+          ? "no"
+          : "n/a";
+    rows.push({
+      id: "vdb_two_wall_support",
+      label: "VdB two-wall derivative support",
+      equation: "region II + IV derivative support",
+      value: `two_wall=${supportLabel}  |  deriv=${derivLabel}`,
+      guard: "na",
+      proxy: proxyFrom(["vdb_two_wall_support", "vdb_two_wall_derivative_support"]),
+    });
+  }
 
   // Mechanical feasibility (single tile)
   const hasMarginDeficit =
@@ -417,13 +762,33 @@ export function FrontProofsLedger() {
   const { data: pack, isLoading, error } = useProofPack({
     refetchInterval: 5000,
   });
+  const contractQuery = useGrConstraintContract({ enabled: true, refetchInterval: 2000 });
   const stageGate = useMathStageGate(PROOF_PACK_STAGE_REQUIREMENTS, {
     staleTime: 30_000,
   });
   const stageLabel = stageGate.pending
     ? "STAGE..."
     : STAGE_LABELS[stageGate.stage];
-  const rows = buildLedgerRows(pack, !stageGate.ok);
+  const contractGuardrails = contractQuery.data?.guardrails ?? null;
+  const contractStatuses = contractGuardrails
+    ? ([
+        contractGuardrails.fordRoman,
+        contractGuardrails.thetaAudit,
+        contractGuardrails.tsRatio,
+        contractGuardrails.vdbBand,
+      ] as ContractGuardrailStatus[])
+    : null;
+  const contractSource = contractQuery.data?.sources?.grDiagnostics ?? "missing";
+  const strictMode = isStrictProofPack(pack);
+  const contractStatusesStrict =
+    strictMode && contractStatuses
+      ? contractStatuses.map((status) =>
+          status === "proxy" || status === "missing" ? "fail" : status,
+        )
+      : contractStatuses;
+  const contractBadgeClass = contractSummaryClass(contractStatusesStrict);
+  const rows = buildLedgerRows(pack, !stageGate.ok, strictMode);
+  const visibleRows = strictMode ? rows.filter((row) => !row.proxy) : rows;
 
   return (
     <Card className="bg-slate-950/80 border-cyan-500/40">
@@ -442,7 +807,19 @@ export function FrontProofsLedger() {
             >
               {stageLabel}
             </Badge>
-            {proxyBadge(!stageGate.ok)}
+            {proxyBadge(!stageGate.ok, strictMode)}
+            {contractGuardrails ? (
+              <Badge className={cn("border px-2 py-0.5 text-[10px]", contractBadgeClass)}>
+                {`contract FR=${contractGuardrails.fordRoman} TH=${contractGuardrails.thetaAudit} TS=${contractGuardrails.tsRatio} VdB=${contractGuardrails.vdbBand}`}
+              </Badge>
+            ) : (
+              <Badge className="border border-slate-600 bg-slate-900/70 px-2 py-0.5 text-[10px] text-slate-200">
+                contract unavailable
+              </Badge>
+            )}
+            <Badge className="border border-slate-600 bg-slate-900/70 px-2 py-0.5 text-[10px] text-slate-200">
+              {`source=${contractSource}`}
+            </Badge>
             <span>Math Ledger (proof pack)</span>
           </span>
         </CardTitle>
@@ -454,27 +831,27 @@ export function FrontProofsLedger() {
             Failed to load proof pack. Check /api/helix/pipeline/proofs.
           </div>
         )}
-        {!isLoading && !error && rows.length === 0 && (
+        {!isLoading && !error && visibleRows.length === 0 && (
           <div className="text-slate-400">
             No ledger rows available (proof pack empty).
           </div>
         )}
-        {rows.length > 0 && (
+        {visibleRows.length > 0 && (
           <div className="divide-y divide-slate-800">
-            {rows.map((row) => (
+            {visibleRows.map((row) => (
               <div key={row.id} className="py-2">
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <div className="font-semibold text-slate-100">
                     {row.label}
                     {guardBadge(row.guard, row.guardLabel)}
-                    {proxyBadge(row.proxy)}
+                    {proxyBadge(row.proxy, strictMode)}
                   </div>
                   <div className="font-mono text-[10px] text-slate-400">
                     {row.equation}
                   </div>
                 </div>
                 <div className="font-mono text-[11px] text-slate-200 break-words">
-                  {row.value}
+                  {strictMode && row.proxy ? "non-admissible (proxy)" : row.value}
                 </div>
               </div>
             ))}

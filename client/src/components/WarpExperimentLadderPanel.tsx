@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
 
 type TelemetryBinding = {
   label: string;
@@ -215,18 +216,22 @@ export default function WarpExperimentLadderPanel() {
 
   return (
     <div className="flex h-full w-full flex-col bg-slate-950 text-slate-50">
-      <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-        <div className="space-y-1">
-          <p className="text-[11px] uppercase tracking-wide text-slate-400">Helix experiment ladder</p>
-          <h1 className="flex items-center gap-2 text-xl font-semibold text-white">
-            <ClipboardList className="h-5 w-5 text-emerald-300" />
-            Warp Experiment Ladder
-          </h1>
-          <p className="text-xs text-slate-300">
-            Seven rungs from Casimir tiles to Natario warp checks, pinned to live Helix/Needle telemetry so you can
-            literally check them off.
-          </p>
-        </div>
+        <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <div className="space-y-1">
+            <p className="text-[11px] uppercase tracking-wide text-slate-400">Helix experiment ladder</p>
+            <h1 className="flex items-center gap-2 text-xl font-semibold text-white">
+              <ClipboardList className="h-5 w-5 text-emerald-300" />
+              Warp Experiment Ladder
+            </h1>
+            <p className="text-xs text-slate-300">
+              Seven rungs from Casimir tiles to Natario warp checks, pinned to live Helix/Needle telemetry so you can
+              literally check them off.
+            </p>
+            <PipelineCongruenceBadge
+              label="stress"
+              meta={pipeline?.stressMeta}
+            />
+          </div>
         <div className="flex items-center gap-2 text-xs text-slate-200">
           <Badge variant="outline" className="border-emerald-400/50 bg-emerald-500/10 text-emerald-100">
             Live pipeline

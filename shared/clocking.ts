@@ -9,6 +9,10 @@ export type ClockingSnapshot = {
   detail: string;
   dwell_ms: number | null;
   burst_ms: number | null;
+  metricDerived?: boolean;
+  metricDerivedSource?: string;
+  metricDerivedReason?: string;
+  metricDerivedChart?: string;
 };
 
 export type ClockingInput = {

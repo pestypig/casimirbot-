@@ -8,6 +8,7 @@ import { useEnergyPipeline } from '@/hooks/use-energy-pipeline';
 import type { VacuumGapSweepRow } from '@shared/schema';
 import { cn } from '@/lib/utils';
 import { getSweepGuardReasons } from '@/lib/sweep-guards';
+import PipelineCongruenceBadge from '@/components/common/PipelineCongruenceBadge';
 
 const FALLBACK = '-';
 
@@ -306,11 +307,11 @@ export function CavityMechanismPanel({ className }: { className?: string }) {
 
   return (
     <Card className={cn('border-slate-800 bg-slate-950/75 text-slate-100', className)}>
-      <CardHeader className="space-y-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-100">
-            <Waves className="h-5 w-5 text-cyan-300" />
-            Casimir Tile Cavity
+        <CardHeader className="space-y-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-100">
+              <Waves className="h-5 w-5 text-cyan-300" />
+              Casimir Tile Cavity
           </CardTitle>
           <Badge
             className={cn(
@@ -322,12 +323,16 @@ export function CavityMechanismPanel({ className }: { className?: string }) {
             title={isMock ? 'DEV mock fixture active — deterministic output' : 'Live endpoint values'}
           >
             {isMock ? 'DEV MOCK' : 'LIVE'}
-          </Badge>
-        </div>
-        <CardDescription className="text-xs text-slate-400">
-          Geometry, drive, and sweep baseline pulled from the active HELIX pipeline snapshot.
-        </CardDescription>
-      </CardHeader>
+            </Badge>
+          </div>
+          <PipelineCongruenceBadge
+            label="stress"
+            meta={pipeline?.stressMeta}
+          />
+          <CardDescription className="text-xs text-slate-400">
+            Geometry, drive, and sweep baseline pulled from the active HELIX pipeline snapshot.
+          </CardDescription>
+        </CardHeader>
       <CardContent className="space-y-6">
         <section>
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">

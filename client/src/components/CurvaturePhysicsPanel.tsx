@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { HelpCircle, Copy } from "lucide-react";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
 
 /**
  * CurvaturePhysicsPanel
@@ -203,6 +204,11 @@ export default function CurvaturePhysicsPanel({
                   </TooltipContent>
                 </Tooltip>
               </CardTitle>
+              <PipelineCongruenceBadge
+                label="curvature"
+                meta={pipeline?.curvatureMeta}
+                className="mt-2"
+              />
               <CardDescription className="text-xs">Mode: <span className="uppercase">{String(mode)}</span></CardDescription>
             </div>
             <div className="flex items-center gap-2">

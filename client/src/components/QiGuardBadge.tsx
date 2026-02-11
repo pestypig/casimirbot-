@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import type { QiGuardrail } from "@/types/pipeline";
+import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
 
 type QiGuardBadgeProps = {
   className?: string;
@@ -217,17 +218,22 @@ export function QiGuardBadge({ className, onClick, title = "QI" }: QiGuardBadgeP
           ) : null}
         </div>
       </PopoverTrigger>
-      <PopoverContent
-        side="bottom"
-        align="start"
-        sideOffset={8}
-        className="w-[360px] max-w-[440px] border-slate-800/80 bg-slate-950/95 text-slate-50"
-      >
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-200">QI guard details</p>
-        <pre className="mt-2 max-h-80 whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-slate-100">
-          {titleText}
-        </pre>
-      </PopoverContent>
+        <PopoverContent
+          side="bottom"
+          align="start"
+          sideOffset={8}
+          className="w-[360px] max-w-[440px] border-slate-800/80 bg-slate-950/95 text-slate-50"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-200">QI guard details</p>
+          <pre className="mt-2 max-h-80 whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-slate-100">
+            {titleText}
+          </pre>
+          <PipelineCongruenceBadge
+            label="stress"
+            meta={pipeline?.stressMeta}
+            className="mt-3"
+          />
+        </PopoverContent>
     </Popover>
   );
 }

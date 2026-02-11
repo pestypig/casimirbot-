@@ -22,7 +22,15 @@
         "math-evidence-registry",
         "bridge-math-maturity-stages-math-evidence-registry"
       ],
-      "links": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "CL4 only when constraint inputs are geometry-derived."
+        }
+      ],
       "summary": "A navigable map of math maturity stages and the GR/warp verification walk.",
       "nodeType": "concept",
       "inputs": [],
@@ -52,7 +60,49 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:5a26d0ef40faa96f5ae27b3c62d89166172168caf090291bff97e91c0161b242"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "math-maturity-stages": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "math-pipeline-walk": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "math-verification-gates": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "math-evidence-registry": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-math-maturity-stages-math-evidence-registry": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "math-maturity-stages",
@@ -75,7 +125,9 @@
       "links": [
         {
           "rel": "see-also",
-          "to": "math-evidence-registry"
+          "to": "math-evidence-registry",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Stages define which claims are allowed and which checks are required.",
@@ -109,6 +161,41 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "stage-exploratory": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "stage-reduced-order": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "stage-diagnostic": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "stage-certified": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -127,7 +214,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-maturity-stages"
+          "to": "math-maturity-stages",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Intuition-building and visualization without hard pass/fail claims.",
@@ -161,7 +250,12 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:5a26d0ef40faa96f5ae27b3c62d89166172168caf090291bff97e91c0161b242"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "stage-reduced-order",
@@ -179,7 +273,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-maturity-stages"
+          "to": "math-maturity-stages",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Coarse estimates and proxy constraints with regression snapshots.",
@@ -213,7 +309,12 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:5a26d0ef40faa96f5ae27b3c62d89166172168caf090291bff97e91c0161b242"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "stage-diagnostic",
@@ -231,7 +332,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-maturity-stages"
+          "to": "math-maturity-stages",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Constraint residuals and stability checks enable diagnostic claims.",
@@ -265,7 +368,12 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:5a26d0ef40faa96f5ae27b3c62d89166172168caf090291bff97e91c0161b242"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "stage-certified",
@@ -283,15 +391,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-maturity-stages"
+          "to": "math-maturity-stages",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "math-verification-gates"
+          "to": "math-verification-gates",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "pipeline-certificate"
+          "to": "pipeline-certificate",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Pass/fail under named constraints with certificate integrity checks.",
@@ -331,7 +445,12 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ea15b50192ab5837923460268e2cf14a528ef7cbcc542a0bad31e56494a36e8d"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "math-pipeline-walk",
@@ -356,7 +475,9 @@
       "links": [
         {
           "rel": "see-also",
-          "to": "math-verification-gates"
+          "to": "math-verification-gates",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Narrative walk from energy pipeline to viability certificate.",
@@ -390,7 +511,56 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ed887d7c2f0e727373cae717c79ffdb9c0c626641f354bed5d775871de86a33b"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "pipeline_trace",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "pipeline-energy": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "pipeline-stress-energy": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "pipeline-gr-evolution": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "pipeline-constraint-gate": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "pipeline-viability": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "pipeline-certificate": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "pipeline-energy",
@@ -414,11 +584,15 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-pipeline-walk"
+          "to": "math-pipeline-walk",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "pipeline-stress-energy"
+          "to": "pipeline-stress-energy",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Compute dynamic Casimir and warp proxy inputs.",
@@ -452,6 +626,48 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "energy-pipeline-core": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "dynamic-casimir-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "qi-guardrails-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "phase-control-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "energy-field-inputs": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -475,11 +691,15 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-pipeline-walk"
+          "to": "math-pipeline-walk",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "pipeline-gr-evolution"
+          "to": "pipeline-gr-evolution",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Map pipeline outputs into stress-energy fields.",
@@ -519,6 +739,41 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "stress-energy-equations": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "stress-energy-brick": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-stress-energy-fields": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "stress-energy-integrals": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -546,11 +801,15 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-pipeline-walk"
+          "to": "math-pipeline-walk",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "pipeline-constraint-gate"
+          "to": "pipeline-constraint-gate",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Evolve BSSN fields and compute diagnostics.",
@@ -590,6 +849,69 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "gr-initial-data": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-evolution-solver": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-evolution-brick": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bssn-state": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bssn-evolution-core": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "rk4-integrator": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "stencils": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-diagnostics": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -597,7 +919,7 @@
       "slug": "pipeline-constraint-gate",
       "title": "Constraint Gate",
       "excerpt": "Evaluate constraints against threshold policies.",
-      "bodyMD": "Constraint evaluation applies GR thresholds to diagnostics (server/gr/constraint-evaluator.ts).\n\nMinimal artifact: constraint gate summary.",
+      "bodyMD": "Constraint evaluation applies GR thresholds to diagnostics (server/gr/constraint-evaluator.ts).\n\nMinimal artifact: constraint gate summary and CL4 trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
       "tags": [
         "constraints",
         "gate",
@@ -611,11 +933,29 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-pipeline-walk"
+          "to": "math-pipeline-walk",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "pipeline-viability"
+          "to": "pipeline-viability",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "CL4 only when constraint inputs are geometry-derived."
+        },
+        {
+          "rel": "see-also",
+          "to": "adm-3plus1",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "ADM constraints anchor the gate when chart/units are consistent."
         }
       ],
       "summary": "Evaluate constraints against threshold policies.",
@@ -718,6 +1058,27 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "gr-constraint-policy": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-constraint-network": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -725,7 +1086,7 @@
       "slug": "pipeline-viability",
       "title": "Warp Viability",
       "excerpt": "Combine pipeline outputs with guardrails to evaluate viability.",
-      "bodyMD": "Warp viability evaluates pipeline outputs against guardrails (tools/warpViability.ts, modules/physics/warpAgents.ts).\n\nMinimal artifact: viability evaluation summary.",
+      "bodyMD": "Warp viability evaluates pipeline outputs against guardrails (tools/warpViability.ts, modules/physics/warpAgents.ts).\n\nGuardrail note: CL3_RhoDelta compares constraint-derived rho to a T00 reference; CL4 requires geometry-derived T00 (see docs/warp-geometry-cl4-guardrail-map.md).\n\nMinimal artifact: viability evaluation summary.",
       "tags": [
         "viability",
         "warp",
@@ -733,17 +1094,26 @@
         "evaluation"
       ],
       "children": [
+        "cl3-rho-delta-guardrail",
+        "theta-audit-guardrail",
+        "ford-roman-qi-guardrail",
+        "vdb-band-guardrail",
+        "ts-ratio-guardrail",
         "warp-viability-sim",
         "phase-diagram-validation"
       ],
       "links": [
         {
           "rel": "parent",
-          "to": "math-pipeline-walk"
+          "to": "math-pipeline-walk",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "pipeline-certificate"
+          "to": "pipeline-certificate",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Combine pipeline outputs with guardrails to evaluate viability.",
@@ -752,8 +1122,8 @@
         {
           "type": "code",
           "path": "tools/warpViability.ts",
-          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
-          "content_hash": "sha256:cd7c8fbaf82d248b9f9ecd08799f2e047606668d33b25bcd3a49112c2c6e7ea6"
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:af1a213268a493e9389a882d7e115ca7fe620a033cbacb98afbb1d7a103977d6"
         },
         {
           "type": "code",
@@ -762,8 +1132,62 @@
           "content_hash": "sha256:ae1c954c0e5e5ecb509fddcf17625fe0f9fc26fe93b23ab8e8aa444b1d88dd0c"
         }
       ],
-      "inputs": [],
-      "outputs": [],
+      "inputs": [
+        {
+          "name": "rho_constraint_mean",
+          "unit": "1",
+          "type": "float",
+          "source": "GrConstraintDiagnostics.rho_constraint.mean"
+        },
+        {
+          "name": "rho_delta_mean",
+          "unit": "1",
+          "type": "float",
+          "source": "WarpViabilityMetrics.rho_delta_mean"
+        },
+        {
+          "name": "rho_delta_metric_mean",
+          "unit": "1",
+          "type": "float",
+          "source": "WarpViabilityMetrics.rho_delta_metric_mean"
+        },
+        {
+          "name": "rho_delta_pipeline_mean",
+          "unit": "1",
+          "type": "float",
+          "source": "WarpViabilityMetrics.rho_delta_pipeline_mean"
+        },
+        {
+          "name": "rho_delta_threshold",
+          "unit": "1",
+          "type": "float",
+          "source": "DEFAULT_CL3_RHO_DELTA_MAX"
+        },
+        {
+          "name": "rho_delta_source",
+          "unit": "1",
+          "type": "string",
+          "source": "WarpViabilityMetrics.rho_delta_source"
+        },
+        {
+          "name": "rho_delta_metric_source",
+          "unit": "1",
+          "type": "string",
+          "source": "WarpViabilityMetrics.rho_delta_metric_source"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "status",
+          "unit": "1",
+          "type": "ViabilityStatus"
+        },
+        {
+          "name": "constraints",
+          "unit": "1",
+          "type": "ConstraintEntry[]"
+        }
+      ],
       "assumptions": [],
       "validity": {},
       "deterministic": null,
@@ -783,6 +1207,607 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "cl3-rho-delta-guardrail": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "theta-audit-guardrail": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "ford-roman-qi-guardrail": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "vdb-band-guardrail": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "ts-ratio-guardrail": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "warp-viability-sim": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "phase-diagram-validation": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
+    },
+    {
+      "id": "cl3-rho-delta-guardrail",
+      "slug": "cl3-rho-delta-guardrail",
+      "title": "CL3 Rho Delta Guardrail",
+      "excerpt": "Compare constraint rho to a T00 reference for CL3 congruence checks.",
+      "bodyMD": "CL3_RhoDelta compares constraint-derived rho to a T00 reference (matter, metric, or pipeline). CL4 requires geometry-derived T00 in the same chart and normalization (see docs/warp-geometry-cl4-guardrail-map.md).\n\nMinimal artifact: CL3 rho-delta summary.",
+      "tags": [
+        "cl3",
+        "rho",
+        "guardrails",
+        "constraints"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-viability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Uses constraint-derived rho; CL4 requires geometry-derived T00 reference."
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Constraint diagnostics feed the CL3 delta check."
+        }
+      ],
+      "summary": "Compare constraint rho to a T00 reference for congruence checks.",
+      "nodeType": "derived",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "tools/warpViability.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:af1a213268a493e9389a882d7e115ca7fe620a033cbacb98afbb1d7a103977d6"
+        },
+        {
+          "type": "code",
+          "path": "server/helix-proof-pack.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:b818874efe0a52463c6a13fa94401099f516d8f5720af2e333729e6bb29d31eb"
+        },
+        {
+          "type": "doc",
+          "path": "docs/warp-geometry-cl4-guardrail-map.md",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:945b6580ecf1ea8a21ca60b9ede2684195d2986e4181a52b2ef6df8aa6981855"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "rho_constraint_mean",
+          "unit": "1",
+          "type": "float",
+          "source": "GrConstraintDiagnostics.rho_constraint.mean"
+        },
+        {
+          "name": "matter_avgT00",
+          "unit": "1",
+          "type": "float",
+          "source": "GrConstraintDiagnostics.matter.avgT00"
+        },
+        {
+          "name": "metric_t00_geom_mean",
+          "unit": "1",
+          "type": "float",
+          "source": "warp.stressEnergyTensor.T00*SI_TO_GEOM_STRESS"
+        },
+        {
+          "name": "pipeline_rho_avg_geom",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline.rho_avg*SI_TO_GEOM_STRESS"
+        },
+        {
+          "name": "rho_delta_threshold",
+          "unit": "1",
+          "type": "float",
+          "source": "DEFAULT_CL3_RHO_DELTA_MAX"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rho_delta_mean",
+          "unit": "1",
+          "type": "float"
+        },
+        {
+          "name": "rho_delta_metric_mean",
+          "unit": "1",
+          "type": "float"
+        },
+        {
+          "name": "rho_delta_pipeline_mean",
+          "unit": "1",
+          "type": "float"
+        },
+        {
+          "name": "rho_delta_source",
+          "unit": "1",
+          "type": "string"
+        }
+      ],
+      "assumptions": [
+        "T00 reference must use the same chart and normalization as constraint rho."
+      ],
+      "validity": {
+        "metrics": {
+          "finite": true
+        }
+      },
+      "deterministic": true,
+      "tolerance": null,
+      "environment": {
+        "runtime": "node"
+      },
+      "dependencies": [
+        "pipeline-viability",
+        "pipeline-constraint-gate"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "tolerance"
+        ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {}
+    },
+    {
+      "id": "theta-audit-guardrail",
+      "slug": "theta-audit-guardrail",
+      "title": "Theta Audit Guardrail",
+      "excerpt": "Checks theta (metric-adapter divergence when available) against the configured band.",
+      "bodyMD": "ThetaAudit enforces the theta band using metric-adapter divergence (D_i beta^i) when available; proxy thetaCal remains as a labeled fallback (see docs/warp-geometry-cl4-guardrail-map.md).\n\nMinimal artifact: theta audit constraint summary.",
+      "tags": [
+        "theta",
+        "guardrails",
+        "conditional",
+        "warp"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-viability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "theta-semantics",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Theta semantics are geometry-derived when metric adapter diagnostics are available; proxy fallback remains labeled."
+        }
+      ],
+      "summary": "Checks theta against the configured band (metric-adapter divergence preferred).",
+      "nodeType": "derived",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "tools/warpViability.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:af1a213268a493e9389a882d7e115ca7fe620a033cbacb98afbb1d7a103977d6"
+        },
+        {
+          "type": "doc",
+          "path": "docs/warp-geometry-cl4-guardrail-map.md",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:945b6580ecf1ea8a21ca60b9ede2684195d2986e4181a52b2ef6df8aa6981855"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "theta_geom",
+          "unit": "1/m",
+          "type": "float",
+          "source": "warp.metricAdapter.betaDiagnostics.thetaMax|thetaRms"
+        },
+        {
+          "name": "theta_pipeline_proxy",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline.thetaCal"
+        },
+        {
+          "name": "theta_max",
+          "unit": "1",
+          "type": "float",
+          "source": "WARP_AGENTS.ThetaAudit.theta_max"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "theta_audit_constraint",
+          "unit": "1",
+          "type": "ConstraintEntry",
+          "source": "WarpViabilityResult.constraints[ThetaAudit]"
+        }
+      ],
+      "assumptions": [
+        "theta_geom is preferred when metric adapter diagnostics are present; theta_pipeline_proxy remains a labeled fallback."
+      ],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "pipeline-viability"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "ford-roman-qi-guardrail",
+      "slug": "ford-roman-qi-guardrail",
+      "title": "Ford-Roman QI Guardrail",
+      "excerpt": "Checks QI margin ratio against the Ford-Roman bound with strict metric-source gating.",
+      "bodyMD": "FordRomanQI compares the QI margin ratio (or zeta) to the Ford-Roman bound. In strict congruence mode it requires metric-derived rho/T00 sources and exposes status via qi_strict_* and qi_rho_source (see docs/warp-geometry-cl4-guardrail-map.md).\n\nMinimal artifact: QI margin constraint summary.",
+      "tags": [
+        "qi",
+        "ford-roman",
+        "guardrails",
+        "strict"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-viability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-guardrails-stack",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "qi_metric_derived=true",
+          "note": "QI guardrail is CL4-congruent when strict mode validates metric rho source."
+        }
+      ],
+      "summary": "Checks QI margin ratio against the Ford-Roman bound.",
+      "nodeType": "derived",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/qi/qi-monitor.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:0b30e0afd2298a630fe6413f85936efd2084f61131b0df77224f6421eee7e553"
+        },
+        {
+          "type": "code",
+          "path": "tools/warpViability.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:af1a213268a493e9389a882d7e115ca7fe620a033cbacb98afbb1d7a103977d6"
+        },
+        {
+          "type": "doc",
+          "path": "docs/warp-geometry-cl4-guardrail-map.md",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:945b6580ecf1ea8a21ca60b9ede2684195d2986e4181a52b2ef6df8aa6981855"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "qi_margin_ratio",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline.qiGuardrail.marginRatio"
+        },
+        {
+          "name": "zeta",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline.zeta"
+        },
+        {
+          "name": "qi_rho_source",
+          "unit": "1",
+          "type": "string",
+          "source": "pipeline.qiGuardrail.rhoSource"
+        },
+        {
+          "name": "qi_strict_ok",
+          "unit": "1",
+          "type": "boolean",
+          "source": "proofPack.values.qi_strict_ok"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ford_roman_constraint",
+          "unit": "1",
+          "type": "ConstraintEntry",
+          "source": "WarpViabilityResult.constraints[FordRomanQI]"
+        }
+      ],
+      "assumptions": [
+        "Strict mode requires metric-derived rho source for CL4-congruent FordRomanQI; proxy fallback is explicitly labeled when strict mode is off."
+      ],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "pipeline-viability",
+        "qi-guardrails-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "ts-ratio-guardrail",
+      "slug": "ts-ratio-guardrail",
+      "title": "TS Ratio Guardrail",
+      "excerpt": "Checks TS_ratio against the stability threshold.",
+      "bodyMD": "TS_ratio_min enforces a minimum ratio between light-crossing time and pulse cadence. It remains operational/proxy-only unless derived from proper distances in the active chart (see docs/warp-geometry-cl4-guardrail-map.md).\n\nMinimal artifact: TS ratio constraint summary.",
+      "tags": [
+        "ts",
+        "guardrails",
+        "proxy",
+        "stability"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-viability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-autoscale",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "TS autoscale is operational; TS_ratio remains proxy-only unless derived from metric distances."
+        }
+      ],
+      "summary": "Checks TS_ratio against the stability threshold.",
+      "nodeType": "derived",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "tools/warpViability.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:af1a213268a493e9389a882d7e115ca7fe620a033cbacb98afbb1d7a103977d6"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:0cc006b97fc2e02f7a705bc5b0bccd75a000fbbdb97d39ccbfccc43eeddbd3f1"
+        },
+        {
+          "type": "doc",
+          "path": "docs/warp-geometry-cl4-guardrail-map.md",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:945b6580ecf1ea8a21ca60b9ede2684195d2986e4181a52b2ef6df8aa6981855"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "TS_ratio",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline.TS_ratio"
+        },
+        {
+          "name": "TS_ratio_min",
+          "unit": "1",
+          "type": "float",
+          "source": "DEFAULT_TS_MIN"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ts_ratio_constraint",
+          "unit": "1",
+          "type": "ConstraintEntry",
+          "source": "WarpViabilityResult.constraints[TS_ratio_min]"
+        }
+      ],
+      "assumptions": [
+        "TS_ratio is an operational proxy unless computed from proper distances."
+      ],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "pipeline-viability",
+        "energy-pipeline-core"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "vdb-band-guardrail",
+      "slug": "vdb-band-guardrail",
+      "title": "VdB Band Guardrail",
+      "excerpt": "Checks gamma_VdB against the configured compression band.",
+      "bodyMD": "VdB_band compares gamma_VdB to a configured band based on the pocket floor and planck margin. It remains proxy-only until B(r) derivatives are modeled (see docs/warp-geometry-cl4-guardrail-map.md).\n\nMinimal artifact: VdB band constraint summary.",
+      "tags": [
+        "vdb",
+        "guardrails",
+        "compression",
+        "proxy"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "pipeline-viability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "vdb-compression-factor",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "gamma_VdB is treated as a proxy until B(r) derivatives are modeled for CL2/CL3."
+        }
+      ],
+      "summary": "Checks gamma_VdB against the configured compression band.",
+      "nodeType": "derived",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "tools/warpViability.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:af1a213268a493e9389a882d7e115ca7fe620a033cbacb98afbb1d7a103977d6"
+        },
+        {
+          "type": "code",
+          "path": "server/energy-pipeline.ts",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:0cc006b97fc2e02f7a705bc5b0bccd75a000fbbdb97d39ccbfccc43eeddbd3f1"
+        },
+        {
+          "type": "doc",
+          "path": "docs/warp-geometry-cl4-guardrail-map.md",
+          "repo_rev": "1b80ad7e29d7387666b47f384351cf7ef8b8ea64",
+          "content_hash": "sha256:945b6580ecf1ea8a21ca60b9ede2684195d2986e4181a52b2ef6df8aa6981855"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "gamma_VdB",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline.gammaVanDenBroeck"
+        },
+        {
+          "name": "vdb_limit",
+          "unit": "1",
+          "type": "float",
+          "source": "pipeline.vdbGuard.limit"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "vdb_band_constraint",
+          "unit": "1",
+          "type": "ConstraintEntry",
+          "source": "WarpViabilityResult.constraints[VdB_band]"
+        }
+      ],
+      "assumptions": [
+        "gamma_VdB is a scalar proxy until B(r) derivatives are modeled."
+      ],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "pipeline-viability",
+        "energy-pipeline-core"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -803,11 +1828,15 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-pipeline-walk"
+          "to": "math-pipeline-walk",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "math-verification-gates"
+          "to": "math-verification-gates",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Issue certificate with integrity checks and policy gates.",
@@ -841,6 +1870,20 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "certificate-verify": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -864,11 +1907,15 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-maturity-tree"
+          "to": "math-maturity-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "stage-certified"
+          "to": "stage-certified",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Hard constraints, required tests, and certificate integrity.",
@@ -908,7 +1955,42 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:15f0af7ebbc8cb6535b3fd5fbbcb8e2d47a0d983f8454ad7f8d3d45b6e876842"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "constraint-packs": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "constraint-pack-policy": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "constraint-pack-evaluator": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "constraint-pack-telemetry": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "math-evidence-registry",
@@ -926,11 +2008,15 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-maturity-tree"
+          "to": "math-maturity-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "math-maturity-stages"
+          "to": "math-maturity-stages",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Stage policy, evidence profiles, and dependency graph.",
@@ -988,7 +2074,12 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:a02ea545d0d36b04fb8998d88858ae5dd99dd00e1fcee34adff1bdb5ef16107a"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "energy-pipeline-core",
@@ -1006,7 +2097,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-energy"
+          "to": "pipeline-energy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-quantum-inequality",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Proxy-only unless stress-energy is constraint-derived."
         }
       ],
       "summary": "Central pipeline calculations and state assembly.",
@@ -1040,6 +2140,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1062,7 +2167,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-energy"
+          "to": "pipeline-energy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Dynamic Casimir calculations and geometry coupling.",
@@ -1096,7 +2203,42 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:5e64dd98a978169f5aa81ff831b8363a604d1d66f493436c2b480cf14d7cb692"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "dynamic-casimir-engine": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "natario-metric-engine": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "static-casimir-engine": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "casimir-inference-engine": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "dynamic-casimir-engine",
@@ -1113,7 +2255,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "dynamic-casimir-stack"
+          "to": "dynamic-casimir-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Compute dynamic Casimir energy and sweep curves.",
@@ -1147,6 +2291,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1164,7 +2313,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "dynamic-casimir-stack"
+          "to": "dynamic-casimir-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Compute Natario metric helpers for dynamic Casimir.",
@@ -1198,6 +2349,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1215,7 +2371,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "dynamic-casimir-stack"
+          "to": "dynamic-casimir-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Compute static Casimir energy baseline.",
@@ -1249,6 +2407,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1266,7 +2429,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "dynamic-casimir-stack"
+          "to": "dynamic-casimir-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Infer energy from force series and datasets.",
@@ -1300,6 +2465,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1307,7 +2477,7 @@
       "slug": "qi-guardrails-stack",
       "title": "QI Guardrails Stack",
       "excerpt": "Quantum-inequality monitoring and control loops.",
-      "bodyMD": "QI guardrails apply Ford-Roman bounds, monitoring, and autoscaling.\n\nMinimal artifact: QI guardrail margin report.",
+      "bodyMD": "QI guardrails apply Ford-Roman bounds, monitoring, and autoscaling.\n\nMinimal artifact: QI guardrail margin report and CL4 trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
       "tags": [
         "qi",
         "guardrails",
@@ -1325,7 +2495,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-energy"
+          "to": "pipeline-energy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Quantum-inequality monitoring and control loops.",
@@ -1359,7 +2531,63 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7ca013891c69a6f8bb7b051555aab6e11101d638bc8eefd672c27769a5ae43dd"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "qi-bounds-engine": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "qi-monitor-engine": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "qi-saturation-window": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "qi-stream": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "qi-autoscale": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "qi-autothrottle": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "qi-diagnostics": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "qi-bounds-engine",
@@ -1376,7 +2604,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "qi-guardrails-stack"
+          "to": "qi-guardrails-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Compute Ford-Roman quantum inequality bounds.",
@@ -1410,6 +2640,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1427,7 +2662,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "qi-guardrails-stack"
+          "to": "qi-guardrails-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Kernel-based QI monitor for running averages.",
@@ -1461,6 +2698,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1478,7 +2720,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "qi-guardrails-stack"
+          "to": "qi-guardrails-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Sampling window and saturation estimates.",
@@ -1512,6 +2756,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1529,7 +2778,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "qi-guardrails-stack"
+          "to": "qi-guardrails-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Live QI telemetry aggregation and snapshots.",
@@ -1575,6 +2826,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1592,7 +2848,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "qi-guardrails-stack"
+          "to": "qi-guardrails-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Autoscale QI controls to hold guardrail margins.",
@@ -1626,6 +2884,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1643,7 +2906,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "qi-guardrails-stack"
+          "to": "qi-guardrails-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Throttle controls to prevent guardrail breaches.",
@@ -1677,6 +2942,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1694,7 +2964,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "qi-guardrails-stack"
+          "to": "qi-guardrails-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Schema for QI diagnostic payloads.",
@@ -1728,6 +3000,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1750,7 +3027,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-energy"
+          "to": "pipeline-energy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Phase scheduling, calibration, and pump control.",
@@ -1790,7 +3069,42 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d15ae186f8b765690c3baee80f12026f10b413482cd8481eb2dc9c03cb63affc"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "pipeline_trace",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "phase-scheduler": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "phase-calibration": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "pump-controls": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "ts-autoscale": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "phase-scheduler",
@@ -1807,7 +3121,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "phase-control-stack"
+          "to": "phase-control-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Compute sector phase offsets and pulse alignment.",
@@ -1841,6 +3157,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1858,7 +3179,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "phase-control-stack"
+          "to": "phase-control-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Record calibration snapshots for phase tuning.",
@@ -1896,6 +3219,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1913,7 +3241,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "phase-control-stack"
+          "to": "phase-control-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Drive pump command generation for pulses.",
@@ -1953,6 +3283,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "pipeline_trace",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1970,7 +3305,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "phase-control-stack"
+          "to": "phase-control-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Autoscale TS ratio to stabilize cadence.",
@@ -2004,6 +3341,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2028,7 +3370,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-energy"
+          "to": "pipeline-energy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Schema and adapters for pipeline energy fields.",
@@ -2068,7 +3412,56 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:99363b878655d0793ec6d9e33fce358614d4539cf7fc877c7291252e63d04145"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "raster-energy-field": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "tokamak-energy-field": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "solar-energy-calibration": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "tokamak-synthetic-diagnostics": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "solar-energy-adapter": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "tokamak-energy-adapter": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "raster-energy-field",
@@ -2085,7 +3478,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "energy-field-inputs"
+          "to": "energy-field-inputs",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Canonical raster energy-field contract.",
@@ -2119,6 +3514,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2136,7 +3536,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "energy-field-inputs"
+          "to": "energy-field-inputs",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Tokamak channel manifests and energy fields.",
@@ -2170,6 +3572,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2187,7 +3594,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "energy-field-inputs"
+          "to": "energy-field-inputs",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Calibration for solar intensity to energy density.",
@@ -2221,6 +3630,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2238,7 +3652,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "energy-field-inputs"
+          "to": "energy-field-inputs",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Synthetic diagnostic schema for tokamak inputs.",
@@ -2272,6 +3688,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2289,7 +3710,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "energy-field-inputs"
+          "to": "energy-field-inputs",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Adapter for solar telemetry to energy fields.",
@@ -2323,6 +3746,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2340,7 +3768,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "energy-field-inputs"
+          "to": "energy-field-inputs",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Adapter for tokamak telemetry to energy fields.",
@@ -2374,6 +3804,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2391,7 +3826,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-stress-energy"
+          "to": "pipeline-stress-energy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Compute stress-energy tensors from pipeline fields.",
@@ -2522,6 +3959,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2539,7 +3981,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-stress-energy"
+          "to": "pipeline-stress-energy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Brick that packages stress-energy for GR.",
@@ -2713,6 +4157,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2730,7 +4179,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-stress-energy"
+          "to": "pipeline-stress-energy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "GR stress-energy field representation.",
@@ -2843,6 +4294,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2860,7 +4316,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-stress-energy"
+          "to": "pipeline-stress-energy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Compute integrals over stress-energy fields.",
@@ -2976,6 +4434,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2993,7 +4456,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-gr-evolution"
+          "to": "pipeline-gr-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Initialize GR fields for evolution.",
@@ -3033,6 +4498,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3050,7 +4520,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-gr-evolution"
+          "to": "pipeline-gr-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Orchestrate GR evolution steps.",
@@ -3084,6 +4556,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3101,7 +4578,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-gr-evolution"
+          "to": "pipeline-gr-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Brick wrapper for GR evolution runs.",
@@ -3141,6 +4620,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3158,7 +4642,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-gr-evolution"
+          "to": "pipeline-gr-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "State containers for BSSN fields.",
@@ -3192,6 +4678,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3209,7 +4700,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-gr-evolution"
+          "to": "pipeline-gr-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Core BSSN evolution step.",
@@ -3243,6 +4736,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3260,7 +4758,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-gr-evolution"
+          "to": "pipeline-gr-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Runge-Kutta integrator for BSSN fields.",
@@ -3294,6 +4794,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3311,7 +4816,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-gr-evolution"
+          "to": "pipeline-gr-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Stencil operators for derivatives and boundaries.",
@@ -3345,6 +4852,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3362,7 +4874,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-gr-evolution"
+          "to": "pipeline-gr-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Diagnostics for shift stiffness and stability.",
@@ -3396,6 +4910,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3413,7 +4932,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-constraint-gate"
+          "to": "pipeline-constraint-gate",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Constraint policy thresholds and modes.",
@@ -3483,6 +5004,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3500,7 +5026,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-constraint-gate"
+          "to": "pipeline-constraint-gate",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Compute constraint residuals for GR.",
@@ -3621,7 +5149,7 @@
       },
       "deterministic": true,
       "tolerance": {
-        "abs": 0.000001
+        "abs": 1e-06
       },
       "environment": {
         "runtime": "node"
@@ -3635,6 +5163,11 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3652,7 +5185,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-viability"
+          "to": "pipeline-viability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Simplified viability calculation for pipeline sanity checks.",
@@ -3686,6 +5221,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3703,7 +5243,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-certificate"
+          "to": "pipeline-certificate",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Verify certificate hashes and integrity.",
@@ -3737,6 +5279,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3754,7 +5301,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-verification-gates"
+          "to": "math-verification-gates",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Constraint pack definitions and ladder tiers.",
@@ -3794,6 +5343,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3811,7 +5365,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-verification-gates"
+          "to": "math-verification-gates",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Policy profiles for constraint packs.",
@@ -3851,6 +5407,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3868,7 +5429,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-verification-gates"
+          "to": "math-verification-gates",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Evaluate telemetry against pack constraints.",
@@ -3908,6 +5471,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3925,7 +5493,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-verification-gates"
+          "to": "math-verification-gates",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Telemetry ingestion for constraint evaluation.",
@@ -3959,6 +5529,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -3976,7 +5551,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "pipeline-viability"
+          "to": "pipeline-viability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Validate viability outputs against phase diagram expectations.",
@@ -4016,6 +5593,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -4037,15 +5619,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "math-maturity-tree"
+          "to": "math-maturity-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "math-maturity-stages"
+          "to": "math-maturity-stages",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "math-evidence-registry"
+          "to": "math-evidence-registry",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -4093,7 +5681,12 @@
         }
       ],
       "slug": "bridge-math-maturity-stages-math-evidence-registry",
-      "summary": "Bridge between Math Maturity Stages and Math Evidence Registry."
+      "summary": "Bridge between Math Maturity Stages and Math Evidence Registry.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     }
   ],
   "schema": {

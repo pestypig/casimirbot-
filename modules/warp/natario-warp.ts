@@ -8,10 +8,18 @@
  */
 
 import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
+import { GEOM_TO_SI_STRESS } from '../../shared/gr-units.js';
 import { casimirEnergyDensity } from '../dynamic/stress-energy-equations.js';
 import type { SimulationParameters, WarpGeometry, WarpGeometryKind } from '../../shared/schema.js';
+import {
+  buildWarpMetricAdapterSnapshot,
+  type WarpMetricAdapterSnapshot,
+  type WarpChartLabel,
+  type WarpMetricFamily,
+} from './warp-metric-adapter.js';
 
 export type MassMode = "MODEL_DERIVED" | "TARGET_CALIBRATED" | "MEASURED_FORCE_INFERRED";
+export type StressEnergySource = "metric" | "pipeline" | "proxy";
 
 type Vec3 = [number, number, number];
 
@@ -32,6 +40,223 @@ const vecDot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const vecNormalize = (v: Vec3): Vec3 => {
   const m = vecLen(v) || 1;
   return [v[0] / m, v[1] / m, v[2] / m];
+};
+const INV16PI = 1 / (16 * Math.PI);
+
+const clampDenominator = (value: number) => {
+  if (value >= 0) return Math.max(value, 1e-12);
+  return Math.min(value, -1e-12);
+};
+
+const alcubierreShapeFunction = (rs: number, R: number, sigma: number) => {
+  if (!Number.isFinite(rs)) return 0;
+  const denom = clampDenominator(2 * Math.tanh(sigma * R));
+  const tanhPlus = Math.tanh(sigma * (rs + R));
+  const tanhMinus = Math.tanh(sigma * (rs - R));
+  return (tanhPlus - tanhMinus) / denom;
+};
+
+const alcubierreShapeDerivative = (rs: number, R: number, sigma: number) => {
+  if (!Number.isFinite(rs)) return 0;
+  const denom = clampDenominator(2 * Math.tanh(sigma * R));
+  const sechPlus = 1 / Math.cosh(sigma * (rs + R)) ** 2;
+  const sechMinus = 1 / Math.cosh(sigma * (rs - R)) ** 2;
+  return sigma * (sechPlus - sechMinus) / denom;
+};
+
+const resolveAlcubierreWallThickness = (params: NatarioWarpParams, R: number, sigma?: number) => {
+  const wall =
+    (params.warpGeometry as any)?.wallThickness_m ??
+    params.hullWallThickness_m ??
+    undefined;
+  if (Number.isFinite(wall) && (wall as number) > 0) {
+    return Math.max(1e-9, wall as number);
+  }
+  if (Number.isFinite(sigma) && (sigma as number) > 0) {
+    return Math.max(1e-9, 2 / (sigma as number));
+  }
+  return Math.max(1e-9, R * 0.02);
+};
+
+const calculateAlcubierreShiftField = (params: NatarioWarpParams) => {
+  const defaultR = Math.max(1e-9, (params.bowlRadius || 1) * 1e-6);
+  const R = Number.isFinite(params.bubbleRadius_m)
+    ? Math.max(1e-9, params.bubbleRadius_m as number)
+    : defaultR;
+  const sigma =
+    Number.isFinite(params.bubbleSigma) && (params.bubbleSigma as number) > 0
+      ? Math.max(1e-9, params.bubbleSigma as number)
+      : undefined;
+  const wallThickness = resolveAlcubierreWallThickness(params, R, sigma);
+  const sigmaResolved = sigma ?? Math.max(1e-9, 2 / wallThickness);
+  const v =
+    Number.isFinite(params.bubbleBeta) && (params.bubbleBeta as number) >= 0
+      ? Math.min(0.99, params.bubbleBeta as number)
+      : Math.max(0, params.shiftAmplitude || 0);
+  const center: Vec3 = [0, 0, 0];
+  const driveDir = vecNormalize(
+    params.warpDriveDirection ??
+      (params.warpGeometry as any)?.driveDirection ??
+      [1, 0, 0],
+  );
+  const evaluateShiftVector = (x: number, y: number, z: number): Vec3 => {
+    const dx = x - center[0];
+    const dy = y - center[1];
+    const dz = z - center[2];
+    const rs = Math.hypot(dx, dy, dz);
+    const f = alcubierreShapeFunction(rs, R, sigmaResolved);
+    const beta = -v * f;
+    return [beta * driveDir[0], beta * driveDir[1], beta * driveDir[2]];
+  };
+  return {
+    amplitude: v,
+    R,
+    sigma: sigmaResolved,
+    wallThickness,
+    center,
+    driveDir,
+    netShiftAmplitude: v,
+    evaluateShiftVector,
+  };
+};
+
+const calculateAlcubierreStressEnergy = (
+  params: NatarioWarpParams,
+  shiftMeta: { R: number; sigma: number; amplitude: number },
+) => {
+  const R = shiftMeta.R;
+  const sigma = shiftMeta.sigma;
+  const v = shiftMeta.amplitude;
+  const rSample = Math.max(1e-6, R);
+  const dfdr = alcubierreShapeDerivative(rSample, R, sigma);
+  const yOverR = 1 / Math.sqrt(2);
+  const zOverR = 1 / Math.sqrt(2);
+  const Kxx = -v * dfdr;
+  const Kxy = -0.5 * v * dfdr * yOverR;
+  const Kxz = -0.5 * v * dfdr * zOverR;
+  const trace = Kxx;
+  const kSquared = Kxx * Kxx + 2 * (Kxy * Kxy + Kxz * Kxz);
+  const rhoEulerGeom = (trace * trace - kSquared) * INV16PI;
+  const rhoEuler = rhoEulerGeom * GEOM_TO_SI_STRESS;
+  return {
+    stress: {
+      T00: rhoEuler,
+      T11: -rhoEuler,
+      T22: -rhoEuler,
+      T33: -rhoEuler,
+      isNullEnergyConditionSatisfied: false,
+    },
+    diagnostics: {
+      sampleCount: 1,
+      rhoGeomMean: rhoEulerGeom,
+      rhoSiMean: rhoEuler,
+      kTraceMean: trace,
+      kSquaredMean: kSquared,
+      step_m: rSample,
+      scale_m: rSample,
+    },
+  };
+};
+
+const calculateMetricStressEnergyFromShiftField = (
+  evaluateShiftVector: (x: number, y: number, z: number) => Vec3,
+  opts: { sampleScale_m: number; derivativeStep_m?: number; samplePoints?: Vec3[] },
+) => {
+  const scale = opts.sampleScale_m;
+  if (!Number.isFinite(scale) || scale <= 0) return null;
+  const step = Math.max(1e-9, opts.derivativeStep_m ?? scale * 0.02);
+  const r = Math.max(1e-9, scale);
+  const diag = r / Math.sqrt(2);
+  const points: Vec3[] =
+    opts.samplePoints ?? [
+      [r, 0, 0],
+      [-r, 0, 0],
+      [0, r, 0],
+      [0, -r, 0],
+      [0, 0, r],
+      [0, 0, -r],
+      [diag, diag, 0],
+      [diag, 0, diag],
+      [0, diag, diag],
+    ];
+
+  let sumRho = 0;
+  let sumTrace = 0;
+  let sumKsq = 0;
+  let count = 0;
+  const denom = 2 * step;
+
+  for (const [x, y, z] of points) {
+    try {
+      const betaXp = evaluateShiftVector(x + step, y, z);
+      const betaXm = evaluateShiftVector(x - step, y, z);
+      const betaYp = evaluateShiftVector(x, y + step, z);
+      const betaYm = evaluateShiftVector(x, y - step, z);
+      const betaZp = evaluateShiftVector(x, y, z + step);
+      const betaZm = evaluateShiftVector(x, y, z - step);
+
+      const dBx_dx = (betaXp[0] - betaXm[0]) / denom;
+      const dBy_dx = (betaXp[1] - betaXm[1]) / denom;
+      const dBz_dx = (betaXp[2] - betaXm[2]) / denom;
+
+      const dBx_dy = (betaYp[0] - betaYm[0]) / denom;
+      const dBy_dy = (betaYp[1] - betaYm[1]) / denom;
+      const dBz_dy = (betaYp[2] - betaYm[2]) / denom;
+
+      const dBx_dz = (betaZp[0] - betaZm[0]) / denom;
+      const dBy_dz = (betaZp[1] - betaZm[1]) / denom;
+      const dBz_dz = (betaZp[2] - betaZm[2]) / denom;
+
+      if (
+        !Number.isFinite(dBx_dx) || !Number.isFinite(dBy_dx) || !Number.isFinite(dBz_dx) ||
+        !Number.isFinite(dBx_dy) || !Number.isFinite(dBy_dy) || !Number.isFinite(dBz_dy) ||
+        !Number.isFinite(dBx_dz) || !Number.isFinite(dBy_dz) || !Number.isFinite(dBz_dz)
+      ) {
+        continue;
+      }
+
+      const Kxx = dBx_dx;
+      const Kyy = dBy_dy;
+      const Kzz = dBz_dz;
+      const Kxy = 0.5 * (dBy_dx + dBx_dy);
+      const Kxz = 0.5 * (dBz_dx + dBx_dz);
+      const Kyz = 0.5 * (dBz_dy + dBy_dz);
+      const trace = Kxx + Kyy + Kzz;
+      const kSquared = Kxx * Kxx + Kyy * Kyy + Kzz * Kzz + 2 * (Kxy * Kxy + Kxz * Kxz + Kyz * Kyz);
+      const rhoGeom = (trace * trace - kSquared) * INV16PI;
+      if (!Number.isFinite(rhoGeom)) continue;
+      sumRho += rhoGeom;
+      sumTrace += trace;
+      sumKsq += kSquared;
+      count += 1;
+    } catch {
+      continue;
+    }
+  }
+
+  if (count === 0) return null;
+  const rhoGeomMean = sumRho / count;
+  const kTraceMean = sumTrace / count;
+  const kSquaredMean = sumKsq / count;
+  const rhoEuler = rhoGeomMean * GEOM_TO_SI_STRESS;
+  return {
+    stress: {
+      T00: rhoEuler,
+      T11: -rhoEuler,
+      T22: -rhoEuler,
+      T33: -rhoEuler,
+      isNullEnergyConditionSatisfied: false,
+    },
+    diagnostics: {
+      sampleCount: count,
+      rhoGeomMean,
+      rhoSiMean: rhoEuler,
+      kTraceMean,
+      kSquaredMean,
+      step_m: step,
+      scale_m: scale,
+    },
+  };
 };
 
 export interface NatarioWarpParams {
@@ -80,6 +305,10 @@ export interface NatarioWarpParams {
   warpGridResolution?: number;
   warpDriveDirection?: Vec3;
   hullAxes?: { a: number; b: number; c: number };
+  hullWallThickness_m?: number;
+  bubbleRadius_m?: number;
+  bubbleSigma?: number;
+  bubbleBeta?: number;
   massMode?: MassMode;
   allowMassOverride?: boolean;
 }
@@ -130,6 +359,19 @@ export interface NatarioWarpResult {
 // Momentum flux balance
   momentumFlux: number;                 // kgâ‹…m/sÂ² - booster shell
   stressEnergyTensor: { T00:number; T11:number; T22:number; T33:number; isNullEnergyConditionSatisfied: boolean };
+  stressEnergySource?: StressEnergySource;
+  metricT00?: number;
+  metricT00Source?: StressEnergySource;
+  metricT00Ref?: string;
+  metricStressDiagnostics?: {
+    sampleCount: number;
+    rhoGeomMean: number;
+    rhoSiMean: number;
+    kTraceMean?: number;
+    kSquaredMean?: number;
+    step_m: number;
+    scale_m: number;
+  };
 
   // Validation flags
   isZeroExpansion: boolean;             // |âˆ‡Â·Î²| < tolerance
@@ -143,6 +385,8 @@ export interface NatarioWarpResult {
   thetaScaleCore?: number;
   /** alias: thetaScaleCore_sqrtDuty â€” explicit name showing âˆšduty semantics */
   thetaScaleCore_sqrtDuty?: number;
+  /** CL1â€“CL2 metadata snapshot (chart + ADM assumptions + beta diagnostics). */
+  metricAdapter?: WarpMetricAdapterSnapshot;
 }
 
 /* Minimal physics constants (order-of-magnitude safe) */
@@ -351,15 +595,80 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   }
   const powerDraw = Number.isFinite(params.P_avg_W) ? params.P_avg_W! : Math.abs(amplifiedEnergyDensity) * tileVolume * (params.burstDuration / Math.max(1, params.cycleDuration)) * 1.0;
   const quantumValidation = validateQuantumInequality(totalExoticMass, amplifiedEnergyDensity, Math.max(1e-12, (params.burstDuration||1) * 1e-6), a_m, params.fordRomanLimit_kg ?? DEFAULTS.fordRomanLimit_kg);
-  const shift = calculateNatarioShiftField(params, totalExoticMass);
+  const shift =
+    fieldType === "alcubierre"
+      ? calculateAlcubierreShiftField(params)
+      : calculateNatarioShiftField(params, totalExoticMass);
+  const scale_m = Math.max(1e-9, (params.bowlRadius || 1) * 1e-6);
+  let hodge: HodgeResult | undefined;
+  if (fieldType === 'natario_sdf') {
+    hodge = helmholtzHodgeProject(params);
+  }
   const dutyFactor = (Number.isFinite(+params.burstDuration) && Number.isFinite(+params.cycleDuration) && +params.cycleDuration > 0)
     ? Math.max(1e-12, (+params.burstDuration) / (+params.cycleDuration)) : undefined;
   const thetaScaleCore_sqrtDuty = (Number.isFinite(geo.amplification) && Number.isFinite(dyn.qEnhancement) && Number.isFinite(dutyFactor || NaN))
     ? (geo.amplification * dyn.qEnhancement * Math.sqrt(dutyFactor!))
     : undefined;
-  const stress = calculateStressEnergyTensor(amplifiedEnergyDensity, { amplitude: shift.amplitude }, { dvdr: 0, dvdt: 0 }, params.stressTangentialFactor ?? 0.5);
+  const shiftForMetric =
+    fieldType === "natario_sdf" && hodge
+      ? hodge.evaluate
+      : (shift.evaluateShiftVector as any as (x:number,y:number,z:number)=>Vec3);
+  const metricStressResult =
+    fieldType === "alcubierre"
+      ? calculateAlcubierreStressEnergy(params, {
+          R: (shift as any).R ?? Math.max(1e-9, (params.bowlRadius || 1) * 1e-6),
+          sigma:
+            (shift as any).sigma ??
+            Math.max(1e-9, 2 / Math.max(1e-9, params.hullWallThickness_m ?? 1)),
+          amplitude: shift.amplitude,
+        })
+      : calculateMetricStressEnergyFromShiftField(shiftForMetric, { sampleScale_m: scale_m });
+  const metricStress = metricStressResult?.stress ?? null;
+  const metricStressDiagnostics = metricStressResult?.diagnostics;
+  const pipelineStress = calculateStressEnergyTensor(
+    amplifiedEnergyDensity,
+    { amplitude: shift.amplitude },
+    { dvdr: 0, dvdt: 0 },
+    params.stressTangentialFactor ?? 0.5,
+  );
+  // CL3/CL4 hardening: prefer metric-derived stress whenever available.
+  const stress = metricStress ?? pipelineStress ?? calculateStressEnergyTensor(
+    amplifiedEnergyDensity,
+    { amplitude: shift.amplitude },
+    { dvdr: 0, dvdt: 0 },
+    params.stressTangentialFactor ?? 0.5,
+  );
+  const metricT00 = metricStress?.T00;
+  const metricT00Source: StressEnergySource | undefined =
+    metricStress ? "metric" : undefined;
+  const metricT00Ref: string | undefined = metricStress
+    ? fieldType === "alcubierre"
+      ? "warp.metric.T00.alcubierre.analytic"
+      : fieldType === "natario_sdf"
+        ? "warp.metric.T00.natario_sdf.shift"
+        : fieldType === "irrotational"
+          ? "warp.metric.T00.irrotational.shift"
+          : "warp.metric.T00.natario.shift"
+    : undefined;
+  const stressEnergySource: StressEnergySource =
+    metricStress ? "metric" : pipelineStress ? "pipeline" : "proxy";
   const momentum = calculateMomentumFlux(stress, Math.max(1e-6, params.bowlRadius * 1e-6), params.shellThickness_m ?? 1e-6);
 
+  const alcubierreR = fieldType === "alcubierre" ? (shift as any).R : undefined;
+  const alcubierreSigma = fieldType === "alcubierre" ? (shift as any).sigma : undefined;
+  const alcubierreV = fieldType === "alcubierre" ? (shift as any).amplitude : undefined;
+  const alcubierreDf =
+    fieldType === "alcubierre" && Number.isFinite(alcubierreR) && Number.isFinite(alcubierreSigma)
+      ? alcubierreShapeDerivative(alcubierreR as number, alcubierreR as number, alcubierreSigma as number)
+      : 0;
+  const expansionScalar =
+    fieldType === "alcubierre" && Number.isFinite(alcubierreV)
+      ? -Math.abs(alcubierreV as number) * alcubierreDf
+      : 0;
+  const curlMagnitude =
+    fieldType === "alcubierre" && Number.isFinite(alcubierreV)
+      ? Math.abs(alcubierreV as number) * Math.abs(alcubierreDf)
+      : 0;
   const baseResult: NatarioWarpResult = {
     geometricBlueshiftFactor: geo.gammaGeo,
     effectivePathLength: geo.effectivePathLength_m,
@@ -379,12 +688,23 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     quantumInequalityMargin: quantumValidation.margin,
     quantumSafetyStatus: quantumValidation.status,
     shiftVectorField: { amplitude: shift.amplitude, evaluateShiftVector: (shift.evaluateShiftVector as any) as (x:number,y:number,z:number)=>[number,number,number] },
-    expansionScalar: 0,
-    curlMagnitude: 0,
+    expansionScalar,
+    curlMagnitude,
     momentumFlux: momentum.momentumFlux,
     stressEnergyTensor: stress,
-    isZeroExpansion: Math.abs(0) < (params.expansionTolerance ?? 1e-6),
-    isCurlFree: true,
+    stressEnergySource,
+    metricT00,
+    metricT00Source,
+    metricT00Ref,
+    metricStressDiagnostics,
+    isZeroExpansion:
+      fieldType === "alcubierre"
+        ? Math.abs(expansionScalar) < (params.expansionTolerance ?? 1e-6)
+        : Math.abs(0) < (params.expansionTolerance ?? 1e-6),
+    isCurlFree:
+      fieldType === "alcubierre"
+        ? Math.abs(curlMagnitude) < (params.expansionTolerance ?? 1e-6)
+        : true,
     isQuantumSafe: quantumValidation.status === 'safe',
     isPowerCompliant: Math.abs(1 - ((params.powerTarget_W ?? powerDraw) / Math.max(1e-12, powerDraw))) <= (params.powerTolerance ?? DEFAULTS.powerTolerance),
     dutyFactor: dutyFactor,
@@ -397,7 +717,9 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   };
 
   if (fieldType === 'natario_sdf') {
-    const hodge = helmholtzHodgeProject(params);
+    if (!hodge) {
+      hodge = helmholtzHodgeProject(params);
+    }
     baseResult.shiftVectorField = { amplitude: params.shiftAmplitude ?? shift.amplitude, evaluateShiftVector: hodge.evaluate } as any;
     baseResult.expansionScalar = hodge.rmsDiv;
     baseResult.curlMagnitude = hodge.rmsCurl;
@@ -415,6 +737,36 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
       domain: hodge.domain,
     } as any;
   }
+
+  const chartLabel: WarpChartLabel = "comoving_cartesian";
+  const adapterFamily: WarpMetricFamily =
+    fieldType === "natario_sdf"
+      ? "natario_sdf"
+      : fieldType === "alcubierre"
+        ? "alcubierre"
+        : "natario";
+  const adapterNote =
+    fieldType === "irrotational"
+      ? `requested fieldType=${fieldType} uses Natario solver fallback (family=${adapterFamily})`
+      : undefined;
+  baseResult.metricAdapter = buildWarpMetricAdapterSnapshot({
+    family: adapterFamily,
+    chart: {
+      label: chartLabel,
+      coordinateMap: "bubble-centered coordinates",
+      notes: adapterNote,
+    },
+    requestedFieldType: fieldType,
+    alpha: 1,
+    gammaDiag: [1, 1, 1],
+    shiftVectorField: baseResult.shiftVectorField,
+    hodgeDiagnostics: baseResult.hodgeDiagnostics,
+    expansionScalar: baseResult.expansionScalar,
+    curlMagnitude: baseResult.curlMagnitude,
+    dtGammaProvided: false,
+    sampleScale_m: scale_m,
+    note: adapterNote,
+  });
 
   return baseResult;
 }

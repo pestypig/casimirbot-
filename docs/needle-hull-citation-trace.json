@@ -1,0 +1,218 @@
+[
+  {
+    "paper_id": "Alcubierre1994 https://arxiv.org/pdf/gr-qc/0009013",
+    "equation_id": "Eq. (1)",
+    "assumptions": "Chart adapted to t=const foliation; Eulerian normal defined by lapse/shift; g(n,n)=-1; units G=c=1.",
+    "runtime_signal": "alpha, beta^i, gamma_ij (ADM fields consumed by GR solver / constraint gate)",
+    "mapping_type": "exact",
+    "derivation_notes": "Eq. (1) defines how (alpha,beta,gamma) appear in ds^2; no repo-implementation claim.",
+    "falsifier": "Reconstruct g_{mu nu} from runtime (alpha,beta,gamma); if it does not reproduce Eq. (1) in the declared chart, ADM extraction is wrong."
+  },
+  {
+    "paper_id": "Alcubierre1994 https://arxiv.org/pdf/gr-qc/0009013",
+    "equation_id": "Eq. (9)",
+    "assumptions": "Same chart/observer/units as Eq. (1); D_i is gamma-compatible covariant derivative.",
+    "runtime_signal": "K_ij (extrinsic curvature)",
+    "mapping_type": "exact",
+    "derivation_notes": "Eq. (9) defines K_ij from (alpha,beta,gamma, d_t gamma).",
+    "falsifier": "On a test case with known d_t gamma_ij, if runtime K_ij differs from Eq. (9) beyond numerical tolerance, mapping fails."
+  },
+  {
+    "paper_id": "Gourgoulhon2007 https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+    "equation_id": "Eq. (10.5)",
+    "assumptions": "Sigma_t foliation; Eulerian n; g(n,n)=-1; geometric units with explicit 8pi factors.",
+    "runtime_signal": "H_residual",
+    "mapping_type": "derived",
+    "derivation_notes": "Defines Hamiltonian-constraint violation H from (3)R, K, K_ij K^ij, and E=T(n,n).",
+    "falsifier": "Minkowski data must yield H=0; if H_residual != 0, mapping fails."
+  },
+  {
+    "paper_id": "Gourgoulhon2007 https://people-lux.obspm.fr/gourgoulhon/pdf/form3p1.pdf",
+    "equation_id": "Eq. (10.7)",
+    "assumptions": "Same foliation/observer; D_i gamma-compatible; p_i matter momentum projection.",
+    "runtime_signal": "M_residual",
+    "mapping_type": "derived",
+    "derivation_notes": "Defines momentum-constraint violation M_i = D_j K^j_i - D_i K - 8pi p_i.",
+    "falsifier": "Vacuum K_ij=0 and p_i=0 must yield M_i=0."
+  },
+  {
+    "paper_id": "Natario2002 gr-qc/0110086 (mirror: https://www.ecn.org/cunfi/0110086.pdf)",
+    "equation_id": "Def. 1.1",
+    "assumptions": "M=R^4, standard (t,x^i); n_a=-dt, n^a=partial_t + X; X bounded smooth.",
+    "runtime_signal": "beta (Natario shift in Needle Hull geometry section)",
+    "mapping_type": "derived",
+    "derivation_notes": "Natario defines metric via X; mapping beta to X is within-metric identification.",
+    "falsifier": "If runtime beta cannot be associated with any X such that ds^2 matches Def. 1.1, mapping fails."
+  },
+  {
+    "paper_id": "Natario2002 gr-qc/0110086 (mirror: https://www.ecn.org/cunfi/0110086.pdf)",
+    "equation_id": "Cor. 1.5",
+    "assumptions": "Same chart; theta = div X.",
+    "runtime_signal": "ThetaAudit",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Natario expansion requires spatial derivatives; if ThetaAudit not computed from div X (or -Tr K), no geometry-derived chain.",
+    "falsifier": "Compute div X (or D_i beta^i); if it does not match ThetaAudit up to sign/units, mapping fails."
+  },
+  {
+    "paper_id": "Natario2002 gr-qc/0110086 (mirror: https://www.ecn.org/cunfi/0110086.pdf)",
+    "equation_id": "Thm. 1.7 (identity)",
+    "assumptions": "Eulerian observer; uses (3)R, trK, K_ij K^ij; flat-slice sets (3)R=0.",
+    "runtime_signal": "T00_avg / rho_E",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Natario rho is derived forward from geometry; pipeline T00 is proxy-only.",
+    "falsifier": "Compute rho from runtime (alpha,beta,gamma) via Thm. 1.7; if it disagrees with T00_avg, mapping fails."
+  },
+  {
+    "paper_id": "VanDenBroeck1999 gr-qc/9905084 (mirror: http://www.ufologie.net/htm/warpdrive.pdf)",
+    "equation_id": "Eq. (4)",
+    "assumptions": "Units c=G=hbar=1; constant v; conformal factor B(r_s).",
+    "runtime_signal": "gammaVdB",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "B(r) is functional; no single gammaVdB scalar in Eq. (4).",
+    "falsifier": "Implement B(r) and compare observables sensitive to B' and B''; scalar-only model fails."
+  },
+  {
+    "paper_id": "VanDenBroeck1999 gr-qc/9905084 (mirror: http://www.ufologie.net/htm/warpdrive.pdf)",
+    "equation_id": "Eq. (11)",
+    "assumptions": "Region II; orthonormal basis Eq. (10); T^{hat0hat0} depends on B', B'', (1/r) B'.",
+    "runtime_signal": "VdB_band / region-II energy density",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Scalar-only band cannot encode derivative structure.",
+    "falsifier": "Vary B'(r), B''(r) with scalar factor fixed; if energy density does not respond, mapping fails."
+  },
+  {
+    "paper_id": "VanDenBroeck1999 gr-qc/9905084 (mirror: http://www.ufologie.net/htm/warpdrive.pdf)",
+    "equation_id": "Eq. (17)",
+    "assumptions": "QI-derived thickness scaling; depends on v_s and L_P.",
+    "runtime_signal": "wallThickness",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Needle Hull uses macroscopic wall thickness; no explicit tie to Eq. (17).",
+    "falsifier": "Insert runtime wall thickness into Eq. (17); if violated, mapping fails."
+  },
+  {
+    "paper_id": "FordRoman1994 https://arxiv.org/pdf/gr-qc/9410043",
+    "equation_id": "Eq. (64)",
+    "assumptions": "Lorentzian-smeared energy density in flat 4D; inertial timelike observer.",
+    "runtime_signal": "zeta / FordRomanQI",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Without explicit runtime hat{rho} calculation, zeta is proxy-only.",
+    "falsifier": "Compute hat{rho} and compare derived zeta to runtime zeta."
+  },
+  {
+    "paper_id": "FordRoman1994 https://arxiv.org/pdf/gr-qc/9410043",
+    "equation_id": "Eq. (65)",
+    "assumptions": "Lorentzian sampling kernel with width t0; defines hat{rho} by time average.",
+    "runtime_signal": "sampling_time / tau_window",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "If runtime sampling time does not enter via kernel, mapping is proxy-only.",
+    "falsifier": "Change t0; if margin does not scale in t0^-4 direction, mapping fails."
+  },
+  {
+    "paper_id": "Wilson2011 https://arxiv.org/abs/1105.4714",
+    "equation_id": "NO_SOURCE",
+    "assumptions": "Experimental superconducting circuit; not GR geometry.",
+    "runtime_signal": "modulationFreq_GHz",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "11 GHz DCE observation used for feasibility; no ADM chain.",
+    "falsifier": "If runtime modulation frequency differs from cited GHz regime, mapping fails."
+  },
+  {
+    "paper_id": "Krasnok2024 https://doi.org/10.1063/5.0155213",
+    "equation_id": "NO_SOURCE",
+    "assumptions": "SRF cavity survey; not GR geometry.",
+    "runtime_signal": "qCavity / Q",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Q ~ 1e9 used as multiplicative pump; no ADM chain.",
+    "falsifier": "If runtime assumes Q far outside cited range, mapping fails."
+  },
+  {
+    "paper_id": "Morell2016 https://pubs.acs.org/doi/10.1021/acs.nanolett.6b02038",
+    "equation_id": "NO_SOURCE",
+    "assumptions": "Nanomechanics; not GR geometry.",
+    "runtime_signal": "mechanicalQ",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Feasibility reference for high-Q resonators.",
+    "falsifier": "If runtime requires mechanicalQ beyond cited regime, mapping fails."
+  },
+  {
+    "paper_id": "Zeng2025 https://www.nature.com/articles/s41467-025-58981-2",
+    "equation_id": "NO_SOURCE",
+    "assumptions": "Nanomechanics; not GR geometry.",
+    "runtime_signal": "mechanicalQ",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Reference-only for resonator Q.",
+    "falsifier": "If runtime requires mechanicalQ beyond cited regime, mapping fails."
+  },
+  {
+    "paper_id": "Barton2011 https://mceuengroup.lassp.cornell.edu/sites/mceuen/files/publications/nl1042227.pdf",
+    "equation_id": "NO_SOURCE",
+    "assumptions": "Nanomechanics; not GR geometry.",
+    "runtime_signal": "mechanicalQ",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Reference-only for graphene resonator Q.",
+    "falsifier": "If runtime requires mechanicalQ beyond cited regime, mapping fails."
+  },
+  {
+    "paper_id": "Padamsee2004 https://cds.cern.ch/record/808364/files/p233.pdf",
+    "equation_id": "NO_SOURCE",
+    "assumptions": "Accelerator SRF engineering; not GR geometry.",
+    "runtime_signal": "cryoLoadModel / cavityDissipation",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "SRF dissipation figures used for cryogenic load plausibility.",
+    "falsifier": "If runtime cryo model implies dissipation far above cited regimes, mapping fails."
+  },
+  {
+    "paper_id": "Nugent2022 https://ntrs.nasa.gov/api/citations/20220009350/downloads/MAN_8.3_Nugent_06-16-22.pdf",
+    "equation_id": "NO_SOURCE",
+    "assumptions": "NASA technical report; not GR geometry.",
+    "runtime_signal": "COP_20K",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "COP benchmark; no ADM chain.",
+    "falsifier": "If runtime COP assumptions exceed report bounds, mapping fails."
+  },
+  {
+    "paper_id": "CornwellWelch2011 https://doi.org/10.1063/1.3594197",
+    "equation_id": "NO_SOURCE",
+    "assumptions": "Materials strength; not GR geometry.",
+    "runtime_signal": "maxHoopStress / structuralMargin",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Hoop-stress margining; no ADM chain.",
+    "falsifier": "If runtime stress exceeds cited material bounds, mapping fails."
+  },
+  {
+    "paper_id": "LiYang2023 https://doi.org/10.1002/adfm.202314558",
+    "equation_id": "NO_SOURCE",
+    "assumptions": "Materials survey; not GR geometry.",
+    "runtime_signal": "maxHoopStress / structuralMargin",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Projected diamond strength margining; no ADM chain.",
+    "falsifier": "If runtime stress exceeds cited material bounds, mapping fails."
+  },
+  {
+    "paper_id": "Momota1991 https://www.nifs.ac.jp/report/NIFS-101.pdf",
+    "equation_id": "NO_SOURCE",
+    "assumptions": "Fusion confinement report; not GR geometry.",
+    "runtime_signal": "FRC_pod / powerPodModel",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "FRC roadmap support; no ADM chain.",
+    "falsifier": "If runtime assumes pod performance beyond report bounds, mapping fails."
+  },
+  {
+    "paper_id": "HelionEnergy2021 https://www.eetimes.com/helion-energy-achieves-key-fusion-milestone",
+    "equation_id": "NO_SOURCE (NON_PRIMARY)",
+    "assumptions": "Non-primary source; excluded under primary-only rule.",
+    "runtime_signal": "powerPodModel",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Cannot support equation-trace claims under primary-only rule.",
+    "falsifier": "Replace with primary source; until then, mapping remains non-primary."
+  },
+  {
+    "paper_id": "AtomicRockets https://www.projectrho.com/public_html/rocket/heatrad.php",
+    "equation_id": "NO_SOURCE (NON_PRIMARY)",
+    "assumptions": "Non-primary source; excluded under primary-only rule.",
+    "runtime_signal": "radiatorSizing",
+    "mapping_type": "proxy_only",
+    "derivation_notes": "Cannot support equation-trace claims under primary-only rule.",
+    "falsifier": "Replace with primary source; until then, mapping remains non-primary."
+  }
+]

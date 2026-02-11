@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { C as SPEED_OF_LIGHT } from "@/lib/physics-const";
 import { useEnergyPipeline, useUpdatePipeline, MODE_CONFIGS, fmtPowerUnitFromW, type ModeKey } from "@/hooks/use-energy-pipeline";
 import { cn } from "@/lib/utils";
+import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const clamp01 = (v: number) => clamp(v, 0, 1);
@@ -370,6 +371,11 @@ export default function SpeedCapabilityPanel({ refetchInterval = 1000, panelHash
             </Tooltip>
           </TooltipProvider>
         </CardTitle>
+        <PipelineCongruenceBadge
+          label="stress"
+          meta={pipeline?.stressMeta}
+          className="mt-2"
+        />
         <CardDescription>
           Live mode -&gt; power -&gt; beta closure + per-mode policy ceilings (envelope up to beta~{capSummary.maxBeta.toFixed(2)}).
         </CardDescription>

@@ -1,0 +1,178 @@
+{
+  "status": "INADMISSIBLE",
+  "constraints": [
+    {
+      "id": "FordRomanQI",
+      "description": "Quantum inequality bound on negative energy duration/magnitude.",
+      "severity": "HARD",
+      "passed": false,
+      "lhs": 1,
+      "rhs": 1,
+      "margin": 0,
+      "details": "lhs=-321624115111801000 bound=-18 curvature=unknown; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced"
+    },
+    {
+      "id": "TS_ratio_min",
+      "description": "Minimum TS_ratio for stable warp bubble.",
+      "severity": "SOFT",
+      "passed": false,
+      "lhs": 49.99999999999999,
+      "rhs": 100,
+      "margin": -50.00000000000001,
+      "details": "TS_ratio=49.99999999999999 required>=100; strict=true; metric_source=true; ts_source=warp.metricAdapter+clocking; ts_reason=TS_ratio from proper-distance timing with explicit chart contract; TS_autoscale_active=true; gating=active; resamples=2",
+      "note": "mitigation:ts_autoscale"
+    },
+    {
+      "id": "ThetaAudit",
+      "description": "Theta calibration within allowed band.",
+      "severity": "HARD",
+      "passed": true,
+      "lhs": 61.34470445000966,
+      "rhs": 1000000000000,
+      "margin": -999999999938.6553,
+      "details": "|theta|=61.34470445000966 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence"
+    },
+    {
+      "id": "CL3_RhoDelta",
+      "description": "CL3 stress-energy congruence (constraint rho vs T00).",
+      "severity": "SOFT",
+      "passed": true,
+      "lhs": 0,
+      "rhs": 0.1,
+      "margin": -0.1,
+      "details": "source=warp.metric.T00.natario.shift chart=comoving_cartesian family=natario observer=eulerian_n norm=si_stress contract=ok rho_constraint_mean=-6.643726032182976e-27 T00_ref=-6.643726032182976e-27 delta=0",
+      "note": "source=warp.metric.T00.natario.shift"
+    },
+    {
+      "id": "M_exotic_budget",
+      "description": "Exotic mass within configured budget",
+      "severity": "SOFT",
+      "passed": true,
+      "lhs": 1.2005668736643159e-11,
+      "rhs": 1545.5000000000002,
+      "margin": -1545.4999999999882,
+      "details": "|M_exotic|=1.2005668736643159e-11 budget=1545.5000000000002"
+    },
+    {
+      "id": "VdB_band",
+      "description": "Van den Broeck compression factor within configured band.",
+      "severity": "SOFT",
+      "passed": true,
+      "lhs": 432799.41351960227,
+      "rhs": 10000000000000000,
+      "margin": -9999999999567200,
+      "details": "gamma_VdB=432799.41351960227 band=[0, 10000000000000000] regionII=on regionIV=on twoWall=on derivII=true derivIV=true derivTwoWall=true supportOk=true requiresSupport=true bprime_max_abs=250993566957796.53 bdouble_max_abs=2.684244914400684e+23 dfdr_max_abs=17.461604107900172 thresholds=[1e-18,1e-18,1e-18]"
+    }
+  ],
+  "snapshot": {
+    "bubbleRadius_m": 86.5,
+    "wallThickness_m": 0.019986163866666667,
+    "tileCount": 330950154,
+    "tileArea_cm2": 25,
+    "dutyCycle": 0.14,
+    "d_eff": 0.00035000000000000005,
+    "U_static": -6.122945965634405e-10,
+    "TS_ratio": 49.99999999999999,
+    "gamma_geo_cubed": 17576,
+    "gamma_VdB": 432799.41351960227,
+    "vdb_region_ii_support": true,
+    "vdb_region_ii_bprime_max_abs": 250993566957796.53,
+    "vdb_region_ii_bdouble_max_abs": 2.684244914400684e+23,
+    "vdb_region_ii_t00_mean": -1417151262769726.8,
+    "vdb_region_iv_support": true,
+    "vdb_region_iv_dfdr_max_abs": 17.461604107900172,
+    "vdb_two_wall_support": true,
+    "vdb_region_ii_derivative_support": true,
+    "vdb_region_iv_derivative_support": true,
+    "vdb_two_wall_derivative_support": true,
+    "gammaGeo": 26,
+    "M_exotic": 1.2005668736643159e-11,
+    "thetaCal": 2662408.8722071857,
+    "theta_audit": 61.34470445000966,
+    "theta_geom": 61.34470445000966,
+    "theta_proxy": 2662408.8722071857,
+    "theta_source": "warp.metricAdapter.betaDiagnostics.thetaMax",
+    "theta_proxy_source": "pipeline.thetaCal",
+    "theta_metric_derived": true,
+    "theta_metric_source": "warp.metricAdapter.betaDiagnostics.thetaMax",
+    "theta_metric_reason": "metric_adapter_divergence",
+    "zeta": 1,
+    "qiGuardrail": 1,
+    "T00_min": -804060639838804000,
+    "T00_avg": -804060639838804000,
+    "sectorPeriod_ms": 0.9647552578256863,
+    "dwell_ms": 0.9647552578256863,
+    "burst_ms": 0.000011541317693856062,
+    "ts": {
+      "TS_ratio": 49.99999999999999,
+      "tauLC_ms": 0.000577065884692803,
+      "tauPulse_ns": 129360.02396375,
+      "metricDerived": true,
+      "metricDerivedSource": "warp.metricAdapter+clocking",
+      "metricDerivedReason": "TS_ratio from proper-distance timing with explicit chart contract",
+      "metricDerivedChart": "comoving_cartesian",
+      "autoscale": {
+        "enabled": true,
+        "targetTS": 100,
+        "target": 100,
+        "slewPerSec": 0.25,
+        "slew": 0.25,
+        "floor_ns": 20,
+        "engaged": true,
+        "gating": "active",
+        "TS_ratio": 0.004303704725079691,
+        "tauPulse_ns": 134085.845,
+        "proposedBurst_ns": 20,
+        "appliedBurst_ns": 129360.02396375,
+        "dt_s": 0.141,
+        "dtLast_s": 0.141,
+        "lastTickMs": 1770767559523
+      }
+    },
+    "ts_metric_derived": true,
+    "ts_metric_source": "warp.metricAdapter+clocking",
+    "ts_metric_reason": "TS_ratio from proper-distance timing with explicit chart contract",
+    "grGuardrails": {
+      "source": "proxy",
+      "proxy": true,
+      "missing": [
+        "H_constraint_rms",
+        "M_constraint_rms",
+        "lapse_floor",
+        "beta_max_abs"
+      ],
+      "H_constraint": {
+        "threshold": 0.001
+      },
+      "M_constraint": {
+        "threshold": 0.001
+      },
+      "lapse": {
+        "threshold": 0.2
+      },
+      "beta": {
+        "threshold": 1
+      }
+    },
+    "rho_constraint_mean": -6.643726032182976e-27,
+    "rho_delta_mean": 0,
+    "rho_delta_metric_mean": 0,
+    "rho_delta_pipeline_mean": 6.643726032070729e-15,
+    "rho_delta_threshold": 0.1,
+    "rho_delta_source": "warp.metric.T00.natario.shift",
+    "rho_delta_metric_source": "warp.metric.T00.natario.shift",
+    "rho_delta_metric_chart": "comoving_cartesian",
+    "rho_delta_metric_family": "natario",
+    "rho_delta_metric_observer": "eulerian_n",
+    "rho_delta_metric_normalization": "si_stress",
+    "rho_delta_metric_unit_system": "SI",
+    "rho_delta_metric_contract_status": "ok",
+    "rho_delta_metric_contract_ok": true,
+    "theta_chart_contract_status": "ok",
+    "theta_chart_contract_ok": true,
+    "telemetrySource": "solver"
+  },
+  "certificateHash": "7217703c52b4d30b2207b569e42faa38cbbfd38839f3981e813e90aba375d246",
+  "certificateId": "2ae968d2-d9c0-41f5-ba52-80b68bed98ae",
+  "integrityOk": true
+}

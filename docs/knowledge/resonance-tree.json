@@ -19,7 +19,15 @@
         "resonance-tests",
         "bridge-code-lattice-core-resonance-runtime"
       ],
-      "links": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "CL4 only when constraint inputs are geometry-derived."
+        }
+      ],
       "summary": "Code-lattice resonance pipeline and diagnostics.",
       "nodeType": "concept",
       "inputs": [],
@@ -49,7 +57,49 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:b03196c0937d869378ee03900c2de255e5d7a1dcea29595be828fe887ff93cd4"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "code-lattice-core": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "resonance-runtime": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "resonance-io": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "resonance-tests": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-code-lattice-core-resonance-runtime": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "code-lattice-core",
@@ -67,7 +117,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-tree"
+          "to": "resonance-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Shared schema and base lattice definitions.",
@@ -101,6 +153,20 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "code-lattice-schema": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -117,7 +183,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "code-lattice-core"
+          "to": "code-lattice-core",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Schema definitions for code-lattice data.",
@@ -151,6 +219,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -171,7 +244,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-tree"
+          "to": "resonance-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Resonance calculations and constants.",
@@ -211,6 +286,34 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "resonance-constants": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "resonance-engine": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-resonance-runtime-stewardship-ledger": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -227,7 +330,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-runtime"
+          "to": "resonance-runtime",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Constants for resonance evaluation.",
@@ -261,6 +366,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -279,7 +389,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-runtime"
+          "to": "resonance-runtime",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Core resonance computation engine.",
@@ -313,6 +425,20 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bridge-resonance-engine-verification-checklist": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -335,7 +461,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-tree"
+          "to": "resonance-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Loaders, builders, watchers, and routes.",
@@ -387,6 +515,48 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "resonance-loader": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "resonance-builders": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "resonance-watcher": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "resonance-routes": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-resonance-io-verification-checklist": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -403,7 +573,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-io"
+          "to": "resonance-io",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Load lattice inputs for resonance.",
@@ -437,6 +609,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -453,7 +630,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-io"
+          "to": "resonance-io",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Build lattice structures for resonance.",
@@ -487,6 +666,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -503,7 +687,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-io"
+          "to": "resonance-io",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Watchers for resonance updates.",
@@ -537,6 +723,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -553,7 +744,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-io"
+          "to": "resonance-io",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "HTTP routes for resonance access.",
@@ -587,6 +780,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -605,7 +803,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-tree"
+          "to": "resonance-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Casimir resonance test cases.",
@@ -645,6 +845,20 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bridge-resonance-tests-verification-checklist": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -662,15 +876,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-tree"
+          "to": "resonance-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "code-lattice-core"
+          "to": "code-lattice-core",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "resonance-runtime"
+          "to": "resonance-runtime",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -718,7 +938,12 @@
         }
       ],
       "slug": "bridge-code-lattice-core-resonance-runtime",
-      "summary": "Bridge between Code Lattice Core and Resonance Runtime."
+      "summary": "Bridge between Code Lattice Core and Resonance Runtime.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-resonance-tests-verification-checklist",
@@ -739,15 +964,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-tests"
+          "to": "resonance-tests",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "verification-checklist"
+          "to": "verification-checklist",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "resonance-tests"
+          "to": "resonance-tests",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -792,7 +1023,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between verification-checklist and resonance-tests."
+      "summary": "Bridge between verification-checklist and resonance-tests.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-resonance-runtime-stewardship-ledger",
@@ -813,15 +1049,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-runtime"
+          "to": "resonance-runtime",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "stewardship-ledger"
+          "to": "stewardship-ledger",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "resonance-runtime"
+          "to": "resonance-runtime",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -866,7 +1108,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between stewardship-ledger and resonance-runtime."
+      "summary": "Bridge between stewardship-ledger and resonance-runtime.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-resonance-io-verification-checklist",
@@ -888,15 +1135,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-io"
+          "to": "resonance-io",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "verification-checklist"
+          "to": "verification-checklist",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "resonance-io"
+          "to": "resonance-io",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -941,7 +1194,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between verification-checklist and resonance-io."
+      "summary": "Bridge between verification-checklist and resonance-io.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-resonance-engine-verification-checklist",
@@ -963,15 +1221,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "resonance-engine"
+          "to": "resonance-engine",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "verification-checklist"
+          "to": "verification-checklist",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "resonance-engine"
+          "to": "resonance-engine",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -1016,7 +1280,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between verification-checklist and resonance-engine."
+      "summary": "Bridge between verification-checklist and resonance-engine.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     }
   ],
   "schema": {

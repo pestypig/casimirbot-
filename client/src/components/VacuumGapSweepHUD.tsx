@@ -11,6 +11,7 @@ import { summarizeSweepGuard } from "@/lib/sweep-guards";
 import { sweepTelemetry, type SweepSnapshot } from "@/lib/sweepTelemetry";
 import { useHardwareFeeds, type HardwareConnectHelp } from "@/hooks/useHardwareFeeds";
 import HardwareConnectButton from "./HardwareConnectButton";
+import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
 
 type VacuumGapSweepHUDProps = {
   className?: string;
@@ -362,6 +363,11 @@ export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps)
           <div className="uppercase tracking-wide text-slate-400 text-[11px]">Vacuum-Gap Sweep</div>
           <Badge className={cn("text-[11px] font-semibold", badgeClass)}>Awaiting Sweep</Badge>
         </div>
+        <PipelineCongruenceBadge
+          label="stress"
+          meta={pipeline?.stressMeta}
+          className="mt-2"
+        />
         <div className="mt-3 text-[11px] leading-relaxed text-slate-400">
           Run <span className="text-slate-200 font-semibold">Run Sweep (HW Slew)</span> to populate this HUD with live telemetry.
         </div>
@@ -420,6 +426,11 @@ export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps)
           <Badge className={cn("text-[11px] font-semibold", badgeClass)}>{displayStatusLabel}</Badge>
         </div>
       </div>
+      <PipelineCongruenceBadge
+        label="stress"
+        meta={pipeline?.stressMeta}
+        className="mt-2"
+      />
 
       <Progress className="mt-2" value={pct} />
 

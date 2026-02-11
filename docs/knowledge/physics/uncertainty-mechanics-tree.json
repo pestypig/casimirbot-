@@ -24,7 +24,15 @@
         "uncertainty-reality-bounds",
         "bridge-uncertainty-classical-stack-uncertainty-statistical-stack"
       ],
-      "links": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "CL4 only when constraint inputs are geometry-derived."
+        }
+      ],
       "summary": "Classical, statistical, and quantum-stochastic uncertainty mapped to physics constraints.",
       "nodeType": "concept",
       "inputs": [],
@@ -54,7 +62,70 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:6830d4ef9ce4884cf8901a05c2afd0c3af85dce5e0b10fba4b1320dc3ac66ad2"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "uncertainty-classical-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-statistical-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-data-contracts": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-quantum-stochastic": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-approximation-ladders": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-collapse-constraints": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-reality-bounds": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-uncertainty-classical-stack-uncertainty-statistical-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "uncertainty-classical-stack",
@@ -76,7 +147,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-mechanics-tree"
+          "to": "uncertainty-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Model error, boundary conditions, and numerical precision limits.",
@@ -116,7 +189,42 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:875aee66bffeb84f9a406d2faaf486811dbfa962aeefdf9e9f414a76092a8bd3"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "uncertainty-boundary-conditions": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-discretization": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-numerical-precision": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-timestep-stability": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "uncertainty-boundary-conditions",
@@ -133,7 +241,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-classical-stack"
+          "to": "uncertainty-classical-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Boundary choices define admissible modes and error bands.",
@@ -167,6 +277,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -184,7 +299,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-classical-stack"
+          "to": "uncertainty-classical-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Mesh resolution and discretization error control uncertainty.",
@@ -218,6 +335,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -235,7 +357,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-classical-stack"
+          "to": "uncertainty-classical-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Floating point precision limits error floors.",
@@ -269,6 +393,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -286,7 +415,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-classical-stack"
+          "to": "uncertainty-classical-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Stability bounds constrain timestep error growth.",
@@ -320,6 +451,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -341,7 +477,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-mechanics-tree"
+          "to": "uncertainty-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Sampling noise, distributions, and stochastic variance.",
@@ -375,7 +513,35 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:63bfb24d0701cac0d54c8d77d9497e49861142b1b604eb75ac4a55ab1e03f55e"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "uncertainty-sampling-bounds": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-monte-carlo-bands": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-propagated-bands": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "uncertainty-sampling-bounds",
@@ -392,7 +558,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-statistical-stack"
+          "to": "uncertainty-statistical-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Sampling windows bound valid averages.",
@@ -426,6 +594,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -443,7 +616,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-statistical-stack"
+          "to": "uncertainty-statistical-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Monte Carlo spreads define statistical error bands.",
@@ -477,6 +652,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -494,7 +674,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-statistical-stack"
+          "to": "uncertainty-statistical-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Uncertainty propagation across geometry and energy bands.",
@@ -528,6 +710,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -548,7 +735,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-mechanics-tree"
+          "to": "uncertainty-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Shared schemas for values, sigmas, and bands.",
@@ -594,6 +783,27 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "uncertainty-1sigma-container": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-band-fields": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -611,7 +821,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-data-contracts"
+          "to": "uncertainty-data-contracts",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Explicit 1-sigma value containers.",
@@ -645,6 +857,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -662,7 +879,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-data-contracts"
+          "to": "uncertainty-data-contracts",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Min/max bands for propagated ranges.",
@@ -702,6 +921,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -722,7 +946,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-mechanics-tree"
+          "to": "uncertainty-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Noise-kernel constraints for semiclassical sourcing.",
@@ -756,6 +982,27 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "uncertainty-quantum-gr-bridge": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-coherence-window": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -773,7 +1020,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-quantum-stochastic"
+          "to": "uncertainty-quantum-stochastic",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Semiclassical interface with uncertainty propagation.",
@@ -807,6 +1056,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -824,7 +1078,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-quantum-stochastic"
+          "to": "uncertainty-quantum-stochastic",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Tau and r_c set the causal sampling window.",
@@ -870,6 +1126,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -892,7 +1153,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-mechanics-tree"
+          "to": "uncertainty-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Approximation ladders bridge classical and statistical models.",
@@ -926,7 +1189,42 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:fe43291a90b111c35905fdd287ab682e87a472a0932e929ffa0b8d2d3d8e14a2"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "uncertainty-axisymmetric-approximations": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-pfa-geometry": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-casimir-bands": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-dynamic-transients": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "uncertainty-axisymmetric-approximations",
@@ -943,7 +1241,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-approximation-ladders"
+          "to": "uncertainty-approximation-ladders",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Closed-form approximations and Monte Carlo deltas.",
@@ -977,6 +1277,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -994,7 +1299,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-approximation-ladders"
+          "to": "uncertainty-approximation-ladders",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "PFA and geometry approximations for Casimir models.",
@@ -1028,6 +1335,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1045,7 +1357,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-approximation-ladders"
+          "to": "uncertainty-approximation-ladders",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Material models define banded ranges.",
@@ -1085,6 +1399,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1102,7 +1421,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-approximation-ladders"
+          "to": "uncertainty-approximation-ladders",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Transient energy approximations for time-varying boundaries.",
@@ -1136,6 +1457,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1156,7 +1482,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-mechanics-tree"
+          "to": "uncertainty-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Causal collapse benchmarks and policy gating.",
@@ -1202,6 +1530,27 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "adm_fields",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "uncertainty-collapse-benchmark": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-coherence-policy": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -1219,7 +1568,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-collapse-constraints"
+          "to": "uncertainty-collapse-constraints",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Benchmark contract for causal collapse estimates.",
@@ -1259,6 +1610,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "adm_fields",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1276,7 +1632,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-collapse-constraints"
+          "to": "uncertainty-collapse-constraints",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Policy gating tied to collapse confidence.",
@@ -1310,6 +1668,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1317,7 +1680,7 @@
       "slug": "uncertainty-reality-bounds",
       "title": "Reality Constraint Bounds",
       "excerpt": "Energy conditions and quantum inequality limits.",
-      "bodyMD": "Reality constraints bound uncertainty handling through energy conditions and QI limits.\n\nMinimal artifact: constraint checklist.",
+      "bodyMD": "Reality constraints bound uncertainty handling through energy conditions and QI limits.\n\nMinimal artifact: constraint checklist and CL4 trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
       "tags": [
         "uncertainty",
         "constraints",
@@ -1332,7 +1695,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-mechanics-tree"
+          "to": "uncertainty-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Energy conditions and quantum inequality limits.",
@@ -1372,7 +1737,42 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7ca013891c69a6f8bb7b051555aab6e11101d638bc8eefd672c27769a5ae43dd"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "uncertainty-energy-conditions": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-quantum-inequality": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-sampling-window": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-uncertainty-reality-bounds-verification-checklist": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "uncertainty-energy-conditions",
@@ -1389,7 +1789,24 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-reality-bounds"
+          "to": "uncertainty-reality-bounds",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "qi_metric_derived=true",
+          "note": "CL4 path when strict QI source is metric-derived (qi_metric_derived=true)."
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Fallback proxy path when strict metric-source validation is disabled or unavailable."
         }
       ],
       "summary": "Classical energy conditions bound admissible stress-energy.",
@@ -1423,6 +1840,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1430,7 +1852,7 @@
       "slug": "uncertainty-quantum-inequality",
       "title": "Quantum Inequality",
       "excerpt": "QI bounds constrain magnitude and duration of negative energy.",
-      "bodyMD": "Ford-Roman QI bounds (docs/knowledge/physics/ford-roman-quantum-inequality.md).\n\nMinimal artifact: QI bound summary.",
+      "bodyMD": "Ford-Roman QI bounds (docs/knowledge/physics/ford-roman-quantum-inequality.md).\n\nMinimal artifact: QI bound summary and CL4 trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
       "tags": [
         "uncertainty",
         "quantum-inequality",
@@ -1440,7 +1862,24 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-reality-bounds"
+          "to": "uncertainty-reality-bounds",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "qi_metric_derived=true",
+          "note": "CL4 path when strict QI source is metric-derived (qi_metric_derived=true)."
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Fallback proxy path when strict metric-source validation is disabled or unavailable."
         }
       ],
       "summary": "QI bounds constrain magnitude and duration of negative energy.",
@@ -1474,6 +1913,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1491,7 +1935,24 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-reality-bounds"
+          "to": "uncertainty-reality-bounds",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-ratio-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "ts_metric_derived=true",
+          "note": "CL4 path when TS ratio is computed from metric/proper-distance inputs (ts_metric_derived=true)."
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-ratio-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Fallback proxy path for operational TS ratio."
         }
       ],
       "summary": "Sampling windows must respect system coherence times.",
@@ -1525,6 +1986,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1544,15 +2010,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-mechanics-tree"
+          "to": "uncertainty-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "uncertainty-classical-stack"
+          "to": "uncertainty-classical-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "uncertainty-statistical-stack"
+          "to": "uncertainty-statistical-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -1600,7 +2072,12 @@
         }
       ],
       "slug": "bridge-uncertainty-classical-stack-uncertainty-statistical-stack",
-      "summary": "Bridge between Classical Uncertainty Stack and Statistical Uncertainty Stack."
+      "summary": "Bridge between Classical Uncertainty Stack and Statistical Uncertainty Stack.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-uncertainty-reality-bounds-verification-checklist",
@@ -1621,15 +2098,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-reality-bounds"
+          "to": "uncertainty-reality-bounds",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "verification-checklist"
+          "to": "verification-checklist",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "uncertainty-reality-bounds"
+          "to": "uncertainty-reality-bounds",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -1674,7 +2157,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between verification-checklist and uncertainty-reality-bounds."
+      "summary": "Bridge between verification-checklist and uncertainty-reality-bounds.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     }
   ],
   "schema": {

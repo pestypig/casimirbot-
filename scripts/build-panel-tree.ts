@@ -40,6 +40,7 @@ const PHYSICS_TREE_HINTS = [
   /math-tree/i,
   /uncertainty/i
 ];
+const IDEOLOGY_TREE_HINTS = [/mission-ethos/i];
 
 const sha256 = (filePath: string): string | null => {
   try {
@@ -109,7 +110,16 @@ const run = () => {
         }
       });
     });
-    const matchedList = Array.from(matchedNodes).slice(0, 6);
+    const matchedList: string[] = [];
+    const matchedNodeIds = new Set<string>();
+    for (const key of matchedNodes) {
+      const [, nodeIdMatch] = key.split(":");
+      if (!nodeIdMatch) continue;
+      if (matchedNodeIds.has(nodeIdMatch)) continue;
+      matchedNodeIds.add(nodeIdMatch);
+      matchedList.push(key);
+      if (matchedList.length >= 6) break;
+    }
     for (const key of matchedList) {
       const [, nodeIdMatch] = key.split(":");
       if (nodeIdMatch) {
@@ -350,6 +360,89 @@ const run = () => {
           left: `panel-concept-${panel.id}`,
           right: nodeIdMatch,
           relation: "Panel concept physics join"
+        },
+        inputs: [],
+        outputs: [],
+        assumptions: [],
+        validity: {},
+        deterministic: null,
+        tolerance: null,
+        environment: null,
+        dependencies: [`panel-concept-${panel.id}`, nodeIdMatch],
+        evidence: evidenceEntries.filter((entry) => entry.content_hash || entry.type !== "code"),
+        predictability: {
+          status: "partial",
+          missing: [
+            "inputs",
+            "outputs",
+            "assumptions",
+            "validity",
+            "deterministic",
+            "tolerance",
+            "environment"
+          ]
+        }
+      });
+    }
+
+    const ideologyBridgeTargets = new Map<string, { term?: string; file?: string }>();
+    (panel.termHits ?? []).forEach((hit) => {
+      hit.treeMatches?.forEach((match) => {
+        if (!match.nodeId || !match.treeId) return;
+        if (!IDEOLOGY_TREE_HINTS.some((re) => re.test(match.treeId))) return;
+        const key = match.nodeId;
+        if (!ideologyBridgeTargets.has(key)) {
+          ideologyBridgeTargets.set(key, { term: hit.term, file: hit.files?.[0] });
+        }
+      });
+    });
+    for (const [nodeIdMatch, evidenceHit] of Array.from(ideologyBridgeTargets.entries()).slice(0, 6)) {
+      const bridgeId = `bridge-panel-concept-ethos-${panel.id}-${nodeIdMatch}`;
+      conceptChildren.push(bridgeId);
+      const evidenceEntries: any[] = [];
+      if (evidenceHit?.file) {
+        const hitPath = safePath(evidenceHit.file);
+        if (hitPath && fs.existsSync(hitPath)) {
+          const hash = sha256(hitPath);
+          const type = hitPath.startsWith("docs/")
+            ? "doc"
+            : hitPath.startsWith("client/") ||
+              hitPath.startsWith("server/") ||
+              hitPath.startsWith("modules/") ||
+              hitPath.startsWith("shared/")
+            ? "code"
+            : "doc";
+          evidenceEntries.push({
+            type,
+            path: hitPath,
+            repo_rev: repoRev,
+            content_hash: hash ? `sha256:${hash}` : undefined
+          });
+        }
+      }
+      evidenceEntries.push({
+        type: "doc",
+        path: "client/src/pages/helix-core.panels.ts",
+        repo_rev: repoRev,
+        content_hash: registryHash ? `sha256:${registryHash}` : undefined
+      });
+      conceptBridgeNodes.push({
+        id: bridgeId,
+        slug: bridgeId,
+        title: `${title} Ethos Concept <-> ${nodeIdMatch}`,
+        excerpt: `Bridge between panel concept ${panel.id} and ${nodeIdMatch}.`,
+        bodyMD: `Panel concept ${panel.id} links to ${nodeIdMatch} via term "${evidenceHit?.term ?? "match"}".`,
+        tags: ["bridge", "panel-concept", "ethos", panel.id],
+        nodeType: "bridge",
+        links: [
+          { rel: "parent", to: `panel-concept-${panel.id}` },
+          { rel: "see-also", to: nodeIdMatch },
+          { rel: "see-also", to: `panel-concept-${panel.id}` }
+        ],
+        bridge: {
+          left: `panel-concept-${panel.id}`,
+          right: nodeIdMatch,
+          relation: "Panel concept mission ethos join"
         },
         inputs: [],
         outputs: [],

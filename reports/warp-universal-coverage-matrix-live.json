@@ -1,0 +1,58 @@
+{
+  "createdAt": "2026-02-11T02:51:49.593Z",
+  "source": "http://127.0.0.1:5173/api/helix/pipeline/proofs",
+  "families": [
+    {
+      "family": "natario",
+      "missing_count": 0,
+      "missing_parts": "",
+      "vdb_region_ii_support": true,
+      "vdb_region_iv_support": true,
+      "vdb_two_wall_support": true,
+      "metric_t00_contract_ok": true,
+      "metric_t00_family": "natario",
+      "metric_t00_chart": "comoving_cartesian",
+      "metric_t00_observer": "eulerian_n",
+      "metric_t00_normalization": "si_stress"
+    },
+    {
+      "family": "natario_sdf",
+      "missing_count": 0,
+      "missing_parts": "",
+      "vdb_region_ii_support": true,
+      "vdb_region_iv_support": true,
+      "vdb_two_wall_support": true,
+      "metric_t00_contract_ok": true,
+      "metric_t00_family": "natario_sdf",
+      "metric_t00_chart": "comoving_cartesian",
+      "metric_t00_observer": "eulerian_n",
+      "metric_t00_normalization": "si_stress"
+    },
+    {
+      "family": "irrotational",
+      "missing_count": 0,
+      "missing_parts": "",
+      "vdb_region_ii_support": true,
+      "vdb_region_iv_support": true,
+      "vdb_two_wall_support": true,
+      "metric_t00_contract_ok": true,
+      "metric_t00_family": "natario",
+      "metric_t00_chart": "comoving_cartesian",
+      "metric_t00_observer": "eulerian_n",
+      "metric_t00_normalization": "si_stress"
+    },
+    {
+      "family": "alcubierre",
+      "missing_count": 0,
+      "missing_parts": "",
+      "vdb_region_ii_support": true,
+      "vdb_region_iv_support": true,
+      "vdb_two_wall_support": true,
+      "metric_t00_contract_ok": true,
+      "metric_t00_family": "alcubierre",
+      "metric_t00_chart": "comoving_cartesian",
+      "metric_t00_observer": "eulerian_n",
+      "metric_t00_normalization": "si_stress"
+    }
+  ]
+}

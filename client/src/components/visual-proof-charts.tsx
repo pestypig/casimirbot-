@@ -17,7 +17,9 @@ import { useMathStageGate } from "@/hooks/useMathStageGate";
 import {
   PROOF_PACK_STAGE_REQUIREMENTS,
   getProofValue,
-  readProofNumber,
+  isStrictProofPack,
+  readProofBooleanStrict,
+  readProofNumberStrict,
 } from "@/lib/proof-pack";
 import { STAGE_BADGE, STAGE_LABELS } from "@/lib/math-stage-gate";
 import { cn } from "@/lib/utils";
@@ -56,9 +58,18 @@ export function VisualProofCharts({ results = {}, targets = {} }: VisualProofCha
   const stageGate = useMathStageGate(PROOF_PACK_STAGE_REQUIREMENTS, { staleTime: 30000 });
   const stageLabel = stageGate.pending ? "STAGE..." : STAGE_LABELS[stageGate.stage];
   const stageProxy = !stageGate.ok || !proofPack;
-  const proofNum = (key: string) => readProofNumber(proofPack, key);
+  const strictMode = isStrictProofPack(proofPack);
+  const proofNum = (key: string) => readProofNumberStrict(proofPack, key, strictMode);
+  const proofBool = (key: string) => readProofBooleanStrict(proofPack, key, strictMode);
   const proofProxyFrom = (keys: string[]) =>
     stageProxy || keys.some((key) => Boolean(getProofValue(proofPack, key)?.proxy));
+  const allowFallback = !strictMode;
+  const kTraceMean = proofNum("metric_k_trace_mean");
+  const kSqMean = proofNum("metric_k_sq_mean");
+  const vdbTwoWallSupport = proofBool("vdb_two_wall_support");
+  const vdbTwoWallDerivativeSupport = proofBool("vdb_two_wall_derivative_support");
+  const kProxy = proofProxyFrom(["metric_k_trace_mean", "metric_k_sq_mean"]);
+  const vdbProxy = proofProxyFrom(["vdb_two_wall_support", "vdb_two_wall_derivative_support"]);
 
 
   // --- Live values from pipeline with safe fallbacks ---
@@ -67,61 +78,61 @@ export function VisualProofCharts({ results = {}, targets = {} }: VisualProofCha
   // Power: server sends P_avg in MW — convert to W for this component
   const powerDrawW =
     proofNum("power_avg_W") ??
-    (isFiniteNumber((pipeline as any)?.P_avg_W)
+    (allowFallback && isFiniteNumber((pipeline as any)?.P_avg_W)
       ? ((pipeline as any).P_avg_W as number)
-      : isFiniteNumber((pipeline as any)?.P_avg)
+      : allowFallback && isFiniteNumber((pipeline as any)?.P_avg)
         ? ((pipeline as any).P_avg as number) * 1e6
-        : isFiniteNumber(results.powerDraw)
+        : allowFallback && isFiniteNumber(results.powerDraw)
           ? (results.powerDraw as number)
           : 0);
 
   // Mass
   const massKg =
     proofNum("M_exotic_kg") ??
-    (isFiniteNumber((pipeline as any)?.M_exotic)
+    (allowFallback && isFiniteNumber((pipeline as any)?.M_exotic)
       ? (pipeline as any).M_exotic as number
-      : isFiniteNumber(results.totalExoticMass)
+      : allowFallback && isFiniteNumber(results.totalExoticMass)
         ? (results.totalExoticMass as number)
         : 0);
 
   // Gamma_geo, Q, ζ
   const gammaGeo =
     proofNum("gamma_geo") ??
-    (isFiniteNumber((pipeline as any)?.gammaGeo)
+    (allowFallback && isFiniteNumber((pipeline as any)?.gammaGeo)
       ? (pipeline as any).gammaGeo as number
-      : num(results.geometricBlueshiftFactor, 26));
+      : allowFallback ? num(results.geometricBlueshiftFactor, 26) : 0);
 
   const qCavity =
     proofNum("q_cavity") ??
-    (isFiniteNumber((pipeline as any)?.qCavity)
+    (allowFallback && isFiniteNumber((pipeline as any)?.qCavity)
       ? (pipeline as any).qCavity as number
-      : num(results.qEnhancementFactor, 1e9));
+      : allowFallback ? num(results.qEnhancementFactor, 1e9) : 0);
 
   const zeta =
     proofNum("zeta") ??
-    (isFiniteNumber((pipeline as any)?.zeta)
+    (allowFallback && isFiniteNumber((pipeline as any)?.zeta)
       ? (pipeline as any).zeta as number
-      : num(results.quantumInequalityMargin, 0.5));
+      : allowFallback ? num(results.quantumInequalityMargin, 0.5) : 0);
 
   // Energy (J): prefer pipeline.U_cycle; else fallback
   const totalEnergyJ =
     proofNum("U_cycle_J") ??
-    (isFiniteNumber((pipeline as any)?.U_cycle)
+    (allowFallback && isFiniteNumber((pipeline as any)?.U_cycle)
       ? (pipeline as any).U_cycle as number
-      : num(results.totalEnergy, -2.55e-3));
+      : allowFallback ? num(results.totalEnergy, -2.55e-3) : 0);
 
   // Duty (two notions)
   const dutyBurst =
     proofNum("duty_burst") ??
-    (isFiniteNumber((pipeline as any)?.dutyBurst)
+    (allowFallback && isFiniteNumber((pipeline as any)?.dutyBurst)
       ? (pipeline as any).dutyBurst as number
-      : num(results.dutyFactor, 0.01));
+      : allowFallback ? num(results.dutyFactor, 0.01) : 0);
 
   const dutyEff =
     proofNum("duty_effective") ??
-    (isFiniteNumber((pipeline as any)?.dutyEffective_FR)
+    (allowFallback && isFiniteNumber((pipeline as any)?.dutyEffective_FR)
       ? (pipeline as any).dutyEffective_FR as number
-      : num(results.effectiveDuty, 2.5e-5));
+      : allowFallback ? num(results.effectiveDuty, 2.5e-5) : 0);
 
   const chartProxy = proofProxyFrom([
     "power_avg_W",
@@ -133,6 +144,9 @@ export function VisualProofCharts({ results = {}, targets = {} }: VisualProofCha
     "duty_burst",
     "duty_effective",
   ]);
+  const proxyBadgeClass = strictMode ? "bg-rose-900/40 text-rose-200" : "bg-slate-800 text-slate-300";
+  const proxyBadgeLabel = strictMode ? "NON-ADMISSIBLE" : "PROXY";
+  const strictBlocked = strictMode && chartProxy;
 
   // --- Targets (server-first if exposed; else sane fallbacks) ---
   const exoticMassTarget =
@@ -244,6 +258,31 @@ export function VisualProofCharts({ results = {}, targets = {} }: VisualProofCha
     };
   });
 
+  if (strictBlocked) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-2 mb-4">
+          <TrendingUp className="h-5 w-5" />
+          <h3 className="text-lg font-semibold">Visual Proof Analysis</h3>
+          <Badge variant="outline">Real-time Validation</Badge>
+          <Badge variant="outline" className={cn("border", STAGE_BADGE[stageGate.stage])}>
+            {stageLabel}
+          </Badge>
+          <Badge className={proxyBadgeClass}>{proxyBadgeLabel}</Badge>
+        </div>
+        <Card className="border border-rose-500/40 bg-rose-500/10 text-rose-100">
+          <CardHeader>
+            <CardTitle className="text-sm">Strict mode blocked</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            Proof charts are hidden because one or more inputs are proxy-only in strict
+            congruence mode. Provide metric-derived values to render these charts.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 mb-4">
@@ -254,8 +293,25 @@ export function VisualProofCharts({ results = {}, targets = {} }: VisualProofCha
           {stageLabel}
         </Badge>
         {chartProxy ? (
-          <Badge className="bg-slate-800 text-slate-300">PROXY</Badge>
+          <Badge className={proxyBadgeClass}>{proxyBadgeLabel}</Badge>
         ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
+        <span>
+          metric K: trace={isFiniteNumber(kTraceMean) ? kTraceMean.toExponential(2) : "n/a"} 1/m,{" "}
+          sq={isFiniteNumber(kSqMean) ? kSqMean.toExponential(2) : "n/a"} 1/m^2
+        </span>
+        {kProxy ? <Badge className={proxyBadgeClass}>{proxyBadgeLabel}</Badge> : null}
+        <span>
+          VdB two-wall derivative:{" "}
+          {vdbTwoWallSupport == null
+            ? "n/a"
+            : vdbTwoWallSupport
+              ? "yes"
+              : "no"}{" "}
+          deriv={vdbTwoWallDerivativeSupport == null ? "n/a" : vdbTwoWallDerivativeSupport ? "yes" : "no"}
+        </span>
+        {vdbProxy ? <Badge className={proxyBadgeClass}>{proxyBadgeLabel}</Badge> : null}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">

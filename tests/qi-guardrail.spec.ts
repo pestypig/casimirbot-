@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 const tileTelemetry = { avgNeg: null as number | null, source: null as string | null, updatedAt: 0 };
 vi.mock("../server/qi/pipeline-qi-stream.js", () => ({
@@ -9,6 +9,9 @@ vi.mock("../server/qi/pipeline-qi-stream.js", () => ({
 import { evaluateQiGuardrail, deriveQiStatus, type EnergyPipelineState } from "../server/energy-pipeline";
 import type { PhaseSchedule } from "../server/energy/phase-scheduler.js";
 import type { PhaseScheduleTelemetry } from "../shared/schema";
+import { GEOM_TO_SI_STRESS } from "../shared/gr-units";
+
+const strictCongruenceEnv = process.env.WARP_STRICT_CONGRUENCE;
 
 const baseState: EnergyPipelineState = {
   tileArea_cm2: 1,
@@ -78,6 +81,7 @@ beforeEach(() => {
   tileTelemetry.avgNeg = null;
   tileTelemetry.source = null;
   process.env.QI_TILE_TELEMETRY_SCALE = undefined;
+  process.env.WARP_STRICT_CONGRUENCE = "0";
 });
 
 describe("evaluateQiGuardrail", () => {
@@ -179,6 +183,170 @@ describe("evaluateQiGuardrail", () => {
     expect(guard.rhoSource).toBe("tile-telemetry");
     process.env.QI_TILE_TELEMETRY_SCALE = prev;
   });
+
+  test("uses VdB region II metric source when warp metric T00 is unavailable", () => {
+    const sectorPeriod_ms = 1;
+    const tau_ms = 1;
+    const schedule = makeSchedule(1, [0], sectorPeriod_ms, tau_ms);
+    const scheduleGuard: PhaseSchedule = {
+      phi_deg_by_sector: schedule.phi_deg_by_sector,
+      negSectors: schedule.negSectors,
+      posSectors: schedule.posSectors,
+      weights: schedule.weights ?? Array.from({ length: schedule.N }, () => 1),
+    };
+    const t00Geom = -2.0;
+
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 0,
+        dutyShip: 0,
+        dutyEffective_FR: 0,
+        sectorCount: 1,
+        concurrentSectors: 1,
+        sectorStrobing: 1,
+        negativeFraction: 1,
+        phaseSchedule: schedule,
+        vdbRegionII: {
+          alpha: 1,
+          n: 80,
+          r_tilde_m: 1,
+          delta_tilde_m: 0.1,
+          sampleCount: 16,
+          b_min: 1,
+          b_max: 2,
+          bprime_min: -1,
+          bprime_max: 1,
+          bprime_rms: 0.5,
+          bdouble_min: -2,
+          bdouble_max: 2,
+          bdouble_rms: 1,
+          t00_min: -3,
+          t00_max: -1,
+          t00_mean: t00Geom,
+          t00_rms: 2,
+          support: true,
+        },
+      }),
+      { schedule: scheduleGuard, sectorPeriod_ms, tau_ms },
+    );
+
+    expect(guard.rhoSource).toBe("warp.metric.T00.vdb.regionII");
+    expect(guard.effectiveRho).toBeCloseTo(t00Geom * GEOM_TO_SI_STRESS, 6);
+    expect(guard.rhoOn).toBeCloseTo(guard.effectiveRho, 9);
+    const relErr =
+      Math.abs(guard.lhs_Jm3 - guard.effectiveRho) /
+      Math.max(1, Math.abs(guard.effectiveRho));
+    expect(relErr).toBeLessThan(1e-12);
+  });
+
+  test("ignores VdB region II fallback when derivative evidence is missing", () => {
+    const sectorPeriod_ms = 1;
+    const tau_ms = 1;
+    const schedule = makeSchedule(1, [0], sectorPeriod_ms, tau_ms);
+    const scheduleGuard: PhaseSchedule = {
+      phi_deg_by_sector: schedule.phi_deg_by_sector,
+      negSectors: schedule.negSectors,
+      posSectors: schedule.posSectors,
+      weights: schedule.weights ?? Array.from({ length: schedule.N }, () => 1),
+    };
+
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 0,
+        dutyShip: 0,
+        dutyEffective_FR: 0,
+        sectorCount: 1,
+        concurrentSectors: 1,
+        sectorStrobing: 1,
+        negativeFraction: 1,
+        phaseSchedule: schedule,
+        vdbRegionII: {
+          support: true,
+          sampleCount: 16,
+          t00_mean: -2,
+          bprime_min: 0,
+          bprime_max: 0,
+          bdouble_min: 0,
+          bdouble_max: 0,
+        } as any,
+      }),
+      { schedule: scheduleGuard, sectorPeriod_ms, tau_ms },
+    );
+
+    expect(guard.rhoSource).not.toBe("warp.metric.T00.vdb.regionII");
+  });
+
+  test("prefers warp.metricT00Ref label when metric T00 is present", () => {
+    const sectorPeriod_ms = 1;
+    const tau_ms = 1;
+    const schedule = makeSchedule(1, [0], sectorPeriod_ms, tau_ms);
+    const scheduleGuard: PhaseSchedule = {
+      phi_deg_by_sector: schedule.phi_deg_by_sector,
+      negSectors: schedule.negSectors,
+      posSectors: schedule.posSectors,
+      weights: schedule.weights ?? Array.from({ length: schedule.N }, () => 1),
+    };
+    const metricT00 = -123.456;
+
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 0,
+        dutyShip: 0,
+        dutyEffective_FR: 0,
+        sectorCount: 1,
+        concurrentSectors: 1,
+        sectorStrobing: 1,
+        negativeFraction: 1,
+        phaseSchedule: schedule,
+        warp: {
+          metricT00,
+          metricT00Source: "metric",
+          metricT00Ref: "warp.metric.T00.vdb.regionII",
+        },
+      } as any),
+      { schedule: scheduleGuard, sectorPeriod_ms, tau_ms },
+    );
+
+    expect(guard.rhoSource).toBe("warp.metric.T00.vdb.regionII");
+    expect(guard.effectiveRho).toBeCloseTo(metricT00, 9);
+  });
+
+  test("enforces metric-only rho source in strict congruence mode", () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    const sectorPeriod_ms = 1;
+    const tau_ms = 1;
+    const schedule = makeSchedule(1, [0], sectorPeriod_ms, tau_ms);
+    const scheduleGuard: PhaseSchedule = {
+      phi_deg_by_sector: schedule.phi_deg_by_sector,
+      negSectors: schedule.negSectors,
+      posSectors: schedule.posSectors,
+      weights: schedule.weights ?? Array.from({ length: schedule.N }, () => 1),
+    };
+    tileTelemetry.avgNeg = -100;
+    tileTelemetry.source = "controller";
+
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 0.2,
+        dutyShip: 0.2,
+        dutyEffective_FR: 0.2,
+        sectorCount: 1,
+        concurrentSectors: 1,
+        sectorStrobing: 1,
+        negativeFraction: 1,
+        phaseSchedule: schedule,
+      }),
+      { schedule: scheduleGuard, sectorPeriod_ms, tau_ms },
+    );
+
+    expect(guard.rhoSource).toBe("metric-missing");
+    expect(Number.isFinite(guard.effectiveRho)).toBe(false);
+    expect(guard.marginRatioRaw).toBe(Infinity);
+  });
+});
+
+afterAll(() => {
+  process.env.WARP_STRICT_CONGRUENCE = strictCongruenceEnv;
 });
 
 describe("deriveQiStatus", () => {

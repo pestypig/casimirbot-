@@ -292,6 +292,7 @@ export type TimeDilationRenderPlan = {
     solverStatus?: "CERTIFIED" | "UNSTABLE" | "NOT_CERTIFIED";
     exploratoryOverride?: boolean;
     cinematicOverride?: boolean;
+    natarioGeometryWarp?: boolean;
     wallDetected?: boolean;
     wallSource?: "kretschmann" | "ricci4";
   };

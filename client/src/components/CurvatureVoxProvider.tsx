@@ -51,6 +51,7 @@ export function CurvatureVoxProvider({
     const packet = {
       dims: stress.dims,
       stats: stress.stats,
+      meta: stress.meta,
       version: stressStampRef.current,
       updatedAt,
     };

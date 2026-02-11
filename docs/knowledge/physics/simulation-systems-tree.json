@@ -29,7 +29,15 @@
         "simulation-artifacts",
         "bridge-simulation-contracts-simulation-api"
       ],
-      "links": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "CL4 only when constraint inputs are geometry-derived."
+        }
+      ],
       "summary": "Simulation-only pipeline from contracts to UI surfaces.",
       "nodeType": "concept",
       "inputs": [],
@@ -65,7 +73,112 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7e497860b0d131d22e24f69394f3865824aab5d7146c2c55da36fefb08354ff9"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "pipeline_trace",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "simulation-contracts": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-api": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-storage": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-core-modules": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-geometry-mesh": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-scuffem-service": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-dynamic-casimir": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-warp-module": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-tsn": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-parametric-sweeps": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-ui-surfaces": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-streaming": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-artifacts": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-simulation-contracts-simulation-api": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "simulation-contracts",
@@ -84,7 +197,24 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "qi_metric_derived=true",
+          "note": "CL4 path when strict QI source is metric-derived (qi_metric_derived=true)."
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Fallback proxy path when strict metric-source validation is disabled or unavailable."
         }
       ],
       "summary": "Schema contracts for simulation parameters and results.",
@@ -118,6 +248,20 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bridge-simulation-contracts-stewardship-ledger": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -136,7 +280,39 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "vdb-band-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "vdb_two_wall_derivative_support=true",
+          "note": "CL4 path when VdB derivative diagnostics confirm two-wall derivative support (vdb_two_wall_derivative_support=true)."
+        },
+        {
+          "rel": "see-also",
+          "to": "vdb-band-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Fallback proxy path when two-wall derivative support is unavailable."
+        },
+        {
+          "rel": "see-also",
+          "to": "theta-audit-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "theta_geom=true",
+          "note": "CL4 path when metric-adapter theta is geometry-derived (theta_geom=true)."
+        },
+        {
+          "rel": "see-also",
+          "to": "theta-audit-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Fallback proxy path when geometry theta is unavailable."
         }
       ],
       "summary": "REST and client API helpers for simulations.",
@@ -176,6 +352,20 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bridge-simulation-api-verification-checklist": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -194,7 +384,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Simulation persistence and migrations.",
@@ -234,6 +426,20 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bridge-simulation-storage-stewardship-ledger": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -252,7 +458,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Core simulation modules and registry.",
@@ -304,6 +512,20 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bridge-simulation-core-modules-mission-ethos": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -321,7 +543,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Geometry and mesh generation for simulations.",
@@ -361,6 +585,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -377,7 +606,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "SCUFF-EM adapter and file generation.",
@@ -411,6 +642,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -428,7 +664,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Dynamic Casimir simulation module.",
@@ -468,6 +706,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -484,7 +727,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Warp module simulation parameter bridge.",
@@ -518,6 +763,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -534,7 +784,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Time-sensitive networking simulation.",
@@ -574,6 +826,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -590,7 +847,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Parametric sweep simulation helpers.",
@@ -628,6 +887,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -646,7 +910,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Client surfaces that run and visualize simulations.",
@@ -682,6 +948,20 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bridge-simulation-ui-surfaces-verification-checklist": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -700,7 +980,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "WebSocket and SSE simulation telemetry.",
@@ -734,6 +1016,20 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bridge-simulation-streaming-verification-checklist": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -752,7 +1048,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Generated files and simulation outputs.",
@@ -786,7 +1084,21 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d0664357b50c0ee288952e50cf7eeeb0ea2cef64258cc63fc8420668e2a9f6d0"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bridge-simulation-artifacts-stewardship-ledger": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "bridge-simulation-contracts-simulation-api",
@@ -804,15 +1116,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-systems-tree"
+          "to": "simulation-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "simulation-contracts"
+          "to": "simulation-contracts",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "simulation-api"
+          "to": "simulation-api",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -860,7 +1178,12 @@
         }
       ],
       "slug": "bridge-simulation-contracts-simulation-api",
-      "summary": "Bridge between Simulation Contracts and Simulation API."
+      "summary": "Bridge between Simulation Contracts and Simulation API.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-simulation-core-modules-mission-ethos",
@@ -881,15 +1204,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-core-modules"
+          "to": "simulation-core-modules",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "mission-ethos"
+          "to": "mission-ethos",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "simulation-core-modules"
+          "to": "simulation-core-modules",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -934,7 +1263,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between mission-ethos and simulation-core-modules."
+      "summary": "Bridge between mission-ethos and simulation-core-modules.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-simulation-streaming-verification-checklist",
@@ -956,15 +1290,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-streaming"
+          "to": "simulation-streaming",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "verification-checklist"
+          "to": "verification-checklist",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "simulation-streaming"
+          "to": "simulation-streaming",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -1009,7 +1349,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between verification-checklist and simulation-streaming."
+      "summary": "Bridge between verification-checklist and simulation-streaming.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-simulation-artifacts-stewardship-ledger",
@@ -1031,15 +1376,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-artifacts"
+          "to": "simulation-artifacts",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "stewardship-ledger"
+          "to": "stewardship-ledger",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "simulation-artifacts"
+          "to": "simulation-artifacts",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -1084,7 +1435,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between stewardship-ledger and simulation-artifacts."
+      "summary": "Bridge between stewardship-ledger and simulation-artifacts.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-simulation-storage-stewardship-ledger",
@@ -1106,15 +1462,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-storage"
+          "to": "simulation-storage",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "stewardship-ledger"
+          "to": "stewardship-ledger",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "simulation-storage"
+          "to": "simulation-storage",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -1159,7 +1521,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between stewardship-ledger and simulation-storage."
+      "summary": "Bridge between stewardship-ledger and simulation-storage.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-simulation-api-verification-checklist",
@@ -1181,15 +1548,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-api"
+          "to": "simulation-api",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "verification-checklist"
+          "to": "verification-checklist",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "simulation-api"
+          "to": "simulation-api",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -1234,7 +1607,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between verification-checklist and simulation-api."
+      "summary": "Bridge between verification-checklist and simulation-api.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-simulation-contracts-stewardship-ledger",
@@ -1256,15 +1634,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-contracts"
+          "to": "simulation-contracts",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "stewardship-ledger"
+          "to": "stewardship-ledger",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "simulation-contracts"
+          "to": "simulation-contracts",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -1309,7 +1693,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between stewardship-ledger and simulation-contracts."
+      "summary": "Bridge between stewardship-ledger and simulation-contracts.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-simulation-ui-surfaces-verification-checklist",
@@ -1331,15 +1720,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "simulation-ui-surfaces"
+          "to": "simulation-ui-surfaces",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "verification-checklist"
+          "to": "verification-checklist",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "simulation-ui-surfaces"
+          "to": "simulation-ui-surfaces",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -1384,7 +1779,12 @@
           "environment"
         ]
       },
-      "summary": "Bridge between verification-checklist and simulation-ui-surfaces."
+      "summary": "Bridge between verification-checklist and simulation-ui-surfaces.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     }
   ],
   "schema": {

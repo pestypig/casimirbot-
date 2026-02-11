@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { driveWarpFromPipeline } from "@/lib/warp-pipeline-adapter";
 import { useMetrics } from "@/hooks/use-metrics";
+import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
 
 export default function WarpEngineContainer(props: { className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -136,8 +137,15 @@ export default function WarpEngineContainer(props: { className?: string }) {
     );
   }
 
-  return <div className={props.className}>
-    <canvas ref={canvasRef} className="w-full h-full" />
-    {contractNote && <div className="mt-1 text-xs text-amber-300/80 font-mono">{contractNote}</div>}
-  </div>;
+  return (
+    <div className={props.className}>
+      <PipelineCongruenceBadge
+        label="curvature"
+        meta={pipeline?.curvatureMeta}
+        className="mb-2"
+      />
+      <canvas ref={canvasRef} className="w-full h-full" />
+      {contractNote && <div className="mt-1 text-xs text-amber-300/80 font-mono">{contractNote}</div>}
+    </div>
+  );
 }

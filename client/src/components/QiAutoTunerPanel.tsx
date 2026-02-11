@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { QiTileGuardBands } from "./QiTileGuardBands";
 import { useQiControllerState } from "@/hooks/useQiControllerState";
+import { useGrConstraintContract } from "@/hooks/useGrConstraintContract";
 
 const fmt = (value: unknown, digits = 3, fallback = "—") => {
   const numeric = Number(value);
@@ -31,6 +32,15 @@ const fmt = (value: unknown, digits = 3, fallback = "—") => {
 };
 
 const fmtPercent = (value: number) => `${(value * 100).toFixed(1)} %`;
+
+type ContractGuardrailStatus = "ok" | "fail" | "proxy" | "missing";
+
+const contractSummaryClass = (status: ContractGuardrailStatus | null) => {
+  if (status === "ok") return "border-emerald-300/50 bg-emerald-500/15 text-emerald-200";
+  if (status === "fail") return "border-rose-400/50 bg-rose-500/15 text-rose-200";
+  if (status === "proxy") return "border-amber-400/50 bg-amber-500/15 text-amber-200";
+  return "border-slate-400/40 bg-slate-500/10 text-slate-200";
+};
 
 const controllerBadgeMeta: Record<QiControllerSafetyState, { label: string; className: string }> = {
   OK: {
@@ -92,6 +102,7 @@ const constraintField = (
 
 export function QiAutoTunerPanel() {
   const { data } = useEnergyPipeline();
+  const contractQuery = useGrConstraintContract({ enabled: true, refetchInterval: 2000 });
   const updateMutation = useUpdatePipeline();
   const queryClient = useQueryClient();
 
@@ -145,6 +156,42 @@ export function QiAutoTunerPanel() {
       }
     : null;
   const dutyCycle = Number(data?.dutyCycle) || setpoint?.currentDuty || 0;
+  const qiGuard = data?.qiGuardrail;
+  const qiRhoSource = (qiGuard?.rhoSource ?? "unknown").toString();
+  const qiMetricDerived = qiGuard?.metricDerived;
+  const qiMetricSource = (qiGuard?.metricDerivedSource ?? "unknown").toString();
+  const qiRhoMetric =
+    qiRhoSource.startsWith("warp.metric") ||
+    qiRhoSource.startsWith("gr.rho_constraint") ||
+    qiRhoSource.startsWith("gr.metric");
+  const qiCurvatureRatio = Number(qiGuard?.curvatureRatio);
+  const qiCurvatureRatioDisplay = Number.isFinite(qiCurvatureRatio)
+    ? fmt(qiCurvatureRatio, 3, "--")
+    : null;
+  const qiCurvatureOk = qiGuard?.curvatureOk;
+  const qiCurvatureEnforced = qiGuard?.curvatureEnforced === true;
+  const qiCurvatureBadgeClass =
+    qiCurvatureOk === true
+      ? "border-emerald-300/50 bg-emerald-500/15 text-emerald-200"
+      : qiCurvatureOk === false
+        ? "border-rose-400/50 bg-rose-500/15 text-rose-200"
+        : "border-amber-400/50 bg-amber-500/15 text-amber-200";
+  const qiRhoBadgeClass = qiRhoMetric
+    ? "border-emerald-300/50 bg-emerald-500/15 text-emerald-200"
+    : "border-amber-400/50 bg-amber-500/15 text-amber-200";
+  const qiMetricBadgeClass =
+    qiMetricDerived === true
+      ? "border-emerald-300/50 bg-emerald-500/15 text-emerald-200"
+      : qiMetricDerived === false
+        ? "border-amber-400/50 bg-amber-500/15 text-amber-200"
+        : "border-slate-400/40 bg-slate-500/10 text-slate-200";
+  const contractGuardrails = contractQuery.data?.guardrails;
+  const contractFordRoman = contractGuardrails?.fordRoman ?? null;
+  const contractSummary = contractGuardrails
+    ? `contract FR=${contractGuardrails.fordRoman} TH=${contractGuardrails.thetaAudit} TS=${contractGuardrails.tsRatio} VdB=${contractGuardrails.vdbBand}`
+    : null;
+  const contractSource = contractQuery.data?.sources?.grDiagnostics ?? "unknown";
+  const contractBadgeClass = contractSummaryClass(contractFordRoman);
 
   const updateConstraint = useCallback(
     (key: keyof QiAutoTuneConstraints, next: number) => {
@@ -255,6 +302,34 @@ export function QiAutoTunerPanel() {
       </CardHeader>
 
       <CardContent className="space-y-5 text-sm">
+        {qiGuard && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-200">
+            <Badge className={`border ${qiRhoBadgeClass}`}>
+              {`QI rho source=${qiRhoSource}`}
+            </Badge>
+            <Badge className={`border ${qiMetricBadgeClass}`}>
+              {`metric path=${
+                qiMetricDerived === true
+                  ? "geometry-derived"
+                  : qiMetricDerived === false
+                    ? "proxy-only"
+                    : "unknown"
+              } (${qiMetricSource})`}
+            </Badge>
+            <Badge className={`border ${qiCurvatureBadgeClass}`}>
+              {qiCurvatureOk === true
+                ? `curvature window ok${qiCurvatureRatioDisplay ? ` τ/R=${qiCurvatureRatioDisplay}` : ""}`
+                : qiCurvatureOk === false
+                  ? `curvature window fail${qiCurvatureEnforced ? " (enforced)" : ""}`
+                  : "curvature window n/a"}
+            </Badge>
+            {contractSummary && (
+              <Badge className={`border ${contractBadgeClass}`}>
+                {`${contractSummary} (${contractSource})`}
+              </Badge>
+            )}
+          </div>
+        )}
         {controllerUnavailable && (
           <p className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
             Controller API unreachable; falling back to legacy client heuristics until the server recovers.

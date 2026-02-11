@@ -2,6 +2,7 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import LRLDocsTooltip from "@/components/common/LRLDocsTooltip";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import { useGrConstraintContract } from "@/hooks/useGrConstraintContract";
 import { cn } from "@/lib/utils";
 
 type QiWidgetProps = {
@@ -35,6 +36,15 @@ const STATUS_META: Record<
 };
 
 const FALLBACK = "--";
+
+type ContractGuardrailStatus = "ok" | "fail" | "proxy" | "missing";
+
+const contractGuardrailClass = (status: ContractGuardrailStatus) => {
+  if (status === "ok") return "text-emerald-300";
+  if (status === "fail") return "text-rose-300";
+  if (status === "proxy") return "text-amber-300";
+  return "text-slate-300";
+};
 
 const fmt = (value: unknown, digits = 3) => {
   if (!Number.isFinite(Number(value))) return FALLBACK;
@@ -124,7 +134,10 @@ const LRLCompass: React.FC<LRLCompassProps> = ({ angleDeg, toneClass }) => (
 
 export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
   const { data } = useEnergyPipeline();
+  const contractQuery = useGrConstraintContract({ enabled: true, refetchInterval: 2000 });
+  const contractGuardrails = contractQuery.data?.guardrails;
   const qi = data?.qi;
+  const qiGuard = data?.qiGuardrail;
   const badge = data?.qiBadge ?? "idle";
 
   if (!qi) return null;
@@ -228,6 +241,41 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
   const autoscaleZetaDisplay = Number.isFinite(autoscaleZetaRaw)
     ? (autoscaleZetaRaw as number).toPrecision(3)
     : null;
+  const rhoSource = (qiGuard?.rhoSource ?? "").toString();
+  const metricDerived = qiGuard?.metricDerived;
+  const metricDerivedSource = (qiGuard?.metricDerivedSource ?? "unknown").toString();
+  const rhoIsMetric =
+    rhoSource.startsWith("warp.metric") ||
+    rhoSource.startsWith("gr.rho_constraint") ||
+    rhoSource.startsWith("gr.metric");
+  const rhoSourceLabel = rhoSource.length ? rhoSource : "unknown";
+  const rhoSourceClass = rhoIsMetric ? "text-emerald-300" : "text-amber-300";
+  const metricDerivedClass =
+    metricDerived === true
+      ? "text-emerald-300"
+      : metricDerived === false
+        ? "text-amber-300"
+        : "text-slate-300";
+  const metricDerivedLabel =
+    metricDerived === true ? "geometry-derived" : metricDerived === false ? "proxy-only" : "unknown";
+  const curvatureRatio = Number(qiGuard?.curvatureRatio);
+  const curvatureRadius = Number(qiGuard?.curvatureRadius_m);
+  const curvatureOk = qiGuard?.curvatureOk;
+  const curvatureEnforced = qiGuard?.curvatureEnforced === true;
+  const curvatureStatus =
+    curvatureOk === true ? "ok" : curvatureOk === false ? "fail" : "n/a";
+  const curvatureClass =
+    curvatureOk === true
+      ? "text-emerald-300"
+      : curvatureOk === false
+        ? "text-rose-300"
+        : "text-slate-300";
+  const curvatureRatioDisplay = Number.isFinite(curvatureRatio)
+    ? curvatureRatio.toPrecision(3)
+    : null;
+  const curvatureRadiusDisplay = Number.isFinite(curvatureRadius)
+    ? curvatureRadius.toExponential(2)
+    : null;
 
   return (
     <div
@@ -274,6 +322,54 @@ export const QiWidget: React.FC<QiWidgetProps> = ({ className }) => {
         {" | "}
         sampler: <span className="font-mono text-slate-200">{qi.sampler}</span>
       </div>
+      {qiGuard && (
+        <div className="mt-1 text-[11px] text-slate-400">
+          rho source:{" "}
+          <span className={cn("font-mono", rhoSourceClass)}>{rhoSourceLabel}</span>
+          {" | "}
+          metric path:{" "}
+          <span className={cn("font-mono", metricDerivedClass)}>
+            {metricDerivedLabel}
+          </span>
+          <span className="text-slate-500"> ({metricDerivedSource})</span>
+          {" | "}
+          curvature window:{" "}
+          <span className={cn("font-mono", curvatureClass)}>
+            {curvatureStatus}
+            {curvatureRatioDisplay ? ` (τ/R=${curvatureRatioDisplay})` : ""}
+          </span>
+          {curvatureRadiusDisplay ? (
+            <span className="text-slate-500"> {curvatureRadiusDisplay} m</span>
+          ) : null}
+          {curvatureEnforced && curvatureOk === false ? (
+            <span className="ml-1 text-rose-300">enforced</span>
+          ) : null}
+        </div>
+      )}
+      {contractGuardrails && (
+        <div className="mt-1 text-[11px] text-slate-400">
+          contract guardrails:{" "}
+          <span className={cn("font-mono", contractGuardrailClass(contractGuardrails.fordRoman))}>
+            FR={contractGuardrails.fordRoman}
+          </span>
+          {" | "}
+          <span className={cn("font-mono", contractGuardrailClass(contractGuardrails.thetaAudit))}>
+            TH={contractGuardrails.thetaAudit}
+          </span>
+          {" | "}
+          <span className={cn("font-mono", contractGuardrailClass(contractGuardrails.tsRatio))}>
+            TS={contractGuardrails.tsRatio}
+          </span>
+          {" | "}
+          <span className={cn("font-mono", contractGuardrailClass(contractGuardrails.vdbBand))}>
+            VdB={contractGuardrails.vdbBand}
+          </span>
+          <span className="text-slate-500">
+            {" "}
+            ({contractQuery.data?.sources?.grDiagnostics ?? "unknown"})
+          </span>
+        </div>
+      )}
 
       <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] text-slate-300">
         <span className="text-slate-400">avg rho_f</span>

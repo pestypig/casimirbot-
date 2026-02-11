@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { createProgram, makeGrid, resizeCanvasAndViewport } from "@/lib/gl/simple-gl";
 import { registerWebGLContext } from "@/lib/webgl/context-pool";
+import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
 
 const VERT = `#version 300 es
 layout(location=0) in vec2 a_pos;           // unit square grid [-1,1]^2
@@ -193,6 +194,11 @@ export default function BubbleFieldPanel({ className }: {className?: string}){
 
   return (
     <div className={cn("w-full", className)}>
+      <PipelineCongruenceBadge
+        label="curvature"
+        meta={live?.curvatureMeta}
+        className="mb-2"
+      />
       <div className="w-full aspect-[16/9] rounded-lg overflow-hidden border border-slate-800 bg-black/60">
         <canvas ref={cvRef} className="w-full h-full block" />
       </div>

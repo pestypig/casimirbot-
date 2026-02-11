@@ -30,7 +30,15 @@
         "simulation-systems",
         "bridge-field-equations-stack-stress-energy-stack"
       ],
-      "links": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Constraint gate anchors CL4 geometry-derived validation."
+        }
+      ],
       "summary": "A walkable map from spacetime geometry to constraints, proofs, and verification.",
       "nodeType": "concept",
       "inputs": [],
@@ -66,7 +74,112 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:cfa8949441bef4cec276f2dc2274b7affd811c7feb2d2d8c27341fd96d3e0625"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "geometry-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "field-equations-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "stress-energy-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "energy-conditions-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "casimir-phenomena": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "units-and-scaling": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "numerics-and-stability": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "time-bounds-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "viability-and-claims": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "quantum-gr-bridge": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-mechanics": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "brick-lattice-dataflow": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "simulation-systems": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-field-equations-stack-stress-energy-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "geometry-stack",
@@ -87,7 +200,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Metric, connection, and curvature define the spacetime substrate.",
@@ -127,7 +242,35 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:abe794c5d6c0eeb56d22b888d8002deb0dfc06e138cf228ebf9de3469c9100f5"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "spacetime-metric-basics": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "connection-curvature": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "boundary-conditions-modes": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "spacetime-metric-basics",
@@ -144,7 +287,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "geometry-stack"
+          "to": "geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Define the metric as the core object for distances and intervals.",
@@ -178,6 +323,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -195,7 +345,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "geometry-stack"
+          "to": "geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Curvature expresses how geometry responds to matter and energy.",
@@ -229,6 +381,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "derived_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -246,7 +403,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "geometry-stack"
+          "to": "geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Boundary choices shape stability and the physical interpretation of solutions.",
@@ -280,6 +439,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -302,11 +466,15 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "stress-energy-stack"
+          "to": "stress-energy-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Einstein equations and 3+1 decomposition structure the dynamics.",
@@ -346,7 +514,35 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d535d77287658eb17eca83a253aa2ef10251c2bde79d05e55f47dfdef589c6f3"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "adm_fields",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "einstein-field-equations": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "adm-3plus1": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "york-time-constraints": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "einstein-field-equations",
@@ -363,7 +559,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "field-equations-stack"
+          "to": "field-equations-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "CL4 only when constraint inputs are geometry-derived."
         }
       ],
       "summary": "Curvature equals stress-energy with constant factors.",
@@ -397,6 +602,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -414,7 +624,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "field-equations-stack"
+          "to": "field-equations-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "theta-audit-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "ThetaAudit uses metric-adapter divergence when available; proxy fallback remains labeled."
         }
       ],
       "summary": "Split spacetime into spatial slices and time evolution.",
@@ -448,6 +667,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "adm_fields",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -465,7 +689,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "field-equations-stack"
+          "to": "field-equations-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "York time gauges constrain slicing and stability.",
@@ -499,6 +725,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -519,11 +750,23 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "energy-conditions-stack"
+          "to": "energy-conditions-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "cl3-rho-delta-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "cl3_metric_t00_available=true",
+          "note": "CL3_RhoDelta ties stress-energy projections to constraint-derived rho; CL4 requires geometry-derived T00."
         }
       ],
       "summary": "Stress-energy defines how matter sources curvature.",
@@ -563,7 +806,28 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:bc847bfba9cd1c3b8935cd5dba4b20187e930406f78c4b04405640884554c6cd"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "stress-energy-tensor": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "energy-mass-equivalence": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "stress-energy-tensor",
@@ -580,7 +844,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "stress-energy-stack"
+          "to": "stress-energy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Tensor form of energy, momentum, and pressure.",
@@ -614,6 +880,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -631,7 +902,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "stress-energy-stack"
+          "to": "stress-energy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Energy and mass relate through scaling constants.",
@@ -665,6 +938,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -686,11 +964,30 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "casimir-phenomena"
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "qi_metric_derived=true",
+          "note": "CL4 path when strict QI source is metric-derived (qi_metric_derived=true)."
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Fallback proxy path when strict metric-source validation is disabled or unavailable."
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-phenomena",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Energy conditions and quantum inequalities bound exotic matter.",
@@ -730,7 +1027,35 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7ca013891c69a6f8bb7b051555aab6e11101d638bc8eefd672c27769a5ae43dd"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "energy-conditions": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "negative-energy-interpretation": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "ford-roman-quantum-inequality": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "energy-conditions",
@@ -747,7 +1072,24 @@
       "links": [
         {
           "rel": "parent",
-          "to": "energy-conditions-stack"
+          "to": "energy-conditions-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-guardrails-stack",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "qi_metric_derived=true",
+          "note": "CL4 path when strict QI source is metric-derived (qi_metric_derived=true)."
+        },
+        {
+          "rel": "see-also",
+          "to": "qi-guardrails-stack",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Fallback proxy path when strict metric-source validation is disabled or unavailable."
         }
       ],
       "summary": "Classical conditions restrict stress-energy.",
@@ -781,6 +1123,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -798,7 +1145,24 @@
       "links": [
         {
           "rel": "parent",
-          "to": "energy-conditions-stack"
+          "to": "energy-conditions-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "qi_metric_derived=true",
+          "note": "CL4 path when strict QI source is metric-derived (qi_metric_derived=true)."
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Fallback proxy path when strict metric-source validation is disabled or unavailable."
         }
       ],
       "summary": "Interpretation and limits for negative energy densities.",
@@ -832,6 +1196,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -839,7 +1208,7 @@
       "slug": "ford-roman-quantum-inequality",
       "title": "Ford-Roman Quantum Inequality",
       "excerpt": "Quantum inequalities bound magnitude and duration of negative energy.",
-      "bodyMD": "Quantum inequalities constrain negative energy exposure (docs/knowledge/physics/ford-roman-quantum-inequality.md).\n\nMinimal artifact: inequality bounds summary.",
+      "bodyMD": "Quantum inequalities constrain negative energy exposure (docs/knowledge/physics/ford-roman-quantum-inequality.md).\n\nMinimal artifact: inequality bounds summary and CL4 guardrail trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
       "tags": [
         "quantum-inequality",
         "ford-roman",
@@ -849,7 +1218,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "energy-conditions-stack"
+          "to": "energy-conditions-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Quantum inequalities bound magnitude and duration of negative energy.",
@@ -883,6 +1254,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_proxy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -905,11 +1281,15 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "energy-conditions-stack"
+          "to": "energy-conditions-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Casimir effects provide a concrete negative-energy mechanism.",
@@ -943,6 +1323,41 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "casimir-force-energy": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "casimir-geometry-effects": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "dynamic-casimir-effect": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "vacuum-fluctuations": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -960,7 +1375,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "casimir-phenomena"
+          "to": "casimir-phenomena",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Vacuum boundary conditions generate measurable forces.",
@@ -994,6 +1411,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1011,7 +1433,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "casimir-phenomena"
+          "to": "casimir-phenomena",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Geometry choices change mode structure and energy density.",
@@ -1045,6 +1469,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1062,7 +1491,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "casimir-phenomena"
+          "to": "casimir-phenomena",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Time-varying boundaries create real photons.",
@@ -1096,6 +1527,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1113,7 +1549,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "casimir-phenomena"
+          "to": "casimir-phenomena",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Vacuum fluctuations underpin zero-point energy effects.",
@@ -1147,6 +1585,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1170,11 +1613,15 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "numerics-and-stability"
+          "to": "numerics-and-stability",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Consistent units and scaling keep proofs and simulations coherent.",
@@ -1214,7 +1661,49 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:72bb0803d8f77701c9cf0bae65f8ce80a64e97f4b9d015b229112224896332bb"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "units-systems": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "dimensional-analysis": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "scaling-laws": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "fundamental-constants": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-units-conversion": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "units-systems",
@@ -1231,7 +1720,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "units-and-scaling"
+          "to": "units-and-scaling",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Geometric and SI units must be mapped explicitly.",
@@ -1265,6 +1756,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1282,7 +1778,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "units-and-scaling"
+          "to": "units-and-scaling",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Dimensional checks prevent hidden inconsistencies.",
@@ -1316,6 +1814,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1333,7 +1836,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "units-and-scaling"
+          "to": "units-and-scaling",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Scaling relations explain how results change with size.",
@@ -1367,6 +1872,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1384,7 +1894,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "units-and-scaling"
+          "to": "units-and-scaling",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Constants anchor conversions and scaling.",
@@ -1418,6 +1930,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1442,7 +1959,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Discretization and precision define trustworthy simulations.",
@@ -1482,7 +2001,56 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ddb054d94b2dd772195534006881e64a12f2c85813de571cd29407106091258e"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "discretization-mesh": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "numerical-precision": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "stability-timestep": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "visualization-scaling": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "curvature-diagnostics": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "qi-diagnostics-schema": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "discretization-mesh",
@@ -1499,7 +2067,24 @@
       "links": [
         {
           "rel": "parent",
-          "to": "numerics-and-stability"
+          "to": "numerics-and-stability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "qi_metric_derived=true",
+          "note": "CL4 path when strict QI source is metric-derived (qi_metric_derived=true)."
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Fallback proxy path when strict metric-source validation is disabled or unavailable."
         }
       ],
       "summary": "Mesh resolution shapes accuracy and stability.",
@@ -1533,6 +2118,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1550,7 +2140,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "numerics-and-stability"
+          "to": "numerics-and-stability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Curvature diagnostics support constraint gating when geometry-derived."
         }
       ],
       "summary": "Precision limits determine residual reliability.",
@@ -1584,6 +2183,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1601,7 +2205,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "numerics-and-stability"
+          "to": "numerics-and-stability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Timestep choices control numerical stability.",
@@ -1635,6 +2241,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1652,7 +2263,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "numerics-and-stability"
+          "to": "numerics-and-stability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Scaling choices impact interpretation of plots.",
@@ -1686,6 +2299,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1705,7 +2323,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Sampling windows and time bounds constrain valid claims.",
@@ -1739,7 +2359,21 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:63bfb24d0701cac0d54c8d77d9497e49861142b1b604eb75ac4a55ab1e03f55e"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "sampling-time-bounds": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "sampling-time-bounds",
@@ -1756,7 +2390,24 @@
       "links": [
         {
           "rel": "parent",
-          "to": "time-bounds-stack"
+          "to": "time-bounds-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-ratio-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "ts_metric_derived=true",
+          "note": "CL4 path when TS ratio is computed from metric/proper-distance inputs (ts_metric_derived=true)."
+        },
+        {
+          "rel": "see-also",
+          "to": "ts-ratio-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "note": "Fallback proxy path for operational TS ratio."
         }
       ],
       "summary": "Bounds on sampling windows prevent false averages.",
@@ -1790,6 +2441,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1811,11 +2467,15 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "energy-conditions-stack"
+          "to": "energy-conditions-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Define what counts as viable and what claims are allowed.",
@@ -1855,7 +2515,35 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:76858aa3d49b270ed303e68306d5a9bb51b47c2b5ff01b5aace0c7fa61e8e33c"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "viability-definition": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "no-feasibility-claims": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "certificate-integrity": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "viability-definition",
@@ -1872,7 +2560,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "viability-and-claims"
+          "to": "viability-and-claims",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Define viability in terms of constraints and evidence.",
@@ -1906,6 +2596,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1923,7 +2618,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "viability-and-claims"
+          "to": "viability-and-claims",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Guard against unsupported feasibility claims.",
@@ -1957,6 +2654,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1974,7 +2676,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "viability-and-claims"
+          "to": "viability-and-claims",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Integrity checks back any certified claim.",
@@ -2008,6 +2712,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2025,7 +2734,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "units-and-scaling"
+          "to": "units-and-scaling",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Convert between SI and geometric GR units.",
@@ -2059,6 +2770,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2076,7 +2792,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "numerics-and-stability"
+          "to": "numerics-and-stability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Schema for curvature diagnostics output.",
@@ -2110,6 +2828,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "derived_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2127,7 +2850,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "numerics-and-stability"
+          "to": "numerics-and-stability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Schema for QI diagnostic payloads.",
@@ -2161,6 +2886,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2178,7 +2908,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Bridge notes between quantum effects and GR constraints.",
@@ -2212,6 +2944,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2229,15 +2966,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "numerics-and-stability"
+          "to": "numerics-and-stability",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "time-bounds-stack"
+          "to": "time-bounds-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Classical vs statistical uncertainty and physics constraints.",
@@ -2269,6 +3012,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2286,15 +3034,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "numerics-and-stability"
+          "to": "numerics-and-stability",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "stress-energy-stack"
+          "to": "stress-energy-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Brick payloads and lattice dataflow in physics pipelines.",
@@ -2326,6 +3080,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2343,15 +3102,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "casimir-phenomena"
+          "to": "casimir-phenomena",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "numerics-and-stability"
+          "to": "numerics-and-stability",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Simulation systems and pipelines.",
@@ -2383,6 +3148,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2404,15 +3174,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "physics-foundations-tree"
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "field-equations-stack"
+          "to": "field-equations-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "stress-energy-stack"
+          "to": "stress-energy-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -2460,7 +3236,12 @@
         }
       ],
       "slug": "bridge-field-equations-stack-stress-energy-stack",
-      "summary": "Bridge between Field Equations Stack and Stress-Energy Stack."
+      "summary": "Bridge between Field Equations Stack and Stress-Energy Stack.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     }
   ],
   "schema": {

@@ -12,6 +12,7 @@ import { DEFAULT_T00_CHANNEL, DEFAULT_FLUX_CHANNEL } from "@/components/Curvatur
 import { FluxInvariantBadge } from "@/components/common/FluxInvariantBadge";
 import LRLDocsTooltip from "@/components/common/LRLDocsTooltip";
 import { computeLaplaceRungeLenz, type Vec3 } from "@/physics/alcubierre";
+import { buildCongruenceBadge, resolveCongruenceMeta } from "@/lib/congruence-meta";
 
 const EPS = 1e-9;
 const HIST_BINS = 36;
@@ -57,6 +58,7 @@ const ENERGY_FLUX_HELP: HardwareConnectHelp = {
 type StressBusBase = {
   dims: [number, number, number];
   stats?: StressEnergyBrickDecoded["stats"];
+  meta?: StressEnergyBrickDecoded["meta"];
 };
 
 type StressBusT00Payload = StressBusBase & {
@@ -203,6 +205,7 @@ export default function EnergyFluxPanel() {
       t00: busT00.t00,
       flux: busFlux.flux,
       stats,
+      meta: busFlux.meta ?? busT00.meta ?? stressQuery.data?.meta,
     };
   }, [busT00, busFlux, stressQuery.data]);
 
@@ -212,6 +215,13 @@ export default function EnergyFluxPanel() {
     : stressQuery.data
       ? "query"
       : null;
+  const stressMeta = resolveCongruenceMeta(
+    activeSample?.meta,
+    pipeline?.stressMeta,
+  );
+  const stressMetaSource = stressMeta.source ?? "unknown";
+  const stressMetaCongruence = stressMeta.congruence ?? "unknown";
+  const { proxy: stressMetaProxy } = buildCongruenceBadge(stressMeta);
   const slice = useMemo(() => computeSlice(activeSample), [activeSample]);
 
   const densityMagnitude = activeSample?.stats?.avgT00 ?? null;
@@ -380,6 +390,15 @@ export default function EnergyFluxPanel() {
               Equatorial |T00| vs div S slices and the ratio R = (div S)/(epsilon + |T00|). Currently driven by the
               stress-energy brick feed.
             </CardDescription>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+              <span className="font-mono">stress.source={stressMetaSource}</span>
+              <span className="font-mono">stress.congruence={stressMetaCongruence}</span>
+              {stressMetaProxy && (
+                <Badge variant="outline" className="border-amber-400/60 text-amber-200">
+                  PROXY
+                </Badge>
+              )}
+            </div>
           </div>
           <HardwareConnectButton
             controller={hardwareController}

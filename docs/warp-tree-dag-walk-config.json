@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "allowedCL": "CL4",
+  "allowConceptual": false,
+  "allowProxies": false,
+  "chart": "comoving_cartesian",
+  "region": {
+    "B_equals_1": true,
+    "qi_metric_derived_equals_true": true,
+    "qi_strict_ok_equals_true": true,
+    "theta_geom_equals_true": true,
+    "vdb_two_wall_derivative_support_equals_true": false,
+    "ts_metric_derived_equals_true": false,
+    "cl3_metric_t00_available_equals_true": false,
+    "cl3_rho_gate_equals_true": false
+  },
+  "seedOrder": "lex",
+  "walkMode": "bfs"
+}

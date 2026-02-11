@@ -158,6 +158,10 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     }
     return { a: 503.5, b: 132.0, c: 86.5 }; // meters (semi-axes) - validated Needle Hull defaults
   })();
+  const hullWallThickness_m =
+    rawHull && Number.isFinite(rawHull.wallThickness_m)
+      ? Math.max(1e-9, Number(rawHull.wallThickness_m))
+      : undefined;
   const R_geom_m = Math.cbrt(hull.a * hull.b * hull.c); // meters
   const R_geom_um = R_geom_m * 1e6;                     // Natário expects µm
   
@@ -170,6 +174,22 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
   const warpGeometryAssetId = (params as any).warpGeometryAssetId ?? (warpGeometry as any)?.assetId;
   const warpGridResolution = (params as any).warpGridResolution ?? (warpGeometry as any)?.resolution;
   const warpDriveDirection = (warpGeometry as any)?.driveDirection ?? (params as any).warpDriveDirection;
+  const bubble = (params as any).bubble ?? {};
+  const bubbleRadius_m = Number.isFinite(bubble.R)
+    ? Number(bubble.R)
+    : Number.isFinite((params as any).R)
+      ? Number((params as any).R)
+      : undefined;
+  const bubbleSigma = Number.isFinite(bubble.sigma)
+    ? Number(bubble.sigma)
+    : Number.isFinite((params as any).sigma)
+      ? Number((params as any).sigma)
+      : undefined;
+  const bubbleBeta = Number.isFinite(bubble.beta)
+    ? Number(bubble.beta)
+    : Number.isFinite((params as any).beta)
+      ? Number((params as any).beta)
+      : undefined;
 
   // Sector counts / duty
   const sectorCount = Math.max(1, Math.floor(dyn?.sectorCount ?? 1));
@@ -312,6 +332,10 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     warpGridResolution: Number.isFinite(+warpGridResolution) ? +warpGridResolution : undefined,
     warpDriveDirection: Array.isArray(warpDriveDirection) ? (warpDriveDirection as [number, number, number]) : undefined,
     hullAxes: hull,
+    hullWallThickness_m,
+    bubbleRadius_m,
+    bubbleSigma,
+    bubbleBeta,
 
     // --- Pipeline seeds (threaded through) ---
     gammaGeo,
@@ -344,12 +368,22 @@ function validateWarpResults(result: NatarioWarpResult, params: SimulationParame
     warpResult: result
   });
 
+  const fieldType =
+    (params.dynamicConfig as any)?.warpFieldType ??
+    (params as any).warpFieldType ??
+    "natario";
+  const expectsZeroExpansion =
+    fieldType === "natario" ||
+    fieldType === "natario_sdf" ||
+    fieldType === "irrotational";
+
   const ampFactors = (params as any).ampFactors ?? (params as any).amps ?? {};
   const γ_geo = ampFactors?.gammaGeo ?? 26;
   const γ_vdb = ampFactors?.gammaVanDenBroeck ?? 3.83e1;
   const Q      = params.dynamicConfig?.cavityQ ?? 1e9;
 
   debugLog('[WarpModule] Validation parameters:', { γ_geo, γ_vdb, Q });
+  debugLog('[WarpModule] Warp field expectations:', { fieldType, expectsZeroExpansion });
 
   // More reasonable validation bands based on physics
   const geomMin = 0.1 * γ_geo;  // Allow 90% deviation below
@@ -377,9 +411,11 @@ function validateWarpResults(result: NatarioWarpResult, params: SimulationParame
                             Number.isFinite(result.totalAmplificationFactor);
 
   const quantumSafe = !!result.isQuantumSafe && result.quantumSafetyStatus !== 'violation';
-  const warpFieldStable = !!result.isZeroExpansion && 
-                         !!result.isCurlFree && 
-                         !!result.stressEnergyTensor?.isNullEnergyConditionSatisfied;
+  const warpFieldStable = expectsZeroExpansion
+    ? !!result.isZeroExpansion &&
+      !!result.isCurlFree &&
+      !!result.stressEnergyTensor?.isNullEnergyConditionSatisfied
+    : !!result.stressEnergyTensor?.isNullEnergyConditionSatisfied;
 
   debugLog('[WarpModule] Validation checks:', {
     geometryValid,
@@ -453,7 +489,12 @@ export const warpBubbleModule: CasimirModule = {
 
       // Perform Natário warp bubble calculations
       let warpResult: NatarioWarpResult;
-      if (warpFieldType === 'natario' || warpFieldType === 'natario_sdf' || warpFieldType === 'irrotational') {
+      if (
+        warpFieldType === 'natario' ||
+        warpFieldType === 'natario_sdf' ||
+        warpFieldType === 'irrotational' ||
+        warpFieldType === 'alcubierre'
+      ) {
         warpResult = calculateNatarioWarpBubble(warpParams);
       } else {
         debugWarn(`[WarpModule] Unsupported warpFieldType "${warpFieldType}", falling back to Natário solver`);

@@ -12,9 +12,9 @@ The Needle Hull Mainframe is the operator-facing slice of Helix Core. It stitche
 - Components such as `HelixCasimirAmplifier`, `VacuumGapSweepHUD`, `NearZeroWidget`, and the Hull3D renderer consume the same live pipeline snapshot so geometry, duty, and curvature diagnostics stay synchronized with the mainframe log.
 
 ### 2. Energy pipeline + hull defaults (server)
-- `server/energy-pipeline.ts` seeds the global state with the paper-authentic Needle Hull metrics (`tileArea_cm2 = 25`, `shipRadius_m = 86.5`, sag depth 16 nm, 400 sectors, 1.007 km × 264 m × 173 m hull dimensions).
+- `server/energy-pipeline.ts` seeds the global state with the calibrated pipeline defaults. Needle Hull Mk1 metrics are supported as an explicit preset or override but are not the system default.
 - `initializePipelineState()` → `calculateEnergyPipeline()` compute the stress-energy budget, Ford–Roman duty averages, Natário bell widths, and renderer-ready light-crossing data. `/api/helix/pipeline`, `/api/helix/mode`, and `/api/helix/displacement` streams come directly from this state.
-- `modules/warp/warp-module.ts` ensures anything lacking explicit hull data automatically falls back to the validated ellipsoid `{a: 503.5 m, b: 132.0 m, c: 86.5 m}` so the renderer, Natário solver, and viability tools never drift away from the canonical Needle Hull geometry.
+- `modules/warp/warp-module.ts` ensures anything lacking explicit hull data automatically falls back to the validated ellipsoid `{a: 503.5 m, b: 132.0 m, c: 86.5 m}` so the renderer, Natário solver, and viability tools never drift away from the canonical hull geometry for the active mode.
 
 ### 3. Command + observability loop
 - `server/helix-core.ts` exposes `handleHelixCommand`, which forwards chat transcripts (with a `buildHelixCorePrompt()` snapshot of the current pipeline) to OpenAI, validates function-call schemas, and returns structured `functionResult` payloads when GPT asks to pulse sectors, run diagnostics, or load documents.
@@ -37,9 +37,11 @@ The Needle Hull Mainframe is the operator-facing slice of Helix Core. It stitche
 ## Key Files & Endpoints
 - `client/src/pages/helix-core.tsx` – UI + terminal scaffolding, log wiring, renderer embeds.
 - `client/src/hooks/use-energy-pipeline.ts` – shared React hook for pipeline state, sweeps, and scheduler mutations.
-- `server/energy-pipeline.ts` – canonical Needle Hull geometry and energy modeling.
+- `server/energy-pipeline.ts` – canonical hull geometry for the active mode and energy modeling.
 - `modules/warp/warp-module.ts` – Natário conversion helper that enforces fallback hull axes.
 - `server/helix-core.ts` – `/api/helix/command`, metrics route helpers, rate limiting, and ChatGPT shim.
 - Primary HTTP surfaces: `/api/helix/pipeline`, `/api/helix/metrics`, `/api/helix/displacement`, `/api/helix/mode`, `/api/helix/command`, `/api/helix/tile/:sectorId`.
 
 Keep this file close whenever you need to onboard a new panel, API route, or AI workflow to the Needle Hull Mainframe System—it is the canonical description of how the Mk 1 configuration is represented throughout the stack.
+
+

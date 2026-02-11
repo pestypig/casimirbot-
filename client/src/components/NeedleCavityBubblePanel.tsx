@@ -1,13 +1,16 @@
+import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { useMathStageGate } from "@/hooks/useMathStageGate";
 import { useProofPack } from "@/hooks/useProofPack";
+import { useGrConstraintContract } from "@/hooks/useGrConstraintContract";
 import { STAGE_BADGE, STAGE_LABELS } from "@/lib/math-stage-gate";
 import {
   PROOF_PACK_STAGE_REQUIREMENTS,
   getProofValue,
-  readProofBoolean,
-  readProofNumber,
-  readProofString,
+  isStrictProofPack,
+  readProofBooleanStrict,
+  readProofNumberStrict,
+  readProofStringStrict,
 } from "@/lib/proof-pack";
 import { cn } from "@/lib/utils";
 
@@ -32,12 +35,35 @@ const fmtDim = (v: number | undefined | null, digits = 2): string => {
   return n.toExponential(digits);
 };
 
-const renderProxyBadge = (proxy: boolean) =>
-  proxy ? (
-    <Badge className="ml-2 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-200">
-      PROXY
+const StrictProofContext = React.createContext(false);
+
+function ProxyBadge({ proxy }: { proxy?: boolean }) {
+  const strictMode = React.useContext(StrictProofContext);
+  if (!proxy) return null;
+  return (
+    <Badge
+      className={cn(
+        "ml-2 px-1.5 py-0.5 text-[10px]",
+        strictMode ? "bg-rose-900/40 text-rose-200" : "bg-slate-800 text-slate-200",
+      )}
+    >
+      {strictMode ? "NON-ADMISSIBLE" : "PROXY"}
     </Badge>
-  ) : null;
+  );
+}
+
+type ContractGuardrailStatus = "ok" | "fail" | "proxy" | "missing";
+
+const contractSummaryClass = (statuses: ContractGuardrailStatus[] | null) => {
+  if (!statuses) return "border-slate-600 bg-slate-900/70 text-slate-200";
+  if (statuses.some((status) => status === "fail" || status === "missing")) {
+    return "border-rose-500/40 bg-rose-500/10 text-rose-200";
+  }
+  if (statuses.some((status) => status === "proxy")) {
+    return "border-amber-500/40 bg-amber-500/10 text-amber-200";
+  }
+  return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
+};
 
 export function NeedleCavityBubblePanel() {
   const { data: pack, isLoading, error } = useProofPack({
@@ -49,13 +75,44 @@ export function NeedleCavityBubblePanel() {
   const stageLabel = stageGate.pending
     ? "STAGE..."
     : STAGE_LABELS[stageGate.stage];
+  const contractQuery = useGrConstraintContract({ enabled: true, refetchInterval: 2000 });
+  const contractGuardrails = contractQuery.data?.guardrails ?? null;
+  const contractStatuses: ContractGuardrailStatus[] | null = contractGuardrails
+    ? [
+        contractGuardrails.fordRoman,
+        contractGuardrails.thetaAudit,
+        contractGuardrails.tsRatio,
+        contractGuardrails.vdbBand,
+      ]
+    : null;
+  const contractSource = contractQuery.data?.sources?.grDiagnostics ?? "missing";
   const stageProxy = !stageGate.ok || !pack;
+  const strictMode = isStrictProofPack(pack);
+  const contractStatusesStrict =
+    strictMode && contractStatuses
+      ? contractStatuses.map((status) =>
+          status === "proxy" || status === "missing" ? "fail" : status,
+        )
+      : contractStatuses;
+  const contractBadgeClass = contractSummaryClass(contractStatusesStrict);
 
-  const proofNum = (key: string) => readProofNumber(pack, key);
-  const proofBool = (key: string) => readProofBoolean(pack, key);
-  const proofStr = (key: string) => readProofString(pack, key);
+  const proofNum = (key: string) => readProofNumberStrict(pack, key, strictMode);
+  const proofBool = (key: string) => readProofBooleanStrict(pack, key, strictMode);
+  const proofStr = (key: string) => readProofStringStrict(pack, key, strictMode);
   const proxyFrom = (keys: string[]) =>
     stageProxy || keys.some((key) => Boolean(getProofValue(pack, key)?.proxy));
+
+  const modelMode = proofStr("model_mode");
+  const dutyEffective = proofNum("duty_effective");
+  const dutyBurst = proofNum("duty_burst");
+  const sectorsLive = proofNum("sectors_live");
+  const sectorsTotal = proofNum("sectors_total");
+  const tauLcMs = proofNum("tau_lc_ms");
+  const tauPulseMs = proofNum("tau_pulse_ms");
+  const tauDwellMs = proofNum("tau_dwell_ms");
+  const mechGapReqNm = proofNum("mechanical_gap_req_nm");
+  const mechGapEffNm = proofNum("mechanical_gap_eff_nm");
+  const mechNote = proofStr("mechanical_note");
 
   const tileArea_m2 = proofNum("tile_area_m2");
   const gap_m = proofNum("gap_m");
@@ -89,8 +146,24 @@ export function NeedleCavityBubblePanel() {
   const zeta = proofNum("zeta");
   const fordRomanOK = proofBool("ford_roman_ok");
   const natarioOK = proofBool("natario_ok");
-  const thetaRaw = proofNum("theta_raw");
-  const thetaCal = proofNum("theta_cal");
+  const thetaRaw = proofNum("theta_pipeline_raw");
+  const thetaCal = proofNum("theta_pipeline_cal");
+  const thetaGeom = proofNum("theta_geom");
+  const kTraceMean = proofNum("metric_k_trace_mean");
+  const kSqMean = proofNum("metric_k_sq_mean");
+  const thetaStrictMode = proofBool("theta_strict_mode");
+  const thetaStrictOk = proofBool("theta_strict_ok");
+  const thetaStrictReason = proofStr("theta_strict_reason");
+  const qiStrictMode = proofBool("qi_strict_mode");
+  const qiStrictOk = proofBool("qi_strict_ok");
+  const qiStrictReason = proofStr("qi_strict_reason");
+  const qiRhoSource = proofStr("qi_rho_source");
+  const qiMetricDerived = proofBool("qi_metric_derived");
+  const qiMetricSource = proofStr("qi_metric_source");
+  const qiMetricReason = proofStr("qi_metric_reason");
+  const tsMetricDerived = proofBool("ts_metric_derived");
+  const tsMetricSource = proofStr("ts_metric_source");
+  const tsMetricReason = proofStr("ts_metric_reason");
   const gammaVdB = proofNum("gamma_vdb");
   const gammaVdB_requested = proofNum("gamma_vdb_requested");
   const vdbLimit = proofNum("vdb_limit");
@@ -98,6 +171,11 @@ export function NeedleCavityBubblePanel() {
   const pocketThickness_m = proofNum("vdb_pocket_thickness_m");
   const planckMargin = proofNum("vdb_planck_margin");
   const vdbReason = proofStr("vdb_reason");
+  const vdbTwoWallSupport = proofBool("vdb_two_wall_support");
+  const vdbTwoWallDerivativeSupport = proofBool("vdb_two_wall_derivative_support");
+  const vdbRegionIIDerivativeSupport = proofBool("vdb_region_ii_derivative_support");
+  const vdbRegionIVDerivativeSupport = proofBool("vdb_region_iv_derivative_support");
+  const vdbTwoWallNote = proofStr("vdb_two_wall_note");
 
   const hullDimsValue =
     Lx_m != null && Ly_m != null && Lz_m != null
@@ -111,7 +189,7 @@ export function NeedleCavityBubblePanel() {
 
   const thetaValue =
     thetaRaw != null || thetaCal != null
-      ? `${fmtSci(thetaRaw)} raw / ${fmtSci(thetaCal)} cal`
+      ? `${fmtSci(thetaRaw)} pipeline_raw / ${fmtSci(thetaCal)} pipeline_cal`
       : "n/a";
 
   const vdbValue =
@@ -120,7 +198,8 @@ export function NeedleCavityBubblePanel() {
       : "n/a";
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-[#050915] text-slate-100">
+    <StrictProofContext.Provider value={strictMode}>
+      <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-[#050915] text-slate-100">
       <header className="border-b border-white/10 bg-black/40 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -148,13 +227,24 @@ export function NeedleCavityBubblePanel() {
             >
               {stageLabel}
             </Badge>
-            {stageProxy ? (
-              <Badge className="border px-2 py-0.5 text-[10px] bg-slate-800 text-slate-200">
-                PROXY
-              </Badge>
-            ) : null}
+            <ProxyBadge proxy={stageProxy} />
             <span>Proof pack</span>
           </div>
+        </div>
+        <div className="mt-2 flex items-center gap-2 text-[10px]">
+          {contractGuardrails ? (
+            <Badge className={cn("border px-2 py-0.5", contractBadgeClass)}>
+              {`contract FR=${contractGuardrails.fordRoman} TH=${contractGuardrails.thetaAudit} TS=${contractGuardrails.tsRatio} VdB=${contractGuardrails.vdbBand}`}
+            </Badge>
+          ) : (
+            <Badge className="border border-slate-600/50 bg-slate-900/60 px-2 py-0.5 text-slate-300">
+              contract unavailable
+            </Badge>
+          )}
+          <span className="text-slate-400">{`source=${contractSource}`}</span>
+          {modelMode ? (
+            <span className="text-slate-400">{`mode=${modelMode}`}</span>
+          ) : null}
         </div>
       </header>
 
@@ -178,11 +268,25 @@ export function NeedleCavityBubblePanel() {
               proxy={proxyFrom(["tile_area_m2"])}
             />
             <LedgerRow
-              label="Gap g"
-              formula="g = gap_nm * 1e-9"
+              label="Casimir gap g (effective)"
+              formula="g = gap_nm (effective, model-mode aware)"
               value={fmtSci(gap_m)}
               unit="m"
               proxy={proxyFrom(["gap_m"])}
+            />
+            <LedgerRow
+              label="Requested gap g_req"
+              formula="g_req = mechanical.requestedGap_nm"
+              value={fmtSci(mechGapReqNm)}
+              unit="nm"
+              proxy={proxyFrom(["mechanical_gap_req_nm"])}
+            />
+            <LedgerRow
+              label="Effective gap g_eff"
+              formula="g_eff = mechanical.constrainedGap_nm"
+              value={fmtSci(mechGapEffNm)}
+              unit="nm"
+              proxy={proxyFrom(["mechanical_gap_eff_nm"])}
             />
             {gap_guard_m != null ? (
               <LedgerRow
@@ -243,6 +347,12 @@ export function NeedleCavityBubblePanel() {
               unit="Pa"
               highlight={margin_Pa != null && margin_Pa < 0}
               proxy={proxyFrom(["mechanical_margin_Pa"])}
+            />
+            <LedgerRow
+              label="Mechanical note"
+              formula="mechanical feasibility clamp note"
+              value={mechNote ?? "n/a"}
+              proxy={proxyFrom(["mechanical_note"])}
             />
             <LedgerRow
               label="Max stroke s_max"
@@ -345,6 +455,53 @@ export function NeedleCavityBubblePanel() {
               unit="J/m^3"
               proxy={proxyFrom(["rho_static_J_m3", "rho_inst_J_m3", "rho_avg_J_m3"])}
             />
+            <Divider label="Duty + timing" />
+            <LedgerRow
+              label="Effective duty d_eff"
+              formula="d_eff = duty_burst * S_live / S_total"
+              value={fmtSci(dutyEffective)}
+              unit="-"
+              proxy={proxyFrom(["duty_effective"])}
+            />
+            <LedgerRow
+              label="Local burst duty"
+              formula="duty_burst = burst / cycle"
+              value={fmtSci(dutyBurst)}
+              unit="-"
+              proxy={proxyFrom(["duty_burst"])}
+            />
+            <LedgerRow
+              label="S_live / S_total"
+              formula="sector strobing coverage"
+              value={
+                sectorsLive != null || sectorsTotal != null
+                  ? `${fmtSci(sectorsLive)} / ${fmtSci(sectorsTotal)}`
+                  : "n/a"
+              }
+              unit="-"
+              proxy={proxyFrom(["sectors_live", "sectors_total"])}
+            />
+            <LedgerRow
+              label="tau_LC"
+              formula="tau_LC = wall / c"
+              value={fmtSci(tauLcMs)}
+              unit="ms"
+              proxy={proxyFrom(["tau_lc_ms"])}
+            />
+            <LedgerRow
+              label="tau_pulse"
+              formula="tau_pulse = burst_ms"
+              value={fmtSci(tauPulseMs)}
+              unit="ms"
+              proxy={proxyFrom(["tau_pulse_ms"])}
+            />
+            <LedgerRow
+              label="dwell_ms"
+              formula="sector dwell period"
+              value={fmtSci(tauDwellMs)}
+              unit="ms"
+              proxy={proxyFrom(["tau_dwell_ms"])}
+            />
             <Divider label="GR proxy & guardrails" />
             <LedgerRow
               label="TS ratio"
@@ -354,12 +511,84 @@ export function NeedleCavityBubblePanel() {
               proxy={proxyFrom(["ts_ratio"])}
             />
             <LedgerRow
+              label="TS strict congruence"
+              formula="strict mode requires metric-derived TS timing source"
+              value={
+                tsMetricDerived == null
+                  ? "n/a"
+                  : `${tsMetricDerived ? "metric" : "proxy"}${
+                      tsMetricSource ? ` [${tsMetricSource}]` : ""
+                    }${tsMetricReason ? ` (${tsMetricReason})` : ""}`
+              }
+              unit="-"
+              highlight={tsMetricDerived === false}
+              proxy={proxyFrom([
+                "ts_metric_derived",
+                "ts_metric_source",
+                "ts_metric_reason",
+              ])}
+            />
+            <LedgerRow
               label="Ford-Roman QI zeta"
               formula="zeta = sampledIntegral / bound (zeta <= 1)"
               value={fmtSci(zeta)}
               unit={fordRomanOK == null ? "n/a" : fordRomanOK ? "ok" : "violation"}
               highlight={fordRomanOK === false}
               proxy={proxyFrom(["zeta", "ford_roman_ok"])}
+            />
+            <LedgerRow
+              label="QI strict congruence"
+              formula="strict mode requires metric-derived QI rho source"
+              value={
+                qiStrictMode == null && qiStrictOk == null
+                  ? "n/a"
+                  : `${qiStrictMode ? "on" : "off"} / ${
+                      qiStrictOk == null
+                        ? "n/a"
+                        : qiStrictOk
+                          ? "ok"
+                          : "blocked"
+                    }${qiStrictReason ? ` (${qiStrictReason})` : ""}${
+                      qiMetricDerived == null
+                        ? ""
+                        : ` [${qiMetricDerived ? "metric" : "proxy"}]`
+                    }${
+                      qiMetricSource ? ` [metric:${qiMetricSource}]` : ""
+                    }${
+                      qiMetricReason ? ` (${qiMetricReason})` : ""
+                    }${
+                      qiRhoSource ? ` [${qiRhoSource}]` : ""
+                    }`
+              }
+              unit="-"
+              highlight={qiStrictMode === true && qiStrictOk === false}
+              proxy={proxyFrom([
+                "qi_strict_mode",
+                "qi_strict_ok",
+                "qi_strict_reason",
+                "qi_metric_derived",
+                "qi_metric_source",
+                "qi_metric_reason",
+                "qi_rho_source",
+              ])}
+            />
+            <LedgerRow
+              label="QI metric path"
+              formula="metric-derived QI rho provenance"
+              value={
+                qiMetricDerived == null
+                  ? "n/a"
+                  : `${qiMetricDerived ? "metric-derived" : "proxy-only"}${
+                      qiMetricSource ? ` [${qiMetricSource}]` : ""
+                    }${qiMetricReason ? ` (${qiMetricReason})` : ""}`
+              }
+              unit="-"
+              highlight={qiMetricDerived === false}
+              proxy={proxyFrom([
+                "qi_metric_derived",
+                "qi_metric_source",
+                "qi_metric_reason",
+              ])}
             />
             <LedgerRow
               label="Natario constraint"
@@ -376,11 +605,54 @@ export function NeedleCavityBubblePanel() {
               proxy={proxyFrom(["natario_ok"])}
             />
             <LedgerRow
+              label="theta_geom (div beta)"
+              formula="theta_geom = D_i beta^i (metric adapter)"
+              value={fmtSci(thetaGeom)}
+              unit="1/m"
+              proxy={proxyFrom(["theta_geom"])}
+            />
+            <LedgerRow
+              label="K_trace_mean"
+              formula="K_trace = Tr(K_ij)"
+              value={fmtSci(kTraceMean)}
+              unit="1/m"
+              proxy={proxyFrom(["metric_k_trace_mean"])}
+            />
+            <LedgerRow
+              label="K_sq_mean"
+              formula="K_sq = K_ij K^ij"
+              value={fmtSci(kSqMean)}
+              unit="1/m^2"
+              proxy={proxyFrom(["metric_k_sq_mean"])}
+            />
+            <LedgerRow
+              label="theta strict congruence"
+              formula="strict mode requires non-proxy theta_geom input"
+              value={
+                thetaStrictMode == null && thetaStrictOk == null
+                  ? "n/a"
+                  : `${thetaStrictMode ? "on" : "off"} / ${
+                      thetaStrictOk == null
+                        ? "n/a"
+                        : thetaStrictOk
+                          ? "ok"
+                          : "blocked"
+                    }${thetaStrictReason ? ` (${thetaStrictReason})` : ""}`
+              }
+              unit="-"
+              highlight={thetaStrictMode === true && thetaStrictOk === false}
+              proxy={proxyFrom([
+                "theta_strict_mode",
+                "theta_strict_ok",
+                "theta_strict_reason",
+              ])}
+            />
+            <LedgerRow
               label="FR amplification theta_chain"
-              formula="theta_raw = gamma_geo^3 * qSpoil * gamma_VdB(raw) * d_eff; theta_cal uses clamped gamma_VdB"
+              formula="theta_pipeline_raw = gamma_geo^3 * qSpoil * gamma_VdB(raw) * d_eff; theta_pipeline_cal uses clamped gamma_VdB"
               value={thetaValue}
               unit="-"
-              proxy={proxyFrom(["theta_raw", "theta_cal"])}
+              proxy={proxyFrom(["theta_pipeline_raw", "theta_pipeline_cal"])}
             />
             <LedgerRow
               label="Van den Broeck limit"
@@ -388,6 +660,62 @@ export function NeedleCavityBubblePanel() {
               value={vdbValue}
               unit="-"
               proxy={proxyFrom(["gamma_vdb_requested", "gamma_vdb", "vdb_limit"])}
+            />
+            <LedgerRow
+              label="VdB two-wall derivative support"
+              formula="region II + IV derivative support (B'(r), f'(r))"
+              value={
+                vdbTwoWallSupport == null
+                  ? "n/a"
+                  : vdbTwoWallSupport
+                    ? "supported"
+                    : "missing"
+              }
+              unit="-"
+              highlight={vdbTwoWallSupport === false}
+              proxy={proxyFrom(["vdb_two_wall_support", "vdb_two_wall_note"])}
+            />
+            <LedgerRow
+              label="VdB two-wall derivatives"
+              formula="derivative support (B', B'', df/dr)"
+              value={
+                vdbTwoWallDerivativeSupport == null
+                  ? "n/a"
+                  : vdbTwoWallDerivativeSupport
+                    ? "supported"
+                    : "missing"
+              }
+              unit="-"
+              highlight={vdbTwoWallDerivativeSupport === false}
+              proxy={proxyFrom(["vdb_two_wall_derivative_support"])}
+            />
+            <LedgerRow
+              label="VdB region II deriv support"
+              formula="region II derivative availability (B', B'')"
+              value={
+                vdbRegionIIDerivativeSupport == null
+                  ? "n/a"
+                  : vdbRegionIIDerivativeSupport
+                    ? "supported"
+                    : "missing"
+              }
+              unit="-"
+              highlight={vdbRegionIIDerivativeSupport === false}
+              proxy={proxyFrom(["vdb_region_ii_derivative_support"])}
+            />
+            <LedgerRow
+              label="VdB region IV deriv support"
+              formula="region IV derivative availability (df/dr)"
+              value={
+                vdbRegionIVDerivativeSupport == null
+                  ? "n/a"
+                  : vdbRegionIVDerivativeSupport
+                    ? "supported"
+                    : "missing"
+              }
+              unit="-"
+              highlight={vdbRegionIVDerivativeSupport === false}
+              proxy={proxyFrom(["vdb_region_iv_derivative_support"])}
             />
             <LedgerRow
               label="Pocket radius / thickness"
@@ -410,7 +738,13 @@ export function NeedleCavityBubblePanel() {
             {vdbReason ? (
               <div className="mt-1 rounded border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] text-sky-100">
                 VdB guard reason: {vdbReason}
-                {renderProxyBadge(proxyFrom(["vdb_reason"]))}
+                <ProxyBadge proxy={proxyFrom(["vdb_reason"])} />
+              </div>
+            ) : null}
+            {vdbTwoWallNote ? (
+              <div className="mt-1 rounded border border-slate-500/30 bg-slate-500/10 px-2 py-1 text-[10px] text-slate-100">
+                VdB two-wall note: {vdbTwoWallNote}
+                <ProxyBadge proxy={proxyFrom(["vdb_two_wall_note"])} />
               </div>
             ) : null}
           </div>
@@ -422,7 +756,8 @@ export function NeedleCavityBubblePanel() {
           GR proxy uses theta_GR and rho_GR = (K^2 - K_ij K_ij)/(16 pi) from the warp renderer; theta_drive is theta_GR weighted by the amplification chain and sector gating. This panel reads proof-pack scalars; full field plots still live in the Hull 3D and Phoenix panels.
         </div>
       </footer>
-    </div>
+      </div>
+    </StrictProofContext.Provider>
   );
 }
 
@@ -441,19 +776,22 @@ function LedgerRow({
   highlight?: boolean;
   proxy?: boolean;
 }) {
+  const strictMode = React.useContext(StrictProofContext);
+  const blocked = Boolean(proxy && strictMode);
+  const displayValue = blocked ? "non-admissible (proxy)" : value;
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-baseline justify-between gap-2">
         <div className="flex items-center gap-2 text-[11px] font-semibold text-white">
           {label}
-          {renderProxyBadge(Boolean(proxy))}
+          <ProxyBadge proxy={Boolean(proxy)} />
         </div>
         <div
           className={`text-[11px] font-mono ${
             highlight ? "text-amber-300" : "text-slate-100"
           }`}
         >
-          {value}
+          {displayValue}
           {unit ? <span className="ml-1 text-[10px] text-slate-400">{unit}</span> : null}
         </div>
       </div>

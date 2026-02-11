@@ -7,8 +7,10 @@ import { useMathStageGate } from "@/hooks/useMathStageGate";
 import {
   PROOF_PACK_STAGE_REQUIREMENTS,
   getProofValue,
-  readProofNumber,
-  readProofString,
+  isStrictProofPack,
+  readProofBooleanStrict,
+  readProofNumberStrict,
+  readProofStringStrict,
 } from "@/lib/proof-pack";
 import { STAGE_BADGE, STAGE_LABELS } from "@/lib/math-stage-gate";
 import { cn } from "@/lib/utils";
@@ -43,10 +45,15 @@ function ProofStat({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
-const renderProxy = (proxy?: boolean) =>
+const renderProxy = (proxy?: boolean, strict?: boolean) =>
   proxy ? (
-    <Badge className="ml-2 px-1.5 py-0.5 text-[9px] leading-tight bg-slate-800 text-slate-300">
-      PROXY
+    <Badge
+      className={cn(
+        "ml-2 px-1.5 py-0.5 text-[9px] leading-tight",
+        strict ? "bg-rose-900/40 text-rose-200" : "bg-slate-800 text-slate-300",
+      )}
+    >
+      {strict ? "NON-ADMISSIBLE" : "PROXY"}
     </Badge>
   ) : null;
 
@@ -62,35 +69,58 @@ export default function CardProofOverlay({ pipeline, className }: Props) {
     ? "STAGE..."
     : STAGE_LABELS[stageGate.stage];
   const stageProxy = !stageGate.ok || !proofPack;
-  const proofNum = (key: string) => readProofNumber(proofPack, key);
-  const proofStr = (key: string) => readProofString(proofPack, key);
+  const strictMode = isStrictProofPack(proofPack);
+  const proofNum = (key: string) =>
+    readProofNumberStrict(proofPack, key, strictMode);
+  const proofStr = (key: string) =>
+    readProofStringStrict(proofPack, key, strictMode);
+  const proofBool = (key: string) =>
+    readProofBooleanStrict(proofPack, key, strictMode);
   const proofProxy = (key: string) =>
     stageProxy || Boolean(getProofValue(proofPack, key)?.proxy);
   const proofProxyFrom = (keys: string[]) =>
     stageProxy || keys.some((key) => Boolean(getProofValue(proofPack, key)?.proxy));
+  const allowFallback = !strictMode;
 
   const powerW =
     proofNum("power_avg_W") ??
-    (Number.isFinite((pipeline as any)?.P_avg_W)
+    (allowFallback && Number.isFinite((pipeline as any)?.P_avg_W)
       ? Number((pipeline as any).P_avg_W)
-      : Number.isFinite((pipeline as any)?.P_avg)
+      : allowFallback && Number.isFinite((pipeline as any)?.P_avg)
         ? Number((pipeline as any).P_avg) * 1e6
         : undefined);
   const dutyEffective =
     proofNum("duty_effective") ??
-    (Number.isFinite((pipeline as any)?.dutyEffectiveFR)
+    (allowFallback && Number.isFinite((pipeline as any)?.dutyEffectiveFR)
       ? Number((pipeline as any).dutyEffectiveFR)
-      : Number.isFinite((pipeline as any)?.dutyEffective_FR)
+      : allowFallback && Number.isFinite((pipeline as any)?.dutyEffective_FR)
         ? Number((pipeline as any).dutyEffective_FR)
         : undefined);
   const tsRatio =
     proofNum("ts_ratio") ??
-    (Number.isFinite((pipeline as any)?.TS_ratio)
+    (allowFallback && Number.isFinite((pipeline as any)?.TS_ratio)
       ? Number((pipeline as any).TS_ratio)
       : undefined);
 
-  const gammaChain =
-    (pipeline as any)?.gammaChain ?? (pipeline as any)?.gamma_chain;
+  const thetaGeom = proofNum("theta_geom");
+  const kTraceMean = proofNum("metric_k_trace_mean");
+  const kSqMean = proofNum("metric_k_sq_mean");
+  const vdbTwoWallSupport = proofBool("vdb_two_wall_support");
+  const vdbTwoWallDerivativeSupport = proofBool("vdb_two_wall_derivative_support");
+  const vdbTwoWallLabel =
+    vdbTwoWallSupport == null && vdbTwoWallDerivativeSupport == null
+      ? "n/a"
+      : `two_wall=${vdbTwoWallSupport === true ? "yes" : vdbTwoWallSupport === false ? "no" : "n/a"} deriv=${
+          vdbTwoWallDerivativeSupport === true
+            ? "yes"
+            : vdbTwoWallDerivativeSupport === false
+              ? "no"
+              : "n/a"
+        }`;
+
+  const gammaChain = allowFallback
+    ? (pipeline as any)?.gammaChain ?? (pipeline as any)?.gamma_chain
+    : null;
   const gammaParts: string[] = [];
   const gammaGeoCubed = proofNum("gamma_geo_cubed");
   const qGain = proofNum("q_gain");
@@ -136,7 +166,7 @@ export default function CardProofOverlay({ pipeline, className }: Props) {
             >
               {stageLabel}
             </Badge>
-            {renderProxy(stageProxy)}
+            {renderProxy(stageProxy, strictMode)}
           </span>
         </div>
         <div className="text-sm font-semibold text-white">Wireframe + theta sign map</div>
@@ -161,7 +191,7 @@ float theta_gr = u_beta * dfx; // sign flips front vs aft
             value={
               <span className="flex items-center justify-end">
                 {powerW ? fmtPowerUnitFromW(powerW) : "n/a"}
-                {renderProxy(proofProxy("power_avg_W"))}
+                {renderProxy(proofProxy("power_avg_W"), strictMode)}
               </span>
             }
           />
@@ -170,7 +200,7 @@ float theta_gr = u_beta * dfx; // sign flips front vs aft
             value={
               <span className="flex items-center justify-end">
                 {fmtPct(dutyEffective)}
-                {renderProxy(proofProxy("duty_effective"))}
+                {renderProxy(proofProxy("duty_effective"), strictMode)}
               </span>
             }
           />
@@ -179,7 +209,7 @@ float theta_gr = u_beta * dfx; // sign flips front vs aft
             value={
               <span className="flex items-center justify-end">
                 {fmt(tsRatio, 2)}
-                {renderProxy(proofProxy("ts_ratio"))}
+                {renderProxy(proofProxy("ts_ratio"), strictMode)}
               </span>
             }
           />
@@ -189,7 +219,46 @@ float theta_gr = u_beta * dfx; // sign flips front vs aft
               <span className="flex flex-col items-end text-right">
                 <span>{gammaChainLabel}</span>
                 {gammaNote ? <span className="text-[10px] text-slate-400">{gammaNote}</span> : null}
-                {renderProxy(gammaProxy)}
+                {renderProxy(gammaProxy, strictMode)}
+              </span>
+            }
+          />
+          <ProofStat
+            label="theta_geom"
+            value={
+              <span className="flex items-center justify-end">
+                {fmt(thetaGeom, 2)}
+                {renderProxy(proofProxy("theta_geom"), strictMode)}
+              </span>
+            }
+          />
+          <ProofStat
+            label="K_trace_mean"
+            value={
+              <span className="flex items-center justify-end">
+                {fmt(kTraceMean, 2)}
+                {renderProxy(proofProxy("metric_k_trace_mean"), strictMode)}
+              </span>
+            }
+          />
+          <ProofStat
+            label="K_sq_mean"
+            value={
+              <span className="flex items-center justify-end">
+                {fmt(kSqMean, 2)}
+                {renderProxy(proofProxy("metric_k_sq_mean"), strictMode)}
+              </span>
+            }
+          />
+          <ProofStat
+            label="VdB two-wall derivative"
+            value={
+              <span className="flex items-center justify-end">
+                {vdbTwoWallLabel}
+                {renderProxy(
+                  proofProxyFrom(["vdb_two_wall_support", "vdb_two_wall_derivative_support"]),
+                  strictMode,
+                )}
               </span>
             }
           />

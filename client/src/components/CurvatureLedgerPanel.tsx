@@ -6,10 +6,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   LEDGER_GUARD_THRESHOLD,
   useCycleLedger,
 } from "@/hooks/useCycleLedger";
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import { useCurvatureBrick } from "@/hooks/useCurvatureBrick";
+import { buildCongruenceBadge, resolveCongruenceMeta } from "@/lib/congruence-meta";
 
 const SPARKLINE_WIDTH = 220;
 const SPARKLINE_HEIGHT = 72;
@@ -32,6 +36,50 @@ function formatJoules(value: number | null | undefined) {
 
 export function CurvatureLedgerPanel() {
   const { rows, ratioSeries, ratio, ok, source, cycleMs, latest } = useCycleLedger();
+  const { data: pipeline } = useEnergyPipeline();
+  const { sample: curvatureSample } = useCurvatureBrick({ quality: "low", refetchMs: 800 });
+  const curvatureMeta = resolveCongruenceMeta(
+    curvatureSample?.meta,
+    pipeline?.curvatureMeta,
+  );
+  const curvatureSource = curvatureMeta.source ?? "unknown";
+  const curvatureCongruence = curvatureMeta.congruence ?? "unknown";
+  const { label: curvatureBadgeLabel, toneClass: curvatureBadgeTone } =
+    buildCongruenceBadge(curvatureMeta);
+  const thetaMeta = useMemo(() => {
+    const thetaGeom = Number(pipeline?.theta_geom);
+    const thetaGeomPresent = Number.isFinite(thetaGeom);
+    const thetaGeomProxy = pipeline?.theta_geom_proxy === true;
+    const thetaMetricDerived = pipeline?.theta_metric_derived === true;
+    const sourceLabel =
+      thetaMetricDerived || (thetaGeomPresent && !thetaGeomProxy)
+        ? "metric"
+        : "pipeline";
+    const congruence = thetaMetricDerived
+      ? "geometry-derived"
+      : thetaGeomPresent
+        ? "conditional"
+        : "proxy-only";
+    const proxy = congruence !== "geometry-derived";
+    const reason =
+      typeof pipeline?.theta_metric_reason === "string"
+        ? pipeline?.theta_metric_reason
+        : undefined;
+    return { source: sourceLabel, congruence, proxy, reason };
+  }, [
+    pipeline?.theta_geom,
+    pipeline?.theta_geom_proxy,
+    pipeline?.theta_metric_derived,
+    pipeline?.theta_metric_reason,
+  ]);
+  const thetaBadgeLabel = thetaMeta.proxy
+    ? thetaMeta.congruence === "conditional"
+      ? "CONDITIONAL"
+      : "PROXY"
+    : "METRIC";
+  const thetaBadgeTone = thetaMeta.proxy
+    ? "border-amber-400/60 text-amber-200"
+    : "border-emerald-400/60 text-emerald-200";
   const series = useMemo(() => {
     if (!ratioSeries.length) return [];
     if (ratioSeries.length <= MAX_POINTS) return ratioSeries;
@@ -99,6 +147,21 @@ export function CurvatureLedgerPanel() {
             and the Action-Principle telemetry note in{" "}<code className="px-1">docs/needle-hull-mainframe.md</code>.
           </span>
         </CardDescription>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+          <span className="font-mono">curvature.source={curvatureSource}</span>
+          <span className="font-mono">curvature.congruence={curvatureCongruence}</span>
+          <Badge variant="outline" className={curvatureBadgeTone}>
+            {curvatureBadgeLabel}
+          </Badge>
+          <span className="font-mono">theta.source={thetaMeta.source}</span>
+          <span className="font-mono">theta.congruence={thetaMeta.congruence}</span>
+          {thetaMeta.reason ? (
+            <span className="font-mono">theta.reason={thetaMeta.reason}</span>
+          ) : null}
+          <Badge variant="outline" className={thetaBadgeTone}>
+            {thetaBadgeLabel}
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">

@@ -29,8 +29,11 @@ const resolveMassMode = (value: unknown): MassMode => {
 // G├╢├çG├╢├ç Physics Constants (centralized) G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç
 import { HBAR } from "./physics-const.js";
 import { C } from "./utils/physics-const-safe";
+import { GEOM_TO_SI_STRESS, SI_TO_GEOM_STRESS } from "../shared/gr-units.js";
 import { computeClocking, type ClockingSnapshot } from "../shared/clocking.js";
 import type { StressEnergyStats } from "./stress-energy-brick";
+import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.js";
+import type { CongruenceMeta } from "../types/pipeline";
 
 // Keep tau_LC (wall / c) aligned with modulation dwell unless overridden
 const DEFAULT_MODULATION_FREQ_GHZ = 15;
@@ -41,6 +44,7 @@ const STROBE_DUTY_STALE_MS = 20_000;
 // Performance guardrails for billion-tile calculations
 const TILE_EDGE_MAX = 2048;          // safe cap for any "edge" dimension fed into dynamic helpers
 const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles G├Ñ├å skip dynamic per-tile-ish helpers (use aggregate)
+const INV16PI = 1 / (16 * Math.PI);
 
 // Production-quiet logging toggle
 const DEBUG_PIPE = process.env.NODE_ENV !== 'production' && (process.env.HELIX_DEBUG?.includes('pipeline') ?? false);
@@ -67,6 +71,7 @@ import {
   type Vec3,
 } from '../modules/dynamic/stress-energy-equations.js';
 import warpBubbleModule from '../modules/warp/warp-module.js';
+import { buildWarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.js";
 import { DEFAULT_GEOMETRY_SWEEP, DEFAULT_PHASE_MICRO_SWEEP } from "../shared/schema.js";
 import type {
   CardRecipe,
@@ -178,6 +183,104 @@ const parseEnvNumber = (value: string | undefined, fallback: number): number => 
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 };
+const strictCongruenceEnabled = (): boolean =>
+  process.env.WARP_STRICT_CONGRUENCE !== "0";
+const DEFAULT_CL3_RHO_DELTA_MAX = parseEnvNumber(process.env.WARP_CL3_RHO_DELTA_MAX, 0.1);
+
+type TsMetricDerivedStatus = {
+  metricDerived: boolean;
+  source: string;
+  reason?: string;
+  chart?: string;
+};
+
+const hasPositiveFinite = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
+const resolveTsMetricDerivedStatus = (
+  state: EnergyPipelineState,
+  clockingProvenance: "derived" | "hardware" | "simulated",
+): TsMetricDerivedStatus => {
+  if (clockingProvenance === "hardware") {
+    return {
+      metricDerived: false,
+      source: "hardware_timing",
+      reason: "clocking provenance is hardware telemetry",
+    };
+  }
+
+  const tsRatio = Number(state.TS_ratio);
+  const tauLCms = Number((state as any).tauLC_ms ?? state.ts?.tauLC_ms);
+  if (!hasPositiveFinite(tsRatio) || !hasPositiveFinite(tauLCms)) {
+    return {
+      metricDerived: false,
+      source: "timing_missing",
+      reason: "TS_ratio or tauLC_ms missing/non-positive",
+    };
+  }
+
+  const hull = state.hull;
+  const hasHullDims =
+    hasPositiveFinite(hull?.Lx_m) &&
+    hasPositiveFinite(hull?.Ly_m) &&
+    hasPositiveFinite(hull?.Lz_m);
+  if (!hasHullDims) {
+    return {
+      metricDerived: false,
+      source: "hull_missing",
+      reason: "hull dimensions unavailable for proper-distance timing",
+    };
+  }
+
+  const metricAdapter = (state as any)?.warp?.metricAdapter as
+    | WarpMetricAdapterSnapshot
+    | undefined;
+  if (!metricAdapter) {
+    return {
+      metricDerived: false,
+      source: "metric_adapter_missing",
+      reason: "warp metric adapter not available",
+    };
+  }
+
+  const chartLabel = metricAdapter.chart?.label;
+  const dtGammaPolicy = metricAdapter.chart?.dtGammaPolicy;
+  const contractStatus = metricAdapter.chart?.contractStatus;
+  const chartKnown =
+    typeof chartLabel === "string" &&
+    chartLabel !== "unspecified" &&
+    dtGammaPolicy !== "unknown" &&
+    contractStatus !== "unknown";
+  if (!chartKnown) {
+    return {
+      metricDerived: false,
+      source: "chart_unknown",
+      reason: "metric adapter chart contract is unspecified/unknown",
+      chart: typeof chartLabel === "string" ? chartLabel : undefined,
+    };
+  }
+
+  const gammaDiag = metricAdapter.gammaDiag;
+  const gammaDiagValid =
+    Array.isArray(gammaDiag) &&
+    gammaDiag.length === 3 &&
+    gammaDiag.every((v) => hasPositiveFinite(v));
+  if (!gammaDiagValid) {
+    return {
+      metricDerived: false,
+      source: "gamma_diag_missing",
+      reason: "metric adapter gamma diagonal missing/non-positive",
+      chart: chartLabel,
+    };
+  }
+
+  return {
+    metricDerived: true,
+    source: "warp.metricAdapter+clocking",
+    reason: "TS_ratio from proper-distance timing with explicit chart contract",
+    chart: chartLabel,
+  };
+};
 
 export const DEFAULT_PULSED_CURRENT_LIMITS_A = {
   midi: parseEnvNumber(process.env.IPEAK_MAX_MIDI_A, 31_623), // 5 kJ @ 10 uH @ 10 us -> ~31.6 kA
@@ -206,6 +309,294 @@ export function computeTauLcMsFromHull(hull?: {
   return (path_m / C) * 1e3;
 }
 
+const resolveMetricPathLengthFromAdapter = (
+  state: EnergyPipelineState,
+): number | undefined => {
+  const metricAdapter = (state as any)?.warp?.metricAdapter as
+    | WarpMetricAdapterSnapshot
+    | undefined;
+  if (!metricAdapter) return undefined;
+  const gammaDiag = metricAdapter.gammaDiag;
+  if (!Array.isArray(gammaDiag) || gammaDiag.length !== 3) return undefined;
+  const scales = gammaDiag.map((value) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.sqrt(n) : Number.NaN;
+  });
+  if (!scales.every((value) => Number.isFinite(value) && value > 0)) return undefined;
+  const hull = state.hull;
+  if (!hull) return undefined;
+  const dims = [Number(hull.Lx_m), Number(hull.Ly_m), Number(hull.Lz_m)];
+  const scaledDims = dims
+    .map((dim, idx) => (Number.isFinite(dim) && dim > 0 ? dim * scales[idx] : Number.NaN))
+    .filter((dim) => Number.isFinite(dim) && dim > 0);
+  if (scaledDims.length > 0) return Math.max(...scaledDims);
+  const wall = Number(hull.wallThickness_m);
+  if (Number.isFinite(wall) && wall > 0) {
+    return wall * Math.max(...scales);
+  }
+  return undefined;
+};
+
+const toFiniteNumber = (value: unknown): number | undefined => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const toFiniteVec3 = (
+  value: unknown,
+  fallback: [number, number, number],
+): [number, number, number] => {
+  if (Array.isArray(value) && value.length >= 3) {
+    const x = toFiniteNumber(value[0]);
+    const y = toFiniteNumber(value[1]);
+    const z = toFiniteNumber(value[2]);
+    if (x != null && y != null && z != null) {
+      return [x, y, z];
+    }
+  }
+  return fallback;
+};
+
+const resolveCanonicalMetricT00Ref = (
+  warp: Record<string, any>,
+  adapter: WarpMetricAdapterSnapshot | undefined,
+): string | undefined => {
+  if (typeof warp.metricT00Ref === "string" && warp.metricT00Ref.length > 0) {
+    return String(warp.metricT00Ref);
+  }
+  const family = adapter?.family;
+  if (family === "alcubierre") return "warp.metric.T00.alcubierre.analytic";
+  if (family === "vdb") return "warp.metric.T00.vdb.regionII";
+  if (family === "natario_sdf") return "warp.metric.T00.natario_sdf.shift";
+  if (family === "natario") {
+    if (adapter?.requestedFieldType === "irrotational") {
+      return "warp.metric.T00.irrotational.shift";
+    }
+    return "warp.metric.T00.natario.shift";
+  }
+  return undefined;
+};
+
+type MetricT00Observer = "eulerian_n" | "orthonormal_region_ii";
+type MetricT00Normalization = "si_stress";
+type MetricT00UnitSystem = "SI";
+type MetricT00ContractStatus = "ok" | "unknown";
+
+type MetricT00Contract = {
+  status: MetricT00ContractStatus;
+  reason?: string;
+  sourceRef: string;
+  family: string;
+  chart: string;
+  observer: MetricT00Observer;
+  normalization: MetricT00Normalization;
+  unitSystem: MetricT00UnitSystem;
+  derivation: string;
+};
+
+const resolveMetricT00Observer = (metricT00Ref: string): MetricT00Observer =>
+  metricT00Ref === "warp.metric.T00.vdb.regionII"
+    ? "orthonormal_region_ii"
+    : "eulerian_n";
+
+const resolveMetricFamilyFromRef = (
+  metricT00Ref: string,
+  adapter: WarpMetricAdapterSnapshot | undefined,
+): string => {
+  if (typeof adapter?.family === "string" && adapter.family.length > 0) {
+    return adapter.family;
+  }
+  if (metricT00Ref.includes(".vdb.")) return "vdb";
+  if (metricT00Ref.includes(".natario_sdf.")) return "natario_sdf";
+  if (metricT00Ref.includes(".irrotational.")) return "natario";
+  if (metricT00Ref.includes(".natario.")) return "natario";
+  if (metricT00Ref.includes(".alcubierre.")) return "alcubierre";
+  return "unknown";
+};
+
+const buildMetricT00Contract = (params: {
+  adapter?: WarpMetricAdapterSnapshot;
+  metricT00Ref: string;
+  observer?: string;
+  normalization?: string;
+  unitSystem?: string;
+  derivation: string;
+}): MetricT00Contract => {
+  const adapter = params.adapter;
+  const observer =
+    params.observer === "orthonormal_region_ii" || params.observer === "eulerian_n"
+      ? (params.observer as MetricT00Observer)
+      : resolveMetricT00Observer(params.metricT00Ref);
+  const normalization: MetricT00Normalization =
+    params.normalization === "si_stress" ? "si_stress" : "si_stress";
+  const unitSystem: MetricT00UnitSystem = params.unitSystem === "SI" ? "SI" : "SI";
+  const chart =
+    typeof adapter?.chart?.label === "string" && adapter.chart.label.length > 0
+      ? adapter.chart.label
+      : "unspecified";
+  const family = resolveMetricFamilyFromRef(params.metricT00Ref, adapter);
+  const chartContractStatus = adapter?.chart?.contractStatus;
+  let status: MetricT00ContractStatus = "ok";
+  const reasons: string[] = [];
+  if (chart === "unspecified") {
+    status = "unknown";
+    reasons.push("chart_unspecified");
+  }
+  if (chartContractStatus === "unknown") {
+    status = "unknown";
+    reasons.push("chart_contract_unknown");
+  }
+  if (!params.metricT00Ref.startsWith("warp.metric.T00")) {
+    status = "unknown";
+    reasons.push("metric_ref_noncanonical");
+  }
+  return {
+    status,
+    ...(reasons.length ? { reason: reasons.join(",") } : {}),
+    sourceRef: params.metricT00Ref,
+    family,
+    chart,
+    observer,
+    normalization,
+    unitSystem,
+    derivation: params.derivation,
+  };
+};
+
+const buildNatarioRuntimePayload = (
+  state: EnergyPipelineState,
+  fallback?: Record<string, unknown> | null,
+): Record<string, unknown> => {
+  const warp = ((state as any).warp ?? {}) as Record<string, any>;
+  const adapter = warp.metricAdapter as WarpMetricAdapterSnapshot | undefined;
+  const alpha = toFiniteNumber(adapter?.alpha) ?? 1;
+  const gammaDiagRaw = Array.isArray(adapter?.gammaDiag) ? adapter.gammaDiag : undefined;
+  const gammaDiag: [number, number, number] =
+    gammaDiagRaw &&
+    gammaDiagRaw.length >= 3 &&
+    toFiniteNumber(gammaDiagRaw[0]) != null &&
+    toFiniteNumber(gammaDiagRaw[1]) != null &&
+    toFiniteNumber(gammaDiagRaw[2]) != null
+      ? [
+          Number(gammaDiagRaw[0]),
+          Number(gammaDiagRaw[1]),
+          Number(gammaDiagRaw[2]),
+        ]
+      : [1, 1, 1];
+
+  const shiftAmplitude =
+    firstFinite(
+      warp.betaAvg,
+      warp.natarioShiftAmplitude,
+      warp?.shiftVectorField?.amplitude,
+      (state as any).beta_avg,
+    ) ?? 0;
+  const shiftBeta = toFiniteVec3((fallback as any)?.shiftBeta, [shiftAmplitude, 0, 0]);
+  const stress = (warp.stressEnergyTensor ??
+    (state as any).stressEnergy ??
+    (fallback as any)?.stressEnergyTensor ??
+    {}) as Record<string, unknown>;
+  const metricT00Ref = resolveCanonicalMetricT00Ref(warp, adapter);
+  const metricT00SourceRaw =
+    typeof warp.metricT00Source === "string" && warp.metricT00Source.length > 0
+      ? String(warp.metricT00Source)
+      : undefined;
+  const stressEnergySourceRaw =
+    typeof warp.stressEnergySource === "string" && warp.stressEnergySource.length > 0
+      ? String(warp.stressEnergySource)
+      : undefined;
+  const metricT00 = firstFinite(warp.metricT00, stress.T00 as number | undefined);
+  const metricMode =
+    metricT00 != null &&
+    (metricT00SourceRaw === "metric" ||
+      stressEnergySourceRaw === "metric" ||
+      (metricT00Ref != null && metricT00Ref.startsWith("warp.metric.T00")));
+  const metricT00Source = metricMode ? "metric" : metricT00SourceRaw;
+  const metricT00Derivation =
+    metricMode && metricT00Ref != null
+      ? metricT00Ref === "warp.metric.T00.vdb.regionII"
+        ? "forward_B_to_derivatives_to_rho_E"
+        : metricT00Ref === "warp.metric.T00.vdb.regionIV"
+          ? "forward_fwall_to_rho_E"
+        : "forward_shift_to_K_to_rho_E"
+      : "proxy_or_pipeline";
+  const metricT00Contract = metricMode && metricT00Ref != null
+    ? buildMetricT00Contract({
+        adapter,
+        metricT00Ref,
+        observer:
+          typeof warp.metricT00Observer === "string" ? String(warp.metricT00Observer) : undefined,
+        normalization:
+          typeof warp.metricT00Normalization === "string"
+            ? String(warp.metricT00Normalization)
+            : undefined,
+        unitSystem:
+          typeof warp.metricT00UnitSystem === "string"
+            ? String(warp.metricT00UnitSystem)
+            : undefined,
+        derivation: metricT00Derivation,
+      })
+    : undefined;
+
+  const t00 = toFiniteNumber(stress.T00) ?? 0;
+  const t11 = toFiniteNumber(stress.T11) ?? 0;
+  const t22 = toFiniteNumber(stress.T22) ?? 0;
+  const t33 = toFiniteNumber(stress.T33) ?? 0;
+
+  return {
+    ...(fallback ?? {}),
+    metricMode,
+    lapseN: alpha,
+    shiftBeta,
+    gSpatialDiag: gammaDiag,
+    gSpatialSym: [gammaDiag[0], 0, 0, gammaDiag[1], 0, gammaDiag[2]],
+    g0i: [-shiftBeta[0], -shiftBeta[1], -shiftBeta[2]],
+    viewForward: [1, 0, 0],
+    stressEnergyTensor: {
+      T00: t00,
+      T11: t11,
+      T22: t22,
+      T33: t33,
+    },
+    stressEnergySource:
+      stressEnergySourceRaw ??
+      (metricMode
+        ? "metric"
+        : "proxy"),
+    metricT00,
+    metricT00Source: metricT00Source ?? undefined,
+    metricT00Ref,
+    metricT00Derivation,
+    metricT00Observer: metricT00Contract?.observer,
+    metricT00Normalization: metricT00Contract?.normalization,
+    metricT00UnitSystem: metricT00Contract?.unitSystem,
+    metricT00ContractStatus: metricT00Contract?.status,
+    metricT00ContractReason: metricT00Contract?.reason,
+    chartLabel: adapter?.chart?.label ?? "unspecified",
+    chartDtGammaPolicy: adapter?.chart?.dtGammaPolicy ?? "unknown",
+    chartContractStatus: adapter?.chart?.contractStatus ?? "unknown",
+    dutyFactor:
+      firstFinite(
+        warp.dutyFactor,
+        (state as any).dutyEffective_FR,
+        (state as any).dutyShip,
+        (state as any).dutyCycle,
+      ) ?? undefined,
+    thetaScaleCore_sqrtDuty: firstFinite(
+      warp.thetaScaleCore_sqrtDuty,
+      warp.thetaScaleCore,
+      (fallback as any)?.thetaScaleCore_sqrtDuty,
+      (fallback as any)?.thetaScaleCore,
+    ),
+    thetaScaleCore: firstFinite(
+      warp.thetaScaleCore,
+      warp.thetaScaleCore_sqrtDuty,
+      (fallback as any)?.thetaScaleCore,
+      (fallback as any)?.thetaScaleCore_sqrtDuty,
+    ),
+  };
+};
+
 const DEFAULT_QI_TAU_MS = parseEnvNumber(process.env.QI_TAU_MS, 5);
 const DEFAULT_QI_GUARD = parseEnvNumber(process.env.QI_GUARD_FRAC ?? process.env.QI_GUARD, 0.05);
 const DEFAULT_QI_DT_MS = parseEnvNumber(process.env.QI_DT_MS, 2);
@@ -213,6 +604,8 @@ const DEFAULT_QI_FIELD = (process.env.QI_FIELD_TYPE as QiFieldType | undefined) 
 const DEFAULT_NEGATIVE_FRACTION = 0.4;
 const DEFAULT_QI_INTEREST_RATE = parseEnvNumber(process.env.QI_INTEREST_RATE, 0.2);
 const DEFAULT_QI_INTEREST_WINDOW_MULT = parseEnvNumber(process.env.QI_INTEREST_WINDOW_MULT, 2);
+const DEFAULT_QI_CURVATURE_RATIO_MAX = parseEnvNumber(process.env.QI_CURVATURE_RATIO_MAX, 0.1);
+const QI_CURVATURE_ENFORCE = (process.env.QI_CURVATURE_ENFORCE ?? "1") !== "0";
 const DEFAULT_PUMP_FREQ_LIMIT_GHZ = Math.max(
   0.01,
   Math.min(parseEnvNumber(process.env.PUMP_FREQ_LIMIT_GHZ, 120), 1_000),
@@ -528,6 +921,10 @@ export type TsTelemetry = {
   TS_ratio?: number;
   tauLC_ms?: number;
   tauPulse_ns?: number;
+  metricDerived?: boolean;
+  metricDerivedSource?: string;
+  metricDerivedReason?: string;
+  metricDerivedChart?: string;
   autoscale?: TsAutoscaleState;
 };
 
@@ -604,6 +1001,48 @@ export type MechanicalGuard = {
   status: 'ok' | 'saturated' | 'fail';
 };
 
+export type VdbRegionIIDiagnostics = {
+  alpha: number;
+  n: number;
+  r_tilde_m: number;
+  delta_tilde_m: number;
+  sampleCount: number;
+  b_min: number;
+  b_max: number;
+  bprime_min: number;
+  bprime_max: number;
+  bprime_rms: number;
+  bdouble_min: number;
+  bdouble_max: number;
+  bdouble_rms: number;
+  t00_min: number;
+  t00_max: number;
+  t00_mean: number;
+  t00_rms: number;
+  support: boolean;
+  note?: string;
+};
+
+export type VdbRegionIVDiagnostics = {
+  R_m: number;
+  sigma: number;
+  sampleCount: number;
+  dfdr_max_abs: number;
+  dfdr_rms: number;
+  beta?: number;
+  r_min_m?: number;
+  r_max_m?: number;
+  step_m?: number;
+  t00_min?: number;
+  t00_max?: number;
+  t00_mean?: number;
+  t00_rms?: number;
+  k_trace_mean?: number;
+  k_squared_mean?: number;
+  support: boolean;
+  note?: string;
+};
+
 export type SurfaceAreaEstimate = {
   value: number; // preferred estimate (metric quadrature)
   uncertainty: number; // +- absolute m^2
@@ -650,6 +1089,8 @@ export type GrConstraintDiagnostics = {
   max: number;
   maxAbs: number;
   rms?: number;
+  mean?: number;
+  sampleCount?: number;
 };
 
 export type GrMomentumConstraintDiagnostics = {
@@ -666,6 +1107,7 @@ export type GrPipelineDiagnostics = {
   updatedAt: number;
   source: "gr-evolve-brick";
   meta?: import("./gr-evolve-brick").GrBrickMeta;
+  metricAdapter?: WarpMetricAdapterSnapshot;
   grid: {
     dims: [number, number, number];
     bounds: { min: Vec3; max: Vec3 };
@@ -690,7 +1132,9 @@ export type GrPipelineDiagnostics = {
   constraints: {
     H_constraint: GrConstraintDiagnostics;
     M_constraint: GrMomentumConstraintDiagnostics;
+    rho_constraint?: GrConstraintDiagnostics;
   };
+  invariants?: import("./gr-evolve-brick").GrInvariantStatsSet;
   matter?: {
     stressEnergy?: StressEnergyStats;
   };
@@ -703,6 +1147,23 @@ export type GrPipelineDiagnostics = {
     bytesEstimate: number;
     msPerStep: number;
   };
+};
+
+export type MetricConstraintAudit = {
+  updatedAt: number;
+  source: string;
+  chart?: string;
+  family?: string;
+  observer?: string;
+  normalization?: string;
+  unitSystem?: string;
+  rho_constraint: GrConstraintDiagnostics;
+};
+
+export type GrInvariantBaseline = {
+  invariants?: import("./gr-evolve-brick").GrInvariantStatsSet;
+  source?: string;
+  updatedAt?: number;
 };
 
 export type GrRequestPayload = {
@@ -818,6 +1279,15 @@ export interface EnergyPipelineState {
   rho_static?: number;      // Static Casimir energy density (J/m^3)
   rho_inst?: number;        // Instantaneous (on-window) energy density (J/m^3)
   rho_avg?: number;         // Cycle-averaged energy density (J/m^3)
+  rho_constraint?: GrConstraintDiagnostics; // Constraint-derived energy density (geometry-based)
+  rho_constraint_source?: string;           // Source tag for rho_constraint
+  rho_delta_metric_mean?: number;           // Relative delta vs metric-derived T00
+  rho_delta_pipeline_mean?: number;         // Relative delta vs pipeline rho_avg
+  rho_delta_threshold?: number;             // CL3 threshold (relative)
+  rho_delta_gate?: boolean;                 // CL3 gate pass/fail
+  rho_delta_gate_reason?: string;           // CL3 gate reason
+  rho_delta_gate_source?: string;           // CL3 gate source tag
+  rho_delta_missing_parts?: string[];       // Missing input list for CL3 delta
   U_static_total?: number;  // Aggregate static energy across hull (N_tiles * U_static)
   U_static_total_band?: { min: number; max: number };
   gammaChain?: {
@@ -840,6 +1310,8 @@ export interface EnergyPipelineState {
     targetHit?: boolean;
     targetShortfall?: number;
   };
+  vdbRegionII?: VdbRegionIIDiagnostics;
+  vdbRegionIV?: VdbRegionIVDiagnostics;
   TS_ratio: number;         // Time-scale separation ratio (conservative)
   TS_long?: number;         // Time-scale using longest dimension
   TS_geom?: number;         // Time-scale using geometric mean
@@ -881,12 +1353,16 @@ export interface EnergyPipelineState {
   qiBadge?: 'ok' | 'near' | 'violation';
   clocking?: ClockingSnapshot;
   clockingProvenance?: "derived" | "hardware" | "simulated";
+  tsMetricDerived?: boolean;
+  tsMetricDerivedSource?: string;
+  tsMetricDerivedReason?: string;
   mechanical?: MechanicalFeasibility;
   mechGuard?: MechanicalGuard;
 
   // GR diagnostics (optional)
   grEnabled?: boolean;
   gr?: GrPipelineDiagnostics;
+  grBaseline?: GrInvariantBaseline;
   grRequest?: GrRequestPayload;
   warpViability?: {
     certificate: WarpViabilityCertificate;
@@ -967,6 +1443,9 @@ export interface EnergyPipelineState {
   qiInterest?: QuantumInterestBook | null;
   qiAutothrottle?: QiAutothrottleState | null;
   qiAutoscale?: QiAutoscaleState | null;
+  curvatureMeta?: CongruenceMeta;
+  stressMeta?: CongruenceMeta;
+  metricConstraint?: MetricConstraintAudit;
 }
 
 export const buildGrRequestPayload = (state: EnergyPipelineState): GrRequestPayload => {
@@ -1200,6 +1679,14 @@ let sweepHistoryDropped = 0;
 const PLANCK_LENGTH_M = 1.616255e-35; // m
 const PLANCK_SAFETY_MULT = 1e6;       // keep pockets many orders above l_P
 const POCKET_WALL_FLOOR_FRAC = 0.01;  // require VdB pocket >1% of wall thickness
+const VDB_PROFILE_N = 80;            // Van Den Broeck polynomial order (paper example)
+const VDB_REGION_SAMPLES = 64;       // sample count across region II band
+const VDB_BPRIME_MIN_ABS = parseEnvNumber(process.env.WARP_VDB_BPRIME_MIN_ABS, 1e-18);
+const VDB_BDOUBLE_MIN_ABS = parseEnvNumber(
+  process.env.WARP_VDB_BDOUBLE_MIN_ABS,
+  1e-18,
+);
+const VDB_DFDR_MIN_ABS = parseEnvNumber(process.env.WARP_VDB_DFDR_MIN_ABS, 1e-18);
 
 // Mechanical feasibility defaults (nm-scale gap over 25 cm^2 plate)
 const EPSILON_0 = 8.8541878128e-12; // F/m
@@ -1351,6 +1838,670 @@ function guardGammaVdB(params: {
     reason,
   };
 }
+
+const computeVdbRegionII = (params: {
+  gammaVdB: number;
+  pocketRadius_m: number;
+  pocketThickness_m: number;
+  n?: number;
+  samples?: number;
+}): VdbRegionIIDiagnostics | null => {
+  const gammaVdB = Number(params.gammaVdB);
+  const r0 = Number(params.pocketRadius_m);
+  const delta = Number(params.pocketThickness_m);
+  if (!Number.isFinite(gammaVdB) || !Number.isFinite(r0) || !Number.isFinite(delta)) return null;
+  if (r0 <= 0 || delta <= 0) return null;
+
+  const alpha = Math.max(0, gammaVdB - 1);
+  const n = Math.max(3, Math.round(Number.isFinite(params.n) ? (params.n as number) : VDB_PROFILE_N));
+  const samples = Math.max(4, Math.floor(Number.isFinite(params.samples) ? (params.samples as number) : VDB_REGION_SAMPLES));
+
+  let bMin = Number.POSITIVE_INFINITY;
+  let bMax = Number.NEGATIVE_INFINITY;
+  let bPrimeMin = Number.POSITIVE_INFINITY;
+  let bPrimeMax = Number.NEGATIVE_INFINITY;
+  let bDoubleMin = Number.POSITIVE_INFINITY;
+  let bDoubleMax = Number.NEGATIVE_INFINITY;
+  let t00Min = Number.POSITIVE_INFINITY;
+  let t00Max = Number.NEGATIVE_INFINITY;
+  let bPrimeSumSq = 0;
+  let bDoubleSumSq = 0;
+  let t00Sum = 0;
+  let t00SumSq = 0;
+
+  for (let i = 0; i < samples; i += 1) {
+    const t = (i + 0.5) / samples;
+    const w = Math.max(0, Math.min(1, 1 - t));
+    const r = r0 + t * delta;
+    const rSafe = Math.max(r, 1e-18);
+
+    const wPowN = Math.pow(w, n);
+    const wPowNMinus1 = Math.pow(w, n - 1);
+    const wPowNMinus2 = Math.pow(w, n - 2);
+    const wPowNMinus3 = Math.pow(w, n - 3);
+
+    const B = 1 + alpha * (-(n - 1) * wPowN + n * wPowNMinus1);
+    const dBdw = alpha * n * (n - 1) * wPowNMinus2 * (1 - w);
+    const d2Bdw2 = alpha * n * (n - 1) * wPowNMinus3 * ((n - 2) - (n - 1) * w);
+    const invDelta = 1 / delta;
+    const Bprime = -dBdw * invDelta;
+    const Bdouble = d2Bdw2 * invDelta * invDelta;
+
+    const invB3 = 1 / (B * B * B);
+    const invB4 = invB3 / B;
+    const t00 =
+      (1 / (8 * Math.PI)) *
+      ((Bprime * Bprime) * invB4 - (2 * Bdouble) * invB3 - (4 * Bprime) * invB3 / rSafe);
+
+    if (B < bMin) bMin = B;
+    if (B > bMax) bMax = B;
+    if (Bprime < bPrimeMin) bPrimeMin = Bprime;
+    if (Bprime > bPrimeMax) bPrimeMax = Bprime;
+    if (Bdouble < bDoubleMin) bDoubleMin = Bdouble;
+    if (Bdouble > bDoubleMax) bDoubleMax = Bdouble;
+    if (t00 < t00Min) t00Min = t00;
+    if (t00 > t00Max) t00Max = t00;
+    bPrimeSumSq += Bprime * Bprime;
+    bDoubleSumSq += Bdouble * Bdouble;
+    t00Sum += t00;
+    t00SumSq += t00 * t00;
+  }
+
+  if (!Number.isFinite(bMin)) bMin = 0;
+  if (!Number.isFinite(bMax)) bMax = 0;
+  if (!Number.isFinite(bPrimeMin)) bPrimeMin = 0;
+  if (!Number.isFinite(bPrimeMax)) bPrimeMax = 0;
+  if (!Number.isFinite(bDoubleMin)) bDoubleMin = 0;
+  if (!Number.isFinite(bDoubleMax)) bDoubleMax = 0;
+  if (!Number.isFinite(t00Min)) t00Min = 0;
+  if (!Number.isFinite(t00Max)) t00Max = 0;
+
+  const bPrimeRms = Math.sqrt(bPrimeSumSq / samples);
+  const bDoubleRms = Math.sqrt(bDoubleSumSq / samples);
+  const t00Mean = t00Sum / samples;
+  const t00Rms = Math.sqrt(t00SumSq / samples);
+  const maxAbsBprime = Math.max(Math.abs(bPrimeMin), Math.abs(bPrimeMax));
+  const maxAbsBdouble = Math.max(Math.abs(bDoubleMin), Math.abs(bDoubleMax));
+
+  return {
+    alpha,
+    n,
+    r_tilde_m: r0,
+    delta_tilde_m: delta,
+    sampleCount: samples,
+    b_min: bMin,
+    b_max: bMax,
+    bprime_min: bPrimeMin,
+    bprime_max: bPrimeMax,
+    bprime_rms: bPrimeRms,
+    bdouble_min: bDoubleMin,
+    bdouble_max: bDoubleMax,
+    bdouble_rms: bDoubleRms,
+    t00_min: t00Min,
+    t00_max: t00Max,
+    t00_mean: t00Mean,
+    t00_rms: t00Rms,
+    support: maxAbsBprime > 0 || maxAbsBdouble > 0,
+    note: "Region II only; outer f-wall not evaluated.",
+  };
+};
+
+const hasVdbRegionIIMetricSupport = (
+  diag: VdbRegionIIDiagnostics | null | undefined,
+): boolean => {
+  if (!diag || diag.support !== true) return false;
+  const sampleCount = Number(diag.sampleCount);
+  const t00Mean = Number(diag.t00_mean);
+  const bprimeMaxAbs = Math.max(
+    Math.abs(Number(diag.bprime_min)),
+    Math.abs(Number(diag.bprime_max)),
+  );
+  const bdoubleMaxAbs = Math.max(
+    Math.abs(Number(diag.bdouble_min)),
+    Math.abs(Number(diag.bdouble_max)),
+  );
+  return (
+    Number.isFinite(sampleCount) &&
+    sampleCount > 0 &&
+    Number.isFinite(t00Mean) &&
+    Number.isFinite(bprimeMaxAbs) &&
+    bprimeMaxAbs > VDB_BPRIME_MIN_ABS &&
+    Number.isFinite(bdoubleMaxAbs) &&
+    bdoubleMaxAbs > VDB_BDOUBLE_MIN_ABS
+  );
+};
+
+const hasVdbRegionIVMetricSupport = (
+  diag: VdbRegionIVDiagnostics | null | undefined,
+): boolean => {
+  if (!diag || diag.support !== true) return false;
+  const sampleCount = Number(diag.sampleCount);
+  const t00Mean = Number(diag.t00_mean);
+  const dfdrMaxAbs = Math.abs(Number(diag.dfdr_max_abs));
+  return (
+    Number.isFinite(sampleCount) &&
+    sampleCount > 0 &&
+    Number.isFinite(t00Mean) &&
+    Number.isFinite(dfdrMaxAbs) &&
+    dfdrMaxAbs > VDB_DFDR_MIN_ABS
+  );
+};
+
+const hasVdbRegionIIDerivatives = (
+  diag: VdbRegionIIDiagnostics | null | undefined,
+): boolean => {
+  if (!diag) return false;
+  const bprimeMaxAbs = Math.max(
+    Math.abs(Number(diag.bprime_min)),
+    Math.abs(Number(diag.bprime_max)),
+  );
+  const bdoubleMaxAbs = Math.max(
+    Math.abs(Number(diag.bdouble_min)),
+    Math.abs(Number(diag.bdouble_max)),
+  );
+  return (
+    Number.isFinite(bprimeMaxAbs) &&
+    bprimeMaxAbs > VDB_BPRIME_MIN_ABS &&
+    Number.isFinite(bdoubleMaxAbs) &&
+    bdoubleMaxAbs > VDB_BDOUBLE_MIN_ABS
+  );
+};
+
+const buildVdbConformalDiagnostics = (
+  diag: VdbRegionIIDiagnostics | null | undefined,
+  betaAmplitude?: number,
+): {
+  bMin?: number;
+  bMax?: number;
+  bprimeMin?: number;
+  bprimeMax?: number;
+  bdoubleMin?: number;
+  bdoubleMax?: number;
+  betaAmplitude?: number;
+} | undefined => {
+  if (!diag) return undefined;
+  return {
+    bMin: Number.isFinite(diag.b_min) ? Number(diag.b_min) : undefined,
+    bMax: Number.isFinite(diag.b_max) ? Number(diag.b_max) : undefined,
+    bprimeMin: Number.isFinite(diag.bprime_min) ? Number(diag.bprime_min) : undefined,
+    bprimeMax: Number.isFinite(diag.bprime_max) ? Number(diag.bprime_max) : undefined,
+    bdoubleMin: Number.isFinite(diag.bdouble_min) ? Number(diag.bdouble_min) : undefined,
+    bdoubleMax: Number.isFinite(diag.bdouble_max) ? Number(diag.bdouble_max) : undefined,
+    betaAmplitude:
+      Number.isFinite(betaAmplitude as number) && (betaAmplitude as number) >= 0
+        ? Number(betaAmplitude)
+        : undefined,
+  };
+};
+
+const resolveBubbleWallParams = (state: EnergyPipelineState): { R: number; sigma: number } | null => {
+  const bubble = (state as any)?.bubble ?? {};
+  const rawR = Number.isFinite(bubble.R)
+    ? Number(bubble.R)
+    : Number.isFinite((state as any).R)
+      ? Number((state as any).R)
+      : Number.isFinite((state as any).radius)
+        ? Number((state as any).radius)
+        : Number.NaN;
+  const rawSigma = Number.isFinite(bubble.sigma)
+    ? Number(bubble.sigma)
+    : Number.isFinite((state as any).sigma)
+      ? Number((state as any).sigma)
+      : Number.NaN;
+  if (!Number.isFinite(rawR) || !Number.isFinite(rawSigma)) return null;
+  const R = Math.max(1e-6, rawR);
+  const sigma = Math.max(1e-6, rawSigma);
+  return { R, sigma };
+};
+
+const buildVdbFallbackShiftField = (
+  state: EnergyPipelineState,
+): { amplitude: number; evaluateShiftVector: (x: number, y: number, z: number) => [number, number, number] } | undefined => {
+  const bubble = resolveBubbleWallParams(state);
+  if (!bubble) return undefined;
+
+  const den = Math.max(1e-8, 2 * Math.tanh(bubble.sigma * bubble.R));
+  const rawBeta = firstFinite(
+    (state as any).beta_avg,
+    Number((state as any)?.bubble?.beta),
+    Number((state as any)?.beta),
+    Number((state as any)?.dynamicConfig?.beta),
+  );
+  const amplitude = Math.max(0, Math.min(0.99, Math.abs(rawBeta ?? 0.15)));
+  const driveDirection = normalizeVec(
+    toFiniteVec3(
+      (state as any)?.dynamicConfig?.warpDriveDirection ??
+        (state as any)?.warpGeometry?.driveDirection ??
+        [1, 0, 0],
+      [1, 0, 0],
+    ),
+  );
+  const evaluateShiftVector = (x: number, y: number, z: number): [number, number, number] => {
+    const rs = Math.hypot(x, y, z);
+    const f =
+      (Math.tanh(bubble.sigma * (rs + bubble.R)) -
+        Math.tanh(bubble.sigma * (rs - bubble.R))) /
+      den;
+    const beta = -amplitude * f;
+    return [
+      beta * driveDirection[0],
+      beta * driveDirection[1],
+      beta * driveDirection[2],
+    ];
+  };
+  return { amplitude, evaluateShiftVector };
+};
+
+const refreshMetricT00Contract = (state: EnergyPipelineState): void => {
+  const warpState = (state as any).warp as Record<string, any> | undefined;
+  if (!warpState) return;
+  const metricT00 = firstFinite(warpState.metricT00);
+  const metricT00Source = warpState.metricT00Source ?? warpState.stressEnergySource;
+  if (metricT00Source !== "metric" || metricT00 == null) return;
+  const adapter = warpState.metricAdapter as WarpMetricAdapterSnapshot | undefined;
+  const metricT00Ref =
+    typeof warpState.metricT00Ref === "string" && warpState.metricT00Ref.length > 0
+      ? String(warpState.metricT00Ref)
+      : resolveCanonicalMetricT00Ref(warpState, adapter) ?? "warp.metric.T00";
+  const derivation =
+    typeof warpState.metricT00Derivation === "string" && warpState.metricT00Derivation.length > 0
+      ? String(warpState.metricT00Derivation)
+      : metricT00Ref === "warp.metric.T00.vdb.regionII"
+        ? "forward_B_to_derivatives_to_rho_E"
+        : metricT00Ref === "warp.metric.T00.vdb.regionIV"
+          ? "forward_fwall_to_rho_E"
+        : "forward_shift_to_K_to_rho_E";
+  const contract = buildMetricT00Contract({
+    adapter,
+    metricT00Ref,
+    observer:
+      typeof warpState.metricT00Observer === "string"
+        ? String(warpState.metricT00Observer)
+        : undefined,
+    normalization:
+      typeof warpState.metricT00Normalization === "string"
+        ? String(warpState.metricT00Normalization)
+        : undefined,
+    unitSystem:
+      typeof warpState.metricT00UnitSystem === "string"
+        ? String(warpState.metricT00UnitSystem)
+        : undefined,
+    derivation,
+  });
+  warpState.metricT00Ref = metricT00Ref;
+  warpState.metricT00Derivation = derivation;
+  warpState.metricT00Observer = contract.observer;
+  warpState.metricT00Normalization = contract.normalization;
+  warpState.metricT00UnitSystem = contract.unitSystem;
+  warpState.metricT00Contract = contract;
+};
+
+const refreshMetricConstraintAudit = (state: EnergyPipelineState): void => {
+  const warpState = (state as any).warp as Record<string, any> | undefined;
+  if (!warpState) {
+    state.metricConstraint = undefined;
+    return;
+  }
+  const diagnostics = warpState.metricStressDiagnostics;
+  const rhoGeomMean = firstFinite(diagnostics?.rhoGeomMean);
+  if (rhoGeomMean == null) {
+    state.metricConstraint = undefined;
+    return;
+  }
+  const sampleCount = Number.isFinite(diagnostics?.sampleCount)
+    ? Number(diagnostics.sampleCount)
+    : undefined;
+  const absMean = Math.abs(rhoGeomMean);
+  const rho_constraint: GrConstraintDiagnostics = {
+    min: rhoGeomMean,
+    max: rhoGeomMean,
+    maxAbs: absMean,
+    rms: absMean,
+    mean: rhoGeomMean,
+    ...(sampleCount != null ? { sampleCount } : {}),
+  };
+  const adapter = warpState.metricAdapter as WarpMetricAdapterSnapshot | undefined;
+  const metricT00Ref =
+    typeof warpState.metricT00Ref === "string" && warpState.metricT00Ref.length > 0
+      ? String(warpState.metricT00Ref)
+      : resolveCanonicalMetricT00Ref(warpState, adapter) ?? "warp.metric.T00";
+  const contract = warpState.metricT00Contract as MetricT00Contract | undefined;
+  const observerRaw =
+    (contract?.observer as string | undefined) ??
+    (typeof warpState.metricT00Observer === "string"
+      ? String(warpState.metricT00Observer)
+      : undefined);
+  const normalizationRaw =
+    (contract?.normalization as string | undefined) ??
+    (typeof warpState.metricT00Normalization === "string"
+      ? String(warpState.metricT00Normalization)
+      : undefined);
+  const unitSystemRaw =
+    (contract?.unitSystem as string | undefined) ??
+    (typeof warpState.metricT00UnitSystem === "string"
+      ? String(warpState.metricT00UnitSystem)
+      : undefined);
+  state.metricConstraint = {
+    updatedAt: Date.now(),
+    source: metricT00Ref,
+    chart: adapter?.chart?.label,
+    family: adapter?.family,
+    observer: observerRaw,
+    normalization: normalizationRaw,
+    unitSystem: unitSystemRaw,
+    rho_constraint,
+  };
+};
+
+const refreshCl3Telemetry = (state: EnergyPipelineState): void => {
+  const strict = strictCongruenceEnabled();
+  const missingParts: string[] = [];
+  const grConstraint = state.gr?.constraints?.rho_constraint;
+  const metricConstraint = state.metricConstraint?.rho_constraint;
+  const rhoConstraint = grConstraint ?? metricConstraint;
+  const rhoConstraintMean = firstFinite(rhoConstraint?.mean);
+  const rhoConstraintSource = grConstraint
+    ? "gr.rho_constraint"
+    : metricConstraint
+      ? state.metricConstraint?.source
+        ? `metricConstraint:${state.metricConstraint.source}`
+        : "metricConstraint"
+      : undefined;
+
+  const metricDebug: EffectiveRhoDebug = {};
+  const metricRhoSi = resolveMetricRhoFromState(state, metricDebug, {
+    allowConstraintFallback: false,
+  });
+  const metricSource = metricDebug.source;
+  const metricRhoGeom =
+    metricRhoSi != null ? metricRhoSi * SI_TO_GEOM_STRESS : undefined;
+
+  const pipelineRhoAvg = firstFinite(state.rho_avg);
+  const pipelineRhoAvgGeom =
+    pipelineRhoAvg != null ? pipelineRhoAvg * SI_TO_GEOM_STRESS : undefined;
+
+  const deltaMetric =
+    rhoConstraintMean != null && metricRhoGeom != null
+      ? relDelta(rhoConstraintMean, metricRhoGeom)
+      : undefined;
+  const deltaPipeline =
+    rhoConstraintMean != null && pipelineRhoAvgGeom != null
+      ? relDelta(rhoConstraintMean, pipelineRhoAvgGeom)
+      : undefined;
+
+  const warpState = (state as any).warp as Record<string, any> | undefined;
+  const metricContractStatus =
+    (warpState as any)?.metricT00Contract?.status ??
+    (warpState as any)?.metricT00ContractStatus ??
+    (state as any)?.natario?.metricT00ContractStatus;
+  const metricContractOk =
+    typeof metricContractStatus === "string" ? metricContractStatus === "ok" : undefined;
+
+  if (rhoConstraintMean == null) missingParts.push("missing_rho_constraint");
+  if (metricRhoGeom == null || !metricSource) missingParts.push("missing_metric_t00");
+  if (strict && metricRhoGeom != null && metricContractOk === false) {
+    missingParts.push("missing_metric_contract");
+  }
+
+  const missingReason = missingParts.length
+    ? missingParts.includes("missing_metric_t00")
+      ? "metric_source_missing"
+      : missingParts.includes("missing_metric_contract")
+        ? "metric_contract_missing"
+        : "constraint_rho_missing"
+    : undefined;
+
+  const gateDelta = deltaMetric;
+  const gateSource =
+    gateDelta != null
+      ? metricSource
+      : missingReason === "metric_source_missing"
+        ? "metric-missing"
+        : missingReason === "metric_contract_missing"
+          ? "metric-contract-missing"
+          : missingReason === "constraint_rho_missing"
+            ? "constraint-missing"
+            : "missing_inputs";
+  const gatePass = gateDelta != null ? gateDelta <= DEFAULT_CL3_RHO_DELTA_MAX : false;
+  const gateReason =
+    gateDelta != null
+      ? gatePass
+        ? "within_threshold"
+        : "above_threshold"
+      : missingReason ?? "missing_inputs";
+
+  state.rho_constraint = rhoConstraint;
+  state.rho_constraint_source = rhoConstraintSource;
+  state.rho_delta_metric_mean = deltaMetric;
+  state.rho_delta_pipeline_mean = deltaPipeline;
+  state.rho_delta_threshold = gateDelta != null ? DEFAULT_CL3_RHO_DELTA_MAX : undefined;
+  state.rho_delta_gate = gatePass;
+  state.rho_delta_gate_reason = gateReason;
+  state.rho_delta_gate_source = gateSource;
+  state.rho_delta_missing_parts = missingParts.length ? missingParts : undefined;
+};
+
+const refreshThetaAuditFromMetricAdapter = (state: EnergyPipelineState): void => {
+  const metricBeta = (state as any).warp?.metricAdapter?.betaDiagnostics;
+  const thetaGeomCandidate = metricBeta?.thetaMax ?? metricBeta?.thetaRms;
+  const thetaGeom =
+    Number.isFinite(thetaGeomCandidate) ? Number(thetaGeomCandidate) : undefined;
+  const thetaGeomProxy = metricBeta?.method === "not-computed";
+  const thetaGeomUsable = thetaGeom != null && !thetaGeomProxy;
+  const thetaProxySource =
+    (state as any).thetaCal != null
+      ? "pipeline.thetaCal"
+      : (state as any).thetaScaleExpected != null
+        ? "pipeline.thetaScaleExpected"
+        : undefined;
+  const thetaGeomSource =
+    thetaGeom != null
+      ? metricBeta?.thetaMax != null
+        ? "warp.metricAdapter.betaDiagnostics.thetaMax"
+        : "warp.metricAdapter.betaDiagnostics.thetaRms"
+      : undefined;
+  const thetaProxy = (state as any).thetaCal ?? (state as any).thetaScaleExpected;
+  const thetaAudit = thetaGeomUsable ? thetaGeom : thetaProxy;
+  const thetaMetricReason = thetaGeomUsable
+    ? "metric_adapter_divergence"
+    : thetaGeom == null
+      ? "missing_theta_geom"
+      : "theta_geom_proxy";
+
+  (state as any).theta_geom = thetaGeom;
+  (state as any).theta_geom_source = thetaGeomSource;
+  (state as any).theta_geom_proxy = thetaGeomProxy;
+  (state as any).theta_proxy = thetaProxy;
+  (state as any).theta_proxy_source = thetaProxySource;
+  (state as any).theta_audit = thetaAudit;
+  (state as any).theta_metric_derived = thetaGeomUsable;
+  (state as any).theta_metric_source = thetaGeomUsable ? thetaGeomSource : undefined;
+  (state as any).theta_metric_reason = thetaMetricReason;
+  (state as any).theta_source = thetaGeomUsable ? thetaGeomSource : thetaProxySource;
+  if ((state as any).uniformsExplain?.thetaAudit) {
+    (state as any).uniformsExplain.thetaAudit.thetaGeom = thetaGeom;
+    (state as any).uniformsExplain.thetaAudit.thetaGeomSource =
+      (state as any).theta_geom_source;
+    (state as any).uniformsExplain.thetaAudit.thetaGeomProxy =
+      (state as any).theta_geom_proxy;
+    (state as any).uniformsExplain.thetaAudit.thetaAudit = thetaAudit;
+    (state as any).uniformsExplain.thetaAudit.thetaMetricDerived = thetaGeomUsable;
+    (state as any).uniformsExplain.thetaAudit.thetaMetricReason = thetaMetricReason;
+  }
+};
+
+const refreshCongruenceMeta = (state: EnergyPipelineState): void => {
+  const warpState = (state as any).warp as Record<string, any> | undefined;
+  const metricT00 = firstFinite(
+    warpState?.metricT00,
+    warpState?.metricStressEnergy?.T00,
+    warpState?.stressEnergyTensor?.T00,
+  );
+  const metricSource =
+    warpState?.metricT00Source ??
+    warpState?.metricStressSource ??
+    warpState?.stressEnergySource;
+  const metricMode = metricSource === "metric" && metricT00 != null;
+  const curvatureSource = metricMode ? "metric" : state ? "pipeline" : "unknown";
+  const curvatureCongruence = metricMode ? "conditional" : "proxy-only";
+  const curvatureProxy = curvatureCongruence !== "geometry-derived";
+
+  const stressSource =
+    warpState?.stressEnergySource ??
+    (state as any)?.stressEnergySource ??
+    (state as any)?.metricStressSource;
+  const stressMetricMode = stressSource === "metric";
+  const stressMetaSource = stressMetricMode ? "metric" : state ? "pipeline" : "unknown";
+  const stressMetaCongruence = stressMetricMode ? "conditional" : "proxy-only";
+  const stressMetaProxy = stressMetaCongruence !== "geometry-derived";
+
+  state.curvatureMeta = {
+    source: curvatureSource,
+    congruence: curvatureCongruence,
+    proxy: curvatureProxy,
+  };
+  state.stressMeta = {
+    source: stressMetaSource,
+    congruence: stressMetaCongruence,
+    proxy: stressMetaProxy,
+  };
+};
+
+const refreshUniversalCoverageStatus = (state: EnergyPipelineState): void => {
+  const missing: string[] = [];
+  const warpState = (state as any).warp as Record<string, any> | undefined;
+  const metricT00 = firstFinite(
+    warpState?.metricT00,
+    warpState?.metricStressEnergy?.T00,
+    warpState?.stressEnergyTensor?.T00,
+  );
+  const metricSource =
+    warpState?.metricT00Source ?? warpState?.metricStressSource ?? warpState?.stressEnergySource;
+  const metricMode = metricSource === "metric" && metricT00 != null;
+  if (!metricMode) missing.push("missing_metric_t00");
+
+  const metricContractStatus =
+    (warpState as any)?.metricT00Contract?.status ??
+    (warpState as any)?.metricT00ContractStatus ??
+    (state as any)?.natario?.metricT00ContractStatus;
+  if (metricMode && metricContractStatus !== "ok") {
+    missing.push("missing_metric_contract");
+  }
+
+  const chartContractStatus =
+    (warpState as any)?.metricAdapter?.chart?.contractStatus ??
+    (warpState as any)?.metricAdapter?.chart?.contract_status;
+  if (metricMode && chartContractStatus !== "ok") {
+    missing.push("missing_chart_contract");
+  }
+
+  const thetaMetricDerived = (state as any).theta_metric_derived === true;
+  if (!thetaMetricDerived) missing.push("missing_theta_geom");
+
+  const rhoConstraint = state.rho_constraint ?? state.metricConstraint?.rho_constraint;
+  if (!Number.isFinite(rhoConstraint?.mean)) missing.push("missing_rho_constraint");
+
+  const gammaVdB = Number(state.gammaVanDenBroeck);
+  if (Number.isFinite(gammaVdB) && gammaVdB > 1) {
+    const vdbRegionIIDeriv = (state as any).vdb_region_ii_derivative_support === true;
+    const vdbRegionIVDeriv = (state as any).vdb_region_iv_derivative_support === true;
+    const vdbTwoWallDeriv = (state as any).vdb_two_wall_derivative_support === true;
+    if (!vdbRegionIIDeriv) missing.push("missing_vdb_region_ii_derivatives");
+    if (!vdbRegionIVDeriv) missing.push("missing_vdb_region_iv_derivatives");
+    if (!vdbTwoWallDeriv) missing.push("missing_vdb_two_wall_derivatives");
+  }
+
+  (state as any).congruence_missing_parts = missing.length ? missing : undefined;
+  (state as any).congruence_missing_count = missing.length;
+  (state as any).congruence_missing_reason = missing.length ? missing[0] : undefined;
+};
+
+const computeVdbRegionIV = (params: {
+  R: number;
+  sigma: number;
+  beta?: number;
+  samples?: number;
+}): VdbRegionIVDiagnostics | null => {
+  const R = Number(params.R);
+  const sigma = Number(params.sigma);
+  if (!Number.isFinite(R) || !Number.isFinite(sigma)) return null;
+  if (R <= 0 || sigma <= 0) return null;
+  const rawBeta = Number.isFinite(params.beta) ? Number(params.beta) : Number.NaN;
+  const amplitude =
+    Number.isFinite(rawBeta)
+      ? Math.max(0, Math.min(0.99, Math.abs(rawBeta)))
+      : Math.max(0, Math.min(0.99, 0.15));
+  const samples = Math.max(4, Math.floor(Number.isFinite(params.samples) ? (params.samples as number) : VDB_REGION_SAMPLES));
+  const span = 3 / sigma;
+  const rMin = Math.max(0, R - span);
+  const rMax = R + span;
+  const den = Math.max(1e-8, 2 * Math.tanh(sigma * R));
+  const sech2 = (x: number) => {
+    const c = Math.cosh(x);
+    return c === 0 ? 0 : 1 / (c * c);
+  };
+  const dTopHatDr = (r: number) =>
+    sigma * (sech2(sigma * (r + R)) - sech2(sigma * (r - R))) / den;
+
+  let maxAbs = 0;
+  let sumSq = 0;
+  let t00Min = Number.POSITIVE_INFINITY;
+  let t00Max = Number.NEGATIVE_INFINITY;
+  let t00Sum = 0;
+  let t00SumSq = 0;
+  let traceSum = 0;
+  let kSquaredSum = 0;
+  const yOverR = 1 / Math.sqrt(2);
+  const zOverR = yOverR;
+  for (let i = 0; i < samples; i += 1) {
+    const t = (i + 0.5) / samples;
+    const r = rMin + (rMax - rMin) * t;
+    const dfdr = dTopHatDr(r);
+    const abs = Math.abs(dfdr);
+    if (abs > maxAbs) maxAbs = abs;
+    sumSq += dfdr * dfdr;
+    const Kxx = -amplitude * dfdr;
+    const Kxy = -0.5 * amplitude * dfdr * yOverR;
+    const Kxz = -0.5 * amplitude * dfdr * zOverR;
+    const trace = Kxx;
+    const kSquared = Kxx * Kxx + 2 * (Kxy * Kxy + Kxz * Kxz);
+    const rhoGeom = (trace * trace - kSquared) * INV16PI;
+    if (rhoGeom < t00Min) t00Min = rhoGeom;
+    if (rhoGeom > t00Max) t00Max = rhoGeom;
+    t00Sum += rhoGeom;
+    t00SumSq += rhoGeom * rhoGeom;
+    traceSum += trace;
+    kSquaredSum += kSquared;
+  }
+  const rms = Math.sqrt(sumSq / samples);
+  const t00Mean = t00Sum / samples;
+  const t00Rms = Math.sqrt(t00SumSq / samples);
+  const kTraceMean = traceSum / samples;
+  const kSquaredMean = kSquaredSum / samples;
+  if (!Number.isFinite(t00Min)) t00Min = 0;
+  if (!Number.isFinite(t00Max)) t00Max = 0;
+  return {
+    R_m: R,
+    sigma,
+    sampleCount: samples,
+    dfdr_max_abs: maxAbs,
+    dfdr_rms: rms,
+    beta: amplitude,
+    r_min_m: rMin,
+    r_max_m: rMax,
+    step_m: (rMax - rMin) / samples,
+    t00_min: t00Min,
+    t00_max: t00Max,
+    t00_mean: t00Mean,
+    t00_rms: t00Rms,
+    k_trace_mean: kTraceMean,
+    k_squared_mean: kSquaredMean,
+    support: maxAbs > 0,
+    note: Number.isFinite(rawBeta)
+      ? "Region IV f-wall derivative sample around R."
+      : "Region IV f-wall derivative sample around R (beta defaulted).",
+  };
+};
 
 export function appendSweepRows(rows: VacuumGapSweepRow[]) {
   if (!rows.length) return;
@@ -3493,14 +4644,44 @@ export async function calculateEnergyPipeline(
     hull: guardInputHull,
     gammaRequested: state.gammaVanDenBroeck,
   });
-  state.gammaVanDenBroeckGuard = {
-    ...guardForApplied,
-    requested: baseGammaRequest,
-    targetHit: allowTargetCalibration ? targetShortfall === 0 : undefined,
-    targetShortfall: allowTargetCalibration ? (targetShortfall || undefined) : undefined,
-  };
-  (state as any).gammaVanDenBroeck_guard = state.gammaVanDenBroeckGuard;
-  // Split gamma_VdB into visual vs mass knobs to keep calibrator away from renderer
+    state.gammaVanDenBroeckGuard = {
+      ...guardForApplied,
+      requested: baseGammaRequest,
+      targetHit: allowTargetCalibration ? targetShortfall === 0 : undefined,
+      targetShortfall: allowTargetCalibration ? (targetShortfall || undefined) : undefined,
+    };
+    (state as any).gammaVanDenBroeck_guard = state.gammaVanDenBroeckGuard;
+    state.vdbRegionII = computeVdbRegionII({
+      gammaVdB: state.gammaVanDenBroeck,
+      pocketRadius_m: guardForApplied.pocketRadius_m,
+      pocketThickness_m: guardForApplied.pocketThickness_m,
+    }) ?? undefined;
+    const bubbleParams = resolveBubbleWallParams(state);
+    const vdbRegionIVBeta = firstFinite(
+      (state as any).beta_avg,
+      Number((state as any)?.bubble?.beta),
+      Number((state as any)?.beta),
+      Number((state as any)?.dynamicConfig?.beta),
+    );
+    state.vdbRegionIV = bubbleParams
+      ? computeVdbRegionIV({
+          R: bubbleParams.R,
+          sigma: bubbleParams.sigma,
+          beta: vdbRegionIVBeta,
+        }) ?? undefined
+      : undefined;
+    const vdbRegionIIDerivativeSupport = hasVdbRegionIIMetricSupport(state.vdbRegionII);
+    const vdbRegionIVDfdrMaxAbs = Number(state.vdbRegionIV?.dfdr_max_abs);
+    const vdbRegionIVDerivativeSupport =
+      state.vdbRegionIV?.support === true &&
+      Number.isFinite(vdbRegionIVDfdrMaxAbs) &&
+      Math.abs(vdbRegionIVDfdrMaxAbs) > VDB_DFDR_MIN_ABS;
+    const vdbTwoWallDerivativeSupport =
+      vdbRegionIIDerivativeSupport && vdbRegionIVDerivativeSupport;
+    (state as any).vdb_region_ii_derivative_support = vdbRegionIIDerivativeSupport;
+    (state as any).vdb_region_iv_derivative_support = vdbRegionIVDerivativeSupport;
+    (state as any).vdb_two_wall_derivative_support = vdbTwoWallDerivativeSupport;
+    // Split gamma_VdB into visual vs mass knobs to keep calibrator away from renderer
   (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // G├Ñ├ë pipeline value (targeted when enabled)
   (state as any).gammaVanDenBroeck_vis  = PAPER_VDB.GAMMA_VDB;                 // G├Ñ├ë fixed "physics/visual" seed for renderer
 
@@ -3924,9 +5105,23 @@ export async function calculateEnergyPipeline(
     ...clocking,
     TS: Number.isFinite(clockingTS) && clockingTS > 0 ? clockingTS : clocking.TS ?? null,
   };
+  const tsMetricStatusPreWarp = resolveTsMetricDerivedStatus(
+    state,
+    clockingProvenance,
+  );
+  clockingWithTS.metricDerived = tsMetricStatusPreWarp.metricDerived;
+  clockingWithTS.metricDerivedSource = tsMetricStatusPreWarp.source;
+  clockingWithTS.metricDerivedReason = tsMetricStatusPreWarp.reason;
+  clockingWithTS.metricDerivedChart = tsMetricStatusPreWarp.chart;
   state.clocking = clockingWithTS;
   state.clockingProvenance = clockingProvenance;
+  state.tsMetricDerived = tsMetricStatusPreWarp.metricDerived;
+  state.tsMetricDerivedSource = tsMetricStatusPreWarp.source;
+  state.tsMetricDerivedReason = tsMetricStatusPreWarp.reason;
   (state as any).averaging = clockingWithTS;
+  (state as any).tsMetricDerived = tsMetricStatusPreWarp.metricDerived;
+  (state as any).tsMetricDerivedSource = tsMetricStatusPreWarp.source;
+  (state as any).tsMetricDerivedReason = tsMetricStatusPreWarp.reason;
   (state as any).TS_modulation = state.TS_ratio;
   const tsCandidate = Number(clocking.TS);
   const tsFallback = Number.isFinite(state.TS_ratio)
@@ -4015,6 +5210,10 @@ export async function calculateEnergyPipeline(
     TS_ratio: Number.isFinite(state.TS_ratio) ? state.TS_ratio : tsCurrent,
     tauLC_ms: lightCrossing.tauLC_ms,
     tauPulse_ns: lightCrossing.burst_ns,
+    metricDerived: state.tsMetricDerived,
+    metricDerivedSource: state.tsMetricDerivedSource,
+    metricDerivedReason: state.tsMetricDerivedReason,
+    metricDerivedChart: state.clocking?.metricDerivedChart,
     autoscale: tsAuto
       ? {
           ...tsAuto,
@@ -4040,7 +5239,9 @@ export async function calculateEnergyPipeline(
     Number.isFinite(QI_AUTOSCALE_WINDOW_TOL) && (QI_AUTOSCALE_WINDOW_TOL as number) >= 0
       ? (QI_AUTOSCALE_WINDOW_TOL as number)
       : 0.05;
-  const autoscaleSource = QI_AUTOSCALE_SOURCE ?? "tile-telemetry";
+  const autoscaleSource = strictCongruenceEnabled()
+    ? process.env.QI_AUTOSCALE_SOURCE ?? "metric"
+    : QI_AUTOSCALE_SOURCE ?? "tile-telemetry";
   const autoscaleNow = wallNow;
   const autoscaleClamps: QiAutoscaleClampReason[] = [];
   const autoscaleState = stepQiAutoscale({
@@ -4118,30 +5319,6 @@ export async function calculateEnergyPipeline(
   (state as any).zetaRaw = qiGuard.marginRatioRaw;
   (state as any).qiGuardrail = qiGuard;
 
-  const zetaForStatus = Number.isFinite(qiGuard.marginRatioRaw)
-    ? qiGuard.marginRatioRaw
-    : Number.isFinite(qiGuard.marginRatio)
-    ? qiGuard.marginRatio
-    : null;
-  const guardLog = {
-    margin: qiGuard.marginRatio,
-    marginRaw: qiGuard.marginRatioRaw,
-    lhs_Jm3: qiGuard.lhs_Jm3,
-    bound_Jm3: qiGuard.bound_Jm3,
-    sampler: qiGuard.sampler,
-    fieldType: qiGuard.fieldType,
-    window_ms: qiGuard.window_ms,
-    sumWindowDt: qiGuard.sumWindowDt,
-    duty: qiGuard.duty,
-    patternDuty: qiGuard.patternDuty,
-    maskSum: qiGuard.maskSum,
-    effectiveRho: qiGuard.effectiveRho,
-    rhoOn: qiGuard.rhoOn,
-    rhoOnDuty: qiGuard.rhoOnDuty,
-    rhoSource: qiGuard.rhoSource,
-    TS: state.clocking?.TS ?? state.TS_ratio ?? null,
-    clockingDetail: state.clocking ?? null,
-  };
   const tsLog = {
     TS_ratio: state.TS_ratio,
     target: tsCfg.target,
@@ -4174,11 +5351,6 @@ export async function calculateEnergyPipeline(
     floor: autoscaleMinScale,
   };
 
-  if (!Number.isFinite(zetaForStatus) || (zetaForStatus as number) >= 1) {
-    console.warn("[QI-guard] sampled integral exceeds bound", guardLog);
-  } else if (DEBUG_PIPE) {
-    console.log("[QI-guard]", guardLog);
-  }
   if (DEBUG_PIPE) {
     console.log("[TS-guard]", tsLog);
     console.log("[TS-autoscale]", tsAutoLog);
@@ -4213,10 +5385,16 @@ export async function calculateEnergyPipeline(
     qSpoilingFactor: state.qSpoilingFactor
   });
 
-  // Calculate Natario metrics using pipeline state
-  const natario = calculateNatarioMetric({
+  // Legacy Natario proxy payload (kept only for compatibility fallback).
+  // Runtime congruence uses solved warp.metric payload below.
+  const strictCongruence = strictCongruenceEnabled();
+  let natarioLegacy: Record<string, unknown> | null = null;
+  if (!strictCongruence) {
+    natarioLegacy = calculateNatarioMetric({
       gap: state.gap_nm,
-      hull: state.hull ? { a: state.hull.Lx_m / 2, b: state.hull.Ly_m / 2, c: state.hull.Lz_m / 2 } : { a: 503.5, b: 132, c: 86.5 },
+      hull: state.hull
+        ? { a: state.hull.Lx_m / 2, b: state.hull.Ly_m / 2, c: state.hull.Lz_m / 2 }
+        : { a: 503.5, b: 132, c: 86.5 },
       N_tiles: state.N_tiles,
       tileArea_m2: state.tileArea_cm2 * CM2_TO_M2,
       dutyEffectiveFR: d_eff,
@@ -4226,22 +5404,21 @@ export async function calculateEnergyPipeline(
       qSpoilingFactor: state.qSpoilingFactor,
       cavityQ: state.qCavity,
       modulationFreq_GHz: state.modulationFreq_GHz,
-      sectorStrobing: state.concurrentSectors,   // concurrent live sectors
+      sectorStrobing: state.concurrentSectors, // concurrent live sectors
       dynamicConfig: {
-        sectorCount: state.sectorCount,          // TOTAL sectors (e.g. 400)
+        sectorCount: state.sectorCount, // TOTAL sectors (e.g. 400)
         concurrentSectors: state.concurrentSectors,
-        sectorDuty: d_eff,                       // FR duty, not UI duty
+        sectorDuty: d_eff, // FR duty, not UI duty
         cavityQ: state.qCavity,
         qSpoilingFactor: state.qSpoilingFactor,
         gammaGeo: state.gammaGeo,
         gammaVanDenBroeck: state.gammaVanDenBroeck,
         pulseFrequencyGHz: state.modulationFreq_GHz,
-        lightCrossingTimeNs: tauLC_s * 1e9
-      }
-    } as any, state.U_static * state.N_tiles);
-
-  // Store Nat+├¡rio metrics in state for API access
-  (state as any).natario = natario;
+        lightCrossingTimeNs: tauLC_s * 1e9,
+      },
+    } as any, state.U_static * state.N_tiles) as unknown as Record<string, unknown>;
+  }
+  (state as any).natarioLegacy = natarioLegacy ?? undefined;
 
   // Calculate dynamic Casimir with pipeline integration + performance guardrails
 
@@ -4399,6 +5576,12 @@ export async function calculateEnergyPipeline(
       (state.dynamicConfig as any)?.warpGeometryKind ??
       state.warpGeometryKind ??
       'ellipsoid';
+    const bubblePayload = {
+      ...(state as any).bubble,
+      R: (state as any).bubble?.R ?? (state as any).R,
+      sigma: (state as any).bubble?.sigma ?? (state as any).sigma,
+      beta: (state as any).bubble?.beta ?? (state as any).beta,
+    };
     const allowMassOverride = massMode === "TARGET_CALIBRATED";
     const invariantMass_kg =
       Number.isFinite(state.gr?.matter?.stressEnergy?.invariantMass_kg)
@@ -4444,6 +5627,10 @@ export async function calculateEnergyPipeline(
         warpGeometry: warpGeometry ?? undefined,
         warpGeometryKind
       },
+      bubble: bubblePayload,
+      R: bubblePayload.R,
+      sigma: bubblePayload.sigma,
+      beta: bubblePayload.beta,
       warpGeometry: warpGeometry ?? undefined,
       warpGeometryKind,
       warpGeometryAssetId: (warpGeometry as WarpGeometrySpec)?.assetId ?? state.warpGeometryAssetId,
@@ -4461,6 +5648,20 @@ export async function calculateEnergyPipeline(
       return sanitized;
     };
 
+    const buildFallbackMetricAdapter = (note: string) =>
+      buildWarpMetricAdapterSnapshot({
+        family: "unknown",
+        chart: {
+          label: "unspecified",
+          dtGammaPolicy: "unknown",
+          notes: note,
+        },
+        requestedFieldType: warpFieldType,
+        alpha: 1,
+        gammaDiag: [1, 1, 1],
+        note,
+      });
+
     const sanitizeWarpResult = (warpResult: unknown) => {
       if (!warpResult || typeof warpResult !== "object") return warpResult;
       const result = warpResult as Record<string, unknown>;
@@ -4477,13 +5678,431 @@ export async function calculateEnergyPipeline(
     };
 
     const warp = await warpBubbleModule.calculate(warpParams);
+    const sanitizedWarp = sanitizeWarpResult(warp) as Record<string, unknown>;
+    if (!sanitizedWarp.metricAdapter) {
+      sanitizedWarp.metricAdapter = buildFallbackMetricAdapter(
+        "metricAdapter missing from warp module result",
+      );
+    }
 
     // Store warp results in state for API access
-    (state as any).warp = sanitizeWarpResult(warp);
+    (state as any).warp = sanitizedWarp;
     (state as any).beta_avg = warp?.betaAvg ?? warp?.natarioShiftAmplitude ?? (state as any).beta_avg;
+
+    refreshThetaAuditFromMetricAdapter(state);
+    refreshCongruenceMeta(state);
+    refreshUniversalCoverageStatus(state);
   } catch (e) {
     if (DEBUG_PIPE) console.warn('Warp bubble calculation failed:', e);
+    if (!(state as any).warp) {
+      const requestedFieldType =
+        (state.dynamicConfig as any)?.warpFieldType ?? state.warpFieldType ?? "unknown";
+      (state as any).warp = {
+        metricAdapter: buildWarpMetricAdapterSnapshot({
+          family: "unknown",
+          chart: {
+            label: "unspecified",
+            dtGammaPolicy: "unknown",
+            notes: "warp bubble calculation failed",
+          },
+          requestedFieldType,
+          alpha: 1,
+          gammaDiag: [1, 1, 1],
+        }),
+      };
+    } else if (!(state as any).warp.metricAdapter) {
+      (state as any).warp.metricAdapter = buildWarpMetricAdapterSnapshot({
+        family: "unknown",
+        chart: {
+          label: "unspecified",
+          dtGammaPolicy: "unknown",
+          notes: "warp bubble calculation failed",
+        },
+        requestedFieldType:
+          (state.dynamicConfig as any)?.warpFieldType ?? state.warpFieldType ?? "unknown",
+        alpha: 1,
+        gammaDiag: [1, 1, 1],
+      });
+    }
+    refreshThetaAuditFromMetricAdapter(state);
+    refreshCongruenceMeta(state);
+    refreshUniversalCoverageStatus(state);
   }
+
+  // Canonical non-Alcubierre metric source: promote VdB Region II derivatives
+  // into warp.metricT00 when warp module does not provide metric stress.
+  const warpState = (state as any).warp as Record<string, unknown> | undefined;
+  const warpMetricSource = (warpState as any)?.metricT00Source;
+  const warpStressSource = (warpState as any)?.stressEnergySource;
+  const warpMetricRef =
+    typeof (warpState as any)?.metricT00Ref === "string" &&
+    (warpState as any).metricT00Ref.length > 0
+      ? String((warpState as any).metricT00Ref)
+      : undefined;
+  const warpMetricValue = firstFinite((warpState as any)?.metricT00);
+  const hasCanonicalMetricT00 =
+    warpMetricValue !== undefined &&
+    (warpMetricSource === "metric" ||
+      warpStressSource === "metric" ||
+      (warpMetricRef != null && warpMetricRef.startsWith("warp.metric.T00")));
+  if (
+    hasCanonicalMetricT00 &&
+    warpState &&
+    (warpMetricSource !== "metric" || warpStressSource !== "metric")
+  ) {
+    const metricRef =
+      warpMetricRef ??
+      resolveCanonicalMetricT00Ref(
+        warpState as Record<string, any>,
+        (warpState as any)?.metricAdapter as WarpMetricAdapterSnapshot | undefined,
+      );
+    (state as any).warp = {
+      ...warpState,
+      metricT00Source: "metric",
+      stressEnergySource: "metric",
+      ...(metricRef ? { metricT00Ref: metricRef } : {}),
+    };
+  }
+  const vdbRegionII = (state as any).vdbRegionII;
+  const vdbRegionIIT00Geom = firstFinite(vdbRegionII?.t00_mean);
+  let vdbRegionIIPromoted = false;
+  if (
+    !hasCanonicalMetricT00 &&
+    hasVdbRegionIIMetricSupport(vdbRegionII) &&
+    vdbRegionIIT00Geom !== undefined
+  ) {
+    const vdbMetricT00Si = vdbRegionIIT00Geom * GEOM_TO_SI_STRESS;
+    const vdbBMin = Number(vdbRegionII?.b_min);
+    const vdbBMax = Number(vdbRegionII?.b_max);
+    const vdbBRepresentative =
+      Number.isFinite(vdbBMin) &&
+      vdbBMin > 0 &&
+      Number.isFinite(vdbBMax) &&
+      vdbBMax > 0
+        ? Math.sqrt(vdbBMin * vdbBMax)
+        : Number.isFinite(state.gammaVanDenBroeck)
+          ? Math.sqrt(Math.max(1, Number(state.gammaVanDenBroeck)))
+          : 1;
+    const vdbGammaDiagValue = Math.max(1e-12, vdbBRepresentative * vdbBRepresentative);
+    const existingAdapter = (warpState as any)?.metricAdapter as
+      | WarpMetricAdapterSnapshot
+      | undefined;
+    const vdbFallbackShiftField = buildVdbFallbackShiftField(state);
+    const vdbConformalDiagnostics = buildVdbConformalDiagnostics(
+      vdbRegionII,
+      vdbFallbackShiftField?.amplitude,
+    );
+    const existingChartLabel = existingAdapter?.chart?.label;
+    const existingContractStatus = existingAdapter?.chart?.contractStatus;
+    const useVdbAdapterFallback =
+      !existingAdapter ||
+      existingChartLabel === "unspecified" ||
+      existingContractStatus === "unknown";
+    const metricStressDiagnostics = {
+      sampleCount: Number.isFinite(vdbRegionII?.sampleCount)
+        ? Number(vdbRegionII.sampleCount)
+        : 0,
+      rhoGeomMean: vdbRegionIIT00Geom,
+      rhoSiMean: vdbMetricT00Si,
+      kTraceMean: undefined,
+      kSquaredMean: undefined,
+      step_m: Number.isFinite(vdbRegionII?.delta_tilde_m)
+        ? Number(vdbRegionII.delta_tilde_m) /
+          Math.max(1, Number(vdbRegionII?.sampleCount) || 1)
+        : 0,
+      scale_m: Number.isFinite(vdbRegionII?.r_tilde_m)
+        ? Number(vdbRegionII.r_tilde_m)
+        : 0,
+    };
+    const rebuiltExistingVdbAdapter =
+      !useVdbAdapterFallback &&
+      existingAdapter?.family === "vdb" &&
+      vdbConformalDiagnostics
+        ? buildWarpMetricAdapterSnapshot({
+            family: "vdb",
+            chart: existingAdapter.chart,
+            requestedFieldType: existingAdapter.requestedFieldType,
+            alpha: existingAdapter.alpha,
+            gammaDiag: existingAdapter.gammaDiag,
+            hodgeDiagnostics: {
+              maxDiv: existingAdapter.betaDiagnostics?.thetaMax,
+              rmsDiv: existingAdapter.betaDiagnostics?.thetaRms,
+              maxCurl: existingAdapter.betaDiagnostics?.curlMax,
+              rmsCurl: existingAdapter.betaDiagnostics?.curlRms,
+            },
+            sampleCount: existingAdapter.betaDiagnostics?.sampleCount,
+            expansionScalar:
+              existingAdapter.betaDiagnostics?.thetaMax ??
+              existingAdapter.betaDiagnostics?.thetaRms,
+            curlMagnitude:
+              existingAdapter.betaDiagnostics?.curlMax ??
+              existingAdapter.betaDiagnostics?.curlRms,
+            vdbConformalDiagnostics,
+            note:
+              "Existing VdB adapter rebuilt with region-II conformal derivative diagnostics",
+          })
+        : undefined;
+    (state as any).warp = {
+      ...(warpState ?? {}),
+      metricT00: vdbMetricT00Si,
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.vdb.regionII",
+      metricT00Derivation: "forward_B_to_derivatives_to_rho_E",
+      metricStressDiagnostics,
+      stressEnergySource: "metric",
+      metricAdapter: useVdbAdapterFallback
+        ? buildWarpMetricAdapterSnapshot({
+            family: "vdb",
+            chart: {
+              label: "comoving_cartesian",
+              dtGammaPolicy: "assumed_zero",
+              notes: "Derived from Van Den Broeck region-II diagnostics",
+            },
+            requestedFieldType:
+              (state.dynamicConfig as any)?.warpFieldType ??
+              state.warpFieldType ??
+              "unknown",
+            alpha: 1,
+            gammaDiag: [vdbGammaDiagValue, vdbGammaDiagValue, vdbGammaDiagValue],
+            shiftVectorField: vdbFallbackShiftField,
+            vdbConformalDiagnostics,
+            note: `metricT00 promoted from VdB region-II derivative diagnostics; gammaDiag=B_rep^2 (${vdbGammaDiagValue.toExponential(3)})`,
+          })
+        : rebuiltExistingVdbAdapter ?? existingAdapter,
+    };
+    vdbRegionIIPromoted = true;
+  }
+  const vdbRegionIV = (state as any).vdbRegionIV;
+  const vdbRegionIVT00Geom = firstFinite(vdbRegionIV?.t00_mean);
+  if (
+    !hasCanonicalMetricT00 &&
+    !vdbRegionIIPromoted &&
+    hasVdbRegionIVMetricSupport(vdbRegionIV) &&
+    vdbRegionIVT00Geom !== undefined
+  ) {
+    const vdbMetricT00Si = vdbRegionIVT00Geom * GEOM_TO_SI_STRESS;
+    const existingAdapter = (warpState as any)?.metricAdapter as
+      | WarpMetricAdapterSnapshot
+      | undefined;
+    const existingChartLabel = existingAdapter?.chart?.label;
+    const existingContractStatus = existingAdapter?.chart?.contractStatus;
+    const useVdbAdapterFallback =
+      !existingAdapter ||
+      existingChartLabel === "unspecified" ||
+      existingContractStatus === "unknown";
+    const vdbFallbackShiftField = buildVdbFallbackShiftField(state);
+    const metricStressDiagnostics = {
+      sampleCount: Number.isFinite(vdbRegionIV?.sampleCount)
+        ? Number(vdbRegionIV.sampleCount)
+        : 0,
+      rhoGeomMean: vdbRegionIVT00Geom,
+      rhoSiMean: vdbMetricT00Si,
+      kTraceMean: Number.isFinite(vdbRegionIV?.k_trace_mean)
+        ? Number(vdbRegionIV.k_trace_mean)
+        : undefined,
+      kSquaredMean: Number.isFinite(vdbRegionIV?.k_squared_mean)
+        ? Number(vdbRegionIV.k_squared_mean)
+        : undefined,
+      step_m: Number.isFinite(vdbRegionIV?.step_m) ? Number(vdbRegionIV.step_m) : 0,
+      scale_m: Number.isFinite(vdbRegionIV?.R_m) ? Number(vdbRegionIV.R_m) : 0,
+    };
+    const rebuiltExistingVdbAdapter =
+      !useVdbAdapterFallback &&
+      existingAdapter?.family === "vdb"
+        ? buildWarpMetricAdapterSnapshot({
+            family: "vdb",
+            chart: existingAdapter.chart,
+            requestedFieldType: existingAdapter.requestedFieldType,
+            alpha: existingAdapter.alpha,
+            gammaDiag: existingAdapter.gammaDiag,
+            hodgeDiagnostics: {
+              maxDiv: existingAdapter.betaDiagnostics?.thetaMax,
+              rmsDiv: existingAdapter.betaDiagnostics?.thetaRms,
+              maxCurl: existingAdapter.betaDiagnostics?.curlMax,
+              rmsCurl: existingAdapter.betaDiagnostics?.curlRms,
+            },
+            sampleCount: existingAdapter.betaDiagnostics?.sampleCount,
+            expansionScalar:
+              existingAdapter.betaDiagnostics?.thetaMax ??
+              existingAdapter.betaDiagnostics?.thetaRms,
+            curlMagnitude:
+              existingAdapter.betaDiagnostics?.curlMax ??
+              existingAdapter.betaDiagnostics?.curlRms,
+            note: "Existing VdB adapter retained for region-IV metric fallback",
+          })
+        : undefined;
+    (state as any).warp = {
+      ...(warpState ?? {}),
+      metricT00: vdbMetricT00Si,
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.vdb.regionIV",
+      metricT00Derivation: "forward_fwall_to_rho_E",
+      metricStressDiagnostics,
+      stressEnergySource: "metric",
+      metricAdapter: useVdbAdapterFallback
+        ? buildWarpMetricAdapterSnapshot({
+            family: "vdb",
+            chart: {
+              label: "comoving_cartesian",
+              dtGammaPolicy: "assumed_zero",
+              notes: "Derived from Van Den Broeck region-IV f-wall diagnostics",
+            },
+            requestedFieldType:
+              (state.dynamicConfig as any)?.warpFieldType ??
+              state.warpFieldType ??
+              "unknown",
+            alpha: 1,
+            gammaDiag: [1, 1, 1],
+            shiftVectorField: vdbFallbackShiftField,
+            sampleScale_m: Number.isFinite(vdbRegionIV?.R_m)
+              ? Number(vdbRegionIV.R_m)
+              : undefined,
+            note: "Fallback VdB adapter seeded from region-IV f-wall diagnostics",
+          })
+        : rebuiltExistingVdbAdapter ?? existingAdapter,
+    };
+    if ((state as any).uniformsExplain?.warpMetric) {
+      (state as any).uniformsExplain.warpMetric.metricT00Derivation =
+        "forward_fwall_to_rho_E";
+      (state as any).uniformsExplain.warpMetric.note =
+        "metricT00 promoted from VdB region-IV f-wall diagnostics";
+    }
+  }
+
+  const vdbConformalDiagnostics = buildVdbConformalDiagnostics(
+    vdbRegionII,
+    firstFinite(
+      (warpState as any)?.shiftVectorField?.amplitude,
+      (warpState as any)?.betaAvg,
+      (state as any)?.beta_avg,
+    ),
+  );
+  const gammaVdB = Number(state.gammaVanDenBroeck);
+  const needsConformal =
+    Number.isFinite(gammaVdB) && gammaVdB > 1 && hasVdbRegionIIDerivatives(vdbRegionII);
+  const warpStateLatest = (state as any).warp as Record<string, any> | undefined;
+  if (needsConformal && vdbConformalDiagnostics && warpStateLatest?.metricAdapter) {
+    const adapter = warpStateLatest.metricAdapter as WarpMetricAdapterSnapshot;
+    warpStateLatest.metricAdapter = buildWarpMetricAdapterSnapshot({
+      family: adapter.family,
+      chart: adapter.chart,
+      requestedFieldType: adapter.requestedFieldType,
+      alpha: adapter.alpha,
+      gammaDiag: adapter.gammaDiag,
+      betaDiagnostics: adapter.betaDiagnostics,
+      vdbConformalDiagnostics,
+      note: "VdB conformal diagnostics injected from region-II",
+    });
+  }
+  refreshMetricT00Contract(state);
+  refreshMetricConstraintAudit(state);
+  refreshCl3Telemetry(state);
+  refreshThetaAuditFromMetricAdapter(state);
+  refreshCongruenceMeta(state);
+  refreshUniversalCoverageStatus(state);
+
+  // Recompute tau_LC/TS from metric adapter path length once the adapter is finalized.
+  const metricPath_m = resolveMetricPathLengthFromAdapter(state);
+  if (
+    clockingProvenance !== "hardware" &&
+    Number.isFinite(metricPath_m) &&
+    (metricPath_m as number) > 0
+  ) {
+    const metricClocking = computeClocking({
+      path_m: metricPath_m as number,
+      burst_ms: Number.isFinite((state as any)?.lightCrossing?.burst_ms)
+        ? Number((state as any).lightCrossing.burst_ms)
+        : undefined,
+      dwell_ms: Number.isFinite((state as any)?.lightCrossing?.dwell_ms)
+        ? Number((state as any).lightCrossing.dwell_ms)
+        : sectorPeriodMs,
+      sectorPeriod_ms: sectorPeriodMs,
+      localDuty: state.dutyBurst,
+    });
+    if (
+      Number.isFinite(metricClocking.tauLC_ms as number) &&
+      (metricClocking.tauLC_ms as number) > 0
+    ) {
+      const lightCrossingState = ((state as any).lightCrossing ?? {}) as Record<string, unknown>;
+      lightCrossingState.tauLC_ms = metricClocking.tauLC_ms;
+      lightCrossingState.burst_ms =
+        metricClocking.tauPulse_ms ?? lightCrossingState.burst_ms;
+      lightCrossingState.dwell_ms = metricClocking.dwell_ms ?? lightCrossingState.dwell_ms;
+      const metricTs = Number(metricClocking.TS);
+      if (Number.isFinite(metricTs) && metricTs > 0) {
+        state.TS_long = metricTs;
+        state.TS_ratio = metricTs;
+        lightCrossingState.TS = metricTs;
+      }
+      (state as any).lightCrossing = lightCrossingState;
+      (state as any).tauLC_ms = lightCrossingState.tauLC_ms;
+      state.clocking = {
+        ...(state.clocking ?? metricClocking),
+        ...metricClocking,
+        detail: `${metricClocking.detail}; tau_LC from metric adapter gammaDiag`,
+      };
+    }
+  }
+
+  // Re-evaluate TS metric derivation after warp adapter / metric promotion is available.
+  const tsMetricStatus = resolveTsMetricDerivedStatus(state, clockingProvenance);
+  state.tsMetricDerived = tsMetricStatus.metricDerived;
+  state.tsMetricDerivedSource = tsMetricStatus.source;
+  state.tsMetricDerivedReason = tsMetricStatus.reason;
+  (state as any).tsMetricDerived = tsMetricStatus.metricDerived;
+  (state as any).tsMetricDerivedSource = tsMetricStatus.source;
+  (state as any).tsMetricDerivedReason = tsMetricStatus.reason;
+  if (state.clocking) {
+    state.clocking = {
+      ...state.clocking,
+      metricDerived: tsMetricStatus.metricDerived,
+      metricDerivedSource: tsMetricStatus.source,
+      metricDerivedReason: tsMetricStatus.reason,
+      metricDerivedChart: tsMetricStatus.chart,
+    };
+  }
+  if (state.ts) {
+    state.ts = {
+      ...state.ts,
+      metricDerived: tsMetricStatus.metricDerived,
+      metricDerivedSource: tsMetricStatus.source,
+      metricDerivedReason: tsMetricStatus.reason,
+      metricDerivedChart: tsMetricStatus.chart,
+    };
+    (state as any).ts = state.ts;
+  }
+
+  // Refresh QI guardrail after warp metric promotion so exported QI status/source
+  // reflects the final metric adapter and clocking contract in this tick.
+  const qiGuardLate = evaluateQiGuardrail(state, {
+    schedule: phaseSchedule,
+    sectorPeriod_ms: sectorPeriodMs,
+    sampler,
+    tau_ms: tauMs,
+  });
+  if (qiGuardLate) {
+    state.zeta = qiGuardLate.marginRatio;
+    (state as any).zetaRaw = qiGuardLate.marginRatioRaw;
+    (state as any).qiGuardrail = qiGuardLate;
+    const qiStatusLate = deriveQiStatus({
+      zetaRaw: qiGuardLate.marginRatioRaw,
+      zetaClamped: qiGuardLate.marginRatio,
+      pAvg: state.P_avg,
+      pWarn: P_warn,
+      mode: state.currentMode,
+    });
+    state.fordRomanCompliance = qiStatusLate.compliance;
+    state.curvatureLimit = state.fordRomanCompliance;
+    state.overallStatus = qiStatusLate.overallStatus;
+  }
+  // Canonical Natario payload now mirrors solved warp metric output.
+  // Legacy inverse/proxy Natario is retained under `natarioLegacy` for diagnostics.
+  (state as any).natario = buildNatarioRuntimePayload(
+    state,
+    ((state as any).natarioLegacy as Record<string, unknown> | undefined) ??
+      ((state as any).natario as Record<string, unknown> | undefined),
+  );
+  emitQiGuardLog(state, (state as any).qiGuardrail ?? qiGuard);
 
   // Speed/beta closure: derive effective translation from power and warp proxy
   const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -4561,6 +6180,48 @@ function flushPendingPumpCommand(): void {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[pipeline] multi-tone pump slew failed: ${message}`);
   });
+}
+
+function emitQiGuardLog(state: EnergyPipelineState, qiGuard: any): void {
+  if (!qiGuard) return;
+  const zetaForStatus = Number.isFinite(qiGuard.marginRatioRaw)
+    ? qiGuard.marginRatioRaw
+    : Number.isFinite(qiGuard.marginRatio)
+    ? qiGuard.marginRatio
+    : null;
+  const guardLog = {
+    margin: qiGuard.marginRatio,
+    marginRaw: qiGuard.marginRatioRaw,
+    lhs_Jm3: qiGuard.lhs_Jm3,
+    bound_Jm3: qiGuard.bound_Jm3,
+    sampler: qiGuard.sampler,
+    fieldType: qiGuard.fieldType,
+    window_ms: qiGuard.window_ms,
+    sumWindowDt: qiGuard.sumWindowDt,
+    duty: qiGuard.duty,
+    patternDuty: qiGuard.patternDuty,
+    maskSum: qiGuard.maskSum,
+    effectiveRho: qiGuard.effectiveRho,
+    rhoOn: qiGuard.rhoOn,
+    rhoOnDuty: qiGuard.rhoOnDuty,
+    rhoSource: qiGuard.rhoSource,
+    curvatureRadius_m: qiGuard.curvatureRadius_m,
+    curvatureRatio: qiGuard.curvatureRatio,
+    curvatureOk: qiGuard.curvatureOk,
+    curvatureSource: qiGuard.curvatureSource,
+    metricDerived: qiGuard.metricDerived,
+    metricDerivedSource: qiGuard.metricDerivedSource,
+    metricDerivedReason: qiGuard.metricDerivedReason,
+    metricDerivedChart: qiGuard.metricDerivedChart,
+    TS: state.clocking?.TS ?? state.TS_ratio ?? null,
+    clockingDetail: state.clocking ?? null,
+  };
+
+  if (!Number.isFinite(zetaForStatus) || (zetaForStatus as number) >= 1) {
+    console.warn("[QI-guard] sampled integral exceeds bound", guardLog);
+  } else if (DEBUG_PIPE) {
+    console.log("[QI-guard]", guardLog);
+  }
 }
 
 function updateQiTelemetry(state: EnergyPipelineState) {
@@ -4989,6 +6650,9 @@ function clampInt(value: number, min: number, max: number): number {
   return Math.round(clampNumber(value, min, max));
 }
 
+const relDelta = (current: number, baseline: number, eps = 1e-12) =>
+  Math.abs(current - baseline) / Math.max(Math.abs(baseline), eps);
+
 type EffectiveRhoDebug = {
   source?: string;
   value?: number;
@@ -5001,7 +6665,150 @@ function resolveTileTelemetryScale(): number {
   return Math.max(0, Math.abs(scale));
 }
 
+function resolveMetricRhoFromState(
+  state: EnergyPipelineState,
+  debug?: EffectiveRhoDebug,
+  opts?: { allowConstraintFallback?: boolean },
+): number | undefined {
+  const allowConstraintFallback = opts?.allowConstraintFallback !== false;
+  const warp = (state as any)?.warp;
+  const warpMetricSource =
+    warp?.metricT00Source ?? warp?.metricStressSource ?? warp?.stressEnergySource;
+  const warpMetricT00 = firstFinite(
+    warp?.metricT00,
+    warp?.metricStressEnergy?.T00,
+    warp?.metricStressDiagnostics?.rhoSiMean,
+  );
+  const warpMetricRef =
+    typeof warp?.metricT00Ref === "string" && warp.metricT00Ref.length > 0
+      ? String(warp.metricT00Ref)
+      : "warp.metricT00";
+  if (warpMetricSource === "metric" && warpMetricT00 !== undefined) {
+    if (debug) {
+      debug.source = warpMetricRef;
+      debug.value = warpMetricT00;
+      debug.note = "metric-derived";
+    }
+    return warpMetricT00;
+  }
+
+  const natario = (state as any)?.natario;
+  const natarioMetricSource = natario?.metricT00Source ?? natario?.metricSource;
+  const natarioMetricT00 = firstFinite(
+    natario?.metricT00,
+    natario?.stressEnergyTensor?.T00,
+  );
+  const natarioMetricRef =
+    typeof natario?.metricT00Ref === "string" && natario.metricT00Ref.length > 0
+      ? String(natario.metricT00Ref)
+      : "warp.metric.T00.natario.shift";
+  if (natarioMetricSource === "metric" && natarioMetricT00 !== undefined) {
+    if (debug) {
+      debug.source = natarioMetricRef;
+      debug.value = natarioMetricT00;
+      debug.note = "metric-derived (natario payload)";
+    }
+    return natarioMetricT00;
+  }
+
+  const vdbRegionII = (state as any)?.vdbRegionII;
+  const vdbT00Geom = firstFinite(vdbRegionII?.t00_mean);
+  if (hasVdbRegionIIMetricSupport(vdbRegionII) && vdbT00Geom !== undefined) {
+    const rhoSi = vdbT00Geom * GEOM_TO_SI_STRESS;
+    if (debug) {
+      debug.source = "warp.metric.T00.vdb.regionII";
+      debug.value = rhoSi;
+      debug.note = "metric-derived (VdB region II, geometric -> SI)";
+    }
+    return rhoSi;
+  }
+
+  if (allowConstraintFallback) {
+    const rhoConstraint = state.gr?.constraints?.rho_constraint?.mean;
+    if (Number.isFinite(rhoConstraint as number)) {
+      const rhoSi = Number(rhoConstraint) * GEOM_TO_SI_STRESS;
+      if (debug) {
+        debug.source = "gr.rho_constraint.mean";
+        debug.value = rhoSi;
+        debug.note = "constraint-derived (geometric -> SI)";
+      }
+      return rhoSi;
+    }
+  }
+
+  return undefined;
+}
+
+type QiCurvatureInfo = {
+  radius_m?: number;
+  ratio?: number;
+  ok?: boolean;
+  source?: string;
+  note?: string;
+  scalar?: number;
+};
+
+function pickInvariantScalar(
+  stats?: import("./gr-evolve-brick").GrInvariantStats,
+): number | undefined {
+  if (!stats) return undefined;
+  const candidate = firstFinite(stats.p98, stats.max, stats.mean);
+  if (!Number.isFinite(candidate)) return undefined;
+  const absVal = Math.abs(candidate as number);
+  return absVal > 0 ? absVal : undefined;
+}
+
+function resolveQiCurvature(
+  state: EnergyPipelineState,
+  tau_ms: number,
+): QiCurvatureInfo {
+  const invariants = state.gr?.invariants;
+  if (!invariants) return {};
+
+  const kretschmann = pickInvariantScalar(invariants.kretschmann);
+  const ricci4 = pickInvariantScalar(invariants.ricci4);
+  const scalar = kretschmann ?? ricci4;
+  const source = kretschmann != null
+    ? "gr.invariants.kretschmann"
+    : ricci4 != null
+      ? "gr.invariants.ricci4"
+      : undefined;
+
+  if (scalar == null) {
+    return { source, note: "missing curvature invariants" };
+  }
+  if (!(scalar > 0)) {
+    return { source, scalar, note: "non-positive curvature scalar" };
+  }
+
+  const radius_m = Math.pow(1 / scalar, 0.25);
+  if (!Number.isFinite(radius_m) || radius_m <= 0) {
+    return { source, scalar, note: "non-finite curvature radius" };
+  }
+
+  const tau_s = Math.max(0, tau_ms) / 1000;
+  const tau_m = C * tau_s;
+  const ratio = tau_m / radius_m;
+  const ok = Number.isFinite(ratio) ? ratio <= DEFAULT_QI_CURVATURE_RATIO_MAX : undefined;
+
+  return { radius_m, ratio, ok, source, scalar };
+}
+
 function estimateEffectiveRhoFromState(state: EnergyPipelineState, debug?: EffectiveRhoDebug): number {
+  const metricRho = resolveMetricRhoFromState(state, debug);
+  if (Number.isFinite(metricRho as number)) {
+    return Number(metricRho);
+  }
+  if (strictCongruenceEnabled()) {
+    if (debug) {
+      debug.source = "metric-missing";
+      debug.value = Number.NaN;
+      debug.reason = "strict_metric_required";
+      debug.note = "WARP_STRICT_CONGRUENCE=1 disables proxy rho fallbacks";
+    }
+    return Number.NaN;
+  }
+
   const nowMs = Date.now();
   const tilesTelemetry = getLatestQiTileStats();
   if (
@@ -5306,6 +7113,15 @@ function rhoSourceIsDutyFallback(rhoDebug: EffectiveRhoDebug): boolean {
   return src === "duty-fallback" || src === "duty" || src === "schedule";
 }
 
+function rhoSourceIsMetric(rhoDebug: EffectiveRhoDebug): boolean {
+  const src = (rhoDebug.source ?? "").toLowerCase();
+  return (
+    src.startsWith("warp.metric") ||
+    src.startsWith("gr.rho_constraint") ||
+    src.startsWith("gr.metric")
+  );
+}
+
 type QiStatusInput = {
   zetaRaw?: number;
   zetaClamped?: number;
@@ -5382,6 +7198,16 @@ export function evaluateQiGuardrail(
   rhoNote?: string;
   sumWindowDt: number;
   rhoOnDuty?: number;
+  curvatureRadius_m?: number;
+  curvatureRatio?: number;
+  curvatureOk?: boolean;
+  curvatureSource?: string;
+  curvatureNote?: string;
+  curvatureEnforced?: boolean;
+  metricDerived?: boolean;
+  metricDerivedSource?: string;
+  metricDerivedReason?: string;
+  metricDerivedChart?: string;
 } {
   const sampler = opts.sampler ?? state.phaseSchedule?.sampler ?? state.qi?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
   const tau_ms =
@@ -5429,7 +7255,13 @@ export function evaluateQiGuardrail(
   const duty = patternDuty > 0 ? patternDuty : Math.max(negSectors.length / Math.max(sectorCount, 1), 1e-6);
   const rhoDebug: EffectiveRhoDebug = {};
   const effectiveRho = estimateEffectiveRhoFromState(state, rhoDebug);
-  const rhoOn = duty > 0 ? effectiveRho / duty : effectiveRho;
+  const metricRho = rhoSourceIsMetric(rhoDebug);
+  const rhoOn = metricRho ? effectiveRho : duty > 0 ? effectiveRho / duty : effectiveRho;
+  const curvatureInfo = resolveQiCurvature(state, tau_ms);
+  const curvatureRatio = curvatureInfo.ratio;
+  const curvatureOk = curvatureInfo.ok;
+  const curvatureNote = curvatureInfo.note;
+  const curvatureEnforced = QI_CURVATURE_ENFORCE;
   const dt_s = pattern.dt_s;
   const sumWindowDt = pattern.window.reduce((acc, v) => acc + v * dt_s, 0);
   let lhs = 0;
@@ -5470,6 +7302,39 @@ export function evaluateQiGuardrail(
     bound_Jm3 < 0 && Number.isFinite(bound_Jm3) ? Math.abs(lhs) / Math.abs(bound_Jm3) : Infinity;
   const marginRatio = QI_POLICY_ENFORCE ? Math.min(rawRatio, QI_POLICY_MAX_ZETA) : rawRatio;
 
+  const rhoNote = [rhoDebug.note ?? rhoDebug.reason, curvatureNote].filter(Boolean).join("; ") || undefined;
+  const timingMetricDerived = Boolean(
+    state.ts?.metricDerived ?? state.clocking?.metricDerived ?? state.tsMetricDerived,
+  );
+  const timingMetricDerivedSource = String(
+    state.ts?.metricDerivedSource ??
+      state.clocking?.metricDerivedSource ??
+      state.tsMetricDerivedSource ??
+      "unknown",
+  );
+  const timingMetricDerivedReason = String(
+    state.ts?.metricDerivedReason ??
+      state.clocking?.metricDerivedReason ??
+      state.tsMetricDerivedReason ??
+      "metric-derivation-status unavailable",
+  );
+  const metricDerivedChart = String(
+    state.ts?.metricDerivedChart ?? state.clocking?.metricDerivedChart ?? "unknown",
+  );
+  const metricDerived = metricRho && timingMetricDerived;
+  const metricDerivedSource = metricDerived
+    ? `${rhoDebug.source ?? "unknown"}+${timingMetricDerivedSource}`
+    : metricRho
+      ? rhoDebug.source ?? "unknown"
+      : timingMetricDerivedSource;
+  const metricDerivedReason = metricDerived
+    ? "rho_source_metric;timing_metric"
+    : metricRho
+      ? "timing_non_metric"
+      : timingMetricDerived
+        ? "rho_source_non_metric"
+        : `rho_source_non_metric;timing_non_metric;timing_reason=${timingMetricDerivedReason}`;
+
   return {
     lhs_Jm3: lhs,
     bound_Jm3,
@@ -5486,9 +7351,19 @@ export function evaluateQiGuardrail(
     effectiveRho,
     rhoOn,
     rhoSource: rhoDebug.source,
-    rhoNote: rhoDebug.note ?? rhoDebug.reason,
+    rhoNote,
     sumWindowDt,
     rhoOnDuty: rhoSourceIsDutyFallback(rhoDebug) ? rhoOn * duty : undefined,
+    curvatureRadius_m: curvatureInfo.radius_m,
+    curvatureRatio,
+    curvatureOk,
+    curvatureSource: curvatureInfo.source,
+    curvatureNote,
+    curvatureEnforced,
+    metricDerived,
+    metricDerivedSource,
+    metricDerivedReason,
+    metricDerivedChart,
   };
 }
 
@@ -5796,6 +7671,49 @@ export async function computeEnergySnapshot(sim: any) {
   thetaScaleCore_sqrtDuty: finite((result as any).natario?.thetaScaleCore_sqrtDuty ?? (result as any).natario?.thetaScaleCore),
   /* @deprecated legacy key; prefer thetaScaleCore_sqrtDuty */
   thetaScaleCore: finite((result as any).natario?.thetaScaleCore ?? (result as any).natario?.thetaScaleCore_sqrtDuty),
+  metricSource: typeof (result as any).natario?.stressEnergySource === "string"
+    ? String((result as any).natario.stressEnergySource)
+    : undefined,
+  metricT00: finite((result as any).natario?.metricT00),
+  metricT00Source: typeof (result as any).natario?.metricT00Source === "string"
+    ? String((result as any).natario.metricT00Source)
+    : undefined,
+  metricT00Ref: typeof (result as any).natario?.metricT00Ref === "string"
+    ? String((result as any).natario.metricT00Ref)
+    : undefined,
+  metricT00Observer: typeof (result as any).natario?.metricT00Observer === "string"
+    ? String((result as any).natario.metricT00Observer)
+    : undefined,
+  metricT00Normalization: typeof (result as any).natario?.metricT00Normalization === "string"
+    ? String((result as any).natario.metricT00Normalization)
+    : undefined,
+  metricT00UnitSystem: typeof (result as any).natario?.metricT00UnitSystem === "string"
+    ? String((result as any).natario.metricT00UnitSystem)
+    : undefined,
+  metricT00ContractStatus: typeof (result as any).natario?.metricT00ContractStatus === "string"
+    ? String((result as any).natario.metricT00ContractStatus)
+    : undefined,
+  metricT00ContractReason: typeof (result as any).natario?.metricT00ContractReason === "string"
+    ? String((result as any).natario.metricT00ContractReason)
+    : undefined,
+  metricT00Derivation: typeof (result as any).natario?.metricT00Derivation === "string"
+    ? String((result as any).natario.metricT00Derivation)
+    : undefined,
+  chartLabel: typeof (result as any).natario?.chartLabel === "string"
+    ? String((result as any).natario.chartLabel)
+    : undefined,
+  chartDtGammaPolicy: typeof (result as any).natario?.chartDtGammaPolicy === "string"
+    ? String((result as any).natario.chartDtGammaPolicy)
+    : undefined,
+  chartContractStatus: typeof (result as any).natario?.chartContractStatus === "string"
+    ? String((result as any).natario.chartContractStatus)
+    : undefined,
+  stressEnergyTensor: {
+    T00: finite((result as any).natario?.stressEnergyTensor?.T00),
+    T11: finite((result as any).natario?.stressEnergyTensor?.T11),
+    T22: finite((result as any).natario?.stressEnergyTensor?.T22),
+    T33: finite((result as any).natario?.stressEnergyTensor?.T33),
+  },
   };
 
   // --- Compatibility aliases: accept alternate server keys and provide both forms ---
@@ -5945,6 +7863,8 @@ export async function computeEnergySnapshot(sim: any) {
       // safety
       zeta: result.zeta,
       TS_ratio: result.TS_ratio,
+      ts_metric_derived: (result as any).tsMetricDerived === true,
+      strict_congruence: strictCongruenceEnabled(),
     },
 
     // Base equations (render these + a line below with the live values)
@@ -6024,7 +7944,8 @@ export async function computeEnergySnapshot(sim: any) {
     // Duty authority (adapter selects by mode; renderer never fabricates)
     ...duty,
     // For adapter mode selection & viewers
-    mode: sim.mode ?? result.currentMode ?? 'hover'
+    mode: sim.mode ?? result.currentMode ?? 'hover',
+    strictCongruence: strictCongruenceEnabled(),
   };
 }
 

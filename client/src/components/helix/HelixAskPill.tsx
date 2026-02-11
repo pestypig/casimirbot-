@@ -211,6 +211,23 @@ type HelixAskReply = {
         terms?: string[];
       };
     };
+    graph_congruence_diagnostics?: {
+      treeCount?: number;
+      allowedEdges?: number;
+      blockedEdges?: number;
+      resolvedInTreeEdges?: number;
+      resolvedCrossTreeEdges?: number;
+      blockedByReason?: Record<string, number>;
+      blockedByCondition?: Record<string, number>;
+        strictSignals?: {
+          B_equals_1?: boolean;
+          qi_metric_derived_equals_true?: boolean;
+          qi_strict_ok_equals_true?: boolean;
+          theta_geom_equals_true?: boolean;
+          vdb_two_wall_derivative_support_equals_true?: boolean;
+          ts_metric_derived_equals_true?: boolean;
+        };
+      };
     citation_repair?: boolean;
     live_events?: Array<{
       ts: string;
@@ -2327,6 +2344,32 @@ export function HelixAskPill({
                         ? ` · ${reply.debug.arbiter_strictness}`
                         : ""}
                       {reply.debug.arbiter_reason ? ` · ${reply.debug.arbiter_reason}` : ""}
+                    </p>
+                  ) : null}
+                  {reply.debug.graph_congruence_diagnostics ? (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Graph congruence: blocked{" "}
+                      {reply.debug.graph_congruence_diagnostics.blockedEdges ?? 0}
+                      {" / "}allowed{" "}
+                      {reply.debug.graph_congruence_diagnostics.allowedEdges ?? 0}
+                      {" | "}in-tree{" "}
+                      {reply.debug.graph_congruence_diagnostics.resolvedInTreeEdges ?? 0}
+                      {" | "}cross-tree{" "}
+                      {reply.debug.graph_congruence_diagnostics.resolvedCrossTreeEdges ?? 0}
+                      {" | "}strict QI metric path{" "}
+                      {reply.debug.graph_congruence_diagnostics.strictSignals
+                        ?.qi_metric_derived_equals_true
+                        ? "on"
+                        : "off"}
+                    </p>
+                  ) : null}
+                  {reply.debug.graph_congruence_diagnostics?.blockedByCondition &&
+                  Object.keys(reply.debug.graph_congruence_diagnostics.blockedByCondition).length > 0 ? (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Graph blocked conditions:{" "}
+                      {Object.entries(reply.debug.graph_congruence_diagnostics.blockedByCondition)
+                        .map(([key, count]) => `${key}:${count}`)
+                        .join(", ")}
                     </p>
                   ) : null}
                   {typeof reply.debug.evidence_gate_ok === "boolean" ? (

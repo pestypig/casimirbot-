@@ -1,0 +1,1398 @@
+{
+  "config": {
+    "version": 1,
+    "allowedCL": "CL4",
+    "allowConceptual": false,
+    "allowProxies": false,
+    "chart": "comoving_cartesian",
+    "region": {
+      "B_equals_1": true,
+      "qi_metric_derived_equals_true": true,
+      "qi_strict_ok_equals_true": true,
+      "theta_geom_equals_true": true,
+      "vdb_two_wall_derivative_support_equals_true": false,
+      "ts_metric_derived_equals_true": false,
+      "cl3_metric_t00_available_equals_true": false,
+      "cl3_rho_gate_equals_true": false
+    },
+    "seedOrder": "lex",
+    "walkMode": "bfs"
+  },
+  "startNodes": [
+    "warp-mechanics-tree",
+    "physics-foundations-tree",
+    "brick-lattice-dataflow-tree",
+    "math-maturity-tree",
+    "gr-solver-tree",
+    "simulation-systems-tree",
+    "uncertainty-mechanics-tree",
+    "panel-concepts-tree",
+    "panel-registry-tree",
+    "resonance-tree"
+  ],
+  "walkMode": "bfs",
+  "seedOrder": "lex",
+  "visitedCount": 15,
+  "visited": [
+    {
+      "id": "warp-mechanics-tree",
+      "depth": 0
+    },
+    {
+      "id": "physics-foundations-tree",
+      "depth": 0
+    },
+    {
+      "id": "brick-lattice-dataflow-tree",
+      "depth": 0
+    },
+    {
+      "id": "math-maturity-tree",
+      "depth": 0
+    },
+    {
+      "id": "gr-solver-tree",
+      "depth": 0
+    },
+    {
+      "id": "simulation-systems-tree",
+      "depth": 0
+    },
+    {
+      "id": "uncertainty-mechanics-tree",
+      "depth": 0
+    },
+    {
+      "id": "panel-concepts-tree",
+      "depth": 0
+    },
+    {
+      "id": "panel-registry-tree",
+      "depth": 0
+    },
+    {
+      "id": "resonance-tree",
+      "depth": 0
+    },
+    {
+      "id": "pipeline-constraint-gate",
+      "depth": 1,
+      "via": {
+        "source": "warp-mechanics-tree",
+        "target": "pipeline-constraint-gate",
+        "edgeType": "guardrail_congruent",
+        "requiresCL": "CL4",
+        "condition": null,
+        "chartDependency": null,
+        "note": "Constraint gate is CL4 when inputs are geometry-derived."
+      }
+    },
+    {
+      "id": "gr-constraint-gate",
+      "depth": 1,
+      "via": {
+        "source": "gr-solver-tree",
+        "target": "gr-constraint-gate",
+        "edgeType": "guardrail_congruent",
+        "requiresCL": "CL4",
+        "condition": null,
+        "chartDependency": null,
+        "note": "CL4 only when constraint inputs are geometry-derived."
+      }
+    },
+    {
+      "id": "adm-3plus1",
+      "depth": 2,
+      "via": {
+        "source": "pipeline-constraint-gate",
+        "target": "adm-3plus1",
+        "edgeType": "guardrail_congruent",
+        "requiresCL": "CL4",
+        "condition": null,
+        "chartDependency": null,
+        "note": "ADM constraints anchor the gate when chart/units are consistent."
+      }
+    },
+    {
+      "id": "theta-audit-guardrail",
+      "depth": 3,
+      "via": {
+        "source": "adm-3plus1",
+        "target": "theta-audit-guardrail",
+        "edgeType": "guardrail_congruent",
+        "requiresCL": "CL4",
+        "condition": null,
+        "chartDependency": null,
+        "note": "ThetaAudit uses metric-adapter divergence when available; proxy fallback remains labeled."
+      }
+    },
+    {
+      "id": "theta-semantics",
+      "depth": 4,
+      "via": {
+        "source": "theta-audit-guardrail",
+        "target": "theta-semantics",
+        "edgeType": "guardrail_congruent",
+        "requiresCL": "CL4",
+        "condition": null,
+        "chartDependency": null,
+        "note": "Theta semantics are geometry-derived when metric adapter diagnostics are available; proxy fallback remains labeled."
+      }
+    }
+  ],
+  "diagnostics": {
+    "inventory": {
+      "nodesCount": 869,
+      "edgesCount": 3339,
+      "blockedLinkCount": 4
+    },
+    "globalFilter": {
+      "allowedEdges": 40,
+      "blockedEdges": 3299,
+      "blockedByReason": {
+        "blocked_link": 0,
+        "conceptual_disallowed": 3262,
+        "proxy_disallowed": 20,
+        "cl_exceeds_allowed": 0,
+        "chart_mismatch": 10,
+        "condition_unsatisfied": 7
+      },
+      "blockedByCondition": {
+        "cl3_metric_t00_available_equals_true": 4,
+        "ts_metric_derived_equals_true": 2,
+        "vdb_two_wall_derivative_support_equals_true": 1
+      },
+      "blockedSamples": [
+        {
+          "source": "warp-mechanics-tree",
+          "target": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-mechanics-tree",
+          "target": "warp-proxy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-mechanics-tree",
+          "target": "warp-control-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-mechanics-tree",
+          "target": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-mechanics-tree",
+          "target": "cl3-rho-delta-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "reason": "condition_unsatisfied",
+          "condition": "cl3_metric_t00_available=true",
+          "conditionKey": "cl3_metric_t00_available_equals_true",
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "warp-bubble",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "alcubierre-metric",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "natario-zero-expansion",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "shift-vector-expansion-scalar",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "bubble-wall-thickness",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "vdb-compression-factor",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "bridge-warp-geometry-stack-stewardship-ledger",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "natario-alcubierre-special-case",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "vdb-metric",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "vdb-region-ii-diagnostics",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "vdb-region-iv-diagnostics",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "vdb-two-wall-signature",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "warp-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-geometry-stack",
+          "target": "cl3-rho-delta-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "reason": "condition_unsatisfied",
+          "condition": "cl3_metric_t00_available=true",
+          "conditionKey": "cl3_metric_t00_available_equals_true",
+          "chartDependency": null
+        },
+        {
+          "source": "warp-bubble",
+          "target": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-bubble",
+          "target": "vdb-band-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "reason": "proxy_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "alcubierre-metric",
+          "target": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "alcubierre-metric",
+          "target": "natario-alcubierre-special-case",
+          "edgeType": "equivalent_adm",
+          "requiresCL": "CL1",
+          "reason": "chart_mismatch",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": "lab_cartesian"
+        },
+        {
+          "source": "alcubierre-metric",
+          "target": "natario-alcubierre-special-case",
+          "edgeType": "equivalent_geometry",
+          "requiresCL": "CL2",
+          "reason": "chart_mismatch",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": "lab_cartesian"
+        },
+        {
+          "source": "alcubierre-metric",
+          "target": "natario-alcubierre-special-case",
+          "edgeType": "equivalent_stress_energy",
+          "requiresCL": "CL3",
+          "reason": "chart_mismatch",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": "lab_cartesian"
+        },
+        {
+          "source": "alcubierre-metric",
+          "target": "vdb-metric",
+          "edgeType": "conditional_region",
+          "requiresCL": "CL1",
+          "reason": "chart_mismatch",
+          "condition": "B(r)=1",
+          "conditionKey": null,
+          "chartDependency": "lab_cartesian"
+        },
+        {
+          "source": "alcubierre-metric",
+          "target": "vdb-metric",
+          "edgeType": "conditional_region",
+          "requiresCL": "CL2",
+          "reason": "chart_mismatch",
+          "condition": "B(r)=1",
+          "conditionKey": null,
+          "chartDependency": "lab_cartesian"
+        },
+        {
+          "source": "alcubierre-metric",
+          "target": "vdb-metric",
+          "edgeType": "conditional_region",
+          "requiresCL": "CL3",
+          "reason": "chart_mismatch",
+          "condition": "B(r)=1",
+          "conditionKey": null,
+          "chartDependency": "lab_cartesian"
+        },
+        {
+          "source": "natario-zero-expansion",
+          "target": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "shift-vector-expansion-scalar",
+          "target": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "bubble-wall-thickness",
+          "target": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "vdb-compression-factor",
+          "target": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-proxy-stack",
+          "target": "casimir-lattice",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-proxy-stack",
+          "target": "ford-roman-proxy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-proxy-stack",
+          "target": "power-mass-ladders",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-proxy-stack",
+          "target": "warp-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "casimir-lattice",
+          "target": "warp-proxy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "ford-roman-proxy",
+          "target": "warp-proxy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "power-mass-ladders",
+          "target": "warp-proxy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-control-stack",
+          "target": "sector-strobes-duty-cycle",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-control-stack",
+          "target": "active-fraction",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-control-stack",
+          "target": "bridge-warp-control-stack-verification-checklist",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-control-stack",
+          "target": "warp-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "sector-strobes-duty-cycle",
+          "target": "warp-control-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "sector-strobes-duty-cycle",
+          "target": "ts-ratio-guardrail",
+          "edgeType": "proxy_only",
+          "requiresCL": "none",
+          "reason": "proxy_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "active-fraction",
+          "target": "warp-control-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-implementation-stack",
+          "target": "warp-module",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-implementation-stack",
+          "target": "natario-warp-implementation",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-implementation-stack",
+          "target": "casimir-natario-bridge",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-implementation-stack",
+          "target": "theta-semantics",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-implementation-stack",
+          "target": "warp-pulsed-power",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-implementation-stack",
+          "target": "warpfield-mesh-patch-plan",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-implementation-stack",
+          "target": "warpfield-visualization-roadmap",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-implementation-stack",
+          "target": "warp-console-architecture",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-implementation-stack",
+          "target": "warp-llm-contracts",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-implementation-stack",
+          "target": "warp-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "casimir-natario-bridge",
+          "target": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "casimir-natario-bridge",
+          "target": "casimir-lattice",
+          "edgeType": "association",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "casimir-natario-bridge",
+          "target": "natario-zero-expansion",
+          "edgeType": "association",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-module",
+          "target": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        }
+      ]
+    },
+    "traversalFilter": {
+      "evaluatedEdges": 245,
+      "allowedEdges": 13,
+      "blockedEdges": 232,
+      "enqueuedEdges": 12,
+      "blockedByReason": {
+        "blocked_link": 0,
+        "conceptual_disallowed": 231,
+        "proxy_disallowed": 0,
+        "cl_exceeds_allowed": 0,
+        "chart_mismatch": 0,
+        "condition_unsatisfied": 1
+      },
+      "blockedByCondition": {
+        "cl3_metric_t00_available_equals_true": 1
+      },
+      "blockedSamples": [
+        {
+          "source": "warp-mechanics-tree",
+          "target": "warp-geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-mechanics-tree",
+          "target": "warp-proxy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-mechanics-tree",
+          "target": "warp-control-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-mechanics-tree",
+          "target": "warp-implementation-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "warp-mechanics-tree",
+          "target": "cl3-rho-delta-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "reason": "condition_unsatisfied",
+          "condition": "cl3_metric_t00_available=true",
+          "conditionKey": "cl3_metric_t00_available_equals_true",
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "geometry-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "field-equations-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "stress-energy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "energy-conditions-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "casimir-phenomena",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "units-and-scaling",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "numerics-and-stability",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "time-bounds-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "viability-and-claims",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "quantum-gr-bridge",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "uncertainty-mechanics",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "brick-lattice-dataflow",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "simulation-systems",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "physics-foundations-tree",
+          "target": "bridge-field-equations-stack-stress-energy-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "brick-lattice-dataflow-tree",
+          "target": "brick-stress-energy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "brick-lattice-dataflow-tree",
+          "target": "brick-curvature",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "brick-lattice-dataflow-tree",
+          "target": "brick-gr-evolve",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "brick-lattice-dataflow-tree",
+          "target": "brick-gr-initial",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "brick-lattice-dataflow-tree",
+          "target": "brick-brick-serialization",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "brick-lattice-dataflow-tree",
+          "target": "brick-client-lattice",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "brick-lattice-dataflow-tree",
+          "target": "brick-client-hooks",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "brick-lattice-dataflow-tree",
+          "target": "brick-ui-panels",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "brick-lattice-dataflow-tree",
+          "target": "brick-constraints-tests",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "brick-lattice-dataflow-tree",
+          "target": "bridge-brick-stress-energy-brick-curvature",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "math-maturity-tree",
+          "target": "math-maturity-stages",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "math-maturity-tree",
+          "target": "math-pipeline-walk",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "math-maturity-tree",
+          "target": "math-verification-gates",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "math-maturity-tree",
+          "target": "math-evidence-registry",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "math-maturity-tree",
+          "target": "bridge-math-maturity-stages-math-evidence-registry",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "gr-solver-progress",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "gr-solver-robustness",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "gr-evolution-orchestration",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "bssn-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "gr-constraint-network",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "gr-constraint-gate",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "gr-constraint-policy",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "gr-evaluation",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "gr-worker-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "gr-agent-loop",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "gr-assistant-adapter",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "gr-solver-tree",
+          "target": "bridge-gr-solver-progress-gr-solver-robustness",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-contracts",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-api",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-storage",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-core-modules",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-geometry-mesh",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-scuffem-service",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-dynamic-casimir",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-warp-module",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-tsn",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-parametric-sweeps",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-ui-surfaces",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-streaming",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "simulation-artifacts",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "simulation-systems-tree",
+          "target": "bridge-simulation-contracts-simulation-api",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        }
+      ]
+    },
+    "strictSignals": {
+      "B_equals_1": true,
+      "qi_metric_derived_equals_true": true,
+      "qi_strict_ok_equals_true": true,
+      "theta_geom_equals_true": true,
+      "vdb_two_wall_derivative_support_equals_true": false,
+      "ts_metric_derived_equals_true": false,
+      "cl3_metric_t00_available_equals_true": false,
+      "cl3_rho_gate_equals_true": false
+    }
+  }
+}

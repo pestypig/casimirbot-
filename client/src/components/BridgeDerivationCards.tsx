@@ -529,6 +529,19 @@ function ThetaScaleCard({ m }: { m: HelixMetrics }) {
   const thetaRaw = num(thetaAudit?.results?.thetaRaw);
   const thetaCal = num(thetaAudit?.results?.thetaCal);
   const serverAuditTheta = num(snap.thetaScaleExpected); // same as thetaCal
+  const thetaGeom = num(
+    (snap as any).theta_geom ??
+      (thetaAudit as any)?.thetaGeom ??
+      (snap as any)?.uniformsExplain?.thetaAudit?.thetaGeom,
+  );
+  const thetaGeomSource =
+    (snap as any).theta_geom_source ??
+    (thetaAudit as any)?.thetaGeomSource ??
+    (snap as any)?.uniformsExplain?.thetaAudit?.thetaGeomSource;
+  const thetaGeomProxy =
+    (snap as any).theta_geom_proxy ??
+    (thetaAudit as any)?.thetaGeomProxy ??
+    (snap as any)?.uniformsExplain?.thetaAudit?.thetaGeomProxy;
 
   // Calculate expected values using UI data for verification
   const thetaExpectedCal =
@@ -641,6 +654,11 @@ function ThetaScaleCard({ m }: { m: HelixMetrics }) {
         <div>• γ_VdB_cal = {gammaVdB_cal ? fexp(gammaVdB_cal, 2) : '—'} (calibrated)</div>
         {gammaVdB_raw && <div>• γ_VdB_raw = {fexp(gammaVdB_raw, 2)} (raw paper)</div>}
         {dutySrc && <div>• d_eff = {dEff ? fexp(dEff, 6) : '—'} (from {dutySrc})</div>}
+        {thetaGeom != null && (
+          <div>
+            • θ_geom = {fexp(thetaGeom, 2)} (metric{thetaGeomSource ? `; ${thetaGeomSource}` : ""}{thetaGeomProxy ? "; proxy" : ""})
+          </div>
+        )}
         {mode === 'STANDBY' && (
           <div className="text-amber-400">⚠ Standby: adapter may override visual θ→0</div>
         )}

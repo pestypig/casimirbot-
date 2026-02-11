@@ -28,7 +28,15 @@
         "gr-assistant-adapter",
         "bridge-gr-solver-progress-gr-solver-robustness"
       ],
-      "links": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "gr-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "CL4 only when constraint inputs are geometry-derived."
+        }
+      ],
       "summary": "A walk from GR evolution to constraint gates and robustness notes.",
       "nodeType": "concept",
       "inputs": [],
@@ -58,7 +66,98 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ed887d7c2f0e727373cae717c79ffdb9c0c626641f354bed5d775871de86a33b"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "gr-solver-progress": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-solver-robustness": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-evolution-orchestration": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bssn-evolution": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-constraint-network": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-constraint-gate": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-constraint-policy": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-evaluation": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-worker-stack": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-agent-loop": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-assistant-adapter": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "bridge-gr-solver-progress-gr-solver-robustness": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "gr-solver-progress",
@@ -75,7 +174,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "CL4 only when constraint inputs are geometry-derived."
         }
       ],
       "summary": "Status and milestones for solver development.",
@@ -109,6 +217,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -126,7 +239,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Constraint residuals feed the pipeline gate when inputs are geometry-derived."
         }
       ],
       "summary": "Robustness checks and failure modes.",
@@ -160,6 +282,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -184,7 +311,17 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "cl3-rho-delta-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "cl3_metric_t00_available=true",
+          "note": "CL3 rho-delta uses constraint-derived rho; CL4 needs geometry-derived matter."
         }
       ],
       "summary": "Core evolution step for GR fields.",
@@ -306,6 +443,55 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bssn-state": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "rk4-integrator": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "stencils": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-diagnostics": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-stress-energy": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "stress-energy-integrals": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -325,7 +511,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Pipeline constraint gate is CL4-congruent when inputs are geometry-derived."
         }
       ],
       "summary": "Compute constraint residuals and diagnostics.",
@@ -446,7 +641,7 @@
       },
       "deterministic": true,
       "tolerance": {
-        "abs": 0.000001
+        "abs": 1e-06
       },
       "environment": {
         "runtime": "node"
@@ -460,6 +655,20 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bridge-gr-constraint-network-stewardship-ledger": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -467,7 +676,7 @@
       "slug": "gr-constraint-gate",
       "title": "GR Constraint Gate",
       "excerpt": "Gate evaluation converts diagnostics into pass/fail.",
-      "bodyMD": "Constraint gate applies thresholds (server/gr/constraint-evaluator.ts).\n\nMinimal artifact: gate status summary.",
+      "bodyMD": "Constraint gate applies thresholds (server/gr/constraint-evaluator.ts).\n\nMinimal artifact: gate status summary and CL4 trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
       "tags": [
         "gate",
         "constraints",
@@ -479,7 +688,16 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Constraint policy thresholds map into the pipeline gate when inputs are geometry-derived."
         }
       ],
       "summary": "Gate evaluation converts diagnostics into pass/fail.",
@@ -581,6 +799,20 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "bridge-gr-constraint-gate-verification-checklist": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -600,7 +832,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Orchestration loop for GR evaluation and proposals.",
@@ -705,6 +939,20 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "gr-agent-loop-schema": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -726,7 +974,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Orchestrate GR evolution runs and bricks.",
@@ -848,6 +1098,34 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "gr-initial-data": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-evolution-solver": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-evolution-brick": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -865,7 +1143,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-evolution-orchestration"
+          "to": "gr-evolution-orchestration",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Initialize GR fields for evolution.",
@@ -972,6 +1252,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -989,7 +1274,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-evolution-orchestration"
+          "to": "gr-evolution-orchestration",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Solver loop for GR evolution.",
@@ -1114,6 +1401,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1131,7 +1423,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-evolution-orchestration"
+          "to": "gr-evolution-orchestration",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Brick wrapper for GR evolution outputs.",
@@ -1226,7 +1520,7 @@
       "deterministic": true,
       "tolerance": {
         "cfl_max": 0.5,
-        "abs": 0.000001
+        "abs": 1e-06
       },
       "environment": {
         "runtime": "node"
@@ -1238,6 +1532,11 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1255,7 +1554,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "bssn-evolution"
+          "to": "bssn-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "State containers for BSSN fields.",
@@ -1287,6 +1588,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1304,7 +1610,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "bssn-evolution"
+          "to": "bssn-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Runge-Kutta integrator for BSSN fields.",
@@ -1371,6 +1679,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1388,7 +1701,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "bssn-evolution"
+          "to": "bssn-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Stencil operators for derivatives and boundaries.",
@@ -1460,6 +1775,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1477,7 +1797,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "bssn-evolution"
+          "to": "bssn-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Diagnostics for shift stiffness and stability.",
@@ -1540,6 +1862,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1557,7 +1884,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "bssn-evolution"
+          "to": "bssn-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Stress-energy grids for GR evolution.",
@@ -1668,6 +1997,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1685,7 +2019,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "bssn-evolution"
+          "to": "bssn-evolution",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Integrals over stress-energy fields.",
@@ -1801,6 +2137,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "stress_energy",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1818,7 +2159,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Constraint policy thresholds and modes.",
@@ -1890,6 +2233,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "guardrail_geometry",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -1907,7 +2255,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Evaluation orchestration for GR runs.",
@@ -1997,6 +2347,11 @@
         "missing": [
           "tolerance"
         ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2019,7 +2374,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Worker processes for GR evaluation.",
@@ -2090,7 +2447,42 @@
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:06d1fdeb607406df189b7d10d9a0b1ef39703fd13c692f5651f1b3a792a105b1"
         }
-      ]
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "gr-worker": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-worker-client": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-worker-types": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "gr-os-payload": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
+      }
     },
     {
       "id": "gr-worker",
@@ -2107,7 +2499,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-worker-stack"
+          "to": "gr-worker-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Worker runtime for GR evaluations.",
@@ -2161,6 +2555,11 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2178,7 +2577,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-worker-stack"
+          "to": "gr-worker-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Client interface for GR worker calls.",
@@ -2235,6 +2636,11 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2252,7 +2658,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-worker-stack"
+          "to": "gr-worker-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Shared types for GR worker payloads.",
@@ -2296,6 +2704,11 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2313,7 +2726,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-worker-stack"
+          "to": "gr-worker-stack",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Payload schema for GR OS telemetry.",
@@ -2389,6 +2804,11 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2408,7 +2828,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Adapter for GR assistant workflows.",
@@ -2474,6 +2896,20 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "childMeta": {
+        "gr-assistant-tools": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        }
       }
     },
     {
@@ -2491,7 +2927,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-agent-loop"
+          "to": "gr-agent-loop",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Schema for GR agent loop runs.",
@@ -2541,6 +2979,11 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2558,7 +3001,9 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-assistant-adapter"
+          "to": "gr-assistant-adapter",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         }
       ],
       "summary": "Standalone GR helper service for metric checks.",
@@ -2620,6 +3065,11 @@
       "predictability": {
         "status": "complete",
         "missing": []
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2638,15 +3088,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-solver-tree"
+          "to": "gr-solver-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "gr-solver-progress"
+          "to": "gr-solver-progress",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "gr-solver-robustness"
+          "to": "gr-solver-robustness",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -2694,7 +3150,12 @@
         }
       ],
       "slug": "bridge-gr-solver-progress-gr-solver-robustness",
-      "summary": "Bridge between GR Solver Progress and GR Solver Robustness."
+      "summary": "Bridge between GR Solver Progress and GR Solver Robustness.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
     },
     {
       "id": "bridge-gr-constraint-gate-verification-checklist",
@@ -2714,15 +3175,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-constraint-gate"
+          "to": "gr-constraint-gate",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "verification-checklist"
+          "to": "verification-checklist",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "gr-constraint-gate"
+          "to": "gr-constraint-gate",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -2766,6 +3233,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -2786,15 +3258,21 @@
       "links": [
         {
           "rel": "parent",
-          "to": "gr-constraint-network"
+          "to": "gr-constraint-network",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "stewardship-ledger"
+          "to": "stewardship-ledger",
+          "edgeType": "association",
+          "requiresCL": "none"
         },
         {
           "rel": "see-also",
-          "to": "gr-constraint-network"
+          "to": "gr-constraint-network",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "bridge": {
@@ -2838,6 +3316,11 @@
           "tolerance",
           "environment"
         ]
+      },
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
       }
     }
   ],
