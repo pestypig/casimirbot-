@@ -2948,6 +2948,7 @@ export default function TimeDilationLatticePanel({
   });
   const regionStatsRef = useRef({ hasGrid: false, hasTint: false });
   const grAutoEnableRef = useRef(false);
+  const grAutoKickRef = useRef(false);
 
   useEffect(() => {
     if (grAutoEnableRef.current) return;
@@ -3006,6 +3007,14 @@ export default function TimeDilationLatticePanel({
     refetchMs: grAutoRefresh ? 5000 : 0,
     enabled: grRequested,
   });
+  useEffect(() => {
+    if (!strictCongruence) return;
+    if (!grRequested) return;
+    if (grQuery.data || grQuery.isFetching) return;
+    if (grAutoKickRef.current) return;
+    grAutoKickRef.current = true;
+    grQuery.refetch();
+  }, [strictCongruence, grRequested, grQuery.data, grQuery.isFetching, grQuery.refetch]);
   const regionDims = useMemo(() => {
     const bounds = resolveHullBounds(pipelineState);
     const dx = Math.max(1e-3, regionTargetDx);

@@ -23,6 +23,12 @@ The lattice renders only when **all** of the following are true:
 
 If any of these are false, the lattice is **blocked** and displays a strict-mode message instead of rendering a proxy visualization.
 
+## GR Brick Auto-Kick (Strict Mode)
+
+When strict mode is enabled, the panel will auto-kick the GR brick once if no GR brick is present.
+This prevents the lattice from idling in `WAITING_GR` when the server is otherwise ready.
+The kick is single-shot per panel session and is not a polling loop.
+
 ## Natario Geometry Warp (Default)
 
 Natario mode now supports metric-derived geometry warp by default:
