@@ -2512,6 +2512,26 @@ export default function TimeDilationLatticePanel({
     }),
     [hullBounds],
   );
+  const canonicalHull = useMemo(() => {
+    const hull = (pipelineState as any)?.hull;
+    if (hull && typeof hull === "object") {
+      return {
+        ...hull,
+        Lx_m: Number.isFinite(hull.Lx_m) ? hull.Lx_m : hullDims.Lx_m,
+        Ly_m: Number.isFinite(hull.Ly_m) ? hull.Ly_m : hullDims.Ly_m,
+        Lz_m: Number.isFinite(hull.Lz_m) ? hull.Lz_m : hullDims.Lz_m,
+        wallThickness_m: Number.isFinite(hull.wallThickness_m)
+          ? hull.wallThickness_m
+          : DEFAULT_HULL_WALL_THICKNESS,
+      };
+    }
+    return {
+      Lx_m: hullDims.Lx_m,
+      Ly_m: hullDims.Ly_m,
+      Lz_m: hullDims.Lz_m,
+      wallThickness_m: DEFAULT_HULL_WALL_THICKNESS,
+    };
+  }, [pipelineState, hullDims]);
   const updatePipeline = useUpdatePipeline();
   const hullPreviewPayload = useHullPreviewPayload();
   const lapseQuery = useLapseBrick({ quality: "low", refetchMs: 2000 });
@@ -2547,6 +2567,11 @@ export default function TimeDilationLatticePanel({
   const [glError, setGlError] = useState<string | null>(null);
   const [glEpoch, setGlEpoch] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [certifiedMode, setCertifiedMode] = useState(false);
+  const [certActivationState, setCertActivationState] =
+    useState<"idle" | "running" | "done" | "error">("idle");
+  const [certActivationProgress, setCertActivationProgress] = useState(0);
+  const [certActivationError, setCertActivationError] = useState<string | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(showDebug);
   const debugBlocked = latticeMetricOnly && strictMetricMissing;
   const debugAutoPublish = import.meta.env.VITE_LATTICE_DEBUG_PUSH === "1";
@@ -2970,7 +2995,8 @@ export default function TimeDilationLatticePanel({
   }, [pipelineState, grTargetDx]);
   const includeKijResolved = grIncludeKij || grIncludeExtra;
   const includeMatterResolved = grIncludeMatter || grIncludeExtra;
-  const grRequested = grEnabled || grAutoRefresh;
+  const certifiedModeEnabled = latticeMetricOnly ? certifiedMode : true;
+  const grRequested = certifiedModeEnabled ? (grEnabled || grAutoRefresh) : false;
   const gateRequirements = useMemo(() => {
     const entries: Array<{ module: string; minStage: MathStageLabel }> = [
       { module: "server/energy-pipeline.ts", minStage: "reduced-order" },
@@ -2983,7 +3009,7 @@ export default function TimeDilationLatticePanel({
     }
     return entries;
   }, [grRequested]);
-  const mathStageOK = useMemo(() => {
+  const mathStageOKBase = useMemo(() => {
     const hasGraph = Boolean(mathGraph?.root);
     if (!hasGraph) return false;
     for (const entry of gateRequirements) {
@@ -2992,6 +3018,7 @@ export default function TimeDilationLatticePanel({
     }
     return true;
   }, [gateRequirements, mathGraph?.root, mathNodeIndex]);
+  const mathStageOK = latticeMetricOnly ? true : mathStageOKBase;
   const grQuery = useGrBrick({
     quality: grQuality,
     dims: grDims,
@@ -3664,7 +3691,7 @@ export default function TimeDilationLatticePanel({
   const renderPlanRef = useRef<TimeDilationRenderPlan | null>(null);
   const [renderPlanVersion, setRenderPlanVersion] = useState(0);
 
-  const activationState = useMemo(() => {
+  const activationMetrics = useMemo(() => {
     const power = resolvePowerW(pipelineState);
     const duty = resolveDutyEffective(pipelineState);
     const gammaGeo = resolveGammaGeo(pipelineState);
@@ -3718,8 +3745,22 @@ export default function TimeDilationLatticePanel({
   }, [pipelineState, contractGuardrails]);
 
   useEffect(() => {
-    activationTargetRef.current = activationState.activation;
-  }, [activationState.activation]);
+    activationTargetRef.current = activationMetrics.activation;
+  }, [activationMetrics.activation]);
+
+  useEffect(() => {
+    if (certActivationState !== "running") return;
+    const target = 0.25 + gateProgress.ratio * 0.65;
+    setCertActivationProgress((prev) => clamp01(Math.max(prev, target)));
+  }, [certActivationState, gateProgress.ratio]);
+
+  useEffect(() => {
+    if (certActivationState !== "running") return;
+    if (renderPlan.banner === "CERTIFIED" && !anyProxy && grCertified) {
+      setCertActivationProgress(1);
+      setCertActivationState("done");
+    }
+  }, [certActivationState, renderPlan.banner, anyProxy, grCertified]);
 
   const pipelineProofs = useMemo(() => {
     const t00Metric = resolveProofPackNumber(
@@ -3805,6 +3846,9 @@ export default function TimeDilationLatticePanel({
     );
     return hasGeometry && (nonDefault || userChosen);
   }, [pipelineState, hullBounds]);
+  const effectiveHasHull = certifiedModeEnabled
+    ? hasHull || Boolean((pipelineState as any)?.hull)
+    : false;
   const wallDetectionAvailable = Boolean(wallDiagnostics);
   const wallDetected = wallDiagnostics?.detected ?? null;
   const wallSource = wallDiagnostics?.source;
@@ -3816,7 +3860,7 @@ export default function TimeDilationLatticePanel({
   );
   const anyProxy = latticeMetricOnly
     ? grProxy || strictMetricMissing
-    : activationState.activationProxy ||
+    : activationMetrics.activationProxy ||
       pipelineProofs.t00Min.proxy ||
       pipelineProofs.mExotic.proxy ||
       grProxy ||
@@ -3825,7 +3869,7 @@ export default function TimeDilationLatticePanel({
   const renderPlan = useMemo(
     () =>
       computeTimeDilationRenderPlan(pipelineState, grQuery.data ?? null, lapseQuery.data ?? null, {
-        hasHull,
+        hasHull: effectiveHasHull,
         wallDetectionAvailable,
         wallDetected,
         wallSource,
@@ -3848,7 +3892,7 @@ export default function TimeDilationLatticePanel({
       pipelineState,
       grQuery.data,
       lapseQuery.data,
-      hasHull,
+      effectiveHasHull,
       wallDetectionAvailable,
       wallDetected,
       wallSource,
@@ -4601,7 +4645,7 @@ export default function TimeDilationLatticePanel({
   ]);
 
   const renderBlocked = bannerBlocked || !mathGate.allowed;
-  const renderEnabled = !renderBlocked;
+  const renderEnabled = certifiedModeEnabled && !renderBlocked;
   useEffect(() => {
     renderEnabledRef.current = renderEnabled;
   }, [renderEnabled]);
@@ -4674,37 +4718,37 @@ export default function TimeDilationLatticePanel({
       radiusProxy: bubbleParams.radiusProxy,
       centerProxy: bubbleParams.centerProxy,
       grProxy,
-      activation: activationState.activation,
-      activationBase: activationState.activationBase,
-      activationProxy: activationState.activationProxy,
-      powerW: activationState.power.value,
-      powerSource: activationState.power.source,
-      powerProxy: activationState.power.proxy,
-      dEff: activationState.duty.value,
-      dEffSource: activationState.duty.source,
-      dEffProxy: activationState.duty.proxy,
-      tsRatio: activationState.tsRatio.value,
-      tsRatioSource: activationState.tsRatio.source,
-      tsRatioProxy: activationState.tsRatio.proxy,
+      activation: activationMetrics.activation,
+      activationBase: activationMetrics.activationBase,
+      activationProxy: activationMetrics.activationProxy,
+      powerW: activationMetrics.power.value,
+      powerSource: activationMetrics.power.source,
+      powerProxy: activationMetrics.power.proxy,
+      dEff: activationMetrics.duty.value,
+      dEffSource: activationMetrics.duty.source,
+      dEffProxy: activationMetrics.duty.proxy,
+      tsRatio: activationMetrics.tsRatio.value,
+      tsRatioSource: activationMetrics.tsRatio.source,
+      tsRatioProxy: activationMetrics.tsRatio.proxy,
       tsMetricDerived,
       tsMetricSource,
       tsMetricReason,
-      gammaGeo: activationState.gammaGeo.value,
-      gammaGeoCubed: activationState.gammaGeoCubed,
-      gammaGeoSource: activationState.gammaGeo.source,
-      gammaGeoProxy: activationState.gammaGeo.proxy,
-      gammaVdB: activationState.gammaVdB.value,
-      gammaVdBSource: activationState.gammaVdB.source,
-      gammaVdBProxy: activationState.gammaVdB.proxy,
-      qSpoil: activationState.qSpoil.value,
-      qSpoilSource: activationState.qSpoil.source,
-      qSpoilProxy: activationState.qSpoil.proxy,
+      gammaGeo: activationMetrics.gammaGeo.value,
+      gammaGeoCubed: activationMetrics.gammaGeoCubed,
+      gammaGeoSource: activationMetrics.gammaGeo.source,
+      gammaGeoProxy: activationMetrics.gammaGeo.proxy,
+      gammaVdB: activationMetrics.gammaVdB.value,
+      gammaVdBSource: activationMetrics.gammaVdB.source,
+      gammaVdBProxy: activationMetrics.gammaVdB.proxy,
+      qSpoil: activationMetrics.qSpoil.value,
+      qSpoilSource: activationMetrics.qSpoil.source,
+      qSpoilProxy: activationMetrics.qSpoil.proxy,
       thetaGeom: thetaGeom.value,
       thetaGeomSource: thetaGeom.source,
       thetaGeomProxy: thetaGeom.proxy,
-      thetaCal: activationState.thetaCal.value,
-      thetaSource: activationState.thetaCal.source,
-      thetaProxy: activationState.thetaCal.proxy,
+      thetaCal: activationMetrics.thetaCal.value,
+      thetaSource: activationMetrics.thetaCal.source,
+      thetaProxy: activationMetrics.thetaCal.proxy,
       kTraceMean: pipelineProofs.kTraceMean.value,
       kTraceSource: pipelineProofs.kTraceMean.source,
       kTraceProxy: pipelineProofs.kTraceMean.proxy,
@@ -4721,10 +4765,10 @@ export default function TimeDilationLatticePanel({
       mExotic: pipelineProofs.mExotic.value,
       mExoticSource: pipelineProofs.mExotic.source,
       mExoticProxy: pipelineProofs.mExotic.proxy,
-      guardrails: activationState.guardrails,
-      guardrailsSource: activationState.guardrails.source,
+      guardrails: activationMetrics.guardrails,
+      guardrailsSource: activationMetrics.guardrails.source,
       contractGuardrailSource,
-      viabilityStatus: resolveViabilityLabel(pipelineState, activationState.guardrails.hardPass),
+      viabilityStatus: resolveViabilityLabel(pipelineState, activationMetrics.guardrails.hardPass),
       alphaSource,
       clockMode: clockRateLabel,
       viewerChart,
@@ -4768,7 +4812,7 @@ export default function TimeDilationLatticePanel({
     betaField,
     bubbleParams,
     alphaSource,
-    activationState,
+    activationMetrics,
     pipelineProofs,
     hullField,
     hullThickness,
@@ -5325,6 +5369,74 @@ export default function TimeDilationLatticePanel({
     setRegionEnabled(true);
     regionQuery.refetch();
   };
+
+  const activateNatarioCertified = React.useCallback(async () => {
+    setCertifiedMode(true);
+    setCertActivationState("running");
+    setCertActivationProgress(0.05);
+    setCertActivationError(null);
+    setGrEnabled(true);
+    setGrAutoRefresh(false);
+    try {
+      await updatePipeline.mutateAsync({
+        hull: canonicalHull,
+        warpFieldType: "natario",
+        dynamicConfig: { warpFieldType: "natario" },
+        grEnabled: true,
+      } as any);
+      setCertActivationProgress(0.35);
+      const res = await fetch("/api/helix/time-dilation/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          warpFieldType: "natario",
+          grEnabled: true,
+          publishDiagnostics: true,
+          async: true,
+          kickGrBrick: true,
+          kickQuality: grQuality,
+          gridScale,
+          grTargetDx,
+          includeExtra: grIncludeExtra,
+          includeMatter: includeMatterResolved,
+          includeKij: includeKijResolved,
+          wallInvariant,
+          timeoutMs: 120000,
+          diagnosticsTimeoutMs: 120000,
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`activate failed (${res.status}) ${text}`);
+      }
+      setCertActivationProgress(0.6);
+      grQuery.refetch();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Activation failed";
+      setCertActivationError(message);
+      setCertActivationState("error");
+    }
+  }, [
+    updatePipeline,
+    canonicalHull,
+    grQuality,
+    gridScale,
+    grTargetDx,
+    grIncludeExtra,
+    includeMatterResolved,
+    includeKijResolved,
+    wallInvariant,
+    grQuery,
+  ]);
+
+  const resetCertifiedMode = React.useCallback(() => {
+    setCertifiedMode(false);
+    setCertActivationState("idle");
+    setCertActivationProgress(0);
+    setCertActivationError(null);
+    setGrEnabled(false);
+    setGrAutoRefresh(false);
+  }, []);
 
   const resetVisualTuning = () => {
     setVisualTuning(DEFAULT_VISUAL_TUNING);
@@ -6098,6 +6210,24 @@ export default function TimeDilationLatticePanel({
               </DropdownMenuCheckboxItem>
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                Canonical
+              </DropdownMenuLabel>
+              <DropdownMenuCheckboxItem
+                checked={certifiedMode}
+                onCheckedChange={(value) => {
+                  if (value) {
+                    void activateNatarioCertified();
+                  } else {
+                    resetCertifiedMode();
+                  }
+                }}
+                disabled={certActivationState === "running"}
+                className="text-xs text-slate-200"
+              >
+                Natario Certified
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
                 Overlays
               </DropdownMenuLabel>
               <DropdownMenuCheckboxItem
@@ -6202,7 +6332,7 @@ export default function TimeDilationLatticePanel({
             </div>
           </div>
         )}
-        {renderBanner && bannerDetails && (
+        {certifiedModeEnabled && renderBanner && bannerDetails && (
           <div className="pointer-events-none absolute inset-x-3 top-3 z-30 flex justify-center">
             <div className="pointer-events-auto max-w-[360px] rounded-md border border-amber-500/40 bg-black/80 px-3 py-2 text-[11px] text-slate-200">
               <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300">
@@ -6300,6 +6430,40 @@ export default function TimeDilationLatticePanel({
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        {certActivationState === "running" && (
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black/70">
+            <div className="max-w-[340px] rounded-md border border-emerald-500/40 bg-black/85 px-3 py-2 text-[11px] text-slate-200">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-300">
+                Activating Natario Certified
+              </div>
+              <div className="mt-1 text-slate-300">
+                Writing hull, kicking GR brick, and publishing diagnostics.
+              </div>
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  <span>progress</span>
+                  <span>{Math.round(certActivationProgress * 100)}%</span>
+                </div>
+                <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-white/10">
+                  <div
+                    className="h-full rounded bg-emerald-400/80 transition-[width] duration-300"
+                    style={{ width: `${Math.round(certActivationProgress * 100)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {certActivationState === "error" && certActivationError && (
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black/70">
+            <div className="max-w-[340px] rounded-md border border-rose-500/40 bg-black/85 px-3 py-2 text-[11px] text-slate-200">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-rose-300">
+                Natario activation failed
+              </div>
+              <div className="mt-1 text-slate-300">{certActivationError}</div>
             </div>
           </div>
         )}
@@ -7878,7 +8042,7 @@ export default function TimeDilationLatticePanel({
             )}
           </div>
         )}
-        {glStatus === "context-lost" && !renderBlocked && (
+        {glStatus === "context-lost" && renderEnabled && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 text-slate-200">
             <div className="flex flex-col items-center gap-2 text-center">
               <div className="text-xs uppercase tracking-[0.3em] text-slate-400">WebGL context lost</div>
@@ -7888,7 +8052,7 @@ export default function TimeDilationLatticePanel({
             </div>
           </div>
         )}
-        {!isReady && glStatus !== "context-lost" && !renderBlocked && (
+        {!isReady && glStatus !== "context-lost" && renderEnabled && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 text-slate-200">
             <div className="flex flex-col items-center gap-2 text-center">
               <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Buffering simulation</div>

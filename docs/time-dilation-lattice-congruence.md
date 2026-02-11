@@ -12,6 +12,18 @@ Applies to `client/src/components/TimeDilationLatticePanel.tsx` and `client/src/
 - **Strict congruence**: on by default unless `WARP_STRICT_CONGRUENCE=0` is set in the server environment.
 - **Strict-only lattice**: `VITE_LATTICE_STRICT_ONLY=1` forces strict mode in the lattice panel even if the pipeline tries to relax it.
 
+## Canonical Toggle (Debug Menu)
+
+The Debug menu now includes a **Natario Certified** toggle that:
+
+- writes a hull payload (canonical dimensions + wall thickness),
+- sets `warpFieldType=natario`,
+- kicks the GR brick,
+- publishes lattice diagnostics.
+
+When the toggle is **off**, the lattice stays **blank** (no rendering). When the toggle is **on**, a progress overlay
+tracks the activation pipeline until the lattice becomes `CERTIFIED`.
+
 ## Metric-Derived Rendering Contract
 
 The lattice renders only when **all** of the following are true:
