@@ -3748,20 +3748,6 @@ export default function TimeDilationLatticePanel({
     activationTargetRef.current = activationMetrics.activation;
   }, [activationMetrics.activation]);
 
-  useEffect(() => {
-    if (certActivationState !== "running") return;
-    const target = 0.25 + gateProgress.ratio * 0.65;
-    setCertActivationProgress((prev) => clamp01(Math.max(prev, target)));
-  }, [certActivationState, gateProgress.ratio]);
-
-  useEffect(() => {
-    if (certActivationState !== "running") return;
-    if (renderPlan.banner === "CERTIFIED" && !anyProxy && grCertified) {
-      setCertActivationProgress(1);
-      setCertActivationState("done");
-    }
-  }, [certActivationState, renderPlan.banner, anyProxy, grCertified]);
-
   const pipelineProofs = useMemo(() => {
     const t00Metric = resolveProofPackNumber(
       proofPack,
@@ -4643,6 +4629,20 @@ export default function TimeDilationLatticePanel({
     alphaSource,
     renderPlan.sourceForTheta,
   ]);
+
+  useEffect(() => {
+    if (certActivationState !== "running") return;
+    const target = 0.25 + gateProgress.ratio * 0.65;
+    setCertActivationProgress((prev) => clamp01(Math.max(prev, target)));
+  }, [certActivationState, gateProgress.ratio]);
+
+  useEffect(() => {
+    if (certActivationState !== "running") return;
+    if (renderPlan.banner === "CERTIFIED" && !anyProxy && grCertified) {
+      setCertActivationProgress(1);
+      setCertActivationState("done");
+    }
+  }, [certActivationState, renderPlan.banner, anyProxy, grCertified]);
 
   const renderBlocked = bannerBlocked || !mathGate.allowed;
   const renderEnabled = certifiedModeEnabled && !renderBlocked;
