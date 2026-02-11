@@ -5384,6 +5384,7 @@ export default function TimeDilationLatticePanel({
         warpFieldType: "natario",
         dynamicConfig: { warpFieldType: "natario" },
         grEnabled: true,
+        strictCongruence: true,
       } as any);
       setCertActivationProgress(0.35);
       const res = await fetch("/api/helix/time-dilation/activate", {
@@ -5392,6 +5393,8 @@ export default function TimeDilationLatticePanel({
         body: JSON.stringify({
           warpFieldType: "natario",
           grEnabled: true,
+          strictCongruence: true,
+          applyCanonicalHull: true,
           publishDiagnostics: true,
           async: true,
           kickGrBrick: true,
@@ -6237,7 +6240,7 @@ export default function TimeDilationLatticePanel({
                 disabled={certActivationState === "running"}
                 className="text-xs text-slate-200"
               >
-                Natario Certified
+                Natario Canonical
               </DropdownMenuCheckboxItem>
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
@@ -6450,7 +6453,7 @@ export default function TimeDilationLatticePanel({
           <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black/70">
             <div className="max-w-[340px] rounded-md border border-emerald-500/40 bg-black/85 px-3 py-2 text-[11px] text-slate-200">
               <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-300">
-                Activating Natario Certified
+                Activating Natario Canonical
               </div>
               <div className="mt-1 text-slate-300">
                 Writing hull, kicking GR brick, and publishing diagnostics.

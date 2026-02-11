@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   buildTimeDilationDiagnostics,
   type TimeDilationDiagnosticsOptions,
+  DEFAULT_HULL_AXES,
+  DEFAULT_HULL_WALL_THICKNESS_M,
 } from "@shared/time-dilation-diagnostics";
 
 type TimeDilationDiagnosticsStore = {
@@ -25,6 +27,8 @@ const ActivateSchema = z.object({
   baseUrl: z.string().url().optional(),
   warpFieldType: z.enum(["natario", "natario_sdf", "alcubierre", "irrotational"]).default("natario"),
   grEnabled: z.boolean().default(true),
+  strictCongruence: z.boolean().optional(),
+  applyCanonicalHull: z.boolean().optional(),
   publishDiagnostics: z.boolean().default(true),
   async: z.boolean().default(true),
   kickGrBrick: z.boolean().default(true),
@@ -38,6 +42,13 @@ const ActivateSchema = z.object({
   wallInvariant: z.enum(["kretschmann", "ricci4"]).optional(),
   timeoutMs: z.number().positive().optional(),
   diagnosticsTimeoutMs: z.number().positive().optional(),
+});
+
+const resolveCanonicalHull = () => ({
+  Lx_m: DEFAULT_HULL_AXES[0] * 2,
+  Ly_m: DEFAULT_HULL_AXES[1] * 2,
+  Lz_m: DEFAULT_HULL_AXES[2] * 2,
+  wallThickness_m: DEFAULT_HULL_WALL_THICKNESS_M,
 });
 
 const resolveBaseUrl = (req: Request, override?: string) => {
@@ -156,9 +167,11 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
       void postJson<any>(
         `${baseUrl}/api/helix/pipeline/update`,
         {
+          ...(input.applyCanonicalHull === false ? {} : { hull: resolveCanonicalHull() }),
           warpFieldType: input.warpFieldType,
           dynamicConfig: { warpFieldType: input.warpFieldType },
           grEnabled: input.grEnabled,
+          strictCongruence: input.strictCongruence ?? true,
         },
         timeoutMs,
       )
@@ -195,12 +208,14 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
       return;
     }
 
-      const pipelineUpdate = await postJson<any>(
+    const pipelineUpdate = await postJson<any>(
       `${baseUrl}/api/helix/pipeline/update`,
       {
+        ...(input.applyCanonicalHull === false ? {} : { hull: resolveCanonicalHull() }),
         warpFieldType: input.warpFieldType,
         dynamicConfig: { warpFieldType: input.warpFieldType },
         grEnabled: input.grEnabled,
+        strictCongruence: input.strictCongruence ?? true,
       },
       timeoutMs,
     );

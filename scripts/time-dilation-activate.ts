@@ -60,6 +60,8 @@ const run = async () => {
   const publish = parseBool(args.publish, true);
   const asyncMode = parseBool(args.async, false);
   const kickGrBrick = parseBool(args.kickGrBrick, true);
+  const strictCongruence = parseBool(args.strictCongruence, true);
+  const applyCanonicalHull = parseBool(args.applyCanonicalHull, true);
   const quality = typeof args.quality === "string" ? args.quality : undefined;
   const kickQuality = typeof args.kickQuality === "string" ? args.kickQuality : undefined;
   const gridScale =
@@ -85,6 +87,8 @@ const run = async () => {
       baseUrl: baseUrlOverride,
       warpFieldType,
       grEnabled,
+      strictCongruence,
+      applyCanonicalHull,
       publishDiagnostics: publish,
       async: asyncMode,
       kickGrBrick,
