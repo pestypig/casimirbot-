@@ -298,17 +298,17 @@ const EXPLORE_VISUAL_TUNING = {
 
 const VERT = `#version 300 es
 precision highp float;
-layout(location=0) in vec3 a_pos;
-layout(location=1) in float a_alpha;
-layout(location=2) in float a_hull;
-layout(location=3) in vec3 a_hullDir;
-layout(location=4) in vec3 a_beta;
-layout(location=5) in vec3 a_gamma;
-layout(location=6) in vec3 a_shear;
-  layout(location=7) in float a_constraint;
-  layout(location=8) in float a_region;
-  layout(location=9) in float a_regionGrid;
-  layout(location=10) in float a_theta;
+in vec3 a_pos;
+in float a_alpha;
+in float a_hull;
+in vec3 a_hullDir;
+in vec3 a_beta;
+in vec3 a_gamma;
+in vec3 a_shear;
+  in float a_constraint;
+  in float a_region;
+  in float a_regionGrid;
+  in float a_theta;
 
 uniform mat4 u_mvp;
 uniform float u_time;
@@ -5474,7 +5474,19 @@ export default function TimeDilationLatticePanel({
 
       let prog: WebGLProgram;
       try {
-        prog = createProgram(gl, VERT, FRAG);
+        prog = createProgram(gl, VERT, FRAG, {
+          a_pos: 0,
+          a_alpha: 1,
+          a_hull: 2,
+          a_hullDir: 3,
+          a_beta: 4,
+          a_gamma: 5,
+          a_shear: 6,
+          a_constraint: 7,
+          a_region: 8,
+          a_regionGrid: 9,
+          a_theta: 10,
+        });
         progRef.current = prog;
       } catch (err) {
         setGlStatus("compile-fail");

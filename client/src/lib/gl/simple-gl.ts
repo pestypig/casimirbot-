@@ -2,7 +2,12 @@
  * Simple WebGL utilities shared between visualization components
  */
 
-export function createProgram(gl: WebGL2RenderingContext, vertexSource: string, fragmentSource: string): WebGLProgram {
+export function createProgram(
+  gl: WebGL2RenderingContext,
+  vertexSource: string,
+  fragmentSource: string,
+  bindings?: Record<string, number>,
+): WebGLProgram {
   const vs = gl.createShader(gl.VERTEX_SHADER);
   if (!vs) throw new Error('Failed to create vertex shader object');
   
@@ -28,6 +33,11 @@ export function createProgram(gl: WebGL2RenderingContext, vertexSource: string, 
   
   gl.attachShader(prog, vs);
   gl.attachShader(prog, fs);
+  if (bindings) {
+    for (const [name, location] of Object.entries(bindings)) {
+      gl.bindAttribLocation(prog, location, name);
+    }
+  }
   gl.linkProgram(prog);
   
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
