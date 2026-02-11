@@ -70,6 +70,8 @@ const run = async () => {
     typeof args.timeoutMs === "string" ? Number(args.timeoutMs) : 15000;
   const diagnosticsTimeoutMs =
     typeof args.diagnosticsTimeoutMs === "string" ? Number(args.diagnosticsTimeoutMs) : undefined;
+  const baseUrlOverride =
+    typeof args.baseUrl === "string" ? args.baseUrl : undefined;
   const includeExtra = parseBool(args.includeExtra, true);
   const includeMatter = parseBool(args.includeMatter, true);
   const includeKij = parseBool(args.includeKij, true);
@@ -80,6 +82,7 @@ const run = async () => {
   const activation = await postJson<any>(
     `${baseUrl}/api/helix/time-dilation/activate`,
     {
+      baseUrl: baseUrlOverride,
       warpFieldType,
       grEnabled,
       publishDiagnostics: publish,
