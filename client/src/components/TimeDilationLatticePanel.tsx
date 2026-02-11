@@ -26,6 +26,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -6242,6 +6243,13 @@ export default function TimeDilationLatticePanel({
               >
                 Natario Canonical
               </DropdownMenuCheckboxItem>
+              <DropdownMenuItem
+                onSelect={() => resetCertifiedMode()}
+                disabled={certActivationState === "running"}
+                className="text-xs text-slate-200"
+              >
+                Blank canvas
+              </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
                 Overlays
