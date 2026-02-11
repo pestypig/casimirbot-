@@ -8357,11 +8357,73 @@ export async function getGrConstraintContract(req: Request, res: Response) {
       proxy: constraints.some((entry) => entry.proxy),
     };
 
-    const payload = grConstraintContractSchema.parse(contract);
-    res.json(payload);
+    const parsedContract = grConstraintContractSchema.safeParse(contract);
+    if (!parsedContract.success) {
+      const issues = parsedContract.error.flatten();
+      console.error("[helix-core] gr constraint contract schema error:", issues);
+      const fallback: GrConstraintContract = {
+        kind: "gr-constraint-contract",
+        version: 1,
+        updatedAt: Date.now(),
+        policy: policyBundle,
+        sources: {
+          grDiagnostics: gr ? "pipeline" : "missing",
+          certificate: certAvailable ? "physics.warp.viability" : "missing",
+        },
+        guardrails: {
+          fordRoman: "missing",
+          thetaAudit: "missing",
+          tsRatio: "missing",
+          vdbBand: "missing",
+        },
+        constraints: [],
+        certificate: {
+          status: certificateStatus,
+          admissibleStatus: policyBundle.certificate.admissibleStatus,
+          hasCertificate: certAvailable,
+          certificateHash,
+          certificateId,
+        },
+        notes: [
+          "Contract schema validation failed; returning fallback payload.",
+        ],
+        proxy: true,
+      };
+      res.json(fallback);
+      return;
+    }
+    res.json(parsedContract.data);
   } catch (err) {
     console.error("[helix-core] gr constraint contract error:", err);
     const message = err instanceof Error ? err.message : "Failed to build gr constraint contract";
+    const policyBundle = await resolveGrConstraintPolicyBundle().catch(() => null);
+    if (policyBundle) {
+      const fallback: GrConstraintContract = {
+        kind: "gr-constraint-contract",
+        version: 1,
+        updatedAt: Date.now(),
+        policy: policyBundle,
+        sources: { grDiagnostics: "missing", certificate: "missing" },
+        guardrails: {
+          fordRoman: "missing",
+          thetaAudit: "missing",
+          tsRatio: "missing",
+          vdbBand: "missing",
+        },
+        constraints: [],
+        certificate: {
+          status: "NOT_CERTIFIED",
+          admissibleStatus: policyBundle.certificate.admissibleStatus,
+          hasCertificate: false,
+          certificateHash: null,
+          certificateId: null,
+        },
+        notes: [message],
+        proxy: true,
+      };
+      res.json(fallback);
+      return;
+    }
     res.status(500).json({ error: "gr-constraint-contract-failed", message });
   }
 }
@@ -8389,13 +8451,47 @@ export async function getGrAssistantReport(req: Request, res: Response) {
       return;
     }
 
-    const result = (await grAssistantHandler(parsed.data, {})) as {
+    const buildErrorReport = (message: string): GrAssistantReportPayload => ({
+      source: "error",
+      assumptions: {
+        coords: ["unknown"],
+        signature: "unknown",
+        units_internal: "unknown",
+      },
+      artifacts: [],
+      checks: [],
+      failed_checks: [],
+      passed: false,
+      notes: [message],
+    });
+
+    let result: {
       report: GrAssistantReportPayload;
       gate?: GrGrounding;
       citations?: string[];
       trace_id?: string;
       training_trace_id?: string;
     };
+    try {
+      result = (await grAssistantHandler(parsed.data, {})) as {
+        report: GrAssistantReportPayload;
+        gate?: GrGrounding;
+        citations?: string[];
+        trace_id?: string;
+        training_trace_id?: string;
+      };
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to build gr assistant report";
+      const payload = grAssistantReportSchema.parse({
+        kind: "gr-assistant-report",
+        updatedAt: Date.now(),
+        report: buildErrorReport(message),
+      });
+      res.json(payload);
+      return;
+    }
+
     const payload = grAssistantReportSchema.parse({
       kind: "gr-assistant-report",
       updatedAt: Date.now(),
@@ -8410,7 +8506,24 @@ export async function getGrAssistantReport(req: Request, res: Response) {
     console.error("[helix-core] gr assistant report error:", err);
     const message =
       err instanceof Error ? err.message : "Failed to build gr assistant report";
-    res.status(500).json({ error: "gr-assistant-report-failed", message });
+    const payload = grAssistantReportSchema.parse({
+      kind: "gr-assistant-report",
+      updatedAt: Date.now(),
+      report: {
+        source: "error",
+        assumptions: {
+          coords: ["unknown"],
+          signature: "unknown",
+          units_internal: "unknown",
+        },
+        artifacts: [],
+        checks: [],
+        failed_checks: [],
+        passed: false,
+        notes: [message],
+      },
+    });
+    res.json(payload);
   }
 }
 

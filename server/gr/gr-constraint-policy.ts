@@ -17,6 +17,8 @@ const DEFAULT_CERTIFICATE_POLICY: GrCertificatePolicy = {
   treatMissingCertificateAsNotCertified: true,
 };
 
+let warnedMissingWarpAgents = false;
+
 const mergeOverrides = <T extends Record<string, unknown>>(
   base: T,
   overrides?: Partial<T>,
@@ -37,12 +39,20 @@ export async function resolveGrConstraintPolicyBundle(
     policy?: Partial<GrConstraintPolicy>;
   },
 ): Promise<GrConstraintPolicyBundle> {
-  const agentsConfig = await loadWarpAgentsConfig().catch((error) => {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to load WARP_AGENTS.md: ${message}`);
-  });
+  let agentsConfig: WarpAgentsConfig | null = null;
+  try {
+    agentsConfig = await loadWarpAgentsConfig();
+  } catch (error) {
+    if (!warnedMissingWarpAgents) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[gr-constraint-policy] Falling back to default policy (WARP_AGENTS.md missing): ${message}`,
+      );
+      warnedMissingWarpAgents = true;
+    }
+  }
 
-  const gateConfig = agentsConfig.grConstraintGate;
+  const gateConfig = agentsConfig?.grConstraintGate;
   const baseThresholds = mergeOverrides(
     { ...DEFAULT_GR_CONSTRAINT_THRESHOLDS },
     gateConfig?.thresholds,
@@ -65,7 +75,7 @@ export async function resolveGrConstraintPolicyBundle(
     ...(overridesApplied ? { overridesApplied } : {}),
   };
 
-  const certificate = agentsConfig.viabilityPolicy
+  const certificate = agentsConfig?.viabilityPolicy
     ? { ...agentsConfig.viabilityPolicy }
     : DEFAULT_CERTIFICATE_POLICY;
 

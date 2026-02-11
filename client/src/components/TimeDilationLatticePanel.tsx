@@ -5200,6 +5200,7 @@ export default function TimeDilationLatticePanel({
 
   const buildDiagnosticsPayload = React.useCallback(
     (mode: "export" | "auto" = "export") => {
+      const includeDebugPayload = debugAllowed && mode === "export";
       const plan = renderPlanRef.current ?? renderPlan;
       const canonical = {
         family: proofStr("warp_canonical_family") ?? canonicalFamily,
@@ -5253,11 +5254,11 @@ export default function TimeDilationLatticePanel({
           viewerChart,
         },
         warp_provenance: warpProvenance,
-        debug_stats: debugAllowed ? debugStats : null,
-        diagnostics: debugAllowed ? diagnostics : null,
-        lapse_stats: debugAllowed ? lapseStats : null,
-        gr_stats: debugAllowed ? grStats : null,
-        solver: debugAllowed
+        debug_stats: includeDebugPayload ? debugStats : null,
+        diagnostics: includeDebugPayload ? diagnostics : null,
+        lapse_stats: includeDebugPayload ? lapseStats : null,
+        gr_stats: includeDebugPayload ? grStats : null,
+        solver: includeDebugPayload
           ? {
               solverDiagnostics,
               solverHealthDiagnostics,
