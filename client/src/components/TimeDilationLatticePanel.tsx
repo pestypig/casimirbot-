@@ -6482,12 +6482,26 @@ export default function TimeDilationLatticePanel({
           </div>
         )}
         {certActivationState === "error" && certActivationError && (
-          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black/70">
+          <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/70">
             <div className="max-w-[340px] rounded-md border border-rose-500/40 bg-black/85 px-3 py-2 text-[11px] text-slate-200">
               <div className="text-[10px] uppercase tracking-[0.2em] text-rose-300">
                 Natario activation failed
               </div>
-              <div className="mt-1 text-slate-300">{certActivationError}</div>
+              <div className="mt-1 select-text whitespace-pre-wrap text-slate-300">
+                {certActivationError}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-rose-200 transition hover:bg-rose-500/20"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(certActivationError).catch(() => {});
+                  }}
+                >
+                  Copy error
+                </button>
+                <span className="text-[10px] text-slate-400">Select to highlight</span>
+              </div>
             </div>
           </div>
         )}
