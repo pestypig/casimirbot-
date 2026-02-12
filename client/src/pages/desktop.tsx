@@ -1396,6 +1396,7 @@ export default function DesktopPage() {
   const [askQueue, setAskQueue] = useState<string[]>([]);
   const [askActiveQuestion, setAskActiveQuestion] = useState<string | null>(null);
   const [askMood, setAskMood] = useState<LumaMood>("question");
+  const [askMoodAssetIndex, setAskMoodAssetIndex] = useState(0);
   const [askMoodBroken, setAskMoodBroken] = useState(false);
   const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
     {},
@@ -1690,6 +1691,7 @@ export default function DesktopPage() {
 
   useEffect(() => {
     setAskMoodBroken(false);
+    setAskMoodAssetIndex(0);
   }, [askMood]);
 
   useEffect(() => {
@@ -1800,7 +1802,8 @@ export default function DesktopPage() {
   }, [cancelMoodHint, clearLiveDraftFlush, clearMoodTimer]);
 
   const askMoodAsset = resolveMoodAsset(askMood);
-  const askMoodSrc = askMoodBroken ? null : askMoodAsset?.sources[0] ?? null;
+  const askMoodSources = askMoodAsset?.sources ?? [];
+  const askMoodSrc = askMoodBroken ? null : askMoodSources[askMoodAssetIndex] ?? null;
   const askMoodLabel = askMoodAsset?.label ?? "Helix mood";
   const askMoodPalette = LUMA_MOOD_PALETTE[askMood] ?? LUMA_MOOD_PALETTE.question;
   const askMoodRingClass = askMoodPalette.ring;
@@ -2707,7 +2710,14 @@ export default function DesktopPage() {
                     alt={`${askMoodLabel} mood`}
                     className="h-9 w-9 object-contain"
                     loading="lazy"
-                    onError={() => setAskMoodBroken(true)}
+                    onError={() => {
+                      setAskMoodAssetIndex((current) => {
+                        const next = current + 1;
+                        if (next < askMoodSources.length) return next;
+                        setAskMoodBroken(true);
+                        return current;
+                      });
+                    }}
                   />
                 ) : (
                   <BrainCircuit
