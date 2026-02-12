@@ -2,6 +2,43 @@
  * Simple WebGL utilities shared between visualization components
  */
 
+type ShaderDebugPayload = {
+  stage: "vertex" | "fragment";
+  log: string;
+  source?: string;
+  translated?: string | null;
+};
+
+const addLineNumbers = (source: string) =>
+  source
+    .split(/\r?\n/)
+    .map((line, idx) => `${String(idx + 1).padStart(4, " ")}| ${line}`)
+    .join("\n");
+
+const captureShaderDebug = (
+  gl: WebGL2RenderingContext,
+  shader: WebGLShader,
+  stage: ShaderDebugPayload["stage"],
+  source: string,
+): ShaderDebugPayload => {
+  const log = gl.getShaderInfoLog(shader) || "unknown error";
+  let translated: string | null = null;
+  try {
+    const ext: any = gl.getExtension("WEBGL_debug_shaders");
+    if (ext?.getTranslatedShaderSource) {
+      translated = ext.getTranslatedShaderSource(shader) || null;
+    }
+  } catch {
+    translated = null;
+  }
+  return {
+    stage,
+    log,
+    source: addLineNumbers(source),
+    translated: translated ? addLineNumbers(translated) : null,
+  };
+};
+
 export function createProgram(
   gl: WebGL2RenderingContext,
   vertexSource: string,
@@ -9,28 +46,32 @@ export function createProgram(
   bindings?: Record<string, number>,
 ): WebGLProgram {
   const vs = gl.createShader(gl.VERTEX_SHADER);
-  if (!vs) throw new Error('Failed to create vertex shader object');
-  
+  if (!vs) throw new Error("Failed to create vertex shader object");
+
   gl.shaderSource(vs, vertexSource);
   gl.compileShader(vs);
   if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
-    const info = gl.getShaderInfoLog(vs) || 'unknown error';
-    throw new Error(`Vertex shader compile error: ${info}`);
+    const debug = captureShaderDebug(gl, vs, "vertex", vertexSource);
+    console.error("[gl] vertex shader compile failed", debug);
+    (globalThis as any).__lastShaderError = debug;
+    throw new Error(`Vertex shader compile error: ${debug.log} (see console)`);
   }
 
   const fs = gl.createShader(gl.FRAGMENT_SHADER);
-  if (!fs) throw new Error('Failed to create fragment shader object');
-  
+  if (!fs) throw new Error("Failed to create fragment shader object");
+
   gl.shaderSource(fs, fragmentSource);
   gl.compileShader(fs);
   if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
-    const info = gl.getShaderInfoLog(fs) || 'unknown error';
-    throw new Error(`Fragment shader compile error: ${info}`);
+    const debug = captureShaderDebug(gl, fs, "fragment", fragmentSource);
+    console.error("[gl] fragment shader compile failed", debug);
+    (globalThis as any).__lastShaderError = debug;
+    throw new Error(`Fragment shader compile error: ${debug.log} (see console)`);
   }
 
   const prog = gl.createProgram();
-  if (!prog) throw new Error('Failed to create GL program');
-  
+  if (!prog) throw new Error("Failed to create GL program");
+
   gl.attachShader(prog, vs);
   gl.attachShader(prog, fs);
   if (bindings) {
@@ -39,9 +80,10 @@ export function createProgram(
     }
   }
   gl.linkProgram(prog);
-  
+
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-    const info = gl.getProgramInfoLog(prog) || 'unknown link error';
+    const info = gl.getProgramInfoLog(prog) || "unknown link error";
+    console.error("[gl] program link failed", info);
     throw new Error(`Program link error: ${info}`);
   }
 
