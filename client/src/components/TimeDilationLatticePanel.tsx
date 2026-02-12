@@ -205,6 +205,83 @@ type TimeDilationLatticePanelProps = {
   showDebug?: boolean;
 };
 
+type ActivationErrorState = {
+  raw: string;
+  display: string;
+};
+
+type PanelErrorBoundaryState = {
+  hasError: boolean;
+  error?: Error;
+};
+
+class TimeDilationPanelErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  PanelErrorBoundaryState
+> {
+  state: PanelErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(error: Error): PanelErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[time-dilation] panel render error:", error, info);
+  }
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: undefined });
+  };
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    const message = this.state.error?.message ?? "Unknown render error.";
+    return (
+      <div className="relative flex min-h-[420px] w-full items-center justify-center rounded-xl border border-rose-500/30 bg-black/70 p-6 text-slate-100">
+        <div className="max-w-md text-center">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-rose-300">Render failed</div>
+          <div className="mt-2 text-sm text-slate-200">The lattice hit a render error.</div>
+          <pre className="mt-3 max-h-48 overflow-auto rounded bg-black/40 p-3 text-left text-[11px] text-slate-300 select-text whitespace-pre-wrap">
+            {message}
+          </pre>
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              className="rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-rose-200 transition hover:bg-rose-500/20"
+              onClick={this.handleReset}
+            >
+              Retry render
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+export default function TimeDilationLatticePanel(props: TimeDilationLatticePanelProps) {
+  return (
+    <TimeDilationPanelErrorBoundary>
+      <TimeDilationLatticePanelInner {...props} />
+    </TimeDilationPanelErrorBoundary>
+  );
+}
+
+const buildActivationErrorState = (rawMessage: string): ActivationErrorState => {
+  const trimmed = rawMessage.trim();
+  const isHtml = /<!doctype html|<html/i.test(trimmed);
+  let display = trimmed;
+  if (isHtml) {
+    display =
+      "Activation failed: upstream returned HTML (likely proxy/app not reachable). " +
+      "Confirm the server is running and the preview URL maps to the same origin.";
+  }
+  if (display.length > 2200) {
+    display = `${display.slice(0, 2200)}… (truncated, use Copy error for full)`;
+  }
+  return { raw: trimmed, display };
+};
+
 const GRID_DIV = 12;
 const CM2_TO_M2 = 1e-4;
 const THETA_AUDIT_MAX = 1e12;
@@ -2407,7 +2484,7 @@ function sampleHullFieldForVerts(
   return { dist: outDist, grad: outGrad };
 }
 
-export default function TimeDilationLatticePanel({
+function TimeDilationLatticePanelInner({
   className,
   pipeline,
   kappaTuning,
@@ -2572,7 +2649,9 @@ export default function TimeDilationLatticePanel({
   const [certActivationState, setCertActivationState] =
     useState<"idle" | "running" | "done" | "error">("idle");
   const [certActivationProgress, setCertActivationProgress] = useState(0);
-  const [certActivationError, setCertActivationError] = useState<string | null>(null);
+  const [certActivationError, setCertActivationError] = useState<ActivationErrorState | null>(
+    null,
+  );
   const [debugEnabled, setDebugEnabled] = useState(showDebug);
   const debugBlocked = latticeMetricOnly && strictMetricMissing;
   const debugAutoPublish = import.meta.env.VITE_LATTICE_DEBUG_PUSH === "1";
@@ -5418,7 +5497,7 @@ export default function TimeDilationLatticePanel({
       grQuery.refetch();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Activation failed";
-      setCertActivationError(message);
+      setCertActivationError(buildActivationErrorState(message));
       setCertActivationState("error");
     }
   }, [
@@ -6488,17 +6567,26 @@ export default function TimeDilationLatticePanel({
                 Natario activation failed
               </div>
               <div className="mt-1 select-text whitespace-pre-wrap text-slate-300">
-                {certActivationError}
+                {certActivationError.display}
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
                   className="rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-rose-200 transition hover:bg-rose-500/20"
                   onClick={() => {
-                    void navigator.clipboard?.writeText(certActivationError).catch(() => {});
+                    void navigator.clipboard?.writeText(certActivationError.raw).catch(() => {});
                   }}
                 >
                   Copy error
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-slate-200 transition hover:bg-white/10"
+                  onClick={() => {
+                    void activateNatarioCertified();
+                  }}
+                >
+                  Retry
                 </button>
                 <span className="text-[10px] text-slate-400">Select to highlight</span>
               </div>
