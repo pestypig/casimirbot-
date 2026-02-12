@@ -234,7 +234,8 @@ export const computeTimeDilationRenderPlan = (
     : 0;
 
   const betaWarpWeight = enableGeometryWarp ? ALCUBIERRE_BETA_WARP_WEIGHT : 0;
-  const thetaWarpWeight = enableGeometryWarp ? THETA_WARP_SCALE : 0;
+  const thetaWarpWeight =
+    enableGeometryWarp && mode === "alcubierre" ? THETA_WARP_SCALE : 0;
 
   const betaNorm = resolveScaledNormalization({
     enabled: enableGeometryWarp && sourceForBeta === "gr-brick",

@@ -6,7 +6,7 @@ Purpose
 
 Modes
 - alcubierre: directional warp expected; geometry warp may be enabled when inputs are certified.
-- natario: volume-preserving expectation; geometry warp is disabled by default.
+- natario: volume-preserving expectation; geometry warp may be enabled in strict mode, but theta-driven warp is disabled (theta is diagnostic only).
 
 Data sources
 - GR brick: primary diagnostic fields (alpha, theta, beta, gamma, shear).
@@ -23,7 +23,7 @@ State flags
 
 Visual layers
 - Geometry warp: beta-advection and theta radial warp (only when Alcubierre + certified GR).
-- Theta radial warp: part of geometry warp; never enabled in Natario by default.
+- Theta radial warp: part of geometry warp; disabled for Natario canonical display.
 - Color: clockRate (alpha or g_tt) and theta tint when available.
 - Overlays: constraints and region grid are optional and do not change the core plan.
 - Warp cap: cell-size-limited displacement cap sourced from RenderPlan.
@@ -39,6 +39,9 @@ Soft rules
 - When GR is unavailable, use lapse brick for alpha/clock rate if present; otherwise analytic proxy.
 - Proxy inputs -> banner PROXY, normalization switches to proxy or off as appropriate.
 - Fallback state (GR disabled) -> banner FALLBACK and no geometry warp.
+
+Visualization scalers
+- betaWarpWeight, thetaWarpWeight, geomWarpScale, and normalization targets are visualization scalers, not physical coefficients.
 
 RenderPlan contract
 - All rendering decisions (data sources, warp weights, normalization, banners) come from RenderPlan.

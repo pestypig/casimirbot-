@@ -29,6 +29,9 @@ Convergence gaps (non-math or policy drift)
 - Natario implies theta ~ 0, but the lattice can apply theta-driven warp displacement when geometry warp is enabled.
 - For strict Natario canonical display, theta warp should be disabled or explicitly marked as visual-only.
 
+Status
+- Theta-driven warp is disabled for Natario canonical rendering; theta remains a diagnostic channel.
+
 4. Wall detection thresholds
 - Wall detection uses curvature invariants (ricci4/kretschmann). If thresholds are too high, Natario wall can be classified as NO_HULL.
 - This is a visualization threshold issue, not a geometry mismatch.
