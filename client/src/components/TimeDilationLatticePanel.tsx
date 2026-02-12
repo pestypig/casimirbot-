@@ -8094,7 +8094,7 @@ export default function TimeDilationLatticePanel({
           Color maps expansion/contraction (theta): cool means contraction, warm means expansion. Geometry warp follows the
           RenderPlan: Alcubierre uses beta-advection + theta when certified; Natario canonical uses beta + shear only
           (theta warp disabled). Clock rate uses the selected observer ({clockRateLabel}); static sqrt(-g_tt) applies only
-          where g_tt < 0 (partial_t timelike). Gamma_ij adds anisotropic scaling, K_ij adds shear/twist cues, and
+          where g_tt {"<"} 0 (partial_t timelike). Gamma_ij adds anisotropic scaling, K_ij adds shear/twist cues, and
           H_constraint highlights iso bands when present. Hull contours use hullDist/hullMask bricks from GLB uploads when
           present (visual proxy only). phiScale, warp, breath, and softening are visualization scalers; activation gates
           warp cues using electrical inputs and guardrails.
