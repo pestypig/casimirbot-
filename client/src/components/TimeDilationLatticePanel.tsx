@@ -3824,9 +3824,16 @@ function TimeDilationLatticePanelInner({
     };
   }, [pipelineState, contractGuardrails]);
 
+  const activationEffective = useMemo(() => {
+    if (latticeMetricOnly && certifiedModeEnabled && renderPlanRef.current?.enableGeometryWarp) {
+      return 1;
+    }
+    return activationMetrics.activation;
+  }, [latticeMetricOnly, certifiedModeEnabled, activationMetrics.activation, renderPlanVersion]);
+
   useEffect(() => {
-    activationTargetRef.current = activationMetrics.activation;
-  }, [activationMetrics.activation]);
+    activationTargetRef.current = activationEffective;
+  }, [activationEffective]);
 
   const pipelineProofs = useMemo(() => {
     const t00Metric = resolveProofPackNumber(
@@ -4782,6 +4789,10 @@ function TimeDilationLatticePanelInner({
     const qiCurvatureRatio = Number(qiGuard.curvatureRatio);
     const qiCurvatureOk = qiGuard.curvatureOk;
     const qiCurvatureEnforced = qiGuard.curvatureEnforced === true;
+    const activationEffectiveSource =
+      latticeMetricOnly && certifiedModeEnabled && renderPlanRef.current?.enableGeometryWarp
+        ? "metric-override"
+        : "pipeline";
     const base = {
       kappaDrive: kappaDriveValue,
       blend: kappaBlend,
@@ -4799,6 +4810,8 @@ function TimeDilationLatticePanelInner({
       centerProxy: bubbleParams.centerProxy,
       grProxy,
       activation: activationMetrics.activation,
+      activationEffective,
+      activationEffectiveSource,
       activationBase: activationMetrics.activationBase,
       activationProxy: activationMetrics.activationProxy,
       powerW: activationMetrics.power.value,
@@ -6611,6 +6624,10 @@ function TimeDilationLatticePanelInner({
             <div>breathAmp: {formatFixed(debugStats.breathAmp)}</div>
             <div>softening: {formatFixed(debugStats.softening)}</div>
             <div>activation: {formatProxyValue(formatFixed(debugStats.activation, 3), debugStats.activationProxy)}</div>
+            <div>
+              activation_effective: {formatFixed(debugStats.activationEffective ?? debugStats.activation, 3)} (
+              {debugStats.activationEffectiveSource ?? "pipeline"})
+            </div>
             <div>power_W: {formatProxyValue(formatSci(debugStats.powerW, 2), debugStats.powerProxy, debugStats.powerSource)}</div>
             <div>d_eff: {formatProxyValue(formatFixed(debugStats.dEff, 6), debugStats.dEffProxy, debugStats.dEffSource)}</div>
             <div>TS_ratio: {formatPipelineValue(formatSci(debugStats.tsRatio, 2), debugStats.tsRatioSource, debugStats.tsRatioProxy)}</div>
