@@ -7118,7 +7118,10 @@ export default function TimeDilationLatticePanel({
                   <div className="text-[10px] text-slate-400">
                     bounds: {formatVec3(latticeBounds.min, 1)} to {formatVec3(latticeBounds.max, 1)}
                   </div>
-                  <div className="flex flex-wrap gap-2 pt-1">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                  Visual scales only (non-physical)
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
                     <Button
                       type="button"
                       size="sm"
@@ -8089,11 +8092,12 @@ export default function TimeDilationLatticePanel({
       </div>
         <div className="text-xs text-slate-400">
           Color maps expansion/contraction (theta): cool means contraction, warm means expansion. Geometry warp follows the
-          RenderPlan: Alcubierre uses beta-advection + theta when certified; Natario keeps geometry warp off by default.
-          Clock rate is sampled for pulse timing ({clockRateLabel}). Gamma_ij adds anisotropic scaling, K_ij adds
-          shear/twist cues, and H_constraint highlights iso bands when present. Hull contours use hullDist/hullMask bricks
-          from GLB uploads when present (visual proxy only). phiScale, warp, breath, and softening follow kappa_drive
-          (log-scaled); activation gates warp cues using electrical inputs and guardrails.
+          RenderPlan: Alcubierre uses beta-advection + theta when certified; Natario canonical uses beta + shear only
+          (theta warp disabled). Clock rate uses the selected observer ({clockRateLabel}); static sqrt(-g_tt) applies only
+          where g_tt < 0 (partial_t timelike). Gamma_ij adds anisotropic scaling, K_ij adds shear/twist cues, and
+          H_constraint highlights iso bands when present. Hull contours use hullDist/hullMask bricks from GLB uploads when
+          present (visual proxy only). phiScale, warp, breath, and softening are visualization scalers; activation gates
+          warp cues using electrical inputs and guardrails.
         </div>
     </div>
   );
