@@ -38,6 +38,8 @@ const CONCEPT_HOT_RELOAD =
 let conceptCacheStamp: { fileCount: number; maxMtimeMs: number } | null = null;
 
 const normalizeValue = (value: string): string => value.trim();
+const unquoteValue = (value: string): string =>
+  value.trim().replace(/^["']/, "").replace(/["']$/, "").trim();
 
 const parseAliases = (value?: string): string[] => {
   if (!value) return [];
@@ -217,7 +219,7 @@ const loadConceptCards = (): HelixAskConceptCard[] => {
       if (!parsedBody.definition) continue;
       cards.push({
         id,
-        label,
+        label: label ? unquoteValue(label) : undefined,
         aliases,
         scope,
         intentHints: intentHints.length ? intentHints : undefined,
@@ -537,7 +539,7 @@ const buildConceptTechnicalLines = (card: HelixAskConceptCard): string[] => {
 export function renderConceptAnswer(match: HelixAskConceptMatch | null): string {
   if (!match) return "";
   const { card } = match;
-  const label = card.label ?? card.id;
+  const label = card.label ? unquoteValue(card.label) : card.id;
   const intro = buildConversationalConceptIntro(card.definition ?? "", label);
   const technicalLines = buildConceptTechnicalLines(card);
   const technical = technicalLines.length > 0 ? `Technical notes:\n${technicalLines.join("\n")}` : "";
