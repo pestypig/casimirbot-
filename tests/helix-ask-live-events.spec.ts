@@ -83,7 +83,7 @@ describe("Helix Ask live events", () => {
     expect(allMissing).toEqual([]);
   }, 20000);
 
-  it("answers ideology concept query with a hard forced concept answer", async () => {
+  it("answers ideology concept query with grounded narrative + technical notes", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -104,9 +104,13 @@ describe("Helix Ask live events", () => {
     const text = payload.text.trim();
     expect(text).toContain("Close loops only with verified signals");
     expect(text).toContain("Sources:");
-    expect(answerPath).toContain("forcedAnswer:ideology");
-    expect(answerPath).toContain("answer:forced");
+    expect(answerPath).not.toContain("forcedAnswer:ideology");
+    expect(answerPath).not.toContain("answer:forced");
+    expect(answerPath).toContain("answer:llm");
     expect(payload.debug?.answer_extension_appended ?? false).toBe(false);
+    expect(text).toMatch(/^In plain language/i);
+    expect(text).not.toMatch(/^Confirmed:/i);
+    expect(text).not.toMatch(/Next evidence:/i);
     expect(text).not.toMatch(/^additional repo context:/i);
     expect(text).not.toMatch(/client\/src\/components\/MissionEthosSourcePanel\.tsx/i);
     expect(text).toMatch(/docs\/knowledge\/ethos\/feedback-loop-hygiene\.md/i);

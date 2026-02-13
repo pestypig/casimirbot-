@@ -537,35 +537,6 @@ function isEvidencePathMatch(line: string, allowedPaths: Set<string>): boolean {
   );
 }
 
-function extractEvidenceLines(
-  scaffold: string | undefined,
-  limit = 4,
-  allowedPaths: string[] = [],
-): string[] {
-  if (!scaffold) return [];
-  const normalizedAllowed = allowedPaths.map(normalizeEvidencePath).filter(Boolean);
-  const allowedSet = new Set(normalizedAllowed);
-  const lines = scaffold
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .filter((line) => /^(-|\d+\.)\s+/.test(line));
-  const filteredLines = allowedSet.size > 0
-    ? lines.filter((line) => isEvidencePathMatch(line, allowedSet))
-    : lines;
-  if (lines.length === 0) {
-    return scaffold
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .slice(0, limit);
-  }
-  if (filteredLines.length > 0) {
-    return filteredLines.slice(0, limit);
-  }
-  return [];
-}
-
 function buildConceptEvidencePaths(match: HelixAskConceptMatch): string[] {
   const paths = new Set<string>();
   if (match.card.sourcePath) {
@@ -577,6 +548,44 @@ function buildConceptEvidencePaths(match: HelixAskConceptMatch): string[] {
   return Array.from(paths).filter(Boolean);
 }
 
+const extractConceptTechnicalSection = (match: HelixAskConceptMatch): string => {
+  const rendered = renderConceptAnswer(match);
+  const technicalMatch = rendered.match(/Technical notes:\s*[\s\S]*$/i);
+  return technicalMatch && technicalMatch[0].trim().length > 0
+    ? technicalMatch[0].trim()
+    : rendered.trim();
+};
+
+const MODEL_PLACEHOLDER_RE =
+  /^(?:(?:\w+\.)?llm\.local(?:\s+stub result)?|placeholder|unable to answer|i cannot answer|model error)\b/i;
+
+const isModelPlaceholderAnswer = (value: string): boolean => {
+  if (!value.trim()) return true;
+  return MODEL_PLACEHOLDER_RE.test(value.trim());
+};
+
+const hasUsefulIdeologySignal = (value: string, card: HelixAskConceptMatch["card"]): boolean => {
+  const normalized = value.toLowerCase();
+  const definitionTerms = card.definition.toLowerCase().split(/[^a-z0-9]+/);
+  const hasDefinitionSignal =
+    definitionTerms.length > 0 &&
+    definitionTerms.some((term) => term.length > 4 && normalized.includes(term));
+  const hasNarrativeSignal =
+    /society|civic|public|community|citizen|impact|trust|stability|govern/i.test(value);
+  const hasVerificationSignal = /verified|verify|source|rollback|indicator|evidence/i.test(value);
+  return hasDefinitionSignal && hasNarrativeSignal && hasVerificationSignal;
+};
+
+const isUnhelpfulIdeologyAnswer = (
+  answer: string,
+  card: HelixAskConceptMatch["card"],
+): boolean => {
+  if (!answer.trim()) return true;
+  if (answer.length < 70) return true;
+  if (isModelPlaceholderAnswer(answer)) return true;
+  return !hasUsefulIdeologySignal(answer, card);
+};
+
 function applyIdeologyConceptOverride(
   input: HelixAskPlatonicInput,
 ): { answer: string; applied: boolean; reason?: string } {
@@ -587,21 +596,68 @@ function applyIdeologyConceptOverride(
   if (!match) {
     return { answer: input.answer, applied: false };
   }
-  const conceptParagraph = renderConceptAnswer(match);
-  const allowedEvidencePaths = buildConceptEvidencePaths(match);
-  const evidenceLines = extractEvidenceLines(input.repoScaffold, 4, allowedEvidencePaths);
-  const sourceLine = allowedEvidencePaths.length > 0
-    ? `Sources: ${allowedEvidencePaths.join(", ")}`
+  const conceptAnswer = renderConceptAnswer(match);
+  const conceptAppendix = extractConceptTechnicalSection(match);
+  const sourceLine = buildConceptEvidencePaths(match).length > 0
+    ? `Sources: ${buildConceptEvidencePaths(match).join(", ")}`
     : "";
-  const paragraph3 = evidenceLines.join("\n").trim();
-  const composed = [conceptParagraph, paragraph3, sourceLine]
-    .filter(Boolean)
-    .join("\n\n")
-    .trim();
-  if (!composed) {
+  const conceptAnswerWithSources = [conceptAnswer, sourceLine].filter(Boolean).join("\n\n");
+  const hasSourceLine = (value: string): boolean => /^Sources?:\s*/i.test(value);
+  const appendConceptAppendix = (value: string): string => {
+    const parts: string[] = [value.trim()];
+    if (conceptAppendix && !/^Technical notes:/i.test(value)) {
+      parts.push(conceptAppendix);
+    }
+    if (sourceLine && !hasSourceLine(value)) {
+      parts.push(sourceLine);
+    }
+    return parts.filter(Boolean).join("\n\n").trim();
+  };
+  if (!conceptAnswerWithSources) {
     return { answer: input.answer, applied: false };
   }
-  return { answer: composed, applied: true, reason: "ideology_concept_override" };
+  if (!input.answer.trim()) {
+    return {
+      answer: conceptAnswerWithSources,
+      applied: true,
+      reason: "ideology_concept_override",
+    };
+  }
+  if (isUnhelpfulIdeologyAnswer(input.answer, match.card)) {
+    if (isModelPlaceholderAnswer(input.answer)) {
+      return {
+        answer: conceptAnswerWithSources,
+        applied: false,
+        reason: "ideology_concept_replace_placeholder",
+      };
+    }
+    return {
+      answer: appendConceptAppendix(input.answer),
+      applied: true,
+      reason: "ideology_concept_override",
+    };
+  }
+  if (/^Technical notes:/im.test(input.answer)) {
+    return {
+      answer: appendConceptAppendix(input.answer),
+      applied: false,
+      reason: "ideology_concept_existing_technical",
+    };
+  }
+  const ensureSentence = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return trimmed;
+    return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+  };
+  const lead = ensureSentence(input.answer.trim());
+  const friendlyLead = /^In plain language,?/i.test(lead)
+    ? lead
+    : `In plain language, ${lead}`;
+  return {
+    answer: appendConceptAppendix(friendlyLead),
+    applied: false,
+    reason: "ideology_concept_append",
+  };
 }
 
 function stripJunkFragments(answer: string): { answer: string; applied: boolean; reasons: string[] } {
@@ -1699,7 +1755,8 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
     gatedInput.evidenceGateOk !== false &&
     Boolean(gatedInput.evidenceText && gatedInput.evidenceText.trim().length > 0);
   const skipRattlingReplacement =
-    Boolean(gatedInput.templateLockedAnswer) && gatedInput.intentId === "repo.ideology_reference";
+    gatedInput.intentId === "repo.ideology_reference" &&
+    (Boolean(gatedInput.templateLockedAnswer) || Boolean(gatedInput.conceptMatch));
   if (
     rattlingGateApplied &&
     (gatedInput.domain === "repo" || gatedInput.domain === "falsifiable") &&
@@ -1736,3 +1793,4 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
     variantSummary,
   };
 }
+

@@ -4179,6 +4179,28 @@ const HELIX_ASK_DRAWER_HEADER =
 const HELIX_ASK_SOURCES_LINE = /^sources?\s*:/i;
 const HELIX_ASK_FILE_LIST_ITEM = /^[-*]\s+.+\.(md|json|ts|tsx|js|jsx|html|css|yml|yaml)\b/i;
 
+const HELIX_ASK_IDEOLOGY_SCENARIO_RE =
+  /\b(?:team|platform|organization|org|city|community|product|group|office|company|department|government|school|hospital|forum|moderation|network|platforms|service|service provider)\b/i;
+
+const trim = (value: string): string => value.replace(/\s+/g, " ").trim();
+
+const extractIdeologyScenarioSeed = (question: string): string | null => {
+  const match = question.match(
+    /\b(?:for|for the|for an|for a|in|for your|for their)\s+([^?.!,]+?)(?:\?|,|\s+when|\s+if|\s+how|$)/i,
+  );
+  if (!match?.[1]) return null;
+  const seed = trim(match[1]);
+  if (seed.length < 6 || seed.length > 120) return null;
+  return HELIX_ASK_IDEOLOGY_SCENARIO_RE.test(seed) ? seed : null;
+};
+
+const buildIdeologyConversationSeed = (match: HelixAskConceptMatch | null): string => {
+  if (!match) return "";
+  const rendered = renderConceptAnswer(match);
+  const [lead] = rendered.split(/\n\nTechnical notes:/i);
+  return trim(lead);
+};
+
 function stripDrawerSectionsFromAnswer(answer: string): string {
   if (!answer) return answer;
   const lines = answer.split(/\r?\n/);
@@ -9977,6 +9999,128 @@ function buildGeneralAskEvidencePrompt(
   return lines.join("\n");
 }
 
+function buildHelixAskIdeologySynthesisPrompt(
+  question: string,
+  scaffold: string,
+  format: HelixAskFormat,
+  stageTags: boolean,
+  verbosity: HelixAskVerbosity,
+  toolResultsBlock?: string,
+  softExpansionSentences = 0,
+  conceptMatch?: HelixAskConceptMatch | null,
+): string {
+  const spec = resolveHelixAskVerbositySpec(verbosity);
+  const lines = [
+    "You are Helix Ask, a civic policy explainer grounded in repository evidence.",
+    "Start with a plain-language civic opening before technical details.",
+  ];
+  const scenarioHint = extractIdeologyScenarioSeed(question);
+  const twoParagraphContract = hasTwoParagraphContract(question);
+  const hasCodeSpans = toolResultsHas(toolResultsBlock, "code_spans");
+  const conversationSeed = buildIdeologyConversationSeed(conceptMatch ?? null);
+  const introSentenceBudget =
+    verbosity === "brief" ? "2-3" : verbosity === "normal" ? "3-4" : "4-6";
+  const mechanismSentenceBudget =
+    verbosity === "brief" ? "2-4" : verbosity === "normal" ? "3-5" : "4-6";
+  const effectSentenceBudget =
+    verbosity === "brief" ? "2-3" : verbosity === "normal" ? "2-4" : "2-4";
+  if (conversationSeed) {
+    lines.push(
+      "Use this as a loose anchor, then adapt it to the exact user question.",
+    );
+    lines.push(`"${conversationSeed}"`);
+  }
+  if (format === "steps") {
+    lines.push("Use only the evidence steps below. Do not add steps not in evidence.");
+    if (stageTags) {
+      lines.push("Preserve any stage tags present in the evidence steps.");
+    } else {
+      lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+    }
+    lines.push(
+      `Start directly with a numbered list using "1." style; use ${spec.steps.count} steps and no preamble.`,
+    );
+    lines.push(
+      `Each step should be ${spec.steps.sentences} sentences and cite file paths or gate/certificate ids from evidence steps.`,
+    );
+    if (!twoParagraphContract) {
+      lines.push(
+        `After the steps, add a short paragraph starting with "In practice," (${spec.steps.inPractice} sentences).`,
+      );
+    }
+    lines.push("Evidence steps:");
+  } else {
+    lines.push(
+      "Answer in conversational civic paragraphs, not a checklist. Do not use numbered steps.",
+    );
+    if (twoParagraphContract) {
+      lines.push("Use exactly two paragraphs.");
+      lines.push(
+        `Paragraph 1: open with a plain-language civic summary (${introSentenceBudget} sentences).`,
+      );
+      lines.push(
+      `Paragraph 2: explain mechanism plus social effect in accessible terms (${effectSentenceBudget} sentences).`,
+    );
+    } else {
+      lines.push("Use 3-4 paragraphs.");
+      lines.push(
+        `Paragraph 1: open with a plain-language civic summary (${introSentenceBudget} sentences).`,
+      );
+      lines.push(
+        `Paragraph 2: explain governance mechanism with concrete process detail and why it is needed (${mechanismSentenceBudget} sentences).`,
+      );
+      lines.push(
+        `Paragraph 3: connect to social effects, trust, and stability (${effectSentenceBudget} sentences).`,
+      );
+      lines.push(
+        `If the question includes a scenario, add a final short paragraph that applies the concept to it (${mechanismSentenceBudget} sentences, concise).`,
+      );
+    }
+    lines.push(
+      scenarioHint
+        ? `Include one concrete example sentence that mirrors the scenario: "${scenarioHint}".`
+        : "If a scenario is present in the question, include one concrete example sentence.",
+    );
+    lines.push(
+      "After the narrative paragraphs, include a short appendix headed 'Technical notes:' with only evidence-grounded bullets.",
+    );
+    if (!twoParagraphContract) {
+      lines.push(
+        'Optionally end with "In practice," and one-to-two practical takeaways.',
+      );
+    }
+    if (toolResultsBlock?.trim()) {
+      lines.push("Tool results are authoritative. Use them as ground truth.");
+      lines.push("If TOOL_RESULTS include doc_spans or code_spans, do not claim evidence is missing.");
+      if (!hasCodeSpans) {
+        lines.push(
+          "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
+        );
+      }
+      lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+      lines.push(toolResultsBlock.trim());
+    }
+    lines.push("Evidence bullets:");
+  }
+  if (softExpansionSentences > 0) {
+    lines.push(
+      `If the evidence is strong, you may add up to ${softExpansionSentences} extra sentences of interpretation that do not introduce new uncited facts.`,
+    );
+  }
+  lines.push("Avoid repetition; do not repeat any sentence or paragraph.");
+  lines.push("Do not include the words \"Question:\" or \"Context sources\".");
+  lines.push("Do not include stage tags or parenthetical labels unless explicitly requested.");
+  lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  lines.push("");
+  lines.push(scaffold);
+  lines.push("");
+  lines.push(HELIX_ASK_ANSWER_START);
+  lines.push(HELIX_ASK_ANSWER_END);
+  return lines.join("\n");
+}
+
 function buildHelixAskSynthesisPrompt(
   question: string,
   scaffold: string,
@@ -10507,40 +10651,6 @@ function buildHelixAskPipelineAnswer(): string {
     "Package the response envelope and render in the UI (server/services/helix-ask/envelope.ts, client/src/components/helix/HelixAskPill.tsx).",
   ];
   return steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
-}
-
-function buildHelixAskIdeologyAnswer(conceptMatch: HelixAskConceptMatch): string {
-  const buildConceptEvidencePaths = (match: HelixAskConceptMatch): string[] => {
-    const paths = new Set<string>();
-    if (match.card.sourcePath) {
-      const sourcePath = normalizeEvidencePath(match.card.sourcePath);
-      if (sourcePath) {
-        paths.add(sourcePath);
-      }
-    }
-    for (const entry of match.card.mustIncludeFiles ?? []) {
-      if (entry) {
-        const normalizedPath = normalizeEvidencePath(entry);
-        if (normalizedPath) {
-          paths.add(normalizedPath);
-        }
-      }
-    }
-    return Array.from(paths).filter(Boolean);
-  };
-  const core: string[] = [];
-  if (conceptMatch.card.definition) {
-    core.push(ensureSentence(conceptMatch.card.definition));
-  }
-  if (conceptMatch.card.keyQuestions) {
-    core.push(ensureSentence(`Key questions include: ${conceptMatch.card.keyQuestions}`));
-  }
-  const paragraph1 = core.join(" ").trim();
-  const paragraph2 = conceptMatch.card.notes ? ensureSentence(conceptMatch.card.notes) : "";
-  const sources = buildConceptEvidencePaths(conceptMatch);
-  const sourceLine =
-    sources.length > 0 ? `Sources: ${sources.join(", ")}` : "";
-  return [paragraph1, paragraph2, sourceLine].filter(Boolean).join("\n\n");
 }
 
 const buildConceptEvidencePaths = (match: HelixAskConceptMatch): string[] => {
@@ -15899,11 +16009,15 @@ const executeHelixAsk = async ({
     if (compositeConstraintRequested) {
       intentSecondaryTier = "F3";
     }
+    const isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
     let verbosity = resolveHelixAskVerbosity(
       baseQuestion,
       intentProfile,
       parsed.data.verbosity as HelixAskVerbosity | undefined,
     );
+    if (isIdeologyReferenceIntent && !parsed.data.verbosity) {
+      verbosity = "extended";
+    }
     let intentReason = intentReasonBase;
     if (compositeConstraintRequested) {
       intentReason = `${intentReason}|composite:constraint`;
@@ -15950,6 +16064,13 @@ const executeHelixAsk = async ({
         intentProfile,
         parsed.data.verbosity as HelixAskVerbosity | undefined,
       );
+      if (
+        isIdeologyReferenceIntent &&
+        intentProfile.id === "repo.ideology_reference" &&
+        !parsed.data.verbosity
+      ) {
+        verbosity = "extended";
+      }
       intentReason = reasonSuffix ? `${intentReasonBase}|${reasonSuffix}` : intentReasonBase;
       if (compositeConstraintRequested) {
         intentReason = `${intentReason}|composite:constraint`;
@@ -16867,27 +16988,13 @@ const executeHelixAsk = async ({
       forcedAnswerIsHard = true;
       answerPath.push("forcedAnswer:math_solver");
     }
-    const ideologyConceptAnswerCandidate =
-      intentProfile.id === "repo.ideology_reference" && conceptMatch
-        ? buildHelixAskIdeologyAnswer(conceptMatch)
-        : null;
-    if (!forcedAnswer && ideologyConceptAnswerCandidate) {
-      forcedAnswer = ideologyConceptAnswerCandidate;
-      forcedAnswerIsHard = true;
-      answerPath.push("forcedAnswer:ideology");
-    }
-    if (conceptFastPath && conceptMatch && !forcedAnswer) {
-        const conceptAnswer =
-          intentProfile.id === "repo.ideology_reference"
-            ? buildHelixAskIdeologyAnswer(conceptMatch)
-            : renderConceptDefinition(conceptMatch);
+    if (conceptFastPath && conceptMatch && !forcedAnswer && intentProfile.id !== "repo.ideology_reference") {
+        const conceptAnswer = renderConceptDefinition(conceptMatch);
         if (conceptAnswer) {
           forcedAnswer = conceptAnswer;
           forcedAnswerIsHard = true;
           answerPath.push(
-            intentProfile.id === "repo.ideology_reference"
-              ? "forcedAnswer:ideology"
-              : "forcedAnswer:concept",
+            "forcedAnswer:concept",
           );
         }
     }
@@ -19270,6 +19377,13 @@ const executeHelixAsk = async ({
           debugPayload.arbiter_topic_ok = arbiterDecision.topicOk;
           debugPayload.arbiter_concept_match = Boolean(arbiterDecision.conceptMatch);
         }
+        if (
+          intentProfile.id === "repo.ideology_reference" &&
+          !parsed.data.verbosity &&
+          softExpansionBudget < 2
+        ) {
+          softExpansionBudget = 2;
+        }
         const softExpansionAllowed =
           softExpansionBudget > 0 &&
           (arbiterMode === "repo_grounded" || arbiterMode === "hybrid") &&
@@ -20023,7 +20137,9 @@ const executeHelixAsk = async ({
             slotCoverageFailed ||
             docSlotCoverageFailed)) ||
           (!evidenceGateOk && ambiguityTerms.length > 0));
-      if (shouldClarifyNow && !forcedAnswer && intentStrategy !== "constraint_report") {
+      const skipIdeologyClarify =
+        isIdeologyReferenceIntent && Boolean(conceptMatch);
+      if (shouldClarifyNow && !forcedAnswer && intentStrategy !== "constraint_report" && !skipIdeologyClarify) {
         const clarifyLine = clarifyOverride ?? buildAmbiguityClarifyLine([]);
         if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
           const scientific = buildScientificMicroReport({
@@ -20062,7 +20178,7 @@ const executeHelixAsk = async ({
         updateAgentDebug();
         recordControllerStop(agentStopReason, "ambiguity_gate");
       }
-        if (failClosedRepoEvidence && !forcedAnswer && intentStrategy !== "constraint_report") {
+      if (failClosedRepoEvidence && !forcedAnswer && intentStrategy !== "constraint_report" && !skipIdeologyClarify) {
           const planClarify = (clarifyOverride ?? planDirectives?.clarifyQuestion ?? "").trim();
           const missingSlots =
             docSlotSummary?.missingSlots?.length
@@ -20220,34 +20336,45 @@ const executeHelixAsk = async ({
           ].join(" | "),
         );
       } else if (isRepoQuestion && repoScaffold) {
-      if (intentProfile.id === "repo.ideology_reference" && conceptMatch && !forcedAnswer) {
-        forcedAnswer = buildHelixAskIdeologyAnswer(conceptMatch);
-        forcedAnswerIsHard = true;
-        answerPath.push("forcedAnswer:ideology");
-      }
         if (intentProfile.id === "repo.helix_ask_pipeline_explain") {
           forcedAnswer = buildHelixAskPipelineAnswer();
           pipelineEvidence = buildHelixAskPipelineEvidence();
           answerPath.push("forcedAnswer:helix_pipeline");
         }
-        prompt = ensureFinalMarker(
-          buildHelixAskSynthesisPrompt(
-            baseQuestion,
-            repoScaffold,
-            formatSpec.format,
-            formatSpec.stageTags,
-            verbosity,
-            toolResultsBlock,
-            softExpansionBudget,
-          ),
-        );
+        const ideologySynthesis = intentProfile.id === "repo.ideology_reference";
+        if (ideologySynthesis) {
+          prompt = ensureFinalMarker(
+            buildHelixAskIdeologySynthesisPrompt(
+              baseQuestion,
+              repoScaffold,
+              formatSpec.format,
+              formatSpec.stageTags,
+              verbosity,
+              toolResultsBlock,
+              softExpansionBudget,
+              conceptMatch,
+            ),
+          );
+        } else {
+          prompt = ensureFinalMarker(
+            buildHelixAskSynthesisPrompt(
+              baseQuestion,
+              repoScaffold,
+              formatSpec.format,
+              formatSpec.stageTags,
+              verbosity,
+              toolResultsBlock,
+              softExpansionBudget,
+            ),
+          );
+        }
         evidenceText = pipelineEvidence ?? repoScaffold;
         if (debugPayload && repoScaffold) {
           debugPayload.evidence_cards = pipelineEvidence ?? repoScaffold;
         }
         logEvent(
           "Synthesis prompt ready",
-          "repo",
+          ideologySynthesis ? "repo_ideology" : "repo",
           formatFileList(extractFilePathsFromText(evidenceText)),
         );
       } else if (promptScaffold) {
@@ -20655,7 +20782,11 @@ const executeHelixAsk = async ({
         shortMetaAfterClean.sentences < HELIX_ASK_SINGLE_LLM_SHORT_FALLBACK_MIN_SENTENCES ||
         shortMetaAfterClean.tokens < HELIX_ASK_SINGLE_LLM_SHORT_FALLBACK_MIN_TOKENS;
       const singleLlmShortFallbackEligible =
-        HELIX_ASK_SINGLE_LLM && hasToolEvidence && !hasCitationsAfterClean && singleLlmVeryShort;
+        HELIX_ASK_SINGLE_LLM &&
+        !isIdeologyReferenceIntent &&
+        hasToolEvidence &&
+        !hasCitationsAfterClean &&
+        singleLlmVeryShort;
       if (singleLlmShortFallbackEligible) {
         const missingSlotsForShortFallback =
           docSlotSummary?.missingSlots?.length
@@ -20868,10 +20999,18 @@ const executeHelixAsk = async ({
       cleaned = stripTrivialOrdinalBullets(cleaned);
       cleaned = dedupeReportParagraphs(cleaned).text;
       const conceptSourcePaths = conceptMatch ? buildConceptEvidencePaths(conceptMatch) : [];
+      const resolvedEvidencePaths = resolveEvidencePaths(evidenceText, contextFiles, contextText, 12);
+      const isDocSourcePath = (value: string): boolean => {
+        return value.trim().toLowerCase().startsWith("docs/");
+      };
       const allowedSourcePaths = Array.from(
         new Set([
-          ...resolveEvidencePaths(evidenceText, contextFiles, contextText, 12),
           ...conceptSourcePaths,
+          ...(
+            isIdeologyReferenceIntent
+              ? resolvedEvidencePaths.filter(isDocSourcePath)
+              : resolvedEvidencePaths
+          ),
         ]),
       );
       cleaned = sanitizeSourcesLine(
@@ -20918,7 +21057,7 @@ const executeHelixAsk = async ({
           answerPath.push("citationFallback:sources");
           logProgress("Citation missing", "repaired");
           logEvent("Citation missing", "repaired", formatFileList(repoEvidencePaths));
-        } else if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
+        } else if (HELIX_ASK_SCIENTIFIC_CLARIFY && !isIdeologyReferenceIntent) {
           const missingSlots =
             docSlotSummary?.missingSlots?.length
               ? docSlotSummary.missingSlots
@@ -20954,6 +21093,12 @@ const executeHelixAsk = async ({
           }
           logProgress("Citation missing", "scientific");
           logEvent("Citation missing", "scientific", formatFileList(repoEvidencePaths));
+        } else if (isIdeologyReferenceIntent) {
+          // Preserve narrative answer style for ideology reference prompts when no repo file
+          // citations are available; avoid scientific micro-report substitution.
+          answerPath.push("citationFallback:non_scientific");
+          logProgress("Citation missing", "non_scientific");
+          logEvent("Citation missing", "non_scientific", formatFileList(repoEvidencePaths));
         } else {
           cleaned =
             "Repo evidence was available but the answer could not be grounded with file citations. Please point to the relevant files or narrow the request.";
@@ -21189,6 +21334,7 @@ const executeHelixAsk = async ({
     }
     if (
       HELIX_ASK_SCIENTIFIC_CLARIFY &&
+      !isIdeologyReferenceIntent &&
       !lockedByIdeologyTemplate &&
       !isScientificMicroReport(cleaned) &&
       (platonicDomain === "repo" || platonicDomain === "hybrid" || platonicDomain === "falsifiable") &&
@@ -21382,7 +21528,12 @@ const executeHelixAsk = async ({
         citedPathStats.total > 0 &&
         citedPathStats.nonTree === 0 &&
         citedPathStats.share >= HELIX_ASK_TREE_DOMINANCE_RATIO;
-      if (HELIX_ASK_SINGLE_LLM && hasToolEvidence && treeDominatedCitations) {
+      if (
+        HELIX_ASK_SINGLE_LLM &&
+        !isIdeologyReferenceIntent &&
+        hasToolEvidence &&
+        treeDominatedCitations
+      ) {
         const dominanceFallback = buildSingleLlmShortAnswerFallback({
           question: baseQuestion,
           definitionFocus,
@@ -21629,6 +21780,7 @@ const executeHelixAsk = async ({
       const answerWordCount = estimateWordCount(cleaned);
       const extensionAppendEligible =
         HELIX_ASK_APPEND_EXTENSION_TO_TEXT &&
+        !isIdeologyReferenceIntent &&
         answerExtension.available &&
         Boolean(answerExtension.text) &&
         (isShortAnswer(cleaned, verbosity).short ||
@@ -21656,7 +21808,12 @@ const executeHelixAsk = async ({
         : shouldForceScientificFallback(cleaned, docBlocks, codeAlignment)
           ? "sparse_scientific_sections"
           : null;
-      if (HELIX_ASK_SINGLE_LLM && hasToolEvidence && scientificFallbackReason) {
+      if (
+        HELIX_ASK_SINGLE_LLM &&
+        !isIdeologyReferenceIntent &&
+        hasToolEvidence &&
+        scientificFallbackReason
+      ) {
         const weakSectionFallback = buildSingleLlmShortAnswerFallback({
           question: baseQuestion,
           definitionFocus,
