@@ -534,6 +534,19 @@ function ensureFinalMarker(value: string): string {
   return `${value.trimEnd()}\n\nANSWER_START\nANSWER_END`;
 }
 
+const HELIX_ASK_ANSWER_BOUNDARY_PREFIX_RE = /^\s*ANSWER_(?:START|END)\b\s*/i;
+const HELIX_ASK_ANSWER_MARKER_SPLIT_RE = /\b(?:ANSWER_START|ANSWER_END)\b/gi;
+
+const stripAnswerBoundaryPrefix = (value: string): string => {
+  let cursor = value.trimStart();
+  while (true) {
+    const stripped = cursor.replace(HELIX_ASK_ANSWER_BOUNDARY_PREFIX_RE, "");
+    if (stripped === cursor) break;
+    cursor = stripped.trimStart();
+  }
+  return cursor;
+};
+
 const HELIX_ASK_STOPWORDS = new Set([
   "a",
   "an",
@@ -1190,6 +1203,7 @@ function stripPromptEcho(response: string, question?: string): string {
   let trimmed = stripQuestionPrefixText(response.trim(), question);
   trimmed = stripLeadingQuestion(trimmed, question);
   trimmed = stripEvidencePromptBlock(trimmed);
+  trimmed = stripAnswerBoundaryPrefix(trimmed);
   const answerBlock = extractAnswerBlock(trimmed);
   if (answerBlock) {
     return answerBlock;
@@ -1242,8 +1256,7 @@ function stripPromptEcho(response: string, question?: string): string {
       lowered.startsWith("do not repeat the question") ||
       lowered.startsWith("end with a short paragraph") ||
       lowered.startsWith("respond with only the answer between") ||
-      lowered === "answer_start" ||
-      lowered === "answer_end" ||
+      /^answer_(?:start|end)\b/i.test(cleaned) ||
       lowered.startsWith("no preamble") ||
       lowered.startsWith("no headings") ||
       lowered.startsWith("ask debug") ||
@@ -1264,24 +1277,41 @@ function stripPromptEcho(response: string, question?: string): string {
       lowered.startsWith("final:")
     );
   };
-  const cleanedLines = trimmed.split(/\r?\n/).filter((line) => !isScaffoldLine(line));
+  const cleanedLines = trimmed
+    .split(/\r?\n/)
+    .filter((line) => !isScaffoldLine(line))
+    .map((line) => stripAnswerBoundaryPrefix(line));
   const cleaned = cleanedLines.join("\n").trim();
   const formatSpec = decideHelixAskFormat(question);
   if (cleaned) {
     return formatSpec.stageTags ? cleaned : stripStageTags(cleaned);
   }
-  return formatSpec.stageTags ? trimmed : stripStageTags(trimmed);
+  return formatSpec.stageTags ? trimmed : stripStageTags(stripAnswerBoundaryPrefix(trimmed));
 }
 
 function extractAnswerBlock(value: string): string {
   if (!value) return "";
+  const splitSegments = value
+    .split(HELIX_ASK_ANSWER_MARKER_SPLIT_RE)
+    .map((segment) => stripAnswerBoundaryPrefix(segment).trim())
+    .filter(Boolean);
+  if (splitSegments.length > 0) {
+    const longest = splitSegments.reduce((best, candidate) =>
+      best.length >= candidate.length ? best : candidate,
+    "");
+    if (longest) return longest;
+  }
   const startIndex = value.lastIndexOf("ANSWER_START");
   if (startIndex >= 0) {
     const afterStart = value.slice(startIndex + "ANSWER_START".length);
     const endIndex = afterStart.lastIndexOf("ANSWER_END");
     const slice = endIndex >= 0 ? afterStart.slice(0, endIndex) : afterStart;
-    const trimmed = slice.trim();
+    const trimmed = stripAnswerBoundaryPrefix(slice).trim();
     if (trimmed) return trimmed;
+  }
+  const boundaryTrimmed = stripAnswerBoundaryPrefix(value);
+  if (boundaryTrimmed) {
+    return boundaryTrimmed;
   }
   const markers = ["FINAL:", "FINAL ANSWER:", "FINAL_ANSWER:", "Answer:"];
   for (const marker of markers) {

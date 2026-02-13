@@ -3360,6 +3360,8 @@ const HELIX_ASK_FILE_HINT =
   /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:ts|tsx|js|jsx|md|json|yml|yaml|mjs|cjs|py|rs|go|java|kt|swift|cpp|c|h)/i;
 const HELIX_ASK_ANSWER_START = "ANSWER_START";
 const HELIX_ASK_ANSWER_END = "ANSWER_END";
+const HELIX_ASK_ANSWER_BOUNDARY_PREFIX_RE = /^\s*ANSWER_(?:START|END)\b\s*/i;
+const HELIX_ASK_ANSWER_MARKER_SPLIT_RE = /\b(?:ANSWER_START|ANSWER_END)\b/gi;
 const HELIX_ASK_PROGRESS_TOOL = "helix.ask.progress";
 const HELIX_ASK_PROGRESS_VERSION = "v1";
 const HELIX_ASK_STREAM_TOOL = "helix.ask.stream";
@@ -3920,8 +3922,7 @@ function isPromptLine(value: string): boolean {
     /^use general knowledge/i.test(cleaned) ||
     /^use only the reasoning/i.test(cleaned) ||
     /^respond with only the answer between/i.test(cleaned) ||
-    /^answer_start$/i.test(cleaned) ||
-    /^answer_end$/i.test(cleaned) ||
+    /^answer_(?:start|end)\b/i.test(cleaned) ||
     /^if the context is insufficient/i.test(cleaned) ||
     /^if the question mentions/i.test(cleaned) ||
     /^when the context includes/i.test(cleaned) ||
@@ -3995,6 +3996,19 @@ function stripScaffoldSections(value: string): string {
   return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+const stripAnswerBoundaryPrefix = (value: string): string => {
+  let cursor = value;
+  let next = cursor.trimStart();
+  while (true) {
+    const stripped = next.replace(HELIX_ASK_ANSWER_BOUNDARY_PREFIX_RE, "");
+    if (stripped === next) {
+      break;
+    }
+    next = stripped.trimStart();
+  }
+  return next;
+};
+
 function stripLeadingQuestion(answer: string, question?: string): string {
   const lines = answer.split(/\r?\n/);
   const target = question?.trim();
@@ -4039,6 +4053,7 @@ function stripPromptEchoFromAnswer(answer: string, question?: string): string {
   trimmed = stripLeadingQuestion(trimmed, question);
   trimmed = stripEvidencePromptBlock(trimmed);
   trimmed = stripScaffoldSections(trimmed);
+  trimmed = stripAnswerBoundaryPrefix(trimmed);
   if (trimmed) {
     const lines = trimmed.split(/\r?\n/);
     let start = 0;
@@ -4062,10 +4077,11 @@ function stripPromptEchoFromAnswer(answer: string, question?: string): string {
     .filter((line) => {
       const cleaned = cleanPromptLine(line);
       if (!cleaned) return false;
-      return !isPromptLine(cleaned);
+      return !isPromptLine(stripAnswerBoundaryPrefix(cleaned));
     })
     .join("\n")
     .trim();
+  trimmed = stripAnswerBoundaryPrefix(trimmed);
   if (!trimmed) return trimmed;
   trimmed = stripScaffoldSections(trimmed);
   if (!trimmed) return trimmed;
@@ -4094,14 +4110,26 @@ function stripEvidencePromptBlock(value: string): string {
 
 function extractAnswerBlock(value: string): string {
   if (!value) return "";
+  const splitSegments = value
+    .split(HELIX_ASK_ANSWER_MARKER_SPLIT_RE)
+    .map((segment) => stripAnswerBoundaryPrefix(segment).trim())
+    .filter(Boolean);
+  if (splitSegments.length > 0) {
+    const longest = splitSegments.reduce((best, candidate) =>
+      best.length >= candidate.length ? best : candidate,
+    "");
+    if (longest) return longest;
+  }
   const startIndex = value.lastIndexOf(HELIX_ASK_ANSWER_START);
   if (startIndex >= 0) {
     const afterStart = value.slice(startIndex + HELIX_ASK_ANSWER_START.length);
     const endIndex = afterStart.lastIndexOf(HELIX_ASK_ANSWER_END);
     const slice = endIndex >= 0 ? afterStart.slice(0, endIndex) : afterStart;
-    const trimmed = slice.trim();
+    const trimmed = stripAnswerBoundaryPrefix(slice).trim();
     if (trimmed) return trimmed;
   }
+  const boundaryStartTrimmed = stripAnswerBoundaryPrefix(value);
+  if (boundaryStartTrimmed.trim()) return boundaryStartTrimmed.trim();
   const markers = ["FINAL:", "FINAL ANSWER:", "FINAL_ANSWER:", "Answer:"];
   for (const marker of markers) {
     const idx = value.lastIndexOf(marker);
