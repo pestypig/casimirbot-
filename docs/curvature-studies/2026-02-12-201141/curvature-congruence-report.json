@@ -1,0 +1,387 @@
+{
+  "generatedAt": "2026-02-12T22:53:33.767Z",
+  "config": {
+    "baseUrl": "http://127.0.0.1:5000",
+    "outputPath": "docs/curvature-studies/2026-02-12-201141/curvature-congruence-report.json",
+    "timeoutMs": 20000,
+    "bundlePath": "docs/curvature-studies/2026-02-12-201141"
+  },
+  "primary": {
+    "name": "2026-02-12-201141",
+    "status": "FAIL",
+    "checks": [
+      {
+        "name": "strictCongruence",
+        "status": "PASS",
+        "details": [
+          "strictCongruence=true"
+        ],
+        "metrics": {
+          "strictCongruence": true
+        }
+      },
+      {
+        "name": "latticeMetricOnly",
+        "status": "PASS",
+        "details": [
+          "latticeMetricOnly=true"
+        ],
+        "metrics": {
+          "latticeMetricOnly": true
+        }
+      },
+      {
+        "name": "proxyBlocked",
+        "status": "PASS",
+        "details": [
+          "anyProxy=false"
+        ],
+        "metrics": {
+          "anyProxy": false
+        }
+      },
+      {
+        "name": "grCertified",
+        "status": "PASS",
+        "details": [
+          "grCertified=true"
+        ],
+        "metrics": {
+          "grCertified": true
+        }
+      },
+      {
+        "name": "banner",
+        "status": "PASS",
+        "details": [
+          "banner=CERTIFIED"
+        ],
+        "metrics": {
+          "gateBanner": "CERTIFIED"
+        }
+      },
+      {
+        "name": "mode",
+        "status": "PASS",
+        "details": [
+          "render_plan.mode=natario"
+        ],
+        "metrics": {
+          "mode": "natario"
+        }
+      },
+      {
+        "name": "chart",
+        "status": "PASS",
+        "details": [
+          "render_plan.chart=comoving_cartesian"
+        ],
+        "metrics": {
+          "chart": "comoving_cartesian"
+        }
+      },
+      {
+        "name": "observer",
+        "status": "PASS",
+        "details": [
+          "render_plan.observer=eulerian_n"
+        ],
+        "metrics": {
+          "observer": "eulerian_n"
+        }
+      },
+      {
+        "name": "normalization",
+        "status": "PASS",
+        "details": [
+          "render_plan.normalization=si_stress"
+        ],
+        "metrics": {
+          "normalization": "si_stress"
+        }
+      },
+      {
+        "name": "thetaWarpWeight",
+        "status": "PASS",
+        "details": [
+          "render_plan.thetaWarpWeight=0"
+        ],
+        "metrics": {
+          "thetaWarpWeight": 0
+        }
+      },
+      {
+        "name": "sourceForAlpha",
+        "status": "PASS",
+        "details": [
+          "sourceForAlpha=gr-brick"
+        ],
+        "metrics": {
+          "sourceForAlpha": "gr-brick"
+        }
+      },
+      {
+        "name": "sourceForBeta",
+        "status": "PASS",
+        "details": [
+          "sourceForBeta=gr-brick"
+        ],
+        "metrics": {
+          "sourceForBeta": "gr-brick"
+        }
+      },
+      {
+        "name": "sourceForTheta",
+        "status": "PASS",
+        "details": [
+          "sourceForTheta=gr-brick"
+        ],
+        "metrics": {
+          "sourceForTheta": "gr-brick"
+        }
+      },
+      {
+        "name": "sourceForClockRate",
+        "status": "PASS",
+        "details": [
+          "sourceForClockRate=gr-brick"
+        ],
+        "metrics": {
+          "sourceForClockRate": "gr-brick"
+        }
+      },
+      {
+        "name": "thetaDefinition",
+        "status": "FAIL",
+        "details": [
+          "theta_definition is required in strict mode"
+        ],
+        "metrics": {
+          "thetaDefinition": "n/a"
+        }
+      },
+      {
+        "name": "kijSignConvention",
+        "status": "FAIL",
+        "details": [
+          "kij_sign_convention is required in strict mode"
+        ],
+        "metrics": {
+          "kijSignConvention": "n/a"
+        }
+      },
+      {
+        "name": "gammaFieldNaming",
+        "status": "FAIL",
+        "details": [
+          "gamma_field_naming required in strict mode"
+        ],
+        "metrics": {
+          "gammaFieldNaming": "n/a"
+        }
+      },
+      {
+        "name": "fieldProvenanceSchema",
+        "status": "WARN",
+        "details": [
+          "field_provenance_schema is required in strict mode"
+        ],
+        "metrics": {
+          "fieldProvenanceSchema": "n/a"
+        }
+      },
+      {
+        "name": "requiredProvenanceKey.theta_definition",
+        "status": "FAIL",
+        "details": [
+          "theta_definition missing; required for strict provenance"
+        ],
+        "metrics": {
+          "key": "theta_definition",
+          "present": false
+        }
+      },
+      {
+        "name": "requiredProvenanceKey.kij_sign_convention",
+        "status": "FAIL",
+        "details": [
+          "kij_sign_convention missing; required for strict provenance"
+        ],
+        "metrics": {
+          "key": "kij_sign_convention",
+          "present": false
+        }
+      },
+      {
+        "name": "requiredProvenanceKey.gamma_field_naming",
+        "status": "FAIL",
+        "details": [
+          "gamma_field_naming missing; required for strict provenance"
+        ],
+        "metrics": {
+          "key": "gamma_field_naming",
+          "present": false
+        }
+      },
+      {
+        "name": "provenanceMissingKeys",
+        "status": "FAIL",
+        "details": [
+          "missing required_provenance keys: theta_definition, kij_sign_convention, gamma_field_naming"
+        ],
+        "metrics": {
+          "missingCount": 3
+        }
+      },
+      {
+        "name": "gttResidual",
+        "status": "WARN",
+        "details": [
+          "insufficient data for ADM reconstruction"
+        ],
+        "metrics": {
+          "gttRelativeResidual": "n/a",
+          "timelikeFrac": "n/a"
+        }
+      },
+      {
+        "name": "thetaK",
+        "status": "WARN",
+        "details": [
+          "theta or Ktrace unavailable"
+        ],
+        "metrics": {
+          "thetaKRelativeResidual": "n/a"
+        }
+      },
+      {
+        "name": "truthFields",
+        "status": "WARN",
+        "details": [
+          "alpha: MISSING",
+          "beta: MISSING",
+          "gamma: MISSING",
+          "kTrace: MISSING",
+          "theta: MISSING"
+        ],
+        "metrics": {
+          "alphaCount": 0,
+          "betaCount": 0,
+          "gammaCount": 0
+        }
+      },
+      {
+        "name": "invariantAvailability",
+        "status": "WARN",
+        "details": [
+          "no curvature invariants detected"
+        ],
+        "metrics": {
+          "invariants": 0
+        }
+      },
+      {
+        "name": "fieldProvenancePresence",
+        "status": "WARN",
+        "details": [
+          "field provenance metadata missing"
+        ],
+        "metrics": {
+          "fieldProvenanceKeys": 0
+        }
+      },
+      {
+        "name": "truthSource.alpha",
+        "status": "WARN",
+        "details": [
+          "alpha provenance source=unknown"
+        ],
+        "metrics": {
+          "source": "unknown"
+        }
+      },
+      {
+        "name": "truthSource.beta",
+        "status": "WARN",
+        "details": [
+          "beta provenance source=unknown"
+        ],
+        "metrics": {
+          "source": "unknown"
+        }
+      },
+      {
+        "name": "truthSource.theta",
+        "status": "WARN",
+        "details": [
+          "theta provenance source=unknown"
+        ],
+        "metrics": {
+          "source": "unknown"
+        }
+      },
+      {
+        "name": "truthSource.kTrace",
+        "status": "WARN",
+        "details": [
+          "kTrace provenance source=unknown"
+        ],
+        "metrics": {
+          "source": "unknown"
+        }
+      }
+    ],
+    "metrics": {
+      "renderingSeed": "n/a",
+      "renderingProbe": "n/a",
+      "passCount": 14,
+      "warnCount": 10,
+      "failCount": 7
+    },
+    "raw": {
+      "strict": {
+        "strictCongruence": true,
+        "latticeMetricOnly": true,
+        "anyProxy": false,
+        "grCertified": true,
+        "banner": "CERTIFIED",
+        "mode": "natario",
+        "chart": "comoving_cartesian",
+        "observer": "eulerian_n",
+        "normalization": "si_stress",
+        "thetaWarpWeight": 0,
+        "sourceForAlpha": "gr-brick",
+        "sourceForBeta": "gr-brick",
+        "sourceForTheta": "gr-brick",
+        "sourceForClockRate": "gr-brick",
+        "thetaDefinition": "",
+        "kijSignConvention": "",
+        "fieldProvenance": {},
+        "renderingSeed": "",
+        "renderingProbe": "",
+        "strictMode": true,
+        "gammaFieldNaming": "",
+        "provenanceSchema": ""
+      },
+      "samples": {
+        "alphaCount": 0,
+        "betaCount": 0,
+        "gammaCount": 0,
+        "gttSampleCount": 0,
+        "thetaCount": 0,
+        "kTraceCount": 0
+      },
+      "truthHashes": {
+        "alpha": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "beta": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "gammaPhys": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "gammaConformal": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "phi": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "theta": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "kTrace": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "gtt": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    }
+  },
+  "compare": null
+}

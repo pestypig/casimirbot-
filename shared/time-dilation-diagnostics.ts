@@ -48,8 +48,22 @@ export type TimeDilationDiagnosticsOptions = {
 };
 
 export type TimeDilationDiagnostics = {
-  kind: "time_dilation_headless";
+  kind: "time_dilation_headless" | "time_dilation_diagnostics";
   captured_at: string;
+  gate: {
+    banner: string | null;
+    reasons: string[];
+  };
+  definitions: {
+    theta_definition: string | null;
+    kij_sign_convention: string | null;
+    gamma_field_naming: string | null;
+    field_provenance_schema: string | null;
+  };
+  fieldProvenance: Record<string, unknown>;
+  proofPack?: unknown;
+  renderingSeed?: string;
+  renderingProbe?: string;
   strict: {
     strictCongruence: boolean;
     latticeMetricOnly: boolean;
@@ -85,6 +99,31 @@ export type TimeDilationDiagnostics = {
     solverHealth: unknown;
   };
 };
+
+type CanonicalField = {
+  family: string;
+  chart: string | null;
+  observer: string | null;
+  normalization: string | null;
+  unitSystem: string | null;
+  match: string | null;
+};
+
+type Definitions = {
+  theta_definition: string | null;
+  kij_sign_convention: string | null;
+  gamma_field_naming: string | null;
+  field_provenance_schema: string | null;
+};
+
+const canonicalizeCanonicalField = (canonical: CanonicalField): CanonicalField => ({
+  family: canonical.family,
+  chart: canonical.chart ?? "unknown",
+  observer: canonical.observer ?? "unknown",
+  normalization: canonical.normalization ?? "unknown",
+  unitSystem: canonical.unitSystem ?? "unknown",
+  match: canonical.match ?? "unknown",
+});
 
 const toNumber = (value: unknown): number | null => {
   const num = typeof value === "number" ? value : Number(value);
@@ -342,9 +381,124 @@ export async function buildTimeDilationDiagnostics(
     ui,
   );
 
+  const canonical = canonicalizeCanonicalField({
+    family: canonicalFamily,
+    chart: readProofString(proofPack, "warp_canonical_chart"),
+    observer: readProofString(proofPack, "warp_canonical_observer"),
+    normalization: readProofString(proofPack, "warp_canonical_normalization"),
+    unitSystem: readProofString(proofPack, "warp_canonical_unit_system"),
+    match: readProofString(proofPack, "warp_canonical_match"),
+  });
+
+  const definitions: Definitions = {
+    theta_definition:
+      readProofString(proofPack, "theta_definition") ??
+      "theta = -Ktrace_eulerian (canonical declaration missing)",
+    kij_sign_convention:
+      readProofString(proofPack, "kij_sign_convention") ??
+      "ADM (check sign convention in runtime)",
+    gamma_field_naming:
+      readProofString(proofPack, "gamma_field_naming") ??
+      "gamma_phys_ij (or phi+tilde_gamma_ij)",
+    field_provenance_schema:
+      readProofString(proofPack, "field_provenance_schema") ??
+      "runtime-field-provenance-v1",
+  };
+  const provenanceBase = {
+    theta_definition: definitions.theta_definition,
+    kij_sign_convention: definitions.kij_sign_convention,
+  };
+
+  const fieldProvenance = {
+    fieldProvenanceSchema: definitions.field_provenance_schema,
+    alpha: {
+      source: renderPlan.sourceForAlpha,
+      observer: canonical.observer,
+      chart: canonical.chart,
+      units: canonical.unitSystem,
+      definitionId: "alpha",
+      derivedFrom: "warp.metricAdapter.alpha",
+    },
+    beta: {
+      source: renderPlan.sourceForBeta,
+      observer: canonical.observer,
+      chart: canonical.chart,
+      units: "1/s",
+      definitionId: "betaU",
+      derivedFrom: "warp.metricAdapter.beta",
+    },
+    gamma: {
+      source: "gr-brick",
+      observer: canonical.observer,
+      chart: canonical.chart,
+      units: canonical.unitSystem,
+      definitionId: "gamma",
+      derivedFrom: "warp.metricAdapter.gammaDiag",
+    },
+    theta: {
+      source: renderPlan.sourceForTheta,
+      observer: canonical.observer,
+      chart: canonical.chart,
+      units: "1/s",
+      definitionId: "theta",
+      derivedFrom: "warp.metricAdapter.theta",
+    },
+    kTrace: {
+      source: "gr-brick",
+      observer: canonical.observer,
+      chart: canonical.chart,
+      units: "1/s",
+      definitionId: "K",
+      derivedFrom: "warp.metricAdapter.Ktrace",
+    },
+    ...provenanceBase,
+  };
+
+  const renderingSeed = [
+    canonical.family,
+    canonical.chart,
+    canonical.observer,
+    canonical.normalization,
+    String(renderPlan.sourceForAlpha),
+    String(renderPlan.sourceForBeta),
+    String(renderPlan.sourceForTheta),
+    String(renderPlan.metricBlend),
+    String(renderPlan.warpCap),
+  ].join("|");
+
+  const renderingProbe = JSON.stringify({
+    mode: renderPlan.mode,
+    chart: canonical.chart,
+    observer: canonical.observer,
+    metricBlend: renderPlan.metricBlend,
+    warpCap: renderPlan.warpCap,
+    norm: renderPlan.normalization,
+    betaWeight: renderPlan.betaWarpWeight,
+    thetaWeight: renderPlan.thetaWarpWeight,
+    shearWeight: renderPlan.shearWeight,
+    geomScale: renderPlan.warpCap * renderPlan.metricBlend,
+    geometryEnabled: renderPlan.enableGeometryWarp,
+  });
+
   const diagnostics: TimeDilationDiagnostics = {
-    kind: "time_dilation_headless",
+    kind: "time_dilation_diagnostics",
     captured_at: new Date().toISOString(),
+    gate: {
+      banner: renderPlan.banner,
+      reasons: Array.isArray((renderPlan as { reasons?: string[] }).reasons)
+        ? renderPlan.reasons
+        : [],
+    },
+    definitions: {
+      theta_definition: definitions.theta_definition,
+      kij_sign_convention: definitions.kij_sign_convention,
+      gamma_field_naming: definitions.gamma_field_naming,
+      field_provenance_schema: definitions.field_provenance_schema,
+    },
+    fieldProvenance,
+    proofPack,
+    renderingSeed,
+    renderingProbe,
     strict: {
       strictCongruence,
       latticeMetricOnly,
@@ -356,11 +510,11 @@ export async function buildTimeDilationDiagnostics(
     },
     canonical: {
       family: canonicalFamily,
-      chart: readProofString(proofPack, "warp_canonical_chart"),
-      observer: readProofString(proofPack, "warp_canonical_observer"),
-      normalization: readProofString(proofPack, "warp_canonical_normalization"),
-      unitSystem: readProofString(proofPack, "warp_canonical_unit_system"),
-      match: readProofString(proofPack, "warp_canonical_match"),
+      chart: canonical.chart,
+      observer: canonical.observer,
+      normalization: canonical.normalization,
+      unitSystem: canonical.unitSystem,
+      match: canonical.match,
     },
     metric_contract: {
       metric_t00_contract_ok: getProofValue(proofPack, "metric_t00_contract_ok")?.value ?? null,

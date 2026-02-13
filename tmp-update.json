@@ -1,0 +1,7 @@
+﻿{
+  "warpFieldType": "natario",
+  "dynamicConfig": { "warpFieldType": "natario" },
+  "strictCongruence": true,
+  "grEnabled": true,
+  "hull": { "Lx_m": 1007, "Ly_m": 264, "Lz_m": 173, "wallThickness_m": 0.45 }
+}

@@ -105,6 +105,15 @@ const cases: IntentCase[] = [
     expectStageTags: false,
   },
   {
+    question: "How does Feedback Loop Hygiene affect society?",
+    hasRepoHints: true,
+    hasFilePathHints: false,
+    expectedId: "repo.ideology_reference",
+    expectedDomain: "repo",
+    expectedFormat: "compare",
+    expectStageTags: false,
+  },
+  {
     question: "How is warp bubble viability computed through constraint gates to a certificate?",
     hasRepoHints: true,
     hasFilePathHints: false,

@@ -82,4 +82,33 @@ describe("Helix Ask live events", () => {
     }
     expect(allMissing).toEqual([]);
   }, 20000);
+
+  it("answers ideology concept query with a hard forced concept answer", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "How does Feedback Loop Hygiene affect society?",
+        debug: true,
+        sessionId: "test-ideology-concept",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text: string;
+      debug?: { answer_path?: string[]; answer_extension_appended?: boolean };
+      answer_path?: string[];
+      answer_extension_appended?: boolean;
+    };
+    const answerPath = payload.debug?.answer_path ?? payload.answer_path ?? [];
+    const text = payload.text.trim();
+    expect(text).toContain("Close loops only with verified signals");
+    expect(text).toContain("Sources:");
+    expect(answerPath).toContain("forcedAnswer:ideology");
+    expect(answerPath).toContain("answer:forced");
+    expect(payload.debug?.answer_extension_appended ?? false).toBe(false);
+    expect(text).not.toMatch(/^additional repo context:/i);
+    expect(text).not.toMatch(/client\/src\/components\/MissionEthosSourcePanel\.tsx/i);
+    expect(text).toMatch(/docs\/knowledge\/ethos\/feedback-loop-hygiene\.md/i);
+  }, 20000);
 });

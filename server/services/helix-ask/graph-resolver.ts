@@ -110,6 +110,7 @@ type GraphResolverTreeConfig = {
   preferGraph?: boolean;
   edgePriority?: Record<string, number>;
   roleMatchers?: Record<string, string[]>;
+  congruenceWalkOverride?: HelixAskCongruenceWalkOverride;
 };
 
 type GraphResolverPackConfig = {
@@ -313,6 +314,21 @@ const applyCongruenceWalkOverride = (
     allowProxies: override.allowProxies ?? base.allowProxies,
     chart: override.chart ?? base.chart,
     region: Object.keys(mergedRegion).length > 0 ? mergedRegion : undefined,
+  };
+};
+
+const mergeCongruenceOverrides = (
+  base?: HelixAskCongruenceWalkOverride,
+  override?: HelixAskCongruenceWalkOverride,
+): HelixAskCongruenceWalkOverride | undefined => {
+  if (!base && !override) return undefined;
+  return {
+    ...(base ?? {}),
+    ...(override ?? {}),
+    region: {
+      ...(base?.region ?? {}),
+      ...(override?.region ?? {}),
+    },
   };
 };
 
@@ -589,7 +605,11 @@ const loadGraphTree = (
   const fullPath = path.resolve(process.cwd(), sourcePath);
   if (!fs.existsSync(fullPath)) return null;
   try {
-    const congruenceConfig = resolveCongruenceWalkConfig(congruenceWalkOverride);
+    const mergedOverride = mergeCongruenceOverrides(
+      config.congruenceWalkOverride,
+      congruenceWalkOverride,
+    );
+    const congruenceConfig = resolveCongruenceWalkConfig(mergedOverride);
     const congruenceKey = serializeCongruenceWalkConfig(congruenceConfig);
     const stats = fs.statSync(fullPath);
     const cacheKey = `${config.id}:${fullPath}:${congruenceKey}`;

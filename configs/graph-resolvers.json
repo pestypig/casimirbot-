@@ -23,6 +23,9 @@
         "parent": 2,
         "see-also": 1
       },
+      "congruenceWalkOverride": {
+        "allowConceptual": true
+      },
       "weight": 1.2
     },
     {
@@ -343,6 +346,9 @@
         "parent": 2,
         "see-also": 1
       },
+      "congruenceWalkOverride": {
+        "allowConceptual": true
+      },
       "weight": 1.1
     },
     {
@@ -450,6 +456,9 @@
         "parent": 2,
         "see-also": 1
       },
+      "congruenceWalkOverride": {
+        "allowConceptual": true
+      },
       "weight": 1
     },
     {
@@ -476,6 +485,9 @@
         "child": 3,
         "parent": 2,
         "see-also": 1
+      },
+      "congruenceWalkOverride": {
+        "allowConceptual": true
       },
       "weight": 1
     },

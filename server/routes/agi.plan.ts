@@ -3208,7 +3208,8 @@ const HELIX_ASK_TWO_PASS_TRIGGER =
 const HELIX_ASK_WARP_FOCUS = /(warp|bubble|alcubierre|natario)/i;
 const HELIX_ASK_WARP_PATH_BOOST =
   /(modules\/warp|client\/src\/lib\/warp-|warp-module|natario-warp|warp-theta|energy-pipeline|docs\/knowledge\/warp)/i;
-const HELIX_ASK_CONCEPTUAL_FOCUS = /\b(what is|what's|define|definition|meaning|concept|theory)\b/i;
+const HELIX_ASK_CONCEPTUAL_FOCUS =
+  /\b(what is|what's|define|definition|meaning|concept|theory|how (?:does|do)|effect|impact|influence|consequences?)\b/i;
   const HELIX_ASK_DEFINITION_FOCUS =
     /\b(what does\b[^?]{0,80}\bmean\b|what is|what's|define|definition|meaning|concept|theory|in\s+(gpa|pa|kpa|mpa|bar|psi|hz|khz|mhz|ghz|w|mw|gw|j|ev|kg|g|m|cm|mm|nm|s|ms|ns))\b/i;
 const HELIX_ASK_CONCEPT_FAST_PATH_INTENTS = new Set([
@@ -10509,6 +10510,24 @@ function buildHelixAskPipelineAnswer(): string {
 }
 
 function buildHelixAskIdeologyAnswer(conceptMatch: HelixAskConceptMatch): string {
+  const buildConceptEvidencePaths = (match: HelixAskConceptMatch): string[] => {
+    const paths = new Set<string>();
+    if (match.card.sourcePath) {
+      const sourcePath = normalizeEvidencePath(match.card.sourcePath);
+      if (sourcePath) {
+        paths.add(sourcePath);
+      }
+    }
+    for (const entry of match.card.mustIncludeFiles ?? []) {
+      if (entry) {
+        const normalizedPath = normalizeEvidencePath(entry);
+        if (normalizedPath) {
+          paths.add(normalizedPath);
+        }
+      }
+    }
+    return Array.from(paths).filter(Boolean);
+  };
   const core: string[] = [];
   if (conceptMatch.card.definition) {
     core.push(ensureSentence(conceptMatch.card.definition));
@@ -10518,8 +10537,24 @@ function buildHelixAskIdeologyAnswer(conceptMatch: HelixAskConceptMatch): string
   }
   const paragraph1 = core.join(" ").trim();
   const paragraph2 = conceptMatch.card.notes ? ensureSentence(conceptMatch.card.notes) : "";
-  return [paragraph1, paragraph2].filter(Boolean).join("\n\n");
+  const sources = buildConceptEvidencePaths(conceptMatch);
+  const sourceLine =
+    sources.length > 0 ? `Sources: ${sources.join(", ")}` : "";
+  return [paragraph1, paragraph2, sourceLine].filter(Boolean).join("\n\n");
 }
+
+const buildConceptEvidencePaths = (match: HelixAskConceptMatch): string[] => {
+  const paths = new Set<string>();
+  if (match.card.sourcePath) {
+    paths.add(match.card.sourcePath);
+  }
+  for (const entry of match.card.mustIncludeFiles ?? []) {
+    if (entry) {
+      paths.add(entry);
+    }
+  }
+  return Array.from(paths);
+};
 const formatConstraintStatus = (pass: boolean) => (pass ? "PASS" : "FAIL");
 
 function buildNoiseFieldEvidence(): ConstraintEvidenceResult {
@@ -15679,8 +15714,13 @@ const executeHelixAsk = async ({
         }
       }
     }
+    const conceptScopeCandidates = baseQuestion
+      ? listConceptCandidates(baseQuestion, 4)
+      : [];
     const ambiguityCandidates = HELIX_ASK_AMBIGUITY_RESOLVER
-      ? slotPreviewCandidates.slice(0, 3)
+      ? conceptScopeCandidates.length > 0
+        ? conceptScopeCandidates.slice(0, 3)
+        : slotPreviewCandidates.slice(0, 3)
       : [];
     const ambiguityCandidateLabels = Array.from(
       new Set([
@@ -16132,7 +16172,7 @@ const executeHelixAsk = async ({
       intentProfile.id === "repo.ideology_reference" ||
       (isRepoDomain && conceptualFocus);
     if (wantsConceptMatch && baseQuestion) {
-      conceptMatch = findConceptMatch(baseQuestion);
+      conceptMatch = findConceptMatch(baseQuestion, { intentId: intentProfile.id });
       if (conceptMatch && debugPayload) {
         debugPayload.concept_id = conceptMatch.card.id;
         debugPayload.concept_label = conceptMatch.card.label ?? conceptMatch.card.id;
@@ -16489,10 +16529,10 @@ const executeHelixAsk = async ({
     let evidenceUseQuestionTokens = true;
     const conceptFastPathCandidate =
       Boolean(conceptMatch) &&
-      conceptualFocus &&
+      (conceptualFocus || intentProfile.id === "repo.ideology_reference") &&
       intentDomain === "repo" &&
       HELIX_ASK_CONCEPT_FAST_PATH_INTENTS.has(intentProfile.id) &&
-      !graphResolverPreferred;
+      (intentProfile.id === "repo.ideology_reference" ? true : !graphResolverPreferred);
     let conceptFastPath = false;
     let conceptFastPathBlockedReason: string | null = null;
     if (conceptFastPathCandidate && conceptMatch) {
@@ -16827,19 +16867,29 @@ const executeHelixAsk = async ({
       forcedAnswerIsHard = true;
       answerPath.push("forcedAnswer:math_solver");
     }
+    const ideologyConceptAnswerCandidate =
+      intentProfile.id === "repo.ideology_reference" && conceptMatch
+        ? buildHelixAskIdeologyAnswer(conceptMatch)
+        : null;
+    if (!forcedAnswer && ideologyConceptAnswerCandidate) {
+      forcedAnswer = ideologyConceptAnswerCandidate;
+      forcedAnswerIsHard = true;
+      answerPath.push("forcedAnswer:ideology");
+    }
     if (conceptFastPath && conceptMatch && !forcedAnswer) {
-      const conceptAnswer =
-        intentProfile.id === "repo.ideology_reference"
-          ? buildHelixAskIdeologyAnswer(conceptMatch)
-          : renderConceptDefinition(conceptMatch);
-      if (conceptAnswer) {
-        forcedAnswer = conceptAnswer;
-        answerPath.push(
+        const conceptAnswer =
           intentProfile.id === "repo.ideology_reference"
-            ? "forcedAnswer:ideology"
-            : "forcedAnswer:concept",
-        );
-      }
+            ? buildHelixAskIdeologyAnswer(conceptMatch)
+            : renderConceptDefinition(conceptMatch);
+        if (conceptAnswer) {
+          forcedAnswer = conceptAnswer;
+          forcedAnswerIsHard = true;
+          answerPath.push(
+            intentProfile.id === "repo.ideology_reference"
+              ? "forcedAnswer:ideology"
+              : "forcedAnswer:concept",
+          );
+        }
     }
     const shouldRunConstraintLoop =
       !dryRun && (intentStrategy === "constraint_report" || compositeConstraintRequested);
@@ -20170,10 +20220,11 @@ const executeHelixAsk = async ({
           ].join(" | "),
         );
       } else if (isRepoQuestion && repoScaffold) {
-        if (intentProfile.id === "repo.ideology_reference" && conceptMatch && !forcedAnswer) {
-          forcedAnswer = buildHelixAskIdeologyAnswer(conceptMatch);
-          answerPath.push("forcedAnswer:ideology");
-        }
+      if (intentProfile.id === "repo.ideology_reference" && conceptMatch && !forcedAnswer) {
+        forcedAnswer = buildHelixAskIdeologyAnswer(conceptMatch);
+        forcedAnswerIsHard = true;
+        answerPath.push("forcedAnswer:ideology");
+      }
         if (intentProfile.id === "repo.helix_ask_pipeline_explain") {
           forcedAnswer = buildHelixAskPipelineAnswer();
           pipelineEvidence = buildHelixAskPipelineEvidence();
@@ -20816,7 +20867,13 @@ const executeHelixAsk = async ({
         cleaned = stripInlineJsonArtifacts(cleaned);
       cleaned = stripTrivialOrdinalBullets(cleaned);
       cleaned = dedupeReportParagraphs(cleaned).text;
-      const allowedSourcePaths = resolveEvidencePaths(evidenceText, contextFiles, contextText, 12);
+      const conceptSourcePaths = conceptMatch ? buildConceptEvidencePaths(conceptMatch) : [];
+      const allowedSourcePaths = Array.from(
+        new Set([
+          ...resolveEvidencePaths(evidenceText, contextFiles, contextText, 12),
+          ...conceptSourcePaths,
+        ]),
+      );
       cleaned = sanitizeSourcesLine(
         cleaned,
         allowedSourcePaths,
@@ -20956,6 +21013,8 @@ const executeHelixAsk = async ({
           ...extractFilePathsFromText(promptScaffold),
         ]),
       );
+      const templateLockedPlatonicAnswer =
+        Boolean(forcedAnswer && forcedAnswerIsHard && intentProfile.id === "repo.ideology_reference");
       let platonicResult = applyHelixAskPlatonicGates({
         question: baseQuestion,
         answer: cleaned,
@@ -20973,7 +21032,18 @@ const executeHelixAsk = async ({
         repoScaffold,
         promptScaffold,
         conceptMatch,
+        templateLockedAnswer: templateLockedPlatonicAnswer,
       });
+      const lockedByIdeologyTemplate =
+        templateLockedPlatonicAnswer || platonicResult.ideologyTemplateApplied;
+      if (lockedByIdeologyTemplate && intentProfile.id === "repo.ideology_reference") {
+        if (!answerPath.includes("forcedAnswer:ideology")) {
+          answerPath.push("forcedAnswer:ideology");
+        }
+        if (!answerPath.includes("answer:forced")) {
+          answerPath.push("answer:forced");
+        }
+      }
       logEvent(
         "Platonic gates",
         "ok",
@@ -21016,6 +21086,7 @@ const executeHelixAsk = async ({
         HELIX_ASK_DRIFT_REPAIR &&
         !HELIX_ASK_SINGLE_LLM &&
         HELIX_ASK_DRIFT_REPAIR_MAX > 0 &&
+        !lockedByIdeologyTemplate &&
         (platonicResult.beliefGateApplied || platonicResult.rattlingGateApplied) &&
         !platonicResult.coverageGateApplied &&
         evidenceText.trim().length > 0 &&
@@ -21081,6 +21152,7 @@ const executeHelixAsk = async ({
               repoScaffold,
               promptScaffold,
               conceptMatch,
+              templateLockedAnswer: lockedByIdeologyTemplate,
             });
             const gateScore = (result: typeof platonicResult): number =>
               (result.coverageGateApplied ? 1 : 0) +
@@ -21117,6 +21189,7 @@ const executeHelixAsk = async ({
     }
     if (
       HELIX_ASK_SCIENTIFIC_CLARIFY &&
+      !lockedByIdeologyTemplate &&
       !isScientificMicroReport(cleaned) &&
       (platonicDomain === "repo" || platonicDomain === "hybrid" || platonicDomain === "falsifiable") &&
       (platonicResult.coverageGateApplied ||
@@ -21161,6 +21234,7 @@ const executeHelixAsk = async ({
         repoScaffold,
         promptScaffold,
         conceptMatch,
+        templateLockedAnswer: lockedByIdeologyTemplate,
       });
       if (debugPayload) {
         debugPayload.scientific_response_applied = true;
@@ -21536,12 +21610,22 @@ const executeHelixAsk = async ({
         };
         debugPayload.answer_path = answerPath;
       }
-      answerExtension = buildAnswerCoverageExtension({
-        answerText: cleaned,
-        question: baseQuestion,
-        docBlocks,
-        codeAlignment,
-      });
+      if (forcedAnswerIsHard) {
+        answerExtension = {
+          available: false,
+          citations: [],
+          itemCount: 0,
+          docItems: 0,
+          codeItems: 0,
+        };
+      } else {
+        answerExtension = buildAnswerCoverageExtension({
+          answerText: cleaned,
+          question: baseQuestion,
+          docBlocks,
+          codeAlignment,
+        });
+      }
       const answerWordCount = estimateWordCount(cleaned);
       const extensionAppendEligible =
         HELIX_ASK_APPEND_EXTENSION_TO_TEXT &&

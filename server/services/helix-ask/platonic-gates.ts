@@ -96,12 +96,14 @@ export type HelixAskPlatonicInput = {
   repoScaffold?: string;
   promptScaffold?: string;
   conceptMatch?: HelixAskConceptMatch | null;
+  templateLockedAnswer?: boolean;
 };
 
 export type HelixAskPlatonicResult = {
   answer: string;
   junkCleanApplied: boolean;
   junkCleanReasons: string[];
+  ideologyTemplateApplied: boolean;
   conceptLintApplied: boolean;
   conceptLintReasons: string[];
   physicsLintApplied: boolean;
@@ -518,13 +520,39 @@ function jaccardDistanceForSets(a: Set<string>, b: Set<string>): number {
   return 1 - intersection / union;
 }
 
-function extractEvidenceLines(scaffold?: string, limit = 4): string[] {
+function normalizeEvidencePath(value: string): string {
+  return value.replace(/\\/g, "/").trim().toLowerCase();
+}
+
+function isEvidencePathMatch(line: string, allowedPaths: Set<string>): boolean {
+  const linePaths = extractFilePathsFromText(line).map(normalizeEvidencePath);
+  if (linePaths.length === 0) return false;
+  return linePaths.some((linePath) =>
+    Array.from(allowedPaths).some((allowedPath) =>
+      allowedPath.length > 0 &&
+      (linePath === allowedPath ||
+        linePath.endsWith(`/${allowedPath}`) ||
+        allowedPath.endsWith(`/${linePath}`)),
+    ),
+  );
+}
+
+function extractEvidenceLines(
+  scaffold: string | undefined,
+  limit = 4,
+  allowedPaths: string[] = [],
+): string[] {
   if (!scaffold) return [];
+  const normalizedAllowed = allowedPaths.map(normalizeEvidencePath).filter(Boolean);
+  const allowedSet = new Set(normalizedAllowed);
   const lines = scaffold
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
     .filter((line) => /^(-|\d+\.)\s+/.test(line));
+  const filteredLines = allowedSet.size > 0
+    ? lines.filter((line) => isEvidencePathMatch(line, allowedSet))
+    : lines;
   if (lines.length === 0) {
     return scaffold
       .split(/\r?\n/)
@@ -532,7 +560,21 @@ function extractEvidenceLines(scaffold?: string, limit = 4): string[] {
       .filter(Boolean)
       .slice(0, limit);
   }
-  return lines.slice(0, limit);
+  if (filteredLines.length > 0) {
+    return filteredLines.slice(0, limit);
+  }
+  return [];
+}
+
+function buildConceptEvidencePaths(match: HelixAskConceptMatch): string[] {
+  const paths = new Set<string>();
+  if (match.card.sourcePath) {
+    paths.add(match.card.sourcePath);
+  }
+  for (const entry of match.card.mustIncludeFiles ?? []) {
+    if (entry) paths.add(entry);
+  }
+  return Array.from(paths).filter(Boolean);
 }
 
 function applyIdeologyConceptOverride(
@@ -545,9 +587,6 @@ function applyIdeologyConceptOverride(
   if (!match) {
     return { answer: input.answer, applied: false };
   }
-  if (!input.repoScaffold?.trim() && !input.evidenceText?.trim()) {
-    return { answer: input.answer, applied: false };
-  }
   const conceptSentences: string[] = [];
   if (match.card.definition) {
     conceptSentences.push(ensureSentence(match.card.definition));
@@ -556,9 +595,17 @@ function applyIdeologyConceptOverride(
     conceptSentences.push(ensureSentence(`Key questions include: ${match.card.keyQuestions}`));
   }
   const paragraph1 = conceptSentences.join(" ").trim();
-  const evidenceLines = extractEvidenceLines(input.repoScaffold, 4);
-  const paragraph2 = evidenceLines.join("\n").trim();
-  const composed = [paragraph1, paragraph2].filter(Boolean).join("\n\n").trim();
+  const notesParagraph = match.card.notes ? ensureSentence(match.card.notes) : "";
+  const allowedEvidencePaths = buildConceptEvidencePaths(match);
+  const evidenceLines = extractEvidenceLines(input.repoScaffold, 4, allowedEvidencePaths);
+  const sourceLine = allowedEvidencePaths.length > 0
+    ? `Sources: ${allowedEvidencePaths.join(", ")}`
+    : "";
+  const paragraph3 = evidenceLines.join("\n").trim();
+  const composed = [paragraph1, notesParagraph, paragraph3, sourceLine]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
   if (!composed) {
     return { answer: input.answer, applied: false };
   }
@@ -1659,10 +1706,13 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
   const evidenceHealthy =
     gatedInput.evidenceGateOk !== false &&
     Boolean(gatedInput.evidenceText && gatedInput.evidenceText.trim().length > 0);
+  const skipRattlingReplacement =
+    Boolean(gatedInput.templateLockedAnswer) && gatedInput.intentId === "repo.ideology_reference";
   if (
     rattlingGateApplied &&
     (gatedInput.domain === "repo" || gatedInput.domain === "falsifiable") &&
-    !evidenceHealthy
+    !evidenceHealthy &&
+    !skipRattlingReplacement
   ) {
     answer =
       "Answer drifted too far from the provided evidence. Please narrow the request or specify the relevant files.";
@@ -1670,6 +1720,7 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
   const claimLedger = buildClaimLedger(variantInput, variantClaims);
   return {
     answer,
+    ideologyTemplateApplied: ideologyOverride.applied,
     junkCleanApplied: junkClean.applied,
     junkCleanReasons: ideologyOverride.applied
       ? [...junkClean.reasons, ideologyOverride.reason ?? "ideology_override"]

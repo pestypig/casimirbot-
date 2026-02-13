@@ -19,10 +19,15 @@ export type HelixAskConceptMatch = {
   card: HelixAskConceptCard;
   matchedTerm: string;
   matchedField: "id" | "alias";
+  score?: number;
 };
 
 export type HelixAskConceptCandidate = HelixAskConceptMatch & {
   score: number;
+};
+
+export type HelixAskConceptLookupOptions = {
+  intentId?: string;
 };
 
 const CONCEPT_DIR = path.resolve(process.cwd(), "docs", "knowledge");
@@ -243,109 +248,191 @@ const normalizeMatchString = (value: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
-const buildTermRegex = (term: string): RegExp => {
-  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`\\b${escaped}\\b`, "i");
+const hasTokenMatch = (value: string | undefined, token: string): boolean => {
+  const normalizedToken = normalizeMatchString(token);
+  if (!normalizedToken) return false;
+  return normalizeMatchString(value ?? "")
+    .split(" ")
+    .filter(Boolean)
+    .includes(normalizedToken);
 };
 
-export function findConceptMatch(question: string): HelixAskConceptMatch | null {
-  const normalized = normalizeTerm(question);
-  if (!normalized) return null;
-  const normalizedQuestion = normalizeMatchString(question);
-  const cards = loadConceptCards();
-  let best: HelixAskConceptMatch | null = null;
-  let bestScore = 0;
-  for (const card of cards) {
-    const aliasTerms = card.label ? [card.label, ...card.aliases] : card.aliases;
-    const idRegex = buildTermRegex(card.id);
-    if (idRegex.test(normalized)) {
-      const score = card.id.length + 6;
-      if (score > bestScore) {
-        bestScore = score;
-        best = { card, matchedTerm: card.id, matchedField: "id" };
-      }
+const isIdeologyConcept = (card: HelixAskConceptCard): boolean => {
+  if (hasTokenMatch(card.scope, "ideology")) return true;
+  for (const entry of card.topicTags ?? []) {
+    if (hasTokenMatch(entry, "ideology")) return true;
+  }
+  for (const entry of card.intentHints ?? []) {
+    if (hasTokenMatch(entry, "ideology")) return true;
+  }
+  return false;
+};
+
+const filterCardsForLookup = (
+  cards: HelixAskConceptCard[],
+  options?: HelixAskConceptLookupOptions,
+): HelixAskConceptCard[] => {
+  if (!options?.intentId || options.intentId !== "repo.ideology_reference") {
+    return cards;
+  }
+  const ideologyCards = cards.filter(isIdeologyConcept);
+  return ideologyCards.length ? ideologyCards : cards;
+};
+
+const CONCEPT_MATCH_MIN_SCORE = 9;
+const CONCEPT_MATCH_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "as",
+  "at",
+  "by",
+  "for",
+  "from",
+  "how",
+  "in",
+  "is",
+  "it",
+  "of",
+  "on",
+  "that",
+  "the",
+  "this",
+  "to",
+  "with",
+  "without",
+]);
+
+const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
+const escapeRegexTerm = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const normalizeConceptTerm = (value: string): string =>
+  normalizeMatchString(value.replace(/[\u2018\u2019'"]/g, ""));
+
+const buildTermVariants = (value: string): string[] =>
+  unique([
+    normalizeConceptTerm(value),
+    normalizeConceptTerm(value.replace(/-/g, " ")),
+    normalizeConceptTerm(value.replace(/\s+/g, "-")),
+  ]).filter(Boolean);
+
+const tokenizeConceptQuestion = (value: string): string[] =>
+  normalizeConceptTerm(value)
+    .split(" ")
+    .filter((value) => value.length > 2 && !CONCEPT_MATCH_STOP_WORDS.has(value));
+
+const buildConceptMatchTokenScore = (
+  questionQuestionNorm: string,
+  questionTokens: Set<string>,
+  term: string,
+  field: "id" | "alias",
+): number => {
+  const variants = buildTermVariants(term);
+  if (variants.length === 0) return 0;
+
+  const termTokens = tokenizeConceptQuestion(variants[0]);
+  if (termTokens.length === 0) return 0;
+  if (termTokens.length === 1 && termTokens[0].length < 6) {
+    return 0;
+  }
+
+  let overlap = 0;
+  for (const token of termTokens) {
+    if (questionTokens.has(token)) overlap += 1;
+  }
+  if (overlap <= 0) return 0;
+
+  let score = overlap * 12;
+  const overlapRatio = overlap / termTokens.length;
+  if (overlapRatio >= 1) {
+    score += 22;
+  } else if (overlapRatio >= 0.6) {
+    score += 12;
+  } else if (overlapRatio >= 0.4) {
+    score += 6;
+  }
+
+  let phraseScore = 0;
+  for (const variant of variants) {
+    if (!variant || variant.length < 3) continue;
+    if (questionQuestionNorm.includes(variant)) {
+      const boundary = new RegExp(
+        `(?:^|[^a-z0-9])${escapeRegexTerm(variant)}(?:$|[^a-z0-9])`,
+        "i",
+      );
+      phraseScore = Math.max(
+        phraseScore,
+        questionQuestionNorm === variant ? 48 : boundary.test(questionQuestionNorm) ? 28 : 12,
+      );
     }
-    const normalizedId = normalizeMatchString(card.id);
-    if (normalizedId.length >= 6 && normalizedQuestion.includes(normalizedId)) {
-      const score = normalizedId.length + 2;
-      if (score > bestScore) {
-        bestScore = score;
-        best = { card, matchedTerm: card.id, matchedField: "id" };
-      }
-    }
-    for (const alias of aliasTerms) {
-      const aliasRegex = buildTermRegex(alias);
-      if (!aliasRegex.test(normalized)) continue;
-      const score = alias.length + 3;
-      if (score > bestScore) {
-        bestScore = score;
-        best = { card, matchedTerm: alias, matchedField: "alias" };
-      }
-    }
-    for (const alias of aliasTerms) {
-      const normalizedAlias = normalizeMatchString(alias);
-      if (normalizedAlias.length < 6) continue;
-      if (normalizedAlias.split(" ").length < 2) continue;
-      if (!normalizedQuestion.includes(normalizedAlias)) continue;
-      const score = normalizedAlias.length + 1;
-      if (score > bestScore) {
-        bestScore = score;
-        best = { card, matchedTerm: alias, matchedField: "alias" };
-      }
+  }
+  score += phraseScore;
+  if (field === "id") {
+    score += 6;
+  }
+  return score;
+};
+
+const buildBestConceptTermMatch = (card: HelixAskConceptCard, normalizedQuestion: string, questionTokens: Set<string>) => {
+  const candidateTerms = unique([
+    card.id,
+    card.label ?? "",
+    ...(card.aliases ?? []),
+  ]).filter(Boolean);
+  let best: HelixAskConceptCandidate | null = null;
+  for (const rawTerm of candidateTerms) {
+    const matchedField: "id" | "alias" = rawTerm === card.id ? "id" : "alias";
+    const score = buildConceptMatchTokenScore(normalizedQuestion, questionTokens, rawTerm, matchedField);
+    if (score < CONCEPT_MATCH_MIN_SCORE) continue;
+    if (!best || score > best.score) {
+      best = {
+        card,
+        matchedTerm: rawTerm,
+        matchedField,
+        score,
+      };
     }
   }
   return best;
+};
+
+export function findConceptMatch(
+  question: string,
+  options?: HelixAskConceptLookupOptions,
+): HelixAskConceptMatch | null {
+  const normalized = normalizeTerm(question);
+  if (!normalized) return null;
+  const normalizedQuestion = normalizeMatchString(question);
+  const questionTokens = new Set(tokenizeConceptQuestion(normalizedQuestion));
+  const cards = filterCardsForLookup(loadConceptCards(), options);
+  let best: (HelixAskConceptMatch & { score: number }) | null = null;
+  let bestScore = 0;
+  for (const card of cards) {
+    const candidate = buildBestConceptTermMatch(card, normalizedQuestion, questionTokens);
+    if (!candidate) continue;
+    if (candidate.score > bestScore) {
+      bestScore = candidate.score;
+      best = candidate;
+    }
+  }
+  return best ? { ...best } : null;
 }
 
 export function listConceptCandidates(
   question: string,
   limit = 3,
+  options?: HelixAskConceptLookupOptions,
 ): HelixAskConceptCandidate[] {
   const normalized = normalizeTerm(question);
   if (!normalized) return [];
   const normalizedQuestion = normalizeMatchString(question);
-  const cards = loadConceptCards();
+  const questionTokens = new Set(tokenizeConceptQuestion(normalizedQuestion));
+  const cards = filterCardsForLookup(loadConceptCards(), options);
   const candidates: HelixAskConceptCandidate[] = [];
   for (const card of cards) {
-    let best: HelixAskConceptCandidate | null = null;
-    const aliasTerms = card.label ? [card.label, ...card.aliases] : card.aliases;
-    const idRegex = buildTermRegex(card.id);
-    if (idRegex.test(normalized)) {
-      best = {
-        card,
-        matchedTerm: card.id,
-        matchedField: "id",
-        score: card.id.length + 6,
-      };
-    }
-    const normalizedId = normalizeMatchString(card.id);
-    if (!best && normalizedId.length >= 6 && normalizedQuestion.includes(normalizedId)) {
-      best = {
-        card,
-        matchedTerm: card.id,
-        matchedField: "id",
-        score: normalizedId.length + 2,
-      };
-    }
-    for (const alias of aliasTerms) {
-      const aliasRegex = buildTermRegex(alias);
-      if (!aliasRegex.test(normalized)) continue;
-      const score = alias.length + 3;
-      if (!best || score > best.score) {
-        best = { card, matchedTerm: alias, matchedField: "alias", score };
-      }
-    }
-    if (!best) {
-      for (const alias of aliasTerms) {
-        const normalizedAlias = normalizeMatchString(alias);
-        if (normalizedAlias.length < 6) continue;
-        if (normalizedAlias.split(" ").length < 2) continue;
-        if (!normalizedQuestion.includes(normalizedAlias)) continue;
-        const score = normalizedAlias.length + 1;
-        best = { card, matchedTerm: alias, matchedField: "alias", score };
-        break;
-      }
-    }
+    const best = buildBestConceptTermMatch(card, normalizedQuestion, questionTokens);
     if (best) {
       candidates.push(best);
     }
