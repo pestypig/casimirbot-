@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 
 type Phase = "Preflight" | "SpoolUp" | "Cruise" | "StationKeep" | "Return" | "Complete";
 type TripPlan = {
-  distanceLy: number;
-  cruiseDuty: number;
+  distanceLy?: number;
+  cruiseDuty?: number;
   cruiseMode?: "Cruise";
   hoverMode?: "Hover";
   stationKeepHours?: number;
@@ -18,11 +18,16 @@ type Telemetry = {
 };
 
 type TripPlayerProps = {
-  plan: TripPlan;
+  plan?: TripPlan;
   getState: () => { zeta:number; tsRatio:number; powerMW:number; freqGHz:number };
   setMode: (m:"Hover"|"Cruise"|"Emergency"|"Standby" | string)=>void;
   setDuty: (d:number)=>void;
   onTick?: (phase:Phase, t:number)=>void; // optional progress callback
+};
+
+const resolveNumber = (value: unknown, fallback: number) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
 };
 
 // helper: effective ly/hour (use same logic as FuelGauge)
@@ -40,6 +45,19 @@ function computeEffectiveLyPerHour(mode: string, duty=0, gammaGeo=26, qFactor=1e
 }
 
 export function TripPlayer({ plan, getState, setMode, setDuty, onTick }: TripPlayerProps) {
+  const safePlan = React.useMemo(() => {
+    const distanceLy = resolveNumber(plan?.distanceLy, 0);
+    const cruiseDuty = resolveNumber(plan?.cruiseDuty, 0.14);
+    const stationKeepHours = Math.max(1, resolveNumber(plan?.stationKeepHours, 1));
+    return {
+      distanceLy,
+      cruiseDuty,
+      cruiseMode: plan?.cruiseMode ?? "Cruise",
+      hoverMode: plan?.hoverMode ?? "Hover",
+      stationKeepHours,
+    };
+  }, [plan]);
+
   const [phase, setPhase] = React.useState<Phase>("Preflight");
   const [running, setRunning] = React.useState(false);
   const [progress, setProgress] = React.useState(0); // 0..1 within current phase
@@ -49,9 +67,9 @@ export function TripPlayer({ plan, getState, setMode, setDuty, onTick }: TripPla
   const DUR = { 
     Preflight: 5, 
     SpoolUp: 8, 
-    Cruise: Math.max(6, plan.distanceLy*2), 
-    StationKeep: (plan.stationKeepHours??1)*3, 
-    Return: Math.max(6, plan.distanceLy*2) 
+    Cruise: Math.max(6, safePlan.distanceLy * 2), 
+    StationKeep: safePlan.stationKeepHours * 3, 
+    Return: Math.max(6, safePlan.distanceLy * 2) 
   };
 
   React.useEffect(() => {
@@ -86,14 +104,14 @@ export function TripPlayer({ plan, getState, setMode, setDuty, onTick }: TripPla
       });
 
       // micro-guard: if constraints look bad, ease duty
-      if (s.zeta < 0.6 || s.tsRatio < 80) setDuty(Math.max(0.05, plan.cruiseDuty * 0.7));
+      if (s.zeta < 0.6 || s.tsRatio < 80) setDuty(Math.max(0.05, safePlan.cruiseDuty * 0.7));
 
       if (t >= total) {
         // advance
-        if (phase === "Preflight") { setMode(plan.hoverMode ?? "Hover"); setDuty(0.10); setPhase("SpoolUp"); t=0; }
-        else if (phase === "SpoolUp") { setMode(plan.cruiseMode ?? "Cruise"); setDuty(plan.cruiseDuty); setPhase("Cruise"); t=0; }
-        else if (phase === "Cruise") { setMode(plan.hoverMode ?? "Hover"); setDuty(0.08); setPhase("StationKeep"); t=0; }
-        else if (phase === "StationKeep") { setMode(plan.cruiseMode ?? "Cruise"); setDuty(plan.cruiseDuty*0.9); setPhase("Return"); t=0; }
+        if (phase === "Preflight") { setMode(safePlan.hoverMode); setDuty(0.10); setPhase("SpoolUp"); t=0; }
+        else if (phase === "SpoolUp") { setMode(safePlan.cruiseMode); setDuty(safePlan.cruiseDuty); setPhase("Cruise"); t=0; }
+        else if (phase === "Cruise") { setMode(safePlan.hoverMode); setDuty(0.08); setPhase("StationKeep"); t=0; }
+        else if (phase === "StationKeep") { setMode(safePlan.cruiseMode); setDuty(safePlan.cruiseDuty*0.9); setPhase("Return"); t=0; }
         else if (phase === "Return") { setMode("Standby"); setDuty(0); setPhase("Complete"); setRunning(false); }
       } else {
         id = setTimeout(step, 500);
