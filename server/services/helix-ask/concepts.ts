@@ -469,39 +469,79 @@ const ensureSentence = (value: string): string => {
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 };
 
+const NOTE_CLAUSE_RE = /(?:^|[.;]\s*)([A-Za-z][A-Za-z0-9\s-]*?)\s*:\s*([^.;]+)(?=(?:[.;]\s*[A-Za-z][A-Za-z0-9\s-]*\s*:|$))/g;
+
+const toTitleCase = (value: string): string =>
+  value
+    .toLowerCase()
+    .split(" ")
+    .map((token) => (token ? token.charAt(0).toUpperCase() + token.slice(1) : token))
+    .join(" ");
+
+const parseConceptNotes = (notes?: string): string[] => {
+  if (!notes) return [];
+  const trimmed = notes.trim();
+  if (!trimmed) return [];
+  const entries: string[] = [];
+  const seen = new Set<string>();
+  let match: RegExpExecArray | null;
+  NOTE_CLAUSE_RE.lastIndex = 0;
+  while ((match = NOTE_CLAUSE_RE.exec(trimmed)) !== null) {
+    const rawLabel = match[1]?.trim();
+    const rawValue = match[2]?.trim();
+    if (!rawLabel || !rawValue) continue;
+    const label = toTitleCase(rawLabel);
+    const value = rawValue.replace(/\s*[.;]\s*$/, "").trim();
+    if (!value) continue;
+    const key = `${label.toLowerCase()}:${value.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push(`- ${label}: ${ensureSentence(value)}`);
+  }
+  if (entries.length > 0) {
+    return entries;
+  }
+  const fallback = ensureSentence(trimmed);
+  return fallback ? [`- Notes: ${fallback}`] : [];
+};
+
+const buildConversationalConceptIntro = (definition: string, label: string): string => {
+  const definitionText = definition.trim();
+  if (!definitionText) return "";
+  const labelLower = label.toLowerCase();
+  const definitionStart = definitionText.toLowerCase();
+  if (definitionStart.startsWith(labelLower)) {
+    return ensureSentence(definitionText);
+  }
+  const lowerFirstChar = definitionText.charAt(0).toLowerCase() + definitionText.slice(1);
+  return ensureSentence(`In plain language, ${label} means ${lowerFirstChar}`);
+};
+
+const buildConceptTechnicalLines = (card: HelixAskConceptCard): string[] => {
+  const lines: string[] = [];
+  if (card.definition) {
+    lines.push(`- Definition: ${ensureSentence(card.definition)}`);
+  }
+  if (card.keyQuestions) {
+    lines.push(`- Key questions: ${card.keyQuestions}`);
+  }
+  for (const noteLine of parseConceptNotes(card.notes)) {
+    lines.push(noteLine);
+  }
+  if (card.scope) {
+    lines.push(`- Scope: ${card.scope}`);
+  }
+  return lines;
+};
+
 export function renderConceptAnswer(match: HelixAskConceptMatch | null): string {
   if (!match) return "";
   const { card } = match;
-  const sentences: string[] = [];
-  if (card.definition) {
-    sentences.push(ensureSentence(card.definition));
-  }
-  if (card.keyQuestions) {
-    sentences.push(ensureSentence(`Key questions include: ${card.keyQuestions}`));
-  }
-  const paragraph1 = sentences.join(" ").trim();
-
-  const paragraph2Parts: string[] = [];
-  if (card.notes) {
-    paragraph2Parts.push(ensureSentence(card.notes));
-  }
-  if (card.scope) {
-    paragraph2Parts.push(ensureSentence(`Scope: ${card.scope}`));
-  }
-  const paragraph2 = paragraph2Parts.join(" ").trim();
-
-  let inPractice = "";
-  if (card.notes) {
-    inPractice = ensureSentence(
-      "In practice, those standards guide how evidence and justification are weighed in specific contexts.",
-    );
-  } else if (card.definition) {
-    inPractice = ensureSentence(
-      "In practice, it focuses on evaluating which beliefs are justified and reliable.",
-    );
-  }
-
-  return [paragraph1, paragraph2, inPractice].filter(Boolean).join("\n\n");
+  const label = card.label ?? card.id;
+  const intro = buildConversationalConceptIntro(card.definition ?? "", label);
+  const technicalLines = buildConceptTechnicalLines(card);
+  const technical = technicalLines.length > 0 ? `Technical notes:\n${technicalLines.join("\n")}` : "";
+  return [intro, technical].filter(Boolean).join("\n\n");
 }
 
 export function renderConceptDefinition(match: HelixAskConceptMatch | null): string {

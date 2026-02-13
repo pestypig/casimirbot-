@@ -1,7 +1,7 @@
 import { extractFilePathsFromText } from "./paths";
 import { filterSignalTokens, tokenizeAskQuery } from "./query";
 import type { HelixAskFormat } from "./format";
-import type { HelixAskConceptMatch } from "./concepts";
+import { renderConceptAnswer, type HelixAskConceptMatch } from "./concepts";
 
 export type HelixAskDomain = "general" | "repo" | "hybrid" | "falsifiable";
 
@@ -587,22 +587,14 @@ function applyIdeologyConceptOverride(
   if (!match) {
     return { answer: input.answer, applied: false };
   }
-  const conceptSentences: string[] = [];
-  if (match.card.definition) {
-    conceptSentences.push(ensureSentence(match.card.definition));
-  }
-  if (match.card.keyQuestions) {
-    conceptSentences.push(ensureSentence(`Key questions include: ${match.card.keyQuestions}`));
-  }
-  const paragraph1 = conceptSentences.join(" ").trim();
-  const notesParagraph = match.card.notes ? ensureSentence(match.card.notes) : "";
+  const conceptParagraph = renderConceptAnswer(match);
   const allowedEvidencePaths = buildConceptEvidencePaths(match);
   const evidenceLines = extractEvidenceLines(input.repoScaffold, 4, allowedEvidencePaths);
   const sourceLine = allowedEvidencePaths.length > 0
     ? `Sources: ${allowedEvidencePaths.join(", ")}`
     : "";
   const paragraph3 = evidenceLines.join("\n").trim();
-  const composed = [paragraph1, notesParagraph, paragraph3, sourceLine]
+  const composed = [conceptParagraph, paragraph3, sourceLine]
     .filter(Boolean)
     .join("\n\n")
     .trim();

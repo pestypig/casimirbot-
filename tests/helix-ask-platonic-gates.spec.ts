@@ -326,6 +326,39 @@ describe("helix ask platonic gates", () => {
     expect(result.answer).not.toMatch(/weakly reflected/i);
   });
 
+  it("formats ideology concept answers with a friendly lead-in and technical notes", () => {
+    const result = applyHelixAskPlatonicGates({
+      question: "How does Feedback Loop Hygiene affect society?",
+      answer: "md. json, highlighting the importance of verified civic governance.",
+      domain: "general",
+      tier: "F1",
+      intentId: "repo.ideology_reference",
+      format: "brief",
+      conceptMatch: {
+        matchedField: "id",
+        matchedTerm: "feedback-loop-hygiene",
+        card: {
+          id: "feedback-loop-hygiene",
+          aliases: ["Feedback Loop Hygiene", "feedback loop hygiene"],
+          scope: "ideology",
+          definition:
+            "Close loops only with verified signals; in governance that means publish indicators, verify sources, and keep rollback paths before action.",
+          keyQuestions:
+            "Which signals are verified? What indicators are public? What rollback path exists when signals drift?",
+          notes:
+            "Tags: feedback, innovation, guardrails. Societal effect: reduces rumor-driven escalation, improves accountability, and preserves trust. Children: habit-pressure-break.",
+          sourcePath: "docs/knowledge/ethos/feedback-loop-hygiene.md",
+        },
+      },
+    });
+    expect(result.answer).toMatch(/In plain language/i);
+    expect(result.answer).toMatch(/Technical notes:/i);
+    expect(result.answer).toMatch(/- Definition:/i);
+    expect(result.answer).toMatch(/- Key questions:/i);
+    expect(result.answer).toMatch(/- Societal effect:/i);
+    expect(result.answer).toMatch(/Sources:/i);
+  });
+
   it("skips belief gate when concept evidence is explicitly anchored", () => {
     const result = applyHelixAskPlatonicGates({
       question: "Using ideology.json, what does 'tend the Sun ledger' mean here?",
