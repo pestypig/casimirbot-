@@ -542,6 +542,19 @@ const sentenceNormalize = (value: string): string =>
     .replace(/\s+/g, " ")
     .replace(/[.;]+$/g, "");
 
+const maybeInfinitive = (value: string): string => {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  const match = trimmed.match(/^([A-Za-z]+)/);
+  if (!match) return trimmed;
+  const first = match[1];
+  if (!first || !first.length) return trimmed;
+  if (first.length <= 2 || /ing$/i.test(first)) return trimmed;
+  if (!first.endsWith("s")) return trimmed;
+  const infinitive = first.slice(0, -1);
+  return `${infinitive}${trimmed.slice(first.length)}`;
+};
+
 const buildConversationalConceptIntro = (card: HelixAskConceptCard): string => {
   const label = card.label ? unquoteValue(card.label) : card.id;
   const definitionText = card.definition.trim();
@@ -564,9 +577,11 @@ const buildConversationalConceptIntro = (card: HelixAskConceptCard): string => {
 - ${questions.join("\n- ")}`
       : "";
   const practicalImpact = societalEffect
-    ? ensureSentence(`In civic terms, this tends to ${sentenceNormalize(societalEffect)}`)
+    ? ensureSentence(
+        `In civic terms, this tends to ${sentenceNormalize(maybeInfinitive(societalEffect))}`,
+      )
     : "";
-  const scopeLine = card.scope ? `This is in the ${card.scope} scope.` : "";
+  const scopeLine = card.scope ? `This is in the ${unquoteValue(card.scope)} scope.` : "";
 
   return [definitionSentence, practicalQuestions, practicalImpact, scopeLine]
     .filter(Boolean)
@@ -586,7 +601,7 @@ const buildConceptTechnicalLines = (card: HelixAskConceptCard): string[] => {
     lines.push(noteLine);
   }
   if (card.scope) {
-    lines.push(`- Scope: ${card.scope}`);
+    lines.push(`- Scope: ${unquoteValue(card.scope)}`);
   }
   return lines;
 };
