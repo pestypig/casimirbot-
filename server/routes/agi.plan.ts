@@ -2603,6 +2603,17 @@ const HELIX_ASK_SCAFFOLD_TOKENS = clampNumber(
   64,
   2048,
 );
+const HELIX_ASK_FORCE_FULL_ANSWERS =
+  String(process.env.HELIX_ASK_FORCE_FULL_ANSWERS ?? "1").trim() !== "0";
+const HELIX_ASK_FORCE_FULL_ANSWER_TOKENS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_FORCE_FULL_ANSWER_TOKENS ??
+      process.env.VITE_HELIX_ASK_FORCE_FULL_ANSWER_TOKENS,
+    3000,
+  ),
+  1024,
+  4096,
+);
 const HELIX_ASK_MICRO_PASS =
   String(process.env.HELIX_ASK_MICRO_PASS ?? process.env.VITE_HELIX_ASK_MICRO_PASS ?? "1")
     .trim() === "1";
@@ -4542,13 +4553,24 @@ const computeAnswerTokenBudget = ({
   maxTokensOverride?: number | null;
 }): HelixAskAnswerBudget => {
   if (typeof maxTokensOverride === "number" && Number.isFinite(maxTokensOverride) && maxTokensOverride > 0) {
-    const capped = clampNumber(maxTokensOverride, 64, HELIX_ASK_ANSWER_MAX_TOKENS);
+    const requested = Math.max(0, maxTokensOverride);
+    const requestedCap = clampNumber(requested, 64, HELIX_ASK_ANSWER_MAX_TOKENS);
+    const forcedMinCap = HELIX_ASK_FORCE_FULL_ANSWERS
+      ? clampNumber(HELIX_ASK_FORCE_FULL_ANSWER_TOKENS, 64, HELIX_ASK_ANSWER_MAX_TOKENS)
+      : requestedCap;
+    const boosted = HELIX_ASK_FORCE_FULL_ANSWERS && requestedCap < forcedMinCap
+      ? ["request_override", "force_full_answer"]
+      : ["request_override"];
+    const capped = Math.max(requestedCap, forcedMinCap);
+    const reason = HELIX_ASK_FORCE_FULL_ANSWERS && requestedCap < forcedMinCap
+      ? "request_override_force_full"
+      : "request_override";
     return {
       tokens: capped,
       cap: HELIX_ASK_ANSWER_MAX_TOKENS,
       base: capped,
-      boosts: ["request_override"],
-      reason: "request_override",
+      boosts: boosted,
+      reason,
       override: true,
     };
   }
@@ -4587,6 +4609,17 @@ const computeAnswerTokenBudget = ({
   if (evidenceTokens > 1400) {
     base += 200;
     boosts.push("evidence>1400");
+  }
+  if (HELIX_ASK_FORCE_FULL_ANSWERS) {
+    const forcedFloor = clampNumber(
+      HELIX_ASK_FORCE_FULL_ANSWER_TOKENS,
+      64,
+      HELIX_ASK_ANSWER_MAX_TOKENS,
+    );
+    if (base < forcedFloor) {
+      base = forcedFloor;
+      boosts.push("force_full_floor");
+    }
   }
   base = Math.max(base, scaffoldTokens);
   const capped = clampNumber(base, 256, HELIX_ASK_ANSWER_MAX_TOKENS);
@@ -20790,7 +20823,12 @@ const executeHelixAsk = async ({
       const toolResultsPresent = Boolean(toolResultsBlock?.trim());
       const hasToolEvidence =
         docBlocks.length > 0 || (codeAlignment?.spans?.length ?? 0) > 0;
-      if (toolResultsPresent && hasToolEvidence && NO_EVIDENCE_RE.test(cleaned)) {
+      if (
+        !HELIX_ASK_FORCE_FULL_ANSWERS &&
+        toolResultsPresent &&
+        hasToolEvidence &&
+        NO_EVIDENCE_RE.test(cleaned)
+      ) {
         cleaned = buildToolResultsFallbackAnswer({
           definitionFocus,
           docBlocks,
@@ -20810,6 +20848,7 @@ const executeHelixAsk = async ({
         shortMetaAfterClean.sentences < HELIX_ASK_SINGLE_LLM_SHORT_FALLBACK_MIN_SENTENCES ||
         shortMetaAfterClean.tokens < HELIX_ASK_SINGLE_LLM_SHORT_FALLBACK_MIN_TOKENS;
       const singleLlmShortFallbackEligible =
+        !HELIX_ASK_FORCE_FULL_ANSWERS &&
         HELIX_ASK_SINGLE_LLM &&
         !isIdeologyReferenceIntent &&
         hasToolEvidence &&
@@ -21557,6 +21596,7 @@ const executeHelixAsk = async ({
         citedPathStats.nonTree === 0 &&
         citedPathStats.share >= HELIX_ASK_TREE_DOMINANCE_RATIO;
       if (
+        !HELIX_ASK_FORCE_FULL_ANSWERS &&
         HELIX_ASK_SINGLE_LLM &&
         !isIdeologyReferenceIntent &&
         hasToolEvidence &&
@@ -21837,6 +21877,7 @@ const executeHelixAsk = async ({
           ? "sparse_scientific_sections"
           : null;
       if (
+        !HELIX_ASK_FORCE_FULL_ANSWERS &&
         HELIX_ASK_SINGLE_LLM &&
         !isIdeologyReferenceIntent &&
         hasToolEvidence &&
