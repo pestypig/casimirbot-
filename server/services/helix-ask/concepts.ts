@@ -480,11 +480,16 @@ const toTitleCase = (value: string): string =>
     .map((token) => (token ? token.charAt(0).toUpperCase() + token.slice(1) : token))
     .join(" ");
 
-const parseConceptNotes = (notes?: string): string[] => {
+type HelixAskConceptNoteEntry = {
+  label: string;
+  value: string;
+};
+
+const parseConceptNotesEntries = (notes?: string): HelixAskConceptNoteEntry[] => {
   if (!notes) return [];
   const trimmed = notes.trim();
   if (!trimmed) return [];
-  const entries: string[] = [];
+  const entries: HelixAskConceptNoteEntry[] = [];
   const seen = new Set<string>();
   let match: RegExpExecArray | null;
   NOTE_CLAUSE_RE.lastIndex = 0;
@@ -498,25 +503,75 @@ const parseConceptNotes = (notes?: string): string[] => {
     const key = `${label.toLowerCase()}:${value.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    entries.push(`- ${label}: ${ensureSentence(value)}`);
+    entries.push({ label, value });
   }
   if (entries.length > 0) {
     return entries;
   }
   const fallback = ensureSentence(trimmed);
-  return fallback ? [`- Notes: ${fallback}`] : [];
+  return fallback ? [{ label: "Notes", value: fallback }] : [];
 };
 
-const buildConversationalConceptIntro = (definition: string, label: string): string => {
-  const definitionText = definition.trim();
+const parseConceptNotes = (notes?: string): string[] => {
+  return parseConceptNotesEntries(notes).map(
+    (entry) => `- ${entry.label}: ${ensureSentence(entry.value)}`,
+  );
+};
+
+const parseQuestionList = (keyQuestions?: string): string[] => {
+  if (!keyQuestions) return [];
+  return keyQuestions
+    .split("?")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => (entry.endsWith("?") ? entry : `${entry}?`))
+    .filter(Boolean);
+};
+
+const selectNoteValue = (
+  notes: HelixAskConceptNoteEntry[],
+  matcher: (label: string) => boolean,
+): string | null => {
+  const found = notes.find((entry) => matcher(entry.label.toLowerCase()));
+  return found ? found.value.trim() : null;
+};
+
+const sentenceNormalize = (value: string): string =>
+  value
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[.;]+$/g, "");
+
+const buildConversationalConceptIntro = (card: HelixAskConceptCard): string => {
+  const label = card.label ? unquoteValue(card.label) : card.id;
+  const definitionText = card.definition.trim();
   if (!definitionText) return "";
-  const labelLower = label.toLowerCase();
   const definitionStart = definitionText.toLowerCase();
-  if (definitionStart.startsWith(labelLower)) {
-    return ensureSentence(definitionText);
-  }
-  const lowerFirstChar = definitionText.charAt(0).toLowerCase() + definitionText.slice(1);
-  return ensureSentence(`In plain language, ${label} means ${lowerFirstChar}`);
+  const plainStart = definitionStart.startsWith(label.toLowerCase())
+    ? definitionText
+    : `In plain language, ${label} means ${definitionText.charAt(0).toLowerCase() + definitionText.slice(1)}`;
+  const definitionSentence = ensureSentence(plainStart);
+
+  const questions = parseQuestionList(card.keyQuestions);
+  const noteEntries = parseConceptNotesEntries(card.notes);
+  const societalEffect = selectNoteValue(
+    noteEntries,
+    (labelValue) => labelValue.includes("societal effect"),
+  );
+  const practicalQuestions =
+    questions.length > 0
+      ? `In practice, it is easiest to test by asking:
+- ${questions.join("\n- ")}`
+      : "";
+  const practicalImpact = societalEffect
+    ? ensureSentence(`In civic terms, this tends to ${sentenceNormalize(societalEffect)}`)
+    : "";
+  const scopeLine = card.scope ? `This is in the ${card.scope} scope.` : "";
+
+  return [definitionSentence, practicalQuestions, practicalImpact, scopeLine]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
 };
 
 const buildConceptTechnicalLines = (card: HelixAskConceptCard): string[] => {
@@ -539,8 +594,7 @@ const buildConceptTechnicalLines = (card: HelixAskConceptCard): string[] => {
 export function renderConceptAnswer(match: HelixAskConceptMatch | null): string {
   if (!match) return "";
   const { card } = match;
-  const label = card.label ? unquoteValue(card.label) : card.id;
-  const intro = buildConversationalConceptIntro(card.definition ?? "", label);
+  const intro = buildConversationalConceptIntro(card);
   const technicalLines = buildConceptTechnicalLines(card);
   const technical = technicalLines.length > 0 ? `Technical notes:\n${technicalLines.join("\n")}` : "";
   return [intro, technical].filter(Boolean).join("\n\n");
