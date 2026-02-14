@@ -193,6 +193,7 @@ import {
   failHelixAskJob,
   getHelixAskJob,
   markHelixAskJobRunning,
+  touchHelixAskJob,
   type HelixAskJobRecord,
 } from "../services/helix-ask/job-store";
 import {
@@ -3408,6 +3409,14 @@ const HELIX_ASK_JOB_TIMEOUT_MS = clampNumber(
   ),
   30_000,
   30 * 60_000,
+);
+const HELIX_ASK_JOB_HEARTBEAT_MS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_JOB_HEARTBEAT_MS ?? process.env.VITE_HELIX_ASK_JOB_HEARTBEAT_MS,
+    Math.max(2_000, Math.floor(HELIX_ASK_JOB_TIMEOUT_MS / 6)),
+  ),
+  1_000,
+  60_000,
 );
 
 function ensureFinalMarker(value: string): string {
@@ -22123,6 +22132,8 @@ const runHelixAskJob = async (
   }
   let settled = false;
   let timeoutHandle: NodeJS.Timeout | null = null;
+  let heartbeatHandle: NodeJS.Timeout | null = null;
+  const heartbeatIntervalMs = Math.max(1_000, HELIX_ASK_JOB_HEARTBEAT_MS);
   const timeoutMs = HELIX_ASK_JOB_TIMEOUT_MS;
   const timeoutPromise =
     timeoutMs > 0
@@ -22133,6 +22144,13 @@ const runHelixAskJob = async (
           timeoutHandle.unref?.();
         })
       : null;
+
+  heartbeatHandle = setInterval(() => {
+    if (settled) return;
+    touchHelixAskJob(jobId);
+  }, heartbeatIntervalMs);
+  heartbeatHandle.unref?.();
+
   const responder: HelixAskResponder = {
     send: (status, payload) => {
       if (settled) return;
@@ -22179,6 +22197,10 @@ const runHelixAskJob = async (
     if (timeoutHandle) {
       clearTimeout(timeoutHandle);
       timeoutHandle = null;
+    }
+    if (heartbeatHandle) {
+      clearInterval(heartbeatHandle);
+      heartbeatHandle = null;
     }
   }
 };

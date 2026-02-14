@@ -24,6 +24,7 @@ type HelixAskJobStore = {
   complete: (jobId: string, result: Record<string, unknown>) => Promise<HelixAskJobRecord | null>;
   fail: (jobId: string, error: string) => Promise<HelixAskJobRecord | null>;
   appendPartial: (jobId: string, chunk: string) => Promise<void>;
+  touch: (jobId: string) => Promise<void>;
   cleanupExpired: () => Promise<void>;
   reapStale: (cutoffMs: number, reason: string) => Promise<void>;
 };
@@ -186,6 +187,13 @@ const memoryStore: HelixAskJobStore = {
         : next;
     job.updatedAt = Date.now();
   },
+  touch: async (jobId) => {
+    const job = await memoryStore.get(jobId);
+    if (!job) return;
+    if (job.status === "running") {
+      job.updatedAt = Date.now();
+    }
+  },
   cleanupExpired: async () => {
     pruneMemoryExpired();
   },
@@ -287,6 +295,13 @@ const dbStore: HelixAskJobStore = {
     await pool.query(
       `UPDATE helix_ask_jobs SET partial_text = $2, updated_at = now() WHERE id = $1`,
       [jobId, trimmed],
+    );
+  },
+  touch: async (jobId) => {
+    const pool = await getDbPool();
+    await pool.query(
+      `UPDATE helix_ask_jobs SET updated_at = now() WHERE id = $1 AND status = 'running'`,
+      [jobId],
     );
   },
   cleanupExpired: async () => {
@@ -397,5 +412,11 @@ export const failHelixAskJob = async (
 export const appendHelixAskJobPartial = (jobId: string, chunk: string): void => {
   void resolveStore()
     .then((store) => store.appendPartial(jobId, chunk))
+    .catch(() => undefined);
+};
+
+export const touchHelixAskJob = (jobId: string): void => {
+  void resolveStore()
+    .then((store) => store.touch(jobId))
     .catch(() => undefined);
 };

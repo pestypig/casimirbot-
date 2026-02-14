@@ -1,0 +1,34 @@
+[
+  {
+    "name": "fast_320",
+    "max_tokens": 320,
+    "topK": 4,
+    "temperature": 0.24,
+    "verbosity": "brief",
+    "tuning": {
+      "arbiter_repo_ratio": 0.55,
+      "arbiter_hybrid_ratio": 0.55,
+      "scaffold_tokens": 640,
+      "evidence_tokens": 256,
+      "repair_tokens": 96,
+      "format_enforcement": "relaxed",
+      "soft_expansion": 0
+    }
+  },
+  {
+    "name": "fast_980",
+    "max_tokens": 980,
+    "topK": 4,
+    "temperature": 0.24,
+    "verbosity": "brief",
+    "tuning": {
+      "arbiter_repo_ratio": 0.55,
+      "arbiter_hybrid_ratio": 0.55,
+      "scaffold_tokens": 640,
+      "evidence_tokens": 256,
+      "repair_tokens": 96,
+      "format_enforcement": "relaxed",
+      "soft_expansion": 0
+    }
+  }
+]

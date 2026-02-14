@@ -1,0 +1,32 @@
+{
+  "cases": [
+    {
+      "label": "definition broad",
+      "question": "How does Feedback Loop Hygiene affect society?"
+    },
+    {
+      "label": "ideology panel",
+      "question": "In plain terms, what is Feedback Loop Hygiene in the Ideology panel and why does it matter for communities?"
+    },
+    {
+      "label": "social media moderation",
+      "question": "How would a social media team use Feedback Loop Hygiene to avoid rumor-driven escalation and preserve trust?"
+    },
+    {
+      "label": "town council rumor",
+      "question": "How would a town council use Feedback Loop Hygiene to respond when rumors spread about a school safety policy?"
+    },
+    {
+      "label": "concrete example",
+      "question": "Give a concrete example of Feedback Loop Hygiene in a civic moderation workflow, with one verification checkpoint and a rollback path."
+    },
+    {
+      "label": "verification and rollback",
+      "question": "What are the key verification checkpoints and rollback protections in Feedback Loop Hygiene?"
+    },
+    {
+      "label": "non-technical user",
+      "question": "Can you explain Feedback Loop Hygiene to someone new to the concept with a simple example?"
+    }
+  ]
+}
