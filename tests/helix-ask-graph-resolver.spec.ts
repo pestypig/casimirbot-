@@ -246,4 +246,35 @@ describe("helix ask graph resolver congruence overrides", () => {
     expect(ids.has("vdb-band-guardrail") || ids.has("theta-audit-guardrail")).toBe(true);
     expect((framework?.congruenceDiagnostics?.resolvedCrossTreeEdges ?? 0) > 0).toBe(true);
   });
+
+  it("builds a strict root_to_leaf chain for ideology when requested", () => {
+    const pack = resolveHelixAskGraphPack({
+      question: "How does Feedback Loop Hygiene affect society?",
+      topicTags: ["ideology"],
+      lockedTreeIds: ["ideology"],
+      pathMode: "root_to_leaf",
+    });
+    const framework = pack?.frameworks.find((entry) => entry.treeId === "ideology");
+    expect(framework).toBeTruthy();
+    expect(framework?.pathMode).toBe("root_to_leaf");
+    const path = framework?.path ?? [];
+    expect(path.length).toBeGreaterThan(0);
+    expect(path.length).toBeLessThanOrEqual(8);
+    for (let i = 0; i < path.length - 1; i += 1) {
+      const from = path[i]?.id;
+      const to = path[i + 1]?.id;
+      if (!from || !to) continue;
+      const neighbors = __testOnlyResolveTreeNeighborIds({
+        treeId: "ideology",
+        treePath: "docs/ethos/ideology.json",
+        nodeId: from,
+        congruenceWalkOverride: {
+          allowConceptual: true,
+          allowProxies: false,
+          allowedCL: "CL4",
+        },
+      });
+      expect(neighbors).toContain(to);
+    }
+  });
 });

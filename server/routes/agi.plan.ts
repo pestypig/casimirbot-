@@ -9498,7 +9498,7 @@ type HelixAskTreeWalkMetrics = {
   boundCount?: number;
 };
 
-type HelixAskTreeWalkMode = "full" | "root_to_anchor" | "root_only" | "anchor_only";
+type HelixAskTreeWalkMode = "full" | "root_to_anchor" | "root_to_leaf" | "root_only" | "anchor_only";
 
   const normalizeTreeWalkKey = (value: string): string =>
     value.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
@@ -9731,6 +9731,7 @@ const resolveHelixAskTreeWalkMode = (
   if (normalized === "root" || normalized === "root_only") return "root_only";
   if (normalized === "anchor" || normalized === "anchor_only") return "anchor_only";
   if (normalized === "root_to_anchor" || normalized === "root2anchor") return "root_to_anchor";
+  if (normalized === "root_to_leaf" || normalized === "root2leaf") return "root_to_leaf";
   return "full";
 };
 
@@ -9824,6 +9825,9 @@ function buildHelixAskTreeWalk(
         if (anchorIndex >= 0) {
           selected = path.slice(rootIndex, anchorIndex + 1);
         }
+        break;
+      case "root_to_leaf":
+        selected = path.slice(rootIndex);
         break;
       case "full":
       default:
@@ -16387,6 +16391,12 @@ const executeHelixAsk = async ({
       HELIX_ASK_TREE_WALK_MODE_RAW,
       verbosity,
     );
+    if (
+      intentProfile.id === "repo.ideology_reference" &&
+      HELIX_ASK_TREE_WALK_MODE_RAW.trim().toLowerCase() === "full"
+    ) {
+      treeWalkMode = "root_to_leaf";
+    }
     let codeAlignment: HelixAskCodeAlignment | null = null;
     let graphResolverPreferred = false;
     let mathSolveResult: HelixAskMathSolveResult | null = null;
@@ -16682,6 +16692,7 @@ const executeHelixAsk = async ({
         conceptMatch,
         lockedTreeIds: graphTreeLock.length > 0 ? graphTreeLock : undefined,
         congruenceWalkOverride: graphCongruenceWalkOverride,
+        pathMode: treeWalkMode === "root_to_leaf" ? "root_to_leaf" : "full",
       });
       graphResolverPreferred = Boolean(graphPack?.preferGraph);
       graphHintTerms = collectGraphHintTerms(graphPack);
@@ -16720,6 +16731,8 @@ const executeHelixAsk = async ({
             nodes: framework.path.map((node) => node.id),
             source: framework.sourcePath,
             score: framework.rankScore ?? null,
+            pathMode: framework.pathMode ?? null,
+            pathFallbackReason: framework.pathFallbackReason ?? null,
             congruence: framework.congruenceDiagnostics ?? null,
           }));
           const blockedByReasonTotal: Record<string, number> = {};

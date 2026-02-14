@@ -159,3 +159,8 @@ Live events
 
 ## Key implementation file
 - server/routes/agi.plan.ts
+
+## Scientific-method gap note
+
+- Current reasoning depth vs falsification posture is tracked in
+  `docs/helix-ask-scientific-method-gap.md`.

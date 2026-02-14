@@ -28,6 +28,8 @@ export type HelixAskGraphResolvedNode = {
   sourcePath?: string;
 };
 
+type HelixAskGraphPathMode = "full" | "root_to_leaf";
+
 export type HelixAskGraphEvidence = {
   type: "doc" | "code" | "test" | "telemetry";
   path?: string;
@@ -48,6 +50,8 @@ export type HelixAskGraphFramework = {
   scaffoldText: string;
   contextText: string;
   preferGraph: boolean;
+  pathMode?: HelixAskGraphPathMode;
+  pathFallbackReason?: string;
   rankScore?: number;
   anchorScore?: number;
   pathScore?: number;
@@ -997,6 +1001,203 @@ type GraphFrameworkCandidate = {
 const scoreGraphCandidate = (anchorScore: number, pathScore: number, hitCount: number): number =>
   anchorScore * 2 + pathScore + hitCount;
 
+const buildNodeScoringMap = (
+  nodeScores: Array<{ node: GraphNode; score: number }>,
+): Map<string, number> =>
+  new Map(nodeScores.map((entry) => [entry.node.id, entry.score]));
+
+const scorePath = (
+  nodeIds: string[],
+  nodeScoreMap: Map<string, number>,
+): number =>
+  nodeIds.reduce((sum, nodeId) => sum + (nodeScoreMap.get(nodeId) ?? 0), 0);
+
+const buildPathFromNodeIds = (
+  tree: GraphTree,
+  pathIds: string[],
+  defaultScore: number,
+  sourcePath: string,
+): HelixAskGraphResolvedNode[] => {
+  const nodes: HelixAskGraphResolvedNode[] = [];
+  for (const nodeId of pathIds) {
+    const node = tree.nodeById.get(nodeId);
+    if (!node) continue;
+    nodes.push({
+      id: node.id,
+      title: node.title ?? node.id,
+      excerpt: extractExcerpt(node),
+      artifact: extractArtifact(node.bodyMD),
+      tags: node.tags,
+      score: defaultScore,
+      depth: 0,
+      evidence: node.evidence,
+      summary: node.summary,
+      nodeType: node.nodeType,
+      inputs: node.inputs,
+      outputs: node.outputs,
+      assumptions: node.assumptions,
+      validity: node.validity,
+      deterministic: node.deterministic,
+      tolerance: node.tolerance,
+      dependencies: node.dependencies,
+      environment: node.environment,
+      sourcePath,
+    });
+  }
+  return nodes;
+};
+
+const buildBestRootToTargetPath = (params: {
+  tree: GraphTree;
+  rootId: string;
+  nodeScores: Array<{ node: GraphNode; score: number }>;
+  maxDepth: number;
+  maxNodes: number;
+  anchors: Array<{ node: GraphNode; score: number }>;
+}): { path: string[] } => {
+  const { tree, rootId, nodeScores, maxDepth, maxNodes, anchors } = params;
+  const nodeScoreMap = buildNodeScoringMap(nodeScores);
+  let bestPath: string[] | null = null;
+  let bestScore = -Infinity;
+  for (const anchor of anchors) {
+    const candidate = findRootToTargetPath({
+      tree,
+      startId: rootId,
+      targetId: anchor.node.id,
+      maxDepth,
+      maxNodes,
+      nodeScoreMap,
+    });
+    if (!candidate || candidate.length === 0) continue;
+    const candidateScore = scorePath(candidate, nodeScoreMap);
+    const adjustedScore = candidateScore + anchors.length * 0.001 * anchor.score;
+    if (adjustedScore > bestScore) {
+      bestScore = adjustedScore;
+      bestPath = candidate;
+    }
+  }
+  return { path: bestPath ?? [] };
+};
+
+const findRootToTargetPath = (params: {
+  tree: GraphTree;
+  startId: string;
+  targetId: string;
+  maxDepth: number;
+  maxNodes: number;
+  nodeScoreMap: Map<string, number>;
+}): string[] | null => {
+  const { tree, startId, targetId, maxDepth, maxNodes, nodeScoreMap } = params;
+  if (startId === targetId) return [startId];
+  const maxLength = Math.max(1, Math.min(maxDepth + 1, maxNodes));
+  let bestPath: string[] | null = null;
+  let bestScore = -Infinity;
+  const dfs = (
+    currentId: string,
+    depth: number,
+    visited: Set<string>,
+    path: string[],
+    scoreSoFar: number,
+  ): void => {
+    if (depth >= maxLength) return;
+    const neighbors = (tree.neighbors.get(currentId) ?? [])
+      .filter((entry) => tree.nodeById.has(entry.id))
+      .filter((entry) => !visited.has(entry.id))
+      .map((entry) => ({
+        id: entry.id,
+        weight: entry.weight,
+      }))
+      .sort((a, b) => {
+        if (a.weight !== b.weight) return b.weight - a.weight;
+        return (nodeScoreMap.get(b.id) ?? 0) - (nodeScoreMap.get(a.id) ?? 0);
+      });
+    for (const neighbor of neighbors) {
+      const nextId = neighbor.id;
+      const nextScore = scoreSoFar + (nodeScoreMap.get(nextId) ?? 0) + Math.min(0.2, 0.01 * neighbor.weight);
+      if (nextId === targetId) {
+        const candidate = [...path, nextId];
+        if (candidate.length <= maxNodes && nextScore > bestScore) {
+          bestScore = nextScore;
+          bestPath = candidate;
+        }
+        continue;
+      }
+      visited.add(nextId);
+      dfs(nextId, depth + 1, visited, [...path, nextId], nextScore);
+      visited.delete(nextId);
+    }
+  };
+
+  const visited = new Set([startId]);
+  dfs(startId, 1, visited, [startId], nodeScoreMap.get(startId) ?? 0);
+  return bestPath;
+};
+
+const buildSingleRootToLeafPath = (params: {
+  tree: GraphTree;
+  nodeScores: Array<{ node: GraphNode; score: number }>;
+  maxDepth: number;
+  maxNodes: number;
+  anchors: Array<{ node: GraphNode; score: number }>;
+}): { pathIds: string[]; fallbackReason?: string; fallbackToRootToAnchor?: boolean } => {
+  const { tree, nodeScores, maxDepth, maxNodes, anchors } = params;
+  const rootNode = tree.rootId
+    ? tree.nodeById.get(tree.rootId)
+    : null;
+  const rootId = rootNode?.id ?? nodeScores[0]?.node.id;
+  if (!rootId) {
+    return {
+      pathIds: [],
+      fallbackReason: "missing_root_or_anchor_seed",
+      fallbackToRootToAnchor: true,
+    };
+  }
+  const rootToLeaf = buildBestRootToTargetPath({
+    tree,
+    rootId,
+    nodeScores,
+    maxDepth,
+    maxNodes,
+    anchors: anchors.slice().sort((a, b) => b.score - a.score),
+  });
+  if (rootToLeaf.path.length > 0) {
+    return {
+      pathIds: rootToLeaf.path.slice(0, maxNodes),
+      fallbackReason: undefined,
+      fallbackToRootToAnchor: false,
+    };
+  }
+  const fallbackTarget = anchors[0]?.node.id;
+  if (!fallbackTarget || !tree.nodeById.has(rootId)) {
+    return {
+      pathIds: rootId ? [rootId] : [],
+      fallbackReason: "root_to_leaf_disconnected",
+      fallbackToRootToAnchor: true,
+    };
+  }
+  const fallbackTargetNode = tree.nodeById.get(fallbackTarget);
+  if (!fallbackTargetNode) {
+    return {
+      pathIds: [rootId],
+      fallbackReason: "root_to_anchor_unreachable",
+      fallbackToRootToAnchor: true,
+    };
+  }
+  const fallbackPath = buildBestRootToTargetPath({
+    tree,
+    rootId,
+    nodeScores,
+    maxDepth,
+    maxNodes,
+    anchors: [{ node: fallbackTargetNode, score: 0 }],
+  }).path;
+  return {
+    pathIds: fallbackPath.length > 0 ? fallbackPath : [rootId],
+    fallbackReason: fallbackPath.length > 0 ? "root_to_anchor_fallback" : "root_to_anchor_unreachable",
+    fallbackToRootToAnchor: true,
+  };
+};
+
 const mergeScaffoldText = (blocks: string[]): string => {
   const lines: string[] = [];
   const seen = new Set<string>();
@@ -1030,7 +1231,7 @@ const buildFrameworkCandidate = (
   tokens: string[],
   questionNorm: string,
   conceptBoosts: string[],
-  options?: { locked?: boolean },
+  options?: { locked?: boolean; pathMode?: HelixAskGraphPathMode },
 ): GraphFrameworkCandidate | null => {
   const nodeScores = tree.nodes
     .map((node) => ({
@@ -1071,78 +1272,105 @@ const buildFrameworkCandidate = (
     environment: entry.node.environment,
     sourcePath: tree.sourcePath,
   }));
-  const resolveNodeRef = (id: string): GraphNodeRef | null => {
-    const local = tree.nodeById.get(id);
-    if (local) {
-      return {
-        node: local,
-        treeId: tree.id,
-        sourcePath: tree.sourcePath,
-      };
-    }
-    return crossTreeNodeIndex.get(id) ?? null;
-  };
   const maxDepth = treeConfig.maxDepth ?? DEFAULT_MAX_DEPTH;
   const maxNodes = treeConfig.maxNodes ?? DEFAULT_MAX_NODES;
-  const ordered: HelixAskGraphResolvedNode[] = [...resolvedAnchors];
-  const visited = new Set(resolvedAnchors.map((entry) => entry.id));
-  const queue: Array<{ id: string; depth: number }> = resolvedAnchors.map((entry) => ({
-    id: entry.id,
-    depth: 0,
-  }));
-  while (queue.length > 0 && ordered.length < maxNodes) {
-    const current = queue.shift();
-    if (!current) break;
-    if (current.depth >= maxDepth) continue;
-    const neighbors = tree.neighbors.get(current.id) ?? [];
-    const sortedNeighbors = neighbors
-      .map((neighbor) => ({
-        neighbor,
-        score: (() => {
-          const ref = resolveNodeRef(neighbor.id);
-          return ref ? scoreNode(ref.node, tokens, questionNorm, conceptBoosts) : 0;
-        })(),
-      }))
-      .sort((a, b) => {
-        if (a.neighbor.weight !== b.neighbor.weight) {
-          return b.neighbor.weight - a.neighbor.weight;
-        }
-        return b.score - a.score;
-      });
-    for (const entry of sortedNeighbors) {
-      if (ordered.length >= maxNodes) break;
-      const neighbor = entry.neighbor;
-      if (visited.has(neighbor.id)) continue;
-      const ref = resolveNodeRef(neighbor.id);
-      if (!ref) continue;
-      const node = ref.node;
-      visited.add(neighbor.id);
-      ordered.push({
-        id: node.id,
-        title: node.title ?? node.id,
-        excerpt: extractExcerpt(node),
-        artifact: extractArtifact(node.bodyMD),
-        tags: node.tags,
-        score: entry.score,
-        depth: current.depth + 1,
-        relation: neighbor.rel,
-        evidence: node.evidence,
-        summary: node.summary,
-        nodeType: node.nodeType,
-        inputs: node.inputs,
-        outputs: node.outputs,
-        assumptions: node.assumptions,
-        validity: node.validity,
-        deterministic: node.deterministic,
-        tolerance: node.tolerance,
-        dependencies: node.dependencies,
-        environment: node.environment,
-        sourcePath: ref.sourcePath,
-      });
-      queue.push({ id: neighbor.id, depth: current.depth + 1 });
+  const pathMode = options?.pathMode ?? "full";
+  let withRoles: HelixAskGraphResolvedNode[] = [];
+  let pathFallbackReason: string | undefined = undefined;
+  if (pathMode === "root_to_leaf") {
+    const anchorEntries = anchors.slice().sort((a, b) => b.score - a.score);
+    const singlePath = buildSingleRootToLeafPath({
+      tree,
+      nodeScores,
+      maxDepth,
+      maxNodes,
+      anchors: anchorEntries,
+    });
+    pathFallbackReason = singlePath.fallbackReason;
+    withRoles = buildPathFromNodeIds(tree, singlePath.pathIds, 0, tree.sourcePath)
+      .map((entry, index) => {
+        const matchAnchor = anchorEntries.find((anchor) => anchor.node.id === entry.id) != null;
+        return {
+          ...entry,
+          score: nodeScores.find((scoreEntry) => scoreEntry.node.id === entry.id)?.score ?? entry.score,
+          depth: index,
+          relation: index === 0 ? "root" : "child",
+          role: matchAnchor ? "anchor" : undefined,
+        };
+      })
+      .slice(0, maxNodes);
+  } else {
+    const resolveNodeRef = (id: string): GraphNodeRef | null => {
+      const local = tree.nodeById.get(id);
+      if (local) {
+        return {
+          node: local,
+          treeId: tree.id,
+          sourcePath: tree.sourcePath,
+        };
+      }
+      return crossTreeNodeIndex.get(id) ?? null;
+    };
+    const ordered: HelixAskGraphResolvedNode[] = [...resolvedAnchors];
+    const visited = new Set(resolvedAnchors.map((entry) => entry.id));
+    const queue: Array<{ id: string; depth: number }> = resolvedAnchors.map((entry) => ({
+      id: entry.id,
+      depth: 0,
+    }));
+    while (queue.length > 0 && ordered.length < maxNodes) {
+      const current = queue.shift();
+      if (!current) break;
+      if (current.depth >= maxDepth) continue;
+      const neighbors = tree.neighbors.get(current.id) ?? [];
+      const sortedNeighbors = neighbors
+        .map((neighbor) => ({
+          neighbor,
+          score: (() => {
+            const ref = resolveNodeRef(neighbor.id);
+            return ref ? scoreNode(ref.node, tokens, questionNorm, conceptBoosts) : 0;
+          })(),
+        }))
+        .sort((a, b) => {
+          if (a.neighbor.weight !== b.neighbor.weight) {
+            return b.neighbor.weight - a.neighbor.weight;
+          }
+          return b.score - a.score;
+        });
+      for (const entry of sortedNeighbors) {
+        if (ordered.length >= maxNodes) break;
+        const neighbor = entry.neighbor;
+        if (visited.has(neighbor.id)) continue;
+        const ref = resolveNodeRef(neighbor.id);
+        if (!ref) continue;
+        const node = ref.node;
+        visited.add(neighbor.id);
+        ordered.push({
+          id: node.id,
+          title: node.title ?? node.id,
+          excerpt: extractExcerpt(node),
+          artifact: extractArtifact(node.bodyMD),
+          tags: node.tags,
+          score: entry.score,
+          depth: current.depth + 1,
+          relation: neighbor.rel,
+          evidence: node.evidence,
+          summary: node.summary,
+          nodeType: node.nodeType,
+          inputs: node.inputs,
+          outputs: node.outputs,
+          assumptions: node.assumptions,
+          validity: node.validity,
+          deterministic: node.deterministic,
+          tolerance: node.tolerance,
+          dependencies: node.dependencies,
+          environment: node.environment,
+          sourcePath: ref.sourcePath,
+        });
+        queue.push({ id: neighbor.id, depth: current.depth + 1 });
+      }
     }
+    withRoles = resolveRoles(tree, ordered).slice(0, maxNodes);
   }
-  const withRoles = resolveRoles(tree, ordered).slice(0, maxNodes);
   const lines = buildScaffoldLines(tree, resolvedAnchors, withRoles);
   if (lines.length === 0) return null;
   const scaffoldText = lines.join("\n");
@@ -1167,6 +1395,8 @@ const buildFrameworkCandidate = (
     rankScore: weightedScore,
     anchorScore,
     pathScore,
+    pathMode: pathMode === "root_to_leaf" ? "root_to_leaf" : "full",
+    pathFallbackReason,
     congruenceDiagnostics: tree.congruenceDiagnostics,
   };
   return { framework, score: weightedScore, anchorScore, pathScore, hitCount };
@@ -1178,6 +1408,7 @@ export function resolveHelixAskGraphPack(input: {
   conceptMatch?: HelixAskConceptMatch | null;
   lockedTreeIds?: string[];
   congruenceWalkOverride?: HelixAskCongruenceWalkOverride;
+  pathMode?: HelixAskGraphPathMode;
 }): HelixAskGraphPack | null {
   const config = loadGraphResolverConfig();
   if (!config?.trees?.length) return null;
@@ -1224,6 +1455,7 @@ export function resolveHelixAskGraphPack(input: {
     if (!tree) continue;
     const candidate = buildFrameworkCandidate(tree, crossTreeNodeIndex, tokens, questionNorm, conceptBoosts, {
       locked: lockedTreeIds.has(treeConfig.id),
+      pathMode: input.pathMode ?? "full",
     });
     if (candidate) candidates.push(candidate);
   }
@@ -1289,6 +1521,7 @@ export function resolveHelixAskGraphFramework(input: {
   topicTags: HelixAskTopicTag[];
   conceptMatch?: HelixAskConceptMatch | null;
   congruenceWalkOverride?: HelixAskCongruenceWalkOverride;
+  pathMode?: HelixAskGraphPathMode;
 }): HelixAskGraphFramework | null {
   const pack = resolveHelixAskGraphPack(input);
   return pack?.frameworks[0] ?? null;
