@@ -2615,6 +2615,21 @@ const HELIX_ASK_FORCE_FULL_ANSWER_TOKENS = clampNumber(
   1024,
   8192,
 );
+const HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH =
+  String(
+    process.env.HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH ??
+      process.env.VITE_HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH ??
+      "1",
+  ).trim() === "1";
+const HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH_MIN_SCORE = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH_MIN_SCORE ??
+      process.env.VITE_HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH_MIN_SCORE,
+    52,
+  ),
+  20,
+  100,
+);
 const HELIX_ASK_MICRO_PASS =
   String(process.env.HELIX_ASK_MICRO_PASS ?? process.env.VITE_HELIX_ASK_MICRO_PASS ?? "1")
     .trim() === "1";
@@ -15711,13 +15726,42 @@ const executeHelixAsk = async ({
         topicTags.length ? "ok" : "none",
         topicTags.length ? topicTags.join(", ") : "none",
       );
-      let conceptMatch: HelixAskConceptMatch | null = null;
+    let conceptMatch: HelixAskConceptMatch | null = null;
+    let conceptFastPath = false;
+    let forcedAnswer: string | null = null;
+    let forcedAnswerIsHard = false;
+      const earlyIdeologyConceptMatch = findConceptMatch(baseQuestion, {
+        intentId: "repo.ideology_reference",
+      });
+      if (
+        HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH &&
+        earlyIdeologyConceptMatch &&
+        (earlyIdeologyConceptMatch.score ?? 0) >=
+          HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH_MIN_SCORE
+      ) {
+        conceptMatch = earlyIdeologyConceptMatch;
+        conceptFastPath = true;
+        forcedAnswer = renderConceptAnswer(conceptMatch);
+        forcedAnswerIsHard = true;
+        logEvent(
+          "Concept fast path",
+          "preintent_ideology",
+          `score=${earlyIdeologyConceptMatch.score ?? 0}`,
+        );
+        if (debugPayload) {
+          debugPayload.concept_id = conceptMatch.card.id;
+          debugPayload.concept_label = conceptMatch.card.label ?? conceptMatch.card.id;
+          debugPayload.concept_source = conceptMatch.card.sourcePath;
+        }
+        answerPath.push("concept_fast_path:preintent");
+        answerPath.push("forcedAnswer:ideology");
+      }
       const repoNativeTags = new Set([
         "helix_ask",
         "warp",
         "ideology",
         "ledger",
-        "star",
+      "star",
       "constraints",
     ]);
       const repoExpectationSignals: string[] = [];
@@ -15793,34 +15837,39 @@ const executeHelixAsk = async ({
     } else {
       logEvent("Topic profile", "none", "no profile");
     }
-    const ambiguityTargetSpan = extractClarifySpan(baseQuestion);
-    const ambiguitySeedLabels = collectAmbiguitySeedLabels(
-      [
-        ...(slotPreview?.slots ?? []),
-        ...headingSeedSlots,
-        ...slotPlanPassSlots,
-      ],
-      3,
-    );
-    let ambiguityClusterSummary: AmbiguityClusterSummary | null = null;
-    if (debugPayload && ambiguityTargetSpan) {
-      debugPayload.ambiguity_target_span = ambiguityTargetSpan;
-    }
-    if (HELIX_ASK_AMBIGUITY_RESOLVER) {
-      const ambiguityTokenCount = filterCriticTokens(tokenizeAskQuery(baseQuestion)).length;
-      const shouldProbeClusters =
-        ambiguityTokenCount > 0 && ambiguityTokenCount <= HELIX_ASK_AMBIGUITY_SHORT_TOKENS + 2;
-      if (shouldProbeClusters) {
-        const clusterStart = Date.now();
-        const snapshot = await buildAmbiguityCandidateSnapshot({
-          question: baseQuestion,
-          targetSpan: ambiguityTargetSpan,
-          seedTerms: ambiguitySeedLabels,
-          topicProfile,
-        });
-        const summary = buildAmbiguityClusterSummary(snapshot.candidates, ambiguityTargetSpan);
-        if (summary) {
-          ambiguityClusterSummary = summary;
+    let preIntentClarify: string | null = null;
+    let conceptScopeCandidates: HelixAskConceptCandidate[] = [];
+    let ambiguityCandidates: HelixAskConceptCandidate[] = [];
+    let ambiguityCandidateLabels: string[] = [];
+    if (!forcedAnswer) {
+      const ambiguityTargetSpan = extractClarifySpan(baseQuestion);
+      const ambiguitySeedLabels = collectAmbiguitySeedLabels(
+        [
+          ...(slotPreview?.slots ?? []),
+          ...headingSeedSlots,
+          ...slotPlanPassSlots,
+        ],
+        3,
+      );
+      let ambiguityClusterSummary: AmbiguityClusterSummary | null = null;
+      if (debugPayload && ambiguityTargetSpan) {
+        debugPayload.ambiguity_target_span = ambiguityTargetSpan;
+      }
+      if (HELIX_ASK_AMBIGUITY_RESOLVER) {
+        const ambiguityTokenCount = filterCriticTokens(tokenizeAskQuery(baseQuestion)).length;
+        const shouldProbeClusters =
+          ambiguityTokenCount > 0 && ambiguityTokenCount <= HELIX_ASK_AMBIGUITY_SHORT_TOKENS + 2;
+        if (shouldProbeClusters) {
+          const clusterStart = Date.now();
+          const snapshot = await buildAmbiguityCandidateSnapshot({
+            question: baseQuestion,
+            targetSpan: ambiguityTargetSpan,
+            seedTerms: ambiguitySeedLabels,
+            topicProfile,
+          });
+          const summary = buildAmbiguityClusterSummary(snapshot.candidates, ambiguityTargetSpan);
+          if (summary) {
+            ambiguityClusterSummary = summary;
             if (summary.clusters.length > 0) {
               if (HELIX_ASK_AMBIGUITY_LABEL_LLM) {
                 let labelStart: number | null = null;
@@ -15877,165 +15926,176 @@ const executeHelixAsk = async ({
                   logEvent("Ambiguity labels", "error", message);
                 }
               }
+            }
             const finalSummary = ambiguityClusterSummary ?? summary;
-            const detail = [
-              `clusters=${finalSummary.clusters.length}`,
-              `margin=${finalSummary.margin.toFixed(2)}`,
-              `entropy=${finalSummary.entropy.toFixed(2)}`,
-              snapshot.queries.length ? `queries=${snapshot.queries.length}` : "",
-            ]
-              .filter(Boolean)
-              .join(" | ");
-            logEvent("Ambiguity clusters", "ok", detail, clusterStart);
+            if (finalSummary) {
+              const detail = [
+                `clusters=${finalSummary.clusters.length}`,
+                `margin=${finalSummary.margin.toFixed(2)}`,
+                `entropy=${finalSummary.entropy.toFixed(2)}`,
+                snapshot.queries.length ? `queries=${snapshot.queries.length}` : "",
+              ]
+                .filter(Boolean)
+                .join(" | ");
+              logEvent("Ambiguity clusters", "ok", detail, clusterStart);
+            }
           }
           if (debugPayload) {
             debugPayload.ambiguity_target_span = ambiguityTargetSpan;
             const finalSummary = ambiguityClusterSummary ?? summary;
-            debugPayload.ambiguity_cluster_count = finalSummary.clusters.length;
-            debugPayload.ambiguity_cluster_top_mass = finalSummary.clusters[0]?.mass ?? 0;
-            debugPayload.ambiguity_cluster_margin = finalSummary.margin;
-            debugPayload.ambiguity_cluster_entropy = finalSummary.entropy;
-            debugPayload.ambiguity_cluster_candidates = finalSummary.clusters.map((cluster) => ({
-              label: cluster.label,
-              score: Number(cluster.score.toFixed(6)),
-              mass: Number(cluster.mass.toFixed(6)),
-              count: cluster.count,
-            }));
+            if (finalSummary) {
+              debugPayload.ambiguity_cluster_count = finalSummary.clusters.length;
+              debugPayload.ambiguity_cluster_top_mass = finalSummary.clusters[0]?.mass ?? 0;
+              debugPayload.ambiguity_cluster_margin = finalSummary.margin;
+              debugPayload.ambiguity_cluster_entropy = finalSummary.entropy;
+              debugPayload.ambiguity_cluster_candidates = finalSummary.clusters.map((cluster) => ({
+                label: cluster.label,
+                score: Number(cluster.score.toFixed(6)),
+                mass: Number(cluster.mass.toFixed(6)),
+                count: cluster.count,
+              }));
+            }
           }
         }
       }
-    }
-    const conceptScopeCandidates = baseQuestion
-      ? listConceptCandidates(baseQuestion, 4)
-      : [];
-    const ambiguityCandidates = HELIX_ASK_AMBIGUITY_RESOLVER
-      ? conceptScopeCandidates.length > 0
-        ? conceptScopeCandidates.slice(0, 3)
-        : slotPreviewCandidates.slice(0, 3)
-      : [];
-    const ambiguityCandidateLabels = Array.from(
-      new Set([
-        ...ambiguitySeedLabels,
-        ...ambiguityCandidates.map((candidate) => formatAmbiguityCandidateLabel(candidate)),
-      ]),
-    ).slice(0, 3);
-    const ambiguityResolutionRaw = resolvePreIntentAmbiguity({
-      question: baseQuestion,
-      candidates: ambiguityCandidates,
-      clusterSummary: ambiguityClusterSummary,
-      explicitRepoExpectation,
-      repoExpectationLevel,
-      seedLabels: ambiguitySeedLabels,
-    });
-    let ambiguityResolution = blockScoped
-      ? { ...ambiguityResolutionRaw, shouldClarify: false, reason: undefined }
-      : ambiguityResolutionRaw;
-    if (
-      ambiguityResolution.shouldClarify &&
-      HELIX_ASK_AMBIGUITY_EVIDENCE_PASS &&
-      ambiguityClusterSummary?.clusters?.length
-    ) {
-      const senseCandidates = ambiguityClusterSummary.clusters
-        .slice(0, Math.max(2, HELIX_ASK_AMBIGUITY_SENSE_TOPK))
-        .filter((cluster) => cluster.label);
-      if (senseCandidates.length >= 2) {
-        const scores: Array<{
-          label: string;
-          score: number;
-          docShare: number;
-          matchRatio: number;
-        }> = [];
-        for (const sense of senseCandidates) {
-          const senseQueries = mergeHelixAskQueries(
-            [baseQuestion],
-            [sense.label],
-            Math.max(3, HELIX_ASK_QUERY_MERGE_MAX - 2),
-          );
-          const senseContext = await buildAskContextFromQueries(
-            baseQuestion,
-            senseQueries,
-            HELIX_ASK_AMBIGUITY_SENSE_TOPK,
-            topicProfile,
-          );
-          const senseEvidence = evaluateEvidenceEligibility(baseQuestion, senseContext.context, {
-            minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
-            minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
-            signalTokens: ambiguitySeedLabels,
-            useQuestionTokens: true,
-          });
-          const docHits = senseContext.files.filter((filePath) => /(^|\/)docs\//i.test(filePath));
-          const docShare = senseContext.files.length
-            ? docHits.length / senseContext.files.length
-            : 0;
-          const score = Math.min(
-            1,
-            senseEvidence.matchRatio + (docShare >= 0.4 ? 0.1 : 0),
-          );
-          scores.push({
-            label: sense.label,
-            score: Number(score.toFixed(4)),
-            docShare: Number(docShare.toFixed(4)),
-            matchRatio: Number(senseEvidence.matchRatio.toFixed(4)),
-          });
-        }
-        scores.sort((a, b) => b.score - a.score);
-        const top = scores[0];
-        const second = scores[1];
-        const margin = top && second ? top.score - second.score : top?.score ?? 0;
-        if (top && margin >= HELIX_ASK_AMBIGUITY_DOMINANCE_THRESHOLD) {
-          ambiguityResolution = {
-            ...ambiguityResolution,
-            shouldClarify: false,
-            reason: "evidence_dominance",
-          };
-          logEvent(
-            "Ambiguity evidence",
-            "dominant",
-            `sense=${top.label} margin=${margin.toFixed(2)}`,
-          );
-        } else {
-          logEvent(
-            "Ambiguity evidence",
-            "split",
-            `top=${top?.label ?? "n/a"} margin=${margin.toFixed(2)}`,
-          );
-        }
-        if (debugPayload) {
-          debugPayload.ambiguity_evidence_pass = true;
-          debugPayload.ambiguity_evidence_scores = scores;
-          debugPayload.ambiguity_selected = top?.label;
+      conceptScopeCandidates = baseQuestion
+        ? listConceptCandidates(baseQuestion, 4)
+        : [];
+      ambiguityCandidates = HELIX_ASK_AMBIGUITY_RESOLVER
+        ? conceptScopeCandidates.length > 0
+          ? conceptScopeCandidates.slice(0, 3)
+          : slotPreviewCandidates.slice(0, 3)
+        : [];
+      ambiguityCandidateLabels = Array.from(
+        new Set([
+          ...collectAmbiguitySeedLabels(
+            [
+              ...(slotPreview?.slots ?? []),
+              ...headingSeedSlots,
+              ...slotPlanPassSlots,
+            ],
+            3,
+          ),
+          ...ambiguityCandidates.map((candidate) => formatAmbiguityCandidateLabel(candidate)),
+        ]),
+      ).slice(0, 3);
+      const ambiguityResolutionRaw = resolvePreIntentAmbiguity({
+        question: baseQuestion,
+        candidates: ambiguityCandidates,
+        clusterSummary: ambiguityClusterSummary,
+        explicitRepoExpectation,
+        repoExpectationLevel,
+        seedLabels: ambiguitySeedLabels,
+      });
+      let ambiguityResolution = blockScoped
+        ? { ...ambiguityResolutionRaw, shouldClarify: false, reason: undefined }
+        : ambiguityResolutionRaw;
+      if (
+        ambiguityResolution.shouldClarify &&
+        HELIX_ASK_AMBIGUITY_EVIDENCE_PASS &&
+        ambiguityClusterSummary?.clusters?.length
+      ) {
+        const senseCandidates = ambiguityClusterSummary.clusters
+          .slice(0, Math.max(2, HELIX_ASK_AMBIGUITY_SENSE_TOPK))
+          .filter((cluster) => cluster.label);
+        if (senseCandidates.length >= 2) {
+          const scores: Array<{
+            label: string;
+            score: number;
+            docShare: number;
+            matchRatio: number;
+          }> = [];
+          for (const sense of senseCandidates) {
+            const senseQueries = mergeHelixAskQueries(
+              [baseQuestion],
+              [sense.label],
+              Math.max(3, HELIX_ASK_QUERY_MERGE_MAX - 2),
+            );
+            const senseContext = await buildAskContextFromQueries(
+              baseQuestion,
+              senseQueries,
+              HELIX_ASK_AMBIGUITY_SENSE_TOPK,
+              topicProfile,
+            );
+            const senseEvidence = evaluateEvidenceEligibility(baseQuestion, senseContext.context, {
+              minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+              minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+              signalTokens: ambiguitySeedLabels,
+              useQuestionTokens: true,
+            });
+            const docHits = senseContext.files.filter((filePath) => /(^|\/)docs\//i.test(filePath));
+            const docShare = senseContext.files.length
+              ? docHits.length / senseContext.files.length
+              : 0;
+            const score = Math.min(
+              1,
+              senseEvidence.matchRatio + (docShare >= 0.4 ? 0.1 : 0),
+            );
+            scores.push({
+              label: sense.label,
+              score: Number(score.toFixed(4)),
+              docShare: Number(docShare.toFixed(4)),
+              matchRatio: Number(senseEvidence.matchRatio.toFixed(4)),
+            });
+          }
+          scores.sort((a, b) => b.score - a.score);
+          const top = scores[0];
+          const second = scores[1];
+          const margin = top && second ? top.score - second.score : top?.score ?? 0;
+          if (top && margin >= HELIX_ASK_AMBIGUITY_DOMINANCE_THRESHOLD) {
+            ambiguityResolution = {
+              ...ambiguityResolution,
+              shouldClarify: false,
+              reason: "evidence_dominance",
+            };
+            logEvent(
+              "Ambiguity evidence",
+              "dominant",
+              `sense=${top.label} margin=${margin.toFixed(2)}`,
+            );
+          } else {
+            logEvent(
+              "Ambiguity evidence",
+              "split",
+              `top=${top?.label ?? "n/a"} margin=${margin.toFixed(2)}`,
+            );
+          }
+          if (debugPayload) {
+            debugPayload.ambiguity_evidence_pass = true;
+            debugPayload.ambiguity_evidence_scores = scores;
+            debugPayload.ambiguity_selected = top?.label;
+          }
         }
       }
-    }
-    let preIntentClarify: string | null = null;
-    if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
-      debugPayload.ambiguity_resolver_applied = ambiguityResolution.shouldClarify;
-      debugPayload.ambiguity_resolver_reason = ambiguityResolution.reason;
-      debugPayload.ambiguity_resolver_token_count = ambiguityResolution.tokenCount;
-      debugPayload.ambiguity_resolver_short_prompt = ambiguityResolution.shortPrompt;
-      debugPayload.ambiguity_resolver_top_score = ambiguityResolution.topScore;
-      debugPayload.ambiguity_resolver_margin = ambiguityResolution.margin;
-      debugPayload.slot_dominance_margin =
-        ambiguityResolution.clusterMargin ?? ambiguityResolution.margin;
-      if (ambiguityClusterSummary) {
-        debugPayload.ambiguity_cluster_margin = ambiguityResolution.clusterMargin;
-        debugPayload.ambiguity_cluster_entropy = ambiguityResolution.clusterEntropy;
-        debugPayload.ambiguity_cluster_top_mass = ambiguityResolution.clusterTopMass;
+      if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
+        debugPayload.ambiguity_resolver_applied = ambiguityResolution.shouldClarify;
+        debugPayload.ambiguity_resolver_reason = ambiguityResolution.reason;
+        debugPayload.ambiguity_resolver_token_count = ambiguityResolution.tokenCount;
+        debugPayload.ambiguity_resolver_short_prompt = ambiguityResolution.shortPrompt;
+        debugPayload.ambiguity_resolver_top_score = ambiguityResolution.topScore;
+        debugPayload.ambiguity_resolver_margin = ambiguityResolution.margin;
+        debugPayload.slot_dominance_margin =
+          ambiguityResolution.clusterMargin ?? ambiguityResolution.margin;
+        if (ambiguityClusterSummary) {
+          debugPayload.ambiguity_cluster_margin = ambiguityResolution.clusterMargin;
+          debugPayload.ambiguity_cluster_entropy = ambiguityResolution.clusterEntropy;
+          debugPayload.ambiguity_cluster_top_mass = ambiguityResolution.clusterTopMass;
+        }
+        debugPayload.ambiguity_resolver_candidates = ambiguityCandidateLabels;
       }
-      debugPayload.ambiguity_resolver_candidates = ambiguityCandidateLabels;
-    }
-    if (ambiguityResolution.shouldClarify) {
-      preIntentClarify = buildPreIntentClarifyLine(
-        baseQuestion,
-        ambiguityCandidates,
-        ambiguityClusterSummary,
-        ambiguitySeedLabels,
-      );
-      logEvent(
-        "Ambiguity resolver",
-        "clarify",
-        ambiguityResolution.reason ?? "short_prompt",
-      );
+      if (ambiguityResolution.shouldClarify) {
+        preIntentClarify = buildPreIntentClarifyLine(
+          baseQuestion,
+          ambiguityCandidates,
+          ambiguityClusterSummary,
+          ambiguitySeedLabels,
+        );
+        logEvent(
+          "Ambiguity resolver",
+          "clarify",
+          ambiguityResolution.reason ?? "short_prompt",
+        );
+      }
     }
     const intentMatch = matchHelixAskIntent({
       question: baseQuestion,
@@ -16332,8 +16392,6 @@ const executeHelixAsk = async ({
     let mathSolveResult: HelixAskMathSolveResult | null = null;
     let verificationAnchorRequired = false;
     let verificationAnchorHints: string[] = [];
-    let forcedAnswer: string | null = null;
-    let forcedAnswerIsHard = false;
     let retrievalQueries: string[] = [];
     let retrievalFilesSnapshot: string[] = [];
     let promptItems: HelixAskPromptItem[] = [];
@@ -16378,7 +16436,7 @@ const executeHelixAsk = async ({
       isRepoDomain ||
       intentProfile.id === "repo.ideology_reference" ||
       (isRepoDomain && conceptualFocus);
-    if (wantsConceptMatch && baseQuestion) {
+    if (!conceptMatch && wantsConceptMatch && baseQuestion) {
       conceptMatch = findConceptMatch(baseQuestion, { intentId: intentProfile.id });
       if (conceptMatch && debugPayload) {
         debugPayload.concept_id = conceptMatch.card.id;
@@ -16615,107 +16673,117 @@ const executeHelixAsk = async ({
         },
       };
     };
-    const graphCongruenceWalkOverride = resolveGraphCongruenceWalkOverride();
-    graphPack = resolveHelixAskGraphPack({
-      question: baseQuestion,
-      topicTags,
-      conceptMatch,
-      lockedTreeIds: graphTreeLock.length > 0 ? graphTreeLock : undefined,
-      congruenceWalkOverride: graphCongruenceWalkOverride,
-    });
-    graphResolverPreferred = Boolean(graphPack?.preferGraph);
-    graphHintTerms = collectGraphHintTerms(graphPack);
-    graphSeedSlots = buildGraphSeedSlots(graphPack);
-    if (debugPayload) {
-      debugPayload.graph_pack_lock = {
-        requested: graphTreeLock.length > 0 ? graphTreeLock.slice() : [],
-        applied: graphPack?.treeIds ?? [],
-      };
-      debugPayload.graph_congruence_region = graphCongruenceWalkOverride.region;
-      if (graphCongruenceWalkOverride.chart) {
-        debugPayload.graph_congruence_chart = graphCongruenceWalkOverride.chart;
-      }
-    }
-    if (graphPack) {
-      const treeCount = graphPack.frameworks.length;
-      const anchorCount = graphPack.frameworks.reduce((sum, framework) => sum + framework.anchors.length, 0);
-      const nodeCount = graphPack.frameworks.reduce((sum, framework) => sum + framework.path.length, 0);
-      const treeList = graphPack.treeIds.join(", ");
-      const graphDetail = [
-        `trees=${treeCount}`,
-        treeList ? `tree_ids=${treeList}` : null,
-        graphPack.primaryTreeId ? `primary=${graphPack.primaryTreeId}` : null,
-        `anchors=${anchorCount}`,
-        `nodes=${nodeCount}`,
-      ]
-        .filter(Boolean)
-        .join(" | ");
-      logEvent("Graph pack", "resolved", graphDetail);
+    let graphCongruenceWalkOverride: HelixAskCongruenceWalkOverride | undefined;
+    if (!conceptFastPath) {
+      graphCongruenceWalkOverride = resolveGraphCongruenceWalkOverride();
+      graphPack = resolveHelixAskGraphPack({
+        question: baseQuestion,
+        topicTags,
+        conceptMatch,
+        lockedTreeIds: graphTreeLock.length > 0 ? graphTreeLock : undefined,
+        congruenceWalkOverride: graphCongruenceWalkOverride,
+      });
+      graphResolverPreferred = Boolean(graphPack?.preferGraph);
+      graphHintTerms = collectGraphHintTerms(graphPack);
+      graphSeedSlots = buildGraphSeedSlots(graphPack);
       if (debugPayload) {
-        const frameworkTrees = graphPack.frameworks.map((framework) => ({
-          tree: framework.treeId,
-          anchors: framework.anchors.map((node) => node.id),
-          nodes: framework.path.map((node) => node.id),
-          source: framework.sourcePath,
-          score: framework.rankScore ?? null,
-          congruence: framework.congruenceDiagnostics ?? null,
-        }));
-        const blockedByReasonTotal: Record<string, number> = {};
-        const blockedByConditionTotal: Record<string, number> = {};
-        let allowedEdgesTotal = 0;
-        let blockedEdgesTotal = 0;
-        let resolvedInTreeEdgesTotal = 0;
-        let resolvedCrossTreeEdgesTotal = 0;
-        for (const framework of graphPack.frameworks) {
-          const diagnostics = framework.congruenceDiagnostics;
-          if (!diagnostics) continue;
-          allowedEdgesTotal += diagnostics.allowedEdges ?? 0;
-          blockedEdgesTotal += diagnostics.blockedEdges ?? 0;
-          resolvedInTreeEdgesTotal += diagnostics.resolvedInTreeEdges ?? 0;
-          resolvedCrossTreeEdgesTotal += diagnostics.resolvedCrossTreeEdges ?? 0;
-          for (const [reason, count] of Object.entries(diagnostics.blockedByReason ?? {})) {
-            blockedByReasonTotal[reason] = (blockedByReasonTotal[reason] ?? 0) + Number(count || 0);
-          }
-          for (const [condition, count] of Object.entries(diagnostics.blockedByCondition ?? {})) {
-            blockedByConditionTotal[condition] =
-              (blockedByConditionTotal[condition] ?? 0) + Number(count || 0);
+        debugPayload.graph_pack_lock = {
+          requested: graphTreeLock.length > 0 ? graphTreeLock.slice() : [],
+          applied: graphPack?.treeIds ?? [],
+        };
+        if (graphCongruenceWalkOverride) {
+          debugPayload.graph_congruence_region = graphCongruenceWalkOverride.region;
+          if (graphCongruenceWalkOverride.chart) {
+            debugPayload.graph_congruence_chart = graphCongruenceWalkOverride.chart;
           }
         }
-        debugPayload.graph_framework = {
-          primary: graphPack.primaryTreeId,
-          locked: graphTreeLock.length > 0 ? graphTreeLock : undefined,
-          trees: frameworkTrees,
-        };
-        debugPayload.graph_congruence_diagnostics = {
-          treeCount: graphPack.frameworks.length,
-          allowedEdges: allowedEdgesTotal,
-          blockedEdges: blockedEdgesTotal,
-          resolvedInTreeEdges: resolvedInTreeEdgesTotal,
-          resolvedCrossTreeEdges: resolvedCrossTreeEdgesTotal,
-          blockedByReason: blockedByReasonTotal,
-          blockedByCondition: blockedByConditionTotal,
-          strictSignals: {
-            B_equals_1: graphCongruenceWalkOverride.region?.B_equals_1 === true,
-            qi_metric_derived_equals_true:
-              graphCongruenceWalkOverride.region?.qi_metric_derived_equals_true === true,
-            qi_strict_ok_equals_true:
-              graphCongruenceWalkOverride.region?.qi_strict_ok_equals_true === true,
-            theta_geom_equals_true: graphCongruenceWalkOverride.region?.theta_geom_equals_true === true,
-            vdb_two_wall_support_equals_true:
-              graphCongruenceWalkOverride.region?.vdb_two_wall_support_equals_true === true,
-            ts_metric_derived_equals_true:
-              graphCongruenceWalkOverride.region?.ts_metric_derived_equals_true === true,
-            cl3_metric_t00_available_equals_true:
-              graphCongruenceWalkOverride.region?.cl3_metric_t00_available_equals_true === true,
-            cl3_rho_gate_equals_true:
-              graphCongruenceWalkOverride.region?.cl3_rho_gate_equals_true === true,
-          },
-        };
       }
+      if (graphPack) {
+        const treeCount = graphPack.frameworks.length;
+        const anchorCount = graphPack.frameworks.reduce((sum, framework) => sum + framework.anchors.length, 0);
+        const nodeCount = graphPack.frameworks.reduce((sum, framework) => sum + framework.path.length, 0);
+        const treeList = graphPack.treeIds.join(", ");
+        const graphDetail = [
+          `trees=${treeCount}`,
+          treeList ? `tree_ids=${treeList}` : null,
+          graphPack.primaryTreeId ? `primary=${graphPack.primaryTreeId}` : null,
+          `anchors=${anchorCount}`,
+          `nodes=${nodeCount}`,
+        ]
+          .filter(Boolean)
+          .join(" | ");
+        logEvent("Graph pack", "resolved", graphDetail);
+        if (debugPayload) {
+          const frameworkTrees = graphPack.frameworks.map((framework) => ({
+            tree: framework.treeId,
+            anchors: framework.anchors.map((node) => node.id),
+            nodes: framework.path.map((node) => node.id),
+            source: framework.sourcePath,
+            score: framework.rankScore ?? null,
+            congruence: framework.congruenceDiagnostics ?? null,
+          }));
+          const blockedByReasonTotal: Record<string, number> = {};
+          const blockedByConditionTotal: Record<string, number> = {};
+          let allowedEdgesTotal = 0;
+          let blockedEdgesTotal = 0;
+          let resolvedInTreeEdgesTotal = 0;
+          let resolvedCrossTreeEdgesTotal = 0;
+          for (const framework of graphPack.frameworks) {
+            const diagnostics = framework.congruenceDiagnostics;
+            if (!diagnostics) continue;
+            allowedEdgesTotal += diagnostics.allowedEdges ?? 0;
+            blockedEdgesTotal += diagnostics.blockedEdges ?? 0;
+            resolvedInTreeEdgesTotal += diagnostics.resolvedInTreeEdges ?? 0;
+            resolvedCrossTreeEdgesTotal += diagnostics.resolvedCrossTreeEdges ?? 0;
+            for (const [reason, count] of Object.entries(diagnostics.blockedByReason ?? {})) {
+              blockedByReasonTotal[reason] = (blockedByReasonTotal[reason] ?? 0) + Number(count || 0);
+            }
+            for (const [condition, count] of Object.entries(diagnostics.blockedByCondition ?? {})) {
+              blockedByConditionTotal[condition] =
+                (blockedByConditionTotal[condition] ?? 0) + Number(count || 0);
+            }
+          }
+          debugPayload.graph_framework = {
+            primary: graphPack.primaryTreeId,
+            locked: graphTreeLock.length > 0 ? graphTreeLock : undefined,
+            trees: frameworkTrees,
+          };
+          debugPayload.graph_congruence_diagnostics = {
+            treeCount: graphPack.frameworks.length,
+            allowedEdges: allowedEdgesTotal,
+            blockedEdges: blockedEdgesTotal,
+            resolvedInTreeEdges: resolvedInTreeEdgesTotal,
+            resolvedCrossTreeEdges: resolvedCrossTreeEdgesTotal,
+            blockedByReason: blockedByReasonTotal,
+            blockedByCondition: blockedByConditionTotal,
+            strictSignals: {
+              B_equals_1: graphCongruenceWalkOverride.region?.B_equals_1 === true,
+              qi_metric_derived_equals_true:
+                graphCongruenceWalkOverride.region?.qi_metric_derived_equals_true === true,
+              qi_strict_ok_equals_true:
+                graphCongruenceWalkOverride.region?.qi_strict_ok_equals_true === true,
+              theta_geom_equals_true: graphCongruenceWalkOverride.region?.theta_geom_equals_true === true,
+              vdb_two_wall_support_equals_true:
+                graphCongruenceWalkOverride.region?.vdb_two_wall_support_equals_true === true,
+              ts_metric_derived_equals_true:
+                graphCongruenceWalkOverride.region?.ts_metric_derived_equals_true === true,
+              cl3_metric_t00_available_equals_true:
+                graphCongruenceWalkOverride.region?.cl3_metric_t00_available_equals_true === true,
+              cl3_rho_gate_equals_true:
+                graphCongruenceWalkOverride.region?.cl3_rho_gate_equals_true === true,
+            },
+          };
+        }
+        if (debugPayload) {
+          debugPayload.tree_walk_mode = treeWalkMode;
+          debugPayload.tree_walk_max_steps = HELIX_ASK_TREE_WALK_MAX_STEPS;
+        }
+      }
+    } else {
       if (debugPayload) {
-        debugPayload.tree_walk_mode = treeWalkMode;
-        debugPayload.tree_walk_max_steps = HELIX_ASK_TREE_WALK_MAX_STEPS;
+        (debugPayload as Record<string, unknown>).graph_pack_skip_reason = "ideology_fast_path";
       }
+      logEvent("Graph pack", "skipped", "ideology fast path");
     }
     const baseEvidenceSignalTokens = Array.from(
       new Set(
@@ -16740,10 +16808,9 @@ const executeHelixAsk = async ({
       intentDomain === "repo" &&
       HELIX_ASK_CONCEPT_FAST_PATH_INTENTS.has(intentProfile.id) &&
       (intentProfile.id === "repo.ideology_reference" ? true : !graphResolverPreferred);
-    let conceptFastPath = false;
     let conceptFastPathBlockedReason: string | null = null;
-    if (conceptFastPathCandidate && conceptMatch) {
-      if (HELIX_ASK_FORCE_FULL_ANSWERS) {
+    if (!conceptFastPath && conceptFastPathCandidate && conceptMatch) {
+      if (HELIX_ASK_FORCE_FULL_ANSWERS && !HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH) {
         conceptFastPathBlockedReason = "full_answer_mode";
       } else {
         const topCandidate = ambiguityCandidates[0];
@@ -17078,15 +17145,20 @@ const executeHelixAsk = async ({
       forcedAnswerIsHard = true;
       answerPath.push("forcedAnswer:math_solver");
     }
-    if (conceptFastPath && conceptMatch && !forcedAnswer && intentProfile.id !== "repo.ideology_reference") {
-        const conceptAnswer = renderConceptDefinition(conceptMatch);
-        if (conceptAnswer) {
-          forcedAnswer = conceptAnswer;
-          forcedAnswerIsHard = true;
-          answerPath.push(
-            "forcedAnswer:concept",
-          );
+    if (conceptFastPath && conceptMatch && !forcedAnswer) {
+      const conceptAnswer = isIdeologyReferenceIntent
+        ? renderConceptAnswer(conceptMatch)
+        : renderConceptDefinition(conceptMatch);
+      if (conceptAnswer) {
+        forcedAnswer = conceptAnswer;
+        forcedAnswerIsHard = true;
+        answerPath.push(
+          isIdeologyReferenceIntent ? "forcedAnswer:ideology" : "forcedAnswer:concept",
+        );
+        if (isIdeologyReferenceIntent) {
+          answerPath.push("concept_fast_path_enabled");
         }
+      }
     }
     const shouldRunConstraintLoop =
       !dryRun && (intentStrategy === "constraint_report" || compositeConstraintRequested);
@@ -17269,14 +17341,31 @@ const executeHelixAsk = async ({
       return;
     }
 
+    const ideologyFastPathBypass =
+      HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH &&
+      isIdeologyReferenceIntent &&
+      conceptFastPath &&
+      Boolean(forcedAnswer) &&
+      String(verbosity ?? "").trim().length > 0;
+    const ideologyConceptForceBypass =
+      isIdeologyReferenceIntent &&
+      conceptFastPath &&
+      Boolean(forcedAnswer) &&
+      forcedAnswerIsHard &&
+      String(verbosity ?? "").trim().length > 0;
     const forcePlanPass =
       blockScoped ||
-      repoExpectationLevel !== "low" ||
-      requiresRepoEvidence ||
-      conceptFastPath ||
-      Boolean(conceptMatch);
+      (!ideologyFastPathBypass && !ideologyConceptForceBypass && repoExpectationLevel !== "low") ||
+      (!ideologyFastPathBypass && !ideologyConceptForceBypass && requiresRepoEvidence) ||
+      ((conceptFastPath || Boolean(conceptMatch)) &&
+        !ideologyFastPathBypass &&
+        !ideologyConceptForceBypass);
     const microPassDecision = decideHelixAskMicroPass(baseQuestion, formatSpec);
-    const skipMicroPass = intentStrategy === "constraint_report" || mathSolverOk;
+    const skipMicroPass =
+      intentStrategy === "constraint_report" ||
+      mathSolverOk ||
+      ideologyFastPathBypass ||
+      ideologyConceptForceBypass;
     const microPassEnabled =
       !skipMicroPass && (microPassDecision.enabled || promptIngested || forcePlanPass);
     if (debugPayload) {
@@ -20640,10 +20729,85 @@ const executeHelixAsk = async ({
     const fallbackAnswer = forcedAnswer ?? conceptAnswer ?? "";
     const shouldShortCircuitAnswer =
       Boolean(fallbackAnswer) && (forcedAnswerIsHard || !prompt);
+    const shouldFastPathFinalize =
+      shouldShortCircuitAnswer &&
+      isIdeologyReferenceIntent &&
+      conceptFastPath &&
+      forcedAnswerIsHard &&
+      String(verbosity ?? "").trim().length > 0;
     if (shouldShortCircuitAnswer) {
-      result = { text: fallbackAnswer } as LocalAskResult;
+      const forcedRawText = stripPromptEchoFromAnswer(fallbackAnswer, baseQuestion).trim();
+      const forcedCleanText = stripTruncationMarkers(formatHelixAskAnswer(forcedRawText));
+      const forcedMeta = isShortAnswer(forcedCleanText, verbosity);
+      result = { text: forcedCleanText } as LocalAskResult;
+      if (debugPayload) {
+        debugPayload.answer_short_sentences = forcedMeta.sentences;
+        debugPayload.answer_short_tokens = forcedMeta.tokens;
+      }
       logProgress("Answer ready", "concept", answerStart);
       answerPath.push("answer:forced");
+      if (shouldFastPathFinalize) {
+        answerPath.push("answer:fast_path_finalize");
+        result.text = forcedCleanText;
+        result.envelope = buildHelixAskEnvelope({
+          answer: forcedCleanText,
+          format: formatSpec.format,
+          tier: intentTier,
+          secondaryTier: intentSecondaryTier,
+          mode: resolveEnvelopeMode(verbosity),
+          evidenceText: conceptMatch?.card?.sourcePath
+            ? `Sources: ${conceptMatch.card.sourcePath}`
+            : evidenceText,
+          traceId: askTraceId,
+        });
+        if (debugPayload) {
+          debugPayload.answer_after_fallback = clipAskText(
+            forcedCleanText,
+            HELIX_ASK_ANSWER_PREVIEW_CHARS,
+          );
+          debugPayload.answer_final_text = clipAskText(
+            forcedCleanText,
+            HELIX_ASK_ANSWER_PREVIEW_CHARS,
+          );
+          debugPayload.answer_path = answerPath;
+          debugPayload.answer_extension_available = false;
+          debugPayload.micro_pass = false;
+          debugPayload.micro_pass_enabled = false;
+        }
+        if (debugPayload && captureLiveHistory) {
+          const traceEvents = liveEventHistory.slice();
+          debugPayload.live_events = traceEvents;
+          debugPayload.trace_events = traceEvents;
+          debugPayload.trace_summary = buildTraceSummary(traceEvents);
+        }
+        if (debugPayload && overflowHistory.length > 0) {
+          const steps = overflowHistory.flatMap((entry) => entry.steps);
+          debugPayload.overflow_retry_applied = true;
+          debugPayload.overflow_retry_steps = Array.from(new Set(steps));
+          debugPayload.overflow_retry_labels = overflowHistory.map((entry) => entry.label);
+          debugPayload.overflow_retry_attempts = overflowHistory.reduce(
+            (sum, entry) => sum + entry.attempts,
+            0,
+          );
+        }
+        result.prompt_ingested = promptIngested;
+        if (promptIngested) {
+          if (promptIngestSource) {
+            result.prompt_ingest_source = promptIngestSource;
+          }
+          if (promptIngestReason) {
+            result.prompt_ingest_reason = promptIngestReason;
+          }
+        }
+        logDebug("streamEmitter.finalize start", {
+          cleanedLength: forcedCleanText.length,
+        });
+        streamEmitter.finalize(forcedCleanText);
+        logDebug("streamEmitter.finalize complete");
+        const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
+        responder.send(200, responsePayload);
+        return;
+      }
     } else {
       const generalEvidenceForBudget = promptScaffold || generalScaffold;
       const answerBudget = computeAnswerTokenBudget({
