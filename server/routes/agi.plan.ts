@@ -15045,7 +15045,7 @@ const executeHelixAsk = async ({
     });
     let reportDecision = resolveReportModeDecision(initialReportQuestion);
     const isIdeologyConversationalCandidate =
-      !!ideologyConversationCandidate &&
+      Boolean(ideologyConversationCandidate) &&
       shouldUseIdeologyConversationalMode(
         initialReportQuestion,
         reportDecision.tokenCount,
@@ -15055,7 +15055,11 @@ const executeHelixAsk = async ({
           blockScoped,
         },
       );
-    if (isIdeologyConversationalCandidate && !blockScoped && reportDecision.reason !== "explicit_report_request") {
+    if (
+      Boolean(ideologyConversationCandidate) &&
+      !blockScoped &&
+      reportDecision.reason !== "explicit_report_request"
+    ) {
       reportDecision = {
         ...reportDecision,
         enabled: false,
@@ -15805,23 +15809,36 @@ const executeHelixAsk = async ({
       findConceptMatch(baseQuestion, {
         intentId: "repo.ideology_reference",
       });
+    const ideologySeedScore = earlyIdeologyConceptMatch?.score ?? 0;
     const isConceptMatchAvailable =
       Boolean(earlyIdeologyConceptMatch) &&
-      (earlyIdeologyConceptMatch.score ?? 0) >= HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH_MIN_SCORE;
+      (ideologySeedScore >= HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH_MIN_SCORE ||
+        isIdeologyConversationalCandidate);
     if (
       HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH &&
       isConceptMatchAvailable &&
-      !ideologyConversationalMode &&
       reportDecision.reason !== "explicit_report_request"
     ) {
+      if (!earlyIdeologyConceptMatch) {
+        conceptMatch = null;
+      } else {
         conceptMatch = earlyIdeologyConceptMatch;
-        conceptFastPath = true;
-        forcedAnswer = renderConceptAnswer(conceptMatch);
-        forcedAnswerIsHard = true;
+      }
+      conceptFastPath = true;
+      forcedAnswer = renderConceptAnswer(conceptMatch);
+      forcedAnswerIsHard = true;
+      if (!forcedAnswer || !conceptMatch) {
+        logEvent("Concept fast path", "preintent_ideology", "null_match");
+        answerPath.push("concept_fast_path:preintent:missing_card");
+        conceptMatch = null;
+        forcedAnswer = null;
+        conceptFastPath = false;
+        forcedAnswerIsHard = false;
+      } else {
         logEvent(
           "Concept fast path",
           "preintent_ideology",
-          `score=${earlyIdeologyConceptMatch.score ?? 0}`,
+          `score=${ideologySeedScore}`,
         );
         if (debugPayload) {
           debugPayload.concept_id = conceptMatch.card.id;
@@ -15831,6 +15848,7 @@ const executeHelixAsk = async ({
         answerPath.push("concept_fast_path:preintent");
         answerPath.push("forcedAnswer:ideology");
       }
+    }
       const repoNativeTags = new Set([
         "helix_ask",
         "warp",
@@ -16906,7 +16924,6 @@ const executeHelixAsk = async ({
       (conceptualFocus || intentProfile.id === "repo.ideology_reference") &&
       intentDomain === "repo" &&
       HELIX_ASK_CONCEPT_FAST_PATH_INTENTS.has(intentProfile.id) &&
-      !isIdeologyConversationalMode &&
       reportDecision.reason !== "explicit_report_request" &&
       (intentProfile.id === "repo.ideology_reference" ? true : !graphResolverPreferred);
     let conceptFastPathBlockedReason: string | null = null;
