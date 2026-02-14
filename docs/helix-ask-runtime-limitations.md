@@ -7,10 +7,10 @@ migration.
 ## Token limits summary
 | Parameter | Value | Source | File reference |
 | --- | --- | --- | --- |
-| Context window cap | 4,096 tokens (hard max) | `LLM_LOCAL_CONTEXT_TOKENS` | `.replit` |
-| Max output tokens | 2,048 tokens | `LLM_LOCAL_MAX_TOKENS` | `.replit` |
-| Context range | 2,048 - 4,096 (clamped) | code clamp | `server/services/llm/local-runtime.ts` |
-| Default context | 3,072 tokens | fallback | `server/services/llm/local-runtime.ts` |
+| Context window cap | 8,192 tokens (hard max) | `LLM_LOCAL_CONTEXT_TOKENS` | `.replit` |
+| Max output tokens | 8,192 tokens | `LLM_LOCAL_MAX_TOKENS` | `.replit` |
+| Context range | 2,048 - 8,192 (clamped) | code clamp | `server/services/llm/local-runtime.ts` |
+| Default context | 4,096 tokens | fallback | `server/services/llm/local-runtime.ts` |
 | Max TopK files | 4 files | retrieval cap | `server/services/llm/local-runtime.ts` |
 | Max knowledge bytes | 80,000 bytes | per query | `server/services/llm/local-runtime.ts` |
 | Model | `qwen2.5-3b-instruct-q4_k_m.gguf` (~2.0 GB, Q4) | model config | `docs/replit-runtime.md` |
@@ -37,12 +37,12 @@ migration.
 
 ## Capacity estimates
 Given:
-- max output tokens: 2,048
+- max output tokens: 8,192
 - average speed: 3.5 tokens/sec
-- max generation time: ~585 sec (~9.75 min)
+- max generation time: ~1170 sec (~19.5 min)
 
 Implications:
-- With concurrency=1, practical peak is ~6 requests/hour at max size.
+- With concurrency=1, practical peak is roughly half the previous rate when responses run near max size.
 - Safe queue: 1 active + 1-2 waiting (beyond this, latency spikes).
 - RPM limit is not the real bottleneck; generation time is.
 - Interpretation: the constraint is time per generation ("physics-limited"), not
@@ -54,7 +54,7 @@ queued via `spawnWaiters`. This does not crash the server, but it can create
 long waits. Consider adding a queue length cap and user-facing backpressure.
 
 ## Gaps and unknowns
-- GGUF model context metadata not extracted (model may support >4K, but env caps at 4K).
+- GGUF model context metadata not extracted (model may support beyond 8,192, but env still hard-limits to configured maxima).
 - Memory per inference under load not profiled.
 - HTTP-level rate limiting is not currently enforced on `/api/agi/*`.
 

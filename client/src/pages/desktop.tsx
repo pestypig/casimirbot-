@@ -67,7 +67,7 @@ const HELIX_ASK_USE_EXECUTE = HELIX_ASK_MODE === "execute";
 const HELIX_ASK_MAX_TOKENS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_MAX_TOKENS, 2048),
   64,
-  4096,
+  8192,
 );
 const HELIX_ASK_MAX_RENDER_CHARS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_MAX_RENDER_CHARS, 6000),

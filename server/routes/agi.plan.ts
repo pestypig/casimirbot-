@@ -2612,7 +2612,7 @@ const HELIX_ASK_FORCE_FULL_ANSWER_TOKENS = clampNumber(
     3000,
   ),
   1024,
-  4096,
+  8192,
 );
 const HELIX_ASK_MICRO_PASS =
   String(process.env.HELIX_ASK_MICRO_PASS ?? process.env.VITE_HELIX_ASK_MICRO_PASS ?? "1")
@@ -11081,7 +11081,18 @@ type HelixAskOverflowOptions = {
   label?: string;
 };
 
-const OVERFLOW_CONTEXT_MARKERS = new Set(["context:", "prompt context:"]);
+const OVERFLOW_CONTEXT_MARKERS = new Set([
+  "context:",
+  "prompt context:",
+  "evidence:",
+  "evidence bullets:",
+  "evidence steps:",
+  "repo evidence:",
+  "general reasoning:",
+  "constraint evidence:",
+  "technical notes:",
+  "tree walk:",
+]);
 const OVERFLOW_ERROR_RE =
   /(context|ctx|token|prompt\s+too\s+long|max(?:imum)?\s+context|n_ctx|exceed)/i;
 
@@ -16040,13 +16051,19 @@ const executeHelixAsk = async ({
         compositeRequiredFiles = collectCompositeMustIncludeFiles(compositeRequest.topics);
       }
     }
-    if (requiresRepoEvidence && intentProfile.domain === "general") {
+    const isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
+    if (requiresRepoEvidence && intentProfile.domain === "general" && !isIdeologyReferenceIntent) {
       const fallbackProfile = resolveFallbackIntentProfile("hybrid");
       intentProfile = fallbackProfile;
       intentReasonBase = `${intentReasonBase}|obligation:repo_required`;
       logEvent("Fallback", "obligation -> hybrid", intentReasonBase);
     }
-    if (!requiresRepoEvidence && repoExpectationLevel !== "low" && intentProfile.domain === "general") {
+    if (
+      !requiresRepoEvidence &&
+      repoExpectationLevel !== "low" &&
+      intentProfile.domain === "general" &&
+      !isIdeologyReferenceIntent
+    ) {
       const fallbackProfile = resolveFallbackIntentProfile("hybrid");
       intentProfile = fallbackProfile;
       intentReasonBase = `${intentReasonBase}|expectation:${repoExpectationLevel}`;
@@ -16070,7 +16087,6 @@ const executeHelixAsk = async ({
     if (compositeConstraintRequested) {
       intentSecondaryTier = "F3";
     }
-    const isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
     let verbosity = resolveHelixAskVerbosity(
       baseQuestion,
       intentProfile,
@@ -16718,23 +16734,27 @@ const executeHelixAsk = async ({
     let conceptFastPath = false;
     let conceptFastPathBlockedReason: string | null = null;
     if (conceptFastPathCandidate && conceptMatch) {
-      const topCandidate = ambiguityCandidates[0];
-      const secondCandidate = ambiguityCandidates[1];
-      const candidateTopMatch = !topCandidate || topCandidate.card.id === conceptMatch.card.id;
-      const candidateMarginOk =
-        !secondCandidate || (topCandidate?.score ?? 0) - secondCandidate.score >= 3;
-      const conceptRelevantTags = topicTags.filter((tag) => repoNativeTags.has(tag));
-      const conceptTagCoverageOk =
-        conceptTopicTags.length === 0 ||
-        conceptRelevantTags.every((tag) => conceptTopicTags.includes(tag));
-      if (!candidateTopMatch) {
-        conceptFastPathBlockedReason = "concept_candidate_mismatch";
-      } else if (!candidateMarginOk) {
-        conceptFastPathBlockedReason = "concept_candidate_ambiguous";
-      } else if (!conceptTagCoverageOk) {
-        conceptFastPathBlockedReason = "concept_topic_mismatch";
+      if (HELIX_ASK_FORCE_FULL_ANSWERS) {
+        conceptFastPathBlockedReason = "full_answer_mode";
       } else {
-        conceptFastPath = true;
+        const topCandidate = ambiguityCandidates[0];
+        const secondCandidate = ambiguityCandidates[1];
+        const candidateTopMatch = !topCandidate || topCandidate.card.id === conceptMatch.card.id;
+        const candidateMarginOk =
+          !secondCandidate || (topCandidate?.score ?? 0) - secondCandidate.score >= 3;
+        const conceptRelevantTags = topicTags.filter((tag) => repoNativeTags.has(tag));
+        const conceptTagCoverageOk =
+          conceptTopicTags.length === 0 ||
+          conceptRelevantTags.every((tag) => conceptTopicTags.includes(tag));
+        if (!candidateTopMatch) {
+          conceptFastPathBlockedReason = "concept_candidate_mismatch";
+        } else if (!candidateMarginOk) {
+          conceptFastPathBlockedReason = "concept_candidate_ambiguous";
+        } else if (!conceptTagCoverageOk) {
+          conceptFastPathBlockedReason = "concept_topic_mismatch";
+        } else {
+          conceptFastPath = true;
+        }
       }
     }
     if (conceptFastPath) {
@@ -19412,7 +19432,12 @@ const executeHelixAsk = async ({
           explicitRepoExpectation,
           intentDomain,
         });
-        const arbiterMode = arbiterDecision.mode;
+        const rawArbiterMode = arbiterDecision.mode;
+        const isIdeologyIntent = intentProfile.id === "repo.ideology_reference";
+        const arbiterMode =
+          isIdeologyIntent && rawArbiterMode !== "repo_grounded"
+            ? "repo_grounded"
+            : rawArbiterMode;
         const arbiterReason = arbiterDecision.reason;
         const arbiterStrictness = arbiterDecision.strictness;
         const arbiterRepoOk = arbiterDecision.repoOk;
@@ -19421,10 +19446,13 @@ const executeHelixAsk = async ({
           "Arbiter",
           arbiterMode,
           [
+            isIdeologyIntent && rawArbiterMode !== "repo_grounded" ? "forced=repo_grounded" : "",
             `reason=${arbiterReason}`,
             `expectation=${repoExpectationLevel}`,
             `score=${repoExpectationScore}`,
-          ].join(" | "),
+          ]
+            .filter(Boolean)
+            .join(" | "),
         );
         if (debugPayload) {
           debugPayload.arbiter_mode = arbiterMode;

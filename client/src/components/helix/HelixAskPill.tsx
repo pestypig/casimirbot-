@@ -436,7 +436,7 @@ const HELIX_ASK_CONTEXT_CHARS = clampNumber(
 const HELIX_ASK_MAX_TOKENS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_MAX_TOKENS, 2048),
   64,
-  4096,
+  8192,
 );
 const HELIX_ASK_CONTEXT_TOKENS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_ASK_CONTEXT_TOKENS, 2048),
