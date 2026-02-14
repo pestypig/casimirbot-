@@ -3040,6 +3040,18 @@ const HELIX_ASK_REPORT_BLOCK_CHAR_LIMIT = clampNumber(
   180,
   6000,
 );
+const HELIX_ASK_IDEOLOGY_CHAT_MODE_MAX_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_ASK_IDEOLOGY_CHAT_MODE_MAX_TOKENS, 95),
+  40,
+  240,
+);
+const HELIX_ASK_IDEOLOGY_CHAT_MODE_MAX_CHARS = clampNumber(
+  readNumber(process.env.HELIX_ASK_IDEOLOGY_CHAT_MODE_MAX_CHARS, 900),
+  200,
+  3200,
+);
+const HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE = /\b(?:how|why|what|could|would|can|should|in\s+plain|plain\s+language|simple\s+terms|example|examples|scenario|in\s+plain\s+terms|real\s+world)\b/i;
+const HELIX_ASK_IDEOLOGY_REPORT_BAN_RE = /\b(?:report|point[s]?|coverage|summary|compare|difference|between|each|step|slot|bullet|section)\b/i;
 const HELIX_ASK_DRIFT_REPAIR = String(process.env.HELIX_ASK_DRIFT_REPAIR ?? "1").trim() !== "0";
 const HELIX_ASK_DRIFT_REPAIR_MAX = clampNumber(
   readNumber(process.env.HELIX_ASK_DRIFT_REPAIR_MAX, 1),
@@ -12073,6 +12085,22 @@ const normalizeReportBlockText = (text: string): string => {
   return cleaned.trim();
 };
 
+const shouldUseIdeologyConversationalMode = (
+  question: string,
+  tokenCount: number,
+  charCount: number,
+  options?: { explicitReportCue?: boolean; blockScoped?: boolean },
+): boolean => {
+  if (options?.blockScoped) return false;
+  if (options?.explicitReportCue) return false;
+  if (tokenCount > HELIX_ASK_IDEOLOGY_CHAT_MODE_MAX_TOKENS) return false;
+  if (charCount > HELIX_ASK_IDEOLOGY_CHAT_MODE_MAX_CHARS) return false;
+  const trimmed = question.trim();
+  if (trimmed.length < 20) return false;
+  if (HELIX_ASK_IDEOLOGY_REPORT_BAN_RE.test(trimmed)) return false;
+  return HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE.test(trimmed);
+};
+
 const resolveReportBlockHints = (
   text: string,
   options?: { typeHint?: string },
@@ -15011,8 +15039,34 @@ const executeHelixAsk = async ({
       candidates: slotPreviewCandidates,
       seedSlots: [...memorySeedSlots, ...headingSeedSlots],
     });
-    let reportDecision = resolveReportModeDecision(rawQuestion || baseQuestion);
-    if (!reportDecision.enabled && slotPreview.coverageSlots.length >= 2) {
+    const initialReportQuestion = rawQuestion || baseQuestion;
+    const ideologyConversationCandidate = findConceptMatch(initialReportQuestion, {
+      intentId: "repo.ideology_reference",
+    });
+    let reportDecision = resolveReportModeDecision(initialReportQuestion);
+    const isIdeologyConversationalCandidate =
+      !!ideologyConversationCandidate &&
+      shouldUseIdeologyConversationalMode(
+        initialReportQuestion,
+        reportDecision.tokenCount,
+        reportDecision.charCount,
+        {
+          explicitReportCue: reportDecision.reason === "explicit_report_request",
+          blockScoped,
+        },
+      );
+    if (isIdeologyConversationalCandidate && !blockScoped && reportDecision.reason !== "explicit_report_request") {
+      reportDecision = {
+        ...reportDecision,
+        enabled: false,
+        reason: "ideology_chat_mode",
+      };
+    }
+    if (
+      !isIdeologyConversationalCandidate &&
+      !reportDecision.enabled &&
+      slotPreview.coverageSlots.length >= 2
+    ) {
       reportDecision = {
         ...reportDecision,
         enabled: true,
@@ -15096,7 +15150,7 @@ const executeHelixAsk = async ({
         slotPlanPassSlots = [];
       }
     }
-    if (!reportDecision.enabled && slotPreview.coverageSlots.length >= 2) {
+    if (!isIdeologyConversationalCandidate && !reportDecision.enabled && slotPreview.coverageSlots.length >= 2) {
       reportDecision = {
         ...reportDecision,
         enabled: true,
@@ -15734,15 +15788,32 @@ const executeHelixAsk = async ({
     let conceptFastPath = false;
     let forcedAnswer: string | null = null;
     let forcedAnswerIsHard = false;
-      const earlyIdeologyConceptMatch = findConceptMatch(baseQuestion, {
+    const ideologyConversationalMode = Boolean(
+      isIdeologyConversationalCandidate &&
+        shouldUseIdeologyConversationalMode(
+          rawQuestion || baseQuestion,
+          reportDecision.tokenCount,
+          reportDecision.charCount,
+          {
+            explicitReportCue: reportDecision.reason === "explicit_report_request",
+            blockScoped,
+          },
+        ),
+    );
+    const earlyIdeologyConceptMatch =
+      ideologyConversationCandidate ??
+      findConceptMatch(baseQuestion, {
         intentId: "repo.ideology_reference",
       });
-      if (
-        HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH &&
-        earlyIdeologyConceptMatch &&
-        (earlyIdeologyConceptMatch.score ?? 0) >=
-          HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH_MIN_SCORE
-      ) {
+    const isConceptMatchAvailable =
+      Boolean(earlyIdeologyConceptMatch) &&
+      (earlyIdeologyConceptMatch.score ?? 0) >= HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH_MIN_SCORE;
+    if (
+      HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH &&
+      isConceptMatchAvailable &&
+      !ideologyConversationalMode &&
+      reportDecision.reason !== "explicit_report_request"
+    ) {
         conceptMatch = earlyIdeologyConceptMatch;
         conceptFastPath = true;
         forcedAnswer = renderConceptAnswer(conceptMatch);
@@ -16125,6 +16196,18 @@ const executeHelixAsk = async ({
       }
     }
     const isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
+    const isIdeologyConversationalMode = isIdeologyReferenceIntent && ideologyConversationalMode;
+    if (
+      isIdeologyConversationalMode &&
+      !blockScoped &&
+      reportDecision.reason !== "explicit_report_request"
+    ) {
+      reportDecision = {
+        ...reportDecision,
+        enabled: false,
+        reason: "ideology_chat_mode",
+      };
+    }
     if (requiresRepoEvidence && intentProfile.domain === "general" && !isIdeologyReferenceIntent) {
       const fallbackProfile = resolveFallbackIntentProfile("hybrid");
       intentProfile = fallbackProfile;
@@ -16228,6 +16311,9 @@ const executeHelixAsk = async ({
       updateIntentDebug();
     };
     applyIntentProfile(intentProfile);
+    if (isIdeologyReferenceIntent && isIdeologyConversationalMode) {
+      formatSpec = { ...formatSpec, format: "brief", stageTags: false };
+    }
     logEvent(
       "Intent resolved",
       "ok",
@@ -16820,6 +16906,8 @@ const executeHelixAsk = async ({
       (conceptualFocus || intentProfile.id === "repo.ideology_reference") &&
       intentDomain === "repo" &&
       HELIX_ASK_CONCEPT_FAST_PATH_INTENTS.has(intentProfile.id) &&
+      !isIdeologyConversationalMode &&
+      reportDecision.reason !== "explicit_report_request" &&
       (intentProfile.id === "repo.ideology_reference" ? true : !graphResolverPreferred);
     let conceptFastPathBlockedReason: string | null = null;
     if (!conceptFastPath && conceptFastPathCandidate && conceptMatch) {
@@ -17068,6 +17156,9 @@ const executeHelixAsk = async ({
           if (retrievalUpgradeEligible) {
             const fallbackProfile = resolveFallbackIntentProfile("hybrid");
             applyIntentProfile(fallbackProfile, "retrieval_preflight");
+            if (isIdeologyConversationalMode && fallbackProfile.id === "repo.ideology_reference") {
+              formatSpec = { ...formatSpec, format: "brief", stageTags: false };
+            }
             retrievalOverrideApplied = true;
             answerPath.push("intent:retrieval_preflight");
             answerPath.push(`intent_override:${fallbackProfile.id}`);
