@@ -49,3 +49,68 @@ experiment protocol.
 - `docs/helix-ask-ladder.md`
 - `server/routes/agi.plan.ts`
 - `server/services/helix-ask/platonic-gates.ts`
+
+## Cloud chat fixed packet (Feedback Loop Hygiene)
+
+Use this packet for recurring cloud-chat checks so we can detect regressions away
+from the default narrative style.
+
+### Session packet
+
+1. **Baseline narrative**
+   - Question: `In plain language, how does Feedback Loop Hygiene affect society in the Ideology tree?`
+   - Style constraints:
+     - Conversational tone for a non-technical reader.
+     - Grounded in repo ideology context.
+     - Include one short opening paragraph.
+     - Include a root-to-leaf narrative chain (example: `Mission Ethos -> Feedback Loop Hygiene -> [related nodes]`).
+     - Include one concrete real-world example.
+     - Include one concise takeaway with societal impact.
+     - Do **not** output technical notes mode unless explicitly requested.
+
+2. **Root-to-leaf stress test**
+   - Question: `Explain Feedback Loop Hygiene as the root-to-leaf path in Ideology for how a town council should handle online rumor spikes. Include how it links to Civic Signal Loop and Three Tenets Loop.`
+
+3. **Regression test for old compare/report behavior**
+   - Question: `How does Feedback Loop Hygiene affect society?`
+   - Constraint: answer in the new default narrative style only; if the model drifts toward technical compare/report bullets, switch back to plain-language narrative first.
+
+4. **Context-control cross-tree check**
+   - Question: `What is Feedback Loop Hygiene? Answer briefly without code-level repo details. It should be understandable to someone new to the project.`
+
+### Recommended run order
+
+Run prompts in this exact sequence each session:
+
+1) baseline narrative, 2) root-to-leaf stress test, 3) regression test, 4) context-control check.
+
+
+### Automation hook
+
+For CI/regression harness runs, execute the Helix Ask regression script with the
+ideology packet enabled:
+
+```bash
+HELIX_ASK_REGRESSION_IDEOLOGY=1 npm run helix:ask:regression
+```
+
+Use `HELIX_ASK_REGRESSION_ONLY` to isolate a single case label while tuning prompt
+or intent-profile constraints.
+
+### Debug payload (when API access is available)
+
+Append this payload:
+
+```json
+{"debug":true,"verbosity":"extended"}
+```
+
+Compare and record:
+
+- `trace_summary` (expect ideology-intent pathing).
+- Evidence source alignment.
+- Whether response remains single-narrative vs repeated technical bullets.
+- Whether tree walk keeps continuity (root-to-leaf) instead of flattened repeats.
+
+If step 3 still returns technical report style, tighten format constraints in the
+intent profile before the next run.

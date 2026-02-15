@@ -556,6 +556,28 @@ const extractConceptTechnicalSection = (match: HelixAskConceptMatch): string => 
     : rendered.trim();
 };
 
+const stripConceptTechnicalSection = (value: string): string =>
+  value.replace(/\n{2,}Technical notes:\s*[\s\S]*$/i, "").trim();
+
+const shouldIncludeIdeologyTechnicalNotes = (question: string): boolean => {
+  const normalized = question.toLowerCase();
+  const technicalMention =
+    /(technical\s+notes?|technical\s+breakdown|report\s+mode|compare\/report|diagnostic\s+report|debug\s+trace)/i.test(
+      normalized,
+    );
+  if (!technicalMention) return false;
+  const explicitPositive =
+    /\b(include|add|with|show|provide|give|append)\b(?:\s+[^\s]+){0,2}\s+(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)\b/i.test(
+      normalized,
+    );
+  const conditionalGuard = /\bif you are about to output\b/i.test(normalized);
+  const negated = /\b(do not|don't|avoid|without|instead of|switch to plain-language)\b/i.test(normalized);
+  if (conditionalGuard || negated) {
+    return false;
+  }
+  return explicitPositive || /\btechnical\s+notes\b/i.test(normalized);
+};
+
 const MODEL_PLACEHOLDER_RE =
   /^(?:(?:\w+\.)?llm\.local(?:\s+stub result)?|placeholder|unable to answer|i cannot answer|model error)\b/i;
 
@@ -597,15 +619,22 @@ function applyIdeologyConceptOverride(
     return { answer: input.answer, applied: false };
   }
   const conceptAnswer = renderConceptAnswer(match);
+  const conceptAnswerNarrative = stripConceptTechnicalSection(conceptAnswer);
   const conceptAppendix = extractConceptTechnicalSection(match);
+  const allowTechnicalNotes = shouldIncludeIdeologyTechnicalNotes(input.question);
   const sourceLine = buildConceptEvidencePaths(match).length > 0
     ? `Sources: ${buildConceptEvidencePaths(match).join(", ")}`
     : "";
-  const conceptAnswerWithSources = [conceptAnswer, sourceLine].filter(Boolean).join("\n\n");
+  const conceptAnswerWithSources = [
+    allowTechnicalNotes ? conceptAnswer : conceptAnswerNarrative,
+    sourceLine,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const hasSourceLine = (value: string): boolean => /^Sources?:\s*/i.test(value);
   const appendConceptAppendix = (value: string): string => {
     const parts: string[] = [value.trim()];
-    if (conceptAppendix && !/^Technical notes:/i.test(value)) {
+    if (allowTechnicalNotes && conceptAppendix && !/^Technical notes:/i.test(value)) {
       parts.push(conceptAppendix);
     }
     if (sourceLine && !hasSourceLine(value)) {
@@ -632,12 +661,19 @@ function applyIdeologyConceptOverride(
       };
     }
     return {
-      answer: appendConceptAppendix(input.answer),
+      answer: allowTechnicalNotes ? appendConceptAppendix(input.answer) : conceptAnswerWithSources,
       applied: true,
       reason: "ideology_concept_override",
     };
   }
   if (/^Technical notes:/im.test(input.answer)) {
+    if (!allowTechnicalNotes) {
+      return {
+        answer: conceptAnswerWithSources,
+        applied: true,
+        reason: "ideology_concept_remove_technical",
+      };
+    }
     return {
       answer: appendConceptAppendix(input.answer),
       applied: false,
@@ -1793,4 +1829,3 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
     variantSummary,
   };
 }
-
