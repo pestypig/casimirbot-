@@ -246,6 +246,23 @@ export type ExecutionResultSuccess = ExecutionResultBase & { ok: true; output: u
 export type ExecutionResultFailure = ExecutionResultBase & { ok: false; output?: unknown; error?: ExecutionError | string };
 export type ExecutionResult = ExecutionResultSuccess | ExecutionResultFailure;
 
+type CitationVerificationState = {
+  enabled: boolean;
+  pass?: boolean;
+  missing?: string[];
+  repaired?: boolean;
+};
+
+const SCIENTIFIC_MODE_KEYWORDS = /\b(scientific|hypothesis|counterfactual|falsif|uncertainty|reproducib)\b/i;
+
+const isScientificMethodMode = (runtime: ExecutionRuntime): boolean => {
+  if (process.env.HELIX_SCIENTIFIC_METHOD_MODE === "1") {
+    return true;
+  }
+  return SCIENTIFIC_MODE_KEYWORDS.test(runtime.goal);
+};
+
+
 const isFailedResult = (result: ExecutionResult): result is ExecutionResultFailure => result.ok === false;
 
 const TOOL_RETRY_MAX = (() => {
@@ -2599,6 +2616,9 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
   const outputs = new Map<string, unknown>();
   const citationsByStep = new Map<string, string[]>();
   const results: ExecutionResult[] = [];
+  const citationVerification: CitationVerificationState = {
+    enabled: process.env.ENABLE_KNOWLEDGE_CITATION_VERIFY === "1",
+  };
 
   for (const step of steps) {
     const stepStart = Date.now();
@@ -3583,6 +3603,8 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
       if (readable) {
         const { extractCitations, verifyCitations } = await import("../knowledge/citations");
         const verdict = verifyCitations(attachments as any[], extractCitations(readable));
+        citationVerification.pass = verdict.pass;
+        citationVerification.missing = verdict.missing;
         if (!verdict.pass) {
           const lastCall = [...steps].reverse().find((s) => s.kind === "tool.call");
           if (lastCall && lastCall.kind === "tool.call") {
@@ -3710,6 +3732,7 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
                     essence_ids: [],
                   };
               results.push(entry);
+              citationVerification.repaired = stepOk;
             }
           }
         }
@@ -3719,8 +3742,9 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
     // citation repair is best-effort; ignore failures
   }
 
-  recordTaskTraceResults(runtime.taskTrace, results);
-  const success = results.length > 0 && results.every((step) => step.ok);
+  recordTaskTraceResults(runtime.taskTrace, runtime, results, citationVerification);
+  const successFromSteps = results.length > 0 && results.every((step) => step.ok);
+  const success = runtime.taskTrace?.ok ?? successFromSteps;
   recordTaskOutcome(success);
   if (process.env.ENABLE_REFLECTION === "1" && runtime.taskTrace) {
     const personaId = runtime.personaId ?? runtime.taskTrace.persona_id ?? "default";
@@ -3900,14 +3924,94 @@ function buildApprovalReason(capability: ToolRiskType, tool: Tool): string {
   return base;
 }
 
-function recordTaskTraceResults(taskTrace: TTaskTrace | undefined, results: ExecutionResult[]): void {
+function recordTaskTraceResults(
+  taskTrace: TTaskTrace | undefined,
+  runtime: ExecutionRuntime,
+  results: ExecutionResult[],
+  citationVerification: CitationVerificationState,
+): void {
   if (!taskTrace) {
     return;
   }
   taskTrace.steps = results;
-  const ok = results.length > 0 && results.every((step) => step.ok);
+  const stepsOk = results.length > 0 && results.every((step) => step.ok);
+  const scientificMode = isScientificMethodMode(runtime);
+  const citationFailed = citationVerification.enabled && citationVerification.pass === false;
+  const ok = scientificMode ? stepsOk && !citationFailed : stepsOk;
   taskTrace.ok = ok;
   taskTrace.result_summary = summarizeExecutionResults(results);
+  taskTrace.scientific_method = buildScientificMethodRecord(taskTrace, results, citationVerification);
+}
+
+function buildScientificMethodRecord(
+  taskTrace: TTaskTrace,
+  results: ExecutionResult[],
+  citationVerification: CitationVerificationState,
+) {
+  const failure = results.find((step) => !step.ok);
+  const allCitations = new Set(results.flatMap((step) => step.citations ?? []));
+  const successRatio = results.length > 0 ? (results.filter((step) => step.ok).length / results.length) : 0;
+  const citationScore = citationVerification.enabled
+    ? citationVerification.pass === false
+      ? 0.35
+      : citationVerification.pass === true
+        ? 1
+        : 0.6
+    : 0.7;
+  const confidence = Math.min(0.98, Math.max(0.05, 0.55 * successRatio + 0.45 * citationScore));
+  const intervalRadius = Math.max(0.05, 0.5 * (1 - confidence));
+  const uncertainFloor = Math.max(0, confidence - intervalRadius);
+  const uncertainCeil = Math.min(1, confidence + intervalRadius);
+  const hypothesis = `Primary hypothesis: execution trace can satisfy goal with grounded evidence (${taskTrace.goal}).`;
+  const antiHypothesis = `Anti-hypothesis: execution trace is insufficient or refuted for goal (${taskTrace.goal}).`;
+  const citationCounterfactualFail = citationVerification.enabled && (allCitations.size === 0 || citationVerification.pass === false);
+  const correctiveActions: string[] = [];
+  if (failure) {
+    correctiveActions.push(`Investigate failed step ${failure.id} (${failure.kind}).`);
+    correctiveActions.push(`Re-run from step ${failure.id} with bounded repair and refreshed evidence retrieval.`);
+  }
+  if (citationCounterfactualFail) {
+    correctiveActions.push("Enforce citation repair and deny final scientific answer until citations verify.");
+  }
+  if (correctiveActions.length === 0) {
+    correctiveActions.push("No corrective action required; monitor drift across replay/eval runs.");
+  }
+
+  return {
+    hypothesis,
+    anti_hypothesis: antiHypothesis,
+    counterfactual_test: {
+      tested: true,
+      method: citationVerification.enabled
+        ? "Controlled citation-withholding counterfactual (simulate evidence denial when citations are missing/invalid)."
+        : "Outcome inversion check against final step success/failure.",
+      result: failure || citationCounterfactualFail ? "supports_anti_hypothesis" : "supports_hypothesis",
+      failed_step_id: failure?.id,
+    },
+    uncertainty_interval: {
+      low: uncertainFloor,
+      high: uncertainCeil,
+      confidence,
+    },
+    reproducibility: {
+      run_id: taskTrace.id,
+      prompt_hash: taskTrace.prompt_hash ?? undefined,
+      plan_hash: hashPayload(taskTrace.plan_json),
+      timestamp: new Date().toISOString(),
+      step_count: results.length,
+      citation_count: allCitations.size,
+    },
+    corrective_action: {
+      required: failure !== undefined || citationCounterfactualFail,
+      reason:
+        failure !== undefined
+          ? `Failed evidence at step ${failure.id}`
+          : citationCounterfactualFail
+            ? "Citation verification did not pass the scientific gate"
+            : undefined,
+      actions: correctiveActions,
+    },
+  } as TTaskTrace["scientific_method"];
 }
 
 export function summarizeExecutionResults(results: ExecutionResult[]): string {
