@@ -3050,7 +3050,10 @@ const HELIX_ASK_IDEOLOGY_CHAT_MODE_MAX_CHARS = clampNumber(
   200,
   3200,
 );
-const HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE = /\b(?:how|why|what|could|would|can|should|in\s+plain|plain\s+language|simple\s+terms|example|examples|scenario|in\s+plain\s+terms|real\s+world)\b/i;
+const HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE =
+  /\b(?:what|what\s+is|what\s+does|what\s+do|how|in\s+plain|plain\s+language|simple\s+terms|define|meaning\s+of)\b/i;
+const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
+  /\b(?:how|why|impact|affect|effects?|societ(y|al)|community|governance|public|policy|scenario|example|examples|trust|rumor|decision|in\s+real\s+world|for\s+a|for\s+an|for\s+the|platform|team|council|school)\b/i;
 const HELIX_ASK_IDEOLOGY_REPORT_BAN_RE = /\b(?:report|point[s]?|coverage|summary|compare|difference|between|each|step|slot|bullet|section)\b/i;
 const HELIX_ASK_DRIFT_REPAIR = String(process.env.HELIX_ASK_DRIFT_REPAIR ?? "1").trim() !== "0";
 const HELIX_ASK_DRIFT_REPAIR_MAX = clampNumber(
@@ -4259,6 +4262,51 @@ const HELIX_ASK_IDEOLOGY_SCENARIO_RE =
 
 const trim = (value: string): string => value.replace(/\s+/g, " ").trim();
 
+const HELIX_ASK_NOTE_CLAUSE_RE =
+  /(?:^|[.;]\s*)([A-Za-z][A-Za-z0-9\s-]*?)\s*:\s*([^.;]+)(?=(?:[.;]\s*[A-Za-z][A-Za-z0-9\s-]*\s*:|$))/g;
+
+const toTitleCase = (value: string): string =>
+  value
+    .toLowerCase()
+    .split(" ")
+    .map((token) => (token ? token.charAt(0).toUpperCase() + token.slice(1) : token))
+    .join(" ");
+
+type HelixAskConceptNoteEntry = {
+  label: string;
+  value: string;
+};
+
+const parseConceptNotesEntries = (notes?: string): HelixAskConceptNoteEntry[] => {
+  if (!notes) return [];
+  const trimmed = notes.trim();
+  if (!trimmed) return [];
+  const entries: HelixAskConceptNoteEntry[] = [];
+  const seen = new Set<string>();
+  let match: RegExpExecArray | null;
+  HELIX_ASK_NOTE_CLAUSE_RE.lastIndex = 0;
+  while ((match = HELIX_ASK_NOTE_CLAUSE_RE.exec(trimmed)) !== null) {
+    const rawLabel = match[1]?.trim();
+    const rawValue = match[2]?.trim();
+    if (!rawLabel || !rawValue) continue;
+    const label = toTitleCase(rawLabel);
+    const value = rawValue.replace(/\s*[.;]\s*$/, "").trim();
+    if (!value) continue;
+    const key = `${label.toLowerCase()}:${value.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push({ label, value });
+  }
+  if (entries.length > 0) {
+    return entries;
+  }
+  const fallback = ensureSentence(trimmed);
+  return fallback ? [{ label: "Notes", value: fallback }] : [];
+};
+
+const stripConversationQuote = (value: string): string =>
+  value.replace(/^["']/, "").replace(/["']$/, "").trim();
+
 const extractIdeologyScenarioSeed = (question: string): string | null => {
   const match = question.match(
     /\b(?:for|for the|for an|for a|in|for your|for their)\s+([^?.!,]+?)(?:\?|,|\s+when|\s+if|\s+how|$)/i,
@@ -4271,9 +4319,19 @@ const extractIdeologyScenarioSeed = (question: string): string | null => {
 
 const buildIdeologyConversationSeed = (match: HelixAskConceptMatch | null): string => {
   if (!match) return "";
-  const rendered = renderConceptAnswer(match);
-  const [lead] = rendered.split(/\n\nTechnical notes:/i);
-  return trim(lead);
+  const { card } = match;
+  const label = card.label ? stripConversationQuote(card.label) : card.id;
+  const definition = card.definition ? card.definition.trim() : "";
+  const notes = parseConceptNotesEntries(card.notes);
+  const effect = notes.find((entry) =>
+    entry.label.toLowerCase().includes("societal effect"),
+  )?.value;
+  const civicEffect = effect ? ` Societal effect: ${ensureSentence(effect)}` : "";
+  const scope = card.scope ? ` Scope: ${stripConversationQuote(card.scope)}.` : "";
+  const definitionSentence = definition
+    ? ensureSentence(`"${label}" means ${definition.charAt(0).toLowerCase() + definition.slice(1)}`)
+    : `${label} is defined in the ideology tree.`;
+  return `${definitionSentence}${civicEffect}${scope}`.trim();
 };
 
 function stripDrawerSectionsFromAnswer(answer: string): string {
@@ -9801,6 +9859,11 @@ function buildHelixAskTreeWalk(
     const label = framework.treeLabel ?? framework.treeId;
     const header = `Tree Walk: ${label} (tree-derived; source: ${framework.sourcePath})`;
     lines.push(header);
+    const pathModeLabel = framework.pathMode ?? "full";
+    const fallback = framework.pathFallbackReason
+      ? ` | continuity: fallback ${framework.pathFallbackReason}`
+      : "";
+    lines.push(`Chain scaffold: ${pathModeLabel}${fallback}`);
     const anchorIds = new Set(framework.anchors.map((node) => node.id));
     const path = framework.path ?? [];
     if (!path.length) {
@@ -10198,7 +10261,8 @@ function buildHelixAskIdeologySynthesisPrompt(
           "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
         );
       }
-      lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+      lines.push("Use tree_walk as the continuity scaffold for the argument chain.");
+      lines.push("Preserve the walk order as a root-to-leaf evidence thread when organizing the narrative.");
       lines.push(toolResultsBlock.trim());
     }
     lines.push("Evidence bullets:");
@@ -10269,7 +10333,8 @@ function buildHelixAskSynthesisPrompt(
           "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
         );
       }
-      lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+      lines.push("Use tree_walk as the continuity scaffold for the argument chain.");
+      lines.push("Preserve the walk order as a root-to-leaf evidence thread when organizing the narrative.");
       lines.push(toolResultsBlock.trim());
     }
     lines.push("Evidence steps:");
@@ -10302,7 +10367,8 @@ function buildHelixAskSynthesisPrompt(
           "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
         );
       }
-      lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+      lines.push("Use tree_walk as the continuity scaffold for the argument chain.");
+      lines.push("Preserve the walk order as a root-to-leaf evidence thread when organizing the narrative.");
       lines.push(toolResultsBlock.trim());
     }
     lines.push("Evidence bullets:");
@@ -10369,7 +10435,8 @@ function buildHelixAskPromptSynthesisPrompt(
           "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
         );
       }
-      lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+      lines.push("Use tree_walk as the continuity scaffold for the argument chain.");
+      lines.push("Preserve the walk order as a root-to-leaf evidence thread when organizing the narrative.");
       lines.push(toolResultsBlock.trim());
     }
     lines.push("Evidence steps:");
@@ -10398,7 +10465,8 @@ function buildHelixAskPromptSynthesisPrompt(
           "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
         );
       }
-      lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+      lines.push("Use tree_walk as the continuity scaffold for the argument chain.");
+      lines.push("Preserve the walk order as a root-to-leaf evidence thread when organizing the narrative.");
       lines.push(toolResultsBlock.trim());
     }
     lines.push("Evidence bullets:");
@@ -10523,7 +10591,8 @@ function buildHelixAskHybridPrompt(
         "Do not mention code, functions, components, tests, UI, or implementation details unless code_spans are provided.",
       );
     }
-    lines.push("Treat tree_walk as navigation hints only; do not use it as a definition.");
+    lines.push("Use tree_walk as the continuity scaffold for the argument chain.");
+    lines.push("Preserve the walk order as a root-to-leaf evidence thread when organizing the narrative.");
     lines.push(toolResultsBlock.trim());
     lines.push("");
   }
@@ -12098,7 +12167,10 @@ const shouldUseIdeologyConversationalMode = (
   const trimmed = question.trim();
   if (trimmed.length < 20) return false;
   if (HELIX_ASK_IDEOLOGY_REPORT_BAN_RE.test(trimmed)) return false;
-  return HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE.test(trimmed);
+  return (
+    HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE.test(trimmed) ||
+    HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE.test(trimmed)
+  );
 };
 
 const resolveReportBlockHints = (
@@ -14492,6 +14564,11 @@ const executeHelixAsk = async ({
       tree_walk_block_present?: boolean;
       tree_walk_injected?: boolean;
       tree_walk_in_answer?: boolean;
+      answer_retry_model_error?: string;
+      answer_generation_failed?: boolean;
+      answer_model_error?: string;
+      answer_fallback_used?: boolean;
+      answer_fallback_reason?: string;
       plan_directives?: HelixAskPlanDirectives;
       slot_plan?: Array<{
         id: string;
@@ -15043,6 +15120,7 @@ const executeHelixAsk = async ({
     const ideologyConversationCandidate = findConceptMatch(initialReportQuestion, {
       intentId: "repo.ideology_reference",
     });
+    const isIdeologyNarrativeQuery = HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE.test(initialReportQuestion);
     let reportDecision = resolveReportModeDecision(initialReportQuestion);
     const isIdeologyConversationalCandidate =
       Boolean(ideologyConversationCandidate) &&
@@ -15056,7 +15134,7 @@ const executeHelixAsk = async ({
         },
       );
     if (
-      Boolean(ideologyConversationCandidate) &&
+      isIdeologyConversationalCandidate &&
       !blockScoped &&
       reportDecision.reason !== "explicit_report_request"
     ) {
@@ -15792,6 +15870,7 @@ const executeHelixAsk = async ({
     let conceptFastPath = false;
     let forcedAnswer: string | null = null;
     let forcedAnswerIsHard = false;
+    let conceptAnswer: string | null = null;
     const ideologyConversationalMode = Boolean(
       isIdeologyConversationalCandidate &&
         shouldUseIdeologyConversationalMode(
@@ -15812,6 +15891,7 @@ const executeHelixAsk = async ({
     const ideologySeedScore = earlyIdeologyConceptMatch?.score ?? 0;
     const isConceptMatchAvailable =
       Boolean(earlyIdeologyConceptMatch) &&
+      !isIdeologyNarrativeQuery &&
       (ideologySeedScore >= HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH_MIN_SCORE ||
         isIdeologyConversationalCandidate);
     if (
@@ -15825,9 +15905,7 @@ const executeHelixAsk = async ({
         conceptMatch = earlyIdeologyConceptMatch;
       }
       conceptFastPath = true;
-      forcedAnswer = renderConceptAnswer(conceptMatch);
-      forcedAnswerIsHard = true;
-      if (!forcedAnswer || !conceptMatch) {
+      if (!conceptMatch) {
         logEvent("Concept fast path", "preintent_ideology", "null_match");
         answerPath.push("concept_fast_path:preintent:missing_card");
         conceptMatch = null;
@@ -15846,10 +15924,9 @@ const executeHelixAsk = async ({
           debugPayload.concept_source = conceptMatch.card.sourcePath;
         }
         answerPath.push("concept_fast_path:preintent");
-        answerPath.push("forcedAnswer:ideology");
       }
     }
-      const repoNativeTags = new Set([
+    const repoNativeTags = new Set([
         "helix_ask",
         "warp",
         "ideology",
@@ -16495,10 +16572,7 @@ const executeHelixAsk = async ({
       HELIX_ASK_TREE_WALK_MODE_RAW,
       verbosity,
     );
-    if (
-      intentProfile.id === "repo.ideology_reference" &&
-      HELIX_ASK_TREE_WALK_MODE_RAW.trim().toLowerCase() === "full"
-    ) {
+    if (intentProfile.id === "repo.ideology_reference") {
       treeWalkMode = "root_to_leaf";
     }
     let codeAlignment: HelixAskCodeAlignment | null = null;
@@ -16788,7 +16862,12 @@ const executeHelixAsk = async ({
       };
     };
     let graphCongruenceWalkOverride: HelixAskCongruenceWalkOverride | undefined;
-    if (!conceptFastPath) {
+    const shouldResolveGraphPack = !conceptFastPath || isIdeologyReferenceIntent;
+    const graphPackPathMode =
+      treeWalkMode === "root_to_leaf" || treeWalkMode === "root_to_anchor"
+        ? treeWalkMode
+        : undefined;
+    if (shouldResolveGraphPack) {
       graphCongruenceWalkOverride = resolveGraphCongruenceWalkOverride();
       graphPack = resolveHelixAskGraphPack({
         question: baseQuestion,
@@ -16796,11 +16875,15 @@ const executeHelixAsk = async ({
         conceptMatch,
         lockedTreeIds: graphTreeLock.length > 0 ? graphTreeLock : undefined,
         congruenceWalkOverride: graphCongruenceWalkOverride,
-        pathMode: treeWalkMode === "root_to_leaf" ? "root_to_leaf" : "full",
+        pathMode: graphPackPathMode,
       });
       graphResolverPreferred = Boolean(graphPack?.preferGraph);
       graphHintTerms = collectGraphHintTerms(graphPack);
       graphSeedSlots = buildGraphSeedSlots(graphPack);
+      const primaryPathMode = graphPack?.frameworks?.find((framework) => framework.pathMode)?.pathMode;
+      if (primaryPathMode === "root_to_leaf" || primaryPathMode === "root_to_anchor") {
+        treeWalkMode = primaryPathMode;
+      }
       if (debugPayload) {
         debugPayload.graph_pack_lock = {
           requested: graphTreeLock.length > 0 ? graphTreeLock.slice() : [],
@@ -16898,9 +16981,9 @@ const executeHelixAsk = async ({
       }
     } else {
       if (debugPayload) {
-        (debugPayload as Record<string, unknown>).graph_pack_skip_reason = "ideology_fast_path";
+        (debugPayload as Record<string, unknown>).graph_pack_skip_reason = "concept_fast_path";
       }
-      logEvent("Graph pack", "skipped", "ideology fast path");
+      logEvent("Graph pack", "skipped", "concept fast path");
     }
     const baseEvidenceSignalTokens = Array.from(
       new Set(
@@ -16925,7 +17008,9 @@ const executeHelixAsk = async ({
       intentDomain === "repo" &&
       HELIX_ASK_CONCEPT_FAST_PATH_INTENTS.has(intentProfile.id) &&
       reportDecision.reason !== "explicit_report_request" &&
-      (intentProfile.id === "repo.ideology_reference" ? true : !graphResolverPreferred);
+      (intentProfile.id === "repo.ideology_reference"
+        ? !isIdeologyNarrativeQuery
+        : !graphResolverPreferred);
     let conceptFastPathBlockedReason: string | null = null;
     if (!conceptFastPath && conceptFastPathCandidate && conceptMatch) {
       if (HELIX_ASK_FORCE_FULL_ANSWERS && !HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH) {
@@ -17267,16 +17352,16 @@ const executeHelixAsk = async ({
       answerPath.push("forcedAnswer:math_solver");
     }
     if (conceptFastPath && conceptMatch && !forcedAnswer) {
-      const conceptAnswer = isIdeologyReferenceIntent
+      const conceptDraft = isIdeologyReferenceIntent
         ? renderConceptAnswer(conceptMatch)
         : renderConceptDefinition(conceptMatch);
-      if (conceptAnswer) {
-        forcedAnswer = conceptAnswer;
-        forcedAnswerIsHard = true;
-        answerPath.push(
-          isIdeologyReferenceIntent ? "forcedAnswer:ideology" : "forcedAnswer:concept",
-        );
-        if (isIdeologyReferenceIntent) {
+      if (conceptDraft) {
+        conceptAnswer = conceptDraft;
+        if (!isIdeologyReferenceIntent) {
+          forcedAnswer = conceptAnswer;
+          forcedAnswerIsHard = true;
+          answerPath.push("forcedAnswer:concept");
+        } else {
           answerPath.push("concept_fast_path_enabled");
         }
       }
@@ -17522,7 +17607,6 @@ const executeHelixAsk = async ({
     let repoScaffold = "";
     let promptScaffold = "";
     let topicMustIncludeOk: boolean | undefined;
-    let conceptAnswer: string | null = null;
     let pipelineEvidence: string | null = null;
     let planPassStart: number | null = null;
     let planDirectives: HelixAskPlanDirectives | null = null;
@@ -20849,7 +20933,8 @@ const executeHelixAsk = async ({
     logProgress("Generating answer");
     const fallbackAnswer = forcedAnswer ?? conceptAnswer ?? "";
     const shouldShortCircuitAnswer =
-      Boolean(fallbackAnswer) && (forcedAnswerIsHard || !prompt);
+      Boolean(fallbackAnswer) &&
+      (forcedAnswerIsHard || (!prompt && !isIdeologyReferenceIntent));
     const shouldFastPathFinalize =
       shouldShortCircuitAnswer &&
       isIdeologyReferenceIntent &&
@@ -20964,113 +21049,164 @@ const executeHelixAsk = async ({
           label: "answer",
         },
       );
-      const { result: answerResult, overflow: answerOverflow } =
-        await runHelixAskLocalWithOverflowRetry(
-          {
-            prompt,
-            max_tokens: answerMaxTokens,
-            temperature: parsed.data.temperature,
-            seed: parsed.data.seed,
-            stop: parsed.data.stop,
-          },
-          {
-            personaId,
-            sessionId: parsed.data.sessionId,
-            traceId: askTraceId,
-            onToken: streamEmitter.onToken,
-          },
-          {
-            fallbackMaxTokens: answerFallbackTokens,
-            allowContextDrop: true,
-            label: "answer",
-          },
-        );
-      recordOverflow("answer", answerOverflow);
-      let answerText = (answerResult as LocalAskResult)?.text ?? "";
-      let answerMeta = isShortAnswer(answerText, verbosity);
+      let answerGenerationFailed = false;
       let retryApplied = false;
-      const retryEligible =
-        !HELIX_ASK_SINGLE_LLM &&
-        HELIX_ASK_SHORT_ANSWER_RETRY_MAX > 0 &&
-        answerMeta.short &&
-        !answerBudget.override &&
-        Boolean(prompt);
-      if (retryEligible) {
-        const retryBudget = clampNumber(
-          Math.min(Math.round(answerMaxTokens * 1.35), answerBudget.cap),
-          128,
-          answerBudget.cap,
-        );
-        if (retryBudget > answerMaxTokens) {
-          const retryStart = logStepStart(
-            "LLM answer retry",
-            `tokens=${retryBudget}`,
+      let answerText = "";
+      let answerMeta = isShortAnswer(answerText, verbosity);
+      let resultForAnswer: LocalAskResult | null = null;
+      try {
+        const { result: answerResult, overflow: answerOverflow } =
+          await runHelixAskLocalWithOverflowRetry(
             {
-              maxTokens: retryBudget,
-              fn: "runHelixAskLocalWithOverflowRetry",
-              label: "answer_retry",
+              prompt,
+              max_tokens: answerMaxTokens,
+              temperature: parsed.data.temperature,
+              seed: parsed.data.seed,
+              stop: parsed.data.stop,
+            },
+            {
+              personaId,
+              sessionId: parsed.data.sessionId,
+              traceId: askTraceId,
+              onToken: streamEmitter.onToken,
+            },
+            {
+              fallbackMaxTokens: answerFallbackTokens,
+              allowContextDrop: true,
+              label: "answer",
             },
           );
-          const { result: retryResult, overflow: retryOverflow } =
-            await runHelixAskLocalWithOverflowRetry(
+        recordOverflow("answer", answerOverflow);
+        answerText = (answerResult as LocalAskResult)?.text ?? "";
+        answerMeta = isShortAnswer(answerText, verbosity);
+        resultForAnswer = answerResult as LocalAskResult;
+        const retryEligible =
+          !HELIX_ASK_SINGLE_LLM &&
+          HELIX_ASK_SHORT_ANSWER_RETRY_MAX > 0 &&
+          answerMeta.short &&
+          !answerBudget.override &&
+          Boolean(prompt);
+        if (retryEligible) {
+          const retryBudget = clampNumber(
+            Math.min(Math.round(answerMaxTokens * 1.35), answerBudget.cap),
+            128,
+            answerBudget.cap,
+          );
+          if (retryBudget > answerMaxTokens) {
+            const retryStart = logStepStart(
+              "LLM answer retry",
+              `tokens=${retryBudget}`,
               {
-                prompt,
-                max_tokens: retryBudget,
-                temperature: parsed.data.temperature,
-                seed: parsed.data.seed,
-                stop: parsed.data.stop,
-              },
-              {
-                personaId,
-                sessionId: parsed.data.sessionId,
-                traceId: askTraceId,
-                onToken: streamEmitter.onToken,
-              },
-              {
-                fallbackMaxTokens: retryBudget,
-                allowContextDrop: true,
+                maxTokens: retryBudget,
+                fn: "runHelixAskLocalWithOverflowRetry",
                 label: "answer_retry",
               },
             );
-          recordOverflow("answer_retry", retryOverflow);
-          logStepEnd(
-            "LLM answer retry",
-            "done",
-            retryStart,
-            true,
-            {
-              textLength: typeof retryResult?.text === "string" ? retryResult.text.length : 0,
-              fn: "runHelixAskLocalWithOverflowRetry",
-              label: "answer_retry",
-            },
-          );
-          answerText = (retryResult as LocalAskResult)?.text ?? answerText;
-          answerMeta = isShortAnswer(answerText, verbosity);
-          retryApplied = true;
-          if (debugPayload) {
-            debugPayload.answer_retry_applied = true;
-            debugPayload.answer_retry_reason = "short_answer";
-            debugPayload.answer_retry_max_tokens = retryBudget;
+            try {
+              const { result: retryResult, overflow: retryOverflow } =
+                await runHelixAskLocalWithOverflowRetry(
+                  {
+                    prompt,
+                    max_tokens: retryBudget,
+                    temperature: parsed.data.temperature,
+                    seed: parsed.data.seed,
+                    stop: parsed.data.stop,
+                  },
+                  {
+                    personaId,
+                    sessionId: parsed.data.sessionId,
+                    traceId: askTraceId,
+                    onToken: streamEmitter.onToken,
+                  },
+                  {
+                    fallbackMaxTokens: retryBudget,
+                    allowContextDrop: true,
+                    label: "answer_retry",
+                  },
+                );
+              recordOverflow("answer_retry", retryOverflow);
+              logStepEnd(
+                "LLM answer retry",
+                "done",
+                retryStart,
+                true,
+                {
+                  textLength: typeof retryResult?.text === "string" ? retryResult.text.length : 0,
+                  fn: "runHelixAskLocalWithOverflowRetry",
+                  label: "answer_retry",
+                },
+              );
+              answerText = (retryResult as LocalAskResult)?.text ?? answerText;
+              answerMeta = isShortAnswer(answerText, verbosity);
+              retryApplied = true;
+              if (debugPayload) {
+                debugPayload.answer_retry_applied = true;
+                debugPayload.answer_retry_reason = "short_answer";
+                debugPayload.answer_retry_max_tokens = retryBudget;
+              }
+              resultForAnswer = retryResult as LocalAskResult;
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              logStepEnd(
+                "LLM answer retry",
+                "error",
+                retryStart,
+                false,
+                {
+                  fn: "runHelixAskLocalWithOverflowRetry",
+                  label: "answer_retry",
+                  error: message,
+                },
+              );
+              if (debugPayload) {
+                debugPayload.answer_retry_model_error = message;
+                debugPayload.answer_retry_applied = false;
+              }
+            }
           }
-          result = retryResult as LocalAskResult;
-        } else {
-          result = answerResult as LocalAskResult;
-        }
-      } else {
-        result = answerResult as LocalAskResult;
-        if (debugPayload && !retryApplied) {
+        } else if (debugPayload) {
           debugPayload.answer_retry_applied = false;
         }
+      } catch (error) {
+        answerGenerationFailed = true;
+        const message = error instanceof Error ? error.message : String(error);
+        logStepEnd(
+          "LLM answer",
+          "error",
+          llmAnswerStart,
+          false,
+          {
+            fn: "runHelixAskLocalWithOverflowRetry",
+            label: "answer",
+            error: message,
+          },
+        );
+        if (debugPayload) {
+          debugPayload.answer_generation_failed = true;
+          debugPayload.answer_model_error = message;
+          debugPayload.answer_fallback_used = true;
+          debugPayload.answer_fallback_reason = "llm_error";
+        }
       }
-      if ((!result?.text || !result.text.trim()) && fallbackAnswer) {
+
+      const fallbackNeeded = !resultForAnswer || !resultForAnswer.text?.trim();
+      if (answerGenerationFailed || fallbackNeeded) {
+        if (!fallbackAnswer) {
+          throw new Error("No answer text available");
+        }
         result = { text: fallbackAnswer } as LocalAskResult;
+        resultForAnswer = result;
         answerText = fallbackAnswer;
+        answerMeta = isShortAnswer(answerText, verbosity);
         answerPath.push("answer:fallback");
+      } else {
+        result = resultForAnswer as LocalAskResult;
       }
-      if (treeWalkBlock && HELIX_ASK_TREE_WALK_INJECT && typeof result?.text === "string") {
-        const treeWalkApplied = ensureTreeWalkInAnswer(result.text, treeWalkBlock);
+
+      if (treeWalkBlock && HELIX_ASK_TREE_WALK_INJECT && typeof resultForAnswer?.text === "string") {
+        const treeWalkApplied = ensureTreeWalkInAnswer(resultForAnswer.text, treeWalkBlock);
         if (treeWalkApplied.injected) {
-          result.text = treeWalkApplied.text;
+          resultForAnswer.text = treeWalkApplied.text;
           answerText = treeWalkApplied.text;
           answerMeta = isShortAnswer(answerText, verbosity);
           if (debugPayload) {
@@ -21080,6 +21216,7 @@ const executeHelixAsk = async ({
           debugPayload.tree_walk_in_answer = true;
         }
       }
+
       if (debugPayload) {
         debugPayload.answer_short_sentences = answerMeta.sentences;
         debugPayload.answer_short_tokens = answerMeta.tokens;
@@ -21087,22 +21224,27 @@ const executeHelixAsk = async ({
           debugPayload.answer_retry_applied = false;
         }
       }
-      logDebug("llmLocalHandler MAIN complete", {
-        textLength: typeof result.text === "string" ? result.text.length : 0,
-      });
-      logStepEnd(
-        "LLM answer",
-        `tokens=${answerFallbackTokens}`,
-        llmAnswerStart,
-        true,
-        {
+      if (!answerGenerationFailed) {
+        logDebug("llmLocalHandler MAIN complete", {
           textLength: typeof result.text === "string" ? result.text.length : 0,
-          fn: "runHelixAskLocalWithOverflowRetry",
-          label: "answer",
-        },
-      );
+        });
+        logStepEnd(
+          "LLM answer",
+          `tokens=${answerFallbackTokens}`,
+          llmAnswerStart,
+          true,
+          {
+            textLength: typeof result.text === "string" ? result.text.length : 0,
+            fn: "runHelixAskLocalWithOverflowRetry",
+            label: "answer",
+          },
+        );
+      }
       logProgress("Answer ready", undefined, answerStart);
       answerPath.push("answer:llm");
+      if (!result?.text) {
+        throw new Error("No answer generated");
+      }
     }
 
     let cleanedText: string | undefined;

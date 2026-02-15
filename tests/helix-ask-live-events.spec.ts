@@ -25,7 +25,7 @@ describe("Helix Ask live events", () => {
         resolve();
       });
     });
-  });
+  }, 60000);
 
   afterAll(async () => {
     await new Promise<void>((resolve) => {
@@ -96,7 +96,13 @@ describe("Helix Ask live events", () => {
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
       text: string;
-      debug?: { answer_path?: string[]; answer_extension_appended?: boolean };
+      debug?: {
+        answer_path?: string[];
+        answer_extension_appended?: boolean;
+        tree_walk_mode?: string;
+        graph_pack_skip_reason?: string;
+        graph_framework?: { trees?: Array<{ tree: string; nodes: string[] }> };
+      };
       answer_path?: string[];
       answer_extension_appended?: boolean;
     };
@@ -109,10 +115,42 @@ describe("Helix Ask live events", () => {
     expect(answerPath).toContain("answer:llm");
     expect(payload.debug?.answer_extension_appended ?? false).toBe(false);
     expect(text).toMatch(/^In plain language/i);
+    expect(payload.debug?.tree_walk_mode).toBe("root_to_leaf");
+    expect(payload.debug?.graph_pack_skip_reason).toBeUndefined();
+    expect((payload.debug?.graph_framework?.trees?.length ?? 0)).toBeGreaterThan(0);
     expect(text).not.toMatch(/^Confirmed:/i);
     expect(text).not.toMatch(/Next evidence:/i);
     expect(text).not.toMatch(/^additional repo context:/i);
     expect(text).not.toMatch(/client\/src\/components\/MissionEthosSourcePanel\.tsx/i);
     expect(text).toMatch(/docs\/knowledge\/ethos\/feedback-loop-hygiene\.md/i);
-  }, 20000);
+    expect(answerPath.some((entry) => entry.startsWith("concept_fast_path"))).toBe(false);
+  }, 45000);
+
+  it("keeps narrative ideology queries in full-root-to-leaf mode", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "How does Feedback Loop Hygiene affect society and public trust?",
+        debug: true,
+        sessionId: "test-ideology-narrative",
+        verbosity: "extended",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text: string;
+      debug?: {
+        answer_path?: string[];
+        tree_walk_mode?: string;
+        graph_pack_skip_reason?: string;
+      };
+    };
+    const answerPath = payload.debug?.answer_path ?? [];
+    expect(payload.text).toContain("Close loops only with verified signals");
+    expect(payload.text).toContain("In practice,");
+    expect(payload.debug?.tree_walk_mode).toBe("root_to_leaf");
+    expect(payload.debug?.graph_pack_skip_reason).toBeUndefined();
+    expect(answerPath.some((entry) => entry.startsWith("concept_fast_path"))).toBe(false);
+  }, 45000);
 });

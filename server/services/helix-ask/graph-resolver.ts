@@ -28,7 +28,7 @@ export type HelixAskGraphResolvedNode = {
   sourcePath?: string;
 };
 
-type HelixAskGraphPathMode = "full" | "root_to_leaf";
+type HelixAskGraphPathMode = "full" | "root_to_leaf" | "root_to_anchor";
 
 export type HelixAskGraphEvidence = {
   type: "doc" | "code" | "test" | "telemetry";
@@ -104,6 +104,7 @@ type GraphResolverTreeConfig = {
   id: string;
   label?: string;
   path: string;
+  pathMode?: HelixAskGraphPathMode;
   topicTags?: HelixAskTopicTag[];
   matchers?: string[];
   weight?: number;
@@ -121,6 +122,7 @@ type GraphResolverPackConfig = {
   maxTrees?: number;
   minScore?: number;
   minScoreRatio?: number;
+  pathMode?: HelixAskGraphPathMode;
 };
 
 type GraphResolverConfig = {
@@ -223,6 +225,7 @@ const DEFAULT_PACK_MIN_SCORE = 6;
 const DEFAULT_PACK_MIN_SCORE_RATIO = 0.25;
 const MAX_PACK_TREES_LIMIT = 6;
 const LOCKED_TREE_SCORE_BONUS = 4;
+const DEFAULT_GRAPH_PATH_MODE: HelixAskGraphPathMode = "full";
 
 const DEFAULT_CONGRUENCE_WALK_CONFIG_PATH = "docs/warp-tree-dag-walk-config.json";
 const DEFAULT_CONGRUENCE_WALK_CONFIG = {
@@ -246,6 +249,19 @@ type GraphConfigCache = { config: GraphResolverConfig; path: string; mtimeMs: nu
 let graphConfigCache: GraphConfigCache | null = null;
 
 const graphTreeCache = new Map<string, { tree: GraphTree; mtimeMs: number }>();
+
+const normalizeGraphPathMode = (value: unknown): HelixAskGraphPathMode | undefined => {
+  if (value === "full" || value === "root_to_leaf") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "full") return "full";
+    if (normalized === "root_to_leaf" || normalized === "root-to-leaf") return "root_to_leaf";
+    if (normalized === "root_to_anchor" || normalized === "root-to-anchor") return "root_to_anchor";
+  }
+  return undefined;
+};
 
 type CongruenceWalkConfig = {
   allowedCL: "CL0" | "CL1" | "CL2" | "CL3" | "CL4";
@@ -1198,6 +1214,44 @@ const buildSingleRootToLeafPath = (params: {
   };
 };
 
+const buildSingleRootToAnchorPath = (params: {
+  tree: GraphTree;
+  nodeScores: Array<{ node: GraphNode; score: number }>;
+  maxDepth: number;
+  maxNodes: number;
+  anchors: Array<{ node: GraphNode; score: number }>;
+}): { pathIds: string[]; fallbackReason?: string } => {
+  const { tree, nodeScores, maxDepth, maxNodes, anchors } = params;
+  const rootNode = tree.rootId
+    ? tree.nodeById.get(tree.rootId)
+    : null;
+  const rootId = rootNode?.id ?? nodeScores[0]?.node.id;
+  if (!rootId) {
+    return {
+      pathIds: [],
+      fallbackReason: "missing_root_or_anchor_seed",
+    };
+  }
+  const rootToAnchor = buildBestRootToTargetPath({
+    tree,
+    rootId,
+    nodeScores,
+    maxDepth,
+    maxNodes,
+    anchors: anchors.slice().sort((a, b) => b.score - a.score),
+  });
+  if (rootToAnchor.path.length > 0) {
+    return {
+      pathIds: rootToAnchor.path.slice(0, maxNodes),
+      fallbackReason: undefined,
+    };
+  }
+  return {
+    pathIds: [rootId],
+    fallbackReason: "root_to_anchor_unreachable",
+  };
+};
+
 const mergeScaffoldText = (blocks: string[]): string => {
   const lines: string[] = [];
   const seen = new Set<string>();
@@ -1275,11 +1329,37 @@ const buildFrameworkCandidate = (
   const maxDepth = treeConfig.maxDepth ?? DEFAULT_MAX_DEPTH;
   const maxNodes = treeConfig.maxNodes ?? DEFAULT_MAX_NODES;
   const pathMode = options?.pathMode ?? "full";
+  let resolvedPathMode: HelixAskGraphPathMode = pathMode;
   let withRoles: HelixAskGraphResolvedNode[] = [];
   let pathFallbackReason: string | undefined = undefined;
   if (pathMode === "root_to_leaf") {
     const anchorEntries = anchors.slice().sort((a, b) => b.score - a.score);
     const singlePath = buildSingleRootToLeafPath({
+      tree,
+      nodeScores,
+      maxDepth,
+      maxNodes,
+      anchors: anchorEntries,
+    });
+    pathFallbackReason = singlePath.fallbackReason;
+    if (singlePath.fallbackToRootToAnchor) {
+      resolvedPathMode = "root_to_anchor";
+    }
+    withRoles = buildPathFromNodeIds(tree, singlePath.pathIds, 0, tree.sourcePath)
+      .map((entry, index) => {
+        const matchAnchor = anchorEntries.find((anchor) => anchor.node.id === entry.id) != null;
+        return {
+          ...entry,
+          score: nodeScores.find((scoreEntry) => scoreEntry.node.id === entry.id)?.score ?? entry.score,
+          depth: index,
+          relation: index === 0 ? "root" : "child",
+          role: matchAnchor ? "anchor" : undefined,
+        };
+      })
+      .slice(0, maxNodes);
+  } else if (pathMode === "root_to_anchor") {
+    const anchorEntries = anchors.slice().sort((a, b) => b.score - a.score);
+    const singlePath = buildSingleRootToAnchorPath({
       tree,
       nodeScores,
       maxDepth,
@@ -1395,7 +1475,7 @@ const buildFrameworkCandidate = (
     rankScore: weightedScore,
     anchorScore,
     pathScore,
-    pathMode: pathMode === "root_to_leaf" ? "root_to_leaf" : "full",
+    pathMode: resolvedPathMode,
     pathFallbackReason,
     congruenceDiagnostics: tree.congruenceDiagnostics,
   };
@@ -1449,13 +1529,19 @@ export function resolveHelixAskGraphPack(input: {
   const questionNorm = normalizeText(question);
   const tokens = extractQuestionTokens(question);
   const conceptBoosts = extractConceptBoosts(input.conceptMatch);
+  const resolvedPackPathMode = normalizeGraphPathMode(input.pathMode) ?? normalizeGraphPathMode(packConfig.pathMode);
   const candidates: GraphFrameworkCandidate[] = [];
   for (const treeConfig of selectedTrees) {
     const tree = loadGraphTree(treeConfig, input.congruenceWalkOverride);
     if (!tree) continue;
+    const treePathMode =
+      normalizeGraphPathMode(input.pathMode) ??
+      normalizeGraphPathMode(treeConfig.pathMode) ??
+      resolvedPackPathMode ??
+      DEFAULT_GRAPH_PATH_MODE;
     const candidate = buildFrameworkCandidate(tree, crossTreeNodeIndex, tokens, questionNorm, conceptBoosts, {
       locked: lockedTreeIds.has(treeConfig.id),
-      pathMode: input.pathMode ?? "full",
+      pathMode: treePathMode,
     });
     if (candidate) candidates.push(candidate);
   }

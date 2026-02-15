@@ -3,13 +3,15 @@
   "pack": {
     "maxTrees": 3,
     "minScore": 6,
-    "minScoreRatio": 0.25
+    "minScoreRatio": 0.25,
+    "pathMode": "root_to_leaf"
   },
   "trees": [
     {
       "id": "ideology",
       "label": "Mission Ethos Tree",
       "path": "docs/ethos/ideology.json",
+      "pathMode": "root_to_leaf",
       "topicTags": [
         "ideology"
       ],
@@ -323,6 +325,7 @@
       "id": "ethos-knowledge",
       "label": "Ethos Knowledge Walk",
       "path": "docs/knowledge/ethos/ethos-knowledge-tree.json",
+      "pathMode": "root_to_leaf",
       "topicTags": [
         "ideology"
       ],
@@ -435,6 +438,7 @@
       "id": "zen-society",
       "label": "Zen Society Walk",
       "path": "docs/knowledge/zen-society-tree.json",
+      "pathMode": "root_to_leaf",
       "topicTags": [
         "ideology"
       ],

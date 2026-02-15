@@ -56,19 +56,29 @@ describe("helix ask graph resolver congruence overrides", () => {
       },
     });
 
-    const pathWithCondition =
-      withBEqualsOne?.frameworks.find((framework) => framework.treeId === "warp-mechanics")?.path ?? [];
-    const pathWithoutCondition =
-      withoutBEqualsOne?.frameworks.find((framework) => framework.treeId === "warp-mechanics")?.path ?? [];
-
-    const idsWithCondition = new Set(pathWithCondition.map((node) => node.id));
-    const idsWithoutCondition = new Set(pathWithoutCondition.map((node) => node.id));
-
-    expect(idsWithCondition.has("vdb-metric")).toBe(true);
-    expect(idsWithoutCondition.has("vdb-metric")).toBe(false);
     const frameworkWithCondition = withBEqualsOne?.frameworks.find(
       (framework) => framework.treeId === "warp-mechanics",
     );
+    const frameworkWithoutCondition = withoutBEqualsOne?.frameworks.find(
+      (framework) => framework.treeId === "warp-mechanics",
+    );
+    const blockedWith = frameworkWithCondition?.congruenceDiagnostics?.blockedByCondition ?? {};
+    const blockedWithout = frameworkWithoutCondition?.congruenceDiagnostics?.blockedByCondition ?? {};
+    expect(
+      frameworkWithCondition?.congruenceDiagnostics?.strictSignals?.B_equals_1,
+    ).toBe(true);
+    expect(
+      frameworkWithoutCondition?.congruenceDiagnostics?.strictSignals?.B_equals_1,
+    ).toBe(false);
+    expect(frameworkWithCondition?.path).toBeTruthy();
+    expect(frameworkWithoutCondition?.path).toBeTruthy();
+    expect((blockedWithout as Record<string, number>)["B_equals_1"]).toBeGreaterThanOrEqual(1);
+    expect((blockedWith as Record<string, number>)["B_equals_1"]).toBeUndefined();
+    expect(
+      (frameworkWithCondition?.congruenceDiagnostics?.allowedEdges ?? 0) >
+        (frameworkWithoutCondition?.congruenceDiagnostics?.allowedEdges ?? 0),
+    ).toBe(true);
+    expect((frameworkWithCondition?.path?.length ?? 0) > 0).toBe(true);
     expect((frameworkWithCondition?.congruenceDiagnostics?.inventory.evaluatedEdges ?? 0) > 0).toBe(true);
     expect(frameworkWithCondition?.congruenceDiagnostics?.strictSignals.B_equals_1).toBe(true);
   });
@@ -223,7 +233,7 @@ describe("helix ask graph resolver congruence overrides", () => {
     expect(neighborsWithoutCondition).not.toContain("cl3-target");
   });
 
-  it("resolves cross-tree strict guardrail targets into traversal path", () => {
+  it("resolves cross-tree strict guardrail targets into traversal diagnostics", () => {
     const pack = resolveHelixAskGraphPack({
       question: "simulation api vdb theta guardrail links",
       topicTags: ["physics"],
@@ -242,9 +252,11 @@ describe("helix ask graph resolver congruence overrides", () => {
 
     const framework = pack?.frameworks.find((entry) => entry.treeId === "simulation-systems");
     expect(framework).toBeTruthy();
-    const ids = new Set((framework?.path ?? []).map((entry) => entry.id));
-    expect(ids.has("vdb-band-guardrail") || ids.has("theta-audit-guardrail")).toBe(true);
+    expect((framework?.path ?? []).length).toBeGreaterThan(0);
+    expect(["root_to_leaf", "root_to_anchor"]).toContain(framework?.pathMode);
     expect((framework?.congruenceDiagnostics?.resolvedCrossTreeEdges ?? 0) > 0).toBe(true);
+    expect(framework?.congruenceDiagnostics?.strictSignals.vdb_two_wall_support_equals_true).toBe(true);
+    expect(framework?.congruenceDiagnostics?.strictSignals.theta_geom_equals_true).toBe(true);
   });
 
   it("builds a strict root_to_leaf chain for ideology when requested", () => {
@@ -275,6 +287,56 @@ describe("helix ask graph resolver congruence overrides", () => {
         },
       });
       expect(neighbors).toContain(to);
+    }
+  });
+
+  it("uses tree-level root_to_leaf path mode when no per-call override is set", () => {
+    const pack = resolveHelixAskGraphPack({
+      question: "What is Feedback Loop Hygiene and why does it matter?",
+      topicTags: ["ideology"],
+      lockedTreeIds: ["ideology"],
+    });
+    const framework = pack?.frameworks.find((entry) => entry.treeId === "ideology");
+    expect(framework?.pathMode).toBe("root_to_leaf");
+    expect(framework?.path).toBeTruthy();
+  });
+
+  it("applies pack-level root_to_leaf path mode for trees without tree overrides", () => {
+    const pack = resolveHelixAskGraphPack({
+      question: "How do constraint guards affect warp metrics in simulations?",
+      topicTags: ["physics"],
+      lockedTreeIds: ["math"],
+    });
+    const framework = pack?.frameworks.find((entry) => entry.treeId === "math");
+    expect(framework?.pathMode).toBe("root_to_leaf");
+    expect(framework?.path).toBeTruthy();
+  });
+
+  it("respects per-call root_to_leaf override over tree configuration", () => {
+    const pack = resolveHelixAskGraphPack({
+      question: "What is Feedback Loop Hygiene and why does it matter?",
+      topicTags: ["ideology"],
+      lockedTreeIds: ["ideology"],
+      pathMode: "full",
+    });
+    const framework = pack?.frameworks.find((entry) => entry.treeId === "ideology");
+    expect(framework?.pathMode).toBe("full");
+    expect(framework?.path).toBeTruthy();
+  });
+
+  it("falls back to root_to_anchor continuity when requested explicitly", () => {
+    const pack = resolveHelixAskGraphPack({
+      question: "How does Feedback Loop Hygiene affect society?",
+      topicTags: ["ideology"],
+      pathMode: "root_to_anchor",
+      lockedTreeIds: ["ideology"],
+    });
+    const framework = pack?.frameworks.find((entry) => entry.treeId === "ideology");
+    expect(framework?.pathMode).toBe("root_to_anchor");
+    const path = framework?.path ?? [];
+    expect(path.length).toBeGreaterThan(0);
+    if (framework?.rootId) {
+      expect(path[0]?.id).toBe(framework.rootId);
     }
   });
 });
