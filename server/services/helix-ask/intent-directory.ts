@@ -355,7 +355,7 @@ const INTENT_PROFILES: HelixAskIntentProfile[] = [
     domain: "repo",
     tier: "F1",
     strategy: "repo_rag",
-    formatPolicy: "compare",
+    formatPolicy: "brief",
     stageTags: "never",
     evidencePolicy: {
       allowRepoCitations: true,

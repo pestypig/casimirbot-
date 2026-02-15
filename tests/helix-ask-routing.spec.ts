@@ -101,7 +101,7 @@ const cases: IntentCase[] = [
     hasFilePathHints: false,
     expectedId: "repo.ideology_reference",
     expectedDomain: "repo",
-    expectedFormat: "compare",
+    expectedFormat: "brief",
     expectStageTags: false,
   },
   {
@@ -110,7 +110,7 @@ const cases: IntentCase[] = [
     hasFilePathHints: false,
     expectedId: "repo.ideology_reference",
     expectedDomain: "repo",
-    expectedFormat: "compare",
+    expectedFormat: "brief",
     expectStageTags: false,
   },
   {
