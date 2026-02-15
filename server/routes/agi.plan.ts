@@ -3060,6 +3060,7 @@ const HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE =
 const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
   /\b(?:how|why|impact|affect|effects?|societ(y|al)|community|governance|public|policy|scenario|example|examples|trust|rumor|decision|in\s+real\s+world|for\s+a|for\s+an|for\s+the|platform|team|council|school)\b/i;
 const HELIX_ASK_IDEOLOGY_REPORT_BAN_RE = /\b(?:report|point[s]?|coverage|summary|compare|difference|between|each|step|slot|bullet|section)\b/i;
+const HELIX_ASK_IDEOLOGY_NARRATIVE_GUARD_RE = /\b(do not|don't|avoid|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i;
 const HELIX_ASK_DRIFT_REPAIR = String(process.env.HELIX_ASK_DRIFT_REPAIR ?? "1").trim() !== "0";
 const HELIX_ASK_DRIFT_REPAIR_MAX = clampNumber(
   readNumber(process.env.HELIX_ASK_DRIFT_REPAIR_MAX, 1),
@@ -9540,6 +9541,61 @@ const hasWeakScientificSections = (text: string): boolean => {
   return false;
 };
 
+
+const rewriteIdeologyScientificVoice = (text: string, question: string): string => {
+  if (!isScientificMicroReport(text)) return text;
+  const confirmedBullets = extractSectionBullets(extractScientificSectionBody(text, "Confirmed:"));
+  const reasonedBullets = extractSectionBullets(
+    extractScientificSectionBody(text, "Reasoned connections (bounded):"),
+  );
+  const nextEvidenceBullets = extractSectionBullets(extractScientificSectionBody(text, "Next evidence:"));
+
+  const confirmedLine =
+    confirmedBullets.find((entry) => !isLowSignalScientificBullet(entry)) ??
+    "Policy choices should be grounded in verified public signals before action.";
+  const reasonedLine =
+    reasonedBullets.find((entry) => !isLowSignalScientificBullet(entry)) ??
+    "When evidence is thin, treat conclusions as provisional and avoid rumor-driven escalation.";
+
+  const lowerQ = question.toLowerCase();
+  const referencesTownCouncil = /town council|council|rumor spikes|online rumor/.test(lowerQ);
+  const referencesCivicSignalLoop = /civic signal loop/.test(lowerQ);
+  const referencesThreeTenets = /three tenets loop/.test(lowerQ);
+
+  const intro =
+    /feedback loop hygiene/.test(lowerQ)
+      ? "In plain language, Feedback Loop Hygiene means acting on verified civic signals, not momentum or rumor."
+      : "In plain language, this is about slowing decisions until public signals are verified.";
+  const mechanismParts = [reasonedLine];
+  if (referencesTownCouncil) {
+    mechanismParts.push(
+      "For a town council, that means pausing amplification, checking source quality, publishing what is verified, and then choosing reversible actions first.",
+    );
+  }
+  if (referencesCivicSignalLoop || referencesThreeTenets) {
+    const loopLinks: string[] = [];
+    if (referencesCivicSignalLoop) {
+      loopLinks.push("Civic Signal Loop (measure and publish real civic signal quality)");
+    }
+    if (referencesThreeTenets) {
+      loopLinks.push("Three Tenets Loop (apply integrity, transparency, and reversibility)");
+    }
+    mechanismParts.push(`It connects to ${loopLinks.join(" and ")} so decisions stay accountable under pressure.`);
+  }
+
+  const takeawaySeed =
+    nextEvidenceBullets.find((entry) => !/^(Clarify:|Search )/i.test(entry)) ??
+    "When evidence is incomplete, communicate uncertainty plainly and verify before policy escalation.";
+  const takeaway = ensureSentence(`Takeaway: ${takeawaySeed}`);
+
+  const sourcesLineMatch = text.match(/^Sources?:.*$/im);
+  const sourcesLine = sourcesLineMatch?.[0]?.trim() ?? "";
+  return [intro, ensureSentence(confirmedLine), mechanismParts.join(" "), takeaway, sourcesLine]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+};
+
 const shouldForceScientificFallback = (
   text: string,
   docBlocks: Array<unknown>,
@@ -10193,6 +10249,13 @@ function buildHelixAskIdeologySynthesisPrompt(
     verbosity === "brief" ? "2-4" : verbosity === "normal" ? "3-5" : "4-6";
   const effectSentenceBudget =
     verbosity === "brief" ? "2-3" : verbosity === "normal" ? "2-4" : "2-4";
+  const allowTechnicalAppendix =
+    /(include|add|with|show|provide|give|append)[\s\S]{0,40}(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)/i.test(
+      question,
+    ) &&
+    !/(do not|don't|avoid|without|instead of|switch to plain-language)[\s\S]{0,120}(technical\s+notes?|compare\/report|report\s+format|report\s+mode)/i.test(
+      question,
+    );
   if (conversationSeed) {
     lines.push(
       "Use this as a loose anchor, then adapt it to the exact user question.",
@@ -10250,9 +10313,11 @@ function buildHelixAskIdeologySynthesisPrompt(
         ? `Include one concrete example sentence that mirrors the scenario: "${scenarioHint}".`
         : "If a scenario is present in the question, include one concrete example sentence.",
     );
-    lines.push(
-      "After the narrative paragraphs, include a short appendix headed 'Technical notes:' with only evidence-grounded bullets.",
-    );
+    if (allowTechnicalAppendix) {
+      lines.push(
+        "After the narrative paragraphs, include a short appendix headed 'Technical notes:' with only evidence-grounded bullets.",
+      );
+    }
     if (!twoParagraphContract) {
       lines.push(
         'Optionally end with "In practice," and one-to-two practical takeaways.',
@@ -12066,6 +12131,37 @@ const REPORT_MODE_INTENT_RE =
 const REPORT_MODE_HEADING_RE = /^#{1,6}\s+(.+)$/;
 const REPORT_MODE_BULLET_RE = /^\s*(?:[-*+]|[0-9]+[.)]|[a-zA-Z][.)])\s+(.+)$/;
 const REPORT_MODE_SECTION_RE = /^(?:Q:|Question:|Requirement:|Issue:|Task:)\s*(.+)$/i;
+
+const REPORT_MODE_NEGATION_RE = /\b(do not|don't|avoid|without|instead of|switch to plain-language)\b/i;
+const REPORT_MODE_REFERENCE_RE = /\b(report|technical notes?|compare\/report|report mode)\b/i;
+const REPORT_MODE_CONDITIONAL_GUARD_RE = /\bif you are about to output\b/i;
+
+const IDEOLOGY_TECHNICAL_NOTES_RE = /\n{2,}Technical notes:\s*[\s\S]*$/i;
+const IDEOLOGY_TECHNICAL_ALLOW_RE =
+  /\b(include|add|with|show|provide|give|append)\b(?:\s+[^\s]+){0,2}\s+(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)\b/i;
+const IDEOLOGY_TECHNICAL_BLOCK_RE =
+  /\b(do not|don't|avoid|without|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i;
+
+const shouldAllowIdeologyTechnicalNotes = (question: string): boolean => {
+  const normalized = question.toLowerCase();
+  const explicitAllow = IDEOLOGY_TECHNICAL_ALLOW_RE.test(normalized);
+  if (IDEOLOGY_TECHNICAL_BLOCK_RE.test(normalized)) {
+    return false;
+  }
+  return explicitAllow;
+};
+
+const isExplicitReportRequest = (question: string): boolean => {
+  if (!REPORT_MODE_INTENT_RE.test(question)) return false;
+  const normalized = question.toLowerCase();
+  const hasNegation = REPORT_MODE_NEGATION_RE.test(normalized);
+  const hasReportReference = REPORT_MODE_REFERENCE_RE.test(normalized);
+  const conditionalGuard = REPORT_MODE_CONDITIONAL_GUARD_RE.test(normalized);
+  if (hasReportReference && (hasNegation || conditionalGuard)) {
+    return false;
+  }
+  return true;
+};
 type HelixAskReportBlockHint = {
   id: string;
   patterns: RegExp[];
@@ -12171,7 +12267,8 @@ const shouldUseIdeologyConversationalMode = (
   if (charCount > HELIX_ASK_IDEOLOGY_CHAT_MODE_MAX_CHARS) return false;
   const trimmed = question.trim();
   if (trimmed.length < 20) return false;
-  if (HELIX_ASK_IDEOLOGY_REPORT_BAN_RE.test(trimmed)) return false;
+  const hasNarrativeGuard = HELIX_ASK_IDEOLOGY_NARRATIVE_GUARD_RE.test(trimmed);
+  if (HELIX_ASK_IDEOLOGY_REPORT_BAN_RE.test(trimmed) && !hasNarrativeGuard) return false;
   return (
     HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE.test(trimmed) ||
     HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE.test(trimmed)
@@ -12768,7 +12865,7 @@ const resolveReportModeDecision = (question: string): HelixAskReportModeDecision
   if (!HELIX_ASK_REPORT_MODE) {
     return { enabled: false, tokenCount, charCount, blockCount };
   }
-  if (REPORT_MODE_INTENT_RE.test(question)) {
+  if (isExplicitReportRequest(question)) {
     return { enabled: true, reason: "explicit_report_request", tokenCount, charCount, blockCount };
   }
   if (blockCount >= HELIX_ASK_REPORT_TRIGGER_BLOCKS) {
@@ -15160,6 +15257,7 @@ const executeHelixAsk = async ({
     }
     if (
       !isIdeologyConversationalCandidate &&
+      !isIdeologyNarrativeQuery &&
       !reportDecision.enabled &&
       slotPreview.coverageSlots.length >= 2
     ) {
@@ -15246,7 +15344,12 @@ const executeHelixAsk = async ({
         slotPlanPassSlots = [];
       }
     }
-    if (!isIdeologyConversationalCandidate && !reportDecision.enabled && slotPreview.coverageSlots.length >= 2) {
+    if (
+      !isIdeologyConversationalCandidate &&
+      !isIdeologyNarrativeQuery &&
+      !reportDecision.enabled &&
+      slotPreview.coverageSlots.length >= 2
+    ) {
       reportDecision = {
         ...reportDecision,
         enabled: true,
@@ -17367,8 +17470,8 @@ const executeHelixAsk = async ({
     }
     if (conceptFastPath && conceptMatch && !forcedAnswer) {
       const conceptDraft = isIdeologyReferenceIntent
-        ? renderConceptAnswer(conceptMatch)
-        : renderConceptDefinition(conceptMatch);
+        ? renderConceptDefinition(conceptMatch)
+        : renderConceptAnswer(conceptMatch);
       if (conceptDraft) {
         conceptAnswer = conceptDraft;
         if (!isIdeologyReferenceIntent) {
@@ -17687,7 +17790,9 @@ const executeHelixAsk = async ({
         logEvent("Concept card ready", conceptMatch?.card.id, conceptScaffold, conceptStart);
       }
       if (hasConceptScaffold && intentDomain === "general") {
-        conceptAnswer = renderConceptAnswer(conceptMatch);
+        conceptAnswer = isIdeologyReferenceIntent
+          ? renderConceptDefinition(conceptMatch)
+          : renderConceptAnswer(conceptMatch);
       }
       let wantsHybrid = intentStrategy === "hybrid_explain";
       let forceHybridNoEvidence = false;
@@ -22054,6 +22159,12 @@ const executeHelixAsk = async ({
         }
       }
       cleaned = platonicResult.answer;
+      if (
+        intentProfile.id === "repo.ideology_reference" &&
+        !shouldAllowIdeologyTechnicalNotes(baseQuestion)
+      ) {
+        cleaned = cleaned.replace(IDEOLOGY_TECHNICAL_NOTES_RE, "").trim();
+      }
       if (endpointGuardApplied && endpointGuardMessage) {
         cleaned = endpointGuardMessage;
         answerPath.push("endpointGuard:applied");
@@ -22374,6 +22485,9 @@ const executeHelixAsk = async ({
           : extractFilePathsFromText(cleaned),
         rawAnswerSentences,
       );
+      if (isIdeologyReferenceIntent) {
+        cleaned = rewriteIdeologyScientificVoice(cleaned, baseQuestion);
+      }
       cleaned = stripTrivialOrdinalBullets(cleaned);
       cleaned = dedupeReportParagraphs(cleaned).text;
       const scientificFallbackReason = hasWeakScientificSections(cleaned)
