@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { performance } from "node:perf_hooks";
-import { getGlobalPipelineState } from "./energy-pipeline";
-import type { Vec3 } from "./curvature-brick";
+import { getGlobalPipelineState } from "./energy-pipeline.ts";
+import type { Vec3 } from "./curvature-brick.ts";
 import {
   buildEvolutionBrick,
   runInitialDataSolve,
@@ -18,9 +18,9 @@ import {
   type StressEnergyBuildOptions,
 } from "./gr/evolution/index.js";
 import { toGeometricTime, toSiTime, type GrUnitSystem } from "../shared/gr-units.js";
-import type { GrPipelineDiagnostics } from "./energy-pipeline";
+import type { GrPipelineDiagnostics } from "./energy-pipeline.ts";
 import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.js";
-import type { StressEnergyBrickParams, StressEnergyStats } from "./stress-energy-brick";
+import type { StressEnergyBrickParams, StressEnergyStats } from "./stress-energy-brick.ts";
 
 const SIXTEEN_PI = 16 * Math.PI;
 
