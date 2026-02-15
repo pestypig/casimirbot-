@@ -569,6 +569,89 @@ uniform float u_constraintWidth;
 }
 `;
 
+const VERT_COMPAT = `#version 300 es
+precision mediump float;
+in vec3 a_pos;
+in float a_alpha;
+in float a_hull;
+in vec3 a_hullDir;
+in vec3 a_beta;
+in vec3 a_gamma;
+in vec3 a_shear;
+in float a_constraint;
+in float a_region;
+in float a_regionGrid;
+in float a_theta;
+
+uniform mat4 u_mvp;
+uniform float u_time;
+uniform float u_gridScale;
+uniform vec3 u_worldScale;
+uniform float u_pointSize;
+uniform float u_alphaMin;
+uniform float u_thetaScale;
+uniform float u_constraintScale;
+
+out float v_alpha;
+out float v_pulse;
+out float v_hullWeight;
+out float v_constraint;
+out float v_region;
+out float v_regionGrid;
+out float v_theta;
+
+void main() {
+  vec3 p = a_pos * u_gridScale;
+  vec3 warped = p * max(u_worldScale, vec3(1e-3));
+  float alpha = clamp(a_alpha, u_alphaMin, 1.0);
+  v_alpha = alpha;
+  v_theta = clamp(a_theta * u_thetaScale, -1.0, 1.0);
+  v_hullWeight = 0.0;
+  v_constraint = clamp(abs(a_constraint) * u_constraintScale, 0.0, 1.0);
+  v_region = clamp(a_region, 0.0, 1.0);
+  v_regionGrid = clamp(a_regionGrid, 0.0, 1.0);
+  v_pulse = 0.5 + 0.5 * sin(u_time + dot(p, vec3(1.3, 2.1, 0.9)));
+
+  gl_Position = u_mvp * vec4(warped, 1.0);
+  gl_PointSize = u_pointSize / max(1.0, gl_Position.w);
+}
+`;
+
+const FRAG_COMPAT = `#version 300 es
+precision mediump float;
+
+uniform float u_pointPass;
+
+in float v_alpha;
+in float v_pulse;
+in float v_theta;
+out vec4 outColor;
+
+void main() {
+  if (u_pointPass > 0.5) {
+    vec2 c = gl_PointCoord * 2.0 - 1.0;
+    if (dot(c, c) > 1.0) discard;
+  }
+  float t = clamp(v_theta * 0.5 + 0.5, 0.0, 1.0);
+  vec3 color = mix(vec3(0.24, 0.60, 0.95), vec3(0.95, 0.42, 0.24), t);
+  outColor = vec4(color * mix(0.4, 1.0, v_pulse), max(0.2, v_alpha));
+}
+`;
+
+const ATTRIB_BINDINGS = {
+  a_pos: 0,
+  a_alpha: 1,
+  a_hull: 2,
+  a_hullDir: 3,
+  a_beta: 4,
+  a_gamma: 5,
+  a_shear: 6,
+  a_constraint: 7,
+  a_region: 8,
+  a_regionGrid: 9,
+  a_theta: 10,
+} as const;
+
 function makeLatticeSegments(div: number): Float32Array {
   const verts: number[] = [];
   const step = 2 / div;
@@ -2535,13 +2618,21 @@ function TimeDilationLatticePanelInner({
   }, [latticeMetricOnly, proofPack]);
   const contractGuardrails = contractQuery.data?.guardrails ?? null;
   const contractGuardrailSource = contractQuery.data?.sources?.grDiagnostics ?? "missing";
+  const displayGuardrails = useMemo(() => {
+    const tsRatio = resolveTSRatio(pipelineState).value;
+    const gammaVdB = resolveGammaVdB(pipelineState).value;
+    return resolveGuardrails(pipelineState, tsRatio, gammaVdB, contractGuardrails);
+  }, [pipelineState, contractGuardrails]);
+  const displayGuardrailSource =
+    displayGuardrails.source === "contract"
+      ? contractGuardrailSource
+      : "pipeline-derived";
   const contractGuardrailBadgeClass = useMemo(() => {
-    if (!contractGuardrails) return "border border-slate-600 bg-slate-900/70 text-slate-200";
     const statuses: GuardrailState[] = [
-      contractGuardrails.fordRoman,
-      contractGuardrails.thetaAudit,
-      contractGuardrails.tsRatio,
-      contractGuardrails.vdbBand,
+      displayGuardrails.fordRoman,
+      displayGuardrails.thetaAudit,
+      displayGuardrails.tsRatio,
+      displayGuardrails.vdbBand,
     ];
     if (statuses.some((status) => status === "fail" || status === "missing")) {
       return "border border-rose-500/40 bg-rose-500/10 text-rose-200";
@@ -2550,7 +2641,7 @@ function TimeDilationLatticePanelInner({
       return "border border-amber-500/40 bg-amber-500/10 text-amber-200";
     }
     return "border border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
-  }, [contractGuardrails]);
+  }, [displayGuardrails]);
   const tsMetricDerived =
     typeof (pipelineState as any)?.tsMetricDerived === "boolean"
       ? Boolean((pipelineState as any).tsMetricDerived)
@@ -5570,25 +5661,23 @@ function TimeDilationLatticePanelInner({
       releaseContextRef.current = registerWebGLContext(gl, { label: "TimeDilationLatticePanel" });
 
       let prog: WebGLProgram;
+      let shaderMode: "full" | "compat" = "full";
       try {
-        prog = createProgram(gl, VERT, FRAG, {
-          a_pos: 0,
-          a_alpha: 1,
-          a_hull: 2,
-          a_hullDir: 3,
-          a_beta: 4,
-          a_gamma: 5,
-          a_shear: 6,
-          a_constraint: 7,
-          a_region: 8,
-          a_regionGrid: 9,
-          a_theta: 10,
-        });
-        progRef.current = prog;
+        prog = createProgram(gl, VERT, FRAG, ATTRIB_BINDINGS);
       } catch (err) {
-        setGlStatus("compile-fail");
-        setGlError(err instanceof Error ? err.message : String(err));
-        return;
+        console.warn("[TimeDilationLattice] Full shader compile failed, attempting compatibility shader", err);
+        try {
+          prog = createProgram(gl, VERT_COMPAT, FRAG_COMPAT, ATTRIB_BINDINGS);
+          shaderMode = "compat";
+        } catch (fallbackErr) {
+          setGlStatus("compile-fail");
+          setGlError(fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr));
+          return;
+        }
+      }
+      progRef.current = prog;
+      if (shaderMode === "compat") {
+        setGlError("Using compatibility shader mode due to driver compile limits.");
       }
 
         const lineVbo = gl.createBuffer();
@@ -6398,17 +6487,11 @@ function TimeDilationLatticePanelInner({
           <div className="rounded-full border border-slate-600 bg-slate-950/80 px-2 py-[2px] text-slate-200">
             {`source=${tsMetricSource ?? "n/a"}`}
           </div>
-          {contractGuardrails ? (
-            <div className={cn("rounded-full px-2 py-[2px]", contractGuardrailBadgeClass)}>
-              {`contract FR=${contractGuardrails.fordRoman} TH=${contractGuardrails.thetaAudit} TS=${contractGuardrails.tsRatio} VdB=${contractGuardrails.vdbBand}`}
-            </div>
-          ) : (
-            <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
-              contract unavailable
-            </div>
-          )}
+          <div className={cn("rounded-full px-2 py-[2px]", contractGuardrailBadgeClass)}>
+            {`contract FR=${displayGuardrails.fordRoman} TH=${displayGuardrails.thetaAudit} TS=${displayGuardrails.tsRatio} VdB=${displayGuardrails.vdbBand}`}
+          </div>
           <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
-            {`contract source=${contractGuardrailSource}`}
+            {`contract source=${displayGuardrailSource}`}
           </div>
           <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
             {`T00_min source=${t00MinSource}${t00MinProxy ? " (proxy)" : ""}`}
