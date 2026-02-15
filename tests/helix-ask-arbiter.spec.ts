@@ -75,4 +75,34 @@ describe("Helix Ask arbiter", () => {
     expect(result.mode).toBe("repo_grounded");
     expect(result.reason).toBe("high_stakes");
   });
+
+  it("forces clarify when budget requests force_clarify", () => {
+    const result = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.8,
+      mustIncludeOk: true,
+      viabilityMustIncludeOk: true,
+      budgetLevel: "OVER",
+      budgetRecommend: "force_clarify",
+      intentDomain: "repo",
+    });
+    expect(result.mode).toBe("clarify");
+    expect(result.reason).toBe("budget_force_clarify");
+  });
+
+  it("downgrades to hybrid when budget queues deep work", () => {
+    const result = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.8,
+      conceptMatch: true,
+      mustIncludeOk: true,
+      viabilityMustIncludeOk: true,
+      budgetLevel: "OVER",
+      budgetRecommend: "queue_deep_work",
+      intentDomain: "repo",
+    });
+    expect(result.mode).toBe("hybrid");
+    expect(result.reason).toBe("budget_queue_deep_work");
+  });
+
 });

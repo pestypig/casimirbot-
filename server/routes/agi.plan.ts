@@ -142,6 +142,8 @@ import {
   tokenizeAskQuery,
 } from "../services/helix-ask/query";
 import { resolveHelixAskArbiter } from "../services/helix-ask/arbiter";
+import { evaluateRuntimeBudgetState } from "../services/runtime/budget-model";
+import { loadRuntimeFrameContract } from "../services/runtime/frame-contract";
 import {
   buildConceptScaffold,
   findConceptMatch,
@@ -192,6 +194,7 @@ import {
   createHelixAskJob,
   failHelixAskJob,
   getHelixAskJob,
+  getHelixAskActiveJobCount,
   markHelixAskJobRunning,
   touchHelixAskJob,
   type HelixAskJobRecord,
@@ -236,6 +239,8 @@ import { ensureSpecialistsRegistered } from "../specialists/bootstrap";
 import { hullModeEnabled, shouldRegisterExternalAdapter } from "../security/hull-guard";
 import { readKnowledgeConfig } from "../config/knowledge";
 import { resolveLocalRuntimeCaps } from "../services/llm/local-runtime";
+import { kvGetSessionTokensApprox } from "../services/llm/kv-budgeter";
+import { getGpuThermals } from "../services/hardware/gpu-scheduler";
 import { fetchKnowledgeForProjects } from "../services/knowledge/corpus";
 import {
   getTrainingTraceExport,
@@ -13962,6 +13967,7 @@ const executeHelixAsk = async ({
   reportContext,
 }: HelixAskExecutionArgs): Promise<void> => {
   const parsed = { data: request };
+  const askRequestStartedAt = Date.now();
   const askSessionId = parsed.data.sessionId;
   const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
   const dryRun = parsed.data.dryRun === true;
@@ -14360,6 +14366,7 @@ const executeHelixAsk = async ({
       agent_loop_max_steps?: number;
       agent_loop_budget_ms?: number;
       agent_action_budget_ms?: number;
+      clocka_tool_cap?: number;
       agent_loop_steps?: number;
       agent_loop_actions?: HelixAskAgentAction[];
       agent_stop_reason?: string;
@@ -14483,6 +14490,9 @@ const executeHelixAsk = async ({
       arbiter_ratio?: number;
       arbiter_topic_ok?: boolean;
       arbiter_concept_match?: boolean;
+      runtime_budget_level?: "OK" | "WARNING" | "OVER";
+      runtime_budget_recommend?: string;
+      runtime_budget_signals?: Record<string, unknown>;
       plan_pass_used?: boolean;
       plan_pass_forced?: boolean;
       slot_plan_pass_used?: boolean;
@@ -14894,7 +14904,8 @@ const executeHelixAsk = async ({
       }
     }
     const agentLoopEnabled = HELIX_ASK_AGENT_LOOP;
-    const agentLoopMaxSteps = HELIX_ASK_AGENT_LOOP_MAX_STEPS;
+    const runtimeContract = loadRuntimeFrameContract();
+    const agentLoopMaxSteps = Math.max(1, Math.min(HELIX_ASK_AGENT_LOOP_MAX_STEPS, runtimeContract.clockA.max_plan_steps));
     const agentActionBudgetMs = HELIX_ASK_AGENT_ACTION_BUDGET_MS;
     const agentLoopBudgetMs = HELIX_ASK_AGENT_LOOP_BUDGET_MS;
     const agentStart = Date.now();
@@ -14917,6 +14928,7 @@ const executeHelixAsk = async ({
       debugPayload.agent_loop_max_steps = agentLoopMaxSteps;
       debugPayload.agent_loop_budget_ms = agentLoopBudgetMs;
       debugPayload.agent_action_budget_ms = agentActionBudgetMs;
+      debugPayload.clocka_tool_cap = runtimeContract.clockA.max_tool_calls;
       debugPayload.agent_loop_steps = getAgentStepCount();
       debugPayload.agent_loop_actions = agentActions.slice();
       debugPayload.agent_stop_reason = agentStopReason ?? undefined;
@@ -15010,8 +15022,10 @@ const executeHelixAsk = async ({
     };
     const getAgentBlockReason = (): string | null => {
       if (!agentLoopEnabled) return null;
+      const stepCount = getAgentStepCount();
       if (agentActionOverBudget) return "action_budget_exhausted";
-      if (getAgentStepCount() >= agentLoopMaxSteps) return "max_steps";
+      if (stepCount >= runtimeContract.clockA.max_tool_calls) return "clocka_tool_cap";
+      if (stepCount >= agentLoopMaxSteps) return "max_steps";
       if (Date.now() - agentStart > agentLoopBudgetMs) return "budget_exhausted";
       return null;
     };
@@ -19718,6 +19732,28 @@ const executeHelixAsk = async ({
           intentTier === "F3" ||
           intentStrategy === "constraint_report" ||
           compositeConstraintRequested;
+        const activeJobCount = await getHelixAskActiveJobCount();
+        const clockAP95Ms = Math.max(0, Date.now() - askRequestStartedAt);
+        const kvTokens = askSessionId ? kvGetSessionTokensApprox(askSessionId) : 0;
+        const thermals = getGpuThermals();
+        const lanePressure = {
+          llm: Math.min(1, clockAP95Ms / Math.max(1, runtimeContract.clockA.p95_ms)),
+          io: Math.min(1, retrievalConfidence),
+          media: Math.min(1, thermals.current / Math.max(1, thermals.max)),
+          physics: 0,
+          perception: 0,
+        };
+        const budgetState = evaluateRuntimeBudgetState({
+          clockAP95Ms,
+          clockABudgetMs: runtimeContract.clockA.p95_ms,
+          toolCallsLastTick: Math.max(0, getAgentStepCount()),
+          maxToolCalls: runtimeContract.clockA.max_tool_calls,
+          kvTokens,
+          kvMaxTokens: runtimeContract.kv.max_tokens,
+          queueDepth: activeJobCount,
+          queueMaxDepth: runtimeContract.clockB.max_queue_depth,
+          lanePressure,
+        });
         const arbiterDecision = resolveHelixAskArbiter({
           retrievalConfidence,
           repoThreshold: arbiterRepoRatio,
@@ -19734,6 +19770,8 @@ const executeHelixAsk = async ({
           hasHighStakesConstraints,
           explicitRepoExpectation,
           intentDomain,
+          budgetLevel: budgetState.level,
+          budgetRecommend: budgetState.recommend,
         });
         const rawArbiterMode = arbiterDecision.mode;
         const isIdeologyIntent = intentProfile.id === "repo.ideology_reference";
@@ -19768,6 +19806,9 @@ const executeHelixAsk = async ({
           debugPayload.arbiter_ratio = arbiterDecision.ratio;
           debugPayload.arbiter_topic_ok = arbiterDecision.topicOk;
           debugPayload.arbiter_concept_match = Boolean(arbiterDecision.conceptMatch);
+          debugPayload.runtime_budget_level = budgetState.level;
+          debugPayload.runtime_budget_recommend = budgetState.recommend;
+          debugPayload.runtime_budget_signals = budgetState.signals;
         }
         if (
           intentProfile.id === "repo.ideology_reference" &&
