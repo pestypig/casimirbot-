@@ -2618,13 +2618,21 @@ function TimeDilationLatticePanelInner({
   }, [latticeMetricOnly, proofPack]);
   const contractGuardrails = contractQuery.data?.guardrails ?? null;
   const contractGuardrailSource = contractQuery.data?.sources?.grDiagnostics ?? "missing";
+  const displayGuardrails = useMemo(() => {
+    const tsRatio = resolveTSRatio(pipelineState).value;
+    const gammaVdB = resolveGammaVdB(pipelineState).value;
+    return resolveGuardrails(pipelineState, tsRatio, gammaVdB, contractGuardrails);
+  }, [pipelineState, contractGuardrails]);
+  const displayGuardrailSource =
+    displayGuardrails.source === "contract"
+      ? contractGuardrailSource
+      : "pipeline-derived";
   const contractGuardrailBadgeClass = useMemo(() => {
-    if (!contractGuardrails) return "border border-slate-600 bg-slate-900/70 text-slate-200";
     const statuses: GuardrailState[] = [
-      contractGuardrails.fordRoman,
-      contractGuardrails.thetaAudit,
-      contractGuardrails.tsRatio,
-      contractGuardrails.vdbBand,
+      displayGuardrails.fordRoman,
+      displayGuardrails.thetaAudit,
+      displayGuardrails.tsRatio,
+      displayGuardrails.vdbBand,
     ];
     if (statuses.some((status) => status === "fail" || status === "missing")) {
       return "border border-rose-500/40 bg-rose-500/10 text-rose-200";
@@ -2633,7 +2641,7 @@ function TimeDilationLatticePanelInner({
       return "border border-amber-500/40 bg-amber-500/10 text-amber-200";
     }
     return "border border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
-  }, [contractGuardrails]);
+  }, [displayGuardrails]);
   const tsMetricDerived =
     typeof (pipelineState as any)?.tsMetricDerived === "boolean"
       ? Boolean((pipelineState as any).tsMetricDerived)
@@ -6479,17 +6487,11 @@ function TimeDilationLatticePanelInner({
           <div className="rounded-full border border-slate-600 bg-slate-950/80 px-2 py-[2px] text-slate-200">
             {`source=${tsMetricSource ?? "n/a"}`}
           </div>
-          {contractGuardrails ? (
-            <div className={cn("rounded-full px-2 py-[2px]", contractGuardrailBadgeClass)}>
-              {`contract FR=${contractGuardrails.fordRoman} TH=${contractGuardrails.thetaAudit} TS=${contractGuardrails.tsRatio} VdB=${contractGuardrails.vdbBand}`}
-            </div>
-          ) : (
-            <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
-              contract unavailable
-            </div>
-          )}
+          <div className={cn("rounded-full px-2 py-[2px]", contractGuardrailBadgeClass)}>
+            {`contract FR=${displayGuardrails.fordRoman} TH=${displayGuardrails.thetaAudit} TS=${displayGuardrails.tsRatio} VdB=${displayGuardrails.vdbBand}`}
+          </div>
           <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
-            {`contract source=${contractGuardrailSource}`}
+            {`contract source=${displayGuardrailSource}`}
           </div>
           <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
             {`T00_min source=${t00MinSource}${t00MinProxy ? " (proxy)" : ""}`}
