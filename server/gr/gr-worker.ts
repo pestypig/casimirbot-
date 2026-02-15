@@ -1,6 +1,6 @@
 import { parentPort } from "node:worker_threads";
-import { buildGrEvolveBrick } from "../gr-evolve-brick.js";
-import { buildGrInitialBrick } from "../gr-initial-brick.js";
+import { buildGrEvolveBrick } from "../gr-evolve-brick.ts";
+import { buildGrInitialBrick } from "../gr-initial-brick.ts";
 import type {
   GrWorkerRequest,
   GrWorkerResponse,
