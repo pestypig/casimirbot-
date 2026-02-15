@@ -27,6 +27,7 @@ type HelixAskJobStore = {
   touch: (jobId: string) => Promise<void>;
   cleanupExpired: () => Promise<void>;
   reapStale: (cutoffMs: number, reason: string) => Promise<void>;
+  getActiveCount: () => Promise<number>;
 };
 
 type HelixAskJobCreateParams = {
@@ -204,6 +205,16 @@ const memoryStore: HelixAskJobStore = {
       }
     }
   },
+  getActiveCount: async () => {
+    pruneMemoryExpired();
+    let count = 0;
+    for (const job of memoryJobs.values()) {
+      if (job.status === "queued" || job.status === "running") {
+        count += 1;
+      }
+    }
+    return count;
+  },
 };
 
 const getDbPool = async () => {
@@ -318,6 +329,16 @@ const dbStore: HelixAskJobStore = {
       [cutoff, "failed", reason],
     );
   },
+  getActiveCount: async () => {
+    const pool = await getDbPool();
+    const { rows } = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+       FROM helix_ask_jobs
+       WHERE status IN ('queued', 'running') AND expires_at > now()`,
+    );
+    const count = Number(rows[0]?.count ?? 0);
+    return Number.isFinite(count) ? count : 0;
+  },
 };
 
 const shouldUseMemoryStore = (): boolean => {
@@ -419,4 +440,10 @@ export const touchHelixAskJob = (jobId: string): void => {
   void resolveStore()
     .then((store) => store.touch(jobId))
     .catch(() => undefined);
+};
+
+
+export const getHelixAskActiveJobCount = async (): Promise<number> => {
+  const store = await resolveStore();
+  return safeRun(() => store.getActiveCount(), 0);
 };

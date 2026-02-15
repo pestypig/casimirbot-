@@ -37,3 +37,14 @@ export function kvReset(sessionId?: string): void {
   }
   sessions.clear();
 }
+
+export function kvGetSessionBytes(sessionId: string): number {
+  const session = sessions.get(sessionId);
+  return session?.bytes ?? 0;
+}
+
+export function kvGetSessionTokensApprox(sessionId: string): number {
+  const bytes = kvGetSessionBytes(sessionId);
+  if (bytes <= 0) return 0;
+  return Math.ceil(bytes / 4);
+}
