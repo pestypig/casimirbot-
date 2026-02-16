@@ -1429,7 +1429,12 @@ export function useEnergyPipeline(options?: {
         const isNotFound = message.includes("404") || message.toLowerCase().includes("api_not_found");
         const isGateway = isGatewayError(err);
         const shouldDisable = isNotFound || isGateway;
-        console.warn("[HELIX] Failed to issue initial QI margin intent:", err);
+        const shortMessage = message.split("\n")[0]?.slice(0, 220) ?? "unknown_error";
+        if (isGateway) {
+          console.warn("[HELIX] Initial QI margin intent deferred (gateway/backoff):", shortMessage);
+        } else {
+          console.warn("[HELIX] Failed to issue initial QI margin intent:", shortMessage);
+        }
         if (!cancelled) {
           issuedInitialMarginIntent = shouldDisable;
           if (isGateway) {
