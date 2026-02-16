@@ -18763,6 +18763,7 @@ const executeHelixAsk = async ({
     let failClosedReason: string | null = null;
     let runtimeBudgetRecommend: string | null = null;
     let runtimeMustIncludeOk = true;
+    let runtimeViabilityMustIncludeOk = true;
 
     if (debugPayload && skipMicroPass) {
       debugPayload.micro_pass = false;
@@ -19895,7 +19896,7 @@ const executeHelixAsk = async ({
           }
         }
         const viabilityFocus = HELIX_ASK_VIABILITY_FOCUS.test(baseQuestion);
-        const viabilityMustIncludeOk =
+        runtimeViabilityMustIncludeOk =
           !viabilityFocus ||
           pathMatchesAny(contextText, [HELIX_ASK_VIABILITY_PATHS]) ||
           extractFilePathsFromText(contextText).some((filePath) =>
@@ -20143,7 +20144,7 @@ const executeHelixAsk = async ({
           HELIX_ASK_CHANNELS.filter((channel) => channelHits[channel] > 0).length / HELIX_ASK_CHANNELS.length;
         let retrievalConfidence = evidenceGate.matchRatio;
         if (mustIncludeOk) retrievalConfidence += 0.15;
-        if (viabilityMustIncludeOk) retrievalConfidence += 0.05;
+        if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
         if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
         if (contextFilesSnapshot.length >= 5) retrievalConfidence += 0.05;
         if (docShare >= 0.4) retrievalConfidence += 0.1;
@@ -20154,7 +20155,7 @@ const executeHelixAsk = async ({
         retrievalConfidence = Math.min(1, Math.max(0, retrievalConfidence));
         if (debugPayload) {
           debugPayload.topic_must_include_ok = mustIncludeOk;
-          debugPayload.viability_must_include_ok = viabilityMustIncludeOk;
+          debugPayload.viability_must_include_ok = runtimeViabilityMustIncludeOk;
           debugPayload.verification_anchor_ok = verificationAnchorOk;
           debugPayload.plan_must_include_ok = planMustIncludeOk;
           if (planScope?.mustIncludeMissing?.length) {
@@ -20312,7 +20313,7 @@ const executeHelixAsk = async ({
             `ratio=${evidenceGate.matchRatio.toFixed(2)}`,
             `mustInclude=${mustIncludeOk ? "ok" : "missing"}`,
             `planMust=${planMustIncludeOk ? "ok" : "missing"}`,
-            `viability=${viabilityMustIncludeOk ? "ok" : "missing"}`,
+            `viability=${runtimeViabilityMustIncludeOk ? "ok" : "missing"}`,
             `verifyAnchors=${verificationAnchorRequired ? (verificationAnchorOk ? "ok" : "missing") : "n/a"}`,
           ].join(" | "),
         );
@@ -20493,7 +20494,7 @@ const executeHelixAsk = async ({
             HELIX_ASK_CHANNELS.length;
           retrievalConfidence = evidenceGate.matchRatio;
           if (mustIncludeOk) retrievalConfidence += 0.15;
-          if (viabilityMustIncludeOk) retrievalConfidence += 0.05;
+          if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
           if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
           if (attemptFiles.length >= 5) retrievalConfidence += 0.05;
           if (attemptDocShare >= 0.4) retrievalConfidence += 0.1;
@@ -20976,7 +20977,7 @@ const executeHelixAsk = async ({
           repoThreshold: arbiterRepoRatio,
           hybridThreshold: arbiterHybridRatio,
           mustIncludeOk,
-          viabilityMustIncludeOk,
+          viabilityMustIncludeOk: runtimeViabilityMustIncludeOk,
           topicMustIncludeOk,
           conceptMatch: Boolean(conceptMatch),
           hasRepoHints,
@@ -21066,7 +21067,7 @@ const executeHelixAsk = async ({
             } else {
               intentReason = `${intentReason}|topic_gate:missing_core`;
             }
-          } else if (!viabilityMustIncludeOk) {
+          } else if (!runtimeViabilityMustIncludeOk) {
             intentReason = `${intentReason}|viability_gate:missing_core`;
           } else if (!evidenceGate.ok) {
             intentReason = `${intentReason}|evidence_gate:no_repo_evidence`;
@@ -21377,7 +21378,7 @@ const executeHelixAsk = async ({
           (!evidenceGateOk ||
             !runtimeMustIncludeOk ||
             !topicMustIncludeOk ||
-            !viabilityMustIncludeOk ||
+            !runtimeViabilityMustIncludeOk ||
             retrievalConfidence < arbiterHybridRatio)
         ) {
           deterministicScaffoldReasons.push("hybrid_low_confidence");
