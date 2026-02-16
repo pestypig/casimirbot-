@@ -58,6 +58,51 @@ const resolveBaseUrl = (req: Request, override?: string) => {
   return host ? `${protocol}://${host}` : "http://127.0.0.1:5173";
 };
 
+const resolveCanonicalSummary = (
+  input: z.infer<typeof ActivateSchema>,
+  pipelineUpdate?: Record<string, unknown> | null,
+  diagnostics?: Record<string, unknown> | null,
+) => {
+  const strictCongruence =
+    (typeof pipelineUpdate?.strictCongruence === "boolean"
+      ? pipelineUpdate.strictCongruence
+      : input.strictCongruence) ?? true;
+  const canonical =
+    (diagnostics?.canonical as Record<string, unknown> | undefined) ??
+    ((pipelineUpdate as any)?.canonical as Record<string, unknown> | undefined) ??
+    {};
+  return {
+    strictCongruence,
+    mode: input.warpFieldType,
+    family: typeof canonical.family === "string" ? canonical.family : input.warpFieldType,
+    chart: typeof canonical.chart === "string" ? canonical.chart : null,
+    observer: typeof canonical.observer === "string" ? canonical.observer : null,
+    normalization: typeof canonical.normalization === "string" ? canonical.normalization : null,
+  };
+};
+
+const resolveWarnings = (
+  pipelineUpdate?: Record<string, unknown> | null,
+  diagnostics?: Record<string, unknown> | null,
+) => {
+  const warnings: string[] = [];
+  const overallStatus = typeof pipelineUpdate?.overallStatus === "string"
+    ? pipelineUpdate.overallStatus
+    : null;
+  if (overallStatus === "CRITICAL") {
+    warnings.push("overall_status_critical");
+  }
+  if (!diagnostics) {
+    warnings.push("diagnostics_partial");
+  } else {
+    const strict = diagnostics.strict as Record<string, unknown> | undefined;
+    if (strict?.strictMetricMissing === true || strict?.anyProxy === true) {
+      warnings.push("diagnostics_partial");
+    }
+  }
+  return warnings;
+};
+
 const postJson = async <T>(url: string, body: unknown, timeoutMs?: number): Promise<T> => {
   const controller = timeoutMs ? new AbortController() : null;
   const timeout = timeoutMs
@@ -196,14 +241,40 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
           };
         });
 
+      const updatedAt = Date.now();
+      const pipelineUpdate = {
+        ok: true,
+        pending: true,
+        source: "activate_async",
+        requested: {
+          warpFieldType: input.warpFieldType,
+          grEnabled: input.grEnabled,
+          strictCongruence: input.strictCongruence ?? true,
+          applyCanonicalHull: input.applyCanonicalHull !== false,
+        },
+      };
+      const diagnostics = {
+        ok: false,
+        pending: true,
+        error: "diagnostics_pending",
+        message: "Diagnostics are running asynchronously. Poll /api/helix/time-dilation/diagnostics.",
+        updatedAt,
+      };
+      const canonical = resolveCanonicalSummary(input, pipelineUpdate, null);
+      const warnings = resolveWarnings(pipelineUpdate, null);
       res.status(202).json({
         ok: true,
         accepted: true,
         baseUrl,
         warpFieldType: input.warpFieldType,
         grEnabled: input.grEnabled,
-        pipelineUpdate: null,
-        diagnostics: null,
+        updatedAt,
+        renderingSeed: `activate:${updatedAt}`,
+        strictCongruence: canonical.strictCongruence,
+        canonical,
+        warnings,
+        pipelineUpdate,
+        diagnostics,
       });
       return;
     }
@@ -231,14 +302,33 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
     }
 
     const diagnostics = await runDiagnostics();
+    const updatedAt = Date.now();
+    const diagnosticsRecord = diagnostics as unknown as Record<string, unknown>;
+    const pipelineRecord = pipelineUpdate as unknown as Record<string, unknown>;
+    const canonical = resolveCanonicalSummary(input, pipelineRecord, diagnosticsRecord);
+    const warnings = resolveWarnings(pipelineRecord, diagnosticsRecord);
     res.json({
       ok: true,
       accepted: false,
       baseUrl,
       warpFieldType: input.warpFieldType,
       grEnabled: input.grEnabled,
+      updatedAt,
+      renderingSeed:
+        (typeof diagnosticsRecord?.renderingSeed === "string" ? diagnosticsRecord.renderingSeed : null) ??
+        (typeof (pipelineRecord as any)?.renderingSeed === "string" ? (pipelineRecord as any).renderingSeed : null) ??
+        `activate:${updatedAt}`,
+      strictCongruence: canonical.strictCongruence,
+      canonical,
+      warnings,
       pipelineUpdate,
-      diagnostics,
+      diagnostics:
+        diagnostics ?? {
+          ok: false,
+          error: "diagnostics_unavailable",
+          message: "Diagnostics returned empty payload.",
+          updatedAt,
+        },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
