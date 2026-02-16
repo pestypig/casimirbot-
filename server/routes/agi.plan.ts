@@ -208,6 +208,7 @@ import {
   recordHelixAskSessionMemory,
   type HelixAskSessionMemory,
 } from "../services/helix-ask/session-memory";
+import { isFastModeRuntimeMissingSymbolError } from "../services/helix-ask/runtime-errors";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
 import { runBeliefGraphLoop } from "../../modules/analysis/belief-graph-loop";
