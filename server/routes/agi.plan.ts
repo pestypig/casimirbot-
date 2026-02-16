@@ -22789,6 +22789,7 @@ const executeHelixAsk = async ({
               driftRepairImproved = true;
             }
             driftRepairApplied = true;
+            }
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
