@@ -14367,6 +14367,46 @@ type HelixAskCodeAlignment = {
   resolved: string[];
 };
 
+type HelixAskFastQualityDecision = {
+  stage: string;
+  decision: "allow" | "skip" | "deadline";
+  reason: string;
+  elapsedMs: number;
+  remainingMs: number;
+  minimumMs?: number;
+  timeoutMs?: number;
+  stageRemainingMs?: number;
+};
+
+const HELIX_ASK_RUNTIME_SAMPLES_MAX = 64;
+const helixAskRecentRuntimeMs: number[] = [];
+
+const recordHelixAskRuntimeSample = (runtimeMs: number): void => {
+  if (!Number.isFinite(runtimeMs) || runtimeMs <= 0) return;
+  helixAskRecentRuntimeMs.push(runtimeMs);
+  if (helixAskRecentRuntimeMs.length > HELIX_ASK_RUNTIME_SAMPLES_MAX) {
+    helixAskRecentRuntimeMs.splice(0, helixAskRecentRuntimeMs.length - HELIX_ASK_RUNTIME_SAMPLES_MAX);
+  }
+};
+
+const percentileFromSorted = (sorted: number[], p: number): number => {
+  if (sorted.length === 0) return 0;
+  const q = Math.min(1, Math.max(0, p));
+  const idx = q * (sorted.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  const t = idx - lo;
+  return sorted[lo] * (1 - t) + sorted[hi] * t;
+};
+
+const getHelixAskRuntimeP50Ms = (): number => {
+  if (helixAskRecentRuntimeMs.length === 0) return 9000;
+  const sorted = helixAskRecentRuntimeMs.slice().sort((a, b) => a - b);
+  const p50 = percentileFromSorted(sorted, 0.5);
+  return Number.isFinite(p50) && p50 > 0 ? p50 : 9000;
+};
+
 const executeHelixAsk = async ({
   request,
   personaId,
@@ -14901,21 +14941,28 @@ const executeHelixAsk = async ({
       fast_quality_ambiguity_clusters_skipped?: boolean;
       fast_quality_ambiguity_labels_disabled?: boolean;
       fast_quality_retry_strict_mode?: boolean;
-      fast_quality_deadlines?: {
-        query_hints_ms: number;
-        plan_retrieval_ms: number;
-        synthesis_start_ms: number;
-        finalize_ms: number;
-        helper_min_ms: number;
+      fast_quality_budget?: {
+        scale: number;
+        runtime_p50_ms: number;
+        base: {
+          total_ms: number;
+          query_hints_ms: number;
+          plan_retrieval_ms: number;
+          synthesis_start_by_ms: number;
+          finalize_by_ms: number;
+          helper_min_ms: number;
+        };
+        effective: {
+          total_ms: number;
+          query_hints_ms: number;
+          plan_retrieval_ms: number;
+          synthesis_start_by_ms: number;
+          finalize_by_ms: number;
+          helper_min_ms: number;
+        };
       };
-      fast_quality_decisions?: Array<{
-        stage: string;
-        action: string;
-        reason: string;
-        remaining_ms?: number;
-        elapsed_ms?: number;
-        deadline_ms?: number;
-      }>;
+      fast_quality_decisions?: HelixAskFastQualityDecision[];
+      fast_quality_deadline_misses?: string[];
       format_enforcement?: "strict" | "relaxed";
       soft_expansion?: number;
       scaffold_tokens?: number;
@@ -18288,6 +18335,28 @@ const executeHelixAsk = async ({
           } else {
             let queryStart: number | null = null;
             try {
+              const queryHintsElapsedMs = getAskElapsedMs();
+              const queryHintsDeadlineExceeded =
+                fastQualityMode && queryHintsElapsedMs >= FAST_QUALITY_QUERY_HINTS_BUDGET_MS;
+              if (queryHintsDeadlineExceeded) {
+                queryHints = [];
+                planDirectives = null;
+                pushFastQualityDecision(
+                  "query_hints_llm",
+                  "deadline",
+                  "query_hints_stage_budget_exhausted",
+                );
+                logEvent("LLM query hints", "skipped", "fast_quality_query_hints_deadline");
+              } else if (!canStartHelperCall("query_hints_llm", FAST_QUALITY_QUERY_HINTS_BUDGET_MS)) {
+                queryHints = [];
+                planDirectives = null;
+                pushFastQualityDecision(
+                  "query_hints_llm",
+                  "skip",
+                  "deterministic_query_hints_fallback",
+                );
+                logEvent("LLM query hints", "skipped", "fast_quality_deterministic_fallback");
+              } else {
               const conceptSkeleton =
                 intentProfile.id === "hybrid.concept_plus_system_mapping"
                   ? buildHybridConceptSkeleton(baseQuestion, conceptMatch)
@@ -18307,28 +18376,38 @@ const executeHelixAsk = async ({
                   prompt: "buildHelixAskQueryPrompt",
                 },
               );
-              const { result: queryResult, overflow: queryOverflow } =
-                await runHelixAskLocalWithOverflowRetry(
-                  {
-                    prompt: queryPrompt,
-                    max_tokens: queryMaxTokens,
-                    temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-                    seed: parsed.data.seed,
-                    stop: parsed.data.stop,
-                  },
-                  {
-                    personaId,
-                    sessionId: parsed.data.sessionId,
-                    traceId: askTraceId,
-                  },
-                  {
-                    fallbackMaxTokens: queryMaxTokens,
-                    allowContextDrop: true,
-                    label: "query_hints",
-                  },
-                );
-              recordOverflow("query_hints", queryOverflow);
-              const planParse = parsePlanDirectives(queryResult.text ?? "");
+              const queryHelperResult = await runHelperWithinStageBudget(
+                "query_hints_llm",
+                FAST_QUALITY_QUERY_HINTS_BUDGET_MS,
+                () =>
+                  runHelixAskLocalWithOverflowRetry(
+                      {
+                        prompt: queryPrompt,
+                        max_tokens: queryMaxTokens,
+                        temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                        seed: parsed.data.seed,
+                        stop: parsed.data.stop,
+                      },
+                      {
+                        personaId,
+                        sessionId: parsed.data.sessionId,
+                        traceId: askTraceId,
+                      },
+                      {
+                        fallbackMaxTokens: queryMaxTokens,
+                        allowContextDrop: true,
+                        label: "query_hints",
+                      },
+                    ),
+              );
+              if (!queryHelperResult) {
+                queryHints = [];
+                planDirectives = null;
+                pushFastQualityDecision("query_hints_llm", "deadline", "helper_timeout_fallback");
+              } else {
+                const { result: queryResult, overflow: queryOverflow } = queryHelperResult;
+                recordOverflow("query_hints", queryOverflow);
+                const planParse = parsePlanDirectives(queryResult.text ?? "");
               planDirectives = planParse.directives;
               queryHints = filterSlotHintTerms(planParse.queryHints, { maxTokens: 8, maxChars: 90 })
                 .slice(0, HELIX_ASK_QUERY_HINTS_MAX);
@@ -18370,6 +18449,7 @@ const executeHelixAsk = async ({
                   .join(" | ");
                 logEvent("Plan directives", "ok", directiveSummary || "none", queryStart);
               }
+              }
               if (queryStart) {
                 logStepEnd(
                   "LLM query hints",
@@ -18382,6 +18462,7 @@ const executeHelixAsk = async ({
                     label: "query_hints",
                   },
                 );
+              }
               }
             } catch (error) {
               if (queryStart) {
@@ -19984,6 +20065,15 @@ const executeHelixAsk = async ({
           slotCoverageFailed ||
           (docSlotSummary?.missingSlots?.length ?? 0) > 0 ||
           coverageSlotsMissing;
+        const planRetrievalBudgetExceeded =
+          fastQualityMode && getAskElapsedMs() >= FAST_QUALITY_PLAN_RETRIEVAL_BUDGET_MS;
+        if (planRetrievalBudgetExceeded) {
+          pushFastQualityDecision(
+            "plan_retrieval",
+            "deadline",
+            "plan_retrieval_stage_budget_exhausted",
+          );
+        }
         const shouldRetryRetrieval =
           HELIX_ASK_RETRIEVAL_RETRY_ENABLED &&
           !promptIngested &&
@@ -19994,7 +20084,8 @@ const executeHelixAsk = async ({
                 retrievalConfidence < Math.max(0.2, arbiterHybridThreshold - 0.2)
               : retrievalConfidence < arbiterHybridThreshold || missingSlotsForRetry
           ) &&
-          canAgentAct();
+          canAgentAct() &&
+          !planRetrievalBudgetExceeded;
         if (debugPayload && fastQualityMode) {
           debugPayload.fast_quality_retry_strict_mode = true;
         }
@@ -20722,6 +20813,11 @@ const executeHelixAsk = async ({
       }
 
       if (isRepoQuestion && !dryRun) {
+        if (fastQualityMode && getAskElapsedMs() > FAST_QUALITY_SYNTHESIS_START_BY_MS) {
+          pushFastQualityDecision("synthesis", "deadline", "synthesis_started_after_deadline");
+        } else if (fastQualityMode) {
+          pushFastQualityDecision("synthesis", "allow", "synthesis_started_within_deadline");
+        }
         const combinedContext = wantsHybrid
           ? contextText
           : [promptContextText, contextText].filter(Boolean).join("\n\n");
@@ -20880,47 +20976,67 @@ const executeHelixAsk = async ({
               compositeRequest.enabled,
               verificationAnchorRequired ? verificationAnchorHints : [],
             );
-            const { result: evidenceResult, overflow: evidenceOverflow } =
-              await runHelixAskLocalWithOverflowRetry(
-                {
-                  prompt: evidencePrompt,
-                  max_tokens: evidenceTokens,
-                  temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-                  seed: parsed.data.seed,
-                  stop: parsed.data.stop,
-                },
-                {
-                  personaId,
-                  sessionId: parsed.data.sessionId,
-                  traceId: askTraceId,
-                },
-                {
-                  fallbackMaxTokens: evidenceTokens,
-                  allowContextDrop: true,
-                  label: "repo_evidence",
-                },
-              );
-            recordOverflow("repo_evidence", evidenceOverflow);
-            repoScaffold = normalizeScaffoldText(
-              stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
+            const evidenceHelperResult = await runHelperWithinStageBudget(
+              "evidence_cards_llm",
+              FAST_QUALITY_SYNTHESIS_START_BY_MS,
+              () =>
+                runHelixAskLocalWithOverflowRetry(
+                  {
+                    prompt: evidencePrompt,
+                    max_tokens: evidenceTokens,
+                    temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                    seed: parsed.data.seed,
+                    stop: parsed.data.stop,
+                  },
+                  {
+                    personaId,
+                    sessionId: parsed.data.sessionId,
+                    traceId: askTraceId,
+                  },
+                  {
+                    fallbackMaxTokens: evidenceTokens,
+                    allowContextDrop: true,
+                    label: "repo_evidence",
+                  },
+                ),
             );
-            if (repoScaffold && !formatSpec.stageTags) {
-              repoScaffold = stripStageTags(repoScaffold);
-            }
-            if (repoScaffold) {
-              const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
-              const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
-              repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
-            }
-            if (compositeRequest.enabled && compositeRequiredFiles.length && debugPayload) {
-              const missing = compositeRequiredFiles.filter(
-                (entry) => entry && !repoScaffold.toLowerCase().includes(entry.toLowerCase()),
+            if (!evidenceHelperResult) {
+              const scaffoldBlocks = definitionFocus ? definitionDocBlocks : docBlocks;
+              const docScaffoldMax = Math.min(Math.max(minDocEvidenceCards, 1), 6);
+              repoScaffold = buildDocEvidenceScaffold(scaffoldBlocks, {
+                maxBlocks: docScaffoldMax,
+                definitionFocus,
+              });
+              if (repoScaffold) {
+                const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
+                const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
+                repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
+              }
+              pushFastQualityDecision("evidence_cards_llm", "deadline", "helper_timeout_fallback");
+            } else {
+              const { result: evidenceResult, overflow: evidenceOverflow } = evidenceHelperResult;
+              recordOverflow("repo_evidence", evidenceOverflow);
+              repoScaffold = normalizeScaffoldText(
+                stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
               );
-              if (missing.length) {
-                debugPayload.composite_topics = [
-                  ...(debugPayload.composite_topics ?? []),
-                  "missing_anchors",
-                ];
+              if (repoScaffold && !formatSpec.stageTags) {
+                repoScaffold = stripStageTags(repoScaffold);
+              }
+              if (repoScaffold) {
+                const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
+                const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
+                repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
+              }
+              if (compositeRequest.enabled && compositeRequiredFiles.length && debugPayload) {
+                const missing = compositeRequiredFiles.filter(
+                  (entry) => entry && !repoScaffold.toLowerCase().includes(entry.toLowerCase()),
+                );
+                if (missing.length) {
+                  debugPayload.composite_topics = [
+                    ...(debugPayload.composite_topics ?? []),
+                    "missing_anchors",
+                  ];
+                }
               }
             }
             logProgress(
@@ -21012,7 +21128,7 @@ const executeHelixAsk = async ({
               promptScaffold ? "single_llm" : "empty",
               formatFileList(promptContextFiles) ?? promptScaffold,
             );
-          } else {
+          } else if (!fastQualityMode || canStartHelperCall("prompt_cards_llm", FAST_QUALITY_SYNTHESIS_START_BY_MS)) {
             const evidenceStart = logStepStart(
               "LLM prompt cards",
               "prompt",
@@ -21029,30 +21145,40 @@ const executeHelixAsk = async ({
               formatSpec.format,
               formatSpec.stageTags,
             );
-            const { result: evidenceResult, overflow: promptOverflow } =
-              await runHelixAskLocalWithOverflowRetry(
-                {
-                  prompt: evidencePrompt,
-                  max_tokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
-                  temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-                  seed: parsed.data.seed,
-                  stop: parsed.data.stop,
-                },
-                {
-                  personaId,
-                  sessionId: parsed.data.sessionId,
-                  traceId: askTraceId,
-                },
-                {
-                  fallbackMaxTokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
-                  allowContextDrop: true,
-                  label: "prompt_evidence",
-                },
-              );
-            recordOverflow("prompt_evidence", promptOverflow);
-            promptScaffold = normalizeScaffoldText(
-              stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
+            const promptHelperResult = await runHelperWithinStageBudget(
+              "prompt_cards_llm",
+              FAST_QUALITY_SYNTHESIS_START_BY_MS,
+              () =>
+                runHelixAskLocalWithOverflowRetry(
+                  {
+                    prompt: evidencePrompt,
+                    max_tokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
+                    temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                    seed: parsed.data.seed,
+                    stop: parsed.data.stop,
+                  },
+                  {
+                    personaId,
+                    sessionId: parsed.data.sessionId,
+                    traceId: askTraceId,
+                  },
+                  {
+                    fallbackMaxTokens: HELIX_ASK_LONGPROMPT_CARD_TOKENS,
+                    allowContextDrop: true,
+                    label: "prompt_evidence",
+                  },
+                ),
             );
+            if (!promptHelperResult) {
+              pushFastQualityDecision("prompt_cards_llm", "deadline", "helper_timeout_fallback");
+              promptScaffold = clipAskText(promptContextText, HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
+            } else {
+              const { result: evidenceResult, overflow: promptOverflow } = promptHelperResult;
+              recordOverflow("prompt_evidence", promptOverflow);
+              promptScaffold = normalizeScaffoldText(
+                stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
+              );
+            }
             if (promptScaffold && !formatSpec.stageTags) {
               promptScaffold = stripStageTags(promptScaffold);
             }
@@ -21109,30 +21235,40 @@ const executeHelixAsk = async ({
             formatSpec.format,
             formatSpec.stageTags,
           );
-          const { result: evidenceResult, overflow: generalOverflow } =
-            await runHelixAskLocalWithOverflowRetry(
-              {
-                prompt: evidencePrompt,
-                max_tokens: evidenceTokens,
-                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-                seed: parsed.data.seed,
-                stop: parsed.data.stop,
-              },
-              {
-                personaId,
-                sessionId: parsed.data.sessionId,
-                traceId: askTraceId,
-              },
-              {
-                fallbackMaxTokens: evidenceTokens,
-                allowContextDrop: true,
-                label: "general_evidence",
-              },
-            );
-          recordOverflow("general_evidence", generalOverflow);
-          generalScaffold = normalizeScaffoldText(
-            stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
+          const generalHelperResult = await runHelperWithinStageBudget(
+            "reasoning_scaffold_llm",
+            FAST_QUALITY_SYNTHESIS_START_BY_MS,
+            () =>
+              runHelixAskLocalWithOverflowRetry(
+                {
+                  prompt: evidencePrompt,
+                  max_tokens: evidenceTokens,
+                  temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                  seed: parsed.data.seed,
+                  stop: parsed.data.stop,
+                },
+                {
+                  personaId,
+                  sessionId: parsed.data.sessionId,
+                  traceId: askTraceId,
+                },
+                {
+                  fallbackMaxTokens: evidenceTokens,
+                  allowContextDrop: true,
+                  label: "general_evidence",
+                },
+              ),
           );
+          if (!generalHelperResult) {
+            pushFastQualityDecision("reasoning_scaffold_llm", "deadline", "helper_timeout_fallback");
+            generalScaffold = "";
+          } else {
+            const { result: evidenceResult, overflow: generalOverflow } = generalHelperResult;
+            recordOverflow("general_evidence", generalOverflow);
+            generalScaffold = normalizeScaffoldText(
+              stripPromptEchoFromAnswer(evidenceResult.text ?? "", baseQuestion),
+            );
+          }
           if (generalScaffold && !formatSpec.stageTags) {
             generalScaffold = stripStageTags(generalScaffold);
           }
@@ -21733,6 +21869,13 @@ const executeHelixAsk = async ({
         });
         streamEmitter.finalize(forcedCleanText);
         logDebug("streamEmitter.finalize complete");
+        if (debugPayload && fastQualityMode) {
+          const decisions = fastQualityDecisions.slice();
+          debugPayload.fast_quality_decisions = decisions;
+          debugPayload.fast_quality_deadline_misses = decisions
+            .filter((entry) => entry.decision === "deadline")
+            .map((entry) => `${entry.stage}:${entry.reason}`);
+        }
         const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
         responder.send(200, responsePayload);
         return;
@@ -21757,6 +21900,32 @@ const executeHelixAsk = async ({
         debugPayload.answer_token_base = answerBudget.base;
         debugPayload.answer_token_boosts = answerBudget.boosts;
         debugPayload.answer_token_reason = answerBudget.reason;
+      }
+      if (fastQualityMode && getAskElapsedMs() >= FAST_QUALITY_FINALIZE_BY_MS) {
+        const clarifyLine =
+          "Repo evidence was insufficient within fast mode SLA. Please point me to the most relevant file or symbol so I can answer precisely.";
+        pushFastQualityDecision("finalize", "deadline", "finalize_deadline_reached_before_answer");
+        const fastResult: LocalAskResult = {
+          text: clarifyLine,
+          answer: clarifyLine,
+          evidence: evidenceText || undefined,
+          prompt_ingested: promptIngested,
+        };
+        if (debugPayload) {
+          debugPayload.clarify_triggered = true;
+          debugPayload.fallback_reason = "fast_quality_finalize_deadline";
+        }
+        streamEmitter.finalize(clarifyLine);
+        if (debugPayload && fastQualityMode) {
+          const decisions = fastQualityDecisions.slice();
+          debugPayload.fast_quality_decisions = decisions;
+          debugPayload.fast_quality_deadline_misses = decisions
+            .filter((entry) => entry.decision === "deadline")
+            .map((entry) => `${entry.stage}:${entry.reason}`);
+        }
+        const responsePayload = debugPayload ? { ...fastResult, debug: debugPayload } : fastResult;
+        responder.send(200, responsePayload);
+        return;
       }
       logDebug("llmLocalHandler MAIN start", {
         maxTokens: answerMaxTokens,
@@ -22112,7 +22281,7 @@ const executeHelixAsk = async ({
         !HELIX_ASK_SINGLE_LLM &&
         (microPassEnabled || intentStrategy === "constraint_report") &&
         intentProfile.id !== "repo.ideology_reference";
-      if (allowCitationRepair) {
+      if (allowCitationRepair && (!fastQualityMode || canStartHelperCall("citation_repair", FAST_QUALITY_FINALIZE_BY_MS))) {
         const evidenceForRepair = appendEvidenceSources(evidenceText, contextFiles, 6, contextText);
         if (evidenceForRepair !== evidenceText) {
           evidenceText = evidenceForRepair;
@@ -22141,31 +22310,39 @@ const executeHelixAsk = async ({
             formatSpec.format,
             formatSpec.stageTags,
           );
-          const { result: repairResult, overflow: repairOverflow } =
-            await runHelixAskLocalWithOverflowRetry(
-              {
-                prompt: repairPrompt,
-                max_tokens: repairTokens,
-                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
-                seed: parsed.data.seed,
-                stop: parsed.data.stop,
-              },
-              {
-                personaId,
-                sessionId: parsed.data.sessionId,
-                traceId: askTraceId,
-              },
-              {
-                fallbackMaxTokens: repairTokens,
-                allowContextDrop: true,
-                label: "citation_repair",
-              },
-            );
-          recordOverflow("citation_repair", repairOverflow);
-          logDebug("llmLocalHandler CITATION_REPAIR complete", {
-            textLength: typeof repairResult.text === "string" ? repairResult.text.length : 0,
-          });
-          const rawRepairText = repairResult.text ?? "";
+          const repairHelperResult = await runHelperWithinStageBudget(
+            "citation_repair",
+            FAST_QUALITY_FINALIZE_BY_MS,
+            () =>
+              runHelixAskLocalWithOverflowRetry(
+                {
+                  prompt: repairPrompt,
+                  max_tokens: repairTokens,
+                  temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                  seed: parsed.data.seed,
+                  stop: parsed.data.stop,
+                },
+                {
+                  personaId,
+                  sessionId: parsed.data.sessionId,
+                  traceId: askTraceId,
+                },
+                {
+                  fallbackMaxTokens: repairTokens,
+                  allowContextDrop: true,
+                  label: "citation_repair",
+                },
+              ),
+          );
+          if (!repairHelperResult) {
+            pushFastQualityDecision("citation_repair", "deadline", "helper_timeout_fallback");
+          } else {
+            const { result: repairResult, overflow: repairOverflow } = repairHelperResult;
+            recordOverflow("citation_repair", repairOverflow);
+            logDebug("llmLocalHandler CITATION_REPAIR complete", {
+              textLength: typeof repairResult.text === "string" ? repairResult.text.length : 0,
+            });
+            const rawRepairText = repairResult.text ?? "";
           const parsedRepair = parseCitationRepairPayload(rawRepairText);
           let repairedText = parsedRepair?.text ?? rawRepairText;
           repairedText = stripPromptEchoFromAnswer(repairedText, baseQuestion);
@@ -22237,6 +22414,7 @@ const executeHelixAsk = async ({
             );
           } else {
             answerPath.push("citationRepair:skipped(degraded)");
+          }
           }
         } else {
           answerPath.push(hasAnswerPaths ? "citationRepair:skipped(grounded)" : "citationRepair:skipped(no_evidence)");
@@ -22521,6 +22699,7 @@ const executeHelixAsk = async ({
         HELIX_ASK_DRIFT_REPAIR &&
         !HELIX_ASK_SINGLE_LLM &&
         HELIX_ASK_DRIFT_REPAIR_MAX > 0 &&
+        (!fastQualityMode || canStartHelperCall("drift_repair", FAST_QUALITY_FINALIZE_BY_MS)) &&
         !lockedByIdeologyTemplate &&
         (platonicResult.beliefGateApplied || platonicResult.rattlingGateApplied) &&
         !platonicResult.coverageGateApplied &&
@@ -22548,24 +22727,29 @@ const executeHelixAsk = async ({
             formatSpec.stageTags,
           );
           const { result: repairResult, overflow: repairOverflow } =
-            await runHelixAskLocalWithOverflowRetry(
-              {
-                prompt: repairPrompt,
-                max_tokens: repairTokens,
-                temperature: Math.min(parsed.data.temperature ?? 0.2, 0.35),
-                seed: parsed.data.seed,
-                stop: parsed.data.stop,
-              },
-              {
-                personaId,
-                sessionId: parsed.data.sessionId,
-                traceId: askTraceId,
-              },
-              {
-                fallbackMaxTokens: repairTokens,
-                allowContextDrop: true,
-                label: "drift_repair",
-              },
+            await runHelperWithinStageBudget(
+              "drift_repair",
+              FAST_QUALITY_FINALIZE_BY_MS,
+              () =>
+                runHelixAskLocalWithOverflowRetry(
+                  {
+                    prompt: repairPrompt,
+                    max_tokens: repairTokens,
+                    temperature: Math.min(parsed.data.temperature ?? 0.2, 0.35),
+                    seed: parsed.data.seed,
+                    stop: parsed.data.stop,
+                  },
+                  {
+                    personaId,
+                    sessionId: parsed.data.sessionId,
+                    traceId: askTraceId,
+                  },
+                  {
+                    fallbackMaxTokens: repairTokens,
+                    allowContextDrop: true,
+                    label: "drift_repair",
+                  },
+                ),
             );
           recordOverflow("drift_repair", repairOverflow);
           const repairText = stripPromptEchoFromAnswer(repairResult.text ?? "", baseQuestion);
@@ -23233,6 +23417,13 @@ const executeHelixAsk = async ({
         0,
       );
     }
+    if (debugPayload && fastQualityMode) {
+      const decisions = fastQualityDecisions.slice();
+      debugPayload.fast_quality_decisions = decisions;
+      debugPayload.fast_quality_deadline_misses = decisions
+        .filter((entry) => entry.decision === "deadline")
+        .map((entry) => `${entry.stage}:${entry.reason}`);
+    }
     const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
     logDebug("responder.send(200) start", {
       hasDebug: Boolean(debugPayload),
@@ -23249,6 +23440,7 @@ const executeHelixAsk = async ({
     responder.send(500, { ok: false, error: "llm_local_failed", message, status: 500 });
     return;
   } finally {
+    recordHelixAskRuntimeSample(Date.now() - askRequestStartedAt);
     logDebug("executeHelixAsk FINALLY");
   }
 };
