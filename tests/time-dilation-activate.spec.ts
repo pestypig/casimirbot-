@@ -20,6 +20,7 @@ describe("/api/helix/time-dilation/activate contract", () => {
   });
 
   it("returns pending diagnostics object shape for async accepted response", async () => {
+  it("returns non-null pipelineUpdate/diagnostics for async success", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({ ok: true, overallStatus: "NOMINAL", strictCongruence: true }),
@@ -33,6 +34,41 @@ describe("/api/helix/time-dilation/activate contract", () => {
       gate: { banner: null, reasons: [] },
       strict: { strictCongruence: true, strictMetricMissing: false, anyProxy: false },
       canonical: { family: "natario", chart: "comoving_cartesian" },
+      captured_at: new Date().toISOString(),
+      gate: { banner: null, reasons: [] },
+      definitions: {
+        theta_definition: null,
+        kij_sign_convention: null,
+        gamma_field_naming: null,
+        field_provenance_schema: null,
+      },
+      fieldProvenance: {},
+      strict: {
+        strictCongruence: true,
+        latticeMetricOnly: true,
+        strictMetricMissing: false,
+        anyProxy: false,
+        mathStageOK: true,
+        grCertified: true,
+        banner: null,
+      },
+      canonical: {
+        family: "natario",
+        chart: "comoving_cartesian",
+        observer: "ship",
+        normalization: "metric",
+        unitSystem: null,
+        match: null,
+      },
+      metric_contract: {
+        metric_t00_contract_ok: true,
+        metric_chart_contract_status: "ok",
+        metric_chart_notes: null,
+        metric_coordinate_map: null,
+      },
+      render_plan: {},
+      sources: { proof_pack_proxy: false, gr_guardrails_proxy: false },
+      wall: {},
     });
 
     const { helixTimeDilationRouter } = await import("../server/routes/helix/time-dilation");
@@ -107,6 +143,18 @@ describe("/api/helix/time-dilation/activate contract", () => {
   });
 
   it("publishes explicit error diagnostics shape when async background fails", async () => {
+    expect(res.body?.pipelineUpdate).toBeTruthy();
+    expect(res.body?.diagnostics).toBeTruthy();
+    expect(res.body?.updatedAt).toEqual(expect.any(Number));
+    expect(res.body?.renderingSeed).toEqual(expect.any(String));
+    expect(res.body?.strictCongruence).toBe(true);
+    expect(res.body?.canonical).toEqual(
+      expect.objectContaining({ family: "natario", mode: "natario", strictCongruence: true }),
+    );
+    expect(Array.isArray(res.body?.warnings)).toBe(true);
+  });
+
+  it("returns structured diagnostics metadata (not null) in async accepted responses", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({ ok: true, overallStatus: "CRITICAL", strictCongruence: true }),
@@ -144,5 +192,29 @@ describe("/api/helix/time-dilation/activate contract", () => {
     expect(diagRes.body?.payload).toEqual(
       expect.objectContaining({ ok: false, error: "activate_failed", message: expect.any(String) }),
     );
+    const res = await request(app)
+      .post("/api/helix/time-dilation/activate")
+      .send({ warpFieldType: "natario", grEnabled: true, strictCongruence: true, async: true });
+
+    expect(res.status).toBe(202);
+    expect(res.body?.accepted).toBe(true);
+    expect(res.body?.pipelineUpdate).toEqual(
+      expect.objectContaining({ ok: true, pending: true }),
+    );
+    expect(res.body?.diagnostics).toEqual(
+      expect.objectContaining({ ok: false, pending: true, error: "diagnostics_pending" }),
+    );
+    expect(res.body?.diagnostics).not.toBeNull();
+codex/fix-webgl2-and-502-bad-gateway-errors-hy1a3w
+    expect(res.body?.warnings).toEqual(
+      expect.arrayContaining(["diagnostics_partial"]),
+    );
+    expect(res.body?.updatedAt).toEqual(expect.any(Number));
+    expect(res.body?.renderingSeed).toEqual(expect.any(String));
+    expect(res.body?.canonical).toEqual(
+      expect.objectContaining({ mode: "natario", family: "natario", strictCongruence: true }),
+    );
+    expect(Array.isArray(res.body?.warnings)).toBe(true);
+main
   });
 });
