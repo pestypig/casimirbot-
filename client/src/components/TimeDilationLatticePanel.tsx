@@ -19,6 +19,7 @@ import type { GrEvolveBrickChannel, GrEvolveBrickDecoded } from "@/lib/gr-evolve
 import type { LapseBrickChannel, LapseBrickDecoded } from "@/lib/lapse-brick";
 import { fetchHullAssets, type HullAssetEntry } from "@/lib/hull-assets";
 import { parseActivateContract } from "@/lib/time-dilation-activate-contract";
+import { buildGrAssistantSummary } from "@/lib/gr-assistant-summary";
 import { C } from "@/lib/physics-const";
 import { kappaDriveFromPower } from "@/physics/curvature";
 import type { GrRegionStats, HullPreviewPayload, ProofPack, TimeDilationRenderPlan } from "@shared/schema";
@@ -5077,32 +5078,21 @@ function TimeDilationLatticePanelInner({
 
   const grAssistantReport = grAssistantQuery.data ?? null;
   const grAssistantSummary = useMemo(() => {
-    if (!grAssistantReport) return null;
-    const report = grAssistantReport.report;
-    const gate = grAssistantReport.gate;
-    const gateFail = gate?.constraints?.find((entry) => entry.status === "fail");
-    const firstFail = report.failed_checks[0]?.check_name ?? gateFail?.id ?? null;
-    const overallPass = report.passed && (gate?.pass ?? true);
-    return {
-      report,
-      gate,
-      overallPass,
-      firstFail,
-      invariants: Object.entries(report.invariants ?? {}),
-      brickInvariants: Object.entries(report.brick_invariants ?? {}),
-    };
+    return buildGrAssistantSummary(grAssistantReport as any);
   }, [grAssistantReport]);
   const grAssistantStatus = useMemo(() => {
     if (grAssistantQuery.isFetching) return "checking";
     if (!grAssistantSummary) return "idle";
-    return grAssistantSummary.overallPass ? "pass" : "fail";
+    return grAssistantSummary.status;
   }, [grAssistantQuery.isFetching, grAssistantSummary]);
   const grAssistantBadgeClass =
     grAssistantStatus === "pass"
       ? "bg-emerald-500/20 text-emerald-200"
       : grAssistantStatus === "fail"
         ? "bg-rose-500/20 text-rose-200"
-        : "bg-slate-500/20 text-slate-200";
+        : grAssistantStatus === "unknown"
+          ? "bg-amber-500/20 text-amber-200"
+          : "bg-slate-500/20 text-slate-200";
 
   const solverDiagnostics = useMemo(() => {
     if (!debugAllowed) return null;
@@ -6869,9 +6859,9 @@ function TimeDilationLatticePanelInner({
                     gate: {grAssistantSummary.gate.pass ? "pass" : "fail"} | cert: {grAssistantSummary.gate.certificate?.certificateHash ?? "n/a"}
                   </div>
                 ) : null}
-                <div>signature: {grAssistantSummary.report.assumptions.signature}</div>
-                <div>units: {grAssistantSummary.report.assumptions.units_internal}</div>
-                <div>coords: {grAssistantSummary.report.assumptions.coords.join(", ")}</div>
+                <div>signature: {grAssistantSummary.assumptions.signature}</div>
+                <div>units: {grAssistantSummary.assumptions.unitsInternal}</div>
+                <div>coords: {grAssistantSummary.assumptions.coords.join(", ")}</div>
                 {grAssistantSummary.invariants.length > 0 && (
                   <div className="mt-1">
                     <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">

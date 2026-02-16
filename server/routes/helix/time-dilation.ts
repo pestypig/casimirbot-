@@ -20,6 +20,14 @@ type TimeDilationDiagnosticsStore = {
   reason?: string;
 };
 
+type TimeDilationControlCommand = {
+  id: number;
+  issuedAt: number;
+  command: string;
+  args: Record<string, unknown>;
+  source: string | null;
+};
+
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE");
@@ -29,6 +37,8 @@ const setCors = (res: Response) => {
 const helixTimeDilationRouter = express.Router();
 
 let latestDiagnostics: TimeDilationDiagnosticsStore | null = null;
+let latestControlCommand: TimeDilationControlCommand | null = null;
+let controlCommandSeq = 0;
 
 const ActivateSchema = z.object({
   baseUrl: z.string().url().optional(),
@@ -49,6 +59,12 @@ const ActivateSchema = z.object({
   wallInvariant: z.enum(["kretschmann", "ricci4"]).optional(),
   timeoutMs: z.number().positive().optional(),
   diagnosticsTimeoutMs: z.number().positive().optional(),
+});
+
+const ControlCommandSchema = z.object({
+  command: z.string().min(1),
+  args: z.record(z.unknown()).optional(),
+  source: z.string().optional(),
 });
 
 const resolveCanonicalHull = () => ({
@@ -150,6 +166,11 @@ helixTimeDilationRouter.options("/activate", (_req, res) => {
   res.status(200).end();
 });
 
+helixTimeDilationRouter.options("/control", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
 helixTimeDilationRouter.get("/diagnostics", (req, res) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
@@ -166,6 +187,40 @@ helixTimeDilationRouter.get("/diagnostics", (req, res) => {
   }
 
   res.json(buildDiagnosticsEnvelope(latestDiagnostics));
+});
+
+helixTimeDilationRouter.get("/control", (_req, res) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ok: true, command: latestControlCommand });
+});
+
+helixTimeDilationRouter.post("/control", (req, res) => {
+  setCors(res);
+  const parsed = ControlCommandSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ ok: false, error: "invalid-control-command", issues: parsed.error.issues });
+    return;
+  }
+  const issuedAt = Date.now();
+  const source =
+    typeof parsed.data.source === "string" && parsed.data.source.trim().length > 0
+      ? parsed.data.source.trim()
+      : null;
+  latestControlCommand = {
+    id: ++controlCommandSeq,
+    issuedAt,
+    command: parsed.data.command,
+    args: parsed.data.args ?? {},
+    source,
+  };
+  res.json({ ok: true, command: latestControlCommand });
+});
+
+helixTimeDilationRouter.delete("/control", (_req, res) => {
+  setCors(res);
+  latestControlCommand = null;
+  res.json({ ok: true });
 });
 
 helixTimeDilationRouter.post("/diagnostics", (req, res) => {
@@ -341,6 +396,9 @@ main
         baseUrl,
         warpFieldType: input.warpFieldType,
         grEnabled: input.grEnabled,
+        updatedAt: activatedAt,
+        renderingSeed: provisionalSeed,
+        seedStatus: "provisional",
 codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
         updatedAt: activatedAt,
         renderingSeed: provisionalSeed,
@@ -397,6 +455,7 @@ main
         (typeof diagnosticsRecord?.renderingSeed === "string" ? diagnosticsRecord.renderingSeed : null) ??
         (typeof (pipelineRecord as any)?.renderingSeed === "string" ? (pipelineRecord as any).renderingSeed : null) ??
         `activate:${updatedAt}`,
+      seedStatus: "final",
 codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
       seedStatus: "final",
 
@@ -408,6 +467,7 @@ main
       diagnostics:
         diagnostics ?? {
           ok: false,
+          status: "error",
 codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
           status: "error",
 main

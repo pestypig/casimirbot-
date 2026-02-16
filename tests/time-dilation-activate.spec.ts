@@ -192,6 +192,48 @@ describe("/api/helix/time-dilation/activate contract", () => {
     expect(diagRes.body?.payload).toEqual(
       expect.objectContaining({ ok: false, error: "activate_failed", message: expect.any(String) }),
     );
+  });
+});
+
+describe("/api/helix/time-dilation/control", () => {
+  it("accepts codex control commands and returns latest command", async () => {
+    const { helixTimeDilationRouter } = await import("../server/routes/helix/time-dilation");
+    const app = express();
+    app.use(express.json());
+    app.use("/api/helix/time-dilation", helixTimeDilationRouter);
+
+    const postRes = await request(app)
+      .post("/api/helix/time-dilation/control")
+      .send({
+        command: "set_debug_overrides",
+        args: { alphaSource: "gr-brick", warpStrength: 0.14, viewerChart: "adm" },
+        source: "codex",
+      });
+
+    expect(postRes.status).toBe(200);
+    expect(postRes.body?.ok).toBe(true);
+    expect(postRes.body?.command).toEqual(
+      expect.objectContaining({
+        command: "set_debug_overrides",
+        source: "codex",
+        args: expect.objectContaining({ alphaSource: "gr-brick", warpStrength: 0.14 }),
+      }),
+    );
+
+    const getRes = await request(app).get("/api/helix/time-dilation/control");
+    expect(getRes.status).toBe(200);
+    expect(getRes.body?.ok).toBe(true);
+    expect(getRes.body?.command).toEqual(
+      expect.objectContaining({ command: "set_debug_overrides", source: "codex" }),
+    );
+
+    const clearRes = await request(app).delete("/api/helix/time-dilation/control");
+    expect(clearRes.status).toBe(200);
+    expect(clearRes.body?.ok).toBe(true);
+
+    const afterClear = await request(app).get("/api/helix/time-dilation/control");
+    expect(afterClear.status).toBe(200);
+    expect(afterClear.body?.command).toBeNull();
     const res = await request(app)
       .post("/api/helix/time-dilation/activate")
       .send({ warpFieldType: "natario", grEnabled: true, strictCongruence: true, async: true });
