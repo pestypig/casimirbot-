@@ -14,6 +14,8 @@ export type HelixAskArbiterInput = {
   hasHighStakesConstraints: boolean;
   explicitRepoExpectation?: boolean;
   intentDomain?: "general" | "repo" | "hybrid" | "falsifiable";
+  budgetLevel?: "OK" | "WARNING" | "OVER";
+  budgetRecommend?: "none" | "reduce_tool_calls" | "force_clarify" | "queue_deep_work";
 };
 
 export type HelixAskArbiterResult = {
@@ -53,6 +55,12 @@ export function resolveHelixAskArbiter(input: HelixAskArbiterInput): HelixAskArb
   if (input.hasHighStakesConstraints) {
     mode = "repo_grounded";
     reason = "high_stakes";
+  } else if (input.budgetLevel === "OVER" && input.budgetRecommend === "force_clarify") {
+    mode = "clarify";
+    reason = "budget_force_clarify";
+  } else if (input.budgetLevel === "OVER" && input.budgetRecommend === "queue_deep_work") {
+    mode = "hybrid";
+    reason = "budget_queue_deep_work";
   } else if (repoOk) {
     mode = "repo_grounded";
     reason = "repo_ratio";

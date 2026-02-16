@@ -55,7 +55,7 @@ const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
     /\b(helix ask|helixask|ask pipeline|ask system|ask mode|agi ask|\/api\/agi\/ask|helix ask pill|intent routing|route intent|topic tags?|format router|format policy|evidence gate|coverage gate|belief gate|rattling gate|citation repair|cite repair|repair citations|answer path)\b/i,
   warp: /\b(warp|alcubierre|natario|warp bubble|warp drive)\b/i,
   physics:
-    /\b(casimir|quantum inequality|ford-roman|energy condition|stress[-\s]?energy|spacetime|metric|riemann|ricci|einstein tensor|general relativity|gr\b|adm\b|york time)\b/i,
+    /\b(casimir|quantum inequality|ford-roman|energy condition|stress[-\s]?energy|spacetime|metric|riemann|ricci|einstein tensor|general relativity|gr\b|adm\b|york time|atom(?:ic)?|electron(?:s)?|orbital(?:s)?|wavefunction|bohr|hydrogenic)\b/i,
   energy_pipeline:
     /\b(energy pipeline|energy-pipeline|energypipeline|energy\s+pipeline|calculateenergy|drivewarpfrompipeline)\b/i,
   trace: /\b(trace|task trace|tasktrace|trajectory|essence|casimir)\b/i,
@@ -73,7 +73,7 @@ const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
   client: /\b(client|client[-\s]?side|browser|desktop app|ui client)\b/i,
   backend: /\b(backend|back[-\s]?end|server[-\s]?side|api|endpoint|service|worker)\b/i,
   simulation:
-    /\b(simulation|simulator|sim systems?|parametric sweep|finite element|scuffem|gmsh|simulation api)\b/i,
+    /\b(simulation|simulator|sim systems?|parametric sweep|finite element|scuffem|gmsh|simulation api|atomic simulation|orbital simulator|orbital viewer|electron orbital)\b/i,
   uncertainty:
     /\b(uncertainty|confidence interval|error bars?|error propagation|monte carlo|stochastic|noise kernel)\b/i,
   brick: /\b(brick|brick lattice|brick dataflow|brick pipeline|brick mesh)\b/i,
@@ -158,6 +158,9 @@ const WARP_CORE_PATHS: RegExp[] = [
 const PHYSICS_PATHS: RegExp[] = [
   /docs\/knowledge\/physics\//i,
   /docs\/knowledge\/warp\//i,
+  /client\/src\/components\/ElectronOrbitalPanel\.tsx/i,
+  /client\/src\/hooks\/useElectronOrbitSim\.ts/i,
+  /client\/src\/lib\/atomic-orbitals\.ts/i,
 ];
 
 const PHYSICS_NOISE_PATHS: RegExp[] = [
@@ -321,6 +324,10 @@ const SIMULATION_PATHS: RegExp[] = [
   /modules\/analysis\//i,
   /docs\/knowledge\/physics\//i,
   /client\/src\/physics\//i,
+  /docs\/knowledge\/physics\/atomic-systems-tree\.json/i,
+  /client\/src\/components\/ElectronOrbitalPanel\.tsx/i,
+  /client\/src\/hooks\/useElectronOrbitSim\.ts/i,
+  /client\/src\/lib\/atomic-orbitals\.ts/i,
 ];
 
 const UNCERTAINTY_PATHS: RegExp[] = [

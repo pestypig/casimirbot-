@@ -3,6 +3,9 @@ type HelixAskDebug = {
   intent_domain?: string;
   format?: string;
   stage_tags?: boolean;
+  clarify_triggered?: boolean;
+  ambiguity_target_span?: string;
+  ambiguity_cluster_count?: number;
 };
 
 type AskResponse = {
@@ -23,6 +26,8 @@ type RegressionCase = {
       targetSpan?: string;
       requireClusters?: boolean;
     };
+    mustIncludeText?: string[];
+    mustNotIncludeText?: string[];
   };
 };
 
@@ -38,6 +43,7 @@ const DRY_RUN = process.env.HELIX_ASK_REGRESSION_DRY_RUN === "1";
 const LIGHT_MODE = process.env.HELIX_ASK_REGRESSION_LIGHT === "1";
 const ONLY_LABEL = process.env.HELIX_ASK_REGRESSION_ONLY?.trim();
 const AMBIGUITY_MODE = process.env.HELIX_ASK_REGRESSION_AMBIGUITY === "1";
+const IDEOLOGY_MODE = process.env.HELIX_ASK_REGRESSION_IDEOLOGY === "1";
 const normalizeLabel = (value: string): string =>
   value.toLowerCase().replace(/[\s_-]+/g, "_");
 const normalizeToken = (value: string): string =>
@@ -152,8 +158,70 @@ const ambiguityCases: RegressionCase[] = [
   },
 ];
 
+
+const ideologyNarrativeCases: RegressionCase[] = [
+  {
+    label: "ideology baseline narrative",
+    question:
+      "In plain language, how does Feedback Loop Hygiene affect society in the Ideology tree? Do this in a conversational tone for a non-technical reader, but keep it grounded in repo context. Include one short opening paragraph, a root-to-leaf narrative chain, a concrete real-world example, and one concise takeaway with societal impact. Do not return technical notes mode unless explicitly requested.",
+    expect: {
+      intent_id: "repo.ideology_reference",
+      intent_domain: "repo",
+      format: "brief",
+      stage_tags: false,
+      mustIncludeText: [
+        "Mission Ethos",
+        "Feedback Loop Hygiene",
+        "example",
+        "takeaway",
+      ],
+      mustNotIncludeText: ["Technical notes:"],
+    },
+  },
+  {
+    label: "ideology root-to-leaf stress",
+    question:
+      "Explain Feedback Loop Hygiene as the root-to-leaf path in Ideology for how a town council should handle online rumor spikes. Include how it links to Civic Signal Loop and Three Tenets Loop.",
+    expect: {
+      intent_id: "repo.ideology_reference",
+      intent_domain: "repo",
+      format: "brief",
+      stage_tags: false,
+      mustIncludeText: ["Civic Signal Loop", "Three Tenets Loop", "town council"],
+      mustNotIncludeText: ["Technical notes:"],
+    },
+  },
+  {
+    label: "ideology regression compare resistance",
+    question:
+      "How does Feedback Loop Hygiene affect society? Answer in the new default narrative style only. If you are about to output a Technical notes compare/report format, switch to a plain-language narrative first.",
+    expect: {
+      intent_id: "repo.ideology_reference",
+      intent_domain: "repo",
+      format: "brief",
+      stage_tags: false,
+      mustNotIncludeText: ["Technical notes:", "compare/report"],
+    },
+  },
+  {
+    label: "ideology context control",
+    question:
+      "What is Feedback Loop Hygiene? Answer briefly without code-level repo details. It should be understandable to someone new to the project.",
+    expect: {
+      intent_id: "repo.ideology_reference",
+      intent_domain: "repo",
+      format: "brief",
+      stage_tags: false,
+      mustNotIncludeText: ["Technical notes:", "server/", "client/"],
+    },
+  },
+];
+
 const resolvedCases = LIGHT_MODE ? cases.slice(0, 3) : cases;
-const expandedCases = AMBIGUITY_MODE ? [...resolvedCases, ...ambiguityCases] : resolvedCases;
+const withAmbiguityCases = AMBIGUITY_MODE ? [...resolvedCases, ...ambiguityCases] : resolvedCases;
+const expandedCases = IDEOLOGY_MODE
+  ? [...withAmbiguityCases, ...ideologyNarrativeCases]
+  : withAmbiguityCases;
 const finalCases = ONLY_LABEL
   ? expandedCases.filter((entry) => normalizeLabel(entry.label) === normalizeLabel(ONLY_LABEL))
   : expandedCases;
@@ -170,12 +238,13 @@ const runCase = async (entry: RegressionCase, sessionId: string): Promise<string
       signal: controller.signal,
       body: JSON.stringify({
         question: entry.question,
-      debug: true,
-      sessionId,
-      max_tokens: 256,
-      temperature: 0.2,
-      dryRun: DRY_RUN,
-    }),
+        debug: true,
+        verbosity: "extended",
+        sessionId,
+        max_tokens: 256,
+        temperature: 0.2,
+        dryRun: DRY_RUN,
+      }),
   });
   } catch (error) {
     clearTimeout(timeout);
@@ -249,6 +318,20 @@ const runCase = async (entry: RegressionCase, sessionId: string): Promise<string
       failures.push(`${entry.label}: ambiguity_cluster_count ${count} <= 0`);
     }
   }
+
+  const text = payload.text ?? "";
+  const textLower = text.toLowerCase();
+  for (const snippet of entry.expect.mustIncludeText ?? []) {
+    if (!textLower.includes(snippet.toLowerCase())) {
+      failures.push(`${entry.label}: response missing required text snippet "${snippet}"`);
+    }
+  }
+  for (const snippet of entry.expect.mustNotIncludeText ?? []) {
+    if (textLower.includes(snippet.toLowerCase())) {
+      failures.push(`${entry.label}: response included forbidden text snippet "${snippet}"`);
+    }
+  }
+
   return failures;
 };
 

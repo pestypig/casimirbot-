@@ -142,6 +142,8 @@ import {
   tokenizeAskQuery,
 } from "../services/helix-ask/query";
 import { resolveHelixAskArbiter } from "../services/helix-ask/arbiter";
+import { evaluateRuntimeBudgetState } from "../services/runtime/budget-model";
+import { loadRuntimeFrameContract } from "../services/runtime/frame-contract";
 import {
   buildConceptScaffold,
   findConceptMatch,
@@ -168,6 +170,7 @@ import {
   resolveHelixAskGraphPack,
   type HelixAskCongruenceWalkOverride,
   type HelixAskGraphEvidence,
+  type HelixAskGraphResolvedNode,
   type HelixAskGraphPack,
 } from "../services/helix-ask/graph-resolver";
 import {
@@ -192,6 +195,7 @@ import {
   createHelixAskJob,
   failHelixAskJob,
   getHelixAskJob,
+  getHelixAskActiveJobCount,
   markHelixAskJobRunning,
   touchHelixAskJob,
   type HelixAskJobRecord,
@@ -214,6 +218,7 @@ import { metrics, sseConnections } from "../metrics";
 import { personaPolicy } from "../auth/policy";
 import { guardTenant } from "../auth/tenant";
 import { hashStableJson } from "../utils/information-boundary";
+import { ELEMENT_Z_LOOKUP } from "@shared/periodic-table";
 import {
   normalizeEvidencePath,
   normalizeEvidenceRef,
@@ -236,6 +241,8 @@ import { ensureSpecialistsRegistered } from "../specialists/bootstrap";
 import { hullModeEnabled, shouldRegisterExternalAdapter } from "../security/hull-guard";
 import { readKnowledgeConfig } from "../config/knowledge";
 import { resolveLocalRuntimeCaps } from "../services/llm/local-runtime";
+import { kvGetSessionTokensApprox } from "../services/llm/kv-budgeter";
+import { getGpuThermals } from "../services/hardware/gpu-scheduler";
 import { fetchKnowledgeForProjects } from "../services/knowledge/corpus";
 import {
   getTrainingTraceExport,
@@ -3055,6 +3062,7 @@ const HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE =
 const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
   /\b(?:how|why|impact|affect|effects?|societ(y|al)|community|governance|public|policy|scenario|example|examples|trust|rumor|decision|in\s+real\s+world|for\s+a|for\s+an|for\s+the|platform|team|council|school)\b/i;
 const HELIX_ASK_IDEOLOGY_REPORT_BAN_RE = /\b(?:report|point[s]?|coverage|summary|compare|difference|between|each|step|slot|bullet|section)\b/i;
+const HELIX_ASK_IDEOLOGY_NARRATIVE_GUARD_RE = /\b(do not|don't|avoid|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i;
 const HELIX_ASK_DRIFT_REPAIR = String(process.env.HELIX_ASK_DRIFT_REPAIR ?? "1").trim() !== "0";
 const HELIX_ASK_DRIFT_REPAIR_MAX = clampNumber(
   readNumber(process.env.HELIX_ASK_DRIFT_REPAIR_MAX, 1),
@@ -9535,6 +9543,61 @@ const hasWeakScientificSections = (text: string): boolean => {
   return false;
 };
 
+
+const rewriteIdeologyScientificVoice = (text: string, question: string): string => {
+  if (!isScientificMicroReport(text)) return text;
+  const confirmedBullets = extractSectionBullets(extractScientificSectionBody(text, "Confirmed:"));
+  const reasonedBullets = extractSectionBullets(
+    extractScientificSectionBody(text, "Reasoned connections (bounded):"),
+  );
+  const nextEvidenceBullets = extractSectionBullets(extractScientificSectionBody(text, "Next evidence:"));
+
+  const confirmedLine =
+    confirmedBullets.find((entry) => !isLowSignalScientificBullet(entry)) ??
+    "Policy choices should be grounded in verified public signals before action.";
+  const reasonedLine =
+    reasonedBullets.find((entry) => !isLowSignalScientificBullet(entry)) ??
+    "When evidence is thin, treat conclusions as provisional and avoid rumor-driven escalation.";
+
+  const lowerQ = question.toLowerCase();
+  const referencesTownCouncil = /town council|council|rumor spikes|online rumor/.test(lowerQ);
+  const referencesCivicSignalLoop = /civic signal loop/.test(lowerQ);
+  const referencesThreeTenets = /three tenets loop/.test(lowerQ);
+
+  const intro =
+    /feedback loop hygiene/.test(lowerQ)
+      ? "In plain language, Feedback Loop Hygiene means acting on verified civic signals, not momentum or rumor."
+      : "In plain language, this is about slowing decisions until public signals are verified.";
+  const mechanismParts = [reasonedLine];
+  if (referencesTownCouncil) {
+    mechanismParts.push(
+      "For a town council, that means pausing amplification, checking source quality, publishing what is verified, and then choosing reversible actions first.",
+    );
+  }
+  if (referencesCivicSignalLoop || referencesThreeTenets) {
+    const loopLinks: string[] = [];
+    if (referencesCivicSignalLoop) {
+      loopLinks.push("Civic Signal Loop (measure and publish real civic signal quality)");
+    }
+    if (referencesThreeTenets) {
+      loopLinks.push("Three Tenets Loop (apply integrity, transparency, and reversibility)");
+    }
+    mechanismParts.push(`It connects to ${loopLinks.join(" and ")} so decisions stay accountable under pressure.`);
+  }
+
+  const takeawaySeed =
+    nextEvidenceBullets.find((entry) => !/^(Clarify:|Search )/i.test(entry)) ??
+    "When evidence is incomplete, communicate uncertainty plainly and verify before policy escalation.";
+  const takeaway = ensureSentence(`Takeaway: ${takeawaySeed}`);
+
+  const sourcesLineMatch = text.match(/^Sources?:.*$/im);
+  const sourcesLine = sourcesLineMatch?.[0]?.trim() ?? "";
+  return [intro, ensureSentence(confirmedLine), mechanismParts.join(" "), takeaway, sourcesLine]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+};
+
 const shouldForceScientificFallback = (
   text: string,
   docBlocks: Array<unknown>,
@@ -9789,6 +9852,262 @@ const collectTreeFiles = (dir: string): string[] => {
     }
     return paths;
   };
+
+const ATOMIC_TREE_ID = "atomic-systems";
+const ATOMIC_TREE_PATH = "docs/knowledge/physics/atomic-systems-tree.json";
+const ATOMIC_PANEL_ID = "electron-orbital";
+const ATOMIC_VIEWER_ID = "atomic-orbital";
+const ORBITAL_LETTER_L_MAP: Record<string, number> = {
+  s: 0,
+  p: 1,
+  d: 2,
+  f: 3,
+  g: 4,
+};
+type AtomicLaunchDraft = {
+  panelId?: string;
+  viewer?: string;
+  model?: string;
+  Z?: number;
+  n?: number;
+  l?: number;
+  m?: number;
+  sampleCount?: number;
+};
+
+const normalizeLaunchKey = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const readRecordValue = (
+  record: Record<string, unknown>,
+  aliases: string[],
+): unknown => {
+  const aliasSet = new Set(aliases.map(normalizeLaunchKey));
+  for (const [key, value] of Object.entries(record)) {
+    if (aliasSet.has(normalizeLaunchKey(key))) return value;
+  }
+  const name = record.name;
+  if (typeof name === "string" && aliasSet.has(normalizeLaunchKey(name))) {
+    if ("value" in record) return record.value;
+    if ("default" in record) return record.default;
+  }
+  return undefined;
+};
+
+const toInteger = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) return Math.trunc(parsed);
+  }
+  return undefined;
+};
+
+const clampInteger = (value: unknown, min: number, max: number): number | undefined => {
+  const integer = toInteger(value);
+  if (integer == null) return undefined;
+  return Math.max(min, Math.min(max, integer));
+};
+
+const parseAtomicModel = (value: unknown): HelixAskAtomicLaunchModel | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "quantum") return "quantum";
+  if (normalized === "classical") return "classical";
+  return undefined;
+};
+
+const extractAtomicDraftFromNode = (node: HelixAskGraphResolvedNode): AtomicLaunchDraft => {
+  const draft: AtomicLaunchDraft = {};
+  const records: Array<Record<string, unknown>> = [];
+  if (node.environment && typeof node.environment === "object") {
+    records.push(node.environment);
+  }
+  for (const entry of node.inputs ?? []) {
+    if (entry && typeof entry === "object") records.push(entry);
+  }
+  for (const entry of node.outputs ?? []) {
+    if (entry && typeof entry === "object") records.push(entry);
+  }
+
+  for (const record of records) {
+    const panelId = readRecordValue(record, ["panelId", "panel_id", "panel", "targetPanelId"]);
+    if (typeof panelId === "string" && !draft.panelId) {
+      draft.panelId = panelId.trim();
+    }
+    const viewer = readRecordValue(record, ["viewer", "viewerId", "viewer_id"]);
+    if (typeof viewer === "string" && !draft.viewer) {
+      draft.viewer = viewer.trim();
+    }
+    const model = parseAtomicModel(
+      readRecordValue(record, ["model", "atomModel", "atom_model", "mode"]),
+    );
+    if (model && !draft.model) {
+      draft.model = model;
+    }
+    const nuclearCharge = toInteger(
+      readRecordValue(record, ["Z", "z", "nuclearCharge", "nuclear_charge"]),
+    );
+    if (nuclearCharge != null && draft.Z == null) {
+      draft.Z = nuclearCharge;
+    }
+    const principalN = toInteger(
+      readRecordValue(record, ["n", "principal", "principalN", "principal_n"]),
+    );
+    if (principalN != null && draft.n == null) {
+      draft.n = principalN;
+    }
+    const azimuthalL = toInteger(
+      readRecordValue(record, ["l", "azimuthal", "orbitalL", "orbital_l", "angular"]),
+    );
+    if (azimuthalL != null && draft.l == null) {
+      draft.l = azimuthalL;
+    }
+    const magneticM = toInteger(
+      readRecordValue(record, ["m", "magnetic", "magneticM", "magnetic_m"]),
+    );
+    if (magneticM != null && draft.m == null) {
+      draft.m = magneticM;
+    }
+    const sampleCount = toInteger(
+      readRecordValue(record, ["sampleCount", "sample_count", "samples", "points"]),
+    );
+    if (sampleCount != null && draft.sampleCount == null) {
+      draft.sampleCount = sampleCount;
+    }
+  }
+
+  return draft;
+};
+
+const parseAtomicQuestionOverrides = (question: string): AtomicLaunchDraft => {
+  const draft: AtomicLaunchDraft = {};
+  const normalized = question.toLowerCase();
+
+  const classicalMatch = /\b(classical|bohr|trajectory)\b/i.exec(question);
+  const quantumMatch = /\b(quantum|wavefunction|orbital cloud)\b/i.exec(question);
+  if (classicalMatch && (!quantumMatch || classicalMatch.index > quantumMatch.index)) {
+    draft.model = "classical";
+  } else if (quantumMatch) {
+    draft.model = "quantum";
+  }
+
+  const zMatch = /\b(?:z|nuclear charge)\s*(?:=|:|is)?\s*(\d{1,3})\b/i.exec(question);
+  if (zMatch) {
+    draft.Z = Number(zMatch[1]);
+  } else {
+    for (const entry of ELEMENT_Z_LOOKUP) {
+      if (new RegExp(`\\b${entry.name}\\b`, "i").test(normalized)) {
+        draft.Z = entry.Z;
+        break;
+      }
+    }
+  }
+
+  const nMatch = /\bn\s*(?:=|:|is)?\s*(\d{1,2})\b/i.exec(question);
+  if (nMatch) {
+    draft.n = Number(nMatch[1]);
+  }
+  const lMatch = /\bl\s*(?:=|:|is)?\s*(-?\d{1,2})\b/i.exec(question);
+  if (lMatch) {
+    draft.l = Number(lMatch[1]);
+  }
+  const mMatch = /\bm\s*(?:=|:|is)?\s*(-?\d{1,2})\b/i.exec(question);
+  if (mMatch) {
+    draft.m = Number(mMatch[1]);
+  }
+
+  const orbitalNotationMatch = /\b(\d{1,2})\s*([spdfg])\b/i.exec(question);
+  if (orbitalNotationMatch) {
+    draft.n = Number(orbitalNotationMatch[1]);
+    const mappedL = ORBITAL_LETTER_L_MAP[orbitalNotationMatch[2].toLowerCase()];
+    if (mappedL != null) {
+      draft.l = mappedL;
+      if (draft.m == null) draft.m = 0;
+    }
+  }
+
+  const sampleMatch = /\b(?:sample(?:s| count)?|points?)\s*(?:=|:|is)?\s*(\d{2,5})\b/i.exec(
+    question,
+  );
+  if (sampleMatch) {
+    draft.sampleCount = Number(sampleMatch[1]);
+  }
+
+  return draft;
+};
+
+const normalizeAtomicLaunchParams = (draft: AtomicLaunchDraft): HelixAskAtomicLaunchParams => {
+  const model = parseAtomicModel(draft.model) ?? "quantum";
+  let n = clampInteger(draft.n, 1, 7) ?? 1;
+  let l = clampInteger(draft.l, 0, 9) ?? 0;
+  if (l > n - 1) {
+    n = Math.min(7, l + 1);
+  }
+  l = Math.min(l, n - 1);
+  let m = clampInteger(draft.m, -9, 9) ?? 0;
+  if (m < -l) m = -l;
+  if (m > l) m = l;
+  const sampleCount = clampInteger(draft.sampleCount, 96, 4000);
+  return {
+    model,
+    Z: clampInteger(draft.Z, 1, 118) ?? 1,
+    n,
+    l,
+    m,
+    ...(sampleCount != null ? { sampleCount } : {}),
+  };
+};
+
+const resolveAtomicViewerLaunch = (
+  graphPack: HelixAskGraphPack | null,
+  question: string,
+): HelixAskViewerLaunch | null => {
+  if (!graphPack?.frameworks?.length) return null;
+  const atomicFrameworks = graphPack.frameworks.filter((framework) => {
+    if (framework.treeId === ATOMIC_TREE_ID) return true;
+    return framework.sourcePath.replace(/\\/g, "/").endsWith(ATOMIC_TREE_PATH);
+  });
+  if (atomicFrameworks.length === 0) return null;
+
+  const draft: AtomicLaunchDraft = {};
+  const nodes = atomicFrameworks
+    .flatMap((framework) => [...(framework.path ?? []), ...(framework.anchors ?? [])])
+    .slice()
+    .sort((a, b) => b.score - a.score);
+
+  for (const node of nodes) {
+    const nodeDraft = extractAtomicDraftFromNode(node);
+    if (!draft.panelId && nodeDraft.panelId) draft.panelId = nodeDraft.panelId;
+    if (!draft.viewer && nodeDraft.viewer) draft.viewer = nodeDraft.viewer;
+    if (!draft.model && nodeDraft.model) draft.model = nodeDraft.model;
+    if (draft.Z == null && nodeDraft.Z != null) draft.Z = nodeDraft.Z;
+    if (draft.n == null && nodeDraft.n != null) draft.n = nodeDraft.n;
+    if (draft.l == null && nodeDraft.l != null) draft.l = nodeDraft.l;
+    if (draft.m == null && nodeDraft.m != null) draft.m = nodeDraft.m;
+    if (draft.sampleCount == null && nodeDraft.sampleCount != null) {
+      draft.sampleCount = nodeDraft.sampleCount;
+    }
+  }
+
+  const questionOverrides = parseAtomicQuestionOverrides(question);
+  const merged: AtomicLaunchDraft = {
+    ...draft,
+    ...questionOverrides,
+  };
+  const params = normalizeAtomicLaunchParams(merged);
+  const sourcePath = atomicFrameworks[0]?.sourcePath;
+
+  return {
+    viewer: ATOMIC_VIEWER_ID,
+    panel_id: ATOMIC_PANEL_ID,
+    tree_id: atomicFrameworks[0]?.treeId || ATOMIC_TREE_ID,
+    ...(sourcePath ? { source_path: sourcePath } : {}),
+    params,
+  };
+};
 
 const resolveHelixAskTreeWalkMode = (
   raw: string,
@@ -10188,6 +10507,13 @@ function buildHelixAskIdeologySynthesisPrompt(
     verbosity === "brief" ? "2-4" : verbosity === "normal" ? "3-5" : "4-6";
   const effectSentenceBudget =
     verbosity === "brief" ? "2-3" : verbosity === "normal" ? "2-4" : "2-4";
+  const allowTechnicalAppendix =
+    /(include|add|with|show|provide|give|append)[\s\S]{0,40}(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)/i.test(
+      question,
+    ) &&
+    !/(do not|don't|avoid|without|instead of|switch to plain-language)[\s\S]{0,120}(technical\s+notes?|compare\/report|report\s+format|report\s+mode)/i.test(
+      question,
+    );
   if (conversationSeed) {
     lines.push(
       "Use this as a loose anchor, then adapt it to the exact user question.",
@@ -10245,9 +10571,11 @@ function buildHelixAskIdeologySynthesisPrompt(
         ? `Include one concrete example sentence that mirrors the scenario: "${scenarioHint}".`
         : "If a scenario is present in the question, include one concrete example sentence.",
     );
-    lines.push(
-      "After the narrative paragraphs, include a short appendix headed 'Technical notes:' with only evidence-grounded bullets.",
-    );
+    if (allowTechnicalAppendix) {
+      lines.push(
+        "After the narrative paragraphs, include a short appendix headed 'Technical notes:' with only evidence-grounded bullets.",
+      );
+    }
     if (!twoParagraphContract) {
       lines.push(
         'Optionally end with "In practice," and one-to-two practical takeaways.',
@@ -11173,7 +11501,27 @@ type LocalAskResult = {
   prompt_ingested?: boolean;
   prompt_ingest_source?: string;
   prompt_ingest_reason?: string;
+  viewer_launch?: HelixAskViewerLaunch;
   [key: string]: unknown;
+};
+
+type HelixAskAtomicLaunchModel = "quantum" | "classical";
+
+type HelixAskAtomicLaunchParams = {
+  model: HelixAskAtomicLaunchModel;
+  Z: number;
+  n: number;
+  l: number;
+  m: number;
+  sampleCount?: number;
+};
+
+type HelixAskViewerLaunch = {
+  viewer: "atomic-orbital";
+  panel_id: "electron-orbital";
+  tree_id: string;
+  source_path?: string;
+  params: HelixAskAtomicLaunchParams;
 };
 
 type HelixAskOverflowMeta = {
@@ -12061,6 +12409,37 @@ const REPORT_MODE_INTENT_RE =
 const REPORT_MODE_HEADING_RE = /^#{1,6}\s+(.+)$/;
 const REPORT_MODE_BULLET_RE = /^\s*(?:[-*+]|[0-9]+[.)]|[a-zA-Z][.)])\s+(.+)$/;
 const REPORT_MODE_SECTION_RE = /^(?:Q:|Question:|Requirement:|Issue:|Task:)\s*(.+)$/i;
+
+const REPORT_MODE_NEGATION_RE = /\b(do not|don't|avoid|without|instead of|switch to plain-language)\b/i;
+const REPORT_MODE_REFERENCE_RE = /\b(report|technical notes?|compare\/report|report mode)\b/i;
+const REPORT_MODE_CONDITIONAL_GUARD_RE = /\bif you are about to output\b/i;
+
+const IDEOLOGY_TECHNICAL_NOTES_RE = /\n{2,}Technical notes:\s*[\s\S]*$/i;
+const IDEOLOGY_TECHNICAL_ALLOW_RE =
+  /\b(include|add|with|show|provide|give|append)\b(?:\s+[^\s]+){0,2}\s+(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)\b/i;
+const IDEOLOGY_TECHNICAL_BLOCK_RE =
+  /\b(do not|don't|avoid|without|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i;
+
+const shouldAllowIdeologyTechnicalNotes = (question: string): boolean => {
+  const normalized = question.toLowerCase();
+  const explicitAllow = IDEOLOGY_TECHNICAL_ALLOW_RE.test(normalized);
+  if (IDEOLOGY_TECHNICAL_BLOCK_RE.test(normalized)) {
+    return false;
+  }
+  return explicitAllow;
+};
+
+const isExplicitReportRequest = (question: string): boolean => {
+  if (!REPORT_MODE_INTENT_RE.test(question)) return false;
+  const normalized = question.toLowerCase();
+  const hasNegation = REPORT_MODE_NEGATION_RE.test(normalized);
+  const hasReportReference = REPORT_MODE_REFERENCE_RE.test(normalized);
+  const conditionalGuard = REPORT_MODE_CONDITIONAL_GUARD_RE.test(normalized);
+  if (hasReportReference && (hasNegation || conditionalGuard)) {
+    return false;
+  }
+  return true;
+};
 type HelixAskReportBlockHint = {
   id: string;
   patterns: RegExp[];
@@ -12166,7 +12545,8 @@ const shouldUseIdeologyConversationalMode = (
   if (charCount > HELIX_ASK_IDEOLOGY_CHAT_MODE_MAX_CHARS) return false;
   const trimmed = question.trim();
   if (trimmed.length < 20) return false;
-  if (HELIX_ASK_IDEOLOGY_REPORT_BAN_RE.test(trimmed)) return false;
+  const hasNarrativeGuard = HELIX_ASK_IDEOLOGY_NARRATIVE_GUARD_RE.test(trimmed);
+  if (HELIX_ASK_IDEOLOGY_REPORT_BAN_RE.test(trimmed) && !hasNarrativeGuard) return false;
   return (
     HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE.test(trimmed) ||
     HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE.test(trimmed)
@@ -12763,7 +13143,7 @@ const resolveReportModeDecision = (question: string): HelixAskReportModeDecision
   if (!HELIX_ASK_REPORT_MODE) {
     return { enabled: false, tokenCount, charCount, blockCount };
   }
-  if (REPORT_MODE_INTENT_RE.test(question)) {
+  if (isExplicitReportRequest(question)) {
     return { enabled: true, reason: "explicit_report_request", tokenCount, charCount, blockCount };
   }
   if (blockCount >= HELIX_ASK_REPORT_TRIGGER_BLOCKS) {
@@ -13962,6 +14342,7 @@ const executeHelixAsk = async ({
   reportContext,
 }: HelixAskExecutionArgs): Promise<void> => {
   const parsed = { data: request };
+  const askRequestStartedAt = Date.now();
   const askSessionId = parsed.data.sessionId;
   const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
   const dryRun = parsed.data.dryRun === true;
@@ -14360,6 +14741,7 @@ const executeHelixAsk = async ({
       agent_loop_max_steps?: number;
       agent_loop_budget_ms?: number;
       agent_action_budget_ms?: number;
+      clocka_tool_cap?: number;
       agent_loop_steps?: number;
       agent_loop_actions?: HelixAskAgentAction[];
       agent_stop_reason?: string;
@@ -14483,6 +14865,9 @@ const executeHelixAsk = async ({
       arbiter_ratio?: number;
       arbiter_topic_ok?: boolean;
       arbiter_concept_match?: boolean;
+      runtime_budget_level?: "OK" | "WARNING" | "OVER";
+      runtime_budget_recommend?: string;
+      runtime_budget_signals?: Record<string, unknown>;
       plan_pass_used?: boolean;
       plan_pass_forced?: boolean;
       slot_plan_pass_used?: boolean;
@@ -14894,7 +15279,8 @@ const executeHelixAsk = async ({
       }
     }
     const agentLoopEnabled = HELIX_ASK_AGENT_LOOP;
-    const agentLoopMaxSteps = HELIX_ASK_AGENT_LOOP_MAX_STEPS;
+    const runtimeContract = loadRuntimeFrameContract();
+    const agentLoopMaxSteps = Math.max(1, Math.min(HELIX_ASK_AGENT_LOOP_MAX_STEPS, runtimeContract.clockA.max_plan_steps));
     const agentActionBudgetMs = HELIX_ASK_AGENT_ACTION_BUDGET_MS;
     const agentLoopBudgetMs = HELIX_ASK_AGENT_LOOP_BUDGET_MS;
     const agentStart = Date.now();
@@ -14917,6 +15303,7 @@ const executeHelixAsk = async ({
       debugPayload.agent_loop_max_steps = agentLoopMaxSteps;
       debugPayload.agent_loop_budget_ms = agentLoopBudgetMs;
       debugPayload.agent_action_budget_ms = agentActionBudgetMs;
+      debugPayload.clocka_tool_cap = runtimeContract.clockA.max_tool_calls;
       debugPayload.agent_loop_steps = getAgentStepCount();
       debugPayload.agent_loop_actions = agentActions.slice();
       debugPayload.agent_stop_reason = agentStopReason ?? undefined;
@@ -15010,8 +15397,10 @@ const executeHelixAsk = async ({
     };
     const getAgentBlockReason = (): string | null => {
       if (!agentLoopEnabled) return null;
+      const stepCount = getAgentStepCount();
       if (agentActionOverBudget) return "action_budget_exhausted";
-      if (getAgentStepCount() >= agentLoopMaxSteps) return "max_steps";
+      if (stepCount >= runtimeContract.clockA.max_tool_calls) return "clocka_tool_cap";
+      if (stepCount >= agentLoopMaxSteps) return "max_steps";
       if (Date.now() - agentStart > agentLoopBudgetMs) return "budget_exhausted";
       return null;
     };
@@ -15146,6 +15535,7 @@ const executeHelixAsk = async ({
     }
     if (
       !isIdeologyConversationalCandidate &&
+      !isIdeologyNarrativeQuery &&
       !reportDecision.enabled &&
       slotPreview.coverageSlots.length >= 2
     ) {
@@ -15232,7 +15622,12 @@ const executeHelixAsk = async ({
         slotPlanPassSlots = [];
       }
     }
-    if (!isIdeologyConversationalCandidate && !reportDecision.enabled && slotPreview.coverageSlots.length >= 2) {
+    if (
+      !isIdeologyConversationalCandidate &&
+      !isIdeologyNarrativeQuery &&
+      !reportDecision.enabled &&
+      slotPreview.coverageSlots.length >= 2
+    ) {
       reportDecision = {
         ...reportDecision,
         enabled: true,
@@ -16565,6 +16960,7 @@ const executeHelixAsk = async ({
       }
     }
     let graphPack: HelixAskGraphPack | null = null;
+    let viewerLaunch: HelixAskViewerLaunch | null = null;
     let treeWalkBlock = "";
     let treeWalkMetrics: HelixAskTreeWalkMetrics | null = null;
     let treeWalkBindingRate = 0;
@@ -17353,8 +17749,8 @@ const executeHelixAsk = async ({
     }
     if (conceptFastPath && conceptMatch && !forcedAnswer) {
       const conceptDraft = isIdeologyReferenceIntent
-        ? renderConceptAnswer(conceptMatch)
-        : renderConceptDefinition(conceptMatch);
+        ? renderConceptDefinition(conceptMatch)
+        : renderConceptAnswer(conceptMatch);
       if (conceptDraft) {
         conceptAnswer = conceptDraft;
         if (!isIdeologyReferenceIntent) {
@@ -17673,7 +18069,9 @@ const executeHelixAsk = async ({
         logEvent("Concept card ready", conceptMatch?.card.id, conceptScaffold, conceptStart);
       }
       if (hasConceptScaffold && intentDomain === "general") {
-        conceptAnswer = renderConceptAnswer(conceptMatch);
+        conceptAnswer = isIdeologyReferenceIntent
+          ? renderConceptDefinition(conceptMatch)
+          : renderConceptAnswer(conceptMatch);
       }
       let wantsHybrid = intentStrategy === "hybrid_explain";
       let forceHybridNoEvidence = false;
@@ -19718,6 +20116,28 @@ const executeHelixAsk = async ({
           intentTier === "F3" ||
           intentStrategy === "constraint_report" ||
           compositeConstraintRequested;
+        const activeJobCount = await getHelixAskActiveJobCount();
+        const clockAP95Ms = Math.max(0, Date.now() - askRequestStartedAt);
+        const kvTokens = askSessionId ? kvGetSessionTokensApprox(askSessionId) : 0;
+        const thermals = getGpuThermals();
+        const lanePressure = {
+          llm: Math.min(1, clockAP95Ms / Math.max(1, runtimeContract.clockA.p95_ms)),
+          io: Math.min(1, retrievalConfidence),
+          media: Math.min(1, thermals.current / Math.max(1, thermals.max)),
+          physics: 0,
+          perception: 0,
+        };
+        const budgetState = evaluateRuntimeBudgetState({
+          clockAP95Ms,
+          clockABudgetMs: runtimeContract.clockA.p95_ms,
+          toolCallsLastTick: Math.max(0, getAgentStepCount()),
+          maxToolCalls: runtimeContract.clockA.max_tool_calls,
+          kvTokens,
+          kvMaxTokens: runtimeContract.kv.max_tokens,
+          queueDepth: activeJobCount,
+          queueMaxDepth: runtimeContract.clockB.max_queue_depth,
+          lanePressure,
+        });
         const arbiterDecision = resolveHelixAskArbiter({
           retrievalConfidence,
           repoThreshold: arbiterRepoRatio,
@@ -19734,6 +20154,8 @@ const executeHelixAsk = async ({
           hasHighStakesConstraints,
           explicitRepoExpectation,
           intentDomain,
+          budgetLevel: budgetState.level,
+          budgetRecommend: budgetState.recommend,
         });
         const rawArbiterMode = arbiterDecision.mode;
         const isIdeologyIntent = intentProfile.id === "repo.ideology_reference";
@@ -19768,6 +20190,9 @@ const executeHelixAsk = async ({
           debugPayload.arbiter_ratio = arbiterDecision.ratio;
           debugPayload.arbiter_topic_ok = arbiterDecision.topicOk;
           debugPayload.arbiter_concept_match = Boolean(arbiterDecision.conceptMatch);
+          debugPayload.runtime_budget_level = budgetState.level;
+          debugPayload.runtime_budget_recommend = budgetState.recommend;
+          debugPayload.runtime_budget_signals = budgetState.signals;
         }
         if (
           intentProfile.id === "repo.ideology_reference" &&
@@ -19987,6 +20412,10 @@ const executeHelixAsk = async ({
             debugPayload.tree_walk_binding_rate = Number(bindingRate.toFixed(3));
           }
         }
+      }
+      viewerLaunch = resolveAtomicViewerLaunch(graphPack, baseQuestion);
+      if (debugPayload && viewerLaunch) {
+        (debugPayload as Record<string, unknown>).viewer_launch = viewerLaunch;
       }
 
         if (HELIX_ASK_CODE_ALIGNMENT && (docBlocks.length > 0 || graphEvidenceItems.length > 0)) {
@@ -20906,6 +21335,9 @@ const executeHelixAsk = async ({
 
     if (dryRun) {
       const dryPayload: LocalAskResult = { text: "", prompt_ingested: promptIngested };
+      if (viewerLaunch) {
+        dryPayload.viewer_launch = viewerLaunch;
+      }
       if (promptIngested) {
         if (promptIngestSource) {
           dryPayload.prompt_ingest_source = promptIngestSource;
@@ -21004,6 +21436,9 @@ const executeHelixAsk = async ({
           if (promptIngestReason) {
             result.prompt_ingest_reason = promptIngestReason;
           }
+        }
+        if (viewerLaunch) {
+          result.viewer_launch = viewerLaunch;
         }
         logDebug("streamEmitter.finalize start", {
           cleanedLength: forcedCleanText.length,
@@ -22013,6 +22448,12 @@ const executeHelixAsk = async ({
         }
       }
       cleaned = platonicResult.answer;
+      if (
+        intentProfile.id === "repo.ideology_reference" &&
+        !shouldAllowIdeologyTechnicalNotes(baseQuestion)
+      ) {
+        cleaned = cleaned.replace(IDEOLOGY_TECHNICAL_NOTES_RE, "").trim();
+      }
       if (endpointGuardApplied && endpointGuardMessage) {
         cleaned = endpointGuardMessage;
         answerPath.push("endpointGuard:applied");
@@ -22333,6 +22774,9 @@ const executeHelixAsk = async ({
           : extractFilePathsFromText(cleaned),
         rawAnswerSentences,
       );
+      if (isIdeologyReferenceIntent) {
+        cleaned = rewriteIdeologyScientificVoice(cleaned, baseQuestion);
+      }
       cleaned = stripTrivialOrdinalBullets(cleaned);
       cleaned = dedupeReportParagraphs(cleaned).text;
       const scientificFallbackReason = hasWeakScientificSections(cleaned)
@@ -22435,6 +22879,9 @@ const executeHelixAsk = async ({
       if (promptIngestReason) {
         result.prompt_ingest_reason = promptIngestReason;
       }
+    }
+    if (viewerLaunch) {
+      result.viewer_launch = viewerLaunch;
     }
     if (debugPayload && captureLiveHistory) {
       const traceEvents = liveEventHistory.slice();

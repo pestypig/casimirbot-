@@ -1,0 +1,39 @@
+{
+  "profile": "console_499",
+  "clockA": {
+    "p95_ms": 400,
+    "hard_deadline_ms": 900,
+    "max_tool_calls": 2,
+    "max_plan_steps": 4,
+    "max_output_tokens": 220
+  },
+  "clockB": {
+    "max_concurrent_jobs": 2,
+    "job_timeslice_ms": 1200,
+    "max_queue_depth": 50
+  },
+  "kv": { "max_tokens": 8000, "evict": "oldest" },
+  "session_memory": { "ttl_ms": 86400000, "max_items": 400 },
+  "tools": {
+    "repo_search": { "timeout_ms": 900, "max_results": 10 },
+    "graph_resolver": { "max_depth": 5, "max_nodes": 120 },
+    "vision": { "max_fps": 10 },
+    "stt": { "streaming": true },
+    "tts_local": { "timeout_ms": 650, "streaming": true }
+  },
+  "lanes": {
+    "llm": { "max_concurrent": 1 },
+    "media": { "max_concurrent": 1 },
+    "perception": { "max_concurrent": 1 },
+    "physics": { "max_concurrent": 1 },
+    "io": { "max_concurrent": 2 }
+  },
+  "degrade_ladder": [
+    "reduce_output_tokens",
+    "reduce_tool_calls",
+    "swap_to_smaller_model",
+    "drop_vision_fps",
+    "force_clarify",
+    "queue_deep_work"
+  ]
+}

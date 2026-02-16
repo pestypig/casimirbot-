@@ -8370,13 +8370,8 @@ export async function getGrConstraintContract(req: Request, res: Response) {
           grDiagnostics: gr ? "pipeline" : "missing",
           certificate: certAvailable ? "physics.warp.viability" : "missing",
         },
-        guardrails: {
-          fordRoman: "missing",
-          thetaAudit: "missing",
-          tsRatio: "missing",
-          vdbBand: "missing",
-        },
-        constraints: [],
+        guardrails,
+        constraints,
         certificate: {
           status: certificateStatus,
           admissibleStatus: policyBundle.certificate.admissibleStatus,
@@ -8386,6 +8381,7 @@ export async function getGrConstraintContract(req: Request, res: Response) {
         },
         notes: [
           "Contract schema validation failed; returning fallback payload.",
+          JSON.stringify(issues),
         ],
         proxy: true,
       };
