@@ -11849,7 +11849,7 @@ const buildSlotClarifyLine = (args: {
   slotPlan?: HelixAskSlotPlan | null;
   planClarify?: string;
 }): string => {
-  const planClarify = (args.planClarify ?? "").trim();
+  const planClarify = sanitizePlanClarifyLine(args.planClarify ?? "");
   if (planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)) {
     return planClarify;
   }
@@ -11870,6 +11870,20 @@ const buildSlotClarifyLine = (args: {
     return `I could not confirm "${label}" (and ${slots.slice(1, 3).join(", ")}). Please point to the relevant files or clarify the terms.`;
   }
   return `I could not confirm "${label}" yet. Please point to the relevant files or clarify the term.`;
+};
+
+
+
+const sanitizePlanClarifyLine = (value: string): string => {
+  const line = value.trim();
+  if (!line) return line;
+  if (/did not cover key terms from the question/i.test(line)) {
+    return "Repo evidence was required by the question but could not be confirmed. Please point to the relevant files or clarify the term.";
+  }
+  if (/(?:[a-z0-9]+(?:-[a-z0-9]+)*-tree)/i.test(line)) {
+    return "Repo evidence was incomplete for this request. Please point to the relevant files or clarify the term.";
+  }
+  return line;
 };
 
 const SCIENTIFIC_REPORT_HEAD_RE =
@@ -21019,7 +21033,7 @@ const executeHelixAsk = async ({
         recordControllerStop(agentStopReason, "ambiguity_gate");
       }
       if (failClosedRepoEvidence && !forcedAnswer && intentStrategy !== "constraint_report" && !skipIdeologyClarify) {
-          const planClarify = (clarifyOverride ?? planDirectives?.clarifyQuestion ?? "").trim();
+          const planClarify = sanitizePlanClarifyLine(clarifyOverride ?? planDirectives?.clarifyQuestion ?? "");
           const missingSlots =
             docSlotSummary?.missingSlots?.length
               ? docSlotSummary.missingSlots
@@ -22019,7 +22033,7 @@ const executeHelixAsk = async ({
               .trim();
             paragraph1 = clipAskText(collapsed || stripped, 420);
           }
-          const planClarify = (clarifyOverride ?? planDirectives?.clarifyQuestion ?? "").trim();
+          const planClarify = sanitizePlanClarifyLine(clarifyOverride ?? planDirectives?.clarifyQuestion ?? "");
           const clarifyLine =
             planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)
               ? planClarify
