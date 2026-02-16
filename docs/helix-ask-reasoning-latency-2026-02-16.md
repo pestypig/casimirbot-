@@ -78,3 +78,29 @@ Rules:
 - Tradeoff note (what was deliberately omitted for speed)
 - If relevant: “Best next step” (1 item)
 ```
+
+## Fast Quality Mode patch (request-level toggle)
+Implemented in this patch:
+- Added `tuning.fast_quality_mode` request override.
+- In fast mode, suppresses non-safety forced plan-pass behavior.
+- In fast mode, disables ambiguity-cluster probing for non-report contexts and always disables ambiguity-label LLM path.
+- In fast mode, tightens retrieval-retry trigger and defaults retry topK bonus to `1`.
+- Preserves safety behavior for constraint/report paths and keeps evidence/gate checks active.
+
+### Fast mode sweep result
+Sweep: `artifacts/helix-ask-latency/helix-ask-sweep.2026-02-16T044821404Z.json`
+
+- `quality_extended`: p50 444 ms, p95 941 ms, quality 0.909
+- `fast_brief`: p50 392 ms, p95 457 ms, quality 0.973
+- `fast_quality_mode`: p50 1279 ms, p95 1318 ms, quality 0.273
+
+### Quality-vs-latency artifact for fast mode
+Artifact: `artifacts/helix-ask-latency/quality-vs-latency-fast-quality-mode.json`
+
+Result summary from the latest run:
+- baseline: avg latency ~513.671 ms, coverage 0.786, evidence gate pass rate 0.714, micro-pass rate 1.000
+- fast_quality_mode: avg latency ~1235.943 ms, coverage 0.786, evidence gate pass rate 0.000, micro-pass rate 1.000
+
+Interpretation:
+- The request-level toggle and routing guards are implemented, but this initial profile does **not** improve quality-speed tradeoff yet on the study pack.
+- Next tuning step should target citation/evidence behavior for ideology prompts under fast mode before using it as default in sweeps.
