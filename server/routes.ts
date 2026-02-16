@@ -237,10 +237,11 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi", refineryRouter);
     app.use("/api/agi", constraintPacksRouter);
     app.use("/api/agi/adapter", adapterRouter);
-    if (process.env.ENABLE_AGI === "1" && process.env.ENABLE_TRACE_API === "1") {
+    const enableTraceApi = flagEnabled(process.env.ENABLE_TRACE_API, false);
+    if (enableTraceApi) {
       const { traceRouter } = await import("./routes/agi.trace");
       app.use("/api/agi/trace", traceRouter);
-      if (process.env.ENABLE_MEMORY_UI === "1") {
+      if (flagEnabled(process.env.ENABLE_MEMORY_UI, false)) {
         const { memoryTraceRouter } = await import("./routes/agi.memory.trace");
         app.use("/api/agi/memory", memoryTraceRouter);
       }
@@ -250,7 +251,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi/eval", evalRouter);
   }
 
-  if (!fastBoot && process.env.SMALL_LLM_URL) {
+  const enableSmallLlmRoutes = !fastBoot && flagEnabled(process.env.ENABLE_SMALL_LLM, true);
+  if (enableSmallLlmRoutes) {
     const { smallLlmRouter } = await import("./routes/small-llm");
     app.use("/api/small-llm", smallLlmRouter);
   }
@@ -1428,5 +1430,4 @@ export const routes = [
   { path: '/inspector', name: 'inspector' }
 ];
 export default routes;
-
 

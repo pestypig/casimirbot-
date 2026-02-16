@@ -54,9 +54,27 @@ export type ExecuteResponse = {
   debate_id?: string | null;
 };
 
+export type AtomicViewerLaunchParams = {
+  model: "quantum" | "classical";
+  Z: number;
+  n: number;
+  l: number;
+  m: number;
+  sampleCount?: number;
+};
+
+export type AtomicViewerLaunch = {
+  viewer: "atomic-orbital";
+  panel_id: "electron-orbital";
+  tree_id: string;
+  source_path?: string;
+  params: AtomicViewerLaunchParams;
+};
+
 export type LocalAskResponse = {
   text: string;
   envelope?: HelixAskResponseEnvelope;
+  viewer_launch?: AtomicViewerLaunch;
   model?: string;
   essence_id?: string;
   seed?: number;

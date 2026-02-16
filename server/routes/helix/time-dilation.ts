@@ -7,10 +7,25 @@ import {
   DEFAULT_HULL_WALL_THICKNESS_M,
 } from "@shared/time-dilation-diagnostics";
 
+type DiagnosticsStatus = "pending" | "ready" | "error";
+type SeedStatus = "provisional" | "final";
+
 type TimeDilationDiagnosticsStore = {
+  status: DiagnosticsStatus;
   updatedAt: number;
   source: string | null;
-  payload: unknown;
+  renderingSeed: string;
+  seedStatus: SeedStatus;
+  payload: Record<string, unknown>;
+  reason?: string;
+};
+
+type TimeDilationControlCommand = {
+  id: number;
+  issuedAt: number;
+  command: string;
+  args: Record<string, unknown>;
+  source: string | null;
 };
 
 const setCors = (res: Response) => {
@@ -22,6 +37,8 @@ const setCors = (res: Response) => {
 const helixTimeDilationRouter = express.Router();
 
 let latestDiagnostics: TimeDilationDiagnosticsStore | null = null;
+let latestControlCommand: TimeDilationControlCommand | null = null;
+let controlCommandSeq = 0;
 
 const ActivateSchema = z.object({
   baseUrl: z.string().url().optional(),
@@ -44,6 +61,12 @@ const ActivateSchema = z.object({
   diagnosticsTimeoutMs: z.number().positive().optional(),
 });
 
+const ControlCommandSchema = z.object({
+  command: z.string().min(1),
+  args: z.record(z.unknown()).optional(),
+  source: z.string().optional(),
+});
+
 const resolveCanonicalHull = () => ({
   Lx_m: DEFAULT_HULL_AXES[0] * 2,
   Ly_m: DEFAULT_HULL_AXES[1] * 2,
@@ -56,6 +79,51 @@ const resolveBaseUrl = (req: Request, override?: string) => {
   const host = req.get("host");
   const protocol = req.protocol || "http";
   return host ? `${protocol}://${host}` : "http://127.0.0.1:5173";
+};
+
+const resolveCanonicalSummary = (
+  input: z.infer<typeof ActivateSchema>,
+  pipelineUpdate?: Record<string, unknown> | null,
+  diagnostics?: Record<string, unknown> | null,
+) => {
+  const strictCongruence =
+    (typeof pipelineUpdate?.strictCongruence === "boolean"
+      ? pipelineUpdate.strictCongruence
+      : input.strictCongruence) ?? true;
+  const canonical =
+    (diagnostics?.canonical as Record<string, unknown> | undefined) ??
+    ((pipelineUpdate as any)?.canonical as Record<string, unknown> | undefined) ??
+    {};
+  return {
+    strictCongruence,
+    mode: input.warpFieldType,
+    family: typeof canonical.family === "string" ? canonical.family : input.warpFieldType,
+    chart: typeof canonical.chart === "string" ? canonical.chart : null,
+    observer: typeof canonical.observer === "string" ? canonical.observer : null,
+    normalization: typeof canonical.normalization === "string" ? canonical.normalization : null,
+  };
+};
+
+const resolveWarnings = (
+  pipelineUpdate?: Record<string, unknown> | null,
+  diagnostics?: Record<string, unknown> | null,
+) => {
+  const warnings: string[] = [];
+  const overallStatus = typeof pipelineUpdate?.overallStatus === "string"
+    ? pipelineUpdate.overallStatus
+    : null;
+  if (overallStatus === "CRITICAL") {
+    warnings.push("overall_status_critical");
+  }
+  if (!diagnostics) {
+    warnings.push("diagnostics_partial");
+  } else {
+    const strict = diagnostics.strict as Record<string, unknown> | undefined;
+    if (strict?.strictMetricMissing === true || strict?.anyProxy === true) {
+      warnings.push("diagnostics_partial");
+    }
+  }
+  return warnings;
 };
 
 const postJson = async <T>(url: string, body: unknown, timeoutMs?: number): Promise<T> => {
@@ -77,12 +145,28 @@ const postJson = async <T>(url: string, body: unknown, timeoutMs?: number): Prom
   return (await res.json()) as T;
 };
 
+const buildDiagnosticsEnvelope = (record: TimeDilationDiagnosticsStore) => ({
+  ok: record.status !== "error",
+  status: record.status,
+  updatedAt: record.updatedAt,
+  source: record.source,
+  renderingSeed: record.renderingSeed,
+  seedStatus: record.seedStatus,
+  reason: record.reason ?? null,
+  payload: record.payload,
+});
+
 helixTimeDilationRouter.options("/diagnostics", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
 
 helixTimeDilationRouter.options("/activate", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixTimeDilationRouter.options("/control", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
@@ -98,16 +182,45 @@ helixTimeDilationRouter.get("/diagnostics", (req, res) => {
 
   const raw = typeof req.query.raw === "string" ? req.query.raw === "1" : false;
   if (raw) {
-    res.json(latestDiagnostics.payload);
+    res.json(buildDiagnosticsEnvelope(latestDiagnostics));
     return;
   }
 
-  res.json({
-    ok: true,
-    updatedAt: latestDiagnostics.updatedAt,
-    source: latestDiagnostics.source,
-    payload: latestDiagnostics.payload,
-  });
+  res.json(buildDiagnosticsEnvelope(latestDiagnostics));
+});
+
+helixTimeDilationRouter.get("/control", (_req, res) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ok: true, command: latestControlCommand });
+});
+
+helixTimeDilationRouter.post("/control", (req, res) => {
+  setCors(res);
+  const parsed = ControlCommandSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ ok: false, error: "invalid-control-command", issues: parsed.error.issues });
+    return;
+  }
+  const issuedAt = Date.now();
+  const source =
+    typeof parsed.data.source === "string" && parsed.data.source.trim().length > 0
+      ? parsed.data.source.trim()
+      : null;
+  latestControlCommand = {
+    id: ++controlCommandSeq,
+    issuedAt,
+    command: parsed.data.command,
+    args: parsed.data.args ?? {},
+    source,
+  };
+  res.json({ ok: true, command: latestControlCommand });
+});
+
+helixTimeDilationRouter.delete("/control", (_req, res) => {
+  setCors(res);
+  latestControlCommand = null;
+  res.json({ ok: true });
 });
 
 helixTimeDilationRouter.post("/diagnostics", (req, res) => {
@@ -117,10 +230,15 @@ helixTimeDilationRouter.post("/diagnostics", (req, res) => {
   const sourceRaw = payload?.source;
   const source =
     typeof sourceRaw === "string" && sourceRaw.trim().length > 0 ? sourceRaw.trim() : null;
+  const updatedAt = Date.now();
+  const renderingSeed = typeof payload.renderingSeed === "string" ? payload.renderingSeed : `diag:${updatedAt}`;
   latestDiagnostics = {
-    updatedAt: Date.now(),
+    status: "ready",
+    updatedAt,
     source,
     payload,
+    renderingSeed,
+    seedStatus: "final",
   };
   res.json({ ok: true, updatedAt: latestDiagnostics.updatedAt });
 });
@@ -164,6 +282,22 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
       } satisfies TimeDilationDiagnosticsOptions);
 
     if (input.async) {
+      const activatedAt = Date.now();
+      const provisionalSeed = `activate:${activatedAt}`;
+      latestDiagnostics = {
+        status: "pending",
+        updatedAt: activatedAt,
+        source: "time_dilation_activate_async",
+        renderingSeed: provisionalSeed,
+        seedStatus: "provisional",
+        reason: "diagnostics_running",
+        payload: {
+          ok: false,
+          kind: "time_dilation_diagnostics_pending",
+          message: "Diagnostics are running asynchronously. Poll /api/helix/time-dilation/diagnostics.",
+        },
+      };
+
       void postJson<any>(
         `${baseUrl}/api/helix/pipeline/update`,
         {
@@ -185,25 +319,80 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
             params.set("format", "json");
             await fetch(`${baseUrl}/api/helix/gr-evolve-brick?${params.toString()}`).catch(() => null);
           }
-          return runDiagnostics();
+          const diagnostics = await runDiagnostics();
+          const diagnosticsRecord = (diagnostics ?? {}) as Record<string, unknown>;
+          const finalSeed =
+            typeof diagnosticsRecord.renderingSeed === "string" ? diagnosticsRecord.renderingSeed : provisionalSeed;
+          latestDiagnostics = {
+            status: "ready",
+            updatedAt: Date.now(),
+            source: "time_dilation_activate_async",
+            renderingSeed: finalSeed,
+            seedStatus: "final",
+            payload: {
+              kind: typeof diagnosticsRecord.kind === "string" ? diagnosticsRecord.kind : "time_dilation_diagnostics",
+              gate: (diagnosticsRecord.gate as Record<string, unknown> | undefined) ?? { banner: null, reasons: [] },
+              strict: (diagnosticsRecord.strict as Record<string, unknown> | undefined) ?? {},
+              canonical: (diagnosticsRecord.canonical as Record<string, unknown> | undefined) ?? {},
+              ...diagnosticsRecord,
+              renderingSeed: finalSeed,
+            },
+          };
         })
         .catch((err) => {
           const message = err instanceof Error ? err.message : String(err);
           latestDiagnostics = {
+            status: "error",
             updatedAt: Date.now(),
             source: "time_dilation_activate_error",
-            payload: { ok: false, error: "activate_failed", message },
+            renderingSeed: provisionalSeed,
+            seedStatus: "provisional",
+            reason: "activate_failed",
+            payload: {
+              ok: false,
+              error: "activate_failed",
+              message,
+            },
           };
         });
-
+      const pipelineUpdate = {
+        ok: true,
+        pending: true,
+        source: "activate_async",
+        requested: {
+          warpFieldType: input.warpFieldType,
+          grEnabled: input.grEnabled,
+          strictCongruence: input.strictCongruence ?? true,
+          applyCanonicalHull: input.applyCanonicalHull !== false,
+        },
+      };
+      const diagnostics = {
+        ok: false,
+        status: "pending",
+        pending: true,
+        error: "diagnostics_pending",
+        reason: "diagnostics_running",
+        message: "Diagnostics are running asynchronously. Poll /api/helix/time-dilation/diagnostics.",
+        updatedAt: activatedAt,
+        renderingSeed: provisionalSeed,
+        seedStatus: "provisional" as SeedStatus,
+      };
+      const canonical = resolveCanonicalSummary(input, pipelineUpdate, null);
+      const warnings = resolveWarnings(pipelineUpdate, null);
       res.status(202).json({
         ok: true,
         accepted: true,
         baseUrl,
         warpFieldType: input.warpFieldType,
         grEnabled: input.grEnabled,
-        pipelineUpdate: null,
-        diagnostics: null,
+        updatedAt: activatedAt,
+        renderingSeed: provisionalSeed,
+        seedStatus: "provisional",
+        strictCongruence: canonical.strictCongruence,
+        canonical,
+        warnings,
+        pipelineUpdate,
+        diagnostics,
       });
       return;
     }
@@ -231,14 +420,35 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
     }
 
     const diagnostics = await runDiagnostics();
+    const updatedAt = Date.now();
+    const diagnosticsRecord = diagnostics as unknown as Record<string, unknown>;
+    const pipelineRecord = pipelineUpdate as unknown as Record<string, unknown>;
+    const canonical = resolveCanonicalSummary(input, pipelineRecord, diagnosticsRecord);
+    const warnings = resolveWarnings(pipelineRecord, diagnosticsRecord);
     res.json({
       ok: true,
       accepted: false,
       baseUrl,
       warpFieldType: input.warpFieldType,
       grEnabled: input.grEnabled,
+      updatedAt,
+      renderingSeed:
+        (typeof diagnosticsRecord?.renderingSeed === "string" ? diagnosticsRecord.renderingSeed : null) ??
+        (typeof (pipelineRecord as any)?.renderingSeed === "string" ? (pipelineRecord as any).renderingSeed : null) ??
+        `activate:${updatedAt}`,
+      seedStatus: "final",
+      strictCongruence: canonical.strictCongruence,
+      canonical,
+      warnings,
       pipelineUpdate,
-      diagnostics,
+      diagnostics:
+        diagnostics ?? {
+          ok: false,
+          status: "error",
+          error: "diagnostics_unavailable",
+          message: "Diagnostics returned empty payload.",
+          updatedAt,
+        },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -281,6 +281,27 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
   const values: Record<string, ProofValue> = {};
   const notes: string[] = [];
 
+  values.theta_definition = makeStringValue(
+    "theta := div(beta) in comoving_cartesian with Eulerian normal n",
+    "config:strict_provenance.theta_definition",
+    false,
+  );
+  values.kij_sign_convention = makeStringValue(
+    "ADM sign: K_ij = -(1/2) * L_n gamma_ij",
+    "config:strict_provenance.kij_sign_convention",
+    false,
+  );
+  values.gamma_field_naming = makeStringValue(
+    "gamma_phys_{ij} (physical metric), tilde_gamma_{ij} (conformal metric), phi (conformal factor)",
+    "config:strict_provenance.gamma_field_naming",
+    false,
+  );
+  values.field_provenance_schema = makeStringValue(
+    "fields.<name>.{source,kind,path,proxy,unit}",
+    "config:strict_provenance.field_provenance_schema",
+    false,
+  );
+
   const modelMode =
     typeof state.modelMode === "string"
       ? state.modelMode
@@ -337,6 +358,43 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
       { value: (state as any).sectorsTotal, source: "pipeline.sectorsTotal", proxy: true },
     ]),
     "1",
+  );
+
+  values.phase01 = makeValue(
+    resolveNumber([
+      { value: (state as any).phase01, source: "pipeline.phase01" },
+      { value: (state as any).hardwareTruth?.sectorState?.phaseCont, source: "pipeline.hardwareTruth.sectorState.phaseCont", proxy: true },
+    ]),
+    "1",
+  );
+  values.lobe_count = makeValue(
+    resolveNumber([
+      { value: (state as any).lobeCount, source: "pipeline.lobeCount" },
+      { value: (state as any).hardwareTruth?.sectorState?.lobeCount, source: "pipeline.hardwareTruth.sectorState.lobeCount", proxy: true },
+    ]),
+    "1",
+  );
+  values.lobe_mask = makeStringValue(
+    (state as any).lobeMask ?? (state as any).hardwareTruth?.sectorState?.lobeMask ?? null,
+    (state as any).lobeMask != null
+      ? "pipeline.lobeMask"
+      : "pipeline.hardwareTruth.sectorState.lobeMask",
+    (state as any).lobeMask == null && (state as any).hardwareTruth?.sectorState?.lobeMask == null,
+  );
+  values.run_id = makeStringValue(
+    (state as any).runId ?? (state as any).__runId ?? (state as any).traceId ?? null,
+    "pipeline.runId",
+    (state as any).runId == null && (state as any).__runId == null && (state as any).traceId == null,
+  );
+  values.rendering_seed = makeStringValue(
+    (state as any).renderingSeed ?? (state as any).renderSeed ?? null,
+    "pipeline.renderingSeed",
+    (state as any).renderingSeed == null && (state as any).renderSeed == null,
+  );
+  values.training_trace_id = makeStringValue(
+    (state as any).training_trace_id ?? (state as any).trainingTraceId ?? null,
+    "pipeline.training_trace_id",
+    (state as any).training_trace_id == null && (state as any).trainingTraceId == null,
   );
 
   const lightCrossing = ((state as any).lightCrossing ?? {}) as Record<string, unknown>;

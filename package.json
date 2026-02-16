@@ -53,6 +53,8 @@
     "math:validate": "tsx scripts/validate-math-stage.ts",
     "math:report": "tsx scripts/math-report.ts",
     "math:trace": "tsx scripts/math-trace.ts",
+    "math:congruence:check": "tsx scripts/math-congruence-citation-check.ts",
+    "math:congruence:check:strict": "tsx scripts/math-congruence-citation-check.ts --strict",
     "warp:coverage-audit": "tsx scripts/warp-universal-coverage-audit.ts",
     "reports:ci": "tsx scripts/ci-reports.ts",
     "reports:vitest": "tsx scripts/ci-reports.ts --vitest",
@@ -81,7 +83,9 @@
     "helix:ask:concept-audit": "tsx scripts/helix-ask-concept-audit.ts",
     "helix:ask:sweep": "tsx scripts/helix-ask-sweep.ts",
     "helix:ask:latency-study": "cross-env HELIX_ASK_SWEEP_PACK=scripts/helix-ask-latency-study-pack.json HELIX_ASK_SWEEP_MATRIX=scripts/helix-ask-latency-matrix.json HELIX_ASK_SWEEP_OUT_DIR=artifacts/helix-ask-latency npm run helix:ask:sweep",
-    "helix:ask:agent-eval": "tsx scripts/helix-ask-agent-eval.ts"
+    "helix:ask:agent-eval": "tsx scripts/helix-ask-agent-eval.ts",
+    "curvature:bundle:capture": "tsx scripts/curvature-bundle-capture.ts",
+    "curvature:bundle:validate": "tsx scripts/curvature-bundle-validate.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",
