@@ -43,6 +43,38 @@ experiment protocol.
 4. Define a minimum reproducibility envelope (seed + versioned evidence pack) for
    high-stakes domains.
 
+## Update: planner trace contract now includes scientific-method metadata
+
+`server/services/planner/chat-b.ts` now writes a `scientific_method` record onto
+task traces, including:
+
+- hypothesis + anti-hypothesis statements
+- a bounded counterfactual result marker (`supports_hypothesis` /
+  `supports_anti_hypothesis` / `inconclusive`)
+- uncertainty interval + confidence band
+- reproducibility metadata (run id, plan hash, prompt hash when present,
+  timestamp, step count, citation count)
+- corrective-action payload for failed evidence or missing citations
+
+This closes the first integration layer for scientific-method loop visibility,
+with room to strengthen evidence weighting and domain-calibrated uncertainty.
+
+
+
+## Incremental runtime build status
+
+The planner now applies a **scientific-mode quality gate** when goals indicate
+scientific-method workflows (or `HELIX_SCIENTIFIC_METHOD_MODE=1`):
+
+- citation verification failures are treated as anti-hypothesis evidence for the
+  scientific trace
+- task trace `ok` is downgraded in scientific mode when citation verification
+  fails
+- corrective-action payloads include explicit rerun/repair directives
+
+This is still an intermediate stage and should be followed by explicit
+branch-execution counterfactual tools and calibrated uncertainty models.
+
 ## Related references
 
 - `docs/helix-ask-flow.md`

@@ -115,6 +115,36 @@ export const TaskTrace = z.object({
   routine_json: z.any().optional(),
   collapse_strategy: z.string().optional(),
   collapse_trace: CollapseTraceEntry.optional(),
+  scientific_method: z
+    .object({
+      hypothesis: z.string(),
+      anti_hypothesis: z.string(),
+      counterfactual_test: z.object({
+        tested: z.boolean(),
+        method: z.string(),
+        result: z.enum(["supports_hypothesis", "supports_anti_hypothesis", "inconclusive"]),
+        failed_step_id: z.string().optional(),
+      }),
+      uncertainty_interval: z.object({
+        low: z.number(),
+        high: z.number(),
+        confidence: z.number().min(0).max(1),
+      }),
+      reproducibility: z.object({
+        run_id: z.string(),
+        prompt_hash: z.string().optional(),
+        plan_hash: z.string(),
+        timestamp: z.string(),
+        step_count: z.number().int().nonnegative(),
+        citation_count: z.number().int().nonnegative(),
+      }),
+      corrective_action: z.object({
+        required: z.boolean(),
+        reason: z.string().optional(),
+        actions: z.array(z.string()).default([]),
+      }),
+    })
+    .optional(),
 });
 
 export type TResonanceSelectionSnapshot = {
@@ -147,4 +177,32 @@ export type TTaskTrace = z.infer<typeof TaskTrace> & {
   debug_sources?: boolean;
   collapse_strategy?: string;
   collapse_trace?: TCollapseTraceEntry;
+  scientific_method?: {
+    hypothesis: string;
+    anti_hypothesis: string;
+    counterfactual_test: {
+      tested: boolean;
+      method: string;
+      result: "supports_hypothesis" | "supports_anti_hypothesis" | "inconclusive";
+      failed_step_id?: string;
+    };
+    uncertainty_interval: {
+      low: number;
+      high: number;
+      confidence: number;
+    };
+    reproducibility: {
+      run_id: string;
+      prompt_hash?: string;
+      plan_hash: string;
+      timestamp: string;
+      step_count: number;
+      citation_count: number;
+    };
+    corrective_action: {
+      required: boolean;
+      reason?: string;
+      actions: string[];
+    };
+  };
 };

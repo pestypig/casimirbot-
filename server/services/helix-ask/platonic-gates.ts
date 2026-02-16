@@ -632,7 +632,7 @@ function applyIdeologyConceptOverride(
       };
     }
     return {
-      answer: appendConceptAppendix(input.answer),
+      answer: conceptAnswerWithSources,
       applied: true,
       reason: "ideology_concept_override",
     };
@@ -1167,6 +1167,15 @@ function appendCoverageClarify(
   return paragraphs.join("\n\n");
 }
 
+
+
+const filterCoverageMissingSlots = (slots: string[]): string[] => {
+  return slots
+    .map((slot) => String(slot || "").trim())
+    .filter(Boolean)
+    .filter((slot) => !/(?:[a-z0-9]+(?:-[a-z0-9]+)*-tree)/i.test(slot));
+};
+
 function applyCoverageGate(
   input: HelixAskPlatonicInput,
   summary: HelixAskCoverageSummary,
@@ -1192,14 +1201,16 @@ function applyCoverageGate(
   if (summary.missingKeyCount === 0) {
     return { answer: input.answer, applied: false };
   }
-  const missingSlots = summary.missingSlots.length
+  const missingSlotsRaw = summary.missingSlots.length
     ? summary.missingSlots
     : summary.missingKeys;
+  const missingSlots = filterCoverageMissingSlots(missingSlotsRaw);
   const missingList = missingSlots.join(", ");
-  const guarded = missingList
-    ? `Repo evidence did not cover key terms from the question (${missingList}). Please point to the relevant files or narrow the request.`
-    : "Repo evidence did not cover key terms from the question. Please point to the relevant files or narrow the request.";
-  if (input.evidenceGateOk !== true) {
+  if (missingSlots.length === 0) {
+    return { answer: input.answer, applied: false, reason: "missing_slots_filtered" };
+  }
+  const guarded = `Repo evidence did not cover key terms from the question (${missingList}). Please point to the relevant files or narrow the request.`;
+  if (input.evidenceGateOk !== true && input.intentId !== "repo.ideology_reference") {
     return { answer: guarded, applied: true, reason: "missing_slots" };
   }
   const clarifyLine = missingList

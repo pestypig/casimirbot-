@@ -161,7 +161,7 @@ describe("Chat B planner", () => {
       steps: [],
       approvals: [],
     };
-    await executeCompiledPlan(compiled, {
+    const results = await executeCompiledPlan(compiled, {
       goal: "Summarize Alpha warp status",
       sessionId: taskTrace.id,
       personaId: "alice",
@@ -176,4 +176,137 @@ describe("Chat B planner", () => {
     delete process.env.ENABLE_REFLECTION;
     delete process.env.ENABLE_LOG_TEXT;
   });
+
+  it("records scientific-method metadata on task traces", async () => {
+    await putMemoryRecord(baseRecord);
+    const { nodes } = buildChatBPlan({
+      goal: "Summarize Alpha warp status",
+      searchQuery: "Alpha warp bubble status",
+      finalTool: llmLocalSpec.name,
+    });
+    const compiled = compilePlan(nodes);
+    const taskTrace: TTaskTrace = {
+      id: "trace-scientific-method",
+      persona_id: "alice",
+      created_at: new Date().toISOString(),
+      goal: "Summarize Alpha warp status",
+      plan_json: nodes,
+      steps: [],
+      approvals: [],
+    };
+    await executeCompiledPlan(compiled, {
+      goal: taskTrace.goal,
+      sessionId: taskTrace.id,
+      personaId: "alice",
+      taskTrace,
+    });
+
+    expect(taskTrace.scientific_method).toBeTruthy();
+    expect(taskTrace.scientific_method?.hypothesis).toContain(taskTrace.goal);
+    expect(taskTrace.scientific_method?.anti_hypothesis).toContain(taskTrace.goal);
+    expect(taskTrace.scientific_method?.counterfactual_test.tested).toBe(true);
+    expect(taskTrace.scientific_method?.counterfactual_test.result).toBe("supports_hypothesis");
+    expect(taskTrace.scientific_method?.reproducibility.run_id).toBe(taskTrace.id);
+    expect(taskTrace.scientific_method?.reproducibility.plan_hash).toMatch(/^[a-f0-9]{16}$/);
+    expect(taskTrace.scientific_method?.reproducibility.step_count).toBeGreaterThan(0);
+    expect(taskTrace.scientific_method?.uncertainty_interval.confidence).toBeGreaterThan(0);
+    expect(taskTrace.scientific_method?.corrective_action.required).toBe(false);
+  });
+
+  it("marks anti-hypothesis and corrective action when a scientific workflow step fails", async () => {
+    const failSpec: ToolSpecShape = {
+      name: "llm.local.fail",
+      desc: "fails for testing",
+      inputSchema: {} as any,
+      outputSchema: {} as any,
+      deterministic: true,
+      rateLimit: { rpm: 10 },
+    };
+    registerTool({
+      ...failSpec,
+      handler: async () => {
+        throw new Error("forced scientific failure");
+      },
+    });
+
+    const { nodes } = buildChatBPlan({
+      goal: "Run scientific method analysis for Alpha warp status",
+      searchQuery: "Alpha warp bubble status",
+      finalTool: failSpec.name,
+    });
+    const compiled = compilePlan(nodes);
+    const taskTrace: TTaskTrace = {
+      id: "trace-scientific-failure",
+      persona_id: "alice",
+      created_at: new Date().toISOString(),
+      goal: "Run scientific method analysis for Alpha warp status",
+      plan_json: nodes,
+      steps: [],
+      approvals: [],
+    };
+
+    const results = await executeCompiledPlan(compiled, {
+      goal: taskTrace.goal,
+      sessionId: taskTrace.id,
+      personaId: "alice",
+      taskTrace,
+    });
+
+    expect(results.some((step) => step.ok === false)).toBe(true);
+    expect(taskTrace.ok).toBe(false);
+    expect(taskTrace.scientific_method?.counterfactual_test.result).toBe("supports_anti_hypothesis");
+    expect(taskTrace.scientific_method?.counterfactual_test.failed_step_id).toBeTruthy();
+    expect(taskTrace.scientific_method?.corrective_action.required).toBe(true);
+  });
+
+  it("enforces citation gate in scientific mode when verification is enabled", async () => {
+    process.env.ENABLE_KNOWLEDGE_CITATION_VERIFY = "1";
+    await putMemoryRecord(baseRecord);
+    const taskTrace: TTaskTrace = {
+      id: "trace-scientific-citation-gate",
+      persona_id: "alice",
+      created_at: new Date().toISOString(),
+      goal: "Use scientific method to summarize Alpha warp status",
+      plan_json: [],
+      steps: [],
+      approvals: [],
+    };
+    const { nodes } = buildChatBPlan({
+      goal: taskTrace.goal,
+      searchQuery: "Alpha warp bubble status",
+      finalTool: llmLocalSpec.name,
+    });
+    taskTrace.plan_json = nodes;
+    const compiled = compilePlan(nodes);
+    const results = await executeCompiledPlan(compiled, {
+      goal: taskTrace.goal,
+      sessionId: taskTrace.id,
+      personaId: "alice",
+      taskTrace,
+      knowledgeContext: [
+        {
+          version: 1,
+          project: { name: "alpha" },
+          title: "Alpha Knowledge",
+          summary: "alpha",
+          files: [
+            {
+              name: "alpha.md",
+              content: "Alpha warp bubble status file.",
+            },
+          ],
+        } as any,
+      ],
+    });
+
+    expect(taskTrace.scientific_method?.counterfactual_test.method.toLowerCase()).toContain("citation");
+    expect(taskTrace.scientific_method?.counterfactual_test.result).toBe("supports_anti_hypothesis");
+    expect(taskTrace.scientific_method?.corrective_action.required).toBe(true);
+    expect(taskTrace.ok).toBe(false);
+    expect(results.some((step) => step.id === "scientific.citation_gate" && step.ok === false)).toBe(true);
+    delete process.env.ENABLE_KNOWLEDGE_CITATION_VERIFY;
+  });
+
+
+
 });

@@ -11501,7 +11501,7 @@ const buildSlotClarifyLine = (args: {
   slotPlan?: HelixAskSlotPlan | null;
   planClarify?: string;
 }): string => {
-  const planClarify = (args.planClarify ?? "").trim();
+  const planClarify = sanitizePlanClarifyLine(args.planClarify ?? "");
   if (planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)) {
     return planClarify;
   }
@@ -11522,6 +11522,20 @@ const buildSlotClarifyLine = (args: {
     return `I could not confirm "${label}" (and ${slots.slice(1, 3).join(", ")}). Please point to the relevant files or clarify the terms.`;
   }
   return `I could not confirm "${label}" yet. Please point to the relevant files or clarify the term.`;
+};
+
+
+
+const sanitizePlanClarifyLine = (value: string): string => {
+  const line = value.trim();
+  if (!line) return line;
+  if (/did not cover key terms from the question/i.test(line)) {
+    return "Repo evidence was required by the question but could not be confirmed. Please point to the relevant files or clarify the term.";
+  }
+  if (/(?:[a-z0-9]+(?:-[a-z0-9]+)*-tree)/i.test(line)) {
+    return "Repo evidence was incomplete for this request. Please point to the relevant files or clarify the term.";
+  }
+  return line;
 };
 
 const SCIENTIFIC_REPORT_HEAD_RE =
@@ -12611,6 +12625,23 @@ const stripCitationRepairArtifacts = (value: string): string => {
   return cleaned;
 };
 
+
+export const stripRunawayAnswerArtifacts = (value: string): string => {
+  if (!value) return value;
+  let cleaned = value;
+  cleaned = cleaned.replace(/^(\s*in plain language,)\s*in practice,\s*/i, "$1 ");
+  cleaned = cleaned.replace(/(?:\bEND\.\s*){3,}/gi, "");
+  cleaned = cleaned.replace(/(?:\s*END\.\s*)+$/i, "");
+  const markerMatch = cleaned.match(
+    /\n\s*(Hide Additional Repo Context|Additional repo context:|Details\s*$|Tree Walk\s*$|Execution log\s*$|Ask debug\s*$|Context sources\s*$)/im,
+  );
+  if (markerMatch && typeof markerMatch.index === "number") {
+    cleaned = cleaned.slice(0, markerMatch.index);
+  }
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
+  return cleaned;
+};
+
 const sanitizeCitationRepairOutput = (
   value: string,
   allowedPaths: string[],
@@ -12622,6 +12653,7 @@ const sanitizeCitationRepairOutput = (
   cleaned = scrubbed.text;
   const allowedTokens = extractCitationTokensFromText(evidenceText);
   cleaned = sanitizeSourcesLine(cleaned, allowedPaths, allowedTokens);
+  cleaned = stripRunawayAnswerArtifacts(cleaned);
   return { text: cleaned, removedPaths: scrubbed.removed };
 };
 
@@ -12635,6 +12667,7 @@ const sanitizeReportBlockAnswer = (
   cleaned = deduped.text;
   const scrubbed = scrubUnsupportedPaths(cleaned, allowedPaths);
   cleaned = scrubbed.text;
+  cleaned = stripRunawayAnswerArtifacts(cleaned);
   return {
     text: cleaned,
     removedPaths: scrubbed.removed,
@@ -20571,7 +20604,7 @@ const executeHelixAsk = async ({
         recordControllerStop(agentStopReason, "ambiguity_gate");
       }
       if (failClosedRepoEvidence && !forcedAnswer && intentStrategy !== "constraint_report" && !skipIdeologyClarify) {
-          const planClarify = (clarifyOverride ?? planDirectives?.clarifyQuestion ?? "").trim();
+          const planClarify = sanitizePlanClarifyLine(clarifyOverride ?? planDirectives?.clarifyQuestion ?? "");
           const missingSlots =
             docSlotSummary?.missingSlots?.length
               ? docSlotSummary.missingSlots
@@ -21549,7 +21582,13 @@ const executeHelixAsk = async ({
         allowedSourcePaths,
         extractCitationTokensFromText(evidenceText),
       );
-      const repoEvidencePaths = allowedSourcePaths.slice(0, 6);
+      cleaned = stripRunawayAnswerArtifacts(cleaned);
+      const repoEvidencePaths =
+        allowedSourcePaths.length > 0
+          ? allowedSourcePaths.slice(0, 6)
+          : isIdeologyReferenceIntent
+            ? contextFiles.filter((entry) => entry.toLowerCase().startsWith("docs/")).slice(0, 6)
+            : [];
       if (requiresRepoEvidence && !hasRepoCitations()) {
         if (repoEvidencePaths.length) {
           cleaned = `${cleaned}\n\nSources: ${repoEvidencePaths.join(", ")}`;
@@ -21564,7 +21603,7 @@ const executeHelixAsk = async ({
               .trim();
             paragraph1 = clipAskText(collapsed || stripped, 420);
           }
-          const planClarify = (clarifyOverride ?? planDirectives?.clarifyQuestion ?? "").trim();
+          const planClarify = sanitizePlanClarifyLine(clarifyOverride ?? planDirectives?.clarifyQuestion ?? "");
           const clarifyLine =
             planClarify && /(file|doc|module|path|repo|codebase|where)/i.test(planClarify)
               ? planClarify
@@ -22384,6 +22423,7 @@ const executeHelixAsk = async ({
         allowedSourcePaths,
         extractCitationTokensFromText(evidenceText),
       );
+      cleaned = stripRunawayAnswerArtifacts(cleaned);
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
         logEvent("Answer cleaned preview", "final", finalCleanedPreview, answerStart);
