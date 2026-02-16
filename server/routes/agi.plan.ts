@@ -18368,6 +18368,7 @@ const executeHelixAsk = async ({
     let blockGateDecision: string | undefined;
     let failClosedRepoEvidence = false;
     let failClosedReason: string | null = null;
+    let runtimeBudgetRecommend: string | null = null;
 
     if (debugPayload && skipMicroPass) {
       debugPayload.micro_pass = false;
@@ -20575,6 +20576,7 @@ const executeHelixAsk = async ({
           queueMaxDepth: runtimeContract.clockB.max_queue_depth,
           lanePressure,
         });
+        runtimeBudgetRecommend = budgetState.recommend;
         const arbiterDecision = resolveHelixAskArbiter({
           retrievalConfidence,
           repoThreshold: arbiterRepoRatio,
@@ -20960,9 +20962,9 @@ const executeHelixAsk = async ({
 
       const deterministicScaffoldReasons: string[] = [];
       if (!fastQualityMode && !HELIX_ASK_SINGLE_LLM) {
-        if (budgetState.recommend === "reduce_tool_calls") {
+        if (runtimeBudgetRecommend === "reduce_tool_calls") {
           deterministicScaffoldReasons.push("budget:reduce_tool_calls");
-        } else if (budgetState.recommend === "queue_deep_work") {
+        } else if (runtimeBudgetRecommend === "queue_deep_work") {
           deterministicScaffoldReasons.push("budget:queue_deep_work");
         }
         if (failClosedRepoEvidence) {
