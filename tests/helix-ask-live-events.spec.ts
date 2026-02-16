@@ -159,4 +159,29 @@ describe("Helix Ask live events", () => {
     expect(payload.debug?.graph_pack_skip_reason).toBeUndefined();
     expect(answerPath.some((entry) => entry.startsWith("concept_fast_path"))).toBe(false);
   }, 45000);
+
+  it("does not fan out simple ideology explain prompts into report mode", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "Now explain warp bubble mission ethos",
+        debug: true,
+        sessionId: "test-ideology-explain-no-report",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text: string;
+      debug?: {
+        report_mode?: boolean;
+        report_mode_reason?: string;
+        report_blocks_count?: number;
+      };
+    };
+    expect(payload.debug?.report_mode).toBe(false);
+    expect(payload.debug?.report_mode_reason).toBe("ideology_chat_mode");
+    expect(payload.debug?.report_blocks_count ?? 0).toBeLessThanOrEqual(1);
+    expect(payload.text).toMatch(/mission ethos|warp vessel|radiance/i);
+  }, 45000);
 });

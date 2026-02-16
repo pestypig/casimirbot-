@@ -3046,6 +3046,11 @@ const HELIX_ASK_REPORT_MAX_BLOCKS = clampNumber(
   2,
   40,
 );
+const HELIX_ASK_REPORT_AUTO_MAX_BLOCKS = clampNumber(
+  readNumber(process.env.HELIX_ASK_REPORT_AUTO_MAX_BLOCKS, 3),
+  1,
+  12,
+);
 const HELIX_ASK_REPORT_BLOCK_CHAR_LIMIT = clampNumber(
   readNumber(process.env.HELIX_ASK_REPORT_BLOCK_CHAR_LIMIT, 900),
   180,
@@ -3062,7 +3067,7 @@ const HELIX_ASK_IDEOLOGY_CHAT_MODE_MAX_CHARS = clampNumber(
   3200,
 );
 const HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE =
-  /\b(?:what|what\s+is|what\s+does|what\s+do|how|in\s+plain|plain\s+language|simple\s+terms|define|meaning\s+of)\b/i;
+  /\b(?:what|what\s+is|what\s+does|what\s+do|how|in\s+plain|plain\s+language|simple\s+terms|define|meaning\s+of|explain|explanation)\b/i;
 const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
   /\b(?:how|why|impact|affect|effects?|societ(y|al)|community|governance|public|policy|scenario|example|examples|trust|rumor|decision|in\s+real\s+world|for\s+a|for\s+an|for\s+the|platform|team|council|school)\b/i;
 const HELIX_ASK_IDEOLOGY_REPORT_BAN_RE = /\b(?:report|point[s]?|coverage|summary|compare|difference|between|each|step|slot|bullet|section)\b/i;
@@ -16367,9 +16372,14 @@ const executeHelixAsk = async ({
       const slotBlocks =
         slotPreview.coverageSlots.length > 0 ? buildSlotReportBlocks(slotPreview, baseQuestion) : [];
       const reportBlocks = slotBlocks.length ? slotBlocks : buildReportBlocks(baseQuestion);
-      const limitedBlocks = reportBlocks.slice(0, HELIX_ASK_REPORT_MAX_BLOCKS);
-      const omittedCount = Math.max(0, reportBlocks.length - limitedBlocks.length);
       const inferredReportReason = reportDecision.reason ?? "enabled";
+      const autoBlockCap =
+        inferredReportReason === "multi_slot" || inferredReportReason === "slot_plan"
+          ? HELIX_ASK_REPORT_AUTO_MAX_BLOCKS
+          : HELIX_ASK_REPORT_MAX_BLOCKS;
+      const maxBlockCount = Math.max(1, Math.min(HELIX_ASK_REPORT_MAX_BLOCKS, autoBlockCap));
+      const limitedBlocks = reportBlocks.slice(0, maxBlockCount);
+      const omittedCount = Math.max(0, reportBlocks.length - limitedBlocks.length);
       const bypassSingleBlock =
         (inferredReportReason === "multi_slot" || inferredReportReason === "slot_plan") &&
         limitedBlocks.length <= 1;
