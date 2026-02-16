@@ -23436,6 +23436,14 @@ const executeHelixAsk = async ({
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logDebug("executeHelixAsk ERROR", { message });
+    if (/runHelperWithinStageBudget is not defined/i.test(message)) {
+      const clarifyLine =
+        "I hit an internal fast-mode helper runtime issue. Please retry once; if it persists, I can continue in deterministic clarify mode with one focused follow-up.";
+      streamEmitter.finalize(clarifyLine);
+      logProgress("Fallback", "helper_runtime_missing_clarify", undefined, false);
+      responder.send(200, { ok: true, text: clarifyLine, answer: clarifyLine, fallback: "helper_runtime_missing" });
+      return;
+    }
     streamEmitter.finalize();
     logProgress("Failed", "llm_local_failed", undefined, false);
     responder.send(500, { ok: false, error: "llm_local_failed", message, status: 500 });
