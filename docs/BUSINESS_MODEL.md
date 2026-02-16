@@ -63,12 +63,89 @@ verifies with solvers and tests, and escalates fidelity only when needed.
 - Holdout precision/recall and citation recall (coverage and in-distribution)
 - Gate pass rate with safety-handled outcomes
 - RC dataset reproducibility (manifest hash stability)
+- Helix Ask evidence-gate pass rate
+- Helix Ask arbiter mix (`repo_grounded|hybrid|general|clarify`)
+- Tree/DAG walk determinism rate (same inputs -> same ranked path/context)
+- Graph-lock stability rate across multi-turn sessions
 
 ## Benefit story across generation mediums (measurable targets)
 If every request (code, physics kernels, noise fields, diffusion stubs, coherence graphs)
 runs through the same constraint-first loop, improvements are expected to show up as
 measurable reductions in failure modes and measurable increases in verified yield as
 verification coverage increases.
+
+## Expansion and contraction execution model (2026)
+This operating model explains how the system scales without drifting:
+
+- Expansion is frontier generation: propose new trajectories, branches, and candidate actions.
+- Contraction is reliable scaffolding: enforce constraints, policy gates, and certificate checks before accepting outcomes.
+- Recollection is continuity: preserve traces, deltas, first-fail signals, and procedural reflections so each run starts from learned state, not from zero.
+
+In this model, "singularity" is a convergence point where exploration speed and constraint fidelity remain aligned. It is not uncontrolled collapse; it is stable alignment under explicit limits.
+
+### Collapse event (controlled contraction)
+A collapse event is a deliberate narrowing step triggered when frontier motion exceeds verified scaffold capacity.
+
+Typical trigger pattern:
+- coherence drops and dispersion rises
+- collapse pressure rises above the configured threshold
+- first failing HARD constraint appears or certificate integrity/status is not admissible
+
+Expected response:
+- downgrade from frontier expansion to branch, clarification, or rollback
+- lock to last certified baseline and preserve full artifact chain (trace, deltas, firstFail, certificate)
+- emit recollection signals that inform the next action cycle
+
+### Why this matters commercially
+- Lower wasted labor: fewer speculative branches that cannot pass gates
+- Faster maturity: teams can add frontier rungs while preserving reliability
+- Higher trust: leadership decisions are auditable as "alignment under constraint"
+- Durable innovation: invention widens freedom only after verification confirms stability
+
+## Helix Ask reasoning and tree/DAG walk update (2026)
+This update extends the business model from "constraint-first generation" to
+"constraint-first retrieval and reasoning" at answer-time.
+
+What changed in execution:
+- Helix Ask now applies an anchor-and-walk graph resolver for configured tree topics before evidence gating.
+- Tree/DAG traversal is deterministic under fixed tree files and walk config.
+- Congruence-aware edge filtering tightens which paths are eligible by CL/chart/region conditions.
+- Session graph-locks preserve tree-pack continuity across turns unless evidence shifts.
+- Trace + memory layers preserve run artifacts and support replay-oriented recollection.
+
+## Vision fit check (original -> current)
+Original vision anchor: `docs/product-narrative.md` positions the product as a
+constraint-first, verification-centered engineering agent that converges on
+working systems under finite budgets.
+
+Fit assessment:
+- Fits directly: Helix Ask reasoning now uses the same gate discipline as
+  solver/runtime paths (evidence gates, slot coverage, arbiter policy).
+- Fits directly: deterministic tree/DAG walk reduces "plausible but ungrounded"
+  answer drift and improves replayability.
+- Fits directly: graph-lock + trace continuity supports durable, auditable
+  multi-turn reasoning rather than stateless prompt completion.
+- Partially fits: business ROI from this path is directionally clear but still
+  under-instrumented in production KPI dashboards.
+
+## What improved toward the goal
+- Better repo-grounded consistency for complex prompts through graph-pack
+  injection before synthesis.
+- Lower answer variance from deterministic traversal and explicit walk rules.
+- Stronger continuity for long tasks via session graph-lock behavior.
+- Better forensic/debug quality from trace artifacts and training-trace export.
+- Closer alignment between ideology-aware guidance and technical evidence paths.
+
+## What remains undefined
+- KPI baselines and SLO targets for Helix Ask-specific quality metrics
+  (evidence-gate pass, arbiter mix, graph-lock stability).
+- Promotion criteria that tie tree/DAG walk quality directly to release gates.
+- A formal cross-domain policy for collapse-action thresholds outside current
+  telemetry/governor defaults.
+- Explicit economics model for answer-time verification cost vs latency budget
+  at scale.
+- Productized reporting surface that links these new reasoning metrics to
+  customer ROI and renewal outcomes.
 
 ### Code + repo
 - CI green rate up, time-to-green down
