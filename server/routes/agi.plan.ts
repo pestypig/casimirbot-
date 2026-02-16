@@ -20958,6 +20958,39 @@ const executeHelixAsk = async ({
         }
       }
 
+      const deterministicScaffoldReasons: string[] = [];
+      if (!fastQualityMode && !HELIX_ASK_SINGLE_LLM) {
+        if (budgetState.recommend === "reduce_tool_calls") {
+          deterministicScaffoldReasons.push("budget:reduce_tool_calls");
+        } else if (budgetState.recommend === "queue_deep_work") {
+          deterministicScaffoldReasons.push("budget:queue_deep_work");
+        }
+        if (failClosedRepoEvidence) {
+          deterministicScaffoldReasons.push("fail_closed_repo_evidence");
+        }
+        if (forceHybridNoEvidence) {
+          deterministicScaffoldReasons.push("hybrid_no_evidence");
+        }
+        if (
+          wantsHybrid &&
+          (!evidenceGateOk ||
+            !mustIncludeOk ||
+            !topicMustIncludeOk ||
+            !viabilityMustIncludeOk ||
+            retrievalConfidence < arbiterHybridRatio)
+        ) {
+          deterministicScaffoldReasons.push("hybrid_low_confidence");
+        }
+      }
+      const forceDeterministicScaffolds = deterministicScaffoldReasons.length > 0;
+      if (forceDeterministicScaffolds) {
+        logEvent("Synthesis mode", "deterministic_scaffold", deterministicScaffoldReasons.join(" | "));
+        if (debugPayload) {
+          debugPayload.synthesis_mode = "deterministic_scaffold";
+          debugPayload.synthesis_mode_reasons = deterministicScaffoldReasons.slice();
+        }
+      }
+
       if (isRepoQuestion && !dryRun) {
         if (fastQualityMode && getAskElapsedMs() > FAST_QUALITY_SYNTHESIS_START_BY_MS) {
           pushFastQualityDecision("synthesis", "deadline", "synthesis_started_after_deadline");
@@ -21036,7 +21069,7 @@ const executeHelixAsk = async ({
             evidenceStart,
           );
         } else if (evidenceContext) {
-          if (HELIX_ASK_SINGLE_LLM || fastQualityMode) {
+          if (HELIX_ASK_SINGLE_LLM || fastQualityMode || forceDeterministicScaffolds) {
             const evidenceStart = Date.now();
             if (fastQualityMode) {
               const fastEvidenceCheck = canStartFastHelper(
@@ -21251,8 +21284,8 @@ const executeHelixAsk = async ({
       }
 
       if ((!isRepoQuestion || wantsHybrid) && !dryRun) {
-        if (promptContextText) {
-          if (HELIX_ASK_SINGLE_LLM || fastQualityMode) {
+          if (promptContextText) {
+          if (HELIX_ASK_SINGLE_LLM || fastQualityMode || forceDeterministicScaffolds) {
             promptScaffold = clipAskText(promptContextText, HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
             if (fastQualityMode) {
               const promptCardBudget = canStartFastHelper(
@@ -21369,6 +21402,7 @@ const executeHelixAsk = async ({
         } else if (
           !hasConceptScaffold &&
           !HELIX_ASK_SINGLE_LLM &&
+          !forceDeterministicScaffolds &&
           (!fastQualityMode || canStartHelperCall("reasoning_scaffold_llm", FAST_QUALITY_SYNTHESIS_START_BY_MS))
         ) {
           const evidenceStart = logStepStart(
