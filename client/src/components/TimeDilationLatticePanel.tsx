@@ -18,6 +18,8 @@ import type { CurvatureQuality } from "@/lib/curvature-brick";
 import type { GrEvolveBrickChannel, GrEvolveBrickDecoded } from "@/lib/gr-evolve-brick";
 import type { LapseBrickChannel, LapseBrickDecoded } from "@/lib/lapse-brick";
 import { fetchHullAssets, type HullAssetEntry } from "@/lib/hull-assets";
+import { parseActivateContract } from "@/lib/time-dilation-activate-contract";
+import { buildGrAssistantSummary } from "@/lib/gr-assistant-summary";
 import { C } from "@/lib/physics-const";
 import { kappaDriveFromPower } from "@/physics/curvature";
 import type { GrRegionStats, HullPreviewPayload, ProofPack, TimeDilationRenderPlan } from "@shared/schema";
@@ -568,6 +570,125 @@ uniform float u_constraintWidth;
   outColor = vec4(color * pulse, alpha);
 }
 `;
+
+const VERT_COMPAT = `#version 300 es
+precision mediump float;
+in vec3 a_pos;
+in float a_alpha;
+in float a_hull;
+in vec3 a_hullDir;
+in vec3 a_beta;
+in vec3 a_gamma;
+in vec3 a_shear;
+in float a_constraint;
+in float a_region;
+in float a_regionGrid;
+in float a_theta;
+
+uniform mat4 u_mvp;
+uniform float u_time;
+uniform float u_gridScale;
+uniform vec3 u_worldScale;
+uniform float u_pointSize;
+uniform float u_alphaMin;
+uniform float u_thetaScale;
+uniform float u_constraintScale;
+
+out float v_alpha;
+out float v_pulse;
+out float v_hullWeight;
+out float v_constraint;
+out float v_region;
+out float v_regionGrid;
+out float v_theta;
+
+void main() {
+  vec3 p = a_pos * u_gridScale;
+  vec3 warped = p * max(u_worldScale, vec3(1e-3));
+  float alpha = clamp(a_alpha, u_alphaMin, 1.0);
+  v_alpha = alpha;
+  v_theta = clamp(a_theta * u_thetaScale, -1.0, 1.0);
+  v_hullWeight = 0.0;
+  v_constraint = clamp(abs(a_constraint) * u_constraintScale, 0.0, 1.0);
+  v_region = clamp(a_region, 0.0, 1.0);
+  v_regionGrid = clamp(a_regionGrid, 0.0, 1.0);
+  v_pulse = 0.5 + 0.5 * sin(u_time + dot(p, vec3(1.3, 2.1, 0.9)));
+
+  gl_Position = u_mvp * vec4(warped, 1.0);
+  gl_PointSize = u_pointSize / max(1.0, gl_Position.w);
+}
+`;
+
+const FRAG_COMPAT = `#version 300 es
+precision mediump float;
+
+uniform float u_pointPass;
+
+in float v_alpha;
+in float v_pulse;
+in float v_theta;
+out vec4 outColor;
+
+void main() {
+  if (u_pointPass > 0.5) {
+    vec2 c = gl_PointCoord * 2.0 - 1.0;
+    if (dot(c, c) > 1.0) discard;
+  }
+  float t = clamp(v_theta * 0.5 + 0.5, 0.0, 1.0);
+  vec3 color = mix(vec3(0.24, 0.60, 0.95), vec3(0.95, 0.42, 0.24), t);
+  outColor = vec4(color * mix(0.4, 1.0, v_pulse), max(0.2, v_alpha));
+}
+`;
+
+const VERT_MINIMAL = `#version 300 es
+precision mediump float;
+
+in vec3 a_pos;
+uniform mat4 u_mvp;
+uniform float u_gridScale;
+uniform vec3 u_worldScale;
+uniform float u_pointSize;
+
+void main() {
+  vec3 p = a_pos * u_gridScale;
+  vec3 warped = p * max(u_worldScale, vec3(1e-3));
+  gl_Position = u_mvp * vec4(warped, 1.0);
+  gl_PointSize = u_pointSize / max(1.0, gl_Position.w);
+}
+`;
+
+const FRAG_MINIMAL = `#version 300 es
+precision mediump float;
+
+uniform float u_pointPass;
+out vec4 outColor;
+
+void main() {
+  if (u_pointPass > 0.5) {
+    vec2 c = gl_PointCoord * 2.0 - 1.0;
+    if (dot(c, c) > 1.0) discard;
+  }
+  outColor = vec4(0.72, 0.82, 0.95, 0.85);
+}
+`;
+
+const ATTRIB_BINDINGS = {
+  a_pos: 0,
+  a_alpha: 1,
+  a_hull: 2,
+  a_hullDir: 3,
+  a_beta: 4,
+  a_gamma: 5,
+  a_shear: 6,
+  a_constraint: 7,
+  a_region: 8,
+  a_regionGrid: 9,
+  a_theta: 10,
+} as const;
+
+const ATTRIB_BINDINGS_MINIMAL = {
+  a_pos: 0,
+} as const;
 
 function makeLatticeSegments(div: number): Float32Array {
   const verts: number[] = [];
@@ -2535,13 +2656,21 @@ function TimeDilationLatticePanelInner({
   }, [latticeMetricOnly, proofPack]);
   const contractGuardrails = contractQuery.data?.guardrails ?? null;
   const contractGuardrailSource = contractQuery.data?.sources?.grDiagnostics ?? "missing";
+  const displayGuardrails = useMemo(() => {
+    const tsRatio = resolveTSRatio(pipelineState).value;
+    const gammaVdB = resolveGammaVdB(pipelineState).value;
+    return resolveGuardrails(pipelineState, tsRatio, gammaVdB, contractGuardrails);
+  }, [pipelineState, contractGuardrails]);
+  const displayGuardrailSource =
+    displayGuardrails.source === "contract"
+      ? contractGuardrailSource
+      : "pipeline-derived";
   const contractGuardrailBadgeClass = useMemo(() => {
-    if (!contractGuardrails) return "border border-slate-600 bg-slate-900/70 text-slate-200";
     const statuses: GuardrailState[] = [
-      contractGuardrails.fordRoman,
-      contractGuardrails.thetaAudit,
-      contractGuardrails.tsRatio,
-      contractGuardrails.vdbBand,
+      displayGuardrails.fordRoman,
+      displayGuardrails.thetaAudit,
+      displayGuardrails.tsRatio,
+      displayGuardrails.vdbBand,
     ];
     if (statuses.some((status) => status === "fail" || status === "missing")) {
       return "border border-rose-500/40 bg-rose-500/10 text-rose-200";
@@ -2550,7 +2679,7 @@ function TimeDilationLatticePanelInner({
       return "border border-amber-500/40 bg-amber-500/10 text-amber-200";
     }
     return "border border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
-  }, [contractGuardrails]);
+  }, [displayGuardrails]);
   const tsMetricDerived =
     typeof (pipelineState as any)?.tsMetricDerived === "boolean"
       ? Boolean((pipelineState as any).tsMetricDerived)
@@ -2652,6 +2781,9 @@ function TimeDilationLatticePanelInner({
   const [certActivationError, setCertActivationError] = useState<ActivationErrorState | null>(
     null,
   );
+  const [activationDiagnosticsPartial, setActivationDiagnosticsPartial] = useState(false);
+  const [activationCanonical, setActivationCanonical] =
+    useState<ReturnType<typeof parseActivateContract>["canonical"] | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(showDebug);
   const debugBlocked = latticeMetricOnly && strictMetricMissing;
   const debugAutoPublish = import.meta.env.VITE_LATTICE_DEBUG_PUSH === "1";
@@ -4982,32 +5114,21 @@ function TimeDilationLatticePanelInner({
 
   const grAssistantReport = grAssistantQuery.data ?? null;
   const grAssistantSummary = useMemo(() => {
-    if (!grAssistantReport) return null;
-    const report = grAssistantReport.report;
-    const gate = grAssistantReport.gate;
-    const gateFail = gate?.constraints?.find((entry) => entry.status === "fail");
-    const firstFail = report.failed_checks[0]?.check_name ?? gateFail?.id ?? null;
-    const overallPass = report.passed && (gate?.pass ?? true);
-    return {
-      report,
-      gate,
-      overallPass,
-      firstFail,
-      invariants: Object.entries(report.invariants ?? {}),
-      brickInvariants: Object.entries(report.brick_invariants ?? {}),
-    };
+    return buildGrAssistantSummary(grAssistantReport as any);
   }, [grAssistantReport]);
   const grAssistantStatus = useMemo(() => {
     if (grAssistantQuery.isFetching) return "checking";
     if (!grAssistantSummary) return "idle";
-    return grAssistantSummary.overallPass ? "pass" : "fail";
+    return grAssistantSummary.status;
   }, [grAssistantQuery.isFetching, grAssistantSummary]);
   const grAssistantBadgeClass =
     grAssistantStatus === "pass"
       ? "bg-emerald-500/20 text-emerald-200"
       : grAssistantStatus === "fail"
         ? "bg-rose-500/20 text-rose-200"
-        : "bg-slate-500/20 text-slate-200";
+        : grAssistantStatus === "unknown"
+          ? "bg-amber-500/20 text-amber-200"
+          : "bg-slate-500/20 text-slate-200";
 
   const solverDiagnostics = useMemo(() => {
     if (!debugAllowed) return null;
@@ -5469,6 +5590,8 @@ function TimeDilationLatticePanelInner({
     setCertActivationState("running");
     setCertActivationProgress(0.05);
     setCertActivationError(null);
+    setActivationDiagnosticsPartial(false);
+    setActivationCanonical(null);
     setGrEnabled(true);
     setGrAutoRefresh(false);
     try {
@@ -5506,6 +5629,13 @@ function TimeDilationLatticePanelInner({
         const text = await res.text().catch(() => "");
         throw new Error(`activate failed (${res.status}) ${text}`);
       }
+      const payload = await res.json().catch(() => null);
+      const activation = parseActivateContract(payload);
+      if (!activation.accepted) {
+        throw new Error("activate returned non-accepted response");
+      }
+      setActivationDiagnosticsPartial(activation.diagnosticsPartial);
+      setActivationCanonical(activation.canonical);
       setCertActivationProgress(0.6);
       grQuery.refetch();
     } catch (err) {
@@ -5531,6 +5661,8 @@ function TimeDilationLatticePanelInner({
     setCertActivationState("idle");
     setCertActivationProgress(0);
     setCertActivationError(null);
+    setActivationDiagnosticsPartial(false);
+    setActivationCanonical(null);
     setGrEnabled(false);
     setGrAutoRefresh(false);
   }, []);
@@ -5570,25 +5702,31 @@ function TimeDilationLatticePanelInner({
       releaseContextRef.current = registerWebGLContext(gl, { label: "TimeDilationLatticePanel" });
 
       let prog: WebGLProgram;
+      let shaderMode: "full" | "compat" | "minimal" = "full";
       try {
-        prog = createProgram(gl, VERT, FRAG, {
-          a_pos: 0,
-          a_alpha: 1,
-          a_hull: 2,
-          a_hullDir: 3,
-          a_beta: 4,
-          a_gamma: 5,
-          a_shear: 6,
-          a_constraint: 7,
-          a_region: 8,
-          a_regionGrid: 9,
-          a_theta: 10,
-        });
-        progRef.current = prog;
+        prog = createProgram(gl, VERT, FRAG, ATTRIB_BINDINGS);
       } catch (err) {
-        setGlStatus("compile-fail");
-        setGlError(err instanceof Error ? err.message : String(err));
-        return;
+        console.warn("[TimeDilationLattice] Full shader compile failed, attempting compatibility shader", err);
+        try {
+          prog = createProgram(gl, VERT_COMPAT, FRAG_COMPAT, ATTRIB_BINDINGS);
+          shaderMode = "compat";
+        } catch (compatErr) {
+          console.warn("[TimeDilationLattice] Compatibility shader compile failed, attempting minimal shader", compatErr);
+          try {
+            prog = createProgram(gl, VERT_MINIMAL, FRAG_MINIMAL, ATTRIB_BINDINGS_MINIMAL);
+            shaderMode = "minimal";
+          } catch (fallbackErr) {
+            setGlStatus("compile-fail");
+            setGlError(fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr));
+            return;
+          }
+        }
+      }
+      progRef.current = prog;
+      if (shaderMode === "compat") {
+        setGlError("Using compatibility shader mode due to driver compile limits.");
+      } else if (shaderMode === "minimal") {
+        setGlError("Using minimal shader mode due to driver compile limits.");
       }
 
         const lineVbo = gl.createBuffer();
@@ -6398,17 +6536,11 @@ function TimeDilationLatticePanelInner({
           <div className="rounded-full border border-slate-600 bg-slate-950/80 px-2 py-[2px] text-slate-200">
             {`source=${tsMetricSource ?? "n/a"}`}
           </div>
-          {contractGuardrails ? (
-            <div className={cn("rounded-full px-2 py-[2px]", contractGuardrailBadgeClass)}>
-              {`contract FR=${contractGuardrails.fordRoman} TH=${contractGuardrails.thetaAudit} TS=${contractGuardrails.tsRatio} VdB=${contractGuardrails.vdbBand}`}
-            </div>
-          ) : (
-            <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
-              contract unavailable
-            </div>
-          )}
+          <div className={cn("rounded-full px-2 py-[2px]", contractGuardrailBadgeClass)}>
+            {`contract FR=${displayGuardrails.fordRoman} TH=${displayGuardrails.thetaAudit} TS=${displayGuardrails.tsRatio} VdB=${displayGuardrails.vdbBand}`}
+          </div>
           <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
-            {`contract source=${contractGuardrailSource}`}
+            {`contract source=${displayGuardrailSource}`}
           </div>
           <div className="rounded-full border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-slate-300">
             {`T00_min source=${t00MinSource}${t00MinProxy ? " (proxy)" : ""}`}
@@ -6606,6 +6738,16 @@ function TimeDilationLatticePanelInner({
             </div>
           </div>
         )}
+        {activationDiagnosticsPartial && (
+          <div className="pointer-events-none absolute right-3 top-3 z-20 rounded-md border border-amber-400/40 bg-black/75 px-2 py-1 text-[10px] text-amber-200">
+            <div className="uppercase tracking-[0.18em]">Diagnostics partial</div>
+            <div className="text-[10px] text-amber-100/90">
+              Strict: {activationCanonical?.strictCongruence ? "on" : "off"}
+              {activationCanonical?.family ? ` · family ${activationCanonical.family}` : ""}
+              {activationCanonical?.chart ? ` · chart ${activationCanonical.chart}` : ""}
+            </div>
+          </div>
+        )}
         {(debugOverlayEnabled ||
           geometryControlsEnabled ||
           casimirControlsEnabled ||
@@ -6761,9 +6903,9 @@ function TimeDilationLatticePanelInner({
                     gate: {grAssistantSummary.gate.pass ? "pass" : "fail"} | cert: {grAssistantSummary.gate.certificate?.certificateHash ?? "n/a"}
                   </div>
                 ) : null}
-                <div>signature: {grAssistantSummary.report.assumptions.signature}</div>
-                <div>units: {grAssistantSummary.report.assumptions.units_internal}</div>
-                <div>coords: {grAssistantSummary.report.assumptions.coords.join(", ")}</div>
+                <div>signature: {grAssistantSummary.assumptions.signature}</div>
+                <div>units: {grAssistantSummary.assumptions.unitsInternal}</div>
+                <div>coords: {grAssistantSummary.assumptions.coords.join(", ")}</div>
                 {grAssistantSummary.invariants.length > 0 && (
                   <div className="mt-1">
                     <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
