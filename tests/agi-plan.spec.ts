@@ -161,7 +161,7 @@ describe("Chat B planner", () => {
       steps: [],
       approvals: [],
     };
-    await executeCompiledPlan(compiled, {
+    const results = await executeCompiledPlan(compiled, {
       goal: "Summarize Alpha warp status",
       sessionId: taskTrace.id,
       personaId: "alice",
@@ -278,7 +278,7 @@ describe("Chat B planner", () => {
     });
     taskTrace.plan_json = nodes;
     const compiled = compilePlan(nodes);
-    await executeCompiledPlan(compiled, {
+    const results = await executeCompiledPlan(compiled, {
       goal: taskTrace.goal,
       sessionId: taskTrace.id,
       personaId: "alice",
@@ -286,7 +286,7 @@ describe("Chat B planner", () => {
       knowledgeContext: [
         {
           version: 1,
-          slug: "alpha",
+          project: { name: "alpha" },
           title: "Alpha Knowledge",
           summary: "alpha",
           files: [
@@ -303,7 +303,10 @@ describe("Chat B planner", () => {
     expect(taskTrace.scientific_method?.counterfactual_test.result).toBe("supports_anti_hypothesis");
     expect(taskTrace.scientific_method?.corrective_action.required).toBe(true);
     expect(taskTrace.ok).toBe(false);
+    expect(results.some((step) => step.id === "scientific.citation_gate" && step.ok === false)).toBe(true);
     delete process.env.ENABLE_KNOWLEDGE_CITATION_VERIFY;
   });
+
+
 
 });

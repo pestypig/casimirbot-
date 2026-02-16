@@ -3733,6 +3733,14 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
                   };
               results.push(entry);
               citationVerification.repaired = stepOk;
+              if (stepOk) {
+                const repairedReadable = pickReadableText(output);
+                if (repairedReadable) {
+                  const repairedVerdict = verifyCitations(attachments as any[], extractCitations(repairedReadable));
+                  citationVerification.pass = repairedVerdict.pass;
+                  citationVerification.missing = repairedVerdict.missing;
+                }
+              }
             }
           }
         }
@@ -3740,6 +3748,22 @@ export async function executeCompiledPlan(steps: ExecutorStep[], runtime: Execut
     }
   } catch {
     // citation repair is best-effort; ignore failures
+  }
+
+  const scientificMode = isScientificMethodMode(runtime);
+  if (scientificMode && citationVerification.enabled && citationVerification.pass === false) {
+    const gateError = citationVerification.missing?.length
+      ? `Scientific citation gate failed: missing ${citationVerification.missing.join(", ")}`
+      : "Scientific citation gate failed: verification did not pass";
+    results.push({
+      id: "scientific.citation_gate",
+      kind: "tool.call",
+      ok: false,
+      error: { message: gateError, type: "scientific_citation_gate" },
+      citations: [],
+      latency_ms: 0,
+      essence_ids: [],
+    });
   }
 
   recordTaskTraceResults(runtime.taskTrace, runtime, results, citationVerification);
