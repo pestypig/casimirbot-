@@ -4,3 +4,6 @@
 [submodule "external/webgpu-volume-pathtracer"]
 	path = external/webgpu-volume-pathtracer
 	url = https://github.com/Twinklebear/webgpu-volume-pathtracer
+[submodule "external/atoms-kavan010"]
+	path = external/atoms-kavan010
+	url = https://github.com/kavan010/Atoms

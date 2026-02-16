@@ -53,6 +53,8 @@
     "math:validate": "tsx scripts/validate-math-stage.ts",
     "math:report": "tsx scripts/math-report.ts",
     "math:trace": "tsx scripts/math-trace.ts",
+    "math:congruence:check": "tsx scripts/math-congruence-citation-check.ts",
+    "math:congruence:check:strict": "tsx scripts/math-congruence-citation-check.ts --strict",
     "warp:coverage-audit": "tsx scripts/warp-universal-coverage-audit.ts",
     "reports:ci": "tsx scripts/ci-reports.ts",
     "reports:vitest": "tsx scripts/ci-reports.ts --vitest",

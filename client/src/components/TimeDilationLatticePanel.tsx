@@ -640,38 +640,6 @@ void main() {
 }
 `;
 
-const VERT_MINIMAL = `#version 300 es
-precision mediump float;
-
-in vec3 a_pos;
-uniform mat4 u_mvp;
-uniform float u_gridScale;
-uniform vec3 u_worldScale;
-uniform float u_pointSize;
-
-void main() {
-  vec3 p = a_pos * u_gridScale;
-  vec3 warped = p * max(u_worldScale, vec3(1e-3));
-  gl_Position = u_mvp * vec4(warped, 1.0);
-  gl_PointSize = u_pointSize / max(1.0, gl_Position.w);
-}
-`;
-
-const FRAG_MINIMAL = `#version 300 es
-precision mediump float;
-
-uniform float u_pointPass;
-out vec4 outColor;
-
-void main() {
-  if (u_pointPass > 0.5) {
-    vec2 c = gl_PointCoord * 2.0 - 1.0;
-    if (dot(c, c) > 1.0) discard;
-  }
-  outColor = vec4(0.72, 0.82, 0.95, 0.85);
-}
-`;
-
 const ATTRIB_BINDINGS = {
   a_pos: 0,
   a_alpha: 1,
@@ -684,10 +652,6 @@ const ATTRIB_BINDINGS = {
   a_region: 8,
   a_regionGrid: 9,
   a_theta: 10,
-} as const;
-
-const ATTRIB_BINDINGS_MINIMAL = {
-  a_pos: 0,
 } as const;
 
 function makeLatticeSegments(div: number): Float32Array {
@@ -5702,7 +5666,7 @@ function TimeDilationLatticePanelInner({
       releaseContextRef.current = registerWebGLContext(gl, { label: "TimeDilationLatticePanel" });
 
       let prog: WebGLProgram;
-      let shaderMode: "full" | "compat" | "minimal" = "full";
+      let shaderMode: "full" | "compat" = "full";
       try {
         prog = createProgram(gl, VERT, FRAG, ATTRIB_BINDINGS);
       } catch (err) {
@@ -5710,23 +5674,15 @@ function TimeDilationLatticePanelInner({
         try {
           prog = createProgram(gl, VERT_COMPAT, FRAG_COMPAT, ATTRIB_BINDINGS);
           shaderMode = "compat";
-        } catch (compatErr) {
-          console.warn("[TimeDilationLattice] Compatibility shader compile failed, attempting minimal shader", compatErr);
-          try {
-            prog = createProgram(gl, VERT_MINIMAL, FRAG_MINIMAL, ATTRIB_BINDINGS_MINIMAL);
-            shaderMode = "minimal";
-          } catch (fallbackErr) {
-            setGlStatus("compile-fail");
-            setGlError(fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr));
-            return;
-          }
+        } catch (fallbackErr) {
+          setGlStatus("compile-fail");
+          setGlError(fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr));
+          return;
         }
       }
       progRef.current = prog;
       if (shaderMode === "compat") {
         setGlError("Using compatibility shader mode due to driver compile limits.");
-      } else if (shaderMode === "minimal") {
-        setGlError("Using minimal shader mode due to driver compile limits.");
       }
 
         const lineVbo = gl.createBuffer();

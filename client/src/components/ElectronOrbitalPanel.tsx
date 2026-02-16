@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Atom, Beaker, CircuitBoard, ExternalLink, Info, Repeat, Waves, Zap } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,9 @@ import {
   type SweepSample,
   type SweepState
 } from "@/hooks/useElectronOrbitSim";
+import type { AtomicViewerLaunch } from "@/lib/agi/api";
 import { openDocPanel } from "@/lib/docs/openDocPanel";
+import type { AtomicOrbitalCloud } from "@/lib/atomic-orbitals";
 
 const EPSILON_0 = 8.8541878128e-12;
 const ELECTRON_CHARGE = 1.602176634e-19;
@@ -36,6 +38,75 @@ const formatNumber = (value?: number | null, digits = 2) => {
   }
   return value.toFixed(digits);
 };
+
+const HELIX_ATOMIC_LAUNCH_EVENT = "helix:atomic-launch";
+const HELIX_ATOMIC_LAUNCH_STORAGE_KEY = "helix.atomic.launch.v1";
+
+function coerceAtomicViewerLaunch(value: unknown): AtomicViewerLaunch | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<AtomicViewerLaunch>;
+  if (candidate.viewer !== "atomic-orbital") return null;
+  if (candidate.panel_id !== "electron-orbital") return null;
+  if (!candidate.params || typeof candidate.params !== "object") return null;
+  return candidate as AtomicViewerLaunch;
+}
+
+function readPendingAtomicViewerLaunch(): AtomicViewerLaunch | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(HELIX_ATOMIC_LAUNCH_STORAGE_KEY);
+    if (!raw) return null;
+    return coerceAtomicViewerLaunch(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingAtomicViewerLaunch(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(HELIX_ATOMIC_LAUNCH_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function clampAtomicInt(value: unknown, min: number, max: number, fallback: number): number {
+  const parsed =
+    typeof value === "number" && Number.isFinite(value)
+      ? Math.trunc(value)
+      : typeof value === "string" && value.trim()
+        ? Math.trunc(Number(value))
+        : fallback;
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function normalizeAtomicLaunchParams(params: AtomicViewerLaunch["params"]): {
+  model: "quantum" | "classical";
+  Z: number;
+  n: number;
+  l: number;
+  m: number;
+  sampleCount: number | null;
+} {
+  const model = params.model === "classical" ? "classical" : "quantum";
+  let n = clampAtomicInt(params.n, 1, 7, 1);
+  let l = clampAtomicInt(params.l, 0, 9, 0);
+  if (l > n - 1) {
+    n = Math.min(7, l + 1);
+  }
+  l = Math.min(l, n - 1);
+  let m = clampAtomicInt(params.m, -9, 9, 0);
+  if (m < -l) m = -l;
+  if (m > l) m = l;
+  const Z = clampAtomicInt(params.Z, 1, 118, 1);
+  const hasSampleCount = typeof params.sampleCount === "number" && Number.isFinite(params.sampleCount);
+  const sampleCount = hasSampleCount
+    ? clampAtomicInt(params.sampleCount, 96, 4000, model === "quantum" ? 640 : 280)
+    : null;
+  return { model, Z, n, l, m, sampleCount };
+}
 
 export default function ElectronOrbitalPanel() {
   const [state, actions] = useElectronOrbitSim();
@@ -52,6 +123,10 @@ export default function ElectronOrbitalPanel() {
   const electronB = useMemo(
     () => state.electrons.find((e) => e.id === state.experiment.electronB) ?? state.electrons[1] ?? state.electrons[0] ?? null,
     [state.electrons, state.experiment.electronB]
+  );
+  const selectedCloud = useMemo(
+    () => state.orbitalClouds.find((entry) => entry.electronId === selected?.id)?.cloud ?? null,
+    [selected?.id, state.orbitalClouds]
   );
   const telemetryLabel = state.telemetrySources.join(", ");
 
@@ -79,6 +154,59 @@ export default function ElectronOrbitalPanel() {
     if (typeof window === "undefined") return;
     window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id } }));
   };
+
+  const applyAtomicLaunch = useCallback(
+    (payload: AtomicViewerLaunch) => {
+      const next = normalizeAtomicLaunchParams(payload.params);
+      actions.setAtomModel(next.model);
+      actions.setCloudSampleCount(next.sampleCount);
+      actions.setPotential({ type: "hydrogenic", Z: next.Z });
+      const targetId =
+        (selectedId && state.electrons.some((electron) => electron.id === selectedId)
+          ? selectedId
+          : state.electrons[0]?.id) ?? null;
+      if (!targetId) return;
+      actions.setElectrons((prev) =>
+        prev.map((electron) => {
+          if (electron.id !== targetId) return electron;
+          const orbital = {
+            ...electron.orbital,
+            n: next.n,
+            l: next.l,
+            m: next.m,
+          };
+          return {
+            ...electron,
+            label: `${next.n}${orbitalLabel(next.l)} launch`,
+            orbital,
+            energyEV: (-13.6 * next.Z * next.Z) / (next.n * next.n),
+            occupancy: next.l === 0 ? 2 : 1,
+            spinAligned: orbital.ms > 0,
+          };
+        }),
+      );
+      setSelectedId(targetId);
+    },
+    [actions, selectedId, state.electrons],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const applyPayload = (value: unknown) => {
+      const payload = coerceAtomicViewerLaunch(value);
+      if (!payload) return;
+      applyAtomicLaunch(payload);
+      clearPendingAtomicViewerLaunch();
+    };
+    applyPayload(readPendingAtomicViewerLaunch());
+    const handleAtomicLaunch = (event: Event) => {
+      applyPayload((event as CustomEvent).detail);
+    };
+    window.addEventListener(HELIX_ATOMIC_LAUNCH_EVENT, handleAtomicLaunch);
+    return () => {
+      window.removeEventListener(HELIX_ATOMIC_LAUNCH_EVENT, handleAtomicLaunch);
+    };
+  }, [applyAtomicLaunch]);
 
   return (
     <Card className="h-full border-slate-800 bg-slate-950/75 text-slate-100">
@@ -120,6 +248,18 @@ export default function ElectronOrbitalPanel() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <Select
+              value={state.atomModel}
+              onValueChange={(value) => actions.setAtomModel(value as typeof state.atomModel)}
+            >
+              <SelectTrigger className="w-52 bg-slate-900/80 border-white/10 text-sm text-white">
+                <SelectValue placeholder="Orbital model" />
+              </SelectTrigger>
+              <SelectContent side="bottom" align="end">
+                <SelectItem value="quantum">Quantum probability cloud</SelectItem>
+                <SelectItem value="classical">Classical trajectory shell</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={selected?.id} onValueChange={setSelectedId}>
               <SelectTrigger className="w-48 bg-slate-900/80 border-white/10 text-sm text-white">
                 <SelectValue placeholder="Select electron" />
@@ -163,6 +303,9 @@ export default function ElectronOrbitalPanel() {
                 ? `Hydrogenic · Z=${state.potential.Z}`
                 : `Custom potential (${state.potential.customId ?? "unlinked"})`}
             </Badge>
+            <Badge variant="outline" className="border-white/15 bg-white/5 text-xs text-white">
+              {state.atomModel === "quantum" ? "Quantum |psi|^2 model" : "Classical trajectory model"}
+            </Badge>
             <Badge
               variant="outline"
               className="border-white/15 bg-white/5 text-xs text-white"
@@ -193,8 +336,8 @@ export default function ElectronOrbitalPanel() {
       <CardContent className="space-y-6 pt-6">
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4">
-            <SectionTitle icon={Atom} title="Orbital iso-surface" subtitle="|ψ|² density" />
-            <OrbitalIsoSurface electron={selected} wavefield={state.wavefields} />
+            <SectionTitle icon={Atom} title="Orbital cloud" subtitle={state.atomModel === "quantum" ? "|psi|^2 density" : "Bohr-like trajectory"} />
+            <OrbitalIsoSurface electron={selected} cloud={selectedCloud} simTime={state.time.tSim} />
             <div className="mt-3 flex justify-between text-[11px] text-slate-400">
               <span>Normalization drift</span>
               <span>{formatPercent(state.derived.normalizationError)}</span>
@@ -359,72 +502,120 @@ function SectionTitle({ icon: Icon, title, subtitle }: SectionTitleProps) {
 
 type OrbitalIsoSurfaceProps = {
   electron: ElectronState | null;
-  wavefield: OrbitWavefieldState;
+  cloud: AtomicOrbitalCloud | null;
+  simTime: number;
 };
 
-function OrbitalIsoSurface({ electron, wavefield }: OrbitalIsoSurfaceProps) {
+type ProjectedOrbitalPoint = {
+  x: number;
+  y: number;
+  z: number;
+  weight: number;
+};
+
+function OrbitalIsoSurface({ electron, cloud, simTime }: OrbitalIsoSurfaceProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !electron) return;
+    if (!canvas) return;
     const size = 280;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = "rgba(2, 6, 23, 0.96)";
+    ctx.fillRect(0, 0, size, size);
+
+    if (!electron || !cloud || cloud.points.length === 0) {
+      ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
+      ctx.font = "12px sans-serif";
+      ctx.fillText("No orbital cloud available", 72, size / 2);
+      return;
+    }
+
     const center = size / 2;
     const radius = center * 0.8;
-    const lobes = Math.max(1, electron.orbital.l || 1);
-    ctx.save();
-    ctx.translate(center, center);
-    for (let i = 0; i < lobes; i++) {
-      const theta = (i / lobes) * Math.PI * 2;
+    const extent = Math.max(cloud.extent, 1e-16);
+    const spin = simTime * (cloud.mode === "classical" ? 1.05 : 0.35);
+    const tilt = 0.28 + electron.orbital.l * 0.12;
+    const cosSpin = Math.cos(spin);
+    const sinSpin = Math.sin(spin);
+    const cosTilt = Math.cos(tilt);
+    const sinTilt = Math.sin(tilt);
+
+    const projected: ProjectedOrbitalPoint[] = cloud.points.map((point) => {
+      const x1 = point.x * cosSpin - point.z * sinSpin;
+      const z1 = point.x * sinSpin + point.z * cosSpin;
+      const y2 = point.y * cosTilt - z1 * sinTilt;
+      const z2 = point.y * sinTilt + z1 * cosTilt;
+      const perspective = 1 / (1 + (z2 / extent) * 0.25);
+      return {
+        x: center + (x1 / extent) * radius * perspective,
+        y: center + (y2 / extent) * radius * perspective,
+        z: z2,
+        weight: point.weight
+      };
+    });
+
+    if (cloud.mode === "classical") {
       ctx.beginPath();
-      ctx.ellipse(
-        0,
-        0,
-        radius * (0.5 + 0.3 * Math.sin(theta + wavefield.normalization)),
-        radius * (0.3 + 0.2 * Math.cos(theta + wavefield.normalization)),
-        theta,
-        0,
-        Math.PI * 2
-      );
+      projected.forEach((point, idx) => {
+        if (idx === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
       ctx.closePath();
-      ctx.fillStyle =
+      ctx.strokeStyle =
         electron.structureModel === "toroidal"
-          ? "rgba(168, 85, 247, 0.35)"
-          : "rgba(56, 189, 248, 0.35)";
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.3)";
+          ? "rgba(216, 180, 254, 0.68)"
+          : "rgba(251, 191, 36, 0.74)";
       ctx.lineWidth = 1;
       ctx.stroke();
     }
+
+    const sorted = [...projected].sort((a, b) => a.z - b.z);
+    for (const point of sorted) {
+      const depth = Math.max(0, Math.min(1, (point.z + extent) / (2 * extent)));
+      const alphaBase = cloud.mode === "quantum" ? 0.08 + point.weight * 0.72 : 0.2 + point.weight * 0.55;
+      const alpha = Math.min(0.92, alphaBase * (0.65 + depth * 0.6));
+      const radiusPx = cloud.mode === "quantum" ? 1 + point.weight * 2 : 1.2 + point.weight * 1.3;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radiusPx, 0, Math.PI * 2);
+      ctx.fillStyle =
+        electron.structureModel === "toroidal"
+          ? `rgba(192, 132, 252, ${alpha})`
+          : cloud.mode === "quantum"
+            ? `rgba(56, 189, 248, ${alpha})`
+            : `rgba(251, 191, 36, ${alpha})`;
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(center, center, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(248, 250, 252, 0.95)";
+    ctx.fill();
+
     if (electron.structureModel === "toroidal" && electron.toroidal) {
       ctx.beginPath();
-      ctx.ellipse(
-        0,
-        0,
-        radius * 0.25,
-        radius * 0.25,
-        0,
-        0,
-        Math.PI * 2
-      );
+      ctx.ellipse(center, center, radius * 0.22, radius * 0.13, spin * 0.45, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(248, 250, 252, 0.8)";
       ctx.setLineDash([6, 4]);
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    ctx.restore();
-  }, [electron, wavefield.normalization]);
+  }, [cloud, electron, simTime]);
 
   return (
     <div className="rounded-xl border border-white/5 bg-slate-950/60 p-3">
       <canvas ref={canvasRef} className="mx-auto block h-64 w-full max-w-xs" />
+      {cloud && (
+        <p className="mt-2 text-[11px] text-slate-400">
+          Source: atoms-kavan010 equations ({cloud.mode}, n={cloud.n} l={cloud.l} m={cloud.m}).
+        </p>
+      )}
       {electron?.structureModel === "toroidal" && electron?.toroidal && (
         <p className="mt-2 text-[11px] text-slate-400">
-          Toroidal core radius ≈ {electron.toroidal.torusRadius.toExponential(2)} m (~λC/4π) — double-loop photon topology.
+          Toroidal core radius approx {electron.toroidal.torusRadius.toExponential(2)} m (~lambdaC/4pi).
         </p>
       )}
     </div>
@@ -989,3 +1180,4 @@ function orbitalLabel(l: number) {
       return `ℓ${l}`;
   }
 }
+
