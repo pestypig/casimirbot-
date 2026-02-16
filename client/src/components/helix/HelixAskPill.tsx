@@ -17,6 +17,7 @@ import {
   getPendingHelixAskJob,
   resumeHelixAskJob,
   subscribeToolLogs,
+  type AtomicViewerLaunch,
   type PendingHelixAskJob,
   type ToolLogEvent,
 } from "@/lib/agi/api";
@@ -671,6 +672,9 @@ const HELIX_FILE_PANEL_HINTS: Array<{ pattern: RegExp; panelId: PanelDefinition[
   { pattern: /(agi\.plan|training-trace|essence|trace)/i, panelId: "agi-essence-console" },
   { pattern: /(docs\/|\.md$)/i, panelId: "docs-viewer" },
 ];
+
+const HELIX_ATOMIC_LAUNCH_EVENT = "helix:atomic-launch";
+const HELIX_ATOMIC_LAUNCH_STORAGE_KEY = "helix.atomic.launch.v1";
 
 function normalizePanelQuery(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -1365,6 +1369,28 @@ export function HelixAskPill({
     [onOpenPanel],
   );
 
+  const launchAtomicViewer = useCallback(
+    (payload: AtomicViewerLaunch | undefined) => {
+      if (!payload) return;
+      if (payload.viewer !== "atomic-orbital" || payload.panel_id !== "electron-orbital") return;
+      openPanelById(payload.panel_id);
+      if (typeof window === "undefined") return;
+      try {
+        window.sessionStorage.setItem(HELIX_ATOMIC_LAUNCH_STORAGE_KEY, JSON.stringify(payload));
+      } catch {
+        // Best effort; still dispatch the event.
+      }
+      window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent(HELIX_ATOMIC_LAUNCH_EVENT, {
+            detail: payload,
+          }),
+        );
+      }, 60);
+    },
+    [openPanelById],
+  );
+
   const renderHelixAskContent = useCallback(
     (content: unknown): ReactNode[] => {
       const parts: ReactNode[] = [];
@@ -1788,6 +1814,7 @@ export function HelixAskPill({
         let responseDebug: HelixAskReply["debug"];
         let responsePromptIngested: boolean | undefined;
         let responseEnvelope: HelixAskResponseEnvelope | undefined;
+        let responseViewerLaunch: AtomicViewerLaunch | undefined;
         try {
           const localResponse = await resumeHelixAskJob(pending.jobId, {
             signal: controller.signal,
@@ -1799,6 +1826,7 @@ export function HelixAskPill({
             : stripPromptEcho(localResponse.text ?? "", questionText);
           responseDebug = localResponse.debug;
           responsePromptIngested = localResponse.prompt_ingested;
+          responseViewerLaunch = localResponse.viewer_launch;
         } catch (error) {
           const aborted =
             controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
@@ -1815,6 +1843,7 @@ export function HelixAskPill({
           if (!responseText) {
             responseText = "No response returned.";
           }
+          launchAtomicViewer(responseViewerLaunch);
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
           const replyId = crypto.randomUUID();
@@ -1861,6 +1890,7 @@ export function HelixAskPill({
       clearLiveDraftFlush,
       clearMoodTimer,
       getHelixAskSessionId,
+      launchAtomicViewer,
       requestMoodHint,
       setActive,
       updateMoodFromText,
@@ -1920,6 +1950,7 @@ export function HelixAskPill({
         let responseDebug: HelixAskReply["debug"];
         let responsePromptIngested: boolean | undefined;
         let responseEnvelope: HelixAskResponseEnvelope | undefined;
+        let responseViewerLaunch: AtomicViewerLaunch | undefined;
         setAskStatus("Generating answer...");
         try {
           const localResponse = await askLocal(undefined, {
@@ -1937,6 +1968,7 @@ export function HelixAskPill({
             : stripPromptEcho(localResponse.text ?? "", trimmed);
           responseDebug = localResponse.debug;
           responsePromptIngested = localResponse.prompt_ingested;
+          responseViewerLaunch = localResponse.viewer_launch;
         } catch (error) {
           const aborted =
             controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
@@ -1953,6 +1985,7 @@ export function HelixAskPill({
           if (!responseText) {
             responseText = "No response returned.";
           }
+          launchAtomicViewer(responseViewerLaunch);
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
           const replyId = crypto.randomUUID();
@@ -2000,6 +2033,7 @@ export function HelixAskPill({
       clearLiveDraftFlush,
       clearMoodTimer,
       getHelixAskSessionId,
+      launchAtomicViewer,
       requestMoodHint,
       resizeTextarea,
       setActive,

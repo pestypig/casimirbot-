@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import {
+  buildAtomicOrbitalCloud,
+  type AtomicOrbitalCloud,
+  type AtomicSimulationMode
+} from "@/lib/atomic-orbitals";
 
 const EPSILON_0 = 8.8541878128e-12;
 const ELECTRON_CHARGE = 1.602176634e-19;
@@ -124,14 +129,22 @@ export type OrbitWavefieldState = {
   }>;
 };
 
+export type ElectronOrbitalCloud = {
+  electronId: string;
+  cloud: AtomicOrbitalCloud;
+};
+
 export type OrbitSimState = {
   electrons: ElectronState[];
   potential: PotentialConfig;
+  atomModel: AtomicSimulationMode;
+  cloudSampleCount: number | null;
   time: {
     tSim: number;
     dt: number;
     playing: boolean;
   };
+  orbitalClouds: ElectronOrbitalCloud[];
   wavefields: OrbitWavefieldState;
   sweeps: SweepState;
   experiment: CoulombExperiment;
@@ -149,6 +162,8 @@ export type OrbitSimState = {
 
 export type OrbitSimActions = {
   setPotential: (cfg: Partial<PotentialConfig>) => void;
+  setAtomModel: (mode: AtomicSimulationMode) => void;
+  setCloudSampleCount: (value: number | null) => void;
   setElectrons: (updater: (prev: ElectronState[]) => ElectronState[]) => void;
   toggleStructureModel: (id: string) => void;
   setElectronStructure: (id: string, model: ElectronStructureModel) => void;
@@ -164,6 +179,8 @@ export type OrbitSimActions = {
 export function useElectronOrbitSim(): [OrbitSimState, OrbitSimActions] {
   const { data: pipeline } = useEnergyPipeline();
   const [electrons, setElectronsState] = useState<ElectronState[]>(() => createDefaultElectrons("safe"));
+  const [atomModel, setAtomModelState] = useState<AtomicSimulationMode>("quantum");
+  const [cloudSampleCount, setCloudSampleCountState] = useState<number | null>(null);
   const [potential, setPotentialState] = useState<PotentialConfig>({
     type: "hydrogenic",
     Z: 1
@@ -203,6 +220,32 @@ export function useElectronOrbitSim(): [OrbitSimState, OrbitSimActions] {
       (pipelineDuty ? pipelineDuty * 0.005 : 0);
     return { fieldId, amplitudes, normalization };
   }, [electrons, pipelineDuty, potential.Z, time.tSim]);
+
+  const orbitalClouds = useMemo<ElectronOrbitalCloud[]>(() => {
+    const bohrRadius = BOHR_RADIUS / Math.max(1, potential.Z);
+    const defaultSampleCount = atomModel === "quantum" ? 640 : 280;
+    const sampleCount = Math.max(
+      96,
+      Math.min(4000, cloudSampleCount ?? defaultSampleCount)
+    );
+    return electrons.map((electron, idx) => ({
+      electronId: electron.id,
+      cloud: buildAtomicOrbitalCloud(
+        atomModel,
+        {
+          n: electron.orbital.n,
+          l: electron.orbital.l,
+          m: electron.orbital.m
+        },
+        {
+          bohrRadius,
+          nuclearCharge: potential.Z,
+          sampleCount,
+          seed: seedFromElectron(electron.id, idx)
+        }
+      )
+    }));
+  }, [atomModel, cloudSampleCount, electrons, potential.Z]);
 
   const derived = useMemo(() => {
     const bohrRadius = BOHR_RADIUS / Math.max(1, potential.Z);
@@ -265,6 +308,18 @@ export function useElectronOrbitSim(): [OrbitSimState, OrbitSimActions] {
 
   const setPotential = useCallback((cfg: Partial<PotentialConfig>) => {
     setPotentialState((prev) => ({ ...prev, ...cfg }));
+  }, []);
+
+  const setAtomModel = useCallback((mode: AtomicSimulationMode) => {
+    setAtomModelState(mode);
+  }, []);
+
+  const setCloudSampleCount = useCallback((value: number | null) => {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      setCloudSampleCountState(null);
+      return;
+    }
+    setCloudSampleCountState(Math.max(96, Math.min(4000, Math.trunc(value))));
   }, []);
 
   const setElectrons = useCallback(
@@ -335,6 +390,8 @@ export function useElectronOrbitSim(): [OrbitSimState, OrbitSimActions] {
 
   const resetToSafeDefaults = useCallback(() => {
     setElectronsState(createDefaultElectrons("safe"));
+    setAtomModelState("quantum");
+    setCloudSampleCountState(null);
     setExperiment(createSafeExperimentConfig());
     setSweepState(createDefaultSweepState());
     setTime({ tSim: 0, dt: 0.05, playing: false });
@@ -448,7 +505,10 @@ export function useElectronOrbitSim(): [OrbitSimState, OrbitSimActions] {
   const state: OrbitSimState = {
     electrons,
     potential,
+    atomModel,
+    cloudSampleCount,
     time,
+    orbitalClouds,
     wavefields,
     sweeps,
     experiment,
@@ -459,6 +519,8 @@ export function useElectronOrbitSim(): [OrbitSimState, OrbitSimActions] {
 
   const actions: OrbitSimActions = {
     setPotential,
+    setAtomModel,
+    setCloudSampleCount,
     setElectrons,
     toggleStructureModel,
     setElectronStructure,
@@ -600,4 +662,13 @@ function isCalibrationProbe(
   const separationDelta = Math.abs(experiment.separation - SAFE_SEPARATION);
   const epsDelta = Math.abs(experiment.mediumPermittivity - SAFE_PERMITTIVITY);
   return separationDelta <= SAFE_SEPARATION * 0.05 && epsDelta <= SAFE_PERMITTIVITY * 0.05;
+}
+
+function seedFromElectron(electronId: string, index: number) {
+  let hash = 2166136261 ^ index;
+  for (let i = 0; i < electronId.length; i++) {
+    hash ^= electronId.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
