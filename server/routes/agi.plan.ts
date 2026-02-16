@@ -14755,6 +14755,7 @@ const executeHelixAsk = async ({
         }
         throw error;
       }
+    };
     const fastQualityClockStart = Date.now();
     const fastQualityBudgets = {
       queryHintsMs: 800,
@@ -15709,6 +15710,7 @@ const executeHelixAsk = async ({
             finalize_by_ms: FAST_QUALITY_FINALIZE_BY_MS,
             helper_min_ms: FAST_QUALITY_HELPER_MIN_MS,
           },
+        };
         debugPayload.fast_quality_deadlines = {
           query_hints_ms: fastQualityBudgets.queryHintsMs,
           plan_retrieval_ms: fastQualityBudgets.planRetrievalMs,
@@ -18521,7 +18523,6 @@ const executeHelixAsk = async ({
                 },
               );
               const queryHelperResult = await runHelperWithRuntimeGuard(
-              const queryHelperResult = await runHelperWithinStageBudget(
                 "query_hints_llm",
                 FAST_QUALITY_QUERY_HINTS_BUDGET_MS,
                 () =>
@@ -21076,34 +21077,6 @@ const executeHelixAsk = async ({
               evidenceStart,
             );
           } else if (!fastQualityMode || canStartHelperCall("evidence_cards_llm", FAST_QUALITY_SYNTHESIS_START_BY_MS)) {
-          } else {
-            const evidenceBudget = canStartFastHelper(
-              "evidence_cards",
-              fastQualityBudgets.helperMinMs,
-              fastStageDeadlines.synthesis_start,
-            );
-            if (fastQualityMode && !evidenceBudget.ok) {
-              const evidenceStart = Date.now();
-              const scaffoldBlocks = definitionFocus ? definitionDocBlocks : docBlocks;
-              const docScaffoldMax = Math.min(Math.max(minDocEvidenceCards, 1), 6);
-              repoScaffold = buildDocEvidenceScaffold(scaffoldBlocks, {
-                maxBlocks: docScaffoldMax,
-                definitionFocus,
-              });
-              if (repoScaffold) {
-                const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
-                const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
-                repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
-              }
-              recordFastDecision(
-                "evidence_cards",
-                "skip_llm",
-                evidenceBudget.reason ?? "min_budget_not_met",
-                evidenceBudget.remainingMs,
-                fastStageDeadlines.synthesis_start,
-              );
-              logEvent("LLM evidence cards", "skipped", evidenceBudget.reason, evidenceStart);
-            } else {
             const evidenceStart = logStepStart(
               "LLM evidence cards",
               "repo",
@@ -21123,7 +21096,6 @@ const executeHelixAsk = async ({
               verificationAnchorRequired ? verificationAnchorHints : [],
             );
             const evidenceHelperResult = await runHelperWithRuntimeGuard(
-            const evidenceHelperResult = await runHelperWithinStageBudget(
               "evidence_cards_llm",
               FAST_QUALITY_SYNTHESIS_START_BY_MS,
               () =>
@@ -21237,7 +21209,6 @@ const executeHelixAsk = async ({
               repoScaffold,
               evidenceStart,
             );
-            }
           }
         }
       }
@@ -21322,7 +21293,6 @@ const executeHelixAsk = async ({
               formatSpec.stageTags,
             );
             const promptHelperResult = await runHelperWithRuntimeGuard(
-            const promptHelperResult = await runHelperWithinStageBudget(
               "prompt_cards_llm",
               FAST_QUALITY_SYNTHESIS_START_BY_MS,
               () =>
@@ -21401,7 +21371,6 @@ const executeHelixAsk = async ({
           !HELIX_ASK_SINGLE_LLM &&
           (!fastQualityMode || canStartHelperCall("reasoning_scaffold_llm", FAST_QUALITY_SYNTHESIS_START_BY_MS))
         ) {
-        } else if (!hasConceptScaffold && !HELIX_ASK_SINGLE_LLM && !fastQualityMode) {
           const evidenceStart = logStepStart(
             "LLM reasoning scaffold",
             "general",
@@ -21418,7 +21387,6 @@ const executeHelixAsk = async ({
             formatSpec.stageTags,
           );
           const generalHelperResult = await runHelperWithRuntimeGuard(
-          const generalHelperResult = await runHelperWithinStageBudget(
             "reasoning_scaffold_llm",
             FAST_QUALITY_SYNTHESIS_START_BY_MS,
             () =>
@@ -22494,7 +22462,6 @@ const executeHelixAsk = async ({
             formatSpec.stageTags,
           );
           const repairHelperResult = await runHelperWithRuntimeGuard(
-          const repairHelperResult = await runHelperWithinStageBudget(
             "citation_repair",
             FAST_QUALITY_FINALIZE_BY_MS,
             () =>
@@ -22942,35 +22909,6 @@ const executeHelixAsk = async ({
             const repairText = stripPromptEchoFromAnswer(repairResult.text ?? "", baseQuestion);
             if (repairText) {
               const candidate = applyHelixAskPlatonicGates({
-          const { result: repairResult, overflow: repairOverflow } =
-            await runHelperWithinStageBudget(
-              "drift_repair",
-              FAST_QUALITY_FINALIZE_BY_MS,
-              () =>
-                runHelixAskLocalWithOverflowRetry(
-                  {
-                    prompt: repairPrompt,
-                    max_tokens: repairTokens,
-                    temperature: Math.min(parsed.data.temperature ?? 0.2, 0.35),
-                    seed: parsed.data.seed,
-                    stop: parsed.data.stop,
-                  },
-                  {
-                    personaId,
-                    sessionId: parsed.data.sessionId,
-                    traceId: askTraceId,
-                  },
-                  {
-                    fallbackMaxTokens: repairTokens,
-                    allowContextDrop: true,
-                    label: "drift_repair",
-                  },
-                ),
-            );
-          recordOverflow("drift_repair", repairOverflow);
-          const repairText = stripPromptEchoFromAnswer(repairResult.text ?? "", baseQuestion);
-          if (repairText) {
-            const candidate = applyHelixAskPlatonicGates({
               question: baseQuestion,
               answer: repairText,
               domain: platonicDomain,
@@ -23663,6 +23601,8 @@ const executeHelixAsk = async ({
         answer: clarifyLine,
         fallback: "fast_mode_runtime_missing",
       });
+      return;
+    }
     if (/runHelperWithinStageBudget is not defined/i.test(message)) {
       const clarifyLine =
         "I hit an internal fast-mode helper runtime issue. Please retry once; if it persists, I can continue in deterministic clarify mode with one focused follow-up.";

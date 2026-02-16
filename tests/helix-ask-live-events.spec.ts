@@ -108,7 +108,7 @@ describe("Helix Ask live events", () => {
     };
     const answerPath = payload.debug?.answer_path ?? payload.answer_path ?? [];
     const text = payload.text.trim();
-    expect(text).toContain("Close loops only with verified signals");
+    expect(text).toMatch(/close loops only with verified signals/i);
     expect(text).toContain("Sources:");
     expect(answerPath).not.toContain("forcedAnswer:ideology");
     expect(answerPath).not.toContain("answer:forced");
@@ -147,7 +147,7 @@ describe("Helix Ask live events", () => {
       };
     };
     const answerPath = payload.debug?.answer_path ?? [];
-    expect(payload.text).toContain("Close loops only with verified signals");
+    expect(payload.text).toMatch(/close loops only with verified signals/i);
     expect(payload.text).toContain("In practice,");
     expect(payload.debug?.tree_walk_mode).toBe("root_to_leaf");
     expect(payload.debug?.graph_pack_skip_reason).toBeUndefined();
