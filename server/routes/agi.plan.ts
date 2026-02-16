@@ -13008,21 +13008,6 @@ const stripCitationRepairArtifacts = (value: string): string => {
 };
 
 
-export const stripRunawayAnswerArtifacts = (value: string): string => {
-  if (!value) return value;
-  let cleaned = value;
-  cleaned = cleaned.replace(/^(\s*in plain language,)\s*in practice,\s*/i, "$1 ");
-  cleaned = cleaned.replace(/(?:\bEND\.\s*){3,}/gi, "");
-  cleaned = cleaned.replace(/(?:\s*END\.\s*)+$/i, "");
-  const markerMatch = cleaned.match(
-    /\n\s*(Hide Additional Repo Context|Additional repo context:|Details\s*$|Tree Walk\s*$|Execution log\s*$|Ask debug\s*$|Context sources\s*$)/im,
-  );
-  if (markerMatch && typeof markerMatch.index === "number") {
-    cleaned = cleaned.slice(0, markerMatch.index);
-  }
-  cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
-  return cleaned;
-};
 
 const sanitizeCitationRepairOutput = (
   value: string,
