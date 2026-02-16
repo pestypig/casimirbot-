@@ -116,6 +116,7 @@ describe("/api/helix/time-dilation/activate contract", () => {
       expect.objectContaining({ ok: false, pending: true, error: "diagnostics_pending" }),
     );
     expect(res.body?.diagnostics).not.toBeNull();
+codex/fix-webgl2-and-502-bad-gateway-errors-hy1a3w
     expect(res.body?.warnings).toEqual(
       expect.arrayContaining(["diagnostics_partial"]),
     );
@@ -124,5 +125,7 @@ describe("/api/helix/time-dilation/activate contract", () => {
     expect(res.body?.canonical).toEqual(
       expect.objectContaining({ mode: "natario", family: "natario", strictCongruence: true }),
     );
+    expect(Array.isArray(res.body?.warnings)).toBe(true);
+main
   });
 });
