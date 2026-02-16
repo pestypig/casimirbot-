@@ -646,7 +646,21 @@ export interface EnergyPipelineState {
 export type EnergyPipelineSnapshot = EnergyPipelineState & PipelineSnapshot;
 
 const MAX_SWEEP_ROWS = 2000;
+const QI_INTENT_GATEWAY_BACKOFF_MS = 60_000;
 let issuedInitialMarginIntent = false;
+let qiIntentRetryAfter = 0;
+
+const isGatewayError = (err: unknown): boolean => {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes(" 502") ||
+    normalized.includes(" 503") ||
+    normalized.includes(" 504") ||
+    normalized.includes("bad gateway") ||
+    normalized.includes("upstream")
+  );
+};
 const MAX_STREAM_SWEEP_ROWS = 5000;
 
 const ACTIVE_SLEW_DEFAULT_MOD_DEPTH_CAP_PCT = 0.8;
@@ -1397,6 +1411,7 @@ export function useEnergyPipeline(options?: {
 
   React.useEffect(() => {
     if (issuedInitialMarginIntent) return;
+    if (Date.now() < qiIntentRetryAfter) return;
     if (devMocksEnabled) return;
     if (!query.isSuccess) return;
 
@@ -1408,19 +1423,26 @@ export function useEnergyPipeline(options?: {
           intent: "increase_margin",
           aggressiveness: 0.7,
         });
+        qiIntentRetryAfter = 0;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         const isNotFound = message.includes("404") || message.toLowerCase().includes("api_not_found");
+        const isGateway = isGatewayError(err);
+        const shouldDisable = isNotFound || isGateway;
         console.warn("[HELIX] Failed to issue initial QI margin intent:", err);
         if (!cancelled) {
-          issuedInitialMarginIntent = isNotFound;
+          issuedInitialMarginIntent = shouldDisable;
+          if (isGateway) {
+            qiIntentRetryAfter = Date.now() + QI_INTENT_GATEWAY_BACKOFF_MS;
+            issuedInitialMarginIntent = false;
+          }
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [devMocksEnabled, query.isSuccess]);
+  }, [devMocksEnabled, query.isSuccess, query.dataUpdatedAt]);
 
   const [sweepResults, setSweepResults] = React.useState<VacuumGapSweepRow[]>([]);
   const [sweepMeta, setSweepMeta] = React.useState<SweepResultsMeta>(EMPTY_SWEEP_META);
