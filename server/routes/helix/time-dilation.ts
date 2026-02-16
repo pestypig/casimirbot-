@@ -355,11 +355,6 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
             },
           };
         });
-
-codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
-
-      const updatedAt = Date.now();
-main
       const pipelineUpdate = {
         ok: true,
         pending: true,
@@ -373,7 +368,6 @@ main
       };
       const diagnostics = {
         ok: false,
-codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
         status: "pending",
         pending: true,
         error: "diagnostics_pending",
@@ -382,11 +376,6 @@ codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
         updatedAt: activatedAt,
         renderingSeed: provisionalSeed,
         seedStatus: "provisional" as SeedStatus,
-        pending: true,
-        error: "diagnostics_pending",
-        message: "Diagnostics are running asynchronously. Poll /api/helix/time-dilation/diagnostics.",
-        updatedAt,
-main
       };
       const canonical = resolveCanonicalSummary(input, pipelineUpdate, null);
       const warnings = resolveWarnings(pipelineUpdate, null);
@@ -399,14 +388,6 @@ main
         updatedAt: activatedAt,
         renderingSeed: provisionalSeed,
         seedStatus: "provisional",
-codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
-        updatedAt: activatedAt,
-        renderingSeed: provisionalSeed,
-        seedStatus: "provisional",
-
-        updatedAt,
-        renderingSeed: `activate:${updatedAt}`,
-main
         strictCongruence: canonical.strictCongruence,
         canonical,
         warnings,
@@ -456,10 +437,6 @@ main
         (typeof (pipelineRecord as any)?.renderingSeed === "string" ? (pipelineRecord as any).renderingSeed : null) ??
         `activate:${updatedAt}`,
       seedStatus: "final",
-codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
-      seedStatus: "final",
-
-main
       strictCongruence: canonical.strictCongruence,
       canonical,
       warnings,
@@ -468,9 +445,6 @@ main
         diagnostics ?? {
           ok: false,
           status: "error",
-codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
-          status: "error",
-main
           error: "diagnostics_unavailable",
           message: "Diagnostics returned empty payload.",
           updatedAt,
