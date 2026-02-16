@@ -18,6 +18,7 @@ import type { CurvatureQuality } from "@/lib/curvature-brick";
 import type { GrEvolveBrickChannel, GrEvolveBrickDecoded } from "@/lib/gr-evolve-brick";
 import type { LapseBrickChannel, LapseBrickDecoded } from "@/lib/lapse-brick";
 import { fetchHullAssets, type HullAssetEntry } from "@/lib/hull-assets";
+import { parseActivateContract } from "@/lib/time-dilation-activate-contract";
 import { C } from "@/lib/physics-const";
 import { kappaDriveFromPower } from "@/physics/curvature";
 import type { GrRegionStats, HullPreviewPayload, ProofPack, TimeDilationRenderPlan } from "@shared/schema";
@@ -2743,6 +2744,9 @@ function TimeDilationLatticePanelInner({
   const [certActivationError, setCertActivationError] = useState<ActivationErrorState | null>(
     null,
   );
+  const [activationDiagnosticsPartial, setActivationDiagnosticsPartial] = useState(false);
+  const [activationCanonical, setActivationCanonical] =
+    useState<ReturnType<typeof parseActivateContract>["canonical"] | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(showDebug);
   const debugBlocked = latticeMetricOnly && strictMetricMissing;
   const debugAutoPublish = import.meta.env.VITE_LATTICE_DEBUG_PUSH === "1";
@@ -5560,6 +5564,8 @@ function TimeDilationLatticePanelInner({
     setCertActivationState("running");
     setCertActivationProgress(0.05);
     setCertActivationError(null);
+    setActivationDiagnosticsPartial(false);
+    setActivationCanonical(null);
     setGrEnabled(true);
     setGrAutoRefresh(false);
     try {
@@ -5597,6 +5603,13 @@ function TimeDilationLatticePanelInner({
         const text = await res.text().catch(() => "");
         throw new Error(`activate failed (${res.status}) ${text}`);
       }
+      const payload = await res.json().catch(() => null);
+      const activation = parseActivateContract(payload);
+      if (!activation.accepted) {
+        throw new Error("activate returned non-accepted response");
+      }
+      setActivationDiagnosticsPartial(activation.diagnosticsPartial);
+      setActivationCanonical(activation.canonical);
       setCertActivationProgress(0.6);
       grQuery.refetch();
     } catch (err) {
@@ -5622,6 +5635,8 @@ function TimeDilationLatticePanelInner({
     setCertActivationState("idle");
     setCertActivationProgress(0);
     setCertActivationError(null);
+    setActivationDiagnosticsPartial(false);
+    setActivationCanonical(null);
     setGrEnabled(false);
     setGrAutoRefresh(false);
   }, []);
@@ -6686,6 +6701,16 @@ function TimeDilationLatticePanelInner({
                 </button>
                 <span className="text-[10px] text-slate-400">Select to highlight</span>
               </div>
+            </div>
+          </div>
+        )}
+        {activationDiagnosticsPartial && (
+          <div className="pointer-events-none absolute right-3 top-3 z-20 rounded-md border border-amber-400/40 bg-black/75 px-2 py-1 text-[10px] text-amber-200">
+            <div className="uppercase tracking-[0.18em]">Diagnostics partial</div>
+            <div className="text-[10px] text-amber-100/90">
+              Strict: {activationCanonical?.strictCongruence ? "on" : "off"}
+              {activationCanonical?.family ? ` · family ${activationCanonical.family}` : ""}
+              {activationCanonical?.chart ? ` · chart ${activationCanonical.chart}` : ""}
             </div>
           </div>
         )}

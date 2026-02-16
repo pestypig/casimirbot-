@@ -18,6 +18,7 @@ import {
   validateIdeologyVerifierPackAgainstNodeIds,
 } from "@shared/ideology/ideology-verifiers";
 import { collectIdeologyNodeIdsFromTree } from "../scripts/collect-ideology-node-ids";
+import { resolveStartupConfig } from "./startup-config";
 
 type LatticeWatcherHandle = {
   close(): Promise<void>;
@@ -81,6 +82,9 @@ const log = (message: string, source = "express") => {
 
   console.log(`${formattedTime} [${source}] ${message}`);
 };
+
+const bootStartedAt = new Date().toISOString();
+log(`boot start ts=${bootStartedAt} pid=${process.pid} node=${process.version}`);
 
 const resolveReadyState = (): boolean => appReady && artifactsReady;
 
@@ -889,33 +893,10 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5173 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const fallbackPort = app.get("env") === "production" ? "5000" : "5173";
-  const isDeploy =
-    process.env.REPLIT_DEPLOYMENT === "1" ||
-    process.env.REPLIT_DEPLOYMENT === "true" ||
-    process.env.DEPLOYMENT === "1" ||
-    process.env.DEPLOYMENT === "true";
-
-  let port = parseInt(process.env.PORT || fallbackPort, 10);
-  if (!Number.isFinite(port) || Number.isNaN(port) || port <= 0) {
-    port = parseInt(fallbackPort, 10);
-  }
-
-  const hostEnv = process.env.HOST;
-  let host = hostEnv?.trim() ? hostEnv.trim() : "0.0.0.0";
-
-  if (isDeploy) {
-    const forcedPort = 5000;
-    const forcedHostRaw = hostEnv?.trim() ? hostEnv.trim() : "0.0.0.0";
-    const forcedHost = forcedHostRaw === "0.0.0.0" ? "::" : forcedHostRaw;
-    if (port !== forcedPort || host !== forcedHost) {
-      log(
-        `[deploy] forcing listen ${forcedHost}:${forcedPort} (was ${host}:${port}; env PORT=${process.env.PORT ?? "unset"} HOST=${process.env.HOST ?? "unset"})`
-      );
-    }
-    port = forcedPort;
-    host = forcedHost;
-  }
+  const startupConfig = resolveStartupConfig(process.env, app.get("env"));
+  const port = startupConfig.port;
+  const host = startupConfig.host;
+  const isDeploy = startupConfig.isDeploy;
 
   const isWin = process.platform === "win32";
   const listenOpts: any = { port, host };
@@ -927,6 +908,11 @@ app.use((req, res, next) => {
     `boot env: NODE_ENV=${process.env.NODE_ENV ?? "undefined"} PORT=${process.env.PORT ?? "unset"} ` +
       `HOST=${host} FAST_BOOT=${fastBoot ? "1" : "0"} ` +
       `PROBE_DIAG=${process.env.PROBE_DIAG ?? "unset"} NET_DIAG=${process.env.NET_DIAG ?? "unset"}`
+  );
+  log(
+    `resolved bind host=${host} port=${port} deploy=${isDeploy ? "1" : "0"} ` +
+      `sourcePort=${startupConfig.sourcePort ?? "unset"} sourceHost=${startupConfig.sourceHost ?? "unset"}`,
+    "boot"
   );
   if (probeDiag) {
     const buildId =
