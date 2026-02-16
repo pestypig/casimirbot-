@@ -11329,6 +11329,7 @@ function buildHelixAskDriftRepairPrompt(
 
 const HelixAskTuningOverrides = z
   .object({
+    fast_quality_mode: z.boolean().optional(),
     arbiter_repo_ratio: z.coerce.number().min(0.05).max(0.95).optional(),
     arbiter_hybrid_ratio: z.coerce.number().min(0.05).max(0.95).optional(),
     retrieval_retry_topk_bonus: z.coerce.number().int().min(0).max(20).optional(),
@@ -14574,6 +14575,7 @@ const executeHelixAsk = async ({
     let slotPlanPassSlots: HelixAskSlotPlanEntry[] = [];
     let graphHintTerms: string[] = [];
     const tuningOverrides = HELIX_ASK_SWEEP_OVERRIDES ? parsed.data.tuning : undefined;
+    const fastQualityMode = Boolean(parsed.data.tuning?.fast_quality_mode);
     const arbiterRepoRatio = clampNumber(
       typeof tuningOverrides?.arbiter_repo_ratio === "number"
         ? tuningOverrides.arbiter_repo_ratio
@@ -14591,6 +14593,8 @@ const executeHelixAsk = async ({
     const retryTopKBonus = clampNumber(
       typeof tuningOverrides?.retrieval_retry_topk_bonus === "number"
         ? tuningOverrides.retrieval_retry_topk_bonus
+        : fastQualityMode
+          ? 1
         : HELIX_ASK_RETRIEVAL_RETRY_TOPK_BONUS,
       0,
       20,
@@ -14846,6 +14850,11 @@ const executeHelixAsk = async ({
       arbiter_repo_ratio?: number;
       arbiter_hybrid_ratio?: number;
       retry_topk_bonus?: number;
+      fast_quality_mode?: boolean;
+      fast_quality_plan_pass_suppressed?: boolean;
+      fast_quality_ambiguity_clusters_skipped?: boolean;
+      fast_quality_ambiguity_labels_disabled?: boolean;
+      fast_quality_retry_strict_mode?: boolean;
       format_enforcement?: "strict" | "relaxed";
       soft_expansion?: number;
       scaffold_tokens?: number;
@@ -15446,6 +15455,7 @@ const executeHelixAsk = async ({
     };
     if (debugPayload) {
       debugPayload.tuning_enabled = Boolean(tuningOverrides);
+      debugPayload.fast_quality_mode = fastQualityMode;
       debugPayload.arbiter_repo_ratio = arbiterRepoRatio;
       debugPayload.arbiter_hybrid_ratio = arbiterHybridRatio;
       debugPayload.retry_topk_bonus = retryTopKBonus;
@@ -16439,7 +16449,13 @@ const executeHelixAsk = async ({
       if (debugPayload && ambiguityTargetSpan) {
         debugPayload.ambiguity_target_span = ambiguityTargetSpan;
       }
-      if (HELIX_ASK_AMBIGUITY_RESOLVER) {
+      const fastQualitySafetyContext = reportDecision.enabled;
+      const shouldSkipAmbiguityClusters = fastQualityMode && !fastQualitySafetyContext;
+      if (debugPayload && fastQualityMode) {
+        debugPayload.fast_quality_ambiguity_clusters_skipped = shouldSkipAmbiguityClusters;
+        debugPayload.fast_quality_ambiguity_labels_disabled = true;
+      }
+      if (HELIX_ASK_AMBIGUITY_RESOLVER && !shouldSkipAmbiguityClusters) {
         const ambiguityTokenCount = filterCriticTokens(tokenizeAskQuery(baseQuestion)).length;
         const shouldProbeClusters =
           ambiguityTokenCount > 0 && ambiguityTokenCount <= HELIX_ASK_AMBIGUITY_SHORT_TOKENS + 2;
@@ -16455,7 +16471,7 @@ const executeHelixAsk = async ({
           if (summary) {
             ambiguityClusterSummary = summary;
             if (summary.clusters.length > 0) {
-              if (HELIX_ASK_AMBIGUITY_LABEL_LLM) {
+              if (HELIX_ASK_AMBIGUITY_LABEL_LLM && !fastQualityMode) {
                 let labelStart: number | null = null;
                 try {
                   labelStart = logStepStart(
@@ -17974,23 +17990,36 @@ const executeHelixAsk = async ({
       Boolean(forcedAnswer) &&
       forcedAnswerIsHard &&
       String(verbosity ?? "").trim().length > 0;
-    const forcePlanPass =
+    const forcePlanPassBaseline =
       blockScoped ||
       (!ideologyFastPathBypass && !ideologyConceptForceBypass && repoExpectationLevel !== "low") ||
       (!ideologyFastPathBypass && !ideologyConceptForceBypass && requiresRepoEvidence) ||
       ((conceptFastPath || Boolean(conceptMatch)) &&
         !ideologyFastPathBypass &&
         !ideologyConceptForceBypass);
+    const forcePlanPassSafety =
+      blockScoped ||
+      (!ideologyFastPathBypass && !ideologyConceptForceBypass && requiresRepoEvidence) ||
+      intentStrategy === "constraint_report" ||
+      mathSolverOk;
+    const forcePlanPass = fastQualityMode ? forcePlanPassSafety : forcePlanPassBaseline;
     const microPassDecision = decideHelixAskMicroPass(baseQuestion, formatSpec);
     const skipMicroPass =
       intentStrategy === "constraint_report" ||
       mathSolverOk ||
-      ideologyFastPathBypass ||
-      ideologyConceptForceBypass;
+      ((ideologyFastPathBypass || ideologyConceptForceBypass) && !fastQualityMode);
+    const fastQualityMicroPassRequired =
+      intentStrategy === "constraint_report" || mathSolverOk || reportDecision.enabled;
     const microPassEnabled =
-      !skipMicroPass && (microPassDecision.enabled || promptIngested || forcePlanPass);
+      fastQualityMode
+        ?
+            !skipMicroPass &&
+            (microPassDecision.enabled || promptIngested || forcePlanPass || isRepoQuestion || fastQualityMicroPassRequired)
+        : !skipMicroPass && (microPassDecision.enabled || promptIngested || forcePlanPass);
     if (debugPayload) {
       debugPayload.micro_pass_enabled = microPassEnabled;
+      debugPayload.fast_quality_plan_pass_suppressed =
+        fastQualityMode && forcePlanPassBaseline && !forcePlanPass;
     }
     const microPassReason =
       forcePlanPass && !microPassDecision.enabled && !promptIngested
@@ -19815,8 +19844,16 @@ const executeHelixAsk = async ({
           HELIX_ASK_RETRIEVAL_RETRY_ENABLED &&
           !promptIngested &&
           hasRepoHints &&
-          (retrievalConfidence < arbiterHybridThreshold || missingSlotsForRetry) &&
+          (
+            fastQualityMode
+              ? (missingSlotsForRetry && isRepoQuestion) ||
+                retrievalConfidence < Math.max(0.2, arbiterHybridThreshold - 0.2)
+              : retrievalConfidence < arbiterHybridThreshold || missingSlotsForRetry
+          ) &&
           canAgentAct();
+        if (debugPayload && fastQualityMode) {
+          debugPayload.fast_quality_retry_strict_mode = true;
+        }
         let retryMissingSlots: string[] = [];
         if (shouldRetryRetrieval) {
           const retrySlotTargets =

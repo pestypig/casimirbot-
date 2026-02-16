@@ -1,0 +1,44 @@
+{
+  "cases": [
+    {
+      "label": "ideology baseline",
+      "question": "How does Feedback Loop Hygiene affect society?"
+    },
+    {
+      "label": "ideology ambiguity-heavy",
+      "question": "Can you clarify what Feedback Loop Hygiene means when people say 'slow it down' in civic moderation, and how that differs from censorship?"
+    },
+    {
+      "label": "repo obligation architecture",
+      "question": "In this repo, explain Helix Ask pipeline stages from intent to evidence gates, and name the relevant server files."
+    },
+    {
+      "label": "repo obligation safeguard",
+      "question": "In this codebase, if repo evidence is missing for a repo-grounded question, what safe fallback behavior should happen and why?"
+    },
+    {
+      "label": "ambiguity resolver behavior",
+      "question": "How does Helix Ask decide whether to clarify an ambiguous prompt versus continuing with a best-effort answer?"
+    },
+    {
+      "label": "scientific method gap",
+      "question": "Summarize Helix Ask scientific-method gaps and what would be needed to close hypothesis/counterfactual/uncertainty traceability."
+    },
+    {
+      "label": "single-llm quality",
+      "question": "What should be optimized first so single-LLM generation is high quality on first pass without weakening evidence gates?"
+    },
+    {
+      "label": "uncertainty reporting",
+      "question": "When evidence is partial, how should Helix Ask communicate uncertainty while staying useful to operators?"
+    },
+    {
+      "label": "canary rollback policy",
+      "question": "Propose a canary policy for fast_quality_mode with auto-fallback if evidence quality drops in rolling windows."
+    },
+    {
+      "label": "trace-backed validation",
+      "question": "How should we validate fast_quality_mode on naturally slow prompts using training-trace export data?"
+    }
+  ]
+}
