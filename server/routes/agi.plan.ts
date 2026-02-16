@@ -18380,6 +18380,7 @@ const executeHelixAsk = async ({
     let failClosedRepoEvidence = false;
     let failClosedReason: string | null = null;
     let runtimeBudgetRecommend: string | null = null;
+    let runtimeMustIncludeOk = true;
 
     if (debugPayload && skipMicroPass) {
       debugPayload.micro_pass = false;
@@ -20742,6 +20743,7 @@ const executeHelixAsk = async ({
           promptContextFiles.forEach((entry) => merged.add(entry));
           contextFiles = Array.from(merged);
         }
+        runtimeMustIncludeOk = mustIncludeOk;
     }
 
         const definitionRegistryPaths = collectDefinitionRegistryPaths(
@@ -20991,7 +20993,7 @@ const executeHelixAsk = async ({
         if (
           wantsHybrid &&
           (!evidenceGateOk ||
-            !mustIncludeOk ||
+            !runtimeMustIncludeOk ||
             !topicMustIncludeOk ||
             !viabilityMustIncludeOk ||
             retrievalConfidence < arbiterHybridRatio)
