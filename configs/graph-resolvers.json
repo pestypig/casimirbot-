@@ -641,6 +641,42 @@
       "weight": 1.05
     },
     {
+      "id": "atomic-systems",
+      "label": "Atomic Systems Walk",
+      "path": "docs/knowledge/physics/atomic-systems-tree.json",
+      "topicTags": [
+        "physics",
+        "simulation"
+      ],
+      "matchers": [
+        "atom",
+        "atoms",
+        "atomic",
+        "electron orbital",
+        "electron orbitals",
+        "orbital simulator",
+        "orbital viewer",
+        "quantum orbital",
+        "classical orbital",
+        "bohr",
+        "wavefunction",
+        "electron cloud",
+        "hydrogenic",
+        "nuclear charge"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.08
+    },
+    {
       "id": "ui-backend-binding",
       "label": "UI Backend Binding Walk",
       "path": "docs/knowledge/ui-backend-binding-tree.json",

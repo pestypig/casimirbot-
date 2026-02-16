@@ -170,6 +170,7 @@ import {
   resolveHelixAskGraphPack,
   type HelixAskCongruenceWalkOverride,
   type HelixAskGraphEvidence,
+  type HelixAskGraphResolvedNode,
   type HelixAskGraphPack,
 } from "../services/helix-ask/graph-resolver";
 import {
@@ -9851,6 +9852,285 @@ const collectTreeFiles = (dir: string): string[] => {
     return paths;
   };
 
+const ATOMIC_TREE_ID = "atomic-systems";
+const ATOMIC_TREE_PATH = "docs/knowledge/physics/atomic-systems-tree.json";
+const ATOMIC_PANEL_ID = "electron-orbital";
+const ATOMIC_VIEWER_ID = "atomic-orbital";
+const ORBITAL_LETTER_L_MAP: Record<string, number> = {
+  s: 0,
+  p: 1,
+  d: 2,
+  f: 3,
+  g: 4,
+};
+const ELEMENT_Z_LOOKUP: Array<{ name: string; Z: number }> = [
+  { name: "hydrogen", Z: 1 },
+  { name: "helium", Z: 2 },
+  { name: "lithium", Z: 3 },
+  { name: "beryllium", Z: 4 },
+  { name: "boron", Z: 5 },
+  { name: "carbon", Z: 6 },
+  { name: "nitrogen", Z: 7 },
+  { name: "oxygen", Z: 8 },
+  { name: "fluorine", Z: 9 },
+  { name: "neon", Z: 10 },
+  { name: "sodium", Z: 11 },
+  { name: "magnesium", Z: 12 },
+  { name: "aluminum", Z: 13 },
+  { name: "silicon", Z: 14 },
+  { name: "phosphorus", Z: 15 },
+  { name: "sulfur", Z: 16 },
+  { name: "chlorine", Z: 17 },
+  { name: "argon", Z: 18 },
+  { name: "potassium", Z: 19 },
+  { name: "calcium", Z: 20 },
+];
+
+type AtomicLaunchDraft = {
+  panelId?: string;
+  viewer?: string;
+  model?: string;
+  Z?: number;
+  n?: number;
+  l?: number;
+  m?: number;
+  sampleCount?: number;
+};
+
+const normalizeLaunchKey = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const readRecordValue = (
+  record: Record<string, unknown>,
+  aliases: string[],
+): unknown => {
+  const aliasSet = new Set(aliases.map(normalizeLaunchKey));
+  for (const [key, value] of Object.entries(record)) {
+    if (aliasSet.has(normalizeLaunchKey(key))) return value;
+  }
+  const name = record.name;
+  if (typeof name === "string" && aliasSet.has(normalizeLaunchKey(name))) {
+    if ("value" in record) return record.value;
+    if ("default" in record) return record.default;
+  }
+  return undefined;
+};
+
+const toInteger = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) return Math.trunc(parsed);
+  }
+  return undefined;
+};
+
+const clampInteger = (value: unknown, min: number, max: number): number | undefined => {
+  const integer = toInteger(value);
+  if (integer == null) return undefined;
+  return Math.max(min, Math.min(max, integer));
+};
+
+const parseAtomicModel = (value: unknown): HelixAskAtomicLaunchModel | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "quantum") return "quantum";
+  if (normalized === "classical") return "classical";
+  return undefined;
+};
+
+const extractAtomicDraftFromNode = (node: HelixAskGraphResolvedNode): AtomicLaunchDraft => {
+  const draft: AtomicLaunchDraft = {};
+  const records: Array<Record<string, unknown>> = [];
+  if (node.environment && typeof node.environment === "object") {
+    records.push(node.environment);
+  }
+  for (const entry of node.inputs ?? []) {
+    if (entry && typeof entry === "object") records.push(entry);
+  }
+  for (const entry of node.outputs ?? []) {
+    if (entry && typeof entry === "object") records.push(entry);
+  }
+
+  for (const record of records) {
+    const panelId = readRecordValue(record, ["panelId", "panel_id", "panel", "targetPanelId"]);
+    if (typeof panelId === "string" && !draft.panelId) {
+      draft.panelId = panelId.trim();
+    }
+    const viewer = readRecordValue(record, ["viewer", "viewerId", "viewer_id"]);
+    if (typeof viewer === "string" && !draft.viewer) {
+      draft.viewer = viewer.trim();
+    }
+    const model = parseAtomicModel(
+      readRecordValue(record, ["model", "atomModel", "atom_model", "mode"]),
+    );
+    if (model && !draft.model) {
+      draft.model = model;
+    }
+    const nuclearCharge = toInteger(
+      readRecordValue(record, ["Z", "z", "nuclearCharge", "nuclear_charge"]),
+    );
+    if (nuclearCharge != null && draft.Z == null) {
+      draft.Z = nuclearCharge;
+    }
+    const principalN = toInteger(
+      readRecordValue(record, ["n", "principal", "principalN", "principal_n"]),
+    );
+    if (principalN != null && draft.n == null) {
+      draft.n = principalN;
+    }
+    const azimuthalL = toInteger(
+      readRecordValue(record, ["l", "azimuthal", "orbitalL", "orbital_l", "angular"]),
+    );
+    if (azimuthalL != null && draft.l == null) {
+      draft.l = azimuthalL;
+    }
+    const magneticM = toInteger(
+      readRecordValue(record, ["m", "magnetic", "magneticM", "magnetic_m"]),
+    );
+    if (magneticM != null && draft.m == null) {
+      draft.m = magneticM;
+    }
+    const sampleCount = toInteger(
+      readRecordValue(record, ["sampleCount", "sample_count", "samples", "points"]),
+    );
+    if (sampleCount != null && draft.sampleCount == null) {
+      draft.sampleCount = sampleCount;
+    }
+  }
+
+  return draft;
+};
+
+const parseAtomicQuestionOverrides = (question: string): AtomicLaunchDraft => {
+  const draft: AtomicLaunchDraft = {};
+  const normalized = question.toLowerCase();
+
+  const classicalMatch = /\b(classical|bohr|trajectory)\b/i.exec(question);
+  const quantumMatch = /\b(quantum|wavefunction|orbital cloud)\b/i.exec(question);
+  if (classicalMatch && (!quantumMatch || classicalMatch.index > quantumMatch.index)) {
+    draft.model = "classical";
+  } else if (quantumMatch) {
+    draft.model = "quantum";
+  }
+
+  const zMatch = /\b(?:z|nuclear charge)\s*(?:=|:|is)?\s*(\d{1,3})\b/i.exec(question);
+  if (zMatch) {
+    draft.Z = Number(zMatch[1]);
+  } else {
+    for (const entry of ELEMENT_Z_LOOKUP) {
+      if (new RegExp(`\\b${entry.name}\\b`, "i").test(normalized)) {
+        draft.Z = entry.Z;
+        break;
+      }
+    }
+  }
+
+  const nMatch = /\bn\s*(?:=|:|is)?\s*(\d{1,2})\b/i.exec(question);
+  if (nMatch) {
+    draft.n = Number(nMatch[1]);
+  }
+  const lMatch = /\bl\s*(?:=|:|is)?\s*(-?\d{1,2})\b/i.exec(question);
+  if (lMatch) {
+    draft.l = Number(lMatch[1]);
+  }
+  const mMatch = /\bm\s*(?:=|:|is)?\s*(-?\d{1,2})\b/i.exec(question);
+  if (mMatch) {
+    draft.m = Number(mMatch[1]);
+  }
+
+  const orbitalNotationMatch = /\b(\d{1,2})\s*([spdfg])\b/i.exec(question);
+  if (orbitalNotationMatch) {
+    draft.n = Number(orbitalNotationMatch[1]);
+    const mappedL = ORBITAL_LETTER_L_MAP[orbitalNotationMatch[2].toLowerCase()];
+    if (mappedL != null) {
+      draft.l = mappedL;
+      if (draft.m == null) draft.m = 0;
+    }
+  }
+
+  const sampleMatch = /\b(?:sample(?:s| count)?|points?)\s*(?:=|:|is)?\s*(\d{2,5})\b/i.exec(
+    question,
+  );
+  if (sampleMatch) {
+    draft.sampleCount = Number(sampleMatch[1]);
+  }
+
+  return draft;
+};
+
+const normalizeAtomicLaunchParams = (draft: AtomicLaunchDraft): HelixAskAtomicLaunchParams => {
+  const model = parseAtomicModel(draft.model) ?? "quantum";
+  let n = clampInteger(draft.n, 1, 10) ?? 1;
+  let l = clampInteger(draft.l, 0, 9) ?? 0;
+  if (l > n - 1) {
+    n = Math.min(10, l + 1);
+  }
+  l = Math.min(l, n - 1);
+  let m = clampInteger(draft.m, -9, 9) ?? 0;
+  if (m < -l) m = -l;
+  if (m > l) m = l;
+  const sampleCount = clampInteger(draft.sampleCount, 96, 4000);
+  return {
+    model,
+    Z: clampInteger(draft.Z, 1, 118) ?? 1,
+    n,
+    l,
+    m,
+    ...(sampleCount != null ? { sampleCount } : {}),
+  };
+};
+
+const resolveAtomicViewerLaunch = (
+  graphPack: HelixAskGraphPack | null,
+  question: string,
+): HelixAskViewerLaunch | null => {
+  if (!graphPack?.frameworks?.length) return null;
+  const atomicFrameworks = graphPack.frameworks.filter((framework) => {
+    if (framework.treeId === ATOMIC_TREE_ID) return true;
+    return framework.sourcePath.replace(/\\/g, "/").endsWith(ATOMIC_TREE_PATH);
+  });
+  if (atomicFrameworks.length === 0) return null;
+
+  const draft: AtomicLaunchDraft = {};
+  const nodes = atomicFrameworks
+    .flatMap((framework) => [...(framework.path ?? []), ...(framework.anchors ?? [])])
+    .slice()
+    .sort((a, b) => b.score - a.score);
+
+  for (const node of nodes) {
+    const nodeDraft = extractAtomicDraftFromNode(node);
+    if (!draft.panelId && nodeDraft.panelId) draft.panelId = nodeDraft.panelId;
+    if (!draft.viewer && nodeDraft.viewer) draft.viewer = nodeDraft.viewer;
+    if (!draft.model && nodeDraft.model) draft.model = nodeDraft.model;
+    if (draft.Z == null && nodeDraft.Z != null) draft.Z = nodeDraft.Z;
+    if (draft.n == null && nodeDraft.n != null) draft.n = nodeDraft.n;
+    if (draft.l == null && nodeDraft.l != null) draft.l = nodeDraft.l;
+    if (draft.m == null && nodeDraft.m != null) draft.m = nodeDraft.m;
+    if (draft.sampleCount == null && nodeDraft.sampleCount != null) {
+      draft.sampleCount = nodeDraft.sampleCount;
+    }
+  }
+
+  const questionOverrides = parseAtomicQuestionOverrides(question);
+  const merged: AtomicLaunchDraft = {
+    ...draft,
+    ...questionOverrides,
+  };
+  const params = normalizeAtomicLaunchParams(merged);
+  const sourcePath = atomicFrameworks[0]?.sourcePath;
+
+  return {
+    viewer: ATOMIC_VIEWER_ID,
+    panel_id: ATOMIC_PANEL_ID,
+    tree_id: atomicFrameworks[0]?.treeId || ATOMIC_TREE_ID,
+    ...(sourcePath ? { source_path: sourcePath } : {}),
+    params,
+  };
+};
+
 const resolveHelixAskTreeWalkMode = (
   raw: string,
   verbosity: HelixAskVerbosity,
@@ -11243,7 +11523,27 @@ type LocalAskResult = {
   prompt_ingested?: boolean;
   prompt_ingest_source?: string;
   prompt_ingest_reason?: string;
+  viewer_launch?: HelixAskViewerLaunch;
   [key: string]: unknown;
+};
+
+type HelixAskAtomicLaunchModel = "quantum" | "classical";
+
+type HelixAskAtomicLaunchParams = {
+  model: HelixAskAtomicLaunchModel;
+  Z: number;
+  n: number;
+  l: number;
+  m: number;
+  sampleCount?: number;
+};
+
+type HelixAskViewerLaunch = {
+  viewer: "atomic-orbital";
+  panel_id: "electron-orbital";
+  tree_id: string;
+  source_path?: string;
+  params: HelixAskAtomicLaunchParams;
 };
 
 type HelixAskOverflowMeta = {
@@ -16682,6 +16982,7 @@ const executeHelixAsk = async ({
       }
     }
     let graphPack: HelixAskGraphPack | null = null;
+    let viewerLaunch: HelixAskViewerLaunch | null = null;
     let treeWalkBlock = "";
     let treeWalkMetrics: HelixAskTreeWalkMetrics | null = null;
     let treeWalkBindingRate = 0;
@@ -20134,6 +20435,10 @@ const executeHelixAsk = async ({
           }
         }
       }
+      viewerLaunch = resolveAtomicViewerLaunch(graphPack, baseQuestion);
+      if (debugPayload && viewerLaunch) {
+        (debugPayload as Record<string, unknown>).viewer_launch = viewerLaunch;
+      }
 
         if (HELIX_ASK_CODE_ALIGNMENT && (docBlocks.length > 0 || graphEvidenceItems.length > 0)) {
           if (docBlocks.length > 0) {
@@ -21052,6 +21357,9 @@ const executeHelixAsk = async ({
 
     if (dryRun) {
       const dryPayload: LocalAskResult = { text: "", prompt_ingested: promptIngested };
+      if (viewerLaunch) {
+        dryPayload.viewer_launch = viewerLaunch;
+      }
       if (promptIngested) {
         if (promptIngestSource) {
           dryPayload.prompt_ingest_source = promptIngestSource;
@@ -21150,6 +21458,9 @@ const executeHelixAsk = async ({
           if (promptIngestReason) {
             result.prompt_ingest_reason = promptIngestReason;
           }
+        }
+        if (viewerLaunch) {
+          result.viewer_launch = viewerLaunch;
         }
         logDebug("streamEmitter.finalize start", {
           cleanedLength: forcedCleanText.length,
@@ -22590,6 +22901,9 @@ const executeHelixAsk = async ({
       if (promptIngestReason) {
         result.prompt_ingest_reason = promptIngestReason;
       }
+    }
+    if (viewerLaunch) {
+      result.viewer_launch = viewerLaunch;
     }
     if (debugPayload && captureLiveHistory) {
       const traceEvents = liveEventHistory.slice();

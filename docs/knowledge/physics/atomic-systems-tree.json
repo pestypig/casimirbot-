@@ -1,0 +1,492 @@
+{
+  "version": 1,
+  "rootId": "atomic-systems-tree",
+  "nodes": [
+    {
+      "id": "atomic-systems-tree",
+      "slug": "atomic-systems-tree",
+      "title": "Atomic Systems Tree",
+      "excerpt": "Canonical DAG route for atomic viewer launches across quantum and classical modes.",
+      "bodyMD": "This tree binds Helix Ask prompts about atoms and orbitals to a single viewer and a stable launch-parameter contract.\n\nMinimal artifact: atomic viewer route with parameter mapping.",
+      "tags": [
+        "physics",
+        "simulation",
+        "atomic",
+        "orbital"
+      ],
+      "children": [
+        "atomic-viewer-canonical",
+        "atomic-parameter-contract",
+        "atomic-quantum-route",
+        "atomic-classical-route",
+        "bridge-atomic-quantum-route-atomic-classical-route"
+      ],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "simulation-systems-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Canonical DAG route for atomic viewer launches across quantum and classical modes.",
+      "nodeType": "concept",
+      "inputs": [
+        {
+          "name": "viewer",
+          "value": "atomic-orbital"
+        },
+        {
+          "name": "panelId",
+          "value": "electron-orbital"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "viewer_launch",
+          "value": "atomic launch envelope"
+        }
+      ],
+      "assumptions": [
+        "Hydrogenic defaults apply unless the prompt supplies explicit parameters."
+      ],
+      "validity": {
+        "mode": "diagnostic",
+        "maturity": "reduced-order"
+      },
+      "deterministic": true,
+      "tolerance": {
+        "sampling": "visual",
+        "target": "qualitative"
+      },
+      "environment": {
+        "viewer": "atomic-orbital",
+        "panelId": "electron-orbital",
+        "model": "quantum",
+        "Z": 1,
+        "n": 1,
+        "l": 0,
+        "m": 0,
+        "sampleCount": 640
+      },
+      "dependencies": [],
+      "predictability": {
+        "status": "partial",
+        "missing": []
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/atomic-systems-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/ElectronOrbitalPanel.tsx"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/useElectronOrbitSim.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/atomic-orbitals.ts"
+        }
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "atomic-viewer-canonical",
+      "slug": "atomic-viewer-canonical",
+      "title": "Atomic Viewer Canonical",
+      "excerpt": "Single viewer target for atomic simulations.",
+      "bodyMD": "Route all atom/orbital simulation requests to the Electron Orbital Simulator panel.\n\nMinimal artifact: panel id and viewer id.",
+      "tags": [
+        "atomic",
+        "viewer",
+        "panel",
+        "electron-orbital"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "atomic-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Single viewer target for atomic simulations.",
+      "nodeType": "concept",
+      "inputs": [
+        {
+          "name": "panelId",
+          "value": "electron-orbital"
+        },
+        {
+          "name": "viewer",
+          "value": "atomic-orbital"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "open_panel",
+          "value": "electron-orbital"
+        }
+      ],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": true,
+      "tolerance": null,
+      "environment": {
+        "panelId": "electron-orbital",
+        "viewer": "atomic-orbital"
+      },
+      "dependencies": [
+        "atomic-systems-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": []
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/components/ElectronOrbitalPanel.tsx"
+        }
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "atomic-parameter-contract",
+      "slug": "atomic-parameter-contract",
+      "title": "Atomic Parameter Contract",
+      "excerpt": "Uniform launch keys for quantum and classical orbital rendering.",
+      "bodyMD": "Launch parameters use a shared key set: model, Z, n, l, m, and sampleCount.\n\nMinimal artifact: parameter map for Helix launch payloads.",
+      "tags": [
+        "atomic",
+        "parameters",
+        "quantum",
+        "classical"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "atomic-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Uniform launch keys for quantum and classical orbital rendering.",
+      "nodeType": "concept",
+      "inputs": [
+        {
+          "name": "model",
+          "type": "enum",
+          "allowed": [
+            "quantum",
+            "classical"
+          ],
+          "default": "quantum"
+        },
+        {
+          "name": "Z",
+          "type": "integer",
+          "range": [
+            1,
+            118
+          ],
+          "default": 1
+        },
+        {
+          "name": "n",
+          "type": "integer",
+          "range": [
+            1,
+            10
+          ],
+          "default": 1
+        },
+        {
+          "name": "l",
+          "type": "integer",
+          "default": 0
+        },
+        {
+          "name": "m",
+          "type": "integer",
+          "default": 0
+        },
+        {
+          "name": "sampleCount",
+          "type": "integer",
+          "range": [
+            96,
+            4000
+          ],
+          "default": 640
+        }
+      ],
+      "outputs": [
+        {
+          "name": "viewer_launch.params",
+          "value": "normalized atomic parameter object"
+        }
+      ],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": true,
+      "tolerance": {
+        "sampleCount": "96-4000"
+      },
+      "environment": {
+        "model": "quantum",
+        "Z": 1,
+        "n": 1,
+        "l": 0,
+        "m": 0,
+        "sampleCount": 640
+      },
+      "dependencies": [
+        "atomic-systems-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": []
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/hooks/useElectronOrbitSim.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/atomic-orbitals.ts"
+        }
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "atomic-quantum-route",
+      "slug": "atomic-quantum-route",
+      "title": "Quantum Orbital Route",
+      "excerpt": "Wavefunction probability-cloud launch defaults.",
+      "bodyMD": "Use this route for quantum orbital rendering and probability-cloud visualization.\n\nMinimal artifact: quantum default launch tuple.",
+      "tags": [
+        "atomic",
+        "quantum",
+        "orbital",
+        "wavefunction"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "atomic-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Wavefunction probability-cloud launch defaults.",
+      "nodeType": "concept",
+      "inputs": [
+        {
+          "name": "model",
+          "value": "quantum"
+        },
+        {
+          "name": "sampleCount",
+          "value": 640
+        }
+      ],
+      "outputs": [
+        {
+          "name": "cloud_mode",
+          "value": "quantum"
+        }
+      ],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": true,
+      "tolerance": null,
+      "environment": {
+        "model": "quantum",
+        "sampleCount": 640,
+        "n": 1,
+        "l": 0,
+        "m": 0,
+        "Z": 1
+      },
+      "dependencies": [
+        "atomic-systems-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": []
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/atomic-orbitals.ts"
+        }
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "atomic-classical-route",
+      "slug": "atomic-classical-route",
+      "title": "Classical Orbital Route",
+      "excerpt": "Bohr-like trajectory shell launch defaults.",
+      "bodyMD": "Use this route for classical trajectory shell rendering.\n\nMinimal artifact: classical default launch tuple.",
+      "tags": [
+        "atomic",
+        "classical",
+        "bohr",
+        "trajectory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "atomic-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Bohr-like trajectory shell launch defaults.",
+      "nodeType": "concept",
+      "inputs": [
+        {
+          "name": "model",
+          "value": "classical"
+        },
+        {
+          "name": "sampleCount",
+          "value": 280
+        }
+      ],
+      "outputs": [
+        {
+          "name": "cloud_mode",
+          "value": "classical"
+        }
+      ],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": true,
+      "tolerance": null,
+      "environment": {
+        "model": "classical",
+        "sampleCount": 280,
+        "n": 1,
+        "l": 0,
+        "m": 0,
+        "Z": 1
+      },
+      "dependencies": [
+        "atomic-systems-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": []
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/atomic-orbitals.ts"
+        }
+      ],
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "bridge-atomic-quantum-route-atomic-classical-route",
+      "slug": "bridge-atomic-quantum-route-atomic-classical-route",
+      "title": "Quantum Route <-> Classical Route Bridge",
+      "excerpt": "Bridge between the two launch modes under one parameter contract.",
+      "bodyMD": "Cross-reference between quantum and classical launch routes for the same viewer.\n\nMinimal artifact: mode-switch bridge.",
+      "tags": [
+        "bridge",
+        "atomic",
+        "quantum",
+        "classical"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "atomic-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "atomic-quantum-route",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "atomic-classical-route",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "bridge": {
+        "left": "atomic-quantum-route",
+        "right": "atomic-classical-route",
+        "relation": "Mode switch under one atomic launch contract."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": true,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "atomic-quantum-route",
+        "atomic-classical-route"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": []
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/lib/atomic-orbitals.ts"
+        }
+      ],
+      "summary": "Bridge between the two launch modes under one parameter contract.",
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

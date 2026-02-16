@@ -1,0 +1,150 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "atomic-system-core",
+  "domain": "atomic-simulation",
+  "updatedAt": "2026-02-16",
+  "claims": [
+    {
+      "claimId": "atomic.hydrogenic.energy.nonrel.approx",
+      "statement": "For a single-electron hydrogenic model, principal-level energy scales approximately as E_n ~ -13.6 eV * Z^2 / n^2 under non-relativistic assumptions.",
+      "maturity": "reduced-order",
+      "validityDomain": {
+        "system": "single-electron hydrogenic ions",
+        "constraints": [
+          "non-relativistic approximation",
+          "ignores spin-orbit and QED corrections",
+          "diagnostic viewer use"
+        ],
+        "applicableRange": {
+          "Z": [
+            1,
+            20
+          ],
+          "n": [
+            1,
+            7
+          ]
+        }
+      },
+      "sources": [
+        {
+          "kind": "textbook",
+          "citation": "Griffiths, Introduction to Quantum Mechanics, Hydrogen atom chapter.",
+          "equation": "E_n = -13.6 eV * Z^2 / n^2",
+          "note": "Canonical non-relativistic energy scaling for hydrogenic systems."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "client/src/components/ElectronOrbitalPanel.tsx",
+          "note": "UI currently computes a reduced-order energy estimate for display."
+        }
+      ],
+      "repoBindings": [
+        "client/src/components/ElectronOrbitalPanel.tsx",
+        "client/src/hooks/useElectronOrbitSim.ts",
+        "server/routes/agi.plan.ts"
+      ],
+      "notes": "Use as approximation guidance only; do not present as certified multi-electron prediction."
+    },
+    {
+      "claimId": "atomic.quantum-number.constraints",
+      "statement": "Orbital quantum numbers must satisfy n >= 1, 0 <= l <= n-1, and -l <= m <= l.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "hydrogenic orbital parameterization",
+        "constraints": [
+          "integer quantum numbers",
+          "single-electron angular momentum basis"
+        ],
+        "applicableRange": {
+          "n": [
+            1,
+            7
+          ],
+          "l": [
+            0,
+            6
+          ],
+          "m": [
+            -6,
+            6
+          ]
+        }
+      },
+      "sources": [
+        {
+          "kind": "textbook",
+          "citation": "Standard angular momentum quantization constraints in undergraduate quantum mechanics references.",
+          "equation": "0 <= l <= n-1, -l <= m <= l"
+        },
+        {
+          "kind": "repo-code",
+          "citation": "client/src/lib/atomic-orbitals.ts",
+          "note": "Local normalization applies these bounds before cloud generation."
+        }
+      ],
+      "repoBindings": [
+        "server/routes/agi.plan.ts",
+        "client/src/components/ElectronOrbitalPanel.tsx",
+        "client/src/lib/atomic-orbitals.ts"
+      ]
+    },
+    {
+      "claimId": "atomic.viewer.launch.contract",
+      "statement": "A unified launch contract (model, Z, n, l, m, sampleCount) can drive both quantum and classical atomic viewer modes with deterministic normalization.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "Helix Ask atomic viewer pipeline",
+        "constraints": [
+          "diagnostic visualization path",
+          "parameter normalization and clamping enforced"
+        ],
+        "applicableRange": {
+          "Z": [
+            1,
+            118
+          ],
+          "n": [
+            1,
+            10
+          ],
+          "sampleCount": [
+            96,
+            4000
+          ]
+        }
+      },
+      "sources": [
+        {
+          "kind": "repo-code",
+          "citation": "server/routes/agi.plan.ts",
+          "note": "Server emits viewer_launch payload with normalized params."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "client/src/components/helix/HelixAskPill.tsx",
+          "note": "Ask pill dispatches atomic launch event."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "client/src/components/ElectronOrbitalPanel.tsx",
+          "note": "Panel applies launch payload and updates simulation state."
+        },
+        {
+          "kind": "spec",
+          "citation": "docs/knowledge/physics/atomic-systems-tree.json",
+          "note": "Canonical DAG parameter contract and defaults."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/atomic-systems-tree.json",
+        "configs/graph-resolvers.json",
+        "server/routes/agi.plan.ts",
+        "client/src/components/helix/HelixAskPill.tsx",
+        "client/src/components/ElectronOrbitalPanel.tsx"
+      ]
+    }
+  ]
+}
+
