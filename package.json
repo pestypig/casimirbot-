@@ -85,7 +85,9 @@
     "helix:ask:latency-study": "cross-env HELIX_ASK_SWEEP_PACK=scripts/helix-ask-latency-study-pack.json HELIX_ASK_SWEEP_MATRIX=scripts/helix-ask-latency-matrix.json HELIX_ASK_SWEEP_OUT_DIR=artifacts/helix-ask-latency npm run helix:ask:sweep",
     "helix:ask:agent-eval": "tsx scripts/helix-ask-agent-eval.ts",
     "curvature:bundle:capture": "tsx scripts/curvature-bundle-capture.ts",
-    "curvature:bundle:validate": "tsx scripts/curvature-bundle-validate.ts"
+    "curvature:bundle:validate": "tsx scripts/curvature-bundle-validate.ts",
+    "helix:ask:fast-quality:canary-sweep": "cross-env HELIX_ASK_SWEEP_PACK=scripts/helix-ask-fast-quality-canary-pack.json HELIX_ASK_SWEEP_MATRIX=scripts/helix-ask-latency-matrix.json HELIX_ASK_SWEEP_OUT_DIR=artifacts/helix-ask-latency npm run helix:ask:sweep",
+    "helix:ask:fast-quality:gate": "tsx scripts/helix-ask-fast-quality-promotion-gate.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",
