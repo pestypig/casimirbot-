@@ -49,7 +49,11 @@ describe("Helix Ask live events", () => {
     });
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
-      debug?: { live_events?: Array<{ stage: string }> };
+      debug?: {
+        live_events?: Array<{ stage: string }>;
+        synthesis_mode?: string;
+        synthesis_reason?: string;
+      };
     };
     const stages = new Set(
       (payload.debug?.live_events ?? []).map((entry) => entry.stage),
@@ -81,6 +85,8 @@ describe("Helix Ask live events", () => {
       console.log("Missing stages:", allMissing.join(", "));
     }
     expect(allMissing).toEqual([]);
+    expect(payload.debug?.synthesis_mode).toBeDefined();
+    expect(payload.debug?.synthesis_reason).toMatch(/mode=/);
   }, 20000);
 
   it("answers ideology concept query with grounded narrative + technical notes", async () => {

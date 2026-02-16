@@ -15130,6 +15130,17 @@ const executeHelixAsk = async ({
       runtime_budget_level?: "OK" | "WARNING" | "OVER";
       runtime_budget_recommend?: string;
       runtime_budget_signals?: Record<string, unknown>;
+      synthesis_mode?:
+        | "deterministic_scaffold"
+        | "llm_scaffold"
+        | "mixed_scaffold"
+        | "concept_scaffold"
+        | "empty_scaffold";
+      synthesis_mode_reasons?: string[];
+      synthesis_reason?: string;
+      synthesis_repo_path?: "none" | "concept" | "deterministic" | "llm" | "deterministic_fast_mode";
+      synthesis_prompt_path?: "none" | "deterministic" | "llm";
+      synthesis_general_path?: "none" | "llm";
       plan_pass_used?: boolean;
       plan_pass_forced?: boolean;
       slot_plan_pass_used?: boolean;
@@ -20960,6 +20971,10 @@ const executeHelixAsk = async ({
         }
       }
 
+      let repoSynthesisPath: "none" | "concept" | "deterministic" | "llm" | "deterministic_fast_mode" =
+        "none";
+      let promptSynthesisPath: "none" | "deterministic" | "llm" = "none";
+      let generalSynthesisPath: "none" | "llm" = "none";
       const deterministicScaffoldReasons: string[] = [];
       if (!fastQualityMode && !HELIX_ASK_SINGLE_LLM) {
         if (runtimeBudgetRecommend === "reduce_tool_calls") {
@@ -21044,6 +21059,7 @@ const executeHelixAsk = async ({
             (!definitionFocus ||
               (conceptMatch.card.sourcePath && isDefinitionDocPath(conceptMatch.card.sourcePath)));
         if (allowConceptFastPath && conceptMatch) {
+          repoSynthesisPath = "concept";
           const evidenceStart = Date.now();
           const conceptScaffold = buildConceptScaffold(conceptMatch);
           const conceptSources = conceptMatch.card.sourcePath ? [conceptMatch.card.sourcePath] : [];
@@ -21072,6 +21088,7 @@ const executeHelixAsk = async ({
           );
         } else if (evidenceContext) {
           if (HELIX_ASK_SINGLE_LLM || fastQualityMode || forceDeterministicScaffolds) {
+            repoSynthesisPath = "deterministic";
             const evidenceStart = Date.now();
             if (fastQualityMode) {
               const fastEvidenceCheck = canStartFastHelper(
@@ -21112,6 +21129,7 @@ const executeHelixAsk = async ({
               evidenceStart,
             );
           } else if (!fastQualityMode || canStartHelperCall("evidence_cards_llm", FAST_QUALITY_SYNTHESIS_START_BY_MS)) {
+            repoSynthesisPath = "llm";
             const evidenceStart = logStepStart(
               "LLM evidence cards",
               "repo",
@@ -21216,6 +21234,7 @@ const executeHelixAsk = async ({
               },
             );
           } else {
+            repoSynthesisPath = "deterministic_fast_mode";
             const evidenceStart = Date.now();
             const scaffoldBlocks = definitionFocus ? definitionDocBlocks : docBlocks;
             const docScaffoldMax = Math.min(Math.max(minDocEvidenceCards, 1), 6);
@@ -21288,6 +21307,7 @@ const executeHelixAsk = async ({
       if ((!isRepoQuestion || wantsHybrid) && !dryRun) {
           if (promptContextText) {
           if (HELIX_ASK_SINGLE_LLM || fastQualityMode || forceDeterministicScaffolds) {
+            promptSynthesisPath = "deterministic";
             promptScaffold = clipAskText(promptContextText, HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
             if (fastQualityMode) {
               const promptCardBudget = canStartFastHelper(
@@ -21311,6 +21331,7 @@ const executeHelixAsk = async ({
               formatFileList(promptContextFiles) ?? promptScaffold,
             );
           } else if (!fastQualityMode || canStartHelperCall("prompt_cards_llm", FAST_QUALITY_SYNTHESIS_START_BY_MS)) {
+            promptSynthesisPath = "llm";
             const evidenceStart = logStepStart(
               "LLM prompt cards",
               "prompt",
@@ -21407,6 +21428,7 @@ const executeHelixAsk = async ({
           !forceDeterministicScaffolds &&
           (!fastQualityMode || canStartHelperCall("reasoning_scaffold_llm", FAST_QUALITY_SYNTHESIS_START_BY_MS))
         ) {
+          generalSynthesisPath = "llm";
           const evidenceStart = logStepStart(
             "LLM reasoning scaffold",
             "general",
@@ -21482,6 +21504,59 @@ const executeHelixAsk = async ({
             },
           );
         }
+      }
+
+      const llmSynthesisUsed =
+        repoSynthesisPath === "llm" ||
+        promptSynthesisPath === "llm" ||
+        generalSynthesisPath === "llm";
+      const deterministicSynthesisUsed =
+        forceDeterministicScaffolds ||
+        repoSynthesisPath === "deterministic" ||
+        repoSynthesisPath === "deterministic_fast_mode" ||
+        promptSynthesisPath === "deterministic";
+      const synthesisMode:
+        | "deterministic_scaffold"
+        | "llm_scaffold"
+        | "mixed_scaffold"
+        | "concept_scaffold"
+        | "empty_scaffold" = forceDeterministicScaffolds
+        ? "deterministic_scaffold"
+        : llmSynthesisUsed && deterministicSynthesisUsed
+          ? "mixed_scaffold"
+          : llmSynthesisUsed
+            ? "llm_scaffold"
+            : repoSynthesisPath === "concept"
+              ? "concept_scaffold"
+              : repoScaffold || promptScaffold || generalScaffold
+                ? "deterministic_scaffold"
+                : "empty_scaffold";
+      const synthesisReasons = [
+        ...deterministicScaffoldReasons,
+        fastQualityMode ? "fast_quality_mode" : "",
+        HELIX_ASK_SINGLE_LLM ? "single_llm" : "",
+        wantsHybrid ? "hybrid_route" : "",
+        failClosedRepoEvidence ? "fail_closed_repo_evidence" : "",
+      ].filter(Boolean);
+      const synthesisSummary = [
+        `mode=${synthesisMode}`,
+        `repo=${repoSynthesisPath}`,
+        `prompt=${promptSynthesisPath}`,
+        `general=${generalSynthesisPath}`,
+        `repo_scaffold=${repoScaffold ? "yes" : "no"}`,
+        `prompt_scaffold=${promptScaffold ? "yes" : "no"}`,
+        `general_scaffold=${generalScaffold ? "yes" : "no"}`,
+      ].join(" | ");
+      if (debugPayload) {
+        const existingReasons = debugPayload.synthesis_mode_reasons ?? [];
+        debugPayload.synthesis_mode = synthesisMode;
+        debugPayload.synthesis_mode_reasons = Array.from(
+          new Set([...existingReasons, ...synthesisReasons]),
+        );
+        debugPayload.synthesis_reason = synthesisSummary;
+        debugPayload.synthesis_repo_path = repoSynthesisPath;
+        debugPayload.synthesis_prompt_path = promptSynthesisPath;
+        debugPayload.synthesis_general_path = generalSynthesisPath;
       }
 
       let claimCoverage: ReturnType<typeof evaluateClaimCoverage> | null = null;
