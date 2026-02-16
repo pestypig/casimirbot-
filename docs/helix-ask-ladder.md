@@ -144,6 +144,9 @@ Live events
 ## 13) Envelope + UI
 - The answer is packaged with sections/proof and rendered.
 - Debug payload carries the entire ladder state for inspection.
+- Planner-backed traces include scientific-method metadata (hypothesis,
+  anti-hypothesis, counterfactual result, uncertainty interval,
+  reproducibility, corrective action) for replay/eval loops.
 
 ## Debug fields (selected)
 - intent_id, intent_domain, intent_tier, intent_reason

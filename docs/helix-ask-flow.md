@@ -29,6 +29,14 @@ When HELIX_ASK_TWO_PASS=1, the server can do a two-stage reply:
 2) Expand the scaffold into the chosen format plus a short "In practice"
    paragraph.
 
+
+## Scientific-method trace contract
+When planner execution runs through Chat B, task traces now include a
+`scientific_method` block with hypothesis, anti-hypothesis, counterfactual
+result, uncertainty interval, reproducibility metadata, and corrective-action
+signals. This is emitted in trace artifacts for downstream eval/replay policy
+loops.
+
 ## Key files
 - client/src/pages/desktop.tsx
 - client/src/components/helix/HelixAskPill.tsx

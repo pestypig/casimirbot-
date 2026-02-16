@@ -12611,6 +12611,23 @@ const stripCitationRepairArtifacts = (value: string): string => {
   return cleaned;
 };
 
+
+export const stripRunawayAnswerArtifacts = (value: string): string => {
+  if (!value) return value;
+  let cleaned = value;
+  cleaned = cleaned.replace(/^(\s*in plain language,)\s*in practice,\s*/i, "$1 ");
+  cleaned = cleaned.replace(/(?:\bEND\.\s*){3,}/gi, "");
+  cleaned = cleaned.replace(/(?:\s*END\.\s*)+$/i, "");
+  const markerMatch = cleaned.match(
+    /\n\s*(Hide Additional Repo Context|Additional repo context:|Details\s*$|Tree Walk\s*$|Execution log\s*$|Ask debug\s*$|Context sources\s*$)/im,
+  );
+  if (markerMatch && typeof markerMatch.index === "number") {
+    cleaned = cleaned.slice(0, markerMatch.index);
+  }
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
+  return cleaned;
+};
+
 const sanitizeCitationRepairOutput = (
   value: string,
   allowedPaths: string[],
@@ -12622,6 +12639,7 @@ const sanitizeCitationRepairOutput = (
   cleaned = scrubbed.text;
   const allowedTokens = extractCitationTokensFromText(evidenceText);
   cleaned = sanitizeSourcesLine(cleaned, allowedPaths, allowedTokens);
+  cleaned = stripRunawayAnswerArtifacts(cleaned);
   return { text: cleaned, removedPaths: scrubbed.removed };
 };
 
@@ -12635,6 +12653,7 @@ const sanitizeReportBlockAnswer = (
   cleaned = deduped.text;
   const scrubbed = scrubUnsupportedPaths(cleaned, allowedPaths);
   cleaned = scrubbed.text;
+  cleaned = stripRunawayAnswerArtifacts(cleaned);
   return {
     text: cleaned,
     removedPaths: scrubbed.removed,
@@ -21549,6 +21568,7 @@ const executeHelixAsk = async ({
         allowedSourcePaths,
         extractCitationTokensFromText(evidenceText),
       );
+      cleaned = stripRunawayAnswerArtifacts(cleaned);
       const repoEvidencePaths = allowedSourcePaths.slice(0, 6);
       if (requiresRepoEvidence && !hasRepoCitations()) {
         if (repoEvidencePaths.length) {
@@ -22384,6 +22404,7 @@ const executeHelixAsk = async ({
         allowedSourcePaths,
         extractCitationTokensFromText(evidenceText),
       );
+      cleaned = stripRunawayAnswerArtifacts(cleaned);
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
         logEvent("Answer cleaned preview", "final", finalCleanedPreview, answerStart);
