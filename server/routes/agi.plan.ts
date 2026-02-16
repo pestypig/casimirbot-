@@ -218,6 +218,7 @@ import { metrics, sseConnections } from "../metrics";
 import { personaPolicy } from "../auth/policy";
 import { guardTenant } from "../auth/tenant";
 import { hashStableJson } from "../utils/information-boundary";
+import { ELEMENT_Z_LOOKUP } from "@shared/periodic-table";
 import {
   normalizeEvidencePath,
   normalizeEvidenceRef,
@@ -9863,29 +9864,6 @@ const ORBITAL_LETTER_L_MAP: Record<string, number> = {
   f: 3,
   g: 4,
 };
-const ELEMENT_Z_LOOKUP: Array<{ name: string; Z: number }> = [
-  { name: "hydrogen", Z: 1 },
-  { name: "helium", Z: 2 },
-  { name: "lithium", Z: 3 },
-  { name: "beryllium", Z: 4 },
-  { name: "boron", Z: 5 },
-  { name: "carbon", Z: 6 },
-  { name: "nitrogen", Z: 7 },
-  { name: "oxygen", Z: 8 },
-  { name: "fluorine", Z: 9 },
-  { name: "neon", Z: 10 },
-  { name: "sodium", Z: 11 },
-  { name: "magnesium", Z: 12 },
-  { name: "aluminum", Z: 13 },
-  { name: "silicon", Z: 14 },
-  { name: "phosphorus", Z: 15 },
-  { name: "sulfur", Z: 16 },
-  { name: "chlorine", Z: 17 },
-  { name: "argon", Z: 18 },
-  { name: "potassium", Z: 19 },
-  { name: "calcium", Z: 20 },
-];
-
 type AtomicLaunchDraft = {
   panelId?: string;
   viewer?: string;
@@ -10063,10 +10041,10 @@ const parseAtomicQuestionOverrides = (question: string): AtomicLaunchDraft => {
 
 const normalizeAtomicLaunchParams = (draft: AtomicLaunchDraft): HelixAskAtomicLaunchParams => {
   const model = parseAtomicModel(draft.model) ?? "quantum";
-  let n = clampInteger(draft.n, 1, 10) ?? 1;
+  let n = clampInteger(draft.n, 1, 7) ?? 1;
   let l = clampInteger(draft.l, 0, 9) ?? 0;
   if (l > n - 1) {
-    n = Math.min(10, l + 1);
+    n = Math.min(7, l + 1);
   }
   l = Math.min(l, n - 1);
   let m = clampInteger(draft.m, -9, 9) ?? 0;
