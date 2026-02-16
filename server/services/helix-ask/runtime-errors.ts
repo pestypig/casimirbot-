@@ -1,6 +1,8 @@
 const FAST_MODE_RUNTIME_MISSING_SYMBOLS = ["runHelperWithinStageBudget", "getAskElapsedMs"] as const;
 
 const buildMissingSymbolPatterns = (symbol: string): RegExp[] => [
+  new RegExp(`(?:['"])?\\b${symbol}\\b(?:['"])?(?:\\([^)]*\\))?\\s*(?:is not defined|is undefined)`, "i"),
+  new RegExp(`can't find variable:\\s*(?:['"])?${symbol}\\b(?:['"])?`, "i"),
   new RegExp(`\\b${symbol}\\b\\s*(?:is not defined|is undefined)`, "i"),
   new RegExp(`can't find variable:\\s*${symbol}\\b`, "i"),
 ];

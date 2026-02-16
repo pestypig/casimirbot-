@@ -12,6 +12,11 @@ describe("isFastModeRuntimeMissingSymbolError", () => {
     expect(isFastModeRuntimeMissingSymbolError(message)).toBe(true);
   });
 
+  it("detects quoted/function-form missing symbol messages", () => {
+    expect(isFastModeRuntimeMissingSymbolError("ReferenceError: 'getAskElapsedMs' is not defined")).toBe(true);
+    expect(isFastModeRuntimeMissingSymbolError("ReferenceError: getAskElapsedMs() is not defined")).toBe(true);
+  });
+
   it("ignores unrelated runtime errors", () => {
     const error = new Error("database connection reset");
     expect(isFastModeRuntimeMissingSymbolError(error)).toBe(false);

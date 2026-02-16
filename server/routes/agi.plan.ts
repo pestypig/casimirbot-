@@ -209,6 +209,7 @@ import {
   type HelixAskSessionMemory,
 } from "../services/helix-ask/session-memory";
 import { isFastModeRuntimeMissingSymbolError } from "../services/helix-ask/runtime-errors";
+import { stripRunawayAnswerArtifacts } from "../services/helix-ask/answer-artifacts";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
 import { runBeliefGraphLoop } from "../../modules/analysis/belief-graph-loop";
@@ -14616,6 +14617,144 @@ const executeHelixAsk = async ({
     let graphHintTerms: string[] = [];
     const tuningOverrides = HELIX_ASK_SWEEP_OVERRIDES ? parsed.data.tuning : undefined;
     const fastQualityMode = Boolean(parsed.data.tuning?.fast_quality_mode);
+    const FAST_QUALITY_TOTAL_BUDGET_BASE_MS = 9000;
+    const FAST_QUALITY_FINALIZE_BY_BASE_MS = 8800;
+    const FAST_QUALITY_SYNTHESIS_START_BY_BASE_MS = 6000;
+    const FAST_QUALITY_QUERY_HINTS_BUDGET_BASE_MS = 800;
+    const FAST_QUALITY_PLAN_RETRIEVAL_BUDGET_BASE_MS = 2500;
+    const FAST_QUALITY_HELPER_MIN_BASE_MS = 350;
+    const isReplitRuntime = Boolean(process.env.REPL_ID || process.env.REPL_SLUG || process.env.REPLIT_DB_URL);
+    const runtimeP50Ms = isReplitRuntime ? getHelixAskRuntimeP50Ms() : FAST_QUALITY_TOTAL_BUDGET_BASE_MS;
+    const deadlineScale = clampNumber(runtimeP50Ms / FAST_QUALITY_TOTAL_BUDGET_BASE_MS, 1, 20);
+    const FAST_QUALITY_TOTAL_BUDGET_MS = Math.round(FAST_QUALITY_TOTAL_BUDGET_BASE_MS * deadlineScale);
+    const FAST_QUALITY_FINALIZE_BY_MS = Math.round(FAST_QUALITY_FINALIZE_BY_BASE_MS * deadlineScale);
+    const FAST_QUALITY_SYNTHESIS_START_BY_MS = Math.round(
+      FAST_QUALITY_SYNTHESIS_START_BY_BASE_MS * deadlineScale,
+    );
+    const FAST_QUALITY_QUERY_HINTS_BUDGET_MS = Math.round(
+      FAST_QUALITY_QUERY_HINTS_BUDGET_BASE_MS * deadlineScale,
+    );
+    const FAST_QUALITY_PLAN_RETRIEVAL_BUDGET_MS = Math.round(
+      FAST_QUALITY_PLAN_RETRIEVAL_BUDGET_BASE_MS * deadlineScale,
+    );
+    const FAST_QUALITY_HELPER_MIN_MS = Math.round(FAST_QUALITY_HELPER_MIN_BASE_MS * deadlineScale);
+    const fastQualityDecisions: HelixAskFastQualityDecision[] = [];
+    const getAskElapsedMs = (): number => Math.max(0, Date.now() - askRequestStartedAt);
+    const getAskRemainingMs = (): number =>
+      Math.max(0, FAST_QUALITY_TOTAL_BUDGET_MS - getAskElapsedMs());
+    const getStageRemainingMs = (stageDeadlineMs: number): number =>
+      Math.max(0, stageDeadlineMs - getAskElapsedMs());
+    const pushFastQualityDecision = (
+      stage: string,
+      decision: HelixAskFastQualityDecision["decision"],
+      reason: string,
+      minimumMs?: number,
+      timeoutMs?: number,
+      stageRemainingMs?: number,
+    ): void => {
+      if (!fastQualityMode) return;
+      const elapsedMs = getAskElapsedMs();
+      const remainingMs = Math.max(0, FAST_QUALITY_TOTAL_BUDGET_MS - elapsedMs);
+      fastQualityDecisions.push({
+        stage,
+        decision,
+        reason,
+        elapsedMs,
+        remainingMs,
+        minimumMs,
+        timeoutMs,
+        stageRemainingMs,
+      });
+      logEvent(
+        "Fast quality budget",
+        `${stage}:${decision}`,
+        `${reason} | elapsed=${elapsedMs}ms remaining=${remainingMs}ms${
+          typeof minimumMs === "number" ? ` min=${minimumMs}ms` : ""
+        }${typeof timeoutMs === "number" ? ` timeout=${timeoutMs}ms` : ""}${
+          typeof stageRemainingMs === "number" ? ` stageRemaining=${stageRemainingMs}ms` : ""
+        }`,
+      );
+    };
+    const canStartHelperCall = (stage: string, stageDeadlineMs: number): boolean => {
+      if (!fastQualityMode) return true;
+      const remainingMs = getAskRemainingMs();
+      const stageRemainingMs = getStageRemainingMs(stageDeadlineMs);
+      if (remainingMs < FAST_QUALITY_HELPER_MIN_MS || stageRemainingMs < FAST_QUALITY_HELPER_MIN_MS) {
+        pushFastQualityDecision(
+          stage,
+          "skip",
+          "remaining_below_helper_min_budget",
+          FAST_QUALITY_HELPER_MIN_MS,
+          undefined,
+          stageRemainingMs,
+        );
+        return false;
+      }
+      pushFastQualityDecision(
+        stage,
+        "allow",
+        "helper_budget_ok",
+        FAST_QUALITY_HELPER_MIN_MS,
+        undefined,
+        stageRemainingMs,
+      );
+      return true;
+    };
+    const runHelperWithinStageBudget = async <T>(
+      stage: string,
+      stageDeadlineMs: number,
+      operation: () => Promise<T>,
+    ): Promise<T | null> => {
+      if (!fastQualityMode) {
+        return operation();
+      }
+      const stageRemainingMs = getStageRemainingMs(stageDeadlineMs);
+      const totalRemainingMs = getAskRemainingMs();
+      const timeoutMs = Math.max(1, Math.floor(Math.min(stageRemainingMs, totalRemainingMs)));
+      if (timeoutMs <= 0) {
+        pushFastQualityDecision(
+          stage,
+          "deadline",
+          "stage_budget_exhausted_before_call",
+          undefined,
+          0,
+          stageRemainingMs,
+        );
+        return null;
+      }
+      pushFastQualityDecision(stage, "allow", "helper_timeout_applied", undefined, timeoutMs, stageRemainingMs);
+      try {
+        return await withTimeout(operation(), timeoutMs, stage);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes(`${stage}_timeout`) || message.includes("_timeout")) {
+          pushFastQualityDecision(
+            stage,
+            "deadline",
+            "helper_timeout",
+            undefined,
+            timeoutMs,
+            stageRemainingMs,
+          );
+          return null;
+        }
+        throw error;
+      }
+    };
+    const runHelperWithRuntimeGuard = async <T>(
+      stage: string,
+      stageDeadlineMs: number,
+      operation: () => Promise<T>,
+    ): Promise<T | null> => {
+      try {
+        return await runHelperWithinStageBudget(stage, stageDeadlineMs, operation);
+      } catch (error) {
+        if (isFastModeRuntimeMissingSymbolError(error)) {
+          pushFastQualityDecision(stage, "allow", "runtime_helper_symbol_missing_fallback");
+          return operation();
+        }
+        throw error;
+      }
     const fastQualityClockStart = Date.now();
     const fastQualityBudgets = {
       queryHintsMs: 800,
@@ -15551,6 +15690,25 @@ const executeHelixAsk = async ({
       debugPayload.tuning_enabled = Boolean(tuningOverrides);
       debugPayload.fast_quality_mode = fastQualityMode;
       if (fastQualityMode) {
+        debugPayload.fast_quality_budget = {
+          scale: deadlineScale,
+          runtime_p50_ms: runtimeP50Ms,
+          base: {
+            total_ms: FAST_QUALITY_TOTAL_BUDGET_BASE_MS,
+            query_hints_ms: FAST_QUALITY_QUERY_HINTS_BUDGET_BASE_MS,
+            plan_retrieval_ms: FAST_QUALITY_PLAN_RETRIEVAL_BUDGET_BASE_MS,
+            synthesis_start_by_ms: FAST_QUALITY_SYNTHESIS_START_BY_BASE_MS,
+            finalize_by_ms: FAST_QUALITY_FINALIZE_BY_BASE_MS,
+            helper_min_ms: FAST_QUALITY_HELPER_MIN_BASE_MS,
+          },
+          effective: {
+            total_ms: FAST_QUALITY_TOTAL_BUDGET_MS,
+            query_hints_ms: FAST_QUALITY_QUERY_HINTS_BUDGET_MS,
+            plan_retrieval_ms: FAST_QUALITY_PLAN_RETRIEVAL_BUDGET_MS,
+            synthesis_start_by_ms: FAST_QUALITY_SYNTHESIS_START_BY_MS,
+            finalize_by_ms: FAST_QUALITY_FINALIZE_BY_MS,
+            helper_min_ms: FAST_QUALITY_HELPER_MIN_MS,
+          },
         debugPayload.fast_quality_deadlines = {
           query_hints_ms: fastQualityBudgets.queryHintsMs,
           plan_retrieval_ms: fastQualityBudgets.planRetrievalMs,
@@ -18362,6 +18520,7 @@ const executeHelixAsk = async ({
                   prompt: "buildHelixAskQueryPrompt",
                 },
               );
+              const queryHelperResult = await runHelperWithRuntimeGuard(
               const queryHelperResult = await runHelperWithinStageBudget(
                 "query_hints_llm",
                 FAST_QUALITY_QUERY_HINTS_BUDGET_MS,
@@ -20916,6 +21075,7 @@ const executeHelixAsk = async ({
               repoScaffold,
               evidenceStart,
             );
+          } else if (!fastQualityMode || canStartHelperCall("evidence_cards_llm", FAST_QUALITY_SYNTHESIS_START_BY_MS)) {
           } else {
             const evidenceBudget = canStartFastHelper(
               "evidence_cards",
@@ -20962,6 +21122,7 @@ const executeHelixAsk = async ({
               compositeRequest.enabled,
               verificationAnchorRequired ? verificationAnchorHints : [],
             );
+            const evidenceHelperResult = await runHelperWithRuntimeGuard(
             const evidenceHelperResult = await runHelperWithinStageBudget(
               "evidence_cards_llm",
               FAST_QUALITY_SYNTHESIS_START_BY_MS,
@@ -21047,6 +21208,35 @@ const executeHelixAsk = async ({
                 label: "evidence_cards",
               },
             );
+          } else {
+            const evidenceStart = Date.now();
+            const scaffoldBlocks = definitionFocus ? definitionDocBlocks : docBlocks;
+            const docScaffoldMax = Math.min(Math.max(minDocEvidenceCards, 1), 6);
+            repoScaffold = buildDocEvidenceScaffold(scaffoldBlocks, {
+              maxBlocks: docScaffoldMax,
+              definitionFocus,
+            });
+            if (repoScaffold) {
+              const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
+              const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
+              repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
+            }
+            pushFastQualityDecision(
+              "evidence_cards_llm",
+              "skip",
+              "deterministic_evidence_cards_fallback",
+            );
+            logProgress(
+              "Evidence cards ready",
+              repoScaffold ? "deterministic_fast_mode" : "empty",
+              evidenceStart,
+            );
+            logEvent(
+              "Evidence cards ready",
+              repoScaffold ? "deterministic_fast_mode" : "empty",
+              repoScaffold,
+              evidenceStart,
+            );
             }
           }
         }
@@ -21131,6 +21321,7 @@ const executeHelixAsk = async ({
               formatSpec.format,
               formatSpec.stageTags,
             );
+            const promptHelperResult = await runHelperWithRuntimeGuard(
             const promptHelperResult = await runHelperWithinStageBudget(
               "prompt_cards_llm",
               FAST_QUALITY_SYNTHESIS_START_BY_MS,
@@ -21205,6 +21396,11 @@ const executeHelixAsk = async ({
             promptContextFiles.forEach((entry) => merged.add(entry));
             contextFiles = Array.from(merged);
           }
+        } else if (
+          !hasConceptScaffold &&
+          !HELIX_ASK_SINGLE_LLM &&
+          (!fastQualityMode || canStartHelperCall("reasoning_scaffold_llm", FAST_QUALITY_SYNTHESIS_START_BY_MS))
+        ) {
         } else if (!hasConceptScaffold && !HELIX_ASK_SINGLE_LLM && !fastQualityMode) {
           const evidenceStart = logStepStart(
             "LLM reasoning scaffold",
@@ -21221,6 +21417,7 @@ const executeHelixAsk = async ({
             formatSpec.format,
             formatSpec.stageTags,
           );
+          const generalHelperResult = await runHelperWithRuntimeGuard(
           const generalHelperResult = await runHelperWithinStageBudget(
             "reasoning_scaffold_llm",
             FAST_QUALITY_SYNTHESIS_START_BY_MS,
@@ -22296,6 +22493,7 @@ const executeHelixAsk = async ({
             formatSpec.format,
             formatSpec.stageTags,
           );
+          const repairHelperResult = await runHelperWithRuntimeGuard(
           const repairHelperResult = await runHelperWithinStageBudget(
             "citation_repair",
             FAST_QUALITY_FINALIZE_BY_MS,
@@ -22712,6 +22910,38 @@ const executeHelixAsk = async ({
             formatSpec.format,
             formatSpec.stageTags,
           );
+          const driftHelperResult = await runHelperWithRuntimeGuard(
+            "drift_repair",
+            FAST_QUALITY_FINALIZE_BY_MS,
+            () =>
+              runHelixAskLocalWithOverflowRetry(
+                {
+                  prompt: repairPrompt,
+                  max_tokens: repairTokens,
+                  temperature: Math.min(parsed.data.temperature ?? 0.2, 0.35),
+                  seed: parsed.data.seed,
+                  stop: parsed.data.stop,
+                },
+                {
+                  personaId,
+                  sessionId: parsed.data.sessionId,
+                  traceId: askTraceId,
+                },
+                {
+                  fallbackMaxTokens: repairTokens,
+                  allowContextDrop: true,
+                  label: "drift_repair",
+                },
+              ),
+          );
+          if (!driftHelperResult) {
+            pushFastQualityDecision("drift_repair", "deadline", "helper_timeout_fallback");
+          } else {
+            const { result: repairResult, overflow: repairOverflow } = driftHelperResult;
+            recordOverflow("drift_repair", repairOverflow);
+            const repairText = stripPromptEchoFromAnswer(repairResult.text ?? "", baseQuestion);
+            if (repairText) {
+              const candidate = applyHelixAskPlatonicGates({
           const { result: repairResult, overflow: repairOverflow } =
             await runHelperWithinStageBudget(
               "drift_repair",
@@ -23422,6 +23652,17 @@ const executeHelixAsk = async ({
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logDebug("executeHelixAsk ERROR", { message });
+    if (isFastModeRuntimeMissingSymbolError(error)) {
+      const clarifyLine =
+        "I hit an internal fast-mode runtime issue. Please retry once; if it persists, I can continue in deterministic clarify mode with one focused follow-up.";
+      streamEmitter.finalize(clarifyLine);
+      logProgress("Fallback", "fast_mode_runtime_missing_clarify", undefined, false);
+      responder.send(200, {
+        ok: true,
+        text: clarifyLine,
+        answer: clarifyLine,
+        fallback: "fast_mode_runtime_missing",
+      });
     if (/runHelperWithinStageBudget is not defined/i.test(message)) {
       const clarifyLine =
         "I hit an internal fast-mode helper runtime issue. Please retry once; if it persists, I can continue in deterministic clarify mode with one focused follow-up.";
