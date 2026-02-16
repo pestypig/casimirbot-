@@ -165,7 +165,7 @@ describe("Helix Ask live events", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        question: "Now explain warp bubble mission ethos",
+        question: "explain warp bubble mission ethos",
         debug: true,
         sessionId: "test-ideology-explain-no-report",
       }),

@@ -3070,6 +3070,8 @@ const HELIX_ASK_IDEOLOGY_CHAT_QUERY_RE =
   /\b(?:what|what\s+is|what\s+does|what\s+do|how|in\s+plain|plain\s+language|simple\s+terms|define|meaning\s+of|explain|explanation)\b/i;
 const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
   /\b(?:how|why|impact|affect|effects?|societ(y|al)|community|governance|public|policy|scenario|example|examples|trust|rumor|decision|in\s+real\s+world|for\s+a|for\s+an|for\s+the|platform|team|council|school)\b/i;
+const HELIX_ASK_IDEOLOGY_QUERY_CUE_RE =
+  /\b(?:mission\s+ethos|ethos|ideology|feedback\s+loop\s+hygiene|civic\s+signal|lifetime\s+trust\s+ledger|radiance\s+to\s+the\s+sun)\b/i;
 const HELIX_ASK_IDEOLOGY_REPORT_BAN_RE = /\b(?:report|point[s]?|coverage|summary|compare|difference|between|each|step|slot|bullet|section)\b/i;
 const HELIX_ASK_IDEOLOGY_NARRATIVE_GUARD_RE = /\b(do not|don't|avoid|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i;
 const HELIX_ASK_DRIFT_REPAIR = String(process.env.HELIX_ASK_DRIFT_REPAIR ?? "1").trim() !== "0";
@@ -16208,17 +16210,19 @@ const executeHelixAsk = async ({
     });
     const isIdeologyNarrativeQuery = HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE.test(initialReportQuestion);
     let reportDecision = resolveReportModeDecision(initialReportQuestion);
+    const ideologyConversationalSeed = shouldUseIdeologyConversationalMode(
+      initialReportQuestion,
+      reportDecision.tokenCount,
+      reportDecision.charCount,
+      {
+        explicitReportCue: reportDecision.reason === "explicit_report_request",
+        blockScoped,
+      },
+    );
+    const ideologyCueDetected = HELIX_ASK_IDEOLOGY_QUERY_CUE_RE.test(initialReportQuestion);
     const isIdeologyConversationalCandidate =
-      Boolean(ideologyConversationCandidate) &&
-      shouldUseIdeologyConversationalMode(
-        initialReportQuestion,
-        reportDecision.tokenCount,
-        reportDecision.charCount,
-        {
-          explicitReportCue: reportDecision.reason === "explicit_report_request",
-          blockScoped,
-        },
-      );
+      ideologyConversationalSeed &&
+      (Boolean(ideologyConversationCandidate) || ideologyCueDetected);
     if (
       isIdeologyConversationalCandidate &&
       !blockScoped &&
