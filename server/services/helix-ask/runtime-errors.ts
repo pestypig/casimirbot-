@@ -3,6 +3,8 @@ const FAST_MODE_RUNTIME_MISSING_SYMBOLS = ["runHelperWithinStageBudget", "getAsk
 const buildMissingSymbolPatterns = (symbol: string): RegExp[] => [
   new RegExp(`(?:['"])?\\b${symbol}\\b(?:['"])?(?:\\([^)]*\\))?\\s*(?:is not defined|is undefined)`, "i"),
   new RegExp(`can't find variable:\\s*(?:['"])?${symbol}\\b(?:['"])?`, "i"),
+  new RegExp(`\\b${symbol}\\b\\s*(?:is not defined|is undefined)`, "i"),
+  new RegExp(`can't find variable:\\s*${symbol}\\b`, "i"),
 ];
 
 const FAST_MODE_RUNTIME_MISSING_SYMBOL_PATTERNS = FAST_MODE_RUNTIME_MISSING_SYMBOLS.flatMap(

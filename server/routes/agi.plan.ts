@@ -14755,6 +14755,37 @@ const executeHelixAsk = async ({
         }
         throw error;
       }
+    const fastQualityClockStart = Date.now();
+    const fastQualityBudgets = {
+      queryHintsMs: 800,
+      planRetrievalMs: 2500,
+      synthesisStartMs: 6000,
+      finalizeMs: 8800,
+      helperMinMs: 350,
+    } as const;
+    const getFastElapsedMs = (): number => Date.now() - fastQualityClockStart;
+    const getFastRemainingMs = (targetMs: number): number => targetMs - getFastElapsedMs();
+    const fastStageDeadlines = {
+      query_hints: fastQualityBudgets.queryHintsMs,
+      plan_retrieval: fastQualityBudgets.planRetrievalMs,
+      synthesis_start: fastQualityBudgets.synthesisStartMs,
+      finalize: fastQualityBudgets.finalizeMs,
+    } as const;
+    const canStartFastHelper = (
+      helper: string,
+      minBudgetMs = fastQualityBudgets.helperMinMs,
+      deadlineMs = fastQualityBudgets.finalizeMs,
+    ): { ok: boolean; remainingMs: number; reason?: string } => {
+      if (!fastQualityMode) return { ok: true, remainingMs: Number.POSITIVE_INFINITY };
+      const remainingMs = getFastRemainingMs(deadlineMs);
+      if (remainingMs < minBudgetMs) {
+        return {
+          ok: false,
+          remainingMs,
+          reason: `remaining_budget_below_min:${helper}:${Math.max(0, Math.floor(remainingMs))}<${minBudgetMs}`,
+        };
+      }
+      return { ok: true, remainingMs };
     };
     const arbiterRepoRatio = clampNumber(
       typeof tuningOverrides?.arbiter_repo_ratio === "number"
@@ -15678,6 +15709,12 @@ const executeHelixAsk = async ({
             finalize_by_ms: FAST_QUALITY_FINALIZE_BY_MS,
             helper_min_ms: FAST_QUALITY_HELPER_MIN_MS,
           },
+        debugPayload.fast_quality_deadlines = {
+          query_hints_ms: fastQualityBudgets.queryHintsMs,
+          plan_retrieval_ms: fastQualityBudgets.planRetrievalMs,
+          synthesis_start_ms: fastQualityBudgets.synthesisStartMs,
+          finalize_ms: fastQualityBudgets.finalizeMs,
+          helper_min_ms: fastQualityBudgets.helperMinMs,
         };
       }
       debugPayload.arbiter_repo_ratio = arbiterRepoRatio;
@@ -15692,6 +15729,27 @@ const executeHelixAsk = async ({
       updateAgentDebug();
     }
     const answerPath: string[] = [];
+    const recordFastDecision = (
+      stage: string,
+      action: string,
+      reason: string,
+      remainingMs?: number,
+      deadlineMs?: number,
+    ): void => {
+      if (!fastQualityMode || !debugPayload) return;
+      const next = debugPayload.fast_quality_decisions ?? [];
+      next.push({
+        stage,
+        action,
+        reason,
+        remaining_ms: typeof remainingMs === "number" && Number.isFinite(remainingMs)
+          ? Math.max(0, Math.floor(remainingMs))
+          : undefined,
+        elapsed_ms: Math.max(0, Math.floor(getFastElapsedMs())),
+        deadline_ms: typeof deadlineMs === "number" && Number.isFinite(deadlineMs) ? deadlineMs : undefined,
+      });
+      debugPayload.fast_quality_decisions = next;
+    };
     if (!questionValue && prompt) {
       const extracted = extractQuestionFromPrompt(prompt);
       if (extracted) {
@@ -17752,7 +17810,17 @@ const executeHelixAsk = async ({
       !promptIngested &&
       intentStrategy !== "constraint_report" &&
       !forcedAnswer &&
-      !contextText;
+      !contextText &&
+      (!fastQualityMode || getFastElapsedMs() < fastStageDeadlines.plan_retrieval);
+    if (!preflightEnabled && fastQualityMode && getFastElapsedMs() >= fastStageDeadlines.plan_retrieval) {
+      recordFastDecision(
+        "plan_retrieval",
+        "skip_preflight",
+        "plan_retrieval_deadline_exceeded",
+        getFastRemainingMs(fastStageDeadlines.plan_retrieval),
+        fastStageDeadlines.plan_retrieval,
+      );
+    }
     if (preflightEnabled) {
       const preflightSearchSeed = parsed.data.searchQuery?.trim() || baseQuestion;
       const preflightBaseQueries = buildHelixAskSearchQueries(preflightSearchSeed, topicTags);
@@ -18350,7 +18418,50 @@ const executeHelixAsk = async ({
       if (isRepoQuestion) {
         let queryHints: string[] = [];
         if (!dryRun) {
-          if (HELIX_ASK_SINGLE_LLM) {
+          if (fastQualityMode) {
+            const queryStart = Date.now();
+            const queryBudgetCheck = canStartFastHelper(
+              "query_hints",
+              fastQualityBudgets.helperMinMs,
+              fastStageDeadlines.query_hints,
+            );
+            if (!queryBudgetCheck.ok || getFastElapsedMs() > fastStageDeadlines.query_hints) {
+              queryHints = [];
+              planDirectives = null;
+              const reason = !queryBudgetCheck.ok
+                ? queryBudgetCheck.reason ?? "min_budget_not_met"
+                : "query_hints_stage_deadline_exceeded";
+              recordFastDecision(
+                "query_hints",
+                "skip_llm",
+                reason,
+                queryBudgetCheck.remainingMs,
+                fastStageDeadlines.query_hints,
+              );
+              logProgress("Query hints ready", "fast_mode_skip", queryStart);
+              logEvent("Query hints ready", "fast_mode_skip", reason, queryStart);
+            } else {
+              const deterministicHints = mergeHelixAskQueries(
+                buildHelixAskSearchQueries(baseQuestion, topicTags),
+                [...verificationAnchorHints, ...graphHintTerms],
+                HELIX_ASK_QUERY_HINTS_MAX,
+              );
+              queryHints = deterministicHints
+                .map((hint) => hint.trim())
+                .filter((hint) => hint.length > 0)
+                .slice(0, HELIX_ASK_QUERY_HINTS_MAX);
+              planDirectives = null;
+              recordFastDecision(
+                "query_hints",
+                "deterministic_fallback",
+                "fast_mode_prefer_deterministic",
+                queryBudgetCheck.remainingMs,
+                fastStageDeadlines.query_hints,
+              );
+              logProgress("Query hints ready", `${queryHints.length} hints`, queryStart);
+              logEvent("Query hints ready", "fast_mode", `${queryHints.length} deterministic hints`, queryStart);
+            }
+          } else if (HELIX_ASK_SINGLE_LLM) {
             const queryStart = Date.now();
             queryHints = [];
             planDirectives = null;
@@ -18410,6 +18521,7 @@ const executeHelixAsk = async ({
                 },
               );
               const queryHelperResult = await runHelperWithRuntimeGuard(
+              const queryHelperResult = await runHelperWithinStageBudget(
                 "query_hints_llm",
                 FAST_QUALITY_QUERY_HINTS_BUDGET_MS,
                 () =>
@@ -20923,8 +21035,24 @@ const executeHelixAsk = async ({
             evidenceStart,
           );
         } else if (evidenceContext) {
-          if (HELIX_ASK_SINGLE_LLM) {
+          if (HELIX_ASK_SINGLE_LLM || fastQualityMode) {
             const evidenceStart = Date.now();
+            if (fastQualityMode) {
+              const fastEvidenceCheck = canStartFastHelper(
+                "evidence_cards",
+                fastQualityBudgets.helperMinMs,
+                fastStageDeadlines.synthesis_start,
+              );
+              recordFastDecision(
+                "evidence_cards",
+                "deterministic_fallback",
+                fastEvidenceCheck.ok
+                  ? "fast_mode_prefer_deterministic"
+                  : fastEvidenceCheck.reason ?? "min_budget_not_met",
+                fastEvidenceCheck.remainingMs,
+                fastStageDeadlines.synthesis_start,
+              );
+            }
             const scaffoldBlocks = definitionFocus ? definitionDocBlocks : docBlocks;
             const docScaffoldMax = Math.min(Math.max(minDocEvidenceCards, 1), 6);
             repoScaffold = buildDocEvidenceScaffold(scaffoldBlocks, {
@@ -20948,6 +21076,34 @@ const executeHelixAsk = async ({
               evidenceStart,
             );
           } else if (!fastQualityMode || canStartHelperCall("evidence_cards_llm", FAST_QUALITY_SYNTHESIS_START_BY_MS)) {
+          } else {
+            const evidenceBudget = canStartFastHelper(
+              "evidence_cards",
+              fastQualityBudgets.helperMinMs,
+              fastStageDeadlines.synthesis_start,
+            );
+            if (fastQualityMode && !evidenceBudget.ok) {
+              const evidenceStart = Date.now();
+              const scaffoldBlocks = definitionFocus ? definitionDocBlocks : docBlocks;
+              const docScaffoldMax = Math.min(Math.max(minDocEvidenceCards, 1), 6);
+              repoScaffold = buildDocEvidenceScaffold(scaffoldBlocks, {
+                maxBlocks: docScaffoldMax,
+                definitionFocus,
+              });
+              if (repoScaffold) {
+                const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
+                const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
+                repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
+              }
+              recordFastDecision(
+                "evidence_cards",
+                "skip_llm",
+                evidenceBudget.reason ?? "min_budget_not_met",
+                evidenceBudget.remainingMs,
+                fastStageDeadlines.synthesis_start,
+              );
+              logEvent("LLM evidence cards", "skipped", evidenceBudget.reason, evidenceStart);
+            } else {
             const evidenceStart = logStepStart(
               "LLM evidence cards",
               "repo",
@@ -20967,6 +21123,7 @@ const executeHelixAsk = async ({
               verificationAnchorRequired ? verificationAnchorHints : [],
             );
             const evidenceHelperResult = await runHelperWithRuntimeGuard(
+            const evidenceHelperResult = await runHelperWithinStageBudget(
               "evidence_cards_llm",
               FAST_QUALITY_SYNTHESIS_START_BY_MS,
               () =>
@@ -21080,6 +21237,7 @@ const executeHelixAsk = async ({
               repoScaffold,
               evidenceStart,
             );
+            }
           }
         }
       }
@@ -21123,8 +21281,24 @@ const executeHelixAsk = async ({
 
       if ((!isRepoQuestion || wantsHybrid) && !dryRun) {
         if (promptContextText) {
-          if (HELIX_ASK_SINGLE_LLM) {
+          if (HELIX_ASK_SINGLE_LLM || fastQualityMode) {
             promptScaffold = clipAskText(promptContextText, HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
+            if (fastQualityMode) {
+              const promptCardBudget = canStartFastHelper(
+                "prompt_cards",
+                fastQualityBudgets.helperMinMs,
+                fastStageDeadlines.synthesis_start,
+              );
+              recordFastDecision(
+                "prompt_cards",
+                "deterministic_fallback",
+                promptCardBudget.ok
+                  ? "fast_mode_prefer_deterministic"
+                  : promptCardBudget.reason ?? "min_budget_not_met",
+                promptCardBudget.remainingMs,
+                fastStageDeadlines.synthesis_start,
+              );
+            }
             logEvent(
               "Prompt context cards ready",
               promptScaffold ? "single_llm" : "empty",
@@ -21148,6 +21322,7 @@ const executeHelixAsk = async ({
               formatSpec.stageTags,
             );
             const promptHelperResult = await runHelperWithRuntimeGuard(
+            const promptHelperResult = await runHelperWithinStageBudget(
               "prompt_cards_llm",
               FAST_QUALITY_SYNTHESIS_START_BY_MS,
               () =>
@@ -21226,6 +21401,7 @@ const executeHelixAsk = async ({
           !HELIX_ASK_SINGLE_LLM &&
           (!fastQualityMode || canStartHelperCall("reasoning_scaffold_llm", FAST_QUALITY_SYNTHESIS_START_BY_MS))
         ) {
+        } else if (!hasConceptScaffold && !HELIX_ASK_SINGLE_LLM && !fastQualityMode) {
           const evidenceStart = logStepStart(
             "LLM reasoning scaffold",
             "general",
@@ -21242,6 +21418,7 @@ const executeHelixAsk = async ({
             formatSpec.stageTags,
           );
           const generalHelperResult = await runHelperWithRuntimeGuard(
+          const generalHelperResult = await runHelperWithinStageBudget(
             "reasoning_scaffold_llm",
             FAST_QUALITY_SYNTHESIS_START_BY_MS,
             () =>
@@ -21764,7 +21941,35 @@ const executeHelixAsk = async ({
       );
     }
     const answerStart = Date.now();
+    if (fastQualityMode && getFastElapsedMs() > fastStageDeadlines.synthesis_start) {
+      recordFastDecision(
+        "synthesis_start",
+        "deadline_miss",
+        "synthesis_started_after_deadline",
+        getFastRemainingMs(fastStageDeadlines.synthesis_start),
+        fastStageDeadlines.synthesis_start,
+      );
+    }
     logProgress("Generating answer");
+    if (
+      fastQualityMode &&
+      isRepoQuestion &&
+      !forcedAnswer &&
+      !String(repoScaffold ?? "").trim() &&
+      getFastElapsedMs() >= fastStageDeadlines.plan_retrieval
+    ) {
+      const focusedClarification =
+        "I don’t have enough repository evidence within the fast-mode time budget. Please point me to the specific module or file path you want analyzed.";
+      forcedAnswer = focusedClarification;
+      forcedAnswerIsHard = true;
+      recordFastDecision(
+        "repo_evidence",
+        "force_clarification",
+        "insufficient_repo_evidence_by_budget_end",
+        getFastRemainingMs(fastStageDeadlines.finalize),
+        fastStageDeadlines.finalize,
+      );
+    }
     const fallbackAnswer = forcedAnswer ?? conceptAnswer ?? "";
     const shouldShortCircuitAnswer =
       Boolean(fallbackAnswer) &&
@@ -21910,21 +22115,41 @@ const executeHelixAsk = async ({
         temperature: parsed.data.temperature ?? null,
       });
       const answerFallbackTokens = answerMaxTokens;
-      const llmAnswerStart = logStepStart(
-        "LLM answer",
-        `tokens=${answerMaxTokens}`,
-        {
-          maxTokens: answerMaxTokens,
-          fn: "runHelixAskLocalWithOverflowRetry",
-          label: "answer",
-        },
+      const answerHelperBudget = canStartFastHelper(
+        "answer",
+        fastQualityBudgets.helperMinMs,
+        fastStageDeadlines.finalize,
       );
+      if (fastQualityMode && !answerHelperBudget.ok) {
+        recordFastDecision(
+          "answer",
+          "skip_llm",
+          answerHelperBudget.reason ?? "min_budget_not_met",
+          answerHelperBudget.remainingMs,
+          fastStageDeadlines.finalize,
+        );
+      }
+      const llmAnswerStart =
+        !fastQualityMode || answerHelperBudget.ok
+          ? logStepStart(
+              "LLM answer",
+              `tokens=${answerMaxTokens}`,
+              {
+                maxTokens: answerMaxTokens,
+                fn: "runHelixAskLocalWithOverflowRetry",
+                label: "answer",
+              },
+            )
+          : Date.now();
       let answerGenerationFailed = false;
       let retryApplied = false;
       let answerText = "";
       let answerMeta = isShortAnswer(answerText, verbosity);
       let resultForAnswer: LocalAskResult | null = null;
       try {
+        if (fastQualityMode && !answerHelperBudget.ok) {
+          answerGenerationFailed = true;
+        } else {
         const { result: answerResult, overflow: answerOverflow } =
           await runHelixAskLocalWithOverflowRetry(
             {
@@ -21957,12 +22182,26 @@ const executeHelixAsk = async ({
           !answerBudget.override &&
           Boolean(prompt);
         if (retryEligible) {
+          const answerRetryHelperBudget = canStartFastHelper(
+            "answer_retry",
+            fastQualityBudgets.helperMinMs,
+            fastStageDeadlines.finalize,
+          );
+          if (fastQualityMode && !answerRetryHelperBudget.ok) {
+            recordFastDecision(
+              "answer_retry",
+              "skip_llm",
+              answerRetryHelperBudget.reason ?? "min_budget_not_met",
+              answerRetryHelperBudget.remainingMs,
+              fastStageDeadlines.finalize,
+            );
+          }
           const retryBudget = clampNumber(
             Math.min(Math.round(answerMaxTokens * 1.35), answerBudget.cap),
             128,
             answerBudget.cap,
           );
-          if (retryBudget > answerMaxTokens) {
+          if (retryBudget > answerMaxTokens && (!fastQualityMode || answerRetryHelperBudget.ok)) {
             const retryStart = logStepStart(
               "LLM answer retry",
               `tokens=${retryBudget}`,
@@ -22036,6 +22275,7 @@ const executeHelixAsk = async ({
           }
         } else if (debugPayload) {
           debugPayload.answer_retry_applied = false;
+        }
         }
       } catch (error) {
         answerGenerationFailed = true;
@@ -22254,6 +22494,7 @@ const executeHelixAsk = async ({
             formatSpec.stageTags,
           );
           const repairHelperResult = await runHelperWithRuntimeGuard(
+          const repairHelperResult = await runHelperWithinStageBudget(
             "citation_repair",
             FAST_QUALITY_FINALIZE_BY_MS,
             () =>
@@ -22701,6 +22942,35 @@ const executeHelixAsk = async ({
             const repairText = stripPromptEchoFromAnswer(repairResult.text ?? "", baseQuestion);
             if (repairText) {
               const candidate = applyHelixAskPlatonicGates({
+          const { result: repairResult, overflow: repairOverflow } =
+            await runHelperWithinStageBudget(
+              "drift_repair",
+              FAST_QUALITY_FINALIZE_BY_MS,
+              () =>
+                runHelixAskLocalWithOverflowRetry(
+                  {
+                    prompt: repairPrompt,
+                    max_tokens: repairTokens,
+                    temperature: Math.min(parsed.data.temperature ?? 0.2, 0.35),
+                    seed: parsed.data.seed,
+                    stop: parsed.data.stop,
+                  },
+                  {
+                    personaId,
+                    sessionId: parsed.data.sessionId,
+                    traceId: askTraceId,
+                  },
+                  {
+                    fallbackMaxTokens: repairTokens,
+                    allowContextDrop: true,
+                    label: "drift_repair",
+                  },
+                ),
+            );
+          recordOverflow("drift_repair", repairOverflow);
+          const repairText = stripPromptEchoFromAnswer(repairResult.text ?? "", baseQuestion);
+          if (repairText) {
+            const candidate = applyHelixAskPlatonicGates({
               question: baseQuestion,
               answer: repairText,
               domain: platonicDomain,
@@ -23322,6 +23592,15 @@ const executeHelixAsk = async ({
         extensionCitations: answerExtension?.citations,
       });
     }
+    if (fastQualityMode && getFastElapsedMs() > fastStageDeadlines.finalize) {
+      recordFastDecision(
+        "finalize",
+        "deadline_miss",
+        "finalize_after_deadline",
+        getFastRemainingMs(fastStageDeadlines.finalize),
+        fastStageDeadlines.finalize,
+      );
+    }
     logDebug("streamEmitter.finalize start", {
       cleanedLength: typeof cleanedText === "string" ? cleanedText.length : 0,
     });
@@ -23384,6 +23663,12 @@ const executeHelixAsk = async ({
         answer: clarifyLine,
         fallback: "fast_mode_runtime_missing",
       });
+    if (/runHelperWithinStageBudget is not defined/i.test(message)) {
+      const clarifyLine =
+        "I hit an internal fast-mode helper runtime issue. Please retry once; if it persists, I can continue in deterministic clarify mode with one focused follow-up.";
+      streamEmitter.finalize(clarifyLine);
+      logProgress("Fallback", "helper_runtime_missing_clarify", undefined, false);
+      responder.send(200, { ok: true, text: clarifyLine, answer: clarifyLine, fallback: "helper_runtime_missing" });
       return;
     }
     streamEmitter.finalize();
