@@ -91,10 +91,10 @@ function normalizeAtomicLaunchParams(params: AtomicViewerLaunch["params"]): {
   sampleCount: number | null;
 } {
   const model = params.model === "classical" ? "classical" : "quantum";
-  let n = clampAtomicInt(params.n, 1, 10, 1);
+  let n = clampAtomicInt(params.n, 1, 7, 1);
   let l = clampAtomicInt(params.l, 0, 9, 0);
   if (l > n - 1) {
-    n = Math.min(10, l + 1);
+    n = Math.min(7, l + 1);
   }
   l = Math.min(l, n - 1);
   let m = clampAtomicInt(params.m, -9, 9, 0);
@@ -179,7 +179,7 @@ export default function ElectronOrbitalPanel() {
             ...electron,
             label: `${next.n}${orbitalLabel(next.l)} launch`,
             orbital,
-            energyEV: -13.6 / (next.n * next.n),
+            energyEV: (-13.6 * next.Z * next.Z) / (next.n * next.n),
             occupancy: next.l === 0 ? 2 : 1,
             spinAligned: orbital.ms > 0,
           };

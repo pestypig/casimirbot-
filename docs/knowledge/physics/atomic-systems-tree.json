@@ -211,7 +211,7 @@
           "type": "integer",
           "range": [
             1,
-            10
+            7
           ],
           "default": 1
         },
