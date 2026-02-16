@@ -7,10 +7,17 @@ import {
   DEFAULT_HULL_WALL_THICKNESS_M,
 } from "@shared/time-dilation-diagnostics";
 
+type DiagnosticsStatus = "pending" | "ready" | "error";
+type SeedStatus = "provisional" | "final";
+
 type TimeDilationDiagnosticsStore = {
+  status: DiagnosticsStatus;
   updatedAt: number;
   source: string | null;
-  payload: unknown;
+  renderingSeed: string;
+  seedStatus: SeedStatus;
+  payload: Record<string, unknown>;
+  reason?: string;
 };
 
 const setCors = (res: Response) => {
@@ -122,6 +129,17 @@ const postJson = async <T>(url: string, body: unknown, timeoutMs?: number): Prom
   return (await res.json()) as T;
 };
 
+const buildDiagnosticsEnvelope = (record: TimeDilationDiagnosticsStore) => ({
+  ok: record.status !== "error",
+  status: record.status,
+  updatedAt: record.updatedAt,
+  source: record.source,
+  renderingSeed: record.renderingSeed,
+  seedStatus: record.seedStatus,
+  reason: record.reason ?? null,
+  payload: record.payload,
+});
+
 helixTimeDilationRouter.options("/diagnostics", (_req, res) => {
   setCors(res);
   res.status(200).end();
@@ -143,16 +161,11 @@ helixTimeDilationRouter.get("/diagnostics", (req, res) => {
 
   const raw = typeof req.query.raw === "string" ? req.query.raw === "1" : false;
   if (raw) {
-    res.json(latestDiagnostics.payload);
+    res.json(buildDiagnosticsEnvelope(latestDiagnostics));
     return;
   }
 
-  res.json({
-    ok: true,
-    updatedAt: latestDiagnostics.updatedAt,
-    source: latestDiagnostics.source,
-    payload: latestDiagnostics.payload,
-  });
+  res.json(buildDiagnosticsEnvelope(latestDiagnostics));
 });
 
 helixTimeDilationRouter.post("/diagnostics", (req, res) => {
@@ -162,10 +175,15 @@ helixTimeDilationRouter.post("/diagnostics", (req, res) => {
   const sourceRaw = payload?.source;
   const source =
     typeof sourceRaw === "string" && sourceRaw.trim().length > 0 ? sourceRaw.trim() : null;
+  const updatedAt = Date.now();
+  const renderingSeed = typeof payload.renderingSeed === "string" ? payload.renderingSeed : `diag:${updatedAt}`;
   latestDiagnostics = {
-    updatedAt: Date.now(),
+    status: "ready",
+    updatedAt,
     source,
     payload,
+    renderingSeed,
+    seedStatus: "final",
   };
   res.json({ ok: true, updatedAt: latestDiagnostics.updatedAt });
 });
@@ -209,6 +227,22 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
       } satisfies TimeDilationDiagnosticsOptions);
 
     if (input.async) {
+      const activatedAt = Date.now();
+      const provisionalSeed = `activate:${activatedAt}`;
+      latestDiagnostics = {
+        status: "pending",
+        updatedAt: activatedAt,
+        source: "time_dilation_activate_async",
+        renderingSeed: provisionalSeed,
+        seedStatus: "provisional",
+        reason: "diagnostics_running",
+        payload: {
+          ok: false,
+          kind: "time_dilation_diagnostics_pending",
+          message: "Diagnostics are running asynchronously. Poll /api/helix/time-dilation/diagnostics.",
+        },
+      };
+
       void postJson<any>(
         `${baseUrl}/api/helix/pipeline/update`,
         {
@@ -230,18 +264,47 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
             params.set("format", "json");
             await fetch(`${baseUrl}/api/helix/gr-evolve-brick?${params.toString()}`).catch(() => null);
           }
-          return runDiagnostics();
+          const diagnostics = await runDiagnostics();
+          const diagnosticsRecord = (diagnostics ?? {}) as Record<string, unknown>;
+          const finalSeed =
+            typeof diagnosticsRecord.renderingSeed === "string" ? diagnosticsRecord.renderingSeed : provisionalSeed;
+          latestDiagnostics = {
+            status: "ready",
+            updatedAt: Date.now(),
+            source: "time_dilation_activate_async",
+            renderingSeed: finalSeed,
+            seedStatus: "final",
+            payload: {
+              kind: typeof diagnosticsRecord.kind === "string" ? diagnosticsRecord.kind : "time_dilation_diagnostics",
+              gate: (diagnosticsRecord.gate as Record<string, unknown> | undefined) ?? { banner: null, reasons: [] },
+              strict: (diagnosticsRecord.strict as Record<string, unknown> | undefined) ?? {},
+              canonical: (diagnosticsRecord.canonical as Record<string, unknown> | undefined) ?? {},
+              ...diagnosticsRecord,
+              renderingSeed: finalSeed,
+            },
+          };
         })
         .catch((err) => {
           const message = err instanceof Error ? err.message : String(err);
           latestDiagnostics = {
+            status: "error",
             updatedAt: Date.now(),
             source: "time_dilation_activate_error",
-            payload: { ok: false, error: "activate_failed", message },
+            renderingSeed: provisionalSeed,
+            seedStatus: "provisional",
+            reason: "activate_failed",
+            payload: {
+              ok: false,
+              error: "activate_failed",
+              message,
+            },
           };
         });
 
+codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
+
       const updatedAt = Date.now();
+main
       const pipelineUpdate = {
         ok: true,
         pending: true,
@@ -255,10 +318,20 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
       };
       const diagnostics = {
         ok: false,
+codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
+        status: "pending",
+        pending: true,
+        error: "diagnostics_pending",
+        reason: "diagnostics_running",
+        message: "Diagnostics are running asynchronously. Poll /api/helix/time-dilation/diagnostics.",
+        updatedAt: activatedAt,
+        renderingSeed: provisionalSeed,
+        seedStatus: "provisional" as SeedStatus,
         pending: true,
         error: "diagnostics_pending",
         message: "Diagnostics are running asynchronously. Poll /api/helix/time-dilation/diagnostics.",
         updatedAt,
+main
       };
       const canonical = resolveCanonicalSummary(input, pipelineUpdate, null);
       const warnings = resolveWarnings(pipelineUpdate, null);
@@ -268,8 +341,14 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
         baseUrl,
         warpFieldType: input.warpFieldType,
         grEnabled: input.grEnabled,
+codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
+        updatedAt: activatedAt,
+        renderingSeed: provisionalSeed,
+        seedStatus: "provisional",
+
         updatedAt,
         renderingSeed: `activate:${updatedAt}`,
+main
         strictCongruence: canonical.strictCongruence,
         canonical,
         warnings,
@@ -318,6 +397,10 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
         (typeof diagnosticsRecord?.renderingSeed === "string" ? diagnosticsRecord.renderingSeed : null) ??
         (typeof (pipelineRecord as any)?.renderingSeed === "string" ? (pipelineRecord as any).renderingSeed : null) ??
         `activate:${updatedAt}`,
+codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
+      seedStatus: "final",
+
+main
       strictCongruence: canonical.strictCongruence,
       canonical,
       warnings,
@@ -325,6 +408,9 @@ helixTimeDilationRouter.post("/activate", async (req, res) => {
       diagnostics:
         diagnostics ?? {
           ok: false,
+codex/fix-webgl2-and-502-bad-gateway-errors-nzovm4
+          status: "error",
+main
           error: "diagnostics_unavailable",
           message: "Diagnostics returned empty payload.",
           updatedAt,
