@@ -14,6 +14,7 @@ const demonstrationRouter = Router();
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
     "Content-Type, Authorization, X-Tenant-Id, X-Customer-Id, X-Org-Id, traceparent, tracestate",
@@ -51,6 +52,7 @@ demonstrationRouter.post("/benchmark/pick-place", (_req: Request, res: Response)
   const report = runPickPlaceBenchmark();
   recordTrainingTrace({
     traceId: report.traceId,
+    traceId: `benchmark:${report.traceId}`,
     pass: report.firstFail === null,
     firstFail: report.firstFail ?? undefined,
     deltas: report.deltas.map((entry) => ({

@@ -474,7 +474,13 @@
       "evidence": [
         {
           "type": "code",
-          "path": "client/src/lib/atomic-orbitals.ts"
+          "path": "client/src/lib/atomic-orbitals.ts",
+          "scope": "left"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/atomic-orbitals.ts",
+          "scope": "right"
         }
       ],
       "summary": "Bridge between the two launch modes under one parameter contract.",

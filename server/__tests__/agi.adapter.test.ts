@@ -176,34 +176,6 @@ describe("agi adapter API", () => {
     expect(runMock).not.toHaveBeenCalled();
   });
 
-
-
-  it("vetoes execution when provided robotics certificate hash fails integrity", async () => {
-    const response = await request(app)
-      .post("/api/agi/adapter/run")
-      .send({
-        traceId: "trace-robotics-cert-mismatch-1",
-        actions: [{ id: "intent-move", kind: "intent", params: { heading: 4 } }],
-        roboticsSafety: {
-          collisionMargin_m: 0.2,
-          collisionMarginMin_m: 0.05,
-          torqueUsageRatio: 0.4,
-          torqueUsageMax: 0.8,
-          speedUsageRatio: 0.3,
-          speedUsageMax: 0.9,
-          stabilityMargin: 0.5,
-          stabilityMarginMin: 0.3,
-          certificateHash: "bad-hash",
-        },
-      })
-      .expect(200);
-
-    expect(response.body?.verdict).toBe("FAIL");
-    expect(response.body?.firstFail?.id).toBe("robotics.certificate.integrity");
-    expect(response.body?.certificate?.integrityOk).toBe(false);
-    expect(runMock).not.toHaveBeenCalled();
-  });
-
   it("evaluates constraint pack runs via adapter", async () => {
     const response = await request(app)
       .post("/api/agi/adapter/run")

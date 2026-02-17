@@ -1,12 +1,6 @@
-import crypto from "node:crypto";
 import { Router } from "express";
 import type { Request, Response } from "express";
-import type {
-  GrAgentLoopOptions,
-  GrAgentLoopAttempt,
-} from "../gr/gr-agent-loop.js";
-import { runGrAgentLoop } from "../gr/gr-agent-loop.js";
-import { recordGrAgentLoopRun } from "../services/observability/gr-agent-loop-store.js";
+import crypto from "node:crypto";
 import { guardTenant, shouldRequireTenant } from "../auth/tenant";
 import { getConstraintPackById } from "@shared/constraint-packs";
 import {
@@ -44,6 +38,7 @@ import { applyConstraintPackOverrides } from "../services/constraint-packs/const
 import { scorePremeditation } from "../services/premeditation-scorer.js";
 import { recordTrainingTrace } from "../services/observability/training-trace-store.js";
 import { verifyRoboticsSafetyCertificateIntegrity } from "../../tools/verifyCertificate.js";
+import { runAdapterExecution } from "../services/adapter/run.js";
 
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -55,249 +50,166 @@ const setCors = (res: Response) => {
   res.setHeader("Access-Control-Expose-Headers", "traceparent, tracestate");
 };
 
-type ParamChange = {
-  key: string;
-  from?: unknown;
-  to?: unknown;
-  delta?: number;
-  change: "added" | "removed" | "changed";
+
+
+
+type RoboticsSafetyGateResult = {
+  pass: boolean;
+  firstFail?: TrainingTraceConstraint;
+  deltas: TrainingTraceDelta[];
+  certificate: {
+    status: string;
+    certificateHash: string | null;
+    certificateId: string | null;
+    integrityOk: boolean;
+  };
 };
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>     
-  !!value && typeof value === "object" && !Array.isArray(value);
+const buildRoboticsSafetyGate = (
+  roboticsSafety: AdapterRoboticsSafety,
+): RoboticsSafetyGateResult => {
+  const checks = [
+    {
+      id: "collision.margin",
+      pass: roboticsSafety.collisionMargin_m >= roboticsSafety.collisionMarginMin_m,
+      value: roboticsSafety.collisionMargin_m,
+      limit: `>= ${roboticsSafety.collisionMarginMin_m}`,
+      severity: "HARD",
+    },
+    {
+      id: "torque.bounds",
+      pass: roboticsSafety.torqueUsageRatio <= roboticsSafety.torqueUsageMax,
+      value: roboticsSafety.torqueUsageRatio,
+      limit: `<= ${roboticsSafety.torqueUsageMax}`,
+      severity: "HARD",
+    },
+    {
+      id: "speed.bounds",
+      pass: roboticsSafety.speedUsageRatio <= roboticsSafety.speedUsageMax,
+      value: roboticsSafety.speedUsageRatio,
+      limit: `<= ${roboticsSafety.speedUsageMax}`,
+      severity: "HARD",
+    },
+    {
+      id: "stability.margin",
+      pass: roboticsSafety.stabilityMargin >= roboticsSafety.stabilityMarginMin,
+      value: roboticsSafety.stabilityMargin,
+      limit: `>= ${roboticsSafety.stabilityMarginMin}`,
+      severity: "HARD",
+    },
+  ];
+  const firstFailCheck = checks.find((entry) => !entry.pass);
+  const pass = !firstFailCheck;
+  const payload = {
+    mode: "robotics-safety-v1",
+    checks,
+  };
+  const certificateHash = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(payload), "utf8")
+    .digest("hex");
+  const integrityOk = roboticsSafety.integrityOk ?? true;
+  const deltas: TrainingTraceDelta[] = [
+    {
+      key: "robotics.collision.margin_m",
+      from: null,
+      to: roboticsSafety.collisionMargin_m,
+      delta: roboticsSafety.collisionMargin_m - roboticsSafety.collisionMarginMin_m,
+      change: "added",
+    },
+    {
+      key: "robotics.torque.usage_ratio",
+      from: null,
+      to: roboticsSafety.torqueUsageRatio,
+      delta: roboticsSafety.torqueUsageRatio - roboticsSafety.torqueUsageMax,
+      change: "added",
+    },
+    {
+      key: "robotics.speed.usage_ratio",
+      from: null,
+      to: roboticsSafety.speedUsageRatio,
+      delta: roboticsSafety.speedUsageRatio - roboticsSafety.speedUsageMax,
+      change: "added",
+    },
+    {
+      key: "robotics.stability.margin",
+      from: null,
+      to: roboticsSafety.stabilityMargin,
+      delta: roboticsSafety.stabilityMargin - roboticsSafety.stabilityMarginMin,
+      change: "added",
+    },
+  ];
+  return {
+    pass,
+    firstFail: firstFailCheck
+      ? {
+          id: firstFailCheck.id,
+          severity: firstFailCheck.severity,
+          status: "fail",
+          value: firstFailCheck.value,
+          limit: firstFailCheck.limit,
+          note: "robotics-safety-veto",
+        }
+      : undefined,
+    deltas,
+    certificate: {
+      status: pass ? "GREEN" : "RED",
+      certificateHash,
+      certificateId: `robotics-safety:${certificateHash.slice(0, 12)}`,
+      integrityOk,
+    },
+  };
+};
+
+const hasForbiddenActuationCommand = (actions?: AdapterAction[]): boolean => {
+  if (!Array.isArray(actions)) return false;
+  return actions.some((action) => {
+    const kind = String(action.kind ?? "").toLowerCase();
+    const label = String(action.label ?? "").toLowerCase();
+    return (
+      kind.includes("motor") ||
+      kind.includes("actuat") ||
+      label.includes("motor") ||
+      label.includes("actuat") ||
+      Object.keys(action.params ?? {}).some((key) => /motor|torque|servo/i.test(key))
+    );
+  });
+};
 
 const normalizeCustomerId = (value?: string): string | undefined => {
-  if (!value) return undefined;
+  if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
-const flattenParams = (
-  value: unknown,
-  prefix = "",
-  map: Map<string, unknown> = new Map(),
-): Map<string, unknown> => {
-  if (Array.isArray(value)) {
-    value.forEach((entry, index) => {
-      const next = prefix ? `${prefix}[${index}]` : `[${index}]`;
-      flattenParams(entry, next, map);
-    });
-    return map;
-  }
-  if (isPlainObject(value)) {
-    Object.entries(value).forEach(([key, entry]) => {
-      const next = prefix ? `${prefix}.${key}` : key;
-      flattenParams(entry, next, map);
-    });
-    return map;
-  }
-  if (prefix) {
-    map.set(prefix, value);
-  }
-  return map;
-};
-
-const diffParams = (
-  from?: Record<string, unknown>,
-  to?: Record<string, unknown>,
-): ParamChange[] => {
-  const fromMap = flattenParams(from);
-  const toMap = flattenParams(to);
-  const keys = new Set<string>([...fromMap.keys(), ...toMap.keys()]);
-  const changes: ParamChange[] = [];
-  keys.forEach((key) => {
-    const hasFrom = fromMap.has(key);
-    const hasTo = toMap.has(key);
-    const fromValue = hasFrom ? fromMap.get(key) : undefined;
-    const toValue = hasTo ? toMap.get(key) : undefined;
-    if (hasFrom && hasTo && Object.is(fromValue, toValue)) {
-      return;
-    }
-    const change: ParamChange = {
-      key,
-      from: fromValue,
-      to: toValue,
-      change: hasFrom && !hasTo ? "removed" : !hasFrom && hasTo ? "added" : "changed",
-    };
-    if (typeof fromValue === "number" && typeof toValue === "number") {
-      change.delta = toValue - fromValue;
-    }
-    changes.push(change);
-  });
-  return changes;
-};
-
-const toTrainingTraceDeltas = (changes: ParamChange[]): TrainingTraceDelta[] => {
-  const deltas: TrainingTraceDelta[] = [];
-  for (const change of changes) {
-    const from = typeof change.from === "number" ? change.from : null;
-    const to = typeof change.to === "number" ? change.to : null;
-    const delta = typeof change.delta === "number" ? change.delta : undefined;
-    if (from === null && to === null && delta === undefined) {
-      continue;
-    }
-    deltas.push({
-      key: change.key,
-      from,
-      to,
-      delta,
-      change: change.change,
-    });
-  }
-  return deltas;
-};
-
-const toTrainingTraceConstraint = (
-  constraint: GrConstraintEntry,
-): TrainingTraceConstraint => ({
-  id: constraint.id,
-  severity: constraint.severity,
-  status: constraint.status,
-  value: constraint.value ?? null,
-  limit: constraint.limit ?? null,
-  note: constraint.note,
-});
-
-const findFirstFailingHardConstraint = (
-  constraints?: GrConstraintEntry[],
-): TrainingTraceConstraint | undefined => {
-  if (!Array.isArray(constraints) || constraints.length === 0) {
-    return undefined;
-  }
-  const failing = constraints.find(
-    (entry) => entry.severity === "HARD" && entry.status !== "pass",
-  );
-  return failing ? toTrainingTraceConstraint(failing) : undefined;
-};
-
-const hasAnyTelemetry = (telemetry?: Record<string, unknown>): boolean => {
-  if (!telemetry) return false;
-  return Object.keys(telemetry).length > 0;
-};
-
-const mergeMetricOverrides = (
-  target: ConstraintPackMetricMap,
-  overrides?: ConstraintPackMetricMap,
-) => {
-  if (!overrides) return;
-  for (const [key, value] of Object.entries(overrides)) {
-    if (value !== undefined) {
-      target[key] = value;
-    }
-  }
-};
-
-const hasPolicyOverridePayload = (
-  override: ConstraintPackOverride | undefined,
-): boolean => {
-  if (!override) return false;
-  return (
-    override.policy !== undefined ||
-    override.certificate !== undefined ||
-    (override.constraints?.length ?? 0) > 0 ||
-    (override.proxies?.length ?? 0) > 0
-  );
-};
-
-const resolveAutoTelemetry = (input: {
-  autoTelemetry?: boolean;
-  telemetryPath?: string;
-  junitPath?: string;
-  vitestPath?: string;
-  jestPath?: string;
-  eslintPath?: string;
-  tscPath?: string;
-  toolLogTraceId?: string;
-  toolLogWindowMs?: number;
-  toolLogLimit?: number;
-}): boolean => {
-  const hasAutoHint = !!(
-    input.telemetryPath ||
-    input.junitPath ||
-    input.vitestPath ||
-    input.jestPath ||
-    input.eslintPath ||
-    input.tscPath ||
-    input.toolLogTraceId ||
-    input.toolLogWindowMs ||
-    input.toolLogLimit
-  );
-  if (input.autoTelemetry === true) return true;
-  if (input.autoTelemetry === false) {
-    return hasAutoHint;
-  }
-  if (hasAutoHint) return true;
-  return isAutoTelemetryEnabled();
-};
-
-const resolveTerminalAttempt = (
-  attempts: GrAgentLoopAttempt[],
-  acceptedIteration?: number,
-): GrAgentLoopAttempt | undefined => {
-  if (!Array.isArray(attempts) || attempts.length === 0) {
-    return undefined;
-  }
-  if (acceptedIteration !== undefined) {
-    const match = attempts.find((attempt) => attempt.iteration === acceptedIteration);
-    if (match) return match;
-  }
-  return attempts[attempts.length - 1];
-};
-
 const buildActionProposals = (actions?: AdapterAction[]) => {
-  if (!Array.isArray(actions) || actions.length === 0) {
-    return undefined;
-  }
-  return actions.map((action, index) => ({
-    label: action.label ?? action.id ?? action.kind ?? `action-${index + 1}`,   
-    params: action.params ?? {},
-  }));
-};
-
-const buildArtifactRefs = (input: {
-  runId: string;
-  certificateHash?: string | null;
-  certificateId?: string | null;
-}): AdapterArtifactRef[] => {
-  const artifacts: AdapterArtifactRef[] = [
-    { kind: "gr-agent-loop-run", ref: input.runId },
-    { kind: "gr-agent-loop-run-url", ref: `/api/helix/gr-agent-loop/${input.runId}` },
-    { kind: "training-trace-export", ref: "/api/agi/training-trace/export" },
-  ];
-  if (input.certificateHash) {
-    artifacts.push({ kind: "warp-certificate-hash", ref: input.certificateHash });
-  }
-  if (input.certificateId) {
-    artifacts.push({ kind: "warp-certificate-id", ref: input.certificateId });
-  }
-  return artifacts;
-};
-
-const buildConstraintPackArtifacts = (input: {
-  packId: string;
-  traceId: string;
-  certificateHash?: string | null;
-  certificateId?: string | null;
-}): AdapterArtifactRef[] => {
-  const artifacts: AdapterArtifactRef[] = [
-    { kind: "constraint-pack", ref: input.packId },
-    { kind: "training-trace-id", ref: input.traceId },
-    { kind: "training-trace-url", ref: `/api/agi/training-trace/${input.traceId}` },
-    { kind: "training-trace-export", ref: "/api/agi/training-trace/export" },
-  ];
-  if (input.certificateHash) {
-    artifacts.push({
-      kind: "constraint-pack-certificate-hash",
-      ref: input.certificateHash,
-    });
-  }
-  if (input.certificateId) {
-    artifacts.push({
-      kind: "constraint-pack-certificate-id",
-      ref: input.certificateId,
-    });
-  }
-  return artifacts;
+  if (!actions?.length) return undefined;
+  return actions.map((action, index) => {
+    const params = (action.params ?? {}) as Record<string, unknown>;
+    const sigma =
+      typeof params.sigma === "number"
+        ? params.sigma
+        : typeof params.sigma === "string"
+          ? Number(params.sigma)
+          : 1;
+    const R =
+      typeof params.R === "number"
+        ? params.R
+        : typeof params.R === "string"
+          ? Number(params.R)
+          : 8;
+    const T =
+      typeof params.T === "number"
+        ? params.T
+        : typeof params.T === "string"
+          ? Number(params.T)
+          : 0.25;
+    const fallbackLabel = action.label?.trim() || `${action.kind ?? "proposal"}-${index + 1}`;
+    return {
+      label: fallbackLabel,
+      params: { sigma, R, T },
+    };
+  });
 };
 
 
@@ -616,78 +528,14 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         message: "Provide telemetry or metrics to evaluate the pack.",
       });
     }
+  const { actions, premeditation, roboticsSafety } = parsed.data;
 
-    const metrics =
-      effectivePack.id === "repo-convergence"
-        ? buildRepoConvergenceMetrics(telemetry as RepoConvergenceTelemetry)
-        : effectivePack.id === "tool-use-budget"
-          ? buildToolUseBudgetMetrics(telemetry as ToolUseBudgetTelemetry)
-          : buildAuditSafetyMetrics(telemetry as AuditSafetyTelemetry);
-    mergeMetricOverrides(metrics, pack.metrics);
-    const evaluationNotes = [
-      ...(pack.notes ?? []),
-      ...policyNotes,
-      ...autoTelemetryNotes,
-    ];
-    const evaluation = evaluateConstraintPackFromMetrics(effectivePack, metrics, {
-      certificate: pack.certificate,
-      deltas: pack.deltas,
-      notes: evaluationNotes.length ? evaluationNotes : undefined,
-      proxy: pack.proxy,
-      ladderTier: pack.ladderTier,
-    });
-    const traceId = parsed.data.traceId ?? `adapter:${crypto.randomUUID()}`;
-    const trace = recordConstraintPackTrace({
-      traceId,
-      tenantId: effectiveTenantId,
-      pack: effectivePack,
-      evaluation,
-      metrics,
-      source: {
-        system: "constraint-pack",
-        component: "adapter",
-        tool: effectivePack.id,
-        version: String(effectivePack.version),
-      },
-    });
-    const artifacts = buildConstraintPackArtifacts({
-      packId: effectivePack.id,
-      traceId: trace.id,
-      certificateHash: evaluation.certificate?.certificateHash ?? null,
-      certificateId: evaluation.certificate?.certificateId ?? null,
-    });
-    return res.json({
-      traceId,
-      runId: trace.id,
-      verdict: trace.pass ? "PASS" : "FAIL",
-      pass: trace.pass,
-      firstFail: trace.firstFail ?? null,
-      deltas: trace.deltas,
-      certificate: evaluation.certificate ?? null,
-      artifacts,
+  if (hasForbiddenActuationCommand(actions)) {
+    return res.status(400).json({
+      error: "controller-boundary-violation",
+      message: "LLM actions may propose intent only; direct motor/actuator commands are forbidden.",
     });
   }
-
-  const proposals = buildActionProposals(actions);
-  const proposalCount = proposals?.length ?? 0;
-  const resolvedMaxIterations =
-    budget?.maxIterations ?? (proposalCount > 0 ? Math.min(proposalCount, 50) : undefined);
-  const options: GrAgentLoopOptions = {
-    ...(proposals ? { proposals } : {}),
-    ...(resolvedMaxIterations !== undefined
-      ? { maxIterations: resolvedMaxIterations }
-      : {}),
-    ...(budget?.maxAttemptMs !== undefined || budget?.maxTotalMs !== undefined
-      ? {
-          budget: {
-            maxAttemptMs: budget?.maxAttemptMs,
-            maxTotalMs: budget?.maxTotalMs,
-          },
-        }
-      : {}),
-    ...(policy?.thresholds ? { thresholds: policy.thresholds } : {}),
-    ...(policy?.gate ? { policy: policy.gate } : {}),
-  };
 
   const traceId = parsed.data.traceId ?? `adapter:${crypto.randomUUID()}`;
   const start = Date.now();
@@ -722,35 +570,54 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
     }
   }
   try {
-    const result = await runGrAgentLoop(options);
-    const durationMs = Date.now() - start;
-    const run = recordGrAgentLoopRun({
-      result,
-      options,
-      durationMs,
+    const result = await runAdapterExecution(parsed.data, {
       tenantId: tenantGuard.tenantId,
     });
-    const terminalAttempt = resolveTerminalAttempt(
-      result.attempts,
-      result.acceptedIteration,
-    );
-    const firstFail = terminalAttempt
-      ? findFirstFailingHardConstraint(terminalAttempt.evaluation.constraints)
-      : undefined;
-    const baselineParams =
-      result.attempts.length > 0 ? result.attempts[0].proposal.params : undefined;
-    const terminalParams = terminalAttempt?.proposal.params;
-    const deltas = toTrainingTraceDeltas(
-      diffParams(
-        baselineParams as Record<string, unknown> | undefined,
-        terminalParams as Record<string, unknown> | undefined,
-      ),
-    );
-    const artifacts = buildArtifactRefs({
-      runId: run.id,
-      certificateHash: terminalAttempt?.evaluation.certificate.certificateHash,
-      certificateId: terminalAttempt?.evaluation.certificate.certificateId,
-    });
+
+    if (premeditationResult) {
+      const nowIso = new Date().toISOString();
+      recordTrainingTrace({
+        traceId,
+        tenantId: tenantGuard.tenantId,
+        pass: result.pass,
+        deltas: result.deltas,
+        metrics: {
+          optimism: premeditationResult.optimism,
+          entropy: premeditationResult.entropy,
+        },
+        payload: {
+          kind: "movement_episode",
+          data: {
+            episodeId: `${traceId}:episode`,
+            traceId,
+            primitivePath: premeditationResult.chosenCandidateId
+              ? [premeditationResult.chosenCandidateId]
+              : [],
+            metrics: {
+              optimism: premeditationResult.optimism,
+              entropy: premeditationResult.entropy,
+            },
+            events: [
+              {
+                phase: "premeditate",
+                ts: nowIso,
+                candidateId: premeditationResult.chosenCandidateId,
+                metadata: {
+                  rationaleTags: premeditationResult.rationaleTags,
+                },
+              },
+              {
+                phase: "act",
+                ts: nowIso,
+                controllerRef: "gr-agent-loop",
+              },
+            ],
+            notes: premeditationResult.rationaleTags,
+          },
+        },
+        notes: ["phase=2", "premeditation=enabled"],
+      });
+    }
 
     if (premeditationResult) {
       const nowIso = new Date().toISOString();
@@ -807,6 +674,14 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
       premeditation: premeditationResult,
       certificate: terminalAttempt?.evaluation.certificate ?? null,
       artifacts,
+      runId: result.runId,
+      verdict: result.verdict,
+      pass: result.pass,
+      firstFail: result.firstFail ?? null,
+      deltas: result.deltas,
+      premeditation: premeditationResult,
+      certificate: result.certificate ?? null,
+      artifacts: result.artifacts,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

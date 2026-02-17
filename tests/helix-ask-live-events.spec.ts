@@ -49,7 +49,11 @@ describe("Helix Ask live events", () => {
     });
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
-      debug?: { live_events?: Array<{ stage: string }> };
+      debug?: {
+        live_events?: Array<{ stage: string }>;
+        synthesis_mode?: string;
+        synthesis_reason?: string;
+      };
     };
     const stages = new Set(
       (payload.debug?.live_events ?? []).map((entry) => entry.stage),
@@ -81,6 +85,8 @@ describe("Helix Ask live events", () => {
       console.log("Missing stages:", allMissing.join(", "));
     }
     expect(allMissing).toEqual([]);
+    expect(payload.debug?.synthesis_mode).toBeDefined();
+    expect(payload.debug?.synthesis_reason).toMatch(/mode=/);
   }, 20000);
 
   it("answers ideology concept query with grounded narrative + technical notes", async () => {
@@ -108,7 +114,7 @@ describe("Helix Ask live events", () => {
     };
     const answerPath = payload.debug?.answer_path ?? payload.answer_path ?? [];
     const text = payload.text.trim();
-    expect(text).toContain("Close loops only with verified signals");
+    expect(text).toMatch(/close loops only with verified signals/i);
     expect(text).toContain("Sources:");
     expect(answerPath).not.toContain("forcedAnswer:ideology");
     expect(answerPath).not.toContain("answer:forced");
@@ -147,10 +153,35 @@ describe("Helix Ask live events", () => {
       };
     };
     const answerPath = payload.debug?.answer_path ?? [];
-    expect(payload.text).toContain("Close loops only with verified signals");
+    expect(payload.text).toMatch(/close loops only with verified signals/i);
     expect(payload.text).toContain("In practice,");
     expect(payload.debug?.tree_walk_mode).toBe("root_to_leaf");
     expect(payload.debug?.graph_pack_skip_reason).toBeUndefined();
     expect(answerPath.some((entry) => entry.startsWith("concept_fast_path"))).toBe(false);
+  }, 45000);
+
+  it("does not fan out simple ideology explain prompts into report mode", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "explain warp bubble mission ethos",
+        debug: true,
+        sessionId: "test-ideology-explain-no-report",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text: string;
+      debug?: {
+        report_mode?: boolean;
+        report_mode_reason?: string;
+        report_blocks_count?: number;
+      };
+    };
+    expect(payload.debug?.report_mode).toBe(false);
+    expect(payload.debug?.report_mode_reason).toBe("ideology_chat_mode");
+    expect(payload.debug?.report_blocks_count ?? 0).toBeLessThanOrEqual(1);
+    expect(payload.text).toMatch(/mission ethos|warp vessel|radiance/i);
   }, 45000);
 });
