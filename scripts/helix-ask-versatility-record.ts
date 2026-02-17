@@ -76,6 +76,8 @@ type FailureRecord = {
 const BASE_URL = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5173";
 const OUT_DIR = process.env.HELIX_ASK_VERSATILITY_OUT ?? "artifacts/experiments/helix-ask-versatility";
 const REPORT_PATH = process.env.HELIX_ASK_VERSATILITY_REPORT ?? "reports/helix-ask-versatility-report.md";
+const ISOLATE_RUN_DIR = (process.env.HELIX_ASK_VERSATILITY_ISOLATE_RUN_DIR ?? "1") !== "0";
+const FAIL_ON_INCOMPLETE = (process.env.HELIX_ASK_VERSATILITY_FAIL_ON_INCOMPLETE ?? "1") !== "0";
 const SEEDS = (process.env.HELIX_ASK_VERSATILITY_SEEDS ?? "7,11,13")
   .split(",")
   .map((entry) => Number(entry.trim()))
@@ -532,16 +534,19 @@ const main = async () => {
   const startedAt = new Date().toISOString();
   const runEpoch = Date.now();
   const runId = `versatility-${Date.now()}`;
+  const outRootDir = path.resolve(OUT_DIR);
+  const runOutDir = ISOLATE_RUN_DIR ? path.join(outRootDir, runId) : outRootDir;
   const prompts = allPrompts();
   if (prompts.length < 90) throw new Error(`expected >=90 prompts, got ${prompts.length}`);
+  const expectedRuns = prompts.length * SEEDS.length * TEMPS.length;
 
-  await fs.mkdir(path.resolve(OUT_DIR, "raw"), { recursive: true });
+  await fs.mkdir(path.resolve(runOutDir, "raw"), { recursive: true });
   await fs.mkdir(path.resolve("reports"), { recursive: true });
 
   const promptJsonl = prompts
     .map((entry) => JSON.stringify(entry))
     .join("\n");
-  await fs.writeFile(path.resolve(OUT_DIR, "prompts.jsonl"), `${promptJsonl}\n`, "utf8");
+  await fs.writeFile(path.resolve(runOutDir, "prompts.jsonl"), `${promptJsonl}\n`, "utf8");
 
   let serverChild: ReturnType<typeof spawn> | null = null;
   if (START_SERVER) {
@@ -608,9 +613,9 @@ const main = async () => {
             }
           }
           const fileName = `${runId}-${entry.id}-s${seed}-t${String(temperature).replace(".", "p")}.json`;
-          await fs.writeFile(path.resolve(OUT_DIR, "raw", fileName), `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+          await fs.writeFile(path.resolve(runOutDir, "raw", fileName), `${JSON.stringify(raw, null, 2)}\n`, "utf8");
           if (rawRuns.length % CHECKPOINT_EVERY === 0) {
-            await writeCheckpoint(OUT_DIR, runId, rawRuns);
+            await writeCheckpoint(runOutDir, runId, rawRuns);
           }
         }
       }
@@ -618,7 +623,11 @@ const main = async () => {
   } finally {
     if (serverChild) await stopServer(serverChild);
   }
-  await writeCheckpoint(OUT_DIR, runId, rawRuns);
+  await writeCheckpoint(runOutDir, runId, rawRuns);
+  const runComplete = rawRuns.length === expectedRuns && !terminatedEarlyReason;
+  if (!runComplete && !terminatedEarlyReason) {
+    terminatedEarlyReason = `incomplete_run:${rawRuns.length}/${expectedRuns}`;
+  }
 
   const byFamily = new Map<PromptFamily, RawRun[]>();
   for (const family of ["relation", "repo_technical", "ambiguous_general"] as const) {
@@ -732,11 +741,16 @@ const main = async () => {
     run_duration_ms: Date.now() - runEpoch,
     terminated_early_reason: terminatedEarlyReason,
     global_cooldown_applied_ms: globalCooldownAppliedMs,
+    output_root_dir: outRootDir,
+    output_run_dir: runOutDir,
     base_url: BASE_URL,
     prompt_count: prompts.length,
     seed_count: SEEDS.length,
     temperature_values: TEMPS,
+    expected_runs: expectedRuns,
     total_runs: rawRuns.length,
+    run_complete: runComplete,
+    completion_rate: rawRuns.length / Math.max(1, expectedRuns),
     family_summary: familySummary,
     metrics: {
       attempts: {
@@ -765,7 +779,9 @@ const main = async () => {
 
   const failures = {
     run_id: runId,
+    expected_runs: expectedRuns,
     total_runs: rawRuns.length,
+    run_complete: runComplete,
     top_failure_signatures: topFailures,
     failed_runs: rawRuns.filter((row) => row.failures.length > 0).map((row) => ({
       prompt_id: row.prompt_id,
@@ -780,19 +796,22 @@ const main = async () => {
   };
 
   const recommendationDecision =
-    Boolean(terminatedEarlyReason) ||
+    !runComplete ||
     stubRate > 0.02 ||
     relationPacketBuiltRate < 0.95 ||
     relationDualDomainRate < 0.95 ||
     reportModeCorrectRate < 0.98 ||
     minTextPassRate < 0.9
-      ? "needs_patch"
+      ? (runComplete ? "needs_patch" : "insufficient_run_quality")
       : "ship";
 
   const recommendation = {
     run_id: runId,
     decision: recommendationDecision,
     rationale: [
+      `run_complete=${String(runComplete)}`,
+      `expected_runs=${expectedRuns}`,
+      `total_runs=${rawRuns.length}`,
       `terminated_early_reason=${terminatedEarlyReason ?? "none"}`,
       `global_cooldown_applied_ms=${globalCooldownAppliedMs}`,
       `stub_text_detected_rate=${stubRate.toFixed(3)}`,
@@ -820,9 +839,14 @@ const main = async () => {
     ],
   };
 
-  await fs.writeFile(path.resolve(OUT_DIR, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
-  await fs.writeFile(path.resolve(OUT_DIR, "failures.json"), `${JSON.stringify(failures, null, 2)}\n`, "utf8");
-  await fs.writeFile(path.resolve(OUT_DIR, "recommendation.json"), `${JSON.stringify(recommendation, null, 2)}\n`, "utf8");
+  await fs.writeFile(path.resolve(runOutDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
+  await fs.writeFile(path.resolve(runOutDir, "failures.json"), `${JSON.stringify(failures, null, 2)}\n`, "utf8");
+  await fs.writeFile(path.resolve(runOutDir, "recommendation.json"), `${JSON.stringify(recommendation, null, 2)}\n`, "utf8");
+  await fs.writeFile(
+    path.resolve(outRootDir, "latest.json"),
+    `${JSON.stringify({ run_id: runId, output_run_dir: runOutDir, completed_at: new Date().toISOString() }, null, 2)}\n`,
+    "utf8",
+  );
 
   const familyLines = (Object.entries(familySummary) as Array<[string, Record<string, number>]>).map(
     ([family, stats]) =>
@@ -856,10 +880,14 @@ const main = async () => {
     `- prompts: ${prompts.length}`,
     `- seeds: ${SEEDS.join(",")}`,
     `- temperatures: ${TEMPS.join(",")}`,
+    `- expected_runs: ${expectedRuns}`,
     `- total_runs: ${rawRuns.length}`,
+    `- run_complete: ${String(runComplete)}`,
+    `- completion_rate: ${(100 * rawRuns.length / Math.max(1, expectedRuns)).toFixed(2)}%`,
     `- run_duration_ms: ${Date.now() - runEpoch}`,
     `- terminated_early_reason: ${terminatedEarlyReason ?? "none"}`,
     `- global_cooldown_applied_ms: ${globalCooldownAppliedMs}`,
+    `- output_run_dir: ${runOutDir}`,
     "",
     "## Aggregate by Prompt Family",
     "| family | runs | pass_rate | intent_correct_rate | report_mode_correct_rate | stub_rate | latency_p50_ms | latency_p95_ms |",
@@ -903,8 +931,18 @@ const main = async () => {
   ].join("\n");
 
   await fs.writeFile(path.resolve(REPORT_PATH), `${md}\n`, "utf8");
+  await fs.writeFile(path.resolve(runOutDir, "report.md"), `${md}\n`, "utf8");
 
-  console.log(`[versatility] run=${runId} prompts=${prompts.length} runs=${rawRuns.length} decision=${recommendationDecision}`);
+  console.log(
+    `[versatility] run=${runId} prompts=${prompts.length} expected_runs=${expectedRuns} runs=${rawRuns.length} run_complete=${String(
+      runComplete,
+    )} decision=${recommendationDecision} out=${runOutDir}`,
+  );
+  if (FAIL_ON_INCOMPLETE && !runComplete) {
+    throw new Error(
+      `versatility_run_incomplete expected=${expectedRuns} actual=${rawRuns.length} reason=${terminatedEarlyReason ?? "none"}`,
+    );
+  }
 };
 
 main().catch((error) => {
