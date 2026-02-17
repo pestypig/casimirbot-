@@ -19298,6 +19298,7 @@ const executeHelixAsk = async ({
     let result: LocalAskResult;
     let generalScaffold = "";
     let repoScaffold = "";
+    let repoScaffoldForPrompt = "";
     var repoScaffoldForPrompt = "";
     let promptScaffold = "";
     let topicMustIncludeOk: boolean | undefined;
