@@ -250,6 +250,7 @@ type AskLiveEventEntry = {
   text: string;
   tool?: string;
   ts?: string | number;
+  durationMs?: number;
 };
 
 type HelixAskPillProps = {
@@ -1709,7 +1710,19 @@ export function HelixAskPill({
       setAskLiveEvents((prev) => {
         const id = event.id ?? String(event.seq ?? Date.now());
         if (prev.some((entry) => entry.id === id)) return prev;
-        const next = [...prev, { id, text, tool: toolName || undefined, ts: event.ts }];
+        const next = [
+          ...prev,
+          {
+            id,
+            text,
+            tool: toolName || undefined,
+            ts: event.ts,
+            durationMs:
+              typeof event.durationMs === "number" && Number.isFinite(event.durationMs)
+                ? event.durationMs
+                : undefined,
+          },
+        ];
         const clipped = next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
         askLiveEventsRef.current = clipped;
         return clipped;
@@ -1770,6 +1783,7 @@ export function HelixAskPill({
         text,
         tool: entry.tool,
         ts: entry.ts,
+        durationMs: entry.durationMs,
       };
     });
   }, []);
@@ -2346,6 +2360,11 @@ export function HelixAskPill({
                             <div className="text-[9px] uppercase tracking-[0.22em] text-slate-500">
                               {label}
                             </div>
+                            {typeof entry.durationMs === "number" ? (
+                              <p className="mt-1 text-[10px] text-slate-500">
+                                Duration: {Math.round(entry.durationMs)}ms
+                              </p>
+                            ) : null}
                             <p className="mt-1 whitespace-pre-wrap text-slate-300">
                               {entry.text}
                             </p>

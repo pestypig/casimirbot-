@@ -103,6 +103,7 @@ type AskLiveEventEntry = {
   text: string;
   tool?: string;
   ts?: string | number;
+  durationMs?: number;
 };
 type LumaMoodPalette = {
   ring: string;
@@ -2202,7 +2203,19 @@ export default function DesktopPage() {
       setAskLiveEvents((prev) => {
         const id = event.id ?? String(event.seq ?? Date.now());
         if (prev.some((entry) => entry.id === id)) return prev;
-        const next = [...prev, { id, text, tool: toolName || undefined, ts: event.ts }];
+        const next = [
+          ...prev,
+          {
+            id,
+            text,
+            tool: toolName || undefined,
+            ts: event.ts,
+            durationMs:
+              typeof event.durationMs === "number" && Number.isFinite(event.durationMs)
+                ? event.durationMs
+                : undefined,
+          },
+        ];
         const clipped = next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
         askLiveEventsRef.current = clipped;
         return clipped;
@@ -2247,7 +2260,7 @@ export default function DesktopPage() {
       .filter(Boolean);
   }, []);
 
-  const resolveReplyEvents = useCallback((reply: { id: string; liveEvents?: AskLiveEventEntry[]; debug?: { live_events?: Array<{ ts: string; tool: string; stage: string; detail?: string; text?: string }> } }): AskLiveEventEntry[] => {
+  const resolveReplyEvents = useCallback((reply: { id: string; liveEvents?: AskLiveEventEntry[]; debug?: { live_events?: Array<{ ts: string; tool: string; stage: string; detail?: string; text?: string; durationMs?: number }> } }): AskLiveEventEntry[] => {
     if (reply.liveEvents && reply.liveEvents.length > 0) {
       return reply.liveEvents;
     }
@@ -2263,6 +2276,7 @@ export default function DesktopPage() {
         text,
         tool: entry.tool,
         ts: entry.ts,
+        durationMs: entry.durationMs,
       };
     });
   }, []);
@@ -2913,6 +2927,11 @@ export default function DesktopPage() {
                                   <div className="text-[9px] uppercase tracking-[0.22em] text-slate-500">
                                     {label}
                                   </div>
+                                  {typeof entry.durationMs === "number" ? (
+                                    <p className="mt-1 text-[10px] text-slate-500">
+                                      Duration: {Math.round(entry.durationMs)}ms
+                                    </p>
+                                  ) : null}
                                   <p className="mt-1 whitespace-pre-wrap text-slate-300">
                                     {entry.text}
                                   </p>
