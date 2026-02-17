@@ -219,4 +219,28 @@ describe("Helix Ask live events", () => {
     }
   }, 45000);
 
+  it("does not auto-fanout relation prompts into report mode", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "Now the warp bubble relation to ideology mission ethos?",
+        debug: true,
+        sessionId: "test-relation-no-report-fanout",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      debug?: {
+        report_mode?: boolean;
+        report_mode_reason?: string;
+        intent_id?: string;
+      };
+    };
+    expect(payload.debug?.report_mode).toBe(false);
+    expect(payload.debug?.report_mode_reason).not.toBe("multi_slot");
+    expect(payload.debug?.report_mode_reason).not.toBe("slot_plan");
+    expect(payload.debug?.intent_id).toBe("hybrid.warp_ethos_relation");
+  }, 45000);
+
 });

@@ -16953,6 +16953,10 @@ const executeHelixAsk = async ({
       seedSlots: [...memorySeedSlots, ...headingSeedSlots],
     });
     const initialReportQuestion = rawQuestion || baseQuestion;
+    const warpEthosRelationReportQuery =
+      HELIX_ASK_RELATION_QUERY_RE.test(initialReportQuestion) &&
+      /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(initialReportQuestion) &&
+      /\b(mission ethos|ethos|ideology)\b/i.test(initialReportQuestion);
     const ideologyConversationCandidate = findConceptMatch(initialReportQuestion, {
       intentId: "repo.ideology_reference",
     });
@@ -16983,8 +16987,21 @@ const executeHelixAsk = async ({
       };
     }
     if (
+      warpEthosRelationReportQuery &&
+      reportDecision.enabled &&
+      reportDecision.reason !== "explicit_report_request"
+    ) {
+      reportDecision = {
+        ...reportDecision,
+        enabled: false,
+        reason: "relation_query_mode",
+        blockCount: 1,
+      };
+    }
+    if (
       !isIdeologyConversationalCandidate &&
       !isIdeologyNarrativeQuery &&
+      !warpEthosRelationReportQuery &&
       !reportDecision.enabled &&
       slotPreview.coverageSlots.length >= 2
     ) {
@@ -17074,6 +17091,7 @@ const executeHelixAsk = async ({
     if (
       !isIdeologyConversationalCandidate &&
       !isIdeologyNarrativeQuery &&
+      !warpEthosRelationReportQuery &&
       !reportDecision.enabled &&
       slotPreview.coverageSlots.length >= 2
     ) {
@@ -17696,10 +17714,7 @@ const executeHelixAsk = async ({
       hasFilePathHints ||
       HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
       HELIX_ASK_REPO_EXPECTS.test(baseQuestion);
-    const warpEthosRelationQuery =
-      HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) &&
-      /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(baseQuestion) &&
-      /\b(mission ethos|ethos|ideology)\b/i.test(baseQuestion);
+    const warpEthosRelationQuery = warpEthosRelationReportQuery;
     let topicTags = inferHelixAskTopicTags(
       blockScoped && blockSearchSeed ? blockSearchSeed : baseQuestion,
       parsed.data.searchQuery,
