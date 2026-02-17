@@ -31,4 +31,54 @@ describe("gr constraint gate", () => {
     });
     expect(evaluation.gate.status).toBe("fail");
   });
+
+  it("captures admissible semiclassical residuals without hard fail", () => {
+    const evaluation = evaluateGrConstraintGateFromMetrics(
+      {
+        H_rms: 0.005,
+        M_rms: 0.0005,
+        semiclassical_G_mu_nu_rms: 0.02,
+        semiclassical_T_mu_nu_renorm_rms: 0.019,
+        semiclassical_mismatch_rms: 0.001,
+      },
+      {
+        semiclassical: {
+          mismatchMax: 0.005,
+          severity: "HARD",
+          firstFailId: "TOE-002-SEMICLASSICAL-HARD-FAIL",
+        },
+      },
+    );
+
+    expect(evaluation.gate.status).toBe("pass");
+    expect(evaluation.semiclassicalResiduals).toEqual({
+      G_mu_nu_rms: 0.02,
+      T_mu_nu_renorm_rms: 0.019,
+      mismatch_rms: 0.001,
+    });
+    expect(evaluation.firstFailId).toBeUndefined();
+  });
+
+  it("emits deterministic first-fail id when semiclassical hard mismatch breaches limit", () => {
+    const evaluation = evaluateGrConstraintGateFromMetrics(
+      {
+        H_rms: 0.005,
+        M_rms: 0.0005,
+        semiclassical_mismatch_rms: 0.02,
+      },
+      {
+        semiclassical: {
+          mismatchMax: 0.005,
+          severity: "HARD",
+          firstFailId: "TOE-002-SEMICLASSICAL-HARD-FAIL",
+        },
+      },
+    );
+
+    expect(evaluation.gate.status).toBe("fail");
+    expect(evaluation.firstFailId).toBe("TOE-002-SEMICLASSICAL-HARD-FAIL");
+    const mismatch = evaluation.constraints.find((entry) => entry.id === "SEMICLASSICAL_COUPLING_MISMATCH");
+    expect(mismatch?.status).toBe("fail");
+  });
+
 });
