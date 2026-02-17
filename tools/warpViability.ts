@@ -303,6 +303,27 @@ const clamp01 = (value: number | undefined): number | undefined => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+type ProvenanceClass = "measured" | "proxy" | "inferred";
+type ConfidenceBand = { low: number; high: number };
+
+const CONFIDENCE_BY_PROVENANCE: Record<ProvenanceClass, ConfidenceBand> = {
+  measured: { low: 0.8, high: 0.99 },
+  inferred: { low: 0.5, high: 0.79 },
+  proxy: { low: 0.2, high: 0.49 },
+};
+
+const resolveProvenanceClass = (value: unknown): ProvenanceClass => {
+  const source = typeof value === "string" ? value.toLowerCase() : "";
+  if (!source) return "proxy";
+  if (source.startsWith("warp.metric") || source.startsWith("gr.metric") || source.startsWith("gr.rho_constraint")) {
+    return "measured";
+  }
+  if (source.includes("legacy") || source.includes("fallback")) {
+    return "inferred";
+  }
+  return "proxy";
+};
+
 const constraint = (
   id: string,
   description: string,
@@ -312,9 +333,30 @@ const constraint = (
   rhs?: number,
   details?: string,
   note?: string,
+  provenanceClass?: ProvenanceClass,
+  confidenceBand?: ConfidenceBand,
+  enforceProvenanceInStrict = false,
+  strictMode = false,
 ): ConstraintResult => {
+  const provenanceMissing = enforceProvenanceInStrict && strictMode && provenanceClass == null;
+  const effectivePassed = provenanceMissing ? false : passed;
+  const effectiveNote = provenanceMissing
+    ? [note, "provenance_missing"].filter(Boolean).join(";")
+    : note;
   const margin = lhs !== undefined && rhs !== undefined ? lhs - rhs : undefined;
-  return { id, description, severity, passed, lhs, rhs, margin, details, note };
+  return {
+    id,
+    description,
+    severity,
+    passed: effectivePassed,
+    lhs,
+    rhs,
+    margin,
+    details,
+    note: effectiveNote,
+    provenance_class: provenanceClass,
+    confidence_band: confidenceBand,
+  } as ConstraintResult;
 };
 
 function buildPipelineState(config: WarpConfig): EnergyPipelineState {
@@ -482,6 +524,8 @@ export async function evaluateWarpViability(
   const vdbTwoWallDerivativeSupport =
     vdbRegionIIDerivativeSupport && vdbRegionIVDerivativeSupport;
   const qiGuard = (liveSnapshot?.qiGuardrail as any) ?? (pipeline as any).qiGuardrail;
+  const qiProvenanceClass = resolveProvenanceClass(qiGuard?.rhoSource);
+  const qiConfidenceBand = CONFIDENCE_BY_PROVENANCE[qiProvenanceClass];
   const modeConfig = MODE_CONFIGS[pipeline.currentMode] as { zeta_max?: number } | undefined;
   const zetaMax = modeConfig?.zeta_max ?? 1;
   const strictCongruence = strictCongruenceEnabled();
@@ -496,6 +540,8 @@ export async function evaluateWarpViability(
     (pipeline as any).tsMetricDerivedReason.length > 0
       ? String((pipeline as any).tsMetricDerivedReason)
       : undefined;
+  const tsProvenanceClass: ProvenanceClass = tsMetricDerived ? "measured" : "proxy";
+  const tsConfidenceBand = CONFIDENCE_BY_PROVENANCE[tsProvenanceClass];
   const betaDiagnostics = (pipeline as any).warp?.metricAdapter?.betaDiagnostics;
   const thetaGeom = toFinite(betaDiagnostics?.thetaMax ?? betaDiagnostics?.thetaRms);
   const thetaGeomProxy = betaDiagnostics?.method === "not-computed";
@@ -520,6 +566,8 @@ export async function evaluateWarpViability(
     : thetaGeom == null
       ? "missing_theta_geom"
       : "theta_geom_proxy";
+  const thetaProvenanceClass: ProvenanceClass = thetaMetricDerived ? "measured" : "proxy";
+  const thetaConfidenceBand = CONFIDENCE_BY_PROVENANCE[thetaProvenanceClass];
   const theta = thetaMetricDerived ? thetaGeom : thetaProxy;
   const thetaSource = thetaMetricDerived ? thetaGeomSource : thetaProxySource;
   const mTarget = pipeline.exoticMassTarget_kg ?? pipelineState.exoticMassTarget_kg;
@@ -741,8 +789,12 @@ export async function evaluateWarpViability(
     theta_metric_derived: thetaMetricDerived,
     theta_metric_source: thetaMetricDerived ? thetaGeomSource : undefined,
     theta_metric_reason: thetaMetricReason,
+    theta_provenance_class: thetaProvenanceClass,
+    theta_confidence_band: thetaConfidenceBand,
     zeta: (pipeline as any).zeta,
     qiGuardrail: qiGuard?.marginRatio,
+    qi_provenance_class: qiProvenanceClass,
+    qi_confidence_band: qiConfidenceBand,
     T00_min: (pipeline as any).T00_min ?? T00Value,
     T00_avg: T00Value,
     sectorPeriod_ms: pipeline.sectorPeriod_ms,
@@ -752,6 +804,8 @@ export async function evaluateWarpViability(
     ts_metric_derived: tsMetricDerived,
     ts_metric_source: tsMetricSource,
     ts_metric_reason: tsMetricReason,
+    ts_provenance_class: tsProvenanceClass,
+    ts_confidence_band: tsConfidenceBand,
     grGuardrails,
     rho_constraint_mean: rhoConstraintMean,
     rho_delta_mean: cl3Delta,
@@ -831,6 +885,10 @@ export async function evaluateWarpViability(
           : curvatureOk === false
             ? "curvature_window"
             : undefined,
+        qiProvenanceClass,
+        qiConfidenceBand,
+        true,
+        strictCongruence,
       ),
     );
   } else if (pipeline.fordRomanCompliance !== undefined) {
@@ -850,6 +908,10 @@ export async function evaluateWarpViability(
         zetaMax,
         `strict=${strictCongruence}; source=${sourcePass ? "legacy_boolean" : "proxy_fallback_blocked"}`,
         !sourcePass ? "proxy_input" : undefined,
+        "inferred",
+        CONFIDENCE_BY_PROVENANCE.inferred,
+        true,
+        strictCongruence,
       ),
     );
   }
@@ -888,6 +950,10 @@ export async function evaluateWarpViability(
       DEFAULT_TS_MIN,
       details,
       note,
+      tsProvenanceClass,
+      tsConfidenceBand,
+      true,
+      strictCongruence,
     );
     results.push(tsConstraint);
   }
@@ -918,6 +984,10 @@ export async function evaluateWarpViability(
           : strictCongruence && !thetaContractPass
             ? "chart_contract_missing"
             : undefined,
+        thetaProvenanceClass,
+        thetaConfidenceBand,
+        true,
+        strictCongruence,
       ),
     );
   }

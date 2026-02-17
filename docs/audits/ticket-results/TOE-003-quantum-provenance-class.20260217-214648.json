@@ -1,0 +1,22 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-003-quantum-provenance-class",
+  "files_changed": [
+    "tools/warpViability.ts",
+    "tests/warp-viability.spec.ts"
+  ],
+  "tests_run": [
+    "tests/warp-viability.spec.ts",
+    "tests/qi-guardrail.spec.ts",
+    "tests/pipeline-ts-qi-guard.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "toe-003-quantum-provenance-class",
+    "run_id": "toe-003-quantum-provenance-class",
+    "certificate_hash": "243bb0885d2df06547ce6d3b1616921e7dec0723b25c53b49256ddff2f4ba68d",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}
