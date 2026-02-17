@@ -95,6 +95,115 @@ describe("agi adapter API", () => {
     expect(response.body?.certificate?.integrityOk).toBe(true);
   });
 
+
+
+  it("returns premeditation scoring for deterministic candidate selection", async () => {
+    const response = await request(app)
+      .post("/api/agi/adapter/run")
+      .send({
+        traceId: "trace-premeditation-1",
+        actions: [{ id: "a1", params: { dutyCycle: 0.004 } }],
+        budget: { maxIterations: 1 },
+        premeditation: {
+          lambda: 0.5,
+          mu: 0.25,
+          ideologyWeight: 0.1,
+          coherenceWeight: 0.2,
+          candidates: [
+            {
+              id: "a",
+              valueLongevity: 0.9,
+              risk: 0.4,
+              entropy: 0.1,
+              ideologyAlignment: 0.8,
+              coherenceAlignment: 0.7,
+            },
+            {
+              id: "b",
+              valueLongevity: 0.8,
+              risk: 0.1,
+              entropy: 0.2,
+              ideologyAlignment: 0.6,
+              coherenceAlignment: 0.9,
+            },
+          ],
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.premeditation?.chosenCandidateId).toBe("b");
+    expect(response.body?.premeditation?.optimism).toBeCloseTo(0.94, 8);
+    expect(response.body?.premeditation?.entropy).toBeCloseTo(0.2, 8);
+  });
+
+
+
+  it("rejects direct motor actuation commands from adapter actions", async () => {
+    const response = await request(app)
+      .post("/api/agi/adapter/run")
+      .send({
+        traceId: "trace-boundary-1",
+        actions: [{ kind: "motor-command", params: { torqueNm: 12 } }],
+      })
+      .expect(400);
+
+    expect(response.body?.error).toBe("controller-boundary-violation");
+  });
+
+  it("vetoes execution on failing HARD robotics safety envelope", async () => {
+    const response = await request(app)
+      .post("/api/agi/adapter/run")
+      .send({
+        traceId: "trace-robotics-veto-1",
+        actions: [{ id: "intent-move", kind: "intent", params: { heading: 10 } }],
+        roboticsSafety: {
+          collisionMargin_m: 0.01,
+          collisionMarginMin_m: 0.05,
+          torqueUsageRatio: 0.7,
+          torqueUsageMax: 0.8,
+          speedUsageRatio: 0.6,
+          speedUsageMax: 0.9,
+          stabilityMargin: 0.4,
+          stabilityMarginMin: 0.3,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.verdict).toBe("FAIL");
+    expect(response.body?.pass).toBe(false);
+    expect(response.body?.firstFail?.id).toBe("collision.margin");
+    expect(response.body?.certificate?.integrityOk).toBe(true);
+    expect(runMock).not.toHaveBeenCalled();
+  });
+
+
+
+  it("vetoes execution when provided robotics certificate hash fails integrity", async () => {
+    const response = await request(app)
+      .post("/api/agi/adapter/run")
+      .send({
+        traceId: "trace-robotics-cert-mismatch-1",
+        actions: [{ id: "intent-move", kind: "intent", params: { heading: 4 } }],
+        roboticsSafety: {
+          collisionMargin_m: 0.2,
+          collisionMarginMin_m: 0.05,
+          torqueUsageRatio: 0.4,
+          torqueUsageMax: 0.8,
+          speedUsageRatio: 0.3,
+          speedUsageMax: 0.9,
+          stabilityMargin: 0.5,
+          stabilityMarginMin: 0.3,
+          certificateHash: "bad-hash",
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.verdict).toBe("FAIL");
+    expect(response.body?.firstFail?.id).toBe("robotics.certificate.integrity");
+    expect(response.body?.certificate?.integrityOk).toBe(false);
+    expect(runMock).not.toHaveBeenCalled();
+  });
+
   it("evaluates constraint pack runs via adapter", async () => {
     const response = await request(app)
       .post("/api/agi/adapter/run")

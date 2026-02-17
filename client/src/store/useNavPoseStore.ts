@@ -1,10 +1,41 @@
 import { createWithEqualityFn } from "zustand/traditional";
 import { subscribeNavPose } from "@/lib/nav-pose-channel";
-import type { NavFrame, NavigationPose } from "@shared/schema";
+import type { NavFrame, NavigationPose, MovementEpisodeEvent, MovementEpisodePayload } from "@shared/schema";
 
 const AU_M = 149_597_870_000;
 const STALE_FALLBACK_MS = 1500;
 const now = () => Date.now();
+
+type MovementPhase = MovementEpisodeEvent["phase"];
+
+type MovementTraceEnvelope = {
+  traceId: string;
+  episode: MovementEpisodePayload;
+  pass?: boolean;
+  deltas?: Array<{ key: string; delta: number }>;
+};
+
+const postMovementTrace = async (payload: MovementTraceEnvelope): Promise<void> => {
+  if (typeof fetch !== "function") return;
+  await fetch("/api/agi/training-trace", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      traceId: payload.traceId,
+      pass: payload.pass ?? true,
+      deltas: payload.deltas ?? [],
+      metrics: {
+        optimism: payload.episode.metrics.optimism,
+        entropy: payload.episode.metrics.entropy,
+      },
+      payload: {
+        kind: "movement_episode",
+        data: payload.episode,
+      },
+      notes: ["phase=3", "replay=deterministic"],
+    }),
+  }).catch(() => undefined);
+};
 
 /** Simple heliocentric circular sim for placeholder signal. */
 function makeSimPose(timestamp_ms: number): NavigationPose {
@@ -36,9 +67,23 @@ type NavPoseState = {
   navPose: NavigationPose;
   hasLivePose: boolean;
   source: Source;
+  episodeTraceId?: string;
+  episodeSeed?: string;
+  episodeEvents: MovementEpisodeEvent[];
   start: () => void;
   stop: () => void;
   forceSim: () => void;
+  beginEpisode: (args: { traceId: string; seed: string }) => void;
+  recordEpisodePhase: (args: {
+    phase: MovementPhase;
+    candidateId?: string;
+    controllerRef?: string;
+    predictedDelta?: number;
+    actualDelta?: number;
+    metadata?: Record<string, unknown>;
+    ts?: string;
+  }) => void;
+  flushEpisode: () => Promise<void>;
   ingestDriveVector: (args: {
     velocity_mps: [number, number, number];
     heading_deg?: number;
@@ -93,7 +138,63 @@ export const useNavPoseStore = createWithEqualityFn<NavPoseState>((set, get) => 
     navPose: makeSimPose(now()),
     hasLivePose: false,
     source: "sim",
+    episodeEvents: [],
     _clients: 0,
+
+    beginEpisode: ({ traceId, seed }) => {
+      const state = get();
+      if (state.episodeTraceId === traceId) return;
+      set({
+        episodeTraceId: traceId,
+        episodeSeed: seed,
+        episodeEvents: [],
+      });
+    },
+
+    recordEpisodePhase: ({ phase, candidateId, controllerRef, predictedDelta, actualDelta, metadata, ts }) => {
+      const state = get();
+      if (!state.episodeTraceId) return;
+      const event: MovementEpisodeEvent = {
+        phase,
+        ts: ts ?? new Date().toISOString(),
+        candidateId,
+        controllerRef,
+        predictedDelta,
+        actualDelta,
+        metadata,
+      };
+      const next = [...state.episodeEvents, event];
+      set({ episodeEvents: next.slice(-256) });
+    },
+
+    flushEpisode: async () => {
+      const state = get();
+      if (!state.episodeTraceId || state.episodeEvents.length === 0) return;
+      const entropySamples = state.episodeEvents
+        .map((event) => event.actualDelta ?? event.predictedDelta ?? 0)
+        .filter((value) => Number.isFinite(value));
+      const entropy = entropySamples.length
+        ? entropySamples.reduce((sum, value) => sum + Math.abs(value), 0) / entropySamples.length
+        : 0;
+      const optimism = Math.max(0, 1 - entropy);
+      const episode: MovementEpisodePayload = {
+        episodeId: `${state.episodeTraceId}:episode`,
+        traceId: state.episodeTraceId,
+        primitivePath: state.episodeEvents
+          .map((event) => event.candidateId)
+          .filter((value): value is string => typeof value === "string" && value.length > 0),
+        metrics: { optimism, entropy },
+        events: state.episodeEvents,
+        replaySeed: state.episodeSeed,
+        notes: ["deterministic-ordering"],
+      };
+      await postMovementTrace({
+        traceId: state.episodeTraceId,
+        episode,
+        deltas: entropySamples.length ? [{ key: "nav.delta.mean", delta: entropy }] : [],
+      });
+      set({ episodeEvents: [] });
+    },
 
     start: () => {
       const clients = get()._clients;
@@ -134,6 +235,7 @@ export const useNavPoseStore = createWithEqualityFn<NavPoseState>((set, get) => 
       if (_ingestStaleTimer) {
         clearTimeout(_ingestStaleTimer);
       }
+      void get().flushEpisode();
       stopSimLoop();
       set({
         _dispose: undefined,

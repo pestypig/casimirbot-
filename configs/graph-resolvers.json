@@ -1161,6 +1161,34 @@
         "see-also": 1
       },
       "weight": 1
+    },
+    {
+      "id": "robotics-recollection",
+      "label": "Robotics Recollection Walk",
+      "path": "docs/knowledge/robotics-recollection-tree.json",
+      "topicTags": [
+        "robotics",
+        "recollection"
+      ],
+      "matchers": [
+        "robot recollection",
+        "movement episode",
+        "demonstration retarget",
+        "primitive dag",
+        "replayable episode",
+        "kinematic validity"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.05
     }
   ]
 }
