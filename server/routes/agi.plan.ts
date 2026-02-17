@@ -2611,7 +2611,7 @@ const HELIX_ASK_SINGLE_LLM =
 const HELIX_ASK_ANSWER_CONTRACT_PRIMARY =
   String(process.env.HELIX_ASK_ANSWER_CONTRACT_PRIMARY ?? "1").trim() !== "0";
 const HELIX_ASK_EVIDENCE_CARDS_LLM =
-  String(process.env.HELIX_ASK_EVIDENCE_CARDS_LLM ?? "1").trim() !== "0";
+  String(process.env.HELIX_ASK_EVIDENCE_CARDS_LLM ?? "0").trim() !== "0";
 const HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE = clampNumber(
   readNumber(
     process.env.HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE ??
@@ -19002,6 +19002,7 @@ const executeHelixAsk = async ({
     let result: LocalAskResult;
     let generalScaffold = "";
     let repoScaffold = "";
+    let repoScaffoldForPrompt = "";
     let promptScaffold = "";
     let topicMustIncludeOk: boolean | undefined;
     let pipelineEvidence: string | null = null;
@@ -22508,7 +22509,7 @@ const executeHelixAsk = async ({
         ...extractFilePathsFromText(contextText),
         ...extractFilePathsFromText(promptContextText),
       ]);
-      const repoScaffoldForPrompt = repoScaffold
+      repoScaffoldForPrompt = repoScaffold
         ? scrubUnsupportedPaths(repoScaffold, repoPromptPaths).text || repoScaffold
         : repoScaffold;
       if (intentStrategy === "hybrid_explain" && generalEvidence) {
