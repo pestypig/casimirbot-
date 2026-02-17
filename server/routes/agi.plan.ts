@@ -11741,7 +11741,7 @@ const evaluateRelationContractHardFail = (args: {
     args.contract.summary ?? "",
     ...(args.contract.claims ?? []).map((claim) => claim.text),
   ].join(" ");
-  if (/(?:title:|heading:|slug:|import\s+|export\s+|const\s+\w+\s*=)/i.test(merged)) {
+  if (/\b(?:title:|heading:|slug:|import\s+|export\s+|const\s+\w+\s*=)\b/i.test(merged)) {
     reasons.push("metadata_or_code_noise");
   }
   if ((args.relationPacket.falsifiability_hooks?.length ?? 0) === 0) reasons.push("missing_falsifiability_hook");
@@ -18176,6 +18176,13 @@ const executeHelixAsk = async ({
         compositeRequiredFiles = collectCompositeMustIncludeFiles(compositeRequest.topics);
       }
     }
+    if (warpEthosRelationQuery) {
+      const relationProfile = getHelixAskIntentProfileById("hybrid.warp_ethos_relation");
+      if (relationProfile) {
+        intentProfile = relationProfile;
+        intentReasonBase = `${intentReasonBase}|relation:warp_ethos`;
+      }
+    }
     const isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
     const isIdeologyConversationalMode = isIdeologyReferenceIntent && ideologyConversationalMode;
     if (
@@ -21988,7 +21995,11 @@ const executeHelixAsk = async ({
         }
         answerPath.push(`arbiter:${arbiterMode}`);
         if (arbiterMode === "hybrid" || arbiterMode === "clarify") {
-          const fallbackProfile = resolveFallbackIntentProfile("hybrid");
+          const relationFallbackProfile =
+            warpEthosRelationQuery
+              ? getHelixAskIntentProfileById("hybrid.warp_ethos_relation")
+              : null;
+          const fallbackProfile = relationFallbackProfile ?? resolveFallbackIntentProfile("hybrid");
           intentProfile = fallbackProfile;
           intentDomain = fallbackProfile.domain;
           intentTier = fallbackProfile.tier;
