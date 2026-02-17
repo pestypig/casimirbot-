@@ -108,6 +108,11 @@ describe("warp viability congruence wiring", () => {
     expect(result.snapshot.theta_audit).toBe(0.5);
     expect(result.snapshot.theta_metric_derived).toBe(true);
     expect(result.snapshot.theta_metric_reason).toBe("metric_adapter_divergence");
+    expect((result.snapshot as any).theta_provenance_class).toBe("measured");
+    expect((result.snapshot as any).theta_confidence_band).toEqual({ low: 0.8, high: 0.99 });
+    const ts = result.constraints.find((c) => c.id === "TS_ratio_min");
+    expect((ts as any)?.provenance_class).toBe("measured");
+    expect((ts as any)?.confidence_band).toEqual({ low: 0.8, high: 0.99 });
     expect(cl3?.details).toContain("source=warp.metric.T00.natario.shift");
     expect(cl3?.details).not.toContain("T00_ref=n/a");
   });
@@ -233,6 +238,10 @@ describe("warp viability congruence wiring", () => {
     const fr = result.constraints.find((c) => c.id === "FordRomanQI");
     expect(fr?.passed).toBe(false);
     expect(fr?.note).toBe("proxy_input");
+    expect((fr as any)?.provenance_class).toBe("proxy");
+    expect((fr as any)?.confidence_band).toEqual({ low: 0.2, high: 0.49 });
+    expect((result.snapshot as any).qi_provenance_class).toBe("proxy");
+    expect((result.snapshot as any).qi_confidence_band).toEqual({ low: 0.2, high: 0.49 });
   });
 
   it("fails FordRomanQI in strict mode when metric source is missing contract metadata", async () => {
@@ -278,6 +287,8 @@ describe("warp viability congruence wiring", () => {
     expect(fr?.passed).toBe(false);
     expect(fr?.note).toBe("proxy_input");
     expect(fr?.details).toContain("proxy_fallback_blocked");
+    expect((fr as any)?.provenance_class).toBe("inferred");
+    expect((fr as any)?.confidence_band).toEqual({ low: 0.5, high: 0.79 });
   });
 
   it("fails VdB_band when region-II derivative evidence is missing", async () => {
