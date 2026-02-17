@@ -4,19 +4,41 @@
     {
       "id": "default",
       "personaId": "default",
-      "toolAllowList": ["*"],
+      "toolAllowList": [
+        "*"
+      ],
       "notes": "Fallback agent when no routing hint is provided."
     },
     {
       "id": "research",
       "personaId": "persona:research",
-      "toolAllowList": ["docs.*", "repo.*", "citation.*", "debate.*", "llm.*", "memory.*", "knowledge.*"],
+      "toolAllowList": [
+        "docs.*",
+        "repo.*",
+        "citation.*",
+        "debate.*",
+        "llm.*",
+        "memory.*",
+        "knowledge.*",
+        "telemetry.*",
+        "physics.*",
+        "star.*"
+      ],
       "notes": "Evidence gathering + citation work."
     },
     {
       "id": "builder",
       "personaId": "persona:builder",
-      "toolAllowList": ["repo.*", "tool.*", "llm.*", "specialist.*", "essence.*"],
+      "toolAllowList": [
+        "repo.*",
+        "tool.*",
+        "llm.*",
+        "specialist.*",
+        "essence.*",
+        "telemetry.*",
+        "physics.*",
+        "star.*"
+      ],
       "notes": "Implementation + patch work."
     }
   ]

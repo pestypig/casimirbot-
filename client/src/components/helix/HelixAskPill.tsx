@@ -33,6 +33,13 @@ import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 type HelixAskReply = {
   id: string;
   content: string;
+  mode?: "read" | "observe" | "act" | "verify";
+  proof?: {
+    verdict?: "PASS" | "FAIL";
+    firstFail?: unknown;
+    certificate?: { certificateHash?: string | null; integrityOk?: boolean | null } | null;
+    artifacts?: Array<{ kind: string; ref: string; label?: string }>;
+  };
   question?: string;
   sources?: string[];
   promptIngested?: boolean;
@@ -1177,6 +1184,7 @@ export function HelixAskPill({
   const askRunIdRef = useRef(0);
   const moodHintSessionId = useMemo(() => `helix:mood:${contextId}`, [contextId]);
   const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>({});
+  const [askMode, setAskMode] = useState<"read" | "observe" | "act" | "verify">("read");
 
   const getHelixAskSessionId = useCallback(() => {
     if (helixAskSessionRef.current) return helixAskSessionRef.current;
@@ -1829,6 +1837,8 @@ export function HelixAskPill({
         let responsePromptIngested: boolean | undefined;
         let responseEnvelope: HelixAskResponseEnvelope | undefined;
         let responseViewerLaunch: AtomicViewerLaunch | undefined;
+        let responseMode: "read" | "observe" | "act" | "verify" | undefined;
+        let responseProof: HelixAskReply["proof"];
         try {
           const localResponse = await resumeHelixAskJob(pending.jobId, {
             signal: controller.signal,
@@ -1841,6 +1851,8 @@ export function HelixAskPill({
           responseDebug = localResponse.debug;
           responsePromptIngested = localResponse.prompt_ingested;
           responseViewerLaunch = localResponse.viewer_launch;
+          responseMode = localResponse.mode;
+          responseProof = localResponse.proof;
         } catch (error) {
           const aborted =
             controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
@@ -1871,6 +1883,8 @@ export function HelixAskPill({
                 debug: responseDebug,
                 promptIngested: responsePromptIngested,
                 envelope: responseEnvelope,
+                mode: responseMode,
+                proof: responseProof,
                 sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
                 liveEvents: liveEventsSnapshot,
               },
@@ -1965,6 +1979,8 @@ export function HelixAskPill({
         let responsePromptIngested: boolean | undefined;
         let responseEnvelope: HelixAskResponseEnvelope | undefined;
         let responseViewerLaunch: AtomicViewerLaunch | undefined;
+        let responseMode: "read" | "observe" | "act" | "verify" | undefined;
+        let responseProof: HelixAskReply["proof"];
         setAskStatus("Generating answer...");
         try {
           const localResponse = await askLocal(undefined, {
@@ -1974,6 +1990,7 @@ export function HelixAskPill({
             question: trimmed,
             debug: userSettings.showHelixAskDebug,
             signal: controller.signal,
+            mode: askMode,
           });
           responseEnvelope = localResponse.envelope;
           const envelopeAnswer = responseEnvelope?.answer?.trim() ?? "";
@@ -1983,6 +2000,8 @@ export function HelixAskPill({
           responseDebug = localResponse.debug;
           responsePromptIngested = localResponse.prompt_ingested;
           responseViewerLaunch = localResponse.viewer_launch;
+          responseMode = localResponse.mode;
+          responseProof = localResponse.proof;
         } catch (error) {
           const aborted =
             controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
@@ -2013,6 +2032,8 @@ export function HelixAskPill({
                 debug: responseDebug,
                 promptIngested: responsePromptIngested,
                 envelope: responseEnvelope,
+                mode: responseMode,
+                proof: responseProof,
                 sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
                 liveEvents: liveEventsSnapshot,
               },
@@ -2205,6 +2226,17 @@ export function HelixAskPill({
                   )}
                 </div>
               </div>
+            <select
+              value={askMode}
+              onChange={(event) => setAskMode(event.target.value as "read" | "observe" | "act" | "verify")}
+              className="rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-slate-200"
+              aria-label="Ask mode"
+            >
+              <option value="read">read</option>
+              <option value="observe">observe</option>
+              <option value="act">act</option>
+              <option value="verify">verify</option>
+            </select>
             <textarea
               aria-label="Ask Helix"
               aria-disabled={askBusy}
@@ -2342,299 +2374,22 @@ export function HelixAskPill({
                   </p>
                 ) : null}
                 {renderHelixAskEnvelope(reply)}
-                {replyEvents.length > 0 ? (
-                  <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                      Execution log
-                    </p>
-                    <div className="mt-2 space-y-2 text-[11px] text-slate-300">
-                      {replyEvents.map((entry) => {
-                        const label = entry.tool?.startsWith("helix.ask.")
-                          ? entry.tool.replace("helix.ask.", "").replace(/\./g, " ")
-                          : entry.tool ?? "event";
-                        return (
-                          <div
-                            key={entry.id}
-                            className="rounded-md border border-white/5 bg-white/[0.03] px-2 py-1"
-                          >
-                            <div className="text-[9px] uppercase tracking-[0.22em] text-slate-500">
-                              {label}
-                            </div>
-                            {typeof entry.durationMs === "number" ? (
-                              <p className="mt-1 text-[10px] text-slate-500">
-                                Duration: {Math.round(entry.durationMs)}ms
-                              </p>
-                            ) : null}
-                            <p className="mt-1 whitespace-pre-wrap text-slate-300">
-                              {entry.text}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
+                {reply.proof ? (
+                  <div className="mt-2 rounded-lg border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-300">Proof</p>
+                    <p className="mt-1">Mode: {reply.mode ?? "read"} · Verdict: {reply.proof.verdict ?? "n/a"}</p>
+                    {reply.proof.certificate?.certificateHash ? (
+                      <p className="mt-1">Certificate: {reply.proof.certificate.certificateHash}</p>
+                    ) : null}
+                    {typeof reply.proof.certificate?.integrityOk === "boolean" ? (
+                      <p className="mt-1">Integrity: {reply.proof.certificate.integrityOk ? "OK" : "FAILED"}</p>
+                    ) : null}
+                    {reply.proof.artifacts?.length ? (
+                      <p className="mt-1 whitespace-pre-wrap">
+                        Artifacts: {reply.proof.artifacts.map((a) => `${a.kind}: ${a.ref}`).join(", ")}
+                      </p>
+                    ) : null}
                   </div>
-                ) : null}
-                {userSettings.showHelixAskDebug && reply.debug ? (
-                  <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                      Ask debug
-                    </p>
-                  {reply.content ? (
-                    <div className="mt-2">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
-                        Final answer
-                      </p>
-                      <p className="mt-1 whitespace-pre-wrap text-[11px] text-slate-300">
-                        {renderHelixAskContent(
-                          clipForDisplay(
-                            coerceText(reply.content),
-                            HELIX_ASK_MAX_RENDER_CHARS,
-                            expanded,
-                          ),
-                        )}
-                      </p>
-                    </div>
-                  ) : null}
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    Two-pass: {reply.debug.two_pass ? "on" : "off"}
-                  </p>
-                  {typeof reply.debug.micro_pass === "boolean" ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Micro-pass: {reply.debug.micro_pass ? "on" : "off"}
-                      {reply.debug.micro_pass_auto === true ? " (auto)" : ""}
-                    </p>
-                  ) : null}
-                  {reply.debug.micro_pass_reason ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Micro-pass reason: {reply.debug.micro_pass_reason}
-                    </p>
-                  ) : null}
-                  {reply.debug.intent_id ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Intent: {reply.debug.intent_id}
-                      {reply.debug.intent_domain ? ` · ${reply.debug.intent_domain}` : ""}
-                      {reply.debug.intent_tier ? ` · ${reply.debug.intent_tier}` : ""}
-                      {reply.debug.intent_strategy ? ` · ${reply.debug.intent_strategy}` : ""}
-                    </p>
-                  ) : null}
-                  {reply.debug.intent_reason ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Intent reason: {reply.debug.intent_reason}
-                    </p>
-                  ) : null}
-                  {reply.debug.arbiter_mode ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Arbiter: {reply.debug.arbiter_mode}
-                      {reply.debug.arbiter_strictness
-                        ? ` · ${reply.debug.arbiter_strictness}`
-                        : ""}
-                      {reply.debug.arbiter_reason ? ` · ${reply.debug.arbiter_reason}` : ""}
-                    </p>
-                  ) : null}
-                  {reply.debug.graph_congruence_diagnostics ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Graph congruence: blocked{" "}
-                      {reply.debug.graph_congruence_diagnostics.blockedEdges ?? 0}
-                      {" / "}allowed{" "}
-                      {reply.debug.graph_congruence_diagnostics.allowedEdges ?? 0}
-                      {" | "}in-tree{" "}
-                      {reply.debug.graph_congruence_diagnostics.resolvedInTreeEdges ?? 0}
-                      {" | "}cross-tree{" "}
-                      {reply.debug.graph_congruence_diagnostics.resolvedCrossTreeEdges ?? 0}
-                      {" | "}strict QI metric path{" "}
-                      {reply.debug.graph_congruence_diagnostics.strictSignals
-                        ?.qi_metric_derived_equals_true
-                        ? "on"
-                        : "off"}
-                    </p>
-                  ) : null}
-                  {reply.debug.graph_congruence_diagnostics?.blockedByCondition &&
-                  Object.keys(reply.debug.graph_congruence_diagnostics.blockedByCondition).length > 0 ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Graph blocked conditions:{" "}
-                      {Object.entries(reply.debug.graph_congruence_diagnostics.blockedByCondition)
-                        .map(([key, count]) => `${key}:${count}`)
-                        .join(", ")}
-                    </p>
-                  ) : null}
-                  {typeof reply.debug.evidence_gate_ok === "boolean" ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Evidence gate: {reply.debug.evidence_gate_ok ? "pass" : "fail"}
-                      {typeof reply.debug.evidence_match_count === "number" &&
-                      typeof reply.debug.evidence_token_count === "number"
-                        ? ` (${reply.debug.evidence_match_count}/${reply.debug.evidence_token_count}${
-                            typeof reply.debug.evidence_match_ratio === "number"
-                              ? `, ${reply.debug.evidence_match_ratio.toFixed(2)}`
-                              : ""
-                          })`
-                        : ""}
-                    </p>
-                  ) : null}
-                  {typeof reply.debug.coverage_ratio === "number" ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Coverage gate:{" "}
-                      {reply.debug.coverage_gate_applied ? "applied" : "pass"}
-                      {typeof reply.debug.coverage_ratio === "number"
-                        ? ` (${reply.debug.coverage_ratio.toFixed(2)}`
-                        : ""}
-                      {typeof reply.debug.coverage_missing_key_count === "number"
-                        ? `, missing ${reply.debug.coverage_missing_key_count}`
-                        : ""}
-                      {typeof reply.debug.coverage_ratio === "number" ? ")" : ""}
-                    </p>
-                  ) : null}
-                  {typeof reply.debug.belief_unsupported_rate === "number" ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Belief gate:{" "}
-                      {reply.debug.belief_gate_applied ? "applied" : "pass"}
-                      {typeof reply.debug.belief_unsupported_rate === "number"
-                        ? ` (unsupported ${reply.debug.belief_unsupported_rate.toFixed(2)}`
-                        : ""}
-                      {typeof reply.debug.belief_contradictions === "number"
-                        ? `, contradictions ${reply.debug.belief_contradictions}`
-                        : ""}
-                      {typeof reply.debug.belief_unsupported_rate === "number" ? ")" : ""}
-                    </p>
-                  ) : null}
-                  {typeof reply.debug.rattling_score === "number" ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Rattling: {reply.debug.rattling_score.toFixed(2)}
-                      {typeof reply.debug.rattling_gate_applied === "boolean"
-                        ? ` (gate ${reply.debug.rattling_gate_applied ? "applied" : "pass"})`
-                        : ""}
-                    </p>
-                  ) : null}
-                  {typeof reply.debug.variant_selection_applied === "boolean" ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Variant selection:{" "}
-                      {reply.debug.variant_selection_applied ? "applied" : "off"}
-                      {reply.debug.variant_selection_label
-                        ? ` · ${reply.debug.variant_selection_label}`
-                        : ""}
-                    </p>
-                  ) : null}
-                  {reply.debug.gates ? (
-                    <div className="mt-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-slate-400">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
-                        Gate summary
-                      </p>
-                      <pre className="mt-1 whitespace-pre-wrap">
-                        {safeJsonStringify(reply.debug.gates)}
-                      </pre>
-                    </div>
-                  ) : null}
-                  {typeof reply.promptIngested === "boolean" ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Prompt ingest: {reply.promptIngested ? "on" : "off"}
-                    </p>
-                  ) : null}
-                  {reply.debug.prompt_ingest_reason ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Prompt ingest reason: {reply.debug.prompt_ingest_reason}
-                    </p>
-                  ) : null}
-                  {reply.debug.prompt_ingest_source ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Prompt ingest source: {reply.debug.prompt_ingest_source}
-                    </p>
-                  ) : null}
-                  {typeof reply.debug.prompt_chunk_count === "number" ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Prompt chunks: {reply.debug.prompt_chunk_count}
-                      {typeof reply.debug.prompt_selected === "number"
-                        ? ` (selected ${reply.debug.prompt_selected})`
-                        : ""}
-                    </p>
-                  ) : null}
-                  {reply.debug.prompt_context_points &&
-                  reply.debug.prompt_context_points.length > 0 ? (
-                    <div className="mt-2 whitespace-pre-wrap text-[11px] text-slate-400">
-                      Prompt context points:
-                      {"\n"}
-                      {reply.debug.prompt_context_points.join("\n")}
-                    </div>
-                  ) : null}
-                  {reply.debug.prompt_used_sections &&
-                  reply.debug.prompt_used_sections.length > 0 ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Prompt sections: {reply.debug.prompt_used_sections.join(", ")}
-                    </p>
-                  ) : null}
-                  {typeof reply.debug.evidence_claim_count === "number" ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Claim gate: {reply.debug.evidence_claim_supported ?? 0}/
-                      {reply.debug.evidence_claim_count} supported
-                      {typeof reply.debug.evidence_claim_ratio === "number"
-                        ? ` (${reply.debug.evidence_claim_ratio.toFixed(2)})`
-                        : ""}
-                    </p>
-                  ) : null}
-                  {reply.debug.ambiguity_terms && reply.debug.ambiguity_terms.length > 0 ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Ambiguous terms: {reply.debug.ambiguity_terms.join(", ")}
-                    </p>
-                  ) : null}
-                  {reply.debug.overflow_retry_steps &&
-                  reply.debug.overflow_retry_steps.length > 0 ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Overflow retry: {reply.debug.overflow_retry_steps.join(" -> ")}
-                    </p>
-                  ) : null}
-                  {reply.debug.format ? (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Format: {reply.debug.format}
-                      {typeof reply.debug.stage_tags === "boolean"
-                        ? ` · Stage tags: ${reply.debug.stage_tags ? "on" : "off"}`
-                        : ""}
-                    </p>
-                  ) : null}
-                  {reply.debug.query_hints && reply.debug.query_hints.length > 0 ? (
-                    <div className="mt-2 whitespace-pre-wrap text-[11px] text-slate-400">
-                      Query hints:
-                      {"\n"}
-                      {reply.debug.query_hints.join("\n")}
-                    </div>
-                  ) : null}
-                  {reply.debug.queries && reply.debug.queries.length > 0 ? (
-                    <div className="mt-2 whitespace-pre-wrap text-[11px] text-slate-400">
-                      Queries:
-                      {"\n"}
-                      {reply.debug.queries.join("\n")}
-                    </div>
-                  ) : null}
-                  {reply.debug.scaffold ? (
-                    <p className="mt-2 whitespace-pre-wrap">{reply.debug.scaffold}</p>
-                  ) : null}
-                  {reply.debug.evidence_cards ? (
-                    <p className="mt-2 whitespace-pre-wrap">{reply.debug.evidence_cards}</p>
-                  ) : null}
-                  {reply.debug.live_events && reply.debug.live_events.length > 0 && replyEvents.length === 0 ? (
-                    <div className="mt-2 whitespace-pre-wrap text-[11px] text-slate-300">
-                      Live events:
-                      {"\n"}
-                      {reply.debug.live_events
-                        .map((entry) => {
-                          const status = entry.ok === false ? "FAIL" : "OK";
-                          const duration =
-                            typeof entry.durationMs === "number"
-                              ? ` ${Math.round(entry.durationMs)}ms`
-                              : "";
-                          const label =
-                            entry.text?.trim() ||
-                            `${entry.stage}${entry.detail ? ` - ${entry.detail}` : ""}`;
-                          const toolLabel = entry.tool?.trim();
-                          const prefix = toolLabel ? `${toolLabel} ` : "";
-                          return `${prefix}${status}${duration} | ${label}`;
-                        })
-                        .join("\n")}
-                    </div>
-                  ) : null}
-                  {reply.debug.citation_repair ? (
-                    <p className="mt-2 text-[11px] text-slate-400">
-                      Citation repair: applied
-                    </p>
-                  ) : null}
-                </div>
               ) : null}
               {userSettings.showHelixAskDebug &&
               (reply.sources?.length || reply.debug?.context_files?.length || reply.debug?.prompt_context_files?.length) ? (
