@@ -1,0 +1,94 @@
+{
+  "name": "helix-ask-warp-ethos-goal-zone",
+  "max_iterations": 3,
+  "min_case_pass_rate": 1.0,
+  "allow_stub_text": false,
+  "cases": [
+    {
+      "id": "relation_canonical",
+      "question": "How does a warp bubble fit in with the mission ethos?",
+      "expect": {
+        "intent_id": "hybrid.warp_ethos_relation",
+        "intent_strategy": "hybrid_explain",
+        "report_mode": false,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true,
+        "min_bridge_count": 2,
+        "min_evidence_count": 2,
+        "min_text_chars": 180,
+        "must_include_text": ["warp bubble", "mission ethos"],
+        "must_not_include_text": ["Executive summary:", "Point-by-point:", "Report covers"],
+        "disallow_report_sections": true
+      }
+    },
+    {
+      "id": "relation_short_prompt",
+      "question": "the warp bubble relation to ideology mission ethos?",
+      "expect": {
+        "intent_id": "hybrid.warp_ethos_relation",
+        "intent_strategy": "hybrid_explain",
+        "report_mode": false,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true,
+        "min_bridge_count": 2,
+        "min_evidence_count": 2,
+        "min_text_chars": 180,
+        "must_include_text": ["warp bubble", "mission ethos"],
+        "must_not_include_text": ["Executive summary:", "Point-by-point:", "Report covers"],
+        "disallow_report_sections": true
+      }
+    },
+    {
+      "id": "relation_prefixed_now",
+      "question": "Now the warp bubble relation to ideology mission ethos?",
+      "expect": {
+        "intent_id": "hybrid.warp_ethos_relation",
+        "intent_strategy": "hybrid_explain",
+        "report_mode": false,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true,
+        "min_bridge_count": 2,
+        "min_evidence_count": 2,
+        "min_text_chars": 180,
+        "must_include_text": ["warp bubble", "mission ethos"],
+        "must_not_include_text": ["Executive summary:", "Point-by-point:", "Report covers"],
+        "disallow_report_sections": true
+      }
+    },
+    {
+      "id": "relation_connected_wording",
+      "question": "How is the warp bubble connected to the mission ethos?",
+      "expect": {
+        "intent_id": "hybrid.warp_ethos_relation",
+        "intent_strategy": "hybrid_explain",
+        "report_mode": false,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true,
+        "min_bridge_count": 2,
+        "min_evidence_count": 2,
+        "min_text_chars": 180,
+        "must_include_text": ["warp bubble", "mission ethos"],
+        "must_not_include_text": ["Executive summary:", "Point-by-point:", "Report covers"],
+        "disallow_report_sections": true
+      }
+    },
+    {
+      "id": "relation_define_plus_connect",
+      "question": "What is a warp bubble and how does it relate to mission ethos?",
+      "expect": {
+        "intent_id": "hybrid.warp_ethos_relation",
+        "intent_strategy": "hybrid_explain",
+        "report_mode": false,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true,
+        "min_bridge_count": 2,
+        "min_evidence_count": 2,
+        "min_text_chars": 220,
+        "must_include_text": ["warp bubble", "mission ethos"],
+        "must_not_include_text": ["Executive summary:", "Point-by-point:", "Report covers"],
+        "disallow_report_sections": true
+      }
+    }
+  ]
+}
+
