@@ -216,6 +216,12 @@ import {
 } from "../services/helix-ask/session-memory";
 import { isFastModeRuntimeMissingSymbolError } from "../services/helix-ask/runtime-errors";
 import { stripRunawayAnswerArtifacts } from "../services/helix-ask/answer-artifacts";
+import {
+  HELIX_ASK_TYPED_FAIL_REASONS,
+  renderDeterministicCitationsByEvidenceIds,
+  renderTaggedSectionFallback,
+  type HelixAskTypedFailReason,
+} from "../services/helix-ask/proof-packet";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
 import { runBeliefGraphLoop } from "../../modules/analysis/belief-graph-loop";
@@ -2630,6 +2636,10 @@ const HELIX_ASK_ANSWER_CONTRACT_PRIMARY =
   String(process.env.HELIX_ASK_ANSWER_CONTRACT_PRIMARY ?? "1").trim() !== "0";
 const HELIX_ASK_EVIDENCE_CARDS_LLM =
   String(process.env.HELIX_ASK_EVIDENCE_CARDS_LLM ?? "0").trim() !== "0";
+const HELIX_ASK_PROOF_PACKET_P0 =
+  String(process.env.HELIX_ASK_PROOF_PACKET_P0 ?? "0").trim() !== "0";
+const HELIX_ASK_OPTION_C_FALLBACK =
+  String(process.env.HELIX_ASK_OPTION_C_FALLBACK ?? "0").trim() !== "0";
 const HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE = clampNumber(
   readNumber(
     process.env.HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE ??
@@ -11908,6 +11918,39 @@ const renderHelixAskAnswerContract = (
   }
   return text;
 };
+
+
+type HelixAskFailureClass = "infra_fail" | "parse_fail";
+
+const classifyHelixAskFailure = (
+  reason: HelixAskTypedFailReason,
+): HelixAskFailureClass => (reason === "TIMEOUT" || reason === "GENERIC_COLLAPSE" ? "infra_fail" : "parse_fail");
+
+const buildHelixAskTypedFailReasonFromStatus = (status: string): HelixAskTypedFailReason => {
+  const normalized = String(status || "").toLowerCase();
+  const inferred: HelixAskTypedFailReason = normalized.includes("timeout")
+    ? "TIMEOUT"
+    : normalized.includes("schema")
+      ? "SCHEMA_ERROR"
+      : normalized.includes("validation") || normalized.includes("gate") || normalized.includes("unsupported")
+        ? "VALIDATION_FAIL"
+        : normalized.includes("low_evidence") || normalized.includes("evidence_utilization")
+          ? "LOW_EVIDENCE_UTILIZATION"
+          : "GENERIC_COLLAPSE";
+  return HELIX_ASK_TYPED_FAIL_REASONS.includes(inferred) ? inferred : "GENERIC_COLLAPSE";
+};
+
+const attachHelixAskStageTiming = (
+  debugPayload: Record<string, unknown> | undefined,
+  key: string,
+  durationMs: number,
+): void => {
+  if (!debugPayload) return;
+  const previous = debugPayload.stage_timing_ms;
+  const base = previous && typeof previous === "object" ? (previous as Record<string, number>) : {};
+  debugPayload.stage_timing_ms = { ...base, [key]: Number.isFinite(durationMs) ? Math.max(0, durationMs) : 0 };
+};
+
 
 function buildHelixAskDriftRepairPrompt(
   question: string,
@@ -23393,9 +23436,10 @@ const executeHelixAsk = async ({
                       },
                     );
                   } else {
+                    const typedFailReason = buildHelixAskTypedFailReasonFromStatus("parse_fail");
                     logStepEnd(
                       "LLM answer contract repair",
-                      "parse_fail",
+                      `parse_fail:${typedFailReason}`,
                       contractRepairStart,
                       false,
                       {
@@ -23405,8 +23449,13 @@ const executeHelixAsk = async ({
                             : 0,
                         fn: "runHelixAskLocalWithOverflowRetry",
                         label: "answer_contract_primary_repair",
+                        failureClass: classifyHelixAskFailure(typedFailReason),
                       },
                     );
+                    if (debugPayload) {
+                      (debugPayload as Record<string, unknown>).helix_ask_fail_reason = typedFailReason;
+                      (debugPayload as Record<string, unknown>).helix_ask_fail_class = classifyHelixAskFailure(typedFailReason);
+                    }
                   }
                 }
               }
@@ -23877,17 +23926,23 @@ const executeHelixAsk = async ({
                 },
               );
             } else {
+              const typedFailReason = buildHelixAskTypedFailReasonFromStatus("parse_fail");
               logStepEnd(
                 "LLM answer contract fill",
-                "parse_fail",
+                `parse_fail:${typedFailReason}`,
                 fillStart,
                 false,
                 {
                   textLength: typeof fillResult?.text === "string" ? fillResult.text.length : 0,
                   fn: "runHelixAskLocalWithOverflowRetry",
                   label: "answer_contract_fill",
+                  failureClass: classifyHelixAskFailure(typedFailReason),
                 },
               );
+              if (debugPayload) {
+                (debugPayload as Record<string, unknown>).helix_ask_fail_reason = typedFailReason;
+                (debugPayload as Record<string, unknown>).helix_ask_fail_class = classifyHelixAskFailure(typedFailReason);
+              }
             }
           }
         }
@@ -25095,6 +25150,23 @@ const executeHelixAsk = async ({
         allowedSourcePaths,
         extractCitationTokensFromText(evidenceText),
       );
+      if (HELIX_ASK_PROOF_PACKET_P0 && HELIX_ASK_OPTION_C_FALLBACK && answerContractApplied && answerContract) {
+        const proofEvidence = normalizeCitations([
+          ...(answerContract.sources ?? []),
+          ...extractCitationTokensFromText(evidenceText),
+          ...contextFiles,
+        ]).map((citation, index) => ({ id: `ev_${index + 1}`, citation }));
+        const claimEvidenceIds = proofEvidence.slice(0, 3).map((entry) => entry.id);
+        const renderedCitations = renderDeterministicCitationsByEvidenceIds(claimEvidenceIds, proofEvidence);
+        if (renderedCitations.length > 0) {
+          cleaned = renderTaggedSectionFallback({
+            summary: answerContract.summary,
+            claims: (answerContract.claims ?? []).map((claim) => claim.text),
+            citations: renderedCitations,
+          });
+          answerPath.push("answerContract:option_c_tagged_fallback");
+        }
+      }
       cleaned = stripRunawayAnswerArtifacts(cleaned);
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
@@ -25183,6 +25255,21 @@ const executeHelixAsk = async ({
         .filter((entry) => entry.decision === "deadline")
         .map((entry) => `${entry.stage}:${entry.reason}`);
     }
+    if (debugPayload) {
+      const timeline = Array.isArray((debugPayload as Record<string, unknown>).timeline)
+        ? ((debugPayload as Record<string, unknown>).timeline as Array<Record<string, unknown>>)
+        : [];
+      for (const entry of timeline) {
+        const stageKey = String(entry?.stage ?? entry?.name ?? "").trim();
+        const durationMs = Number(entry?.duration_ms ?? entry?.ms ?? 0);
+        if (!stageKey) continue;
+        attachHelixAskStageTiming(debugPayload as Record<string, unknown>, stageKey, durationMs);
+      }
+      if (!(debugPayload as Record<string, unknown>).helix_ask_fail_reason) {
+        (debugPayload as Record<string, unknown>).helix_ask_fail_reason = null;
+        (debugPayload as Record<string, unknown>).helix_ask_fail_class = null;
+      }
+    }
     const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
     logDebug("responder.send(200) start", {
       hasDebug: Boolean(debugPayload),
@@ -25204,6 +25291,8 @@ const executeHelixAsk = async ({
         text: clarifyLine,
         answer: clarifyLine,
         fallback: "fast_mode_runtime_missing",
+        fail_reason: "GENERIC_COLLAPSE",
+        fail_class: "infra_fail",
       });
       return;
     }
@@ -25212,12 +25301,26 @@ const executeHelixAsk = async ({
         "I hit an internal fast-mode helper runtime issue. Please retry once; if it persists, I can continue in deterministic clarify mode with one focused follow-up.";
       streamEmitter.finalize(clarifyLine);
       logProgress("Fallback", "helper_runtime_missing_clarify", undefined, false);
-      responder.send(200, { ok: true, text: clarifyLine, answer: clarifyLine, fallback: "helper_runtime_missing" });
+      responder.send(200, {
+        ok: true,
+        text: clarifyLine,
+        answer: clarifyLine,
+        fallback: "helper_runtime_missing",
+        fail_reason: "GENERIC_COLLAPSE",
+        fail_class: "infra_fail",
+      });
       return;
     }
     streamEmitter.finalize();
     logProgress("Failed", "llm_local_failed", undefined, false);
-    responder.send(500, { ok: false, error: "llm_local_failed", message, status: 500 });
+    responder.send(500, {
+      ok: false,
+      error: "llm_local_failed",
+      message,
+      status: 500,
+      fail_reason: "GENERIC_COLLAPSE",
+      fail_class: "infra_fail",
+    });
     return;
   } finally {
     recordHelixAskRuntimeSample(Date.now() - askRequestStartedAt);
