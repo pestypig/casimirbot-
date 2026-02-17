@@ -2743,6 +2743,13 @@ const HELIX_ASK_QUERY_TOKENS = clampNumber(
   32,
   512,
 );
+const HELIX_ASK_QUERY_HINTS_TIMEOUT_MS = clampNumber(
+  readNumber(process.env.HELIX_ASK_QUERY_HINTS_TIMEOUT_MS ?? 12000, 12000),
+  500,
+  120000,
+);
+const HELIX_ASK_QUERY_HINTS_PREFLIGHT_SHORT_CIRCUIT =
+  String(process.env.HELIX_ASK_QUERY_HINTS_PREFLIGHT_SHORT_CIRCUIT ?? "1").trim() !== "0";
 const HELIX_ASK_QUERY_TOKENS_BLOCK = clampNumber(
   readNumber(
     process.env.HELIX_ASK_QUERY_TOKENS_BLOCK ??
@@ -19187,6 +19194,18 @@ const executeHelixAsk = async ({
       let forceHybridNoEvidence = false;
       if (isRepoQuestion) {
         let queryHints: string[] = [];
+        const deterministicQueryHints = mergeHelixAskQueries(
+          buildHelixAskSearchQueries(baseQuestion, topicTags),
+          [
+            ...verificationAnchorHints,
+            ...graphHintTerms,
+            ...(preflightContext?.files ?? []).slice(0, HELIX_ASK_QUERY_HINTS_MAX),
+          ],
+          HELIX_ASK_QUERY_HINTS_MAX,
+        )
+          .map((hint) => hint.trim())
+          .filter((hint) => hint.length > 0)
+          .slice(0, HELIX_ASK_QUERY_HINTS_MAX);
         if (!dryRun) {
           if (fastQualityMode) {
             const queryStart = Date.now();
@@ -19231,6 +19250,21 @@ const executeHelixAsk = async ({
               logProgress("Query hints ready", `${queryHints.length} hints`, queryStart);
               logEvent("Query hints ready", "fast_mode", `${queryHints.length} deterministic hints`, queryStart);
             }
+          } else if (
+            HELIX_ASK_QUERY_HINTS_PREFLIGHT_SHORT_CIRCUIT &&
+            preflightSignalsOk &&
+            (preflightContext?.files?.length ?? 0) >= HELIX_ASK_PREFLIGHT_MIN_FILES
+          ) {
+            const queryStart = Date.now();
+            queryHints = deterministicQueryHints;
+            planDirectives = null;
+            logProgress("Query hints ready", `${queryHints.length} hints`, queryStart);
+            logEvent(
+              "Query hints ready",
+              "preflight_short_circuit",
+              `${queryHints.length} deterministic hints`,
+              queryStart,
+            );
           } else if (HELIX_ASK_SINGLE_LLM) {
             const queryStart = Date.now();
             queryHints = [];
@@ -19280,6 +19314,9 @@ const executeHelixAsk = async ({
                 anchorHints: verificationAnchorRequired ? verificationAnchorHints : [],
               });
               const queryMaxTokens = blockScoped ? HELIX_ASK_QUERY_TOKENS_BLOCK : HELIX_ASK_QUERY_TOKENS;
+              const queryRuntimeBudgetMs = fastQualityMode
+                ? FAST_QUALITY_QUERY_HINTS_BUDGET_MS
+                : HELIX_ASK_QUERY_HINTS_TIMEOUT_MS;
               queryStart = logStepStart(
                 "LLM query hints",
                 `tokens=${queryMaxTokens}`,
@@ -19292,9 +19329,33 @@ const executeHelixAsk = async ({
               );
               const queryHelperResult = await runHelperWithRuntimeGuard(
                 "query_hints_llm",
-                FAST_QUALITY_QUERY_HINTS_BUDGET_MS,
+                queryRuntimeBudgetMs,
                 () =>
-                  runHelixAskLocalWithOverflowRetry(
+                  !fastQualityMode
+                    ? withTimeout(
+                        runHelixAskLocalWithOverflowRetry(
+                          {
+                            prompt: queryPrompt,
+                            max_tokens: queryMaxTokens,
+                            temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                            seed: parsed.data.seed,
+                            stop: parsed.data.stop,
+                          },
+                          {
+                            personaId,
+                            sessionId: parsed.data.sessionId,
+                            traceId: askTraceId,
+                          },
+                          {
+                            fallbackMaxTokens: queryMaxTokens,
+                            allowContextDrop: true,
+                            label: "query_hints",
+                          },
+                        ),
+                        queryRuntimeBudgetMs,
+                        "query_hints_llm",
+                      )
+                    : runHelixAskLocalWithOverflowRetry(
                       {
                         prompt: queryPrompt,
                         max_tokens: queryMaxTokens,
@@ -19315,9 +19376,15 @@ const executeHelixAsk = async ({
                     ),
               );
               if (!queryHelperResult) {
-                queryHints = [];
+                queryHints = deterministicQueryHints;
                 planDirectives = null;
                 pushFastQualityDecision("query_hints_llm", "deadline", "helper_timeout_fallback");
+                logEvent(
+                  "LLM query hints",
+                  "fallback",
+                  `deterministic hints=${queryHints.length}`,
+                  queryStart ?? undefined,
+                );
               } else {
                 const { result: queryResult, overflow: queryOverflow } = queryHelperResult;
                 recordOverflow("query_hints", queryOverflow);
@@ -19390,6 +19457,11 @@ const executeHelixAsk = async ({
                 );
               }
               queryHints = [];
+              if (deterministicQueryHints.length > 0) {
+                queryHints = deterministicQueryHints;
+                planDirectives = null;
+                logEvent("LLM query hints", "fallback", `deterministic hints=${queryHints.length}`);
+              }
             }
           }
         }
