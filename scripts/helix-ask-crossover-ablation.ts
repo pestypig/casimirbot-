@@ -35,6 +35,7 @@ type Aggregate = {
   ok_rate: number;
   p95_latency_ms: number;
   avg_latency_ms: number;
+  infra_fail_rate: number;
   parse_fail_rate: number;
   deterministic_fallback_rate: number;
   evidence_gate_pass_rate: number;
@@ -42,6 +43,12 @@ type Aggregate = {
   claim_support_ratio_mean: number;
   citation_validity_rate: number;
   crossover_completeness_mean: number;
+  successful_samples_only: {
+    count: number;
+    citation_validity_rate: number;
+    crossover_completeness_mean: number;
+    claim_support_ratio_mean: number;
+  };
 };
 
 const BASE = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5173";
@@ -105,6 +112,17 @@ const q = (arr: number[], p: number): number => {
 };
 
 const mean = (arr: number[]): number => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+
+const classifyFailureSignature = (row: RunRecord): string => {
+  const payload = JSON.stringify(row.response ?? {}).toLowerCase();
+  if (!row.ok || row.responseStatus >= 500 || payload.includes("temporarily_unavailable") || payload.includes("circuit")) return "infra_unavailable";
+  if (payload.includes("timeout")) return "infra_timeout";
+  if (payload.includes("schema")) return "schema_error";
+  if (payload.includes("parse_fail")) return "parse_fail";
+  if (payload.includes("validation") || payload.includes("gate")) return "validation_fail";
+  if (payload.includes("low_evidence")) return "low_evidence_utilization";
+  return "unknown_failure";
+};
 
 const bootstrapCI = (values: number[], iters = 1000): { mean: number; lo: number; hi: number } => {
   if (!values.length) return { mean: 0, lo: 0, hi: 0 };
@@ -332,8 +350,17 @@ async function aggregate(all: RunRecord[], prompts: PromptEntry[]) {
 
   for (const [variant, rows] of byVariant.entries()) {
     const lat = rows.map((r) => Number(r.response?.duration_ms ?? r.duration_ms ?? 0)).filter((n) => Number.isFinite(n));
-    const parseFails = rows.filter((r) => !r.ok || /parse_fail/i.test(JSON.stringify(r.response ?? {}))).length;
+    const infraFails = rows.filter((r) => !r.ok || r.responseStatus >= 500).length;
+    const parseFails = rows.filter((r) => r.ok && /parse_fail|schema_error|validation_fail/i.test(JSON.stringify(r.response ?? {}))).length;
     const fallback = rows.filter((r) => /deterministic.*fallback|fallback.*deterministic/i.test(JSON.stringify(r.response?.debug ?? {}))).length;
+
+    const failureSignatureCounts = new Map<string, number>();
+    for (const row of rows.filter((r) => !r.ok || r.responseStatus >= 400 || /parse_fail|schema|validation|timeout/i.test(JSON.stringify(r.response ?? {})))) {
+      const key = classifyFailureSignature(row);
+      failureSignatureCounts.set(key, (failureSignatureCounts.get(key) ?? 0) + 1);
+    }
+
+    const successfulRows = rows.filter((r) => r.ok && r.responseStatus < 400 && !/parse_fail/i.test(JSON.stringify(r.response ?? {})));
 
     const evidencePass = rows.filter((r) => r.response?.debug?.evidence_gate_ok === true).length;
     const slotPass = rows.filter((r) => {
@@ -347,6 +374,9 @@ async function aggregate(all: RunRecord[], prompts: PromptEntry[]) {
 
     const citeVals: number[] = [];
     const completeScores: number[] = [];
+    const successCiteVals: number[] = [];
+    const successCompleteScores: number[] = [];
+    const successClaimRatios: number[] = [];
 
     const stageCards: number[] = [];
     const stagePrimary: number[] = [];
@@ -358,6 +388,12 @@ async function aggregate(all: RunRecord[], prompts: PromptEntry[]) {
       citeVals.push(await citationValidity(text));
       const score = [hasWarpMechanism(text), hasMissionEthos(text), hasConnection(text), hasConstraintFrame(text)].filter(Boolean).length / 4;
       completeScores.push(score);
+      if (r.ok && r.responseStatus < 400 && !/parse_fail/i.test(JSON.stringify(r.response ?? {}))) {
+        successCiteVals.push(citeVals[citeVals.length - 1] ?? 0);
+        successCompleteScores.push(score);
+        const claimRatio = Number(r.response?.debug?.evidence_claim_ratio ?? 0);
+        if (Number.isFinite(claimRatio)) successClaimRatios.push(claimRatio);
+      }
 
       const dbg = r.response?.debug ?? {};
       stageCards.push(extractStageLatency(dbg, "evidence_cards"));
@@ -369,16 +405,23 @@ async function aggregate(all: RunRecord[], prompts: PromptEntry[]) {
     aggregates.push({
       variant,
       sample_count: rows.length,
-      ok_rate: rows.length ? (rows.length - parseFails) / rows.length : 0,
+      ok_rate: rows.length ? (rows.length - infraFails) / rows.length : 0,
       p95_latency_ms: q(lat, 0.95),
       avg_latency_ms: mean(lat),
-      parse_fail_rate: rows.length ? parseFails / rows.length : 0,
+      infra_fail_rate: rows.length ? infraFails / rows.length : 0,
+      parse_fail_rate: rows.length ? parseFails / Math.max(1, rows.length - infraFails) : 0,
       deterministic_fallback_rate: rows.length ? fallback / rows.length : 0,
       evidence_gate_pass_rate: rows.length ? evidencePass / rows.length : 0,
       slot_coverage_pass_rate: rows.length ? slotPass / rows.length : 0,
       claim_support_ratio_mean: mean(claimRatios),
       citation_validity_rate: mean(citeVals),
       crossover_completeness_mean: mean(completeScores),
+      successful_samples_only: {
+        count: successfulRows.length,
+        citation_validity_rate: mean(successCiteVals),
+        crossover_completeness_mean: mean(successCompleteScores),
+        claim_support_ratio_mean: mean(successClaimRatios),
+      },
     });
 
     stageLatency[variant] = {
@@ -388,7 +431,13 @@ async function aggregate(all: RunRecord[], prompts: PromptEntry[]) {
       plan_pass_ms_mean: mean(stagePlan),
     };
 
-    detailed[variant] = { stage_latency: stageLatency[variant] };
+    detailed[variant] = {
+      stage_latency: stageLatency[variant],
+      top_failure_signatures: Array.from(failureSignatureCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([signature, count]) => ({ signature, count, rate: rows.length ? count / rows.length : 0 })),
+    };
   }
 
   const baseline = byVariant.get("D_current_adaptive") ?? [];
@@ -465,16 +514,63 @@ async function aggregate(all: RunRecord[], prompts: PromptEntry[]) {
   await fs.writeFile(SUMMARY_PATH, JSON.stringify(summary, null, 2), "utf8");
   await fs.writeFile(RECO_PATH, JSON.stringify(recommendation, null, 2), "utf8");
 
-  const report = `# Helix Ask Crossover Ablation Report\n\n- Endpoint: \`POST /api/agi/ask\`\n- Debug mode: \`true\`\n- Prompt pack: \`artifacts/experiments/helix-ask-crossover/prompts.jsonl\`\n- Prompts: ${prompts.length}\n- Seeds: ${SEEDS.join(", ")}\n- Variants: ${VARIANTS.map((v) => v.id).join(", ")}\n\n## Aggregate Metrics\n\n${aggregates
+  const report = `# Helix Ask Crossover Ablation Report
+
+- Endpoint: POST /api/agi/ask
+- Debug mode: true
+- Prompt pack: artifacts/experiments/helix-ask-crossover/prompts.jsonl
+- Prompts: ${prompts.length}
+- Seeds: ${SEEDS.join(", ")}
+- Variants: ${VARIANTS.map((v) => v.id).join(", ")}
+
+## Aggregate Metrics
+
+${aggregates
     .map(
       (a) =>
-        `### ${a.variant}\n- sample_count: ${a.sample_count}\n- p95_latency_ms: ${a.p95_latency_ms.toFixed(2)}\n- parse_fail_rate: ${(a.parse_fail_rate * 100).toFixed(2)}%\n- evidence_gate_pass_rate: ${(a.evidence_gate_pass_rate * 100).toFixed(2)}%\n- slot_coverage_pass_rate: ${(a.slot_coverage_pass_rate * 100).toFixed(2)}%\n- crossover_completeness_mean: ${a.crossover_completeness_mean.toFixed(4)}\n- citation_validity_rate: ${a.citation_validity_rate.toFixed(4)}`,
+        `### ${a.variant}
+- sample_count: ${a.sample_count}
+- p95_latency_ms: ${a.p95_latency_ms.toFixed(2)}
+- infra_fail_rate: ${(a.infra_fail_rate * 100).toFixed(2)}%
+- parse_fail_rate: ${(a.parse_fail_rate * 100).toFixed(2)}%
+- evidence_gate_pass_rate: ${(a.evidence_gate_pass_rate * 100).toFixed(2)}%
+- slot_coverage_pass_rate: ${(a.slot_coverage_pass_rate * 100).toFixed(2)}%
+- crossover_completeness_mean: ${a.crossover_completeness_mean.toFixed(4)}
+- citation_validity_rate: ${a.citation_validity_rate.toFixed(4)}
+- successful_samples_only.count: ${a.successful_samples_only.count}
+- successful_samples_only.crossover_completeness_mean: ${a.successful_samples_only.crossover_completeness_mean.toFixed(4)}`,
     )
-    .join("\n\n")}\n\n## Paired Deltas vs D_current_adaptive\n\n${Object.entries(deltas)
+    .join("\n\n")}
+
+## Top Failure Signatures
+
+${VARIANTS.map((variant) => {
+    const sigs = detailed[variant.id]?.top_failure_signatures ?? [];
+    const lines = sigs.length
+      ? sigs.map((sig: any) => `- ${sig.signature}: ${sig.count} (${(sig.rate * 100).toFixed(2)}%)`).join("\n")
+      : "- none";
+    return `### ${variant.id}\n${lines}`;
+  }).join("\n\n")}
+
+## Paired Deltas vs D_current_adaptive
+
+${Object.entries(deltas)
     .map(([k, v]: any) =>
       `- ${k}: quality_delta mean=${v.quality_delta.mean.toFixed(4)} [${v.quality_delta.lo.toFixed(4)}, ${v.quality_delta.hi.toFixed(4)}], latency_delta_ms mean=${v.latency_delta_ms.mean.toFixed(2)} [${v.latency_delta_ms.lo.toFixed(2)}, ${v.latency_delta_ms.hi.toFixed(2)}]`,
     )
-    .join("\n")}\n\n## Decision\n\n- decision: **${recommendation.decision}**\n- preferred_default_variant: **${recommendation.preferred_default_variant}**\n- quality gate met: **${recommendation.rationale.gate_quality}**\n- latency/cost gate met: **${recommendation.rationale.gate_latency_cost}**\n\n## Reproducibility\n\nSee \`summary.json\` and per-run raw payloads under each variant raw directory.\n`;
+    .join("\n")}
+
+## Decision
+
+- decision: **${recommendation.decision}**
+- preferred_default_variant: **${recommendation.preferred_default_variant}**
+- quality gate met: **${recommendation.rationale.gate_quality}**
+- latency/cost gate met: **${recommendation.rationale.gate_latency_cost}**
+
+## Reproducibility
+
+See summary.json and per-run raw payloads under each variant raw directory.
+`;
   await fs.writeFile(REPORT_PATH, report, "utf8");
 }
 
