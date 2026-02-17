@@ -60,5 +60,35 @@ describe("Helix Ask modes", () => {
     expect(payload.mode).toBe("verify");
     expect(payload.proof?.verdict).toBeDefined();
     expect(payload.proof?.artifacts?.some((entry) => entry.ref === "/api/agi/training-trace/export")).toBe(true);
+  }, 70000);
+
+  it("activates relation packet mode with dual-domain evidence", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "How does warp bubble connect with mission ethos in this repo?",
+        context: [
+          "docs/knowledge/warp/warp-bubble-overview.md",
+          "Warp bubble is constrained by GR viability checks.",
+          "docs/ethos/ideology.json",
+          "Mission ethos governs stewardship and verification behavior.",
+        ].join("\n"),
+        debug: true,
+        sessionId: "modes-relation",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text?: string;
+      debug?: {
+        relation_packet_built?: boolean;
+        relation_dual_domain_ok?: boolean;
+        relation_packet_bridge_count?: number;
+      };
+    };
+    expect(payload.debug?.relation_packet_built).toBe(true);
+    expect(payload.debug?.relation_dual_domain_ok).toBe(true);
+    expect(payload.debug?.relation_packet_bridge_count ?? 0).toBeGreaterThanOrEqual(2);
   }, 30000);
 });
