@@ -3180,6 +3180,8 @@ const HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS = clampNumber(
   140,
   1400,
 );
+const HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR =
+  String(process.env.HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ?? "1").trim() !== "0";
 const HELIX_ASK_IDEOLOGY_REPORT_BAN_RE = /\b(?:report|point[s]?|coverage|summary|compare|difference|between|each|step|slot|bullet|section)\b/i;
 const HELIX_ASK_IDEOLOGY_NARRATIVE_GUARD_RE = /\b(do not|don't|avoid|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i;
 const HELIX_ASK_DRIFT_REPAIR = String(process.env.HELIX_ASK_DRIFT_REPAIR ?? "1").trim() !== "0";
@@ -11654,6 +11656,13 @@ const RELATION_MODEL_PLACEHOLDER_RE =
   /^(?:(?:\w+\.)?llm\.local(?:\s+stub result)?|placeholder|unable to answer|i cannot answer|model error)\b/i;
 const RELATION_CODE_NOISE_RE =
   /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|usestate|from\s+["']react["'])\b/i;
+const STUB_TEXT_RE = /\bllm\.local\s+stub\s+result\b/i;
+
+const hasModelPlaceholderOrStub = (value: string): boolean => {
+  const normalized = value.trim();
+  if (!normalized) return false;
+  return RELATION_MODEL_PLACEHOLDER_RE.test(normalized) || STUB_TEXT_RE.test(normalized);
+};
 
 const detectRelationDeterministicFallbackReasons = (value: string): string[] => {
   const reasons = new Set<string>();
@@ -11690,6 +11699,7 @@ const detectRepoAnswerQualityFloorReasons = (args: {
   relationPacket: boolean;
   requiresRepoEvidence: boolean;
   intentDomain: string;
+  enforceGlobalFloor?: boolean;
 }): string[] => {
   const reasons = new Set<string>();
   const normalized = args.text.replace(/\s+/g, " ").trim();
@@ -11697,10 +11707,10 @@ const detectRepoAnswerQualityFloorReasons = (args: {
     reasons.add("empty");
     return Array.from(reasons);
   }
-  if (RELATION_MODEL_PLACEHOLDER_RE.test(normalized)) {
+  if (hasModelPlaceholderOrStub(normalized)) {
     reasons.add("placeholder");
   }
-  if (/\bllm\.local\s+stub\s+result\b/i.test(normalized)) {
+  if (STUB_TEXT_RE.test(normalized)) {
     reasons.add("stub_text");
   }
   if (isDeterministicMetadataNoise(normalized)) {
@@ -11711,22 +11721,24 @@ const detectRepoAnswerQualityFloorReasons = (args: {
   }
   const hasCitations =
     extractFilePathsFromText(args.text).length > 0 || hasSourcesLine(args.text);
-  if (
-    (args.requiresRepoEvidence ||
-      args.intentDomain === "repo" ||
-      args.intentDomain === "hybrid" ||
-      args.relationQuery) &&
-    !hasCitations
-  ) {
+  const enforceCitations =
+    args.enforceGlobalFloor ||
+    args.requiresRepoEvidence ||
+    args.intentDomain === "repo" ||
+    args.intentDomain === "hybrid" ||
+    args.relationQuery;
+  if (enforceCitations && !hasCitations) {
     reasons.add("citation_missing");
   }
   const minChars = args.relationQuery
     ? HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS
     : HELIX_ASK_QUALITY_MIN_TEXT_CHARS;
-  if (
-    (args.intentDomain === "repo" || args.intentDomain === "hybrid" || args.relationQuery) &&
-    normalized.length < minChars
-  ) {
+  const enforceMinLength =
+    args.enforceGlobalFloor ||
+    args.intentDomain === "repo" ||
+    args.intentDomain === "hybrid" ||
+    args.relationQuery;
+  if (enforceMinLength && normalized.length < minChars) {
     reasons.add("text_too_short");
   }
   if (args.relationQuery && args.relationPacket) {
@@ -25943,18 +25955,24 @@ const executeHelixAsk = async ({
       }
       cleaned = stripRunawayAnswerArtifacts(cleaned);
       const citationPersistenceGuardEligible =
-        intentDomain === "repo" || intentDomain === "hybrid" || relationDeterministicGuardEligible;
+        HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
+        intentDomain === "repo" ||
+        intentDomain === "hybrid" ||
+        relationDeterministicGuardEligible;
       if (citationPersistenceGuardEligible) {
         const citationGuardAllowedPaths = filterExistingEvidencePaths(Array.from(
           new Set([
             ...allowedSourcePaths,
+            ...contextFiles,
+            ...extractFilePathsFromText(evidenceText),
             ...(relationPacket ? relationPacket.evidence.map((entry) => entry.path) : []),
           ]),
         ));
         const citationGuardTokens = normalizeCitations([
+          ...citationGuardAllowedPaths,
           ...extractCitationTokensFromText(evidenceText),
           ...(relationPacket ? Object.values(relationPacket.source_map) : []),
-          ...citationGuardAllowedPaths,
+          ...contextFiles,
         ]);
         const beforeCitationGuard = cleaned;
         cleaned = sanitizeSourcesLine(cleaned, citationGuardAllowedPaths, citationGuardTokens);
@@ -25974,8 +25992,11 @@ const executeHelixAsk = async ({
         }
       }
       const placeholderFallbackEligible =
-        RELATION_MODEL_PLACEHOLDER_RE.test(cleaned.trim()) &&
-        (intentDomain === "repo" || intentDomain === "hybrid" || requiresRepoEvidence);
+        hasModelPlaceholderOrStub(cleaned) &&
+        (HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
+          intentDomain === "repo" ||
+          intentDomain === "hybrid" ||
+          requiresRepoEvidence);
       if (placeholderFallbackEligible) {
         const placeholderAllowedCitations = normalizeCitations([
           ...extractFilePathsFromText(evidenceText),
@@ -26031,6 +26052,7 @@ const executeHelixAsk = async ({
         isWarpEthosRelationQuestion(baseQuestion) ||
         intentProfile.id === "hybrid.warp_ethos_relation";
       const qualityFloorEligible =
+        HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
         intentDomain === "repo" ||
         intentDomain === "hybrid" ||
         relationQueryForFinalize ||
@@ -26042,6 +26064,7 @@ const executeHelixAsk = async ({
             relationPacket: Boolean(relationPacket),
             requiresRepoEvidence,
             intentDomain,
+            enforceGlobalFloor: HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR,
           })
         : [];
       if (qualityFloorEligible && qualityFloorReasons.length > 0) {
@@ -26099,6 +26122,68 @@ const executeHelixAsk = async ({
           if (debugPayload) {
             debugPayload.answer_quality_floor_applied = true;
             debugPayload.answer_quality_floor_reasons = qualityFloorReasons;
+          }
+        }
+      }
+      if (qualityFloorEligible) {
+        const finalMinChars = relationQueryForFinalize
+          ? HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS
+          : HELIX_ASK_QUALITY_MIN_TEXT_CHARS;
+        if (cleaned.trim().length < finalMinChars) {
+          const expansionClaims = collectDeterministicEvidenceClaims({
+            question: baseQuestion,
+            evidenceText: appendEvidenceSources(evidenceText, contextFiles, 8, contextText),
+            conceptual: !isImplementationQuestion(baseQuestion),
+          });
+          const expandable = [...expansionClaims, "Answer grounded in retrieved evidence."];
+          let expanded = cleaned.trim();
+          for (const claim of expandable) {
+            if (expanded.length >= finalMinChars) break;
+            const sentence = ensureSentence(normalizeContractText(claim, 320));
+            if (!sentence) continue;
+            if (expanded.toLowerCase().includes(sentence.toLowerCase())) continue;
+            expanded = `${expanded}\n\n${sentence}`.trim();
+          }
+          if (expanded.length > cleaned.trim().length) {
+            cleaned = expanded;
+            answerPath.push("qualityFloor:expand_min_length");
+            logEvent("Answer quality floor", "expand_min_length", `min=${finalMinChars}`, answerStart);
+            if (debugPayload) {
+              const existingReasons = Array.isArray(debugPayload.answer_quality_floor_reasons)
+                ? debugPayload.answer_quality_floor_reasons
+                : [];
+              debugPayload.answer_quality_floor_reasons = Array.from(
+                new Set([...existingReasons, "text_too_short_expanded"]),
+              );
+              debugPayload.answer_quality_floor_applied = true;
+            }
+          }
+        }
+      }
+      if (qualityFloorEligible) {
+        const finalPaths = filterExistingEvidencePaths(
+          Array.from(new Set([...allowedSourcePaths, ...contextFiles, ...extractFilePathsFromText(evidenceText)])),
+        );
+        const finalTokens = normalizeCitations([
+          ...finalPaths,
+          ...extractCitationTokensFromText(evidenceText),
+          ...(relationPacket ? Object.values(relationPacket.source_map) : []),
+          ...(relationPacket ? relationPacket.evidence.map((entry) => entry.path) : []),
+        ]);
+        if (
+          (extractFilePathsFromText(cleaned).length === 0 && !hasSourcesLine(cleaned)) &&
+          finalTokens.length > 0
+        ) {
+          cleaned = `${cleaned}\n\nSources: ${finalTokens.slice(0, 8).join(", ")}`.trim();
+          answerPath.push("qualityFloor:append_sources");
+          if (debugPayload) {
+            const existingReasons = Array.isArray(debugPayload.answer_quality_floor_reasons)
+              ? debugPayload.answer_quality_floor_reasons
+              : [];
+            debugPayload.answer_quality_floor_reasons = Array.from(
+              new Set([...existingReasons, "citation_missing_appended"]),
+            );
+            debugPayload.answer_quality_floor_applied = true;
           }
         }
       }
