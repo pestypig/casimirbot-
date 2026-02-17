@@ -1,9 +1,9 @@
 # Helix Ask evidence cards A/B/C report
 
-- Runs per variant (total): 360
-- Primary metric computation: **valid runs only** (status=200)
-- Runs per variant: 360
-- Pairing: (prompt, seed)
+- Generated: 2026-02-17T04:13:17.495Z
+- Primary metric computation: valid runs only (status=200)
+- Decision gates: run_quality=fail (min_valid=200, max_invalid_rate=0.1, min_pair_count=180)
+- Recommendation: insufficient_run_quality
 
 ## Variant metrics
 
@@ -12,23 +12,21 @@
 ```json
 {
   "n_total": 360,
-  "n_valid": 60,
-  "n_invalid": 300,
-  "invalid_rate": 0.8333333333333334,
+  "n_valid": 0,
+  "n_invalid": 360,
+  "invalid_rate": 1,
   "status_counts": {
-    "200": 60,
-    "500": 1,
-    "503": 299
+    "404": 360
   },
   "latency_ms": {
-    "p50": 961.5,
-    "p95": 1980.4499999999991,
-    "mean": 1086.65
-  "n": 360,
-  "latency_ms": {
-    "p50": 1,
-    "p95": 896.2,
-    "mean": 135.76111111111112
+    "p50": 0,
+    "p95": 0,
+    "mean": 0
+  },
+  "latency_all_ms": {
+    "p50": 2,
+    "p95": 3,
+    "mean": 1.9722222222222223
   },
   "stage_latency_ms": {
     "llm_evidence_cards": {
@@ -42,25 +40,19 @@
       "mean": 0
     }
   },
-  "evidence_gate_pass_rate": 0.6428571428571429,
-  "evidence_gate_ratio": 0.6428571428571429,
-  "slot_coverage_pass_rate": 1,
-  "claim_gate_supported_ratio": 0.8611111111111112,
-  "claim_gate_supported_ratio": 0.8472222222222222,
-  "citation_validity_rate": 0.9459459459459459,
+  "evidence_gate_pass_rate": null,
+  "evidence_gate_ratio": null,
+  "slot_coverage_pass_rate": null,
+  "claim_gate_supported_ratio": null,
+  "citation_validity_rate": null,
   "contract_success_rate": {
-    "answer_contract_primary_applied": 0.75,
-    "parse_fail_frequency": 0,
-    "deterministic_fallback_frequency": 0.55
+    "answer_contract_primary_applied": null,
+    "parse_fail_frequency": null,
+    "deterministic_fallback_frequency": null
   },
   "quality_proxy": {
-    "grounded_sentence_rate": 0.4228429903429902,
-    "contradiction_or_unsupported_rate": 0.2
-    "deterministic_fallback_frequency": 0.09166666666666666
-  },
-  "quality_proxy": {
-    "grounded_sentence_rate": 0.0704738317238317,
-    "contradiction_or_unsupported_rate": 0.03333333333333333
+    "grounded_sentence_rate": null,
+    "contradiction_or_unsupported_rate": null
   }
 }
 ```
@@ -70,23 +62,21 @@
 ```json
 {
   "n_total": 360,
-  "n_valid": 60,
-  "n_invalid": 300,
-  "invalid_rate": 0.8333333333333334,
+  "n_valid": 0,
+  "n_invalid": 360,
+  "invalid_rate": 1,
   "status_counts": {
-    "200": 60,
-    "500": 1,
-    "503": 299
+    "404": 360
   },
   "latency_ms": {
-    "p50": 951.5,
-    "p95": 1990.2499999999986,
-    "mean": 1088.5333333333333
-  "n": 360,
-  "latency_ms": {
-    "p50": 1,
-    "p95": 882.25,
-    "mean": 141.0222222222222
+    "p50": 0,
+    "p95": 0,
+    "mean": 0
+  },
+  "latency_all_ms": {
+    "p50": 2,
+    "p95": 3,
+    "mean": 1.8527777777777779
   },
   "stage_latency_ms": {
     "llm_evidence_cards": {
@@ -100,25 +90,19 @@
       "mean": 0
     }
   },
-  "evidence_gate_pass_rate": 0.6428571428571429,
-  "evidence_gate_ratio": 0.6428571428571429,
-  "slot_coverage_pass_rate": 1,
-  "claim_gate_supported_ratio": 0.8472222222222222,
-  "claim_gate_supported_ratio": 0.8333333333333334,
-  "citation_validity_rate": 0.9473684210526315,
+  "evidence_gate_pass_rate": null,
+  "evidence_gate_ratio": null,
+  "slot_coverage_pass_rate": null,
+  "claim_gate_supported_ratio": null,
+  "citation_validity_rate": null,
   "contract_success_rate": {
-    "answer_contract_primary_applied": 0.75,
-    "parse_fail_frequency": 0,
-    "deterministic_fallback_frequency": 0.3
+    "answer_contract_primary_applied": null,
+    "parse_fail_frequency": null,
+    "deterministic_fallback_frequency": null
   },
   "quality_proxy": {
-    "grounded_sentence_rate": 0.4228429903429902,
-    "contradiction_or_unsupported_rate": 0.35
-    "deterministic_fallback_frequency": 0.05
-  },
-  "quality_proxy": {
-    "grounded_sentence_rate": 0.0704738317238317,
-    "contradiction_or_unsupported_rate": 0.058333333333333334
+    "grounded_sentence_rate": null,
+    "contradiction_or_unsupported_rate": null
   }
 }
 ```
@@ -128,23 +112,21 @@
 ```json
 {
   "n_total": 360,
-  "n_valid": 60,
-  "n_invalid": 300,
-  "invalid_rate": 0.8333333333333334,
+  "n_valid": 0,
+  "n_invalid": 360,
+  "invalid_rate": 1,
   "status_counts": {
-    "200": 60,
-    "500": 1,
-    "503": 299
+    "404": 360
   },
   "latency_ms": {
-    "p50": 995.5,
-    "p95": 2060.0499999999997,
-    "mean": 1112.2833333333333
-  "n": 360,
-  "latency_ms": {
-    "p50": 1,
-    "p95": 852.4000000000001,
-    "mean": 137.4388888888889
+    "p50": 0,
+    "p95": 0,
+    "mean": 0
+  },
+  "latency_all_ms": {
+    "p50": 2,
+    "p95": 3,
+    "mean": 1.886111111111111
   },
   "stage_latency_ms": {
     "llm_evidence_cards": {
@@ -158,58 +140,30 @@
       "mean": 0
     }
   },
-  "evidence_gate_pass_rate": 0.6428571428571429,
-  "evidence_gate_ratio": 0.6428571428571429,
-  "slot_coverage_pass_rate": 1,
-  "claim_gate_supported_ratio": 0.8425925925925926,
-  "claim_gate_supported_ratio": 0.8333333333333334,
-  "citation_validity_rate": 0.9459459459459459,
+  "evidence_gate_pass_rate": null,
+  "evidence_gate_ratio": null,
+  "slot_coverage_pass_rate": null,
+  "claim_gate_supported_ratio": null,
+  "citation_validity_rate": null,
   "contract_success_rate": {
-    "answer_contract_primary_applied": 0.75,
-    "parse_fail_frequency": 0,
-    "deterministic_fallback_frequency": 0.35
+    "answer_contract_primary_applied": null,
+    "parse_fail_frequency": null,
+    "deterministic_fallback_frequency": null
   },
   "quality_proxy": {
-    "grounded_sentence_rate": 0.4228429903429902,
-    "contradiction_or_unsupported_rate": 0.35
+    "grounded_sentence_rate": null,
+    "contradiction_or_unsupported_rate": null
   }
 }
 ```
 
-## Paired deltas (bootstrap 95% CI; valid-pair only)
-    "deterministic_fallback_frequency": 0.058333333333333334
-  },
-  "quality_proxy": {
-    "grounded_sentence_rate": 0.0704738317238317,
-    "contradiction_or_unsupported_rate": 0.058333333333333334
-  }
-}
-```
-
-## Paired deltas (bootstrap 95% CI)
+## Paired deltas (valid pairs only)
 
 ```json
 {
   "A_vs_B": {
     "latency_ms": {
-      "pair_count": 60,
-      "mean": -1.8833333333333333,
-      "ci": {
-        "low": -14.500416666666666,
-        "high": 10.467499999999996
-      },
-      "significant": false
-    },
-    "grounded_sentence_rate": {
-      "pair_count": 60,
-      "mean": -5.261111111111111,
-      "ci": {
-        "low": -11.514236111111112,
-        "high": -0.7916666666666666
-      },
-      "significant": true
-    },
-    "grounded_sentence_rate": {
+      "pair_count": 0,
       "mean": 0,
       "ci": {
         "low": 0,
@@ -217,8 +171,17 @@
       },
       "significant": false
     },
-    "citation_validity_indicator": {
-      "pair_count": 60,
+    "grounded_sentence_rate": {
+      "pair_count": 0,
+      "mean": 0,
+      "ci": {
+        "low": 0,
+        "high": 0
+      },
+      "significant": false
+    },
+    "has_citation_indicator": {
+      "pair_count": 0,
       "mean": 0,
       "ci": {
         "low": 0,
@@ -229,24 +192,7 @@
   },
   "C_vs_B": {
     "latency_ms": {
-      "pair_count": 60,
-      "mean": 23.75,
-      "ci": {
-        "low": -3.114166666666666,
-        "high": 48.650416666666665
-      },
-      "significant": false
-    },
-    "grounded_sentence_rate": {
-      "pair_count": 60,
-      "mean": -3.5833333333333335,
-      "ci": {
-        "low": -6.297569444444445,
-        "high": -0.8662500000000023
-      },
-      "significant": true
-    },
-    "grounded_sentence_rate": {
+      "pair_count": 0,
       "mean": 0,
       "ci": {
         "low": 0,
@@ -254,8 +200,17 @@
       },
       "significant": false
     },
-    "citation_validity_indicator": {
-      "pair_count": 60,
+    "grounded_sentence_rate": {
+      "pair_count": 0,
+      "mean": 0,
+      "ci": {
+        "low": 0,
+        "high": 0
+      },
+      "significant": false
+    },
+    "has_citation_indicator": {
+      "pair_count": 0,
       "mean": 0,
       "ci": {
         "low": 0,
@@ -267,32 +222,42 @@
 }
 ```
 
-## Recommendation
-
-- Recommendation after filtering invalid (non-200) runs: **disable_by_default**.
-- Recommendation changed after filtering fail-safe/503 runs: **no** (still disable_by_default).
+## Recommendation payload
 
 ```json
 {
-  "recommendation": "disable_by_default",
-  "decision_criteria": {
-    "quality_improvement_required": 0.05,
-    "latency_p95_increase_max": 0.15
+  "recommendation": "insufficient_run_quality",
+  "quality_delta_grounded_sentence_rate": 0,
+  "latency_delta_p95_ratio": 0,
+  "valid_counts": {
+    "A": 0,
+    "B": 0,
+    "C": 0
   },
-  "observed": {
-    "quality_delta_B_minus_A": 0,
-    "latency_p95_delta_B_minus_A": 0.004948370319876545,
-    "valid_runs": {
-      "A": 60,
-      "B": 60,
-      "C": 60
+  "invalid_counts": {
+    "A": 360,
+    "B": 360,
+    "C": 360
+  },
+  "decision_gates": {
+    "min_valid_per_variant": 200,
+    "max_invalid_rate": 0.1,
+    "min_pair_count": 180,
+    "valid_counts": {
+      "A": 0,
+      "B": 0,
+      "C": 0
     },
-    "invalid_runs": {
-      "A": 300,
-      "B": 300,
-      "C": 300
-    }
-    "latency_p95_delta_B_minus_A": -0.01556572193706767
+    "invalid_rates": {
+      "A": 1,
+      "B": 1,
+      "C": 1
+    },
+    "pair_counts": {
+      "A_vs_B": 0,
+      "C_vs_B": 0
+    },
+    "pass": false
   }
 }
 ```
