@@ -1,3 +1,4 @@
 date_utc,ticket_id,commit,contract_pass,required_tests_pass,casimir_adapter_pass,casimir_run_id,casimir_integrity_ok,claim_tier,scope_drift,repeat_stability,toe_progress_pct_after_run,strict_ready_progress_pct_after_run,scale_decision,notes
 2026-02-17,TOE-001-curvature-stress-bridge,e91f803d,true,true,true,17905,true,reduced-order,false,true,6.0,6.0,hold,"Need 2 more consecutive full-gate passes before scaling."
 2026-02-17,TOE-002-semiclassical-coupling-contract,c605cd5e,true,true,true,18170,true,diagnostic,false,true,8.5,6.0,hold,"Diagnostic claim tier still contributes weighted progress; one more consecutive full-gate pass needed before scaling decision."
+2026-02-17,TOE-003-quantum-provenance-class,5a12eff8,true,true,true,toe-003-quantum-provenance-class,true,diagnostic,false,true,11.0,10.0,scale +1,"Weighted ToE progress advanced to 11.0%; adapter-backed verify replay PASS (run_id=18172) so pilot scaling can begin."

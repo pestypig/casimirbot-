@@ -56,6 +56,21 @@ Stop-scaling triggers:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-02-17 | TOE-001-curvature-stress-bridge | e91f803d | PASS | PASS (`tests/stress-energy-units.spec.ts`, `tests/physics-contract.gate0.spec.ts`) | PASS (`run_id=17905`) | PASS | reduced-order | NO | PASS (repeatable local reruns) | 6.0 | HOLD (need 2 more consecutive pass runs) | Ticket result artifact added and validated. |
 | 2026-02-17 | TOE-002-semiclassical-coupling-contract | c605cd5e | PASS | PASS (`tests/gr-constraint-contract.spec.ts`, `tests/gr-constraint-gate.spec.ts`) | PASS (`run_id=18170` local reproduction) | PASS | diagnostic | NO | PASS (tests + adapter verify reproduced) | 8.5 | HOLD (need 1 more consecutive full-gate pass) | Implementation quality good; keep claim tier diagnostic pending stronger trace metadata in artifact. |
+| 2026-02-17 | TOE-003-quantum-provenance-class | 5a12eff8 | PASS | PASS (`tests/warp-viability.spec.ts`, `tests/qi-guardrail.spec.ts`, `tests/pipeline-ts-qi-guard.spec.ts`) | PASS (`run_id=toe-003-quantum-provenance-class`) | PASS | diagnostic | NO | PASS (tests + verification reproduced) | 11.0 | SCALE +1 (pilot) | Ticket result artifact is valid, contributes to weighted ToE proof progression, and adapter-backed verify replay is reproducible (`run_id=18172`). |
+
+## Daily Summary (2026-02-17)
+
+- Date: 2026-02-17
+- Runs completed: 3
+- Full-gate passes: 3
+- Scope-drift incidents: 0
+- Adapter-fallback incidents: 0
+- ToE progress %: 11.0
+- Strict-ready progress %: 10.0
+- Rolling pass rate (last 10 runs): 100% (3/3 observed)
+- Reviewer count: not recorded in current audit artifacts
+- Active agents: not set (policy baseline is `2 x active reviewers`)
+- Decision for next day: `scale +1` (pilot)
 
 ## Daily Summary Template
 
