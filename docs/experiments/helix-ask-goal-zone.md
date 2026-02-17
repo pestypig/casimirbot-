@@ -53,6 +53,18 @@ For each case (all seeds), target:
    - `POST /api/agi/adapter/run`
    - `GET /api/agi/training-trace/export`
 
+## Physics Context Contract (Cloud Codex)
+When a patch touches physics-facing response behavior (curvature, stress-energy, viability, or quantum-proxy explanations), include these files in active context:
+
+- `shared/curvature-proxy.ts` (canonical `kappa_body`, `kappa_drive`, `kappa_u`)
+- `shared/essence-physics.ts` (typed curvature-unit schema)
+- `server/skills/physics.curvature.ts` (curvature-unit provenance/hash pipeline)
+- `server/helix-proof-pack.ts` (proof-pack curvature surfacing)
+- `tests/physics-contract.gate0.spec.ts` and `tests/curvature-unit.v2.spec.ts` (parity/reproducibility checks)
+- `docs/audits/ideology-physics-claim-gap-audit-2026-02-17.md` and `docs/audits/helix-agent-context-checklist-2026-02-17.json` (cloud execution contract)
+
+Do not claim quantum-gravity unification from this path. Treat curvature-unit outputs as reduced-order bridge evidence unless a new primitive explicitly upgrades maturity and passes required verification.
+
 ## Cloud Codex Runnable Prompt
 ```md
 Run the Helix Ask Goal Zone loop for warp<->ethos relation quality.
@@ -78,5 +90,5 @@ Constraints:
 - Do not broaden behavior with unrelated routing changes.
 - Keep retrieval latency impact <= +10% p95.
 - Preserve deterministic debug diagnostics for relation packet checks.
+- If physics-facing claims are modified, preserve kappa parity and include curvature-unit provenance/hash evidence in artifacts.
 ```
-

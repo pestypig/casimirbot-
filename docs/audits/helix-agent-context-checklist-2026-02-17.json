@@ -1,0 +1,319 @@
+{
+  "schema_version": "helix_agent_context_checklist/1",
+  "kind": "agent_execution_checklist",
+  "created_at": "2026-02-17T00:00:00Z",
+  "name": "Helix Ideology-Physics Agent Context Checklist",
+  "source_report": {
+    "path": "docs/audits/ideology-physics-claim-gap-audit-2026-02-17.md",
+    "sections": [
+      "5.9",
+      "5.10"
+    ]
+  },
+  "objective": "Provide a machine-readable execution contract for cloud/offloaded agents so physics and ideology work remains tree/DAG-bounded, stage-bounded, and scientifically auditable.",
+  "tree_dag_guardrails": {
+    "resolver_config": "configs/graph-resolvers.json",
+    "walk_config": "docs/warp-tree-dag-walk-config.json",
+    "required_defaults": {
+      "allowedCL": "CL4",
+      "allowConceptual": false,
+      "allowProxies": false,
+      "chart": "comoving_cartesian",
+      "seedOrder": "lex",
+      "walkMode": "bfs"
+    },
+    "required_tree_owners": [
+      "physics-foundations",
+      "warp-mechanics",
+      "gr-solver",
+      "uncertainty-mechanics",
+      "dp-collapse"
+    ]
+  },
+  "major_context_areas": [
+    {
+      "id": "gr_policy_fallback",
+      "severity": "high",
+      "code_refs": [
+        "server/gr/gr-constraint-policy.ts",
+        "WARP_AGENTS.md"
+      ],
+      "rule": "If warp-agents policy is unavailable and defaults are used, treat run as non-certifying for production certification lanes.",
+      "required_evidence": [
+        "warp_agents_loaded=true",
+        "policy_source=warp-agents"
+      ]
+    },
+    {
+      "id": "proof_pack_contract",
+      "severity": "high",
+      "code_refs": [
+        "server/helix-proof-pack.ts",
+        "docs/proof-pack.md",
+        "tests/proof-pack.spec.ts",
+        "tests/proof-pack-strict-parity.spec.ts"
+      ],
+      "rule": "Proof-facing values must preserve source/proxy strict provenance and remain parity-checked with viability primitives.",
+      "required_evidence": [
+        "proof_pack_strict_keys_present=true",
+        "proof_pack_proxy_flags_present=true"
+      ]
+    },
+    {
+      "id": "curvature_unit_contract",
+      "severity": "high",
+      "code_refs": [
+        "shared/curvature-proxy.ts",
+        "shared/essence-physics.ts",
+        "server/skills/physics.curvature.ts",
+        "server/helix-proof-pack.ts",
+        "tests/physics-contract.gate0.spec.ts",
+        "tests/curvature-unit.v2.spec.ts"
+      ],
+      "rule": "Curvature-facing claims must preserve canonical kappa formulas, SI-unit lock, and provenance/hash completeness for curvature-unit artifacts.",
+      "required_evidence": [
+        "kappa_shared_client_parity=true",
+        "curvature_unit_schema_valid=true",
+        "curvature_hashes_present=true",
+        "curvature_provenance_present=true"
+      ]
+    },
+    {
+      "id": "gr_os_actions",
+      "severity": "high",
+      "code_refs": [
+        "server/gr/gr-os-payload.ts"
+      ],
+      "rule": "Gate and certificate outcomes must map to explicit actions and stage labels.",
+      "required_evidence": [
+        "gr_os_payload_present=true",
+        "actions_include_halt_on_certificate_or_gate_fail=true",
+        "stage_in={diagnostic,reduced-order,certified}"
+      ]
+    },
+    {
+      "id": "certificate_drift_recheck",
+      "severity": "medium",
+      "code_refs": [
+        "tools/verifyCertificate.ts"
+      ],
+      "rule": "Long-horizon and replay-critical runs must include certificate recheck output beyond integrity hash.",
+      "required_evidence": [
+        "certificate_recheck_run=true",
+        "recheck.physicsOk_recorded=true",
+        "recheck.differences_recorded=true"
+      ]
+    },
+    {
+      "id": "constraint_pack_policy_profiles",
+      "severity": "high",
+      "code_refs": [
+        "server/routes/agi.constraint-packs.ts",
+        "server/services/constraint-packs/constraint-pack-policy.ts",
+        "server/services/constraint-packs/constraint-pack-policy-store.ts"
+      ],
+      "rule": "Tenant-scoped runs must bind profile id/version/customer and reject profile mismatches.",
+      "required_evidence": [
+        "policy_profile_id_recorded=true",
+        "policy_profile_version_recorded=true",
+        "policy_customer_recorded=true",
+        "tenant_policy_mismatch_rejected=true"
+      ]
+    },
+    {
+      "id": "ts_autoscale_semantics",
+      "severity": "medium",
+      "code_refs": [
+        "tools/warpViability.ts"
+      ],
+      "rule": "TS autoscale and resample behavior must be preserved in interpretation/replay, not flattened into a single scalar.",
+      "required_evidence": [
+        "ts_autoscale_fields_recorded=true",
+        "ts_resample_count_recorded=true",
+        "ts_mitigation_recorded=true"
+      ]
+    }
+  ],
+  "required_tests": [
+    "tests/theory-checks.spec.ts",
+    "tests/stress-energy-brick.spec.ts",
+    "tests/york-time.spec.ts",
+    "tests/gr-agent-loop.spec.ts",
+    "tests/gr-agent-loop-baseline.spec.ts",
+    "tests/gr-constraint-gate.spec.ts",
+    "tests/gr-constraint-network.spec.ts",
+    "tests/stress-energy-matter.spec.ts",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "tests/natario-metric-t00.spec.ts",
+    "tests/warp-metric-adapter.spec.ts",
+    "tests/warp-viability.spec.ts",
+    "tests/proof-pack.spec.ts",
+    "tests/proof-pack-strict-parity.spec.ts",
+    "tests/pipeline-ts-qi-guard.spec.ts",
+    "tests/qi-guardrail.spec.ts",
+    "tests/lattice-probe-guardrails.spec.ts",
+    "client/src/components/__tests__/warp-proof-ts-strict.spec.tsx"
+  ],
+  "recommended_tests": [
+    "tests/physics-contract.gate0.spec.ts",
+    "tests/curvature-unit.v2.spec.ts",
+    "tests/proof-pack.spec.ts",
+    "tests/proof-pack-strict-parity.spec.ts"
+  ],
+  "execution_steps": [
+    {
+      "step": 1,
+      "id": "select_scope",
+      "description": "Select one tree-pack owner and one policy lane for the change.",
+      "required": true,
+      "outputs": [
+        "tree_pack_owner",
+        "policy_lane"
+      ]
+    },
+    {
+      "step": 2,
+      "id": "validate_policy_source",
+      "description": "Ensure warp-agents policy loads for certification lanes; if not, downgrade to diagnostic and fail closed for production.",
+      "required": true,
+      "outputs": [
+        "policy_source",
+        "fallback_detected"
+      ]
+    },
+    {
+      "step": 3,
+      "id": "update_contract_then_runtime",
+      "description": "Update primitive/policy/schema contract before runtime evaluators and tests.",
+      "required": true,
+      "outputs": [
+        "contract_patch_refs",
+        "runtime_patch_refs",
+        "test_patch_refs"
+      ]
+    },
+    {
+      "step": 4,
+      "id": "maintain_proof_pack_parity",
+      "description": "Keep proof-pack strict keys and proxy/source annotations aligned with viability outputs.",
+      "required": true,
+      "outputs": [
+        "proof_pack_parity_ok"
+      ]
+    },
+    {
+      "step": 5,
+      "id": "enforce_curvature_contract",
+      "description": "When curvature or stress-energy paths are touched, preserve canonical kappa parity, SI-unit contract, and curvature-unit provenance/hash outputs.",
+      "required": false,
+      "outputs": [
+        "kappa_parity_ok",
+        "curvature_schema_ok",
+        "curvature_hash_bundle"
+      ]
+    },
+    {
+      "step": 6,
+      "id": "run_required_tests",
+      "description": "Run required tests for touched surfaces; include strict parity/proof tests when proof fields are touched.",
+      "required": true,
+      "outputs": [
+        "test_results"
+      ]
+    },
+    {
+      "step": 7,
+      "id": "run_casimir_verify",
+      "description": "Run adapter-backed Casimir verify and capture verdict + certificate metadata.",
+      "required": true,
+      "outputs": [
+        "casimir_verdict",
+        "trace_id",
+        "run_id",
+        "certificate_hash",
+        "certificate_integrity_ok"
+      ]
+    },
+    {
+      "step": 8,
+      "id": "run_recheck_when_needed",
+      "description": "For long-horizon/replay-critical runs, run certificate recheck and capture physics drift outputs.",
+      "required": false,
+      "outputs": [
+        "recheck_integrity_ok",
+        "recheck_physics_ok",
+        "recheck_differences"
+      ]
+    },
+    {
+      "step": 9,
+      "id": "record_policy_profile_context",
+      "description": "Record policy profile context for tenant-scoped runs.",
+      "required": true,
+      "outputs": [
+        "policy_profile_id",
+        "policy_profile_version",
+        "policy_profile_customer"
+      ]
+    },
+    {
+      "step": 10,
+      "id": "emit_artifact_bundle",
+      "description": "Emit all run artifacts required for auditability and replay.",
+      "required": true,
+      "outputs": [
+        "plan",
+        "diff",
+        "constraint_report",
+        "gr_os_payload",
+        "proof_pack_snapshot",
+        "curvature_bundle_refs",
+        "verification_report",
+        "certificate_refs",
+        "training_trace_export"
+      ]
+    },
+    {
+      "step": 11,
+      "id": "assign_claim_tier",
+      "description": "Assign claim tier using objective criteria.",
+      "required": true,
+      "outputs": [
+        "claim_tier"
+      ]
+    }
+  ],
+  "claim_tiers": [
+    {
+      "tier": "diagnostic",
+      "criteria": [
+        "policy fallback active",
+        "proxy-only proof path present",
+        "required evidence missing"
+      ]
+    },
+    {
+      "tier": "reduced-order",
+      "criteria": [
+        "constraints pass",
+        "full certified evidence path incomplete"
+      ]
+    },
+    {
+      "tier": "certified",
+      "criteria": [
+        "hard constraints pass",
+        "certificate policy pass",
+        "required tests pass",
+        "proof-pack parity pass",
+        "certificate integrity pass"
+      ]
+    }
+  ],
+  "verification_contract": {
+    "adapter_endpoint": "/api/agi/adapter/run",
+    "trace_export_endpoint": "/api/agi/training-trace/export",
+    "casimir_verify_required": true,
+    "certificate_required_for_certified": true
+  }
+}
