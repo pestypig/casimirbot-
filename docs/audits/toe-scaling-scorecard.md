@@ -57,17 +57,18 @@ Stop-scaling triggers:
 | 2026-02-17 | TOE-001-curvature-stress-bridge | e91f803d | PASS | PASS (`tests/stress-energy-units.spec.ts`, `tests/physics-contract.gate0.spec.ts`) | PASS (`run_id=17905`) | PASS | reduced-order | NO | PASS (repeatable local reruns) | 6.0 | HOLD (need 2 more consecutive pass runs) | Ticket result artifact added and validated. |
 | 2026-02-17 | TOE-002-semiclassical-coupling-contract | c605cd5e | PASS | PASS (`tests/gr-constraint-contract.spec.ts`, `tests/gr-constraint-gate.spec.ts`) | PASS (`run_id=18170` local reproduction) | PASS | diagnostic | NO | PASS (tests + adapter verify reproduced) | 8.5 | HOLD (need 1 more consecutive full-gate pass) | Implementation quality good; keep claim tier diagnostic pending stronger trace metadata in artifact. |
 | 2026-02-17 | TOE-003-quantum-provenance-class | 5a12eff8 | PASS | PASS (`tests/warp-viability.spec.ts`, `tests/qi-guardrail.spec.ts`, `tests/pipeline-ts-qi-guard.spec.ts`) | PASS (`run_id=toe-003-quantum-provenance-class`) | PASS | diagnostic | NO | PASS (tests + verification reproduced) | 11.0 | SCALE +1 (pilot) | Ticket result artifact is valid, contributes to weighted ToE proof progression, and adapter-backed verify replay is reproducible (`run_id=18172`). |
+| 2026-02-17 | TOE-004-uncertainty-propagation-gates | ffc566bc | PASS | PASS (`tests/gr-invariants.spec.ts`, `tests/stress-energy-integrals.spec.ts`) | PASS (`run_id=1`) | PASS | diagnostic | NO | PASS (ticket-scoped tests and contract checks) | 13.5 | SCALE +1 (pilot) | TOE-004 receipt accepted and counted in weighted ToE proof progression. |
 
 ## Daily Summary (2026-02-17)
 
 - Date: 2026-02-17
-- Runs completed: 3
-- Full-gate passes: 3
+- Runs completed: 4
+- Full-gate passes: 4
 - Scope-drift incidents: 0
 - Adapter-fallback incidents: 0
-- ToE progress %: 11.0
+- ToE progress %: 13.5
 - Strict-ready progress %: 10.0
-- Rolling pass rate (last 10 runs): 100% (3/3 observed)
+- Rolling pass rate (last 10 runs): 100% (4/4 observed)
 - Reviewer count: not recorded in current audit artifacts
 - Active agents: not set (policy baseline is `2 x active reviewers`)
 - Decision for next day: `scale +1` (pilot)
