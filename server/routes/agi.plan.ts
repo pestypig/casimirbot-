@@ -11627,6 +11627,40 @@ const collectDeterministicEvidenceClaims = (args: {
   return out;
 };
 
+const detectDeterministicContractNoiseReasons = (args: {
+  contract: HelixAskAnswerContract;
+  conceptual: boolean;
+  relationQuery: boolean;
+}): string[] => {
+  const reasons = new Set<string>();
+  const lines = [
+    args.contract.summary ?? "",
+    ...(args.contract.claims ?? []).map((claim) => claim.text ?? ""),
+    ...(args.contract.steps ?? []),
+    ...(args.contract.comparisons ?? []).map((entry) => `${entry.label}: ${entry.detail}`),
+  ]
+    .map((line) => normalizeContractText(String(line ?? ""), 320))
+    .filter(Boolean);
+  if (lines.some((line) => isDeterministicMetadataNoise(line))) {
+    reasons.add("metadata_noise");
+  }
+  if (args.conceptual && lines.some((line) => DETERMINISTIC_CODE_LINE_RE.test(line))) {
+    reasons.add("code_noise");
+  }
+  if (lines.some((line) => line.length < 18)) {
+    reasons.add("claim_too_short");
+  }
+  if (args.relationQuery) {
+    const merged = lines.join(" ").toLowerCase();
+    const hasWarp = /\bwarp\b|\bbubble\b/.test(merged);
+    const hasEthos = /\bethos\b|\bideology\b|\bmission\b/.test(merged);
+    if (!hasWarp || !hasEthos) {
+      reasons.add("relation_link_missing");
+    }
+  }
+  return Array.from(reasons);
+};
+
 const buildHelixAskAnswerContractPrompt = (
   question: string,
   evidence: string,
@@ -11817,11 +11851,15 @@ const buildDeterministicAnswerContractFallback = (args: {
 
   const derivedClaimLines = [...evidenceClaims, ...docBullets, ...codeBullets]
     .map((line) => sanitizeDeterministicContractLine(summarizeForExtension(line)))
-    .filter((line) => line.length >= 20);
+    .filter((line) => line.length >= 20)
+    .filter((line) => !isDeterministicMetadataNoise(line))
+    .filter((line) => !(conceptualQuestion && DETERMINISTIC_CODE_LINE_RE.test(line)));
   if (derivedClaimLines.length === 0) {
     const fallbackClaims = splitGroundedSentences(args.evidenceText)
       .map((line) => sanitizeDeterministicContractLine(summarizeForExtension(line)))
-      .filter((line) => line.length >= 24 && !/^sources?:/i.test(line));
+      .filter((line) => line.length >= 24 && !/^sources?:/i.test(line))
+      .filter((line) => !isDeterministicMetadataNoise(line))
+      .filter((line) => !(conceptualQuestion && DETERMINISTIC_CODE_LINE_RE.test(line)));
     derivedClaimLines.push(...fallbackClaims.slice(0, 4));
   }
 
@@ -19299,7 +19337,6 @@ const executeHelixAsk = async ({
     let generalScaffold = "";
     let repoScaffold = "";
     let repoScaffoldForPrompt = "";
-    var repoScaffoldForPrompt = "";
     let promptScaffold = "";
     let topicMustIncludeOk: boolean | undefined;
     let pipelineEvidence: string | null = null;
@@ -23372,6 +23409,7 @@ const executeHelixAsk = async ({
         HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) &&
         /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(baseQuestion) &&
         /\b(mission ethos|ethos|ideology)\b/i.test(baseQuestion);
+      const deterministicConceptualQuestion = !isImplementationQuestion(baseQuestion);
       if (
         HELIX_ASK_ANSWER_CONTRACT_PRIMARY &&
         !HELIX_ASK_SINGLE_LLM &&
@@ -23403,12 +23441,18 @@ const executeHelixAsk = async ({
           deterministicAllowedCitations,
           requiresRepoEvidence,
         );
+        const deterministicNoiseReasons = detectDeterministicContractNoiseReasons({
+          contract: deterministicSanitizedContract,
+          conceptual: deterministicConceptualQuestion,
+          relationQuery: relationQuestionFastPath,
+        });
         const deterministicQualityOk =
-          deterministicGate.ok ||
-          (!deterministicGate.hardFail &&
+          deterministicNoiseReasons.length === 0 &&
+          (deterministicGate.ok ||
+            (!deterministicGate.hardFail &&
             deterministicGate.uniqueRatio >= 0.72 &&
             (deterministicSanitizedContract.claims?.length ?? 0) >= 2 &&
-            (deterministicSanitizedContract.sources?.length ?? 0) >= 2);
+            (deterministicSanitizedContract.sources?.length ?? 0) >= 2));
         if (deterministicQualityOk) {
           primaryContractResult = { text: JSON.stringify(deterministicSanitizedContract) };
           answerContractPrimaryUsed = true;
@@ -23421,6 +23465,8 @@ const executeHelixAsk = async ({
                 : "relation_question_fastpath";
             (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_gate =
               deterministicGate;
+            (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_noise =
+              deterministicNoiseReasons;
           }
           logEvent(
             "LLM answer contract primary",
@@ -23433,12 +23479,14 @@ const executeHelixAsk = async ({
           if (debugPayload) {
             (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic = false;
             (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_rejected =
-              deterministicGate.reasons;
+              [...deterministicGate.reasons, ...deterministicNoiseReasons];
+            (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_noise =
+              deterministicNoiseReasons;
           }
           logEvent(
             "LLM answer contract primary",
             "rejected",
-            `deterministic_pre_llm_rejected | reasons=${deterministicGate.reasons.join(",") || "none"}`,
+            `deterministic_pre_llm_rejected | reasons=${[...deterministicGate.reasons, ...deterministicNoiseReasons].join(",") || "none"}`,
             answerStart,
           );
         }
