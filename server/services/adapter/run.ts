@@ -42,6 +42,31 @@ const toTrainingTraceDeltas = (changes: ParamChange[]): TrainingTraceDelta[] => 
 });
 const toTrainingTraceConstraint = (constraint: GrConstraintEntry): TrainingTraceConstraint => ({ id: constraint.id, severity: constraint.severity, status: constraint.status, value: constraint.value ?? null, limit: constraint.limit ?? null, note: constraint.note });
 const findFirstFailingHardConstraint = (constraints?: GrConstraintEntry[]): TrainingTraceConstraint | undefined => constraints?.find((entry) => entry.severity === "HARD" && entry.status !== "pass") ? toTrainingTraceConstraint(constraints.find((entry) => entry.severity === "HARD" && entry.status !== "pass") as GrConstraintEntry) : undefined;
+type CanonicalFirstFailClass = "constraint" | "certificate_integrity" | "certificate_status" | "certificate_missing";
+const normalizeFirstFail = (input: { verdict: "PASS" | "FAIL"; firstFail?: TrainingTraceConstraint | null; certificate?: Record<string, unknown> | null; fallbackId: string; fallbackNote: string; }): TrainingTraceConstraint | null => {
+  if (input.verdict === "PASS") return input.firstFail ?? null;
+  if (input.firstFail) return input.firstFail;
+  const certificate = input.certificate ?? undefined;
+  const certificateHash = typeof certificate?.certificateHash === "string" ? certificate.certificateHash.trim() : "";
+  const integrityOk = certificate?.integrityOk;
+  const certificateStatus = typeof certificate?.status === "string" ? certificate.status.trim() : "";
+  const canonicalClass: CanonicalFirstFailClass = integrityOk === false
+    ? "certificate_integrity"
+    : !certificateHash
+      ? "certificate_missing"
+      : certificateStatus && certificateStatus !== "FAIL"
+        ? "certificate_status"
+        : "constraint";
+  const id = canonicalClass === "certificate_integrity"
+    ? "ADAPTER_CERTIFICATE_INTEGRITY"
+    : canonicalClass === "certificate_missing"
+      ? "ADAPTER_CERTIFICATE_MISSING"
+      : canonicalClass === "certificate_status"
+        ? `ADAPTER_CERTIFICATE_STATUS_${certificateStatus.toUpperCase()}`
+        : input.fallbackId;
+  const baseNote = canonicalClass === "constraint" ? input.fallbackNote : "certificate_policy_failed";
+  return { id, severity: "HARD", status: "fail", value: null, limit: null, note: `class=${canonicalClass},${baseNote}` };
+};
 const hasAnyTelemetry = (telemetry?: Record<string, unknown>): boolean => !!telemetry && Object.keys(telemetry).length > 0;
 const mergeMetricOverrides = (target: ConstraintPackMetricMap, overrides?: ConstraintPackMetricMap) => { if (!overrides) return; for (const [key, value] of Object.entries(overrides)) if (value !== undefined) target[key] = value; };
 const hasPolicyOverridePayload = (override: ConstraintPackOverride | undefined): boolean => !!override && (override.policy !== undefined || override.certificate !== undefined || (override.constraints?.length ?? 0) > 0 || (override.proxies?.length ?? 0) > 0);
@@ -79,7 +104,9 @@ export async function runAdapterExecution(parsed: AdapterRunRequest, opts?: { te
     const evaluation = evaluateConstraintPackFromMetrics(effectivePack, metrics, { certificate: pack.certificate, deltas: pack.deltas, notes: [...(pack.notes ?? []), ...policyNotes], proxy: pack.proxy, ladderTier: pack.ladderTier });
     const traceId = parsed.traceId ?? `adapter:${crypto.randomUUID()}`;
     const trace = recordConstraintPackTrace({ traceId, tenantId: effectiveTenantId, pack: effectivePack, evaluation, metrics, source: { system: "constraint-pack", component: "adapter", tool: effectivePack.id, version: String(effectivePack.version) } });
-    return { traceId, runId: trace.id, verdict: trace.pass ? "PASS" : "FAIL", pass: trace.pass, firstFail: trace.firstFail ?? null, deltas: trace.deltas, certificate: evaluation.certificate ?? null, artifacts: buildConstraintPackArtifacts({ packId: effectivePack.id, traceId: trace.id, certificateHash: evaluation.certificate?.certificateHash ?? null, certificateId: evaluation.certificate?.certificateId ?? null }) };
+    const verdict = trace.pass ? "PASS" : "FAIL";
+    const certificate = evaluation.certificate ?? null;
+    return { traceId, runId: trace.id, verdict, pass: trace.pass, firstFail: normalizeFirstFail({ verdict, firstFail: trace.firstFail ?? null, certificate, fallbackId: "ADAPTER_CONSTRAINT_FAIL", fallbackNote: "constraint_pack_failed" }), deltas: trace.deltas, certificate, artifacts: buildConstraintPackArtifacts({ packId: effectivePack.id, traceId: trace.id, certificateHash: evaluation.certificate?.certificateHash ?? null, certificateId: evaluation.certificate?.certificateId ?? null }) };
   }
   const proposals = buildActionProposals(actions);
   const proposalCount = proposals?.length ?? 0;
@@ -91,5 +118,7 @@ export async function runAdapterExecution(parsed: AdapterRunRequest, opts?: { te
   const firstFail = terminalAttempt ? findFirstFailingHardConstraint(terminalAttempt.evaluation.constraints) : undefined;
   const baselineParams = result.attempts.length > 0 ? result.attempts[0].proposal.params : undefined;
   const terminalParams = terminalAttempt?.proposal.params;
-  return { traceId, runId: run.id, verdict: result.accepted ? "PASS" : "FAIL", pass: result.accepted, firstFail: firstFail ?? null, deltas: toTrainingTraceDeltas(diffParams(baselineParams as Record<string, unknown> | undefined, terminalParams as Record<string, unknown> | undefined)), certificate: terminalAttempt?.evaluation.certificate ?? null, artifacts: buildArtifactRefs({ runId: run.id, certificateHash: terminalAttempt?.evaluation.certificate.certificateHash, certificateId: terminalAttempt?.evaluation.certificate.certificateId }) };
+  const verdict = result.accepted ? "PASS" : "FAIL";
+  const certificate = terminalAttempt?.evaluation.certificate ?? null;
+  return { traceId, runId: run.id, verdict, pass: result.accepted, firstFail: normalizeFirstFail({ verdict, firstFail: firstFail ?? null, certificate, fallbackId: "ADAPTER_CONSTRAINT_FAIL", fallbackNote: "hard_constraint_failed_or_unavailable" }), deltas: toTrainingTraceDeltas(diffParams(baselineParams as Record<string, unknown> | undefined, terminalParams as Record<string, unknown> | undefined)), certificate, artifacts: buildArtifactRefs({ runId: run.id, certificateHash: terminalAttempt?.evaluation.certificate.certificateHash, certificateId: terminalAttempt?.evaluation.certificate.certificateId }) };
 }

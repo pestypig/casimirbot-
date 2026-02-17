@@ -25,6 +25,42 @@ const setCors = (res: Response) => {
   res.setHeader("Access-Control-Expose-Headers", "traceparent, tracestate");
 };
 
+
+type CanonicalFirstFailClass = "constraint" | "certificate_integrity" | "certificate_status" | "certificate_missing";
+
+const normalizeFailFirstFail = (
+  verdict: "PASS" | "FAIL",
+  firstFail: TrainingTraceConstraint | null | undefined,
+  certificate?: { status?: string; certificateHash?: string | null; integrityOk?: boolean } | null,
+): TrainingTraceConstraint | null => {
+  if (verdict === "PASS") return firstFail ?? null;
+  if (firstFail) return firstFail;
+  const certificateHash = typeof certificate?.certificateHash === "string" ? certificate.certificateHash.trim() : "";
+  const certificateStatus = typeof certificate?.status === "string" ? certificate.status.trim() : "";
+  const canonicalClass: CanonicalFirstFailClass = certificate?.integrityOk === false
+    ? "certificate_integrity"
+    : !certificateHash
+      ? "certificate_missing"
+      : certificateStatus && certificateStatus !== "FAIL"
+        ? "certificate_status"
+        : "constraint";
+  const id = canonicalClass === "certificate_integrity"
+    ? "ADAPTER_CERTIFICATE_INTEGRITY"
+    : canonicalClass === "certificate_missing"
+      ? "ADAPTER_CERTIFICATE_MISSING"
+      : canonicalClass === "certificate_status"
+        ? `ADAPTER_CERTIFICATE_STATUS_${certificateStatus.toUpperCase()}`
+        : "ADAPTER_CONSTRAINT_FAIL";
+  return {
+    id,
+    severity: "HARD",
+    status: "fail",
+    value: null,
+    limit: null,
+    note: `class=${canonicalClass},adapter_fail_without_explicit_firstfail`,
+  };
+};
+
 type RoboticsSafetyGateResult = {
   pass: boolean;
   firstFail?: TrainingTraceConstraint;
@@ -219,7 +255,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         runId: `robotics-veto:${crypto.randomUUID()}`,
         verdict: "FAIL",
         pass: false,
-        firstFail: safety.firstFail ?? null,
+        firstFail: normalizeFailFirstFail("FAIL", safety.firstFail ?? null, safety.certificate),
         deltas: safety.deltas,
         premeditation: premeditationResult,
         certificate: safety.certificate,
@@ -297,7 +333,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
       runId: result.runId,
       verdict: result.verdict,
       pass: result.pass,
-      firstFail: result.firstFail ?? null,
+      firstFail: normalizeFailFirstFail(result.verdict, result.firstFail ?? null, result.certificate as { status?: string; certificateHash?: string | null; integrityOk?: boolean } | null),
       deltas: result.deltas,
       premeditation: premeditationResult,
       certificate: result.certificate ?? null,
