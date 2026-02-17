@@ -290,6 +290,16 @@ const CONCEPTUAL_TOKENS = new Set([
   "methodology",
 ]);
 
+const NON_EVIDENCE_LINE_RE = /navigation hint only;\s*no doc span bound\./i;
+
+const stripNonEvidenceLines = (value: string): string => {
+  if (!value) return value;
+  return value
+    .split(/\r?\n/)
+    .filter((line) => !NON_EVIDENCE_LINE_RE.test(line))
+    .join("\n");
+};
+
 const SMOKE_QUESTION_RE = /\b(smoke)\b.*\brise\b|\brise\b.*\bsmoke\b/i;
 const SMOKE_BAD_RE = /\bsmoke (particles?|plume)?\s*(are|is)\s*(lighter|less dense)\s*than air\b/i;
 const SMOKE_CORE_RE = /\b(hot|warm)\s+air\b|\bbuoyan(t|cy)\b/i;
@@ -1076,7 +1086,8 @@ export function evaluateCoverageSlots(args: {
     return { slots: [], coveredSlots: [], missingSlots: [], ratio: 1 };
   }
 
-  const referenceText = args.referenceText?.toLowerCase() ?? "";
+  const filteredReferenceText = stripNonEvidenceLines(args.referenceText ?? "");
+  const referenceText = filteredReferenceText.toLowerCase();
   const referenceTokensRaw = referenceText ? toTokenSet(referenceText) : new Set<string>();
   const referenceTokens = new Set<string>();
   for (const token of referenceTokensRaw) {
@@ -1086,7 +1097,7 @@ export function evaluateCoverageSlots(args: {
   const pathTokens = new Set<string>();
   const evidencePaths = [
     ...(args.evidencePaths ?? []),
-    ...extractFilePathsFromText(args.referenceText ?? ""),
+    ...extractFilePathsFromText(filteredReferenceText),
   ];
   for (const path of evidencePaths) {
     for (const token of expandPathToken(path)) {

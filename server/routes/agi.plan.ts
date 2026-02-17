@@ -3072,6 +3072,8 @@ const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
   /\b(?:how|why|impact|affect|effects?|societ(y|al)|community|governance|public|policy|scenario|example|examples|trust|rumor|decision|in\s+real\s+world|for\s+a|for\s+an|for\s+the|platform|team|council|school)\b/i;
 const HELIX_ASK_IDEOLOGY_QUERY_CUE_RE =
   /\b(?:mission\s+ethos|ethos|ideology|feedback\s+loop\s+hygiene|civic\s+signal|lifetime\s+trust\s+ledger|radiance\s+to\s+the\s+sun)\b/i;
+const HELIX_ASK_RELATION_QUERY_RE =
+  /\b(?:relate|relation|relationship|related|connect|connection|linked?|mapping|map to|interplay|how .* relates?)\b/i;
 const HELIX_ASK_IDEOLOGY_REPORT_BAN_RE = /\b(?:report|point[s]?|coverage|summary|compare|difference|between|each|step|slot|bullet|section)\b/i;
 const HELIX_ASK_IDEOLOGY_NARRATIVE_GUARD_RE = /\b(do not|don't|avoid|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i;
 const HELIX_ASK_DRIFT_REPAIR = String(process.env.HELIX_ASK_DRIFT_REPAIR ?? "1").trim() !== "0";
@@ -5181,6 +5183,19 @@ function buildHelixAskSearchQueries(
     push("docs/ethos/ideology.json");
     push("docs/ethos/why.md");
     push("mission ethos");
+  }
+  if (HELIX_ASK_RELATION_QUERY_RE.test(normalized)) {
+    push("relationship mapping");
+    push("repo mapping");
+    push("system linkage");
+    push("how does it relate");
+    if (/(warp|bubble|natario|alcubierre)/i.test(normalized)) {
+      push("docs/knowledge/warp/warp-bubble.md");
+    }
+    if (/(mission ethos|ideology|ethos)/i.test(normalized)) {
+      push("docs/knowledge/ethos/mission-ethos.md");
+      push("docs/ethos/ideology.json");
+    }
   }
   if (hasTopic("ledger") || /ledger|stellar ledger|sun ledger|stewardship ledger/i.test(normalized)) {
     push("docs/knowledge/sun-ledger.md");
@@ -12317,6 +12332,21 @@ const SCIENTIFIC_REPORT_HEAD_RE =
 const isScientificMicroReport = (text: string): boolean =>
   Boolean(text && SCIENTIFIC_REPORT_HEAD_RE.test(text));
 
+const enforceUnverifiedHeading = (text: string): string => {
+  if (!text) return text;
+  if (!/^Confirmed:/im.test(text)) return text;
+  return text.replace(/^Confirmed:/im, "Unverified:");
+};
+
+const sanitizeClaimEvidenceRef = (value?: string): string | null => {
+  if (!value) return null;
+  const normalized = (normalizeEvidenceRef(value) ?? value).trim();
+  if (!normalized) return null;
+  const extracted = extractFilePathsFromText(normalized)[0];
+  if (extracted) return extracted;
+  return null;
+};
+
 const extractNextEvidenceLines = (text: string): string[] => {
   if (!text) return [];
   const lines = text.split(/\r?\n/);
@@ -12491,8 +12521,10 @@ const buildScientificMicroReport = (args: {
   if (supportedClaims.length >= 2) {
     const first = supportedClaims[0];
     const second = supportedClaims[1];
-    const firstRef = first.evidenceRefs[0] ? `see ${first.evidenceRefs[0]}` : "see cited evidence";
-    const secondRef = second.evidenceRefs[0] ? `see ${second.evidenceRefs[0]}` : "see cited evidence";
+    const firstRefPath = sanitizeClaimEvidenceRef(first.evidenceRefs[0]);
+    const secondRefPath = sanitizeClaimEvidenceRef(second.evidenceRefs[0]);
+    const firstRef = firstRefPath ? `see ${firstRefPath}` : "see cited evidence";
+    const secondRef = secondRefPath ? `see ${secondRefPath}` : "see cited evidence";
     const firstText = clipAskText(first.text, 160);
     const secondText = clipAskText(second.text, 160);
     lines.push(
@@ -15697,6 +15729,11 @@ const executeHelixAsk = async ({
       evidence_match_ratio?: number;
       evidence_match_count?: number;
       evidence_token_count?: number;
+      evidence_core_required?: boolean;
+      evidence_core_ok?: boolean;
+      evidence_core_match_ratio?: number;
+      evidence_core_match_count?: number;
+      evidence_core_token_count?: number;
       evidence_use_question_tokens?: boolean;
       evidence_signal_tokens?: string[];
       evidence_tokens_preview?: string[];
@@ -18841,6 +18878,13 @@ const executeHelixAsk = async ({
     let runtimeBudgetRecommend: string | null = null;
     let runtimeMustIncludeOk = true;
     let runtimeViabilityMustIncludeOk = true;
+    let evidenceCoreRequired = false;
+    let evidenceCoreGate: EvidenceEligibility = {
+      ok: true,
+      matchCount: 0,
+      tokenCount: 0,
+      matchRatio: 1,
+    };
 
     if (debugPayload && skipMicroPass) {
       debugPayload.micro_pass = false;
@@ -19175,7 +19219,6 @@ const executeHelixAsk = async ({
               slotEvidenceHints,
               graphHintTerms,
             );
-            evidenceUseQuestionTokens = false;
           }
         } else if (slotEvidenceHints.length > 0 || graphHintTerms.length > 0) {
           evidenceSignalTokens = mergeEvidenceSignalTokens(
@@ -19941,9 +19984,18 @@ const executeHelixAsk = async ({
               coverageSlotAliases,
               slotEvidenceHints,
             );
-            evidenceUseQuestionTokens = false;
           }
         }
+        evidenceCoreRequired =
+          (intentDomain === "repo" || intentDomain === "hybrid") &&
+          requiresRepoEvidence;
+        const baseCoreEvidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
+          minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+          minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+          signalTokens: [],
+          useQuestionTokens: true,
+        });
+        evidenceCoreGate = baseCoreEvidenceGate;
         const baseEvidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
           minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
           minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
@@ -19962,6 +20014,9 @@ const executeHelixAsk = async ({
             : null;
         if (evidenceCritic && evidenceCritic.tokenCount > 0) {
           evidenceGate = evidenceCritic;
+        }
+        if (evidenceCoreRequired && !evidenceCoreGate.ok) {
+          evidenceGate = { ...evidenceGate, ok: false };
         }
         if (debugPayload && HELIX_ASK_EVIDENCE_CRITIC) {
           debugPayload.evidence_critic_applied = true;
@@ -20113,7 +20168,14 @@ const executeHelixAsk = async ({
               signalTokens: evidenceSignalTokens,
               useQuestionTokens: evidenceUseQuestionTokens,
             });
+            const repoCoreEvidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
+              minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+              minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+              signalTokens: [],
+              useQuestionTokens: true,
+            });
             evidenceGate = repoEvidenceGate;
+            evidenceCoreGate = repoCoreEvidenceGate;
             if (HELIX_ASK_EVIDENCE_CRITIC) {
               const repoCritic = evaluateEvidenceCritic(baseQuestion, contextText, {
                 minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
@@ -20131,6 +20193,9 @@ const executeHelixAsk = async ({
                 debugPayload.evidence_critic_count = repoCritic.matchCount;
                 debugPayload.evidence_critic_tokens = repoCritic.tokenCount;
               }
+            }
+            if (evidenceCoreRequired && !evidenceCoreGate.ok) {
+              evidenceGate = { ...evidenceGate, ok: false };
             }
             mustIncludeOk = topicProfile
               ? topicMustIncludeSatisfied(extractFilePathsFromText(contextText), topicProfile)
@@ -20219,7 +20284,10 @@ const executeHelixAsk = async ({
           : 0;
         const channelCoverage =
           HELIX_ASK_CHANNELS.filter((channel) => channelHits[channel] > 0).length / HELIX_ASK_CHANNELS.length;
-        let retrievalConfidence = evidenceGate.matchRatio;
+        const retrievalEvidenceRatio = evidenceCoreRequired
+          ? Math.min(evidenceGate.matchRatio, evidenceCoreGate.matchRatio)
+          : evidenceGate.matchRatio;
+        let retrievalConfidence = retrievalEvidenceRatio;
         if (mustIncludeOk) retrievalConfidence += 0.15;
         if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
         if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
@@ -20228,7 +20296,9 @@ const executeHelixAsk = async ({
         if (queryHitCount >= 2) retrievalConfidence += 0.05;
         if (channelCoverage >= 0.67) retrievalConfidence += 0.05;
         if (scoreGap >= 0.02 || topScore >= 0.05) retrievalConfidence += 0.05;
-        if (evidenceGate.matchCount === 0) retrievalConfidence = 0;
+        if (evidenceGate.matchCount === 0 || (evidenceCoreRequired && evidenceCoreGate.matchCount === 0)) {
+          retrievalConfidence = 0;
+        }
         retrievalConfidence = Math.min(1, Math.max(0, retrievalConfidence));
         if (debugPayload) {
           debugPayload.topic_must_include_ok = mustIncludeOk;
@@ -20247,6 +20317,7 @@ const executeHelixAsk = async ({
             `ratio=${evidenceGate.matchRatio.toFixed(2)}`,
             `count=${evidenceGate.matchCount}`,
             `tokens=${evidenceGate.tokenCount}`,
+            `core=${evidenceCoreGate.matchCount}/${evidenceCoreGate.tokenCount}`,
             `confidence=${retrievalConfidence.toFixed(2)}`,
           ].join(" | "),
           undefined,
@@ -20255,6 +20326,9 @@ const executeHelixAsk = async ({
             ratio: Number(evidenceGate.matchRatio.toFixed(3)),
             count: evidenceGate.matchCount,
             tokenCount: evidenceGate.tokenCount,
+            coreRatio: Number(evidenceCoreGate.matchRatio.toFixed(3)),
+            coreCount: evidenceCoreGate.matchCount,
+            coreTokenCount: evidenceCoreGate.tokenCount,
             retrievalConfidence: Number(retrievalConfidence.toFixed(3)),
             docShare: Number(docShare.toFixed(3)),
             docHits: docsHits.length,
@@ -20272,6 +20346,11 @@ const executeHelixAsk = async ({
           debugPayload.evidence_match_ratio = evidenceGate.matchRatio;
           debugPayload.evidence_match_count = evidenceGate.matchCount;
           debugPayload.evidence_token_count = evidenceGate.tokenCount;
+          debugPayload.evidence_core_required = evidenceCoreRequired;
+          debugPayload.evidence_core_ok = evidenceCoreGate.ok;
+          debugPayload.evidence_core_match_ratio = evidenceCoreGate.matchRatio;
+          debugPayload.evidence_core_match_count = evidenceCoreGate.matchCount;
+          debugPayload.evidence_core_token_count = evidenceCoreGate.tokenCount;
           debugPayload.evidence_use_question_tokens = evidenceUseQuestionTokens;
           debugPayload.evidence_signal_tokens = evidenceSignalTokens.slice(0, 12);
           debugPayload.evidence_tokens_preview = evidenceTokensPreview.slice(0, 12);
@@ -20388,6 +20467,7 @@ const executeHelixAsk = async ({
           [
             `match=${evidenceGate.matchCount}/${evidenceGate.tokenCount}`,
             `ratio=${evidenceGate.matchRatio.toFixed(2)}`,
+            `core=${evidenceCoreGate.matchCount}/${evidenceCoreGate.tokenCount}`,
             `mustInclude=${mustIncludeOk ? "ok" : "missing"}`,
             `planMust=${planMustIncludeOk ? "ok" : "missing"}`,
             `viability=${runtimeViabilityMustIncludeOk ? "ok" : "missing"}`,
@@ -20464,7 +20544,14 @@ const executeHelixAsk = async ({
             signalTokens: evidenceSignalTokens,
             useQuestionTokens: evidenceUseQuestionTokens,
           });
+          const attemptCoreEvidenceGate = evaluateEvidenceEligibility(baseQuestion, contextText, {
+            minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
+            minRatio: HELIX_ASK_EVIDENCE_MATCH_MIN_RATIO,
+            signalTokens: [],
+            useQuestionTokens: true,
+          });
           evidenceGate = attemptEvidenceGate;
+          evidenceCoreGate = attemptCoreEvidenceGate;
           if (HELIX_ASK_EVIDENCE_CRITIC) {
             const attemptCritic = evaluateEvidenceCritic(baseQuestion, contextText, {
               minTokens: HELIX_ASK_EVIDENCE_MATCH_MIN_TOKENS,
@@ -20482,6 +20569,9 @@ const executeHelixAsk = async ({
               debugPayload.evidence_critic_count = attemptCritic.matchCount;
               debugPayload.evidence_critic_tokens = attemptCritic.tokenCount;
             }
+          }
+          if (evidenceCoreRequired && !evidenceCoreGate.ok) {
+            evidenceGate = { ...evidenceGate, ok: false };
           }
           mustIncludeOk =
             typeof topicMustIncludeOk === "boolean"
@@ -20569,7 +20659,10 @@ const executeHelixAsk = async ({
           const attemptChannelCoverage =
             HELIX_ASK_CHANNELS.filter((channel) => attemptChannelHits[channel] > 0).length /
             HELIX_ASK_CHANNELS.length;
-          retrievalConfidence = evidenceGate.matchRatio;
+          const attemptEvidenceRatio = evidenceCoreRequired
+            ? Math.min(evidenceGate.matchRatio, evidenceCoreGate.matchRatio)
+            : evidenceGate.matchRatio;
+          retrievalConfidence = attemptEvidenceRatio;
           if (mustIncludeOk) retrievalConfidence += 0.15;
           if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
           if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
@@ -20578,7 +20671,9 @@ const executeHelixAsk = async ({
           if (attemptQueryHits >= 2) retrievalConfidence += 0.05;
           if (attemptChannelCoverage >= 0.67) retrievalConfidence += 0.05;
           if (attemptScoreGap >= 0.02 || attemptTopScore >= 0.05) retrievalConfidence += 0.05;
-          if (evidenceGate.matchCount === 0) retrievalConfidence = 0;
+          if (evidenceGate.matchCount === 0 || (evidenceCoreRequired && evidenceCoreGate.matchCount === 0)) {
+            retrievalConfidence = 0;
+          }
           retrievalConfidence = Math.min(1, Math.max(0, retrievalConfidence));
           evidenceGateOk = evidenceGate.ok;
           if (debugPayload) {
@@ -20586,6 +20681,11 @@ const executeHelixAsk = async ({
             debugPayload.evidence_match_ratio = evidenceGate.matchRatio;
             debugPayload.evidence_match_count = evidenceGate.matchCount;
             debugPayload.evidence_token_count = evidenceGate.tokenCount;
+            debugPayload.evidence_core_required = evidenceCoreRequired;
+            debugPayload.evidence_core_ok = evidenceCoreGate.ok;
+            debugPayload.evidence_core_match_ratio = evidenceCoreGate.matchRatio;
+            debugPayload.evidence_core_match_count = evidenceCoreGate.matchCount;
+            debugPayload.evidence_core_token_count = evidenceCoreGate.tokenCount;
             debugPayload.context_files = result.files;
             debugPayload.queries = queries;
             debugPayload.retrieval_confidence = retrievalConfidence;
@@ -20625,6 +20725,7 @@ const executeHelixAsk = async ({
             `match=${evidenceGate.matchCount}/${evidenceGate.tokenCount}`,
             [
               `ratio=${evidenceGate.matchRatio.toFixed(2)}`,
+              `core=${evidenceCoreGate.matchCount}/${evidenceCoreGate.tokenCount}`,
               `mustInclude=${mustIncludeOk ? "ok" : "missing"}`,
               `files=${result.files.length}`,
             ].join(" | "),
@@ -22068,18 +22169,25 @@ const executeHelixAsk = async ({
           debugPayload.ambiguity_gate_applied = true;
         }
       }
+      const relationQuery = HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion);
+      const relationCoverageWeak =
+        relationQuery &&
+        ((coverageSlotSummary?.coveredSlots.length ?? 0) < 2 &&
+          (docSlotSummary?.coveredSlots.length ?? 0) < 2);
       const shouldClarifyNow =
         !promptIngested &&
         (intentDomain === "repo" || intentDomain === "hybrid") &&
         requiresRepoEvidence &&
         ((claimGateFailed &&
-          (!evidenceGateOk ||
+          (relationQuery ||
+            !evidenceGateOk ||
             definitionDocMissing ||
             slotCoverageFailed ||
             docSlotCoverageFailed)) ||
+          relationCoverageWeak ||
           (!evidenceGateOk && ambiguityTerms.length > 0));
       const skipIdeologyClarify =
-        isIdeologyReferenceIntent && Boolean(conceptMatch);
+        isIdeologyReferenceIntent && Boolean(conceptMatch) && !relationQuery;
       if (shouldClarifyNow && !forcedAnswer && intentStrategy !== "constraint_report" && !skipIdeologyClarify) {
         const clarifyLine = clarifyOverride ?? buildAmbiguityClarifyLine([]);
         if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
@@ -24404,6 +24512,10 @@ const executeHelixAsk = async ({
             debugPayload.answer_short_fallback_reason = scientificFallbackReason;
           }
         }
+      }
+      if (claimGateFailed && (intentDomain === "repo" || intentDomain === "hybrid")) {
+        cleaned = enforceUnverifiedHeading(cleaned);
+        answerPath.push("claimGate:force_unverified");
       }
       cleaned = sanitizeSourcesLine(
         cleaned,

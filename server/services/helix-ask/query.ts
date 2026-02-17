@@ -112,6 +112,16 @@ const HELIX_ASK_META_TOKENS = new Set([
   "two",
 ]);
 
+const NON_EVIDENCE_LINE_RE = /navigation hint only;\s*no doc span bound\./i;
+
+const stripNonEvidenceLines = (value: string): string => {
+  if (!value) return value;
+  return value
+    .split(/\r?\n/)
+    .filter((line) => !NON_EVIDENCE_LINE_RE.test(line))
+    .join("\n");
+};
+
 export function tokenizeAskQuery(input: string): string[] {
   return input
     .toLowerCase()
@@ -150,7 +160,7 @@ const buildEligibilityTokens = (
 
 const countTokenMatches = (tokens: string[], haystack: string): number => {
   if (!tokens.length) return 0;
-  const lower = haystack.toLowerCase();
+  const lower = stripNonEvidenceLines(haystack).toLowerCase();
   let count = 0;
   for (const token of tokens) {
     if (lower.includes(token)) {
