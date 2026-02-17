@@ -3074,6 +3074,10 @@ const HELIX_ASK_IDEOLOGY_QUERY_CUE_RE =
   /\b(?:mission\s+ethos|ethos|ideology|feedback\s+loop\s+hygiene|civic\s+signal|lifetime\s+trust\s+ledger|radiance\s+to\s+the\s+sun)\b/i;
 const HELIX_ASK_RELATION_QUERY_RE =
   /\b(?:relate|relation|relationship|related|connect|connection|linked?|mapping|map to|interplay|how .* relates?)\b/i;
+const HELIX_ASK_RELATION_WARP_ANCHOR_RE =
+  /(^|\/)(docs\/knowledge\/warp\/|modules\/warp\/|docs\/warp-console-architecture\.md|docs\/theta-semantics\.md)/i;
+const HELIX_ASK_RELATION_ETHOS_ANCHOR_RE =
+  /(^|\/)(docs\/ethos\/|docs\/knowledge\/ethos\/|server\/routes\/ethos\.ts|client\/src\/components\/MissionEthosSourcePanel\.tsx|client\/src\/lib\/ideology-types\.ts)/i;
 const HELIX_ASK_IDEOLOGY_REPORT_BAN_RE = /\b(?:report|point[s]?|coverage|summary|compare|difference|between|each|step|slot|bullet|section)\b/i;
 const HELIX_ASK_IDEOLOGY_NARRATIVE_GUARD_RE = /\b(do not|don't|avoid|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i;
 const HELIX_ASK_DRIFT_REPAIR = String(process.env.HELIX_ASK_DRIFT_REPAIR ?? "1").trim() !== "0";
@@ -8619,7 +8623,7 @@ function extractContextFromPrompt(prompt: string): string {
     });
   }
 
-  function normalizeScaffoldText(value: string): string {
+function normalizeScaffoldText(value: string): string {
     const lines = value
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -8633,20 +8637,44 @@ function extractContextFromPrompt(prompt: string): string {
   return trimmed.join("\n");
 }
 
+function filterExistingEvidencePaths(paths: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of paths) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    if (/^(gate|certificate):/i.test(trimmed)) {
+      if (!seen.has(trimmed)) {
+        seen.add(trimmed);
+        out.push(trimmed);
+      }
+      continue;
+    }
+    const normalized = (normalizeEvidenceRef(trimmed) ?? trimmed).replace(/\\/g, "/");
+    if (!normalized) continue;
+    const fullPath = path.resolve(process.cwd(), normalized);
+    if (!fs.existsSync(fullPath)) continue;
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
 function resolveEvidencePaths(
   evidence: string,
   contextFiles: string[],
   contextText?: string,
   limit = 6,
 ): string[] {
-  const evidencePaths = extractFilePathsFromText(evidence);
+  const evidencePaths = filterExistingEvidencePaths(extractFilePathsFromText(evidence));
   if (evidencePaths.length > 0) {
     return Array.from(new Set(evidencePaths)).slice(0, limit);
   }
-  const contextPaths = [
+  const contextPaths = filterExistingEvidencePaths([
     ...contextFiles.filter(Boolean),
     ...(contextText ? extractFilePathsFromText(contextText) : []),
-  ];
+  ]);
   if (contextPaths.length === 0) return [];
   return Array.from(new Set(contextPaths)).slice(0, limit);
 }
@@ -11473,6 +11501,34 @@ const buildHelixAskAnswerContractFieldFillPrompt = (
   lines.push("");
   lines.push("Current contract:");
   lines.push(JSON.stringify(contract));
+  return lines.join("\n");
+};
+
+const buildHelixAskAnswerContractRepairPrompt = (args: {
+  question: string;
+  evidence: string;
+  format: HelixAskFormat;
+  raw: string;
+}): string => {
+  const lines: string[] = [];
+  lines.push("You are Helix Ask answer-contract JSON repair.");
+  lines.push("Task: convert malformed contract output into strict JSON matching the schema.");
+  lines.push("Return strict JSON only. Do NOT include markdown or commentary.");
+  lines.push(
+    'Schema: {"summary":"string","claims":[{"text":"string","evidence":["citation"]}],"steps":["string"],"comparisons":[{"label":"string","detail":"string","evidence":["citation"]}],"uncertainty":"string","sources":["citation"]}.',
+  );
+  lines.push("Use only citation identifiers that appear in the evidence list.");
+  lines.push("Do not invent claims beyond the malformed input and evidence.");
+  lines.push(`Target format: ${args.format}.`);
+  lines.push("");
+  lines.push("Question:");
+  lines.push(clipAskText(args.question, 600));
+  lines.push("");
+  lines.push("Evidence:");
+  lines.push(clipAskText(args.evidence || "No evidence available.", 2200));
+  lines.push("");
+  lines.push("Malformed contract payload:");
+  lines.push(clipAskText(args.raw || "", 2200));
   return lines.join("\n");
 };
 
@@ -20488,10 +20544,10 @@ const executeHelixAsk = async ({
           "Retrieval channels",
           "ok",
           [
-            `hits=lex:${channelHits.lexical},sym:${channelHits.symbol},fuz:${channelHits.fuzzy}`,
+            `hits=lex:${channelHits.lexical},sym:${channelHits.symbol},fuz:${channelHits.fuzzy},path:${channelHits.path}`,
             `tops=lex:${channelTopScores.lexical.toFixed(2)},sym:${channelTopScores.symbol.toFixed(
               2,
-            )},fuz:${channelTopScores.fuzzy.toFixed(2)}`,
+            )},fuz:${channelTopScores.fuzzy.toFixed(2)},path:${channelTopScores.path.toFixed(2)}`,
           ].join(" | "),
         );
         recordControllerStep({
@@ -20759,10 +20815,10 @@ const executeHelixAsk = async ({
             "Retrieval channels",
             "ok",
             [
-              `hits=lex:${attemptChannelHits.lexical},sym:${attemptChannelHits.symbol},fuz:${attemptChannelHits.fuzzy}`,
+              `hits=lex:${attemptChannelHits.lexical},sym:${attemptChannelHits.symbol},fuz:${attemptChannelHits.fuzzy},path:${attemptChannelHits.path}`,
               `tops=lex:${attemptChannelTopScores.lexical.toFixed(2)},sym:${attemptChannelTopScores.symbol.toFixed(
                 2,
-              )},fuz:${attemptChannelTopScores.fuzzy.toFixed(2)}`,
+              )},fuz:${attemptChannelTopScores.fuzzy.toFixed(2)},path:${attemptChannelTopScores.path.toFixed(2)}`,
             ].join(" | "),
             startedAt,
           );
@@ -22170,6 +22226,19 @@ const executeHelixAsk = async ({
         }
       }
       const relationQuery = HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion);
+      const relationAnchorsRequired =
+        relationQuery &&
+        /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(baseQuestion) &&
+        /\b(mission ethos|ethos|ideology)\b/i.test(baseQuestion);
+      const relationAnchorPaths = extractFilePathsFromText(contextText);
+      const relationWarpAnchorOk = relationAnchorPaths.some((filePath) =>
+        HELIX_ASK_RELATION_WARP_ANCHOR_RE.test(filePath),
+      );
+      const relationEthosAnchorOk = relationAnchorPaths.some((filePath) =>
+        HELIX_ASK_RELATION_ETHOS_ANCHOR_RE.test(filePath),
+      );
+      const relationAnchorMissing =
+        relationAnchorsRequired && (!relationWarpAnchorOk || !relationEthosAnchorOk);
       const relationCoverageWeak =
         relationQuery &&
         ((coverageSlotSummary?.coveredSlots.length ?? 0) < 2 &&
@@ -22184,6 +22253,7 @@ const executeHelixAsk = async ({
             definitionDocMissing ||
             slotCoverageFailed ||
             docSlotCoverageFailed)) ||
+          relationAnchorMissing ||
           relationCoverageWeak ||
           (!evidenceGateOk && ambiguityTerms.length > 0));
       const skipIdeologyClarify =
@@ -22312,8 +22382,17 @@ const executeHelixAsk = async ({
       }
 
       const generalEvidence = promptScaffold || generalScaffold;
+      const repoPromptPaths = filterExistingEvidencePaths([
+        ...contextFiles,
+        ...promptContextFiles,
+        ...extractFilePathsFromText(contextText),
+        ...extractFilePathsFromText(promptContextText),
+      ]);
+      const repoScaffoldForPrompt = repoScaffold
+        ? scrubUnsupportedPaths(repoScaffold, repoPromptPaths).text || repoScaffold
+        : repoScaffold;
       if (intentStrategy === "hybrid_explain" && generalEvidence) {
-        const hasRepoEvidence = !forceHybridNoEvidence && Boolean(repoScaffold.trim());
+        const hasRepoEvidence = !forceHybridNoEvidence && Boolean(repoScaffoldForPrompt.trim());
         if (conceptMatch) {
           const coreSentences: string[] = [];
           if (conceptMatch.card.definition) {
@@ -22330,7 +22409,7 @@ const executeHelixAsk = async ({
           const paragraph1 = coreSentences.join(" ").trim();
           let paragraph2 = "";
           if (hasRepoEvidence) {
-            paragraph2 = collapseEvidenceBullets(repoScaffold);
+            paragraph2 = collapseEvidenceBullets(repoScaffoldForPrompt);
           } else {
             paragraph2 =
               "No repo evidence was found for this system mapping; please point to the relevant files or modules.";
@@ -22350,7 +22429,7 @@ const executeHelixAsk = async ({
         const hybridPrompt = buildHelixAskHybridPrompt(
           baseQuestion,
           generalEvidence,
-          repoScaffold,
+          repoScaffoldForPrompt,
           hasRepoEvidence,
           formatSpec.format,
           formatSpec.stageTags,
@@ -22360,7 +22439,7 @@ const executeHelixAsk = async ({
           toolResultsBlock,
         );
         prompt = ensureFinalMarker(hybridPrompt);
-        evidenceText = [repoScaffold, generalEvidence, constraintEvidenceText]
+        evidenceText = [repoScaffoldForPrompt, generalEvidence, constraintEvidenceText]
           .filter(Boolean)
           .join("\n\n");
         if (debugPayload) {
@@ -22368,8 +22447,8 @@ const executeHelixAsk = async ({
           if (generalEvidence) {
             cards.push(`General reasoning:\n${generalEvidence}`);
           }
-          if (repoScaffold) {
-            cards.push(`Repo evidence:\n${repoScaffold}`);
+          if (repoScaffoldForPrompt) {
+            cards.push(`Repo evidence:\n${repoScaffoldForPrompt}`);
           }
           if (constraintEvidenceText) {
             cards.push(`Constraint evidence:\n${constraintEvidenceText}`);
@@ -22397,7 +22476,7 @@ const executeHelixAsk = async ({
           prompt = ensureFinalMarker(
             buildHelixAskIdeologySynthesisPrompt(
               baseQuestion,
-              repoScaffold,
+              repoScaffoldForPrompt,
               formatSpec.format,
               formatSpec.stageTags,
               verbosity,
@@ -22410,7 +22489,7 @@ const executeHelixAsk = async ({
           prompt = ensureFinalMarker(
             buildHelixAskSynthesisPrompt(
               baseQuestion,
-              repoScaffold,
+              repoScaffoldForPrompt,
               formatSpec.format,
               formatSpec.stageTags,
               verbosity,
@@ -22419,14 +22498,15 @@ const executeHelixAsk = async ({
             ),
           );
         }
-        evidenceText = pipelineEvidence ?? repoScaffold;
-        if (debugPayload && repoScaffold) {
-          debugPayload.evidence_cards = pipelineEvidence ?? repoScaffold;
+        evidenceText = pipelineEvidence ?? repoScaffoldForPrompt;
+        if (debugPayload && repoScaffoldForPrompt) {
+          debugPayload.evidence_cards = pipelineEvidence ?? repoScaffoldForPrompt;
         }
+        const synthesisSources = resolveEvidencePaths(evidenceText, contextFiles, contextText, 8);
         logEvent(
           "Synthesis prompt ready",
           ideologySynthesis ? "repo_ideology" : "repo",
-          formatFileList(extractFilePathsFromText(evidenceText)),
+          formatFileList(synthesisSources),
         );
       } else if (promptScaffold) {
         prompt = ensureFinalMarker(
@@ -22872,20 +22952,133 @@ const executeHelixAsk = async ({
                 },
               );
             } else {
-              logStepEnd(
-                "LLM answer contract primary",
-                "parse_fail",
-                contractPrimaryStart,
-                false,
-                {
-                  textLength:
-                    typeof contractPrimaryCall?.text === "string"
-                      ? contractPrimaryCall.text.length
-                      : 0,
-                  fn: "runHelixAskLocalWithOverflowRetry",
-                  label: "answer_contract_primary",
-                },
-              );
+              let recoveredContract = false;
+              if (
+                !fastQualityMode ||
+                canStartHelperCall("answer_contract_primary_repair", FAST_QUALITY_FINALIZE_BY_MS)
+              ) {
+                const contractRepairTokens = clampNumber(
+                  Math.round(contractPrimaryTokens * 0.9),
+                  128,
+                  512,
+                );
+                const contractRepairStart = logStepStart(
+                  "LLM answer contract repair",
+                  `tokens=${contractRepairTokens}`,
+                  {
+                    maxTokens: contractRepairTokens,
+                    fn: "runHelixAskLocalWithOverflowRetry",
+                    label: "answer_contract_primary_repair",
+                    prompt: "buildHelixAskAnswerContractRepairPrompt",
+                  },
+                );
+                const repairPrompt = buildHelixAskAnswerContractRepairPrompt({
+                  question: baseQuestion,
+                  evidence: appendEvidenceSources(evidenceText, contextFiles, 8, contextText),
+                  format: formatSpec.format,
+                  raw: contractPrimaryCall.text ?? "",
+                });
+                const contractRepairHelperResult = await runHelperWithRuntimeGuard(
+                  "answer_contract_primary_repair",
+                  FAST_QUALITY_FINALIZE_BY_MS,
+                  () =>
+                    runHelixAskLocalWithOverflowRetry(
+                      {
+                        prompt: repairPrompt,
+                        max_tokens: contractRepairTokens,
+                        temperature: Math.min(parsed.data.temperature ?? 0.2, 0.25),
+                        seed: parsed.data.seed,
+                        stop: parsed.data.stop,
+                      },
+                      {
+                        personaId,
+                        sessionId: parsed.data.sessionId,
+                        traceId: askTraceId,
+                      },
+                      {
+                        fallbackMaxTokens: contractRepairTokens,
+                        allowContextDrop: true,
+                        label: "answer_contract_primary_repair",
+                      },
+                    ),
+                );
+                if (!contractRepairHelperResult) {
+                  pushFastQualityDecision(
+                    "answer_contract_primary_repair",
+                    "deadline",
+                    "helper_timeout_fallback",
+                  );
+                  logStepEnd(
+                    "LLM answer contract repair",
+                    "timeout",
+                    contractRepairStart,
+                    false,
+                    {
+                      fn: "runHelixAskLocalWithOverflowRetry",
+                      label: "answer_contract_primary_repair",
+                      error: "helper_timeout_fallback",
+                    },
+                  );
+                } else {
+                  const { result: contractRepairCall, overflow: contractRepairOverflow } =
+                    contractRepairHelperResult;
+                  recordOverflow("answer_contract_primary_repair", contractRepairOverflow);
+                  const repairedPrimaryContract = parseHelixAskAnswerContractPayload(
+                    contractRepairCall.text ?? "",
+                  );
+                  if (repairedPrimaryContract) {
+                    primaryContractResult = { text: JSON.stringify(repairedPrimaryContract) };
+                    answerContractPrimaryUsed = true;
+                    recoveredContract = true;
+                    answerPath.push("answerContract:primary_repair");
+                    logStepEnd(
+                      "LLM answer contract repair",
+                      "compiled",
+                      contractRepairStart,
+                      true,
+                      {
+                        textLength:
+                          typeof contractRepairCall?.text === "string"
+                            ? contractRepairCall.text.length
+                            : 0,
+                        fn: "runHelixAskLocalWithOverflowRetry",
+                        label: "answer_contract_primary_repair",
+                      },
+                    );
+                  } else {
+                    logStepEnd(
+                      "LLM answer contract repair",
+                      "parse_fail",
+                      contractRepairStart,
+                      false,
+                      {
+                        textLength:
+                          typeof contractRepairCall?.text === "string"
+                            ? contractRepairCall.text.length
+                            : 0,
+                        fn: "runHelixAskLocalWithOverflowRetry",
+                        label: "answer_contract_primary_repair",
+                      },
+                    );
+                  }
+                }
+              }
+              if (!recoveredContract) {
+                logStepEnd(
+                  "LLM answer contract primary",
+                  "parse_fail",
+                  contractPrimaryStart,
+                  false,
+                  {
+                    textLength:
+                      typeof contractPrimaryCall?.text === "string"
+                        ? contractPrimaryCall.text.length
+                        : 0,
+                    fn: "runHelixAskLocalWithOverflowRetry",
+                    label: "answer_contract_primary",
+                  },
+                );
+              }
             }
           }
         }
@@ -23604,7 +23797,8 @@ const executeHelixAsk = async ({
       const hasRepoCitations = () =>
         extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
       if (!answerContractApplied) {
-        const hasRepoEvidence = intentStrategy === "hybrid_explain" && Boolean(repoScaffold.trim());
+        const hasRepoEvidence =
+          intentStrategy === "hybrid_explain" && Boolean(repoScaffoldForPrompt.trim());
         const hasHybridPlaceholder =
           /(map to this system|repo evidence bullets|paragraph\s*2|paragraph\s*1)/i.test(cleaned);
         if (allowHybridFallback && hasRepoEvidence && (!hasRepoCitations() || hasHybridPlaceholder)) {
@@ -23617,9 +23811,9 @@ const executeHelixAsk = async ({
               .trim();
             paragraph1 = clipAskText(collapsed || stripped, 420);
           }
-          let paragraph2 = collapseEvidenceBullets(repoScaffold);
+          let paragraph2 = collapseEvidenceBullets(repoScaffoldForPrompt);
           if (paragraph2 && extractFilePathsFromText(paragraph2).length === 0) {
-            const repoPaths = extractFilePathsFromText(repoScaffold).slice(0, 6);
+            const repoPaths = extractFilePathsFromText(repoScaffoldForPrompt).slice(0, 6);
             if (repoPaths.length) {
               paragraph2 = `${paragraph2} (${repoPaths.join(", ")})`;
             }
@@ -23643,7 +23837,7 @@ const executeHelixAsk = async ({
       const isDocSourcePath = (value: string): boolean => {
         return value.trim().toLowerCase().startsWith("docs/");
       };
-      const allowedSourcePaths = Array.from(
+      const allowedSourcePaths = filterExistingEvidencePaths(Array.from(
         new Set([
           ...conceptSourcePaths,
           ...(
@@ -23652,7 +23846,7 @@ const executeHelixAsk = async ({
               : resolvedEvidencePaths
           ),
         ]),
-      );
+      ));
       cleaned = sanitizeSourcesLine(
         cleaned,
         allowedSourcePaths,

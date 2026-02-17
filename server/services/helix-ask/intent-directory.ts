@@ -201,6 +201,28 @@ const INTENT_PROFILES: HelixAskIntentProfile[] = [
     priority: 49,
   },
   {
+    id: "hybrid.warp_ethos_relation",
+    label: "Warp + ethos relation mapping",
+    domain: "hybrid",
+    tier: "F1",
+    secondaryTier: "F0",
+    strategy: "hybrid_explain",
+    formatPolicy: "compare",
+    stageTags: "on_request",
+    evidencePolicy: {
+      allowRepoCitations: true,
+      requireCitations: true,
+      allowedEvidenceKinds: ["repo_chunk", "prompt_chunk"],
+    },
+    matchers: [
+      /\b(relate|relation|relationship|related|connect|connection|mapping|map to|interplay)\b/i,
+      /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i,
+      /\b(mission ethos|ethos|ideology)\b/i,
+    ],
+    requiresAllMatchers: true,
+    priority: 72,
+  },
+  {
     id: "hybrid.composite_system_synthesis",
     label: "Composite system synthesis",
     domain: "hybrid",
