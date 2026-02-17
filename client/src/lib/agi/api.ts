@@ -71,8 +71,19 @@ export type AtomicViewerLaunch = {
   params: AtomicViewerLaunchParams;
 };
 
+export type LocalAskProof = {
+  verdict?: "PASS" | "FAIL";
+  firstFail?: unknown;
+  certificate?: { certificateHash?: string | null; integrityOk?: boolean | null } | null;
+  artifacts?: Array<{ kind: string; ref: string; label?: string }>;
+  evidence?: unknown[];
+};
+
 export type LocalAskResponse = {
   text: string;
+  mode?: "read" | "observe" | "act" | "verify";
+  action?: { tool?: string; output?: unknown };
+  proof?: LocalAskProof;
   envelope?: HelixAskResponseEnvelope;
   viewer_launch?: AtomicViewerLaunch;
   model?: string;
@@ -887,6 +898,10 @@ export async function askLocal(
     topK?: number;
     context?: string;
     signal?: AbortSignal;
+    mode?: "read" | "observe" | "act" | "verify";
+    allowTools?: string[];
+    requiredEvidence?: string[];
+    verify?: { mode?: "constraint-pack" | "agent-loop"; packId?: string };
   },
 ): Promise<LocalAskResponse> {
   const body: Record<string, unknown> = {};
@@ -917,6 +932,10 @@ export async function askLocal(
   if (typeof options?.context === "string" && options.context.trim()) {
     body.context = options.context;
   }
+  if (options?.mode) body.mode = options.mode;
+  if (options?.allowTools?.length) body.allowTools = options.allowTools;
+  if (options?.requiredEvidence?.length) body.requiredEvidence = options.requiredEvidence;
+  if (options?.verify) body.verify = options.verify;
   const signal = options?.signal;
   if (isNavigatorOffline()) {
     await waitForOnline(signal);

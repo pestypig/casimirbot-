@@ -112,6 +112,12 @@ import { telemetryCrosscheckDocsHandler, telemetryCrosscheckDocsSpec } from "../
 import { repoGraphSearchHandler, repoGraphSearchSpec } from "../skills/repo.graph.search";
 import { repoDiffReviewHandler, repoDiffReviewSpec } from "../skills/repo.diff.review";
 import { repoPatchSimulateHandler, repoPatchSimulateSpec } from "../skills/repo.patch.simulate";
+import { timeDilationDiagnosticsGetHandler, timeDilationDiagnosticsGetSpec } from "../skills/telemetry.time_dilation.diagnostics.get";
+import { timeDilationControlSetHandler, timeDilationControlSetSpec, timeDilationControlGetHandler, timeDilationControlGetSpec, timeDilationControlClearHandler, timeDilationControlClearSpec } from "../skills/telemetry.time_dilation.control";
+import { physicsCurvatureRunHandler, physicsCurvatureRunSpec } from "../skills/physics.curvature.run";
+import { physicsCurvatureResultGetHandler, physicsCurvatureResultGetSpec } from "../skills/physics.curvature.result.get";
+import { starSolarCurvatureRunHandler, starSolarCurvatureRunSpec } from "../skills/star.solar_curvature.run";
+import { runAdapterExecution } from "../services/adapter/run";
 import {
   matchHelixAskIntent,
   getDefaultHelixAskIntentProfile,
@@ -2322,6 +2328,18 @@ function selectToolForGoal(goal: string, manifest: ToolManifestEntry[]): string 
   if (hasTool("vision.http.describe") && contains(normalized, /\b(image|photo|picture|screenshot|diagram|figure)\b/)) {
     return "vision.http.describe";
   }
+  if (hasTool("telemetry.time_dilation.diagnostics.get") && contains(normalized, /(time\s*dilation|diagnostics|observe)/)) {
+    return "telemetry.time_dilation.diagnostics.get";
+  }
+  if (hasTool("telemetry.time_dilation.control.set") && contains(normalized, /(set|update|apply|control).*(time\s*dilation|warp)/)) {
+    return "telemetry.time_dilation.control.set";
+  }
+  if (hasTool("physics.curvature.run") && contains(normalized, /(run|execute).*(curvature|simulation|sim)/)) {
+    return "physics.curvature.run";
+  }
+  if (hasTool("physics.curvature.result.get") && contains(normalized, /(curvature).*(result|get)/)) {
+    return "physics.curvature.result.get";
+  }
   if (hasTool(sttWhisperSpec.name) && contains(normalized, /\b(audio|transcribe|speech|voice|recording)\b/)) {
     return sttWhisperSpec.name;
   }
@@ -2611,7 +2629,7 @@ const HELIX_ASK_SINGLE_LLM =
 const HELIX_ASK_ANSWER_CONTRACT_PRIMARY =
   String(process.env.HELIX_ASK_ANSWER_CONTRACT_PRIMARY ?? "1").trim() !== "0";
 const HELIX_ASK_EVIDENCE_CARDS_LLM =
-  String(process.env.HELIX_ASK_EVIDENCE_CARDS_LLM ?? "1").trim() !== "0";
+  String(process.env.HELIX_ASK_EVIDENCE_CARDS_LLM ?? "0").trim() !== "0";
 const HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE = clampNumber(
   readNumber(
     process.env.HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE ??
@@ -3093,7 +3111,7 @@ const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
 const HELIX_ASK_IDEOLOGY_QUERY_CUE_RE =
   /\b(?:mission\s+ethos|ethos|ideology|feedback\s+loop\s+hygiene|civic\s+signal|lifetime\s+trust\s+ledger|radiance\s+to\s+the\s+sun)\b/i;
 const HELIX_ASK_RELATION_QUERY_RE =
-  /\b(?:relate|relation|relationship|related|connect|connection|linked?|mapping|map to|interplay|how .* relates?)\b/i;
+  /\b(?:relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay|how .* relates?)\b/i;
 const HELIX_ASK_RELATION_WARP_ANCHOR_RE =
   /(^|\/)(docs\/knowledge\/warp\/|modules\/warp\/|docs\/warp-console-architecture\.md|docs\/theta-semantics\.md)/i;
 const HELIX_ASK_RELATION_ETHOS_ANCHOR_RE =
@@ -10638,10 +10656,10 @@ function buildHelixAskIdeologySynthesisPrompt(
   const effectSentenceBudget =
     verbosity === "brief" ? "2-3" : verbosity === "normal" ? "2-4" : "2-4";
   const allowTechnicalAppendix =
-    /(include|add|with|show|provide|give|append)[\s\S]{0,40}(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)/i.test(
+    /\b(include|add|with|show|provide|give|append)\b[\s\S]{0,40}\b(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)\b/i.test(
       question,
     ) &&
-    !/(do not|don't|avoid|without|instead of|switch to plain-language)[\s\S]{0,120}(technical\s+notes?|compare\/report|report\s+format|report\s+mode)/i.test(
+    !/\b(do not|don't|avoid|without|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i.test(
       question,
     );
   if (conversationSeed) {
@@ -11962,6 +11980,15 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
     traceId: z.string().min(1).max(128).optional(),
     personaId: z.string().min(1).optional(),
     tuning: HelixAskTuningOverrides.optional(),
+    mode: z.enum(["read", "observe", "act", "verify"]).optional(),
+    allowTools: z.array(z.string().min(1)).max(24).optional(),
+    requiredEvidence: z.array(z.string().min(1)).max(24).optional(),
+    verify: z
+      .object({
+        mode: z.enum(["constraint-pack", "agent-loop"]).optional(),
+        packId: z.string().optional(),
+      })
+      .optional(),
   })
   .refine((value) => Boolean(value.prompt || value.question), {
     message: "prompt or question required",
@@ -12471,7 +12498,7 @@ const sanitizePlanClarifyLine = (value: string): string => {
   if (/did not cover key terms from the question/i.test(line)) {
     return "Repo evidence was required by the question but could not be confirmed. Please point to the relevant files or clarify the term.";
   }
-  if (/(?:[a-z0-9]+(?:-[a-z0-9]+)*-tree)/i.test(line)) {
+  if (/(?:\b[a-z0-9]+(?:-[a-z0-9]+)*-tree\b)/i.test(line)) {
     return "Repo evidence was incomplete for this request. Please point to the relevant files or clarify the term.";
   }
   return line;
@@ -14521,6 +14548,13 @@ async function ensureDefaultTools(): Promise<void> {
       console.warn(`[agi.plan] HULL_MODE: skipping external vision.http.describe (${visionHttpBase})`);
     }
   }
+  registerTool({ ...timeDilationDiagnosticsGetSpec, handler: timeDilationDiagnosticsGetHandler });
+  registerTool({ ...timeDilationControlSetSpec, handler: timeDilationControlSetHandler });
+  registerTool({ ...timeDilationControlGetSpec, handler: timeDilationControlGetHandler });
+  registerTool({ ...timeDilationControlClearSpec, handler: timeDilationControlClearHandler });
+  registerTool({ ...physicsCurvatureRunSpec, handler: physicsCurvatureRunHandler });
+  registerTool({ ...physicsCurvatureResultGetSpec, handler: physicsCurvatureResultGetHandler });
+  registerTool({ ...starSolarCurvatureRunSpec, handler: starSolarCurvatureRunHandler });
   if (process.env.ENABLE_PHYSICS === "1" && !getTool(PHYSICS_TOOL_NAME)) {
     const { curvatureUnitSpec, curvatureUnitHandler } = await import("../skills/physics.curvature");
     registerTool({ ...curvatureUnitSpec, handler: curvatureUnitHandler });
@@ -15211,6 +15245,70 @@ const executeHelixAsk = async ({
     let prompt = parsed.data.prompt?.trim();
     const question = parsed.data.question?.trim();
     let questionValue = question;
+    const askMode = parsed.data.mode ?? "read";
+    const askAllowTools = parsed.data.allowTools ?? [];
+    const askRequiredEvidence = parsed.data.requiredEvidence ?? [];
+    if (askMode === "act" || askMode === "verify" || askMode === "observe") {
+      await ensureDefaultTools();
+      const goalText = question ?? prompt ?? "";
+      const manifest = listTools();
+      const toolName = selectToolForGoal(goalText, manifest);
+      const tool = getTool(toolName);
+      if (!tool) {
+        responder.send(500, { ok: false, error: "tool_not_found", toolName });
+        return;
+      }
+      const toolAllowed = askAllowTools.length === 0 || askAllowTools.includes(toolName);
+      if (!toolAllowed && askMode !== "observe") {
+        responder.send(400, { ok: false, error: "tool_not_allowed", toolName });
+        return;
+      }
+      const actionStarted = Date.now();
+      let actionOutput: unknown = null;
+      try {
+        const payload: Record<string, unknown> = { question: goalText, prompt: prompt ?? goalText };
+        if (toolName === "telemetry.time_dilation.control.set") {
+          payload.command = "set";
+          payload.args = { goal: goalText };
+        }
+        if (toolName === "physics.curvature.result.get") {
+          payload.hash = (parsed.data as any)?.verify?.packId ?? "latest";
+        }
+        actionOutput = await tool.handler(payload, { personaId, sessionId: parsed.data.sessionId, traceId: askTraceId });
+      } catch (error) {
+        responder.send(500, { ok: false, error: "tool_execution_failed", message: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+      const adapter = await runAdapterExecution({
+        traceId: `${askTraceId}:proof`,
+        actions: [{ kind: "verify", params: { tool: toolName } }],
+      } as any, { tenantId: undefined });
+      const proof = {
+        verdict: adapter.verdict,
+        firstFail: adapter.firstFail ?? null,
+        certificate: adapter.certificate ?? null,
+        artifacts: adapter.artifacts,
+        evidence: [
+          { type: "tool", tool: toolName, durationMs: Math.max(0, Date.now() - actionStarted), output: actionOutput },
+          ...askRequiredEvidence.map((entry) => ({ type: "required", ref: entry })),
+        ],
+      };
+      if (askMode === "verify") {
+        const integrityOk = Boolean((proof.certificate as any)?.integrityOk);
+        if (proof.verdict !== "PASS" || !integrityOk) {
+          responder.send(200, { ok: false, mode: askMode, text: "Verification failed.", proof, action: { tool: toolName, output: actionOutput } });
+          return;
+        }
+      }
+      responder.send(200, {
+        ok: true,
+        mode: askMode,
+        text: askMode === "observe" ? "Observation complete." : "Action complete.",
+        action: { tool: toolName, output: actionOutput },
+        proof,
+      });
+      return;
+    }
     let sessionMemoryForTags: HelixAskSessionMemory | null = null;
     let sessionMemory: HelixAskSessionMemory | null = null;
     let memorySeedSlots: HelixAskSlotPlanEntry[] = [];
@@ -19002,6 +19100,7 @@ const executeHelixAsk = async ({
     let result: LocalAskResult;
     let generalScaffold = "";
     let repoScaffold = "";
+    var repoScaffoldForPrompt = "";
     let promptScaffold = "";
     let topicMustIncludeOk: boolean | undefined;
     let pipelineEvidence: string | null = null;
@@ -20440,6 +20539,7 @@ const executeHelixAsk = async ({
           ? Math.min(evidenceGate.matchRatio, evidenceCoreGate.matchRatio)
           : evidenceGate.matchRatio;
         let retrievalConfidence = retrievalEvidenceRatio;
+        let retrievalDocShare = docShare;
         if (mustIncludeOk) retrievalConfidence += 0.15;
         if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
         if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
@@ -20815,6 +20915,7 @@ const executeHelixAsk = async ({
             ? Math.min(evidenceGate.matchRatio, evidenceCoreGate.matchRatio)
             : evidenceGate.matchRatio;
           retrievalConfidence = attemptEvidenceRatio;
+          retrievalDocShare = attemptDocShare;
           if (mustIncludeOk) retrievalConfidence += 0.15;
           if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
           if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
@@ -21635,13 +21736,17 @@ const executeHelixAsk = async ({
         }
 
       const promptRetrievalConfidence =
-        typeof debugPayload?.retrieval_confidence === "number"
-          ? debugPayload.retrieval_confidence
-          : 0;
+        typeof retrievalConfidence === "number"
+          ? retrievalConfidence
+          : typeof debugPayload?.retrieval_confidence === "number"
+            ? debugPayload.retrieval_confidence
+            : 0;
       const promptRetrievalDocShare =
-        typeof debugPayload?.retrieval_doc_share === "number"
-          ? debugPayload.retrieval_doc_share
-          : 0;
+        typeof retrievalDocShare === "number"
+          ? retrievalDocShare
+          : typeof debugPayload?.retrieval_doc_share === "number"
+            ? debugPayload.retrieval_doc_share
+            : 0;
       const toolResultsTreeWalk =
         treeWalkMetrics &&
         typeof treeWalkMetrics.boundCount === "number" &&
@@ -22508,11 +22613,11 @@ const executeHelixAsk = async ({
         ...extractFilePathsFromText(contextText),
         ...extractFilePathsFromText(promptContextText),
       ]);
-      const repoScaffoldForPrompt = repoScaffold
+      repoScaffoldForPrompt = repoScaffold
         ? scrubUnsupportedPaths(repoScaffold, repoPromptPaths).text || repoScaffold
         : repoScaffold;
       if (intentStrategy === "hybrid_explain" && generalEvidence) {
-        const hasRepoEvidence = !forceHybridNoEvidence && Boolean(repoScaffoldForPrompt.trim());
+        const hasRepoEvidence = !forceHybridNoEvidence && Boolean(String(repoScaffoldForPrompt ?? "").trim());
         if (conceptMatch) {
           const coreSentences: string[] = [];
           if (conceptMatch.card.definition) {
@@ -22963,7 +23068,57 @@ const executeHelixAsk = async ({
         return;
       }
       let primaryContractResult: LocalAskResult | null = null;
-      if (HELIX_ASK_ANSWER_CONTRACT_PRIMARY && !HELIX_ASK_SINGLE_LLM && evidenceText.trim()) {
+      const strongDeterministicContractSignals =
+        evidenceGateOk &&
+        runtimeMustIncludeOk &&
+        topicMustIncludeOk &&
+        runtimeViabilityMustIncludeOk &&
+        (coverageSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+        (docSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+        retrievalConfidence >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE &&
+        retrievalDocShare >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE;
+      const relationQuestionFastPath =
+        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) &&
+        /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(baseQuestion) &&
+        /\b(mission ethos|ethos|ideology)\b/i.test(baseQuestion);
+      if (
+        HELIX_ASK_ANSWER_CONTRACT_PRIMARY &&
+        !HELIX_ASK_SINGLE_LLM &&
+        evidenceText.trim() &&
+        !primaryContractResult &&
+        (strongDeterministicContractSignals || relationQuestionFastPath)
+      ) {
+        const deterministicPrimaryContract = buildDeterministicAnswerContractFallback({
+          question: baseQuestion,
+          format: formatSpec.format,
+          definitionFocus,
+          docBlocks,
+          codeAlignment,
+          evidenceText: appendEvidenceSources(evidenceText, contextFiles, 8, contextText),
+          allowedCitations: normalizeCitations([
+            ...extractFilePathsFromText(evidenceText),
+            ...extractCitationTokensFromText(evidenceText),
+            ...contextFiles,
+          ]),
+        });
+        primaryContractResult = { text: JSON.stringify(deterministicPrimaryContract) };
+        answerContractPrimaryUsed = true;
+        answerPath.push("answerContract:deterministic_pre_llm");
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic = true;
+          (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_reason =
+            strongDeterministicContractSignals
+              ? "strong_repo_evidence"
+              : "relation_question_fastpath";
+        }
+        logEvent(
+          "LLM answer contract primary",
+          "skipped",
+          `deterministic_pre_llm | claims=${deterministicPrimaryContract.claims?.length ?? 0}`,
+          answerStart,
+        );
+      }
+      if (!primaryContractResult && HELIX_ASK_ANSWER_CONTRACT_PRIMARY && !HELIX_ASK_SINGLE_LLM && evidenceText.trim()) {
         const contractPrimaryBudget = canStartFastHelper(
           "answer_contract_primary",
           fastQualityBudgets.helperMinMs,
@@ -23950,7 +24105,7 @@ const executeHelixAsk = async ({
         extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
       if (!answerContractApplied) {
         const hasRepoEvidence =
-          intentStrategy === "hybrid_explain" && Boolean(repoScaffoldForPrompt.trim());
+          intentStrategy === "hybrid_explain" && Boolean(String(repoScaffoldForPrompt ?? "").trim());
         const hasHybridPlaceholder =
           /(map to this system|repo evidence bullets|paragraph\s*2|paragraph\s*1)/i.test(cleaned);
         if (allowHybridFallback && hasRepoEvidence && (!hasRepoCitations() || hasHybridPlaceholder)) {
