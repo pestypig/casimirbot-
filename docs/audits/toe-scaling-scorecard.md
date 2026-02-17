@@ -59,17 +59,18 @@ Stop-scaling triggers:
 | 2026-02-17 | TOE-003-quantum-provenance-class | 5a12eff8 | PASS | PASS (`tests/warp-viability.spec.ts`, `tests/qi-guardrail.spec.ts`, `tests/pipeline-ts-qi-guard.spec.ts`) | PASS (`run_id=toe-003-quantum-provenance-class`) | PASS | diagnostic | NO | PASS (tests + verification reproduced) | 11.0 | SCALE +1 (pilot) | Ticket result artifact is valid, contributes to weighted ToE proof progression, and adapter-backed verify replay is reproducible (`run_id=18172`). |
 | 2026-02-17 | TOE-004-uncertainty-propagation-gates | ffc566bc | PASS | PASS (`tests/gr-invariants.spec.ts`, `tests/stress-energy-integrals.spec.ts`) | PASS (`run_id=1`) | PASS | diagnostic | NO | PASS (ticket-scoped tests and contract checks) | 13.5 | SCALE +1 (pilot) | TOE-004 receipt accepted and counted in weighted ToE proof progression. |
 | 2026-02-17 | TOE-005-prediction-observation-ledger | 7cf17bd7 | PASS | PASS (`tests/trace-api.spec.ts`, `tests/trace-export.spec.ts`) | PASS (`run_id=11`) | PASS | diagnostic | NO | PASS (ticket-scoped tests and contract checks) | 16.0 | SCALE +1 (pilot) | TOE-005 receipt accepted and counted in weighted ToE proof progression. |
+| 2026-02-17 | TOE-006-firstfail-taxonomy-normalization | f4d2548b | PASS | PASS (`tests/runtime-frame-contract.spec.ts`) | PASS (`run_id=5`) | PASS | diagnostic | NO | PASS (ticket-scoped tests and contract checks) | 18.5 | SCALE +1 (pilot) | TOE-006 receipt accepted and counted in weighted ToE proof progression. |
 
 ## Daily Summary (2026-02-17)
 
 - Date: 2026-02-17
-- Runs completed: 5
-- Full-gate passes: 5
+- Runs completed: 6
+- Full-gate passes: 6
 - Scope-drift incidents: 0
 - Adapter-fallback incidents: 0
-- ToE progress %: 16.0
+- ToE progress %: 18.5
 - Strict-ready progress %: 10.0
-- Rolling pass rate (last 10 runs): 100% (5/5 observed)
+- Rolling pass rate (last 10 runs): 100% (6/6 observed)
 - Reviewer count: not recorded in current audit artifacts
 - Active agents: not set (policy baseline is `2 x active reviewers`)
 - Decision for next day: `scale +1` (pilot)
