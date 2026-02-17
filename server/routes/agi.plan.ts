@@ -3111,7 +3111,7 @@ const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
 const HELIX_ASK_IDEOLOGY_QUERY_CUE_RE =
   /\b(?:mission\s+ethos|ethos|ideology|feedback\s+loop\s+hygiene|civic\s+signal|lifetime\s+trust\s+ledger|radiance\s+to\s+the\s+sun)\b/i;
 const HELIX_ASK_RELATION_QUERY_RE =
-  /\b(?:relate|relation|relationship|related|connect|connection|linked?|mapping|map to|interplay|how .* relates?)\b/i;
+  /\b(?:relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay|how .* relates?)\b/i;
 const HELIX_ASK_RELATION_WARP_ANCHOR_RE =
   /(^|\/)(docs\/knowledge\/warp\/|modules\/warp\/|docs\/warp-console-architecture\.md|docs\/theta-semantics\.md)/i;
 const HELIX_ASK_RELATION_ETHOS_ANCHOR_RE =
@@ -23067,7 +23067,57 @@ const executeHelixAsk = async ({
         return;
       }
       let primaryContractResult: LocalAskResult | null = null;
-      if (HELIX_ASK_ANSWER_CONTRACT_PRIMARY && !HELIX_ASK_SINGLE_LLM && evidenceText.trim()) {
+      const strongDeterministicContractSignals =
+        evidenceGateOk &&
+        runtimeMustIncludeOk &&
+        topicMustIncludeOk &&
+        runtimeViabilityMustIncludeOk &&
+        (coverageSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+        (docSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+        retrievalConfidence >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE &&
+        retrievalDocShare >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE;
+      const relationQuestionFastPath =
+        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) &&
+        /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(baseQuestion) &&
+        /\b(mission ethos|ethos|ideology)\b/i.test(baseQuestion);
+      if (
+        HELIX_ASK_ANSWER_CONTRACT_PRIMARY &&
+        !HELIX_ASK_SINGLE_LLM &&
+        evidenceText.trim() &&
+        !primaryContractResult &&
+        (strongDeterministicContractSignals || relationQuestionFastPath)
+      ) {
+        const deterministicPrimaryContract = buildDeterministicAnswerContractFallback({
+          question: baseQuestion,
+          format: formatSpec.format,
+          definitionFocus,
+          docBlocks,
+          codeAlignment,
+          evidenceText: appendEvidenceSources(evidenceText, contextFiles, 8, contextText),
+          allowedCitations: normalizeCitations([
+            ...extractFilePathsFromText(evidenceText),
+            ...extractCitationTokensFromText(evidenceText),
+            ...contextFiles,
+          ]),
+        });
+        primaryContractResult = { text: JSON.stringify(deterministicPrimaryContract) };
+        answerContractPrimaryUsed = true;
+        answerPath.push("answerContract:deterministic_pre_llm");
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic = true;
+          (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_reason =
+            strongDeterministicContractSignals
+              ? "strong_repo_evidence"
+              : "relation_question_fastpath";
+        }
+        logEvent(
+          "LLM answer contract primary",
+          "skipped",
+          `deterministic_pre_llm | claims=${deterministicPrimaryContract.claims?.length ?? 0}`,
+          answerStart,
+        );
+      }
+      if (!primaryContractResult && HELIX_ASK_ANSWER_CONTRACT_PRIMARY && !HELIX_ASK_SINGLE_LLM && evidenceText.trim()) {
         const contractPrimaryBudget = canStartFastHelper(
           "answer_contract_primary",
           fastQualityBudgets.helperMinMs,
