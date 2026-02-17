@@ -19100,7 +19100,7 @@ const executeHelixAsk = async ({
     let result: LocalAskResult;
     let generalScaffold = "";
     let repoScaffold = "";
-    let repoScaffoldForPrompt = "";
+    var repoScaffoldForPrompt = "";
     let promptScaffold = "";
     let topicMustIncludeOk: boolean | undefined;
     let pipelineEvidence: string | null = null;
@@ -22617,7 +22617,7 @@ const executeHelixAsk = async ({
         ? scrubUnsupportedPaths(repoScaffold, repoPromptPaths).text || repoScaffold
         : repoScaffold;
       if (intentStrategy === "hybrid_explain" && generalEvidence) {
-        const hasRepoEvidence = !forceHybridNoEvidence && Boolean(repoScaffoldForPrompt.trim());
+        const hasRepoEvidence = !forceHybridNoEvidence && Boolean(String(repoScaffoldForPrompt ?? "").trim());
         if (conceptMatch) {
           const coreSentences: string[] = [];
           if (conceptMatch.card.definition) {
@@ -24105,7 +24105,7 @@ const executeHelixAsk = async ({
         extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
       if (!answerContractApplied) {
         const hasRepoEvidence =
-          intentStrategy === "hybrid_explain" && Boolean(repoScaffoldForPrompt.trim());
+          intentStrategy === "hybrid_explain" && Boolean(String(repoScaffoldForPrompt ?? "").trim());
         const hasHybridPlaceholder =
           /(map to this system|repo evidence bullets|paragraph\s*2|paragraph\s*1)/i.test(cleaned);
         if (allowHybridFallback && hasRepoEvidence && (!hasRepoCitations() || hasHybridPlaceholder)) {
