@@ -7,11 +7,13 @@ import {
   retargetDemonstrationToPrimitiveDag,
 } from "../services/demonstration-retargeting.js";
 import { runPickPlaceBenchmark } from "../services/robotics-benchmark.js";
+import { buildRoboticsHandbackBundle } from "../services/robotics-handback.js";
 
 const demonstrationRouter = Router();
 
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
@@ -32,11 +34,24 @@ demonstrationRouter.options("/retarget", (_req, res) => {
 
 
 
+
+
+demonstrationRouter.get("/handback/summary", (_req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  return res.json({
+    ok: true,
+    bundle: buildRoboticsHandbackBundle(),
+  });
+});
+
+
 demonstrationRouter.post("/benchmark/pick-place", (_req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
   const report = runPickPlaceBenchmark();
   recordTrainingTrace({
+    traceId: report.traceId,
     traceId: `benchmark:${report.traceId}`,
     pass: report.firstFail === null,
     firstFail: report.firstFail ?? undefined,

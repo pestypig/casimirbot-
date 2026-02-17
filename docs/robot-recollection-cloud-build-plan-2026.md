@@ -260,3 +260,6 @@ Release candidate exit:
 - sample `movement_episode` JSONL export
 - benchmark replay artifacts and delta report
 - unresolved gaps with proposed next phase order
+
+
+Handback report draft: `docs/robot-recollection-cloud-handback-2026-phase0-6.md`

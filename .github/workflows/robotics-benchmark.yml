@@ -1,0 +1,35 @@
+name: Robotics Benchmark
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run robotics benchmark tests
+        run: npm run test -- server/__tests__/robotics-benchmark.test.ts server/__tests__/agi.demonstration.test.ts
+
+      - name: Generate benchmark report artifact
+        run: npm run robotics:benchmark
+
+      - name: Upload robotics benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: robotics-benchmark-report
+          path: artifacts/robotics-benchmark/pick-place-report.json
+          if-no-files-found: error

@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from "vitest";
 import express from "express";
 import request from "supertest";
 import { demonstrationRouter } from "../routes/agi.demonstration";
+import { trainingTraceRouter } from "../routes/training-trace";
 import { runPickPlaceBenchmark } from "../services/robotics-benchmark";
 
 describe("robotics pick-and-place benchmark", () => {
@@ -12,6 +13,7 @@ describe("robotics pick-and-place benchmark", () => {
     app = express();
     app.use(express.json());
     app.use("/api/agi/demonstration", demonstrationRouter);
+    app.use("/api/agi", trainingTraceRouter);
   });
 
   it("replays fixture deterministically with reproducible primitive path", () => {
@@ -43,6 +45,24 @@ describe("robotics pick-and-place benchmark", () => {
     expect(strict.firstFail).not.toBeNull();
     expect(strict.firstFail?.id).toContain("benchmark.");
     expect(strict.deltas.length).toBe(2);
+  });
+
+
+
+  it("records benchmark trace with stable traceId", async () => {
+    await request(app)
+      .post("/api/agi/demonstration/benchmark/pick-place")
+      .send({})
+      .expect(200);
+
+    const traces = await request(app)
+      .get("/api/agi/training-trace?limit=20")
+      .expect(200);
+
+    const entry = (traces.body?.traces ?? []).find(
+      (row: { traceId?: string }) => row.traceId === "benchmark:pick-place",
+    );
+    expect(entry).toBeTruthy();
   });
 
   it("exposes benchmark API", async () => {
