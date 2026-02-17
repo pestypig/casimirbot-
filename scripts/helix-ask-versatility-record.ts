@@ -130,6 +130,8 @@ const slug = (value: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 72);
 
+const clampSessionId = (value: string): string => value.slice(0, 120);
+
 const makeRelationPrompts = (): PromptCase[] => {
   const base = [
     "How does a warp bubble fit in with the mission ethos?",
@@ -278,7 +280,7 @@ const askOnce = async (entry: PromptCase, seed: number, temperature: number, run
         seed,
         temperature,
         verbosity: "extended",
-        sessionId: `versatility:${runId}:${entry.id}:s${seed}:t${temperature}`,
+        sessionId: clampSessionId(`versatility:${runId}:${entry.id}:s${seed}:t${temperature}`),
       }),
     });
     clearTimeout(timeout);

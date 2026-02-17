@@ -217,6 +217,7 @@ describe("Helix Ask live events", () => {
     expect(payload.text).not.toMatch(/llm\.local stub result/i);
     expect(payload.text).toMatch(/warp bubble|warp/i);
     expect(payload.text).toMatch(/mission ethos|ethos/i);
+    expect(payload.text).toMatch(/Sources:/i);
   }, 45000);
 
   it("does not auto-fanout relation prompts into report mode", async () => {

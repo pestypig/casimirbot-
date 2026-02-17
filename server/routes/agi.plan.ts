@@ -3160,6 +3160,12 @@ const HELIX_ASK_IDEOLOGY_QUERY_CUE_RE =
   /\b(?:mission\s+ethos|ethos|ideology|feedback\s+loop\s+hygiene|civic\s+signal|lifetime\s+trust\s+ledger|radiance\s+to\s+the\s+sun)\b/i;
 const HELIX_ASK_RELATION_QUERY_RE =
   /\b(?:relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay|fit\s+in\s+with|fit\s+together|how .* relates?|how .* fit)\b/i;
+const HELIX_ASK_RELATION_WARP_QUERY_RE =
+  /\b(?:warp\s+bubble|warp\s+drive|warp|alcubierre|natario)\b/i;
+const HELIX_ASK_RELATION_ETHOS_QUERY_RE =
+  /\b(?:mission\s+ethos|mission\s+ethics|ethos|ethic(?:s|al)?|ideology)\b/i;
+const HELIX_ASK_RELATION_CONNECTOR_RE =
+  /\b(?:relation(?:ship)?|relat(?:e|ed|ing)|connect(?:ed|ion)?|link(?:ed|ing)?|bridge|dependency|interplay|fit\s+in\s+with|fit\s+together|map(?:ping)?|govern(?:ed|ance|s)?|constrain(?:ed|s|t)|bind(?:ing|s)?|ties?|compare|versus|vs\.?|separate|policy\s+layer|technical\s+layer|matter\s+for)\b/i;
 const HELIX_ASK_RELATION_WARP_ANCHOR_RE =
   /(^|\/)(docs\/knowledge\/warp\/|modules\/warp\/|docs\/warp-console-architecture\.md|docs\/theta-semantics\.md)/i;
 const HELIX_ASK_RELATION_ETHOS_ANCHOR_RE =
@@ -13458,6 +13464,20 @@ const shouldAllowIdeologyTechnicalNotes = (question: string): boolean => {
   return explicitAllow;
 };
 
+const isWarpEthosRelationQuestion = (question: string): boolean => {
+  if (!question?.trim()) return false;
+  const normalized = question.replace(/\s+/g, " ").trim();
+  const hasWarp = HELIX_ASK_RELATION_WARP_QUERY_RE.test(normalized);
+  const hasEthos = HELIX_ASK_RELATION_ETHOS_QUERY_RE.test(normalized);
+  if (!hasWarp || !hasEthos) return false;
+  const hasConnector =
+    HELIX_ASK_RELATION_QUERY_RE.test(normalized) ||
+    HELIX_ASK_RELATION_CONNECTOR_RE.test(normalized) ||
+    /\bdefine\b[\s\S]{0,120}\b(?:then|and)\b[\s\S]{0,80}\bconnect\b/i.test(normalized) ||
+    /\bwhat(?:'s| is)\b[\s\S]{0,80}\bbridge\b/i.test(normalized);
+  return hasConnector;
+};
+
 const isExplicitReportRequest = (question: string): boolean => {
   if (!REPORT_MODE_INTENT_RE.test(question)) return false;
   const normalized = question.toLowerCase();
@@ -16987,10 +17007,7 @@ const executeHelixAsk = async ({
       seedSlots: [...memorySeedSlots, ...headingSeedSlots],
     });
     const initialReportQuestion = rawQuestion || baseQuestion;
-    const warpEthosRelationReportQuery =
-      HELIX_ASK_RELATION_QUERY_RE.test(initialReportQuestion) &&
-      /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(initialReportQuestion) &&
-      /\b(mission ethos|ethos|ideology)\b/i.test(initialReportQuestion);
+    const warpEthosRelationReportQuery = isWarpEthosRelationQuestion(initialReportQuestion);
     const ideologyConversationCandidate = findConceptMatch(initialReportQuestion, {
       intentId: "repo.ideology_reference",
     });
@@ -23021,7 +23038,10 @@ const executeHelixAsk = async ({
           debugPayload.ambiguity_gate_applied = true;
         }
       }
-      const relationQuery = HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion);
+      const relationQuery =
+        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
+        isWarpEthosRelationQuestion(baseQuestion) ||
+        intentProfile.id === "hybrid.warp_ethos_relation";
       const relationTopology = resolveRelationTopologySignal({
         question: baseQuestion,
         relationIntent: relationQuery,
@@ -24521,6 +24541,7 @@ const executeHelixAsk = async ({
             debugPayload.answer_contract_relation_packet_fallback = true;
             debugPayload.answer_contract_relation_packet_reason =
               relationContractHardFailReasons.slice();
+            (debugPayload as Record<string, unknown>).deterministic_fallback_used_relation = true;
           }
         }
         logEvent(
@@ -25781,6 +25802,7 @@ const executeHelixAsk = async ({
           if (debugPayload) {
             debugPayload.relation_fallback_applied = true;
             debugPayload.relation_fallback_reasons = relationFallbackReasons;
+            (debugPayload as Record<string, unknown>).deterministic_fallback_used_relation = true;
           }
         } else if (debugPayload) {
           debugPayload.relation_fallback_applied = false;
@@ -25805,6 +25827,37 @@ const executeHelixAsk = async ({
         }
       }
       cleaned = stripRunawayAnswerArtifacts(cleaned);
+      const citationPersistenceGuardEligible =
+        intentDomain === "repo" || intentDomain === "hybrid" || relationDeterministicGuardEligible;
+      if (citationPersistenceGuardEligible) {
+        const citationGuardAllowedPaths = filterExistingEvidencePaths(Array.from(
+          new Set([
+            ...allowedSourcePaths,
+            ...(relationPacket ? relationPacket.evidence.map((entry) => entry.path) : []),
+          ]),
+        ));
+        const citationGuardTokens = normalizeCitations([
+          ...extractCitationTokensFromText(evidenceText),
+          ...(relationPacket ? Object.values(relationPacket.source_map) : []),
+          ...citationGuardAllowedPaths,
+        ]);
+        const beforeCitationGuard = cleaned;
+        cleaned = sanitizeSourcesLine(cleaned, citationGuardAllowedPaths, citationGuardTokens);
+        const hasFinalCitations =
+          extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
+        if (!hasFinalCitations && citationGuardTokens.length > 0) {
+          cleaned = `${cleaned}\n\nSources: ${citationGuardTokens.slice(0, 8).join(", ")}`.trim();
+          answerPath.push("citationPersistence:append_sources");
+        } else if (hasFinalCitations) {
+          answerPath.push("citationPersistence:preserved");
+        }
+        if (debugPayload) {
+          debugPayload.citation_persistence_guard_applied = true;
+          debugPayload.citation_persistence_sources = citationGuardTokens.slice(0, 8);
+          debugPayload.citation_persistence_appended =
+            beforeCitationGuard.trim() !== cleaned.trim();
+        }
+      }
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
         logEvent("Answer cleaned preview", "final", finalCleanedPreview, answerStart);
