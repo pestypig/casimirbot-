@@ -57,6 +57,15 @@ type RawRun = {
   debug: AskDebug | null;
   failures: string[];
   attempts?: number;
+  stop_reason?: string;
+  attempt_trace?: Array<{
+    attempt: number;
+    status: number;
+    latency_ms: number;
+    retry_after_ms: number;
+    error?: string;
+    message?: string;
+  }>;
 };
 
 type FailureRecord = {
@@ -79,12 +88,27 @@ const START_SERVER = (process.env.HELIX_ASK_VERSATILITY_START_SERVER ?? "0") ===
 const SERVER_COMMAND = process.env.HELIX_ASK_VERSATILITY_SERVER_CMD ?? "npm";
 const SERVER_ARGS =
   process.env.HELIX_ASK_VERSATILITY_SERVER_ARGS?.split(/\s+/).filter(Boolean) ?? ["run", "dev:agi:5173"];
-const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_ASK_VERSATILITY_TIMEOUT_MS ?? 120000);
+const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_ASK_VERSATILITY_TIMEOUT_MS ?? 45000);
 const MIN_TEXT_CHARS = Number(process.env.HELIX_ASK_VERSATILITY_MIN_TEXT_CHARS ?? 220);
 const MAX_RETRIES = Math.max(0, Number(process.env.HELIX_ASK_VERSATILITY_MAX_RETRIES ?? 3));
 const RETRY_BASE_MS = Math.max(100, Number(process.env.HELIX_ASK_VERSATILITY_RETRY_BASE_MS ?? 900));
 const RETRY_MAX_MS = Math.max(RETRY_BASE_MS, Number(process.env.HELIX_ASK_VERSATILITY_RETRY_MAX_MS ?? 12000));
+const RETRY_AFTER_CAP_MS = Math.max(250, Number(process.env.HELIX_ASK_VERSATILITY_RETRY_AFTER_CAP_MS ?? 5000));
 const RETRY_STUB = (process.env.HELIX_ASK_VERSATILITY_RETRY_STUB ?? "1") !== "0";
+const MAX_CASE_WALL_MS = Math.max(
+  REQUEST_TIMEOUT_MS,
+  Number(process.env.HELIX_ASK_VERSATILITY_MAX_CASE_WALL_MS ?? 90000),
+);
+const MAX_RUN_MS = Math.max(0, Number(process.env.HELIX_ASK_VERSATILITY_MAX_RUN_MS ?? 0));
+const CHECKPOINT_EVERY = Math.max(1, Number(process.env.HELIX_ASK_VERSATILITY_CHECKPOINT_EVERY ?? 10));
+const CIRCUIT_OPEN_MAX_RETRIES = Math.max(
+  0,
+  Number(process.env.HELIX_ASK_VERSATILITY_CIRCUIT_OPEN_MAX_RETRIES ?? 1),
+);
+const CIRCUIT_OPEN_RETRY_AFTER_CUTOFF_MS = Math.max(
+  0,
+  Number(process.env.HELIX_ASK_VERSATILITY_CIRCUIT_OPEN_RETRY_AFTER_CUTOFF_MS ?? 8000),
+);
 const STUB_RE = /llm\.local stub result/i;
 const REPORT_SECTION_RE = /(Executive summary:|Coverage map:|Point-by-point:|Report covers)/i;
 
@@ -140,6 +164,32 @@ const slug = (value: string) =>
 
 const clampSessionId = (value: string): string => value.slice(0, 120);
 const RETRYABLE_STATUS = new Set([0, 408, 429, 500, 502, 503, 504]);
+
+const isCircuitOpenPayload = (payload: AskPayload): boolean => {
+  const error = String(payload.error ?? "").toLowerCase();
+  const message = String(payload.message ?? "").toLowerCase();
+  if (error === "helix_ask_temporarily_unavailable") return true;
+  return message.includes("circuit") || message.includes("temporarily unavailable");
+};
+
+const writeCheckpoint = async (outDir: string, runId: string, rows: RawRun[]) => {
+  const checkpoint = {
+    run_id: runId,
+    timestamp: new Date().toISOString(),
+    completed_runs: rows.length,
+    status_counts: rows.reduce<Record<string, number>>((acc, row) => {
+      const key = String(row.status);
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {}),
+    stop_reasons: rows.reduce<Record<string, number>>((acc, row) => {
+      const key = row.stop_reason ?? "done";
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {}),
+  };
+  await fs.writeFile(path.resolve(outDir, "checkpoint.json"), `${JSON.stringify(checkpoint, null, 2)}\n`, "utf8");
+};
 
 const makeRelationPrompts = (): PromptCase[] => {
   const base = [
@@ -325,7 +375,7 @@ const retryDelayMs = (
   response: Awaited<ReturnType<typeof askOnce>>,
   attempt: number,
 ): number => {
-  const requestedRetry = Math.max(0, toNum(response.payload.retryAfterMs, 0));
+  const requestedRetry = Math.min(RETRY_AFTER_CAP_MS, Math.max(0, toNum(response.payload.retryAfterMs, 0)));
   const backoff = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.max(1, 2 ** attempt));
   return Math.max(requestedRetry, backoff);
 };
@@ -336,15 +386,60 @@ const askWithRetry = async (
   temperature: number,
   runId: string,
 ) => {
+  const begin = Date.now();
   let attempts = 0;
+  let stopReason = "done";
+  let circuitOpenRetries = 0;
+  const attemptTrace: NonNullable<RawRun["attempt_trace"]> = [];
   let response = await askOnce(entry, seed, temperature, runId);
   attempts += 1;
+  attemptTrace.push({
+    attempt: attempts,
+    status: response.status,
+    latency_ms: response.latency_ms,
+    retry_after_ms: Math.max(0, toNum(response.payload.retryAfterMs, 0)),
+    error: response.payload.error,
+    message: response.payload.message,
+  });
   while (attempts <= MAX_RETRIES && shouldRetryResponse(response, entry)) {
-    await sleep(retryDelayMs(response, attempts - 1));
+    const elapsedMs = Date.now() - begin;
+    if (elapsedMs >= MAX_CASE_WALL_MS) {
+      stopReason = "case_wall_exceeded";
+      break;
+    }
+    if (isCircuitOpenPayload(response.payload)) {
+      circuitOpenRetries += 1;
+      const retryAfter = Math.max(0, toNum(response.payload.retryAfterMs, 0));
+      if (
+        circuitOpenRetries > CIRCUIT_OPEN_MAX_RETRIES ||
+        retryAfter >= CIRCUIT_OPEN_RETRY_AFTER_CUTOFF_MS
+      ) {
+        stopReason = "circuit_open_short_circuit";
+        break;
+      }
+    }
+    const delay = retryDelayMs(response, attempts - 1);
+    const remaining = Math.max(0, MAX_CASE_WALL_MS - (Date.now() - begin));
+    if (remaining <= 0) {
+      stopReason = "case_wall_exceeded";
+      break;
+    }
+    await sleep(Math.min(delay, remaining));
     response = await askOnce(entry, seed, temperature, runId);
     attempts += 1;
+    attemptTrace.push({
+      attempt: attempts,
+      status: response.status,
+      latency_ms: response.latency_ms,
+      retry_after_ms: Math.max(0, toNum(response.payload.retryAfterMs, 0)),
+      error: response.payload.error,
+      message: response.payload.message,
+    });
   }
-  return { response, attempts };
+  if (stopReason === "done" && shouldRetryResponse(response, entry) && attempts > MAX_RETRIES) {
+    stopReason = "max_retries_reached";
+  }
+  return { response, attempts, stopReason, attemptTrace };
 };
 
 const toNum = (value: unknown, fallback = 0): number =>
@@ -415,6 +510,7 @@ const avg = (values: number[]): number => (values.length ? values.reduce((sum, v
 
 const main = async () => {
   const startedAt = new Date().toISOString();
+  const runEpoch = Date.now();
   const runId = `versatility-${Date.now()}`;
   const prompts = allPrompts();
   if (prompts.length < 90) throw new Error(`expected >=90 prompts, got ${prompts.length}`);
@@ -435,11 +531,22 @@ const main = async () => {
   }
 
   const rawRuns: RawRun[] = [];
+  let terminatedEarlyReason: string | null = null;
+  const runStartMs = Date.now();
   try {
-    for (const entry of prompts) {
+    outer: for (const entry of prompts) {
       for (const seed of SEEDS) {
         for (const temperature of TEMPS) {
-          const { response, attempts } = await askWithRetry(entry, seed, temperature, runId);
+          if (MAX_RUN_MS > 0 && Date.now() - runStartMs >= MAX_RUN_MS) {
+            terminatedEarlyReason = `max_run_ms_exceeded:${MAX_RUN_MS}`;
+            break outer;
+          }
+          const { response, attempts, stopReason, attemptTrace } = await askWithRetry(
+            entry,
+            seed,
+            temperature,
+            runId,
+          );
           const failures = evaluateFailures(entry, response);
           const raw: RawRun = {
             run_id: runId,
@@ -457,16 +564,22 @@ const main = async () => {
             debug: response.payload.debug ?? null,
             failures,
             attempts,
+            stop_reason: stopReason,
+            attempt_trace: attemptTrace,
           };
           rawRuns.push(raw);
           const fileName = `${runId}-${entry.id}-s${seed}-t${String(temperature).replace(".", "p")}.json`;
           await fs.writeFile(path.resolve(OUT_DIR, "raw", fileName), `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+          if (rawRuns.length % CHECKPOINT_EVERY === 0) {
+            await writeCheckpoint(OUT_DIR, runId, rawRuns);
+          }
         }
       }
     }
   } finally {
     if (serverChild) await stopServer(serverChild);
   }
+  await writeCheckpoint(OUT_DIR, runId, rawRuns);
 
   const byFamily = new Map<PromptFamily, RawRun[]>();
   for (const family of ["relation", "repo_technical", "ambiguous_general"] as const) {
@@ -577,6 +690,8 @@ const main = async () => {
     run_id: runId,
     started_at: startedAt,
     ended_at: new Date().toISOString(),
+    run_duration_ms: Date.now() - runEpoch,
+    terminated_early_reason: terminatedEarlyReason,
     base_url: BASE_URL,
     prompt_count: prompts.length,
     seed_count: SEEDS.length,
@@ -584,6 +699,10 @@ const main = async () => {
     total_runs: rawRuns.length,
     family_summary: familySummary,
     metrics: {
+      attempts: {
+        avg_attempts: avg(rawRuns.map((row) => row.attempts ?? 1)),
+        p95_attempts: percentile(rawRuns.map((row) => row.attempts ?? 1), 95),
+      },
       intent_id_correct_rate: intentCorrectRate,
       report_mode_correct_rate: reportModeCorrectRate,
       relation_packet_built_rate: relationPacketBuiltRate,
@@ -621,6 +740,7 @@ const main = async () => {
   };
 
   const recommendationDecision =
+    Boolean(terminatedEarlyReason) ||
     stubRate > 0.02 ||
     relationPacketBuiltRate < 0.95 ||
     relationDualDomainRate < 0.95 ||
@@ -633,6 +753,7 @@ const main = async () => {
     run_id: runId,
     decision: recommendationDecision,
     rationale: [
+      `terminated_early_reason=${terminatedEarlyReason ?? "none"}`,
       `stub_text_detected_rate=${stubRate.toFixed(3)}`,
       `relation_packet_built_rate=${relationPacketBuiltRate.toFixed(3)}`,
       `relation_dual_domain_ok_rate=${relationDualDomainRate.toFixed(3)}`,
@@ -695,6 +816,8 @@ const main = async () => {
     `- seeds: ${SEEDS.join(",")}`,
     `- temperatures: ${TEMPS.join(",")}`,
     `- total_runs: ${rawRuns.length}`,
+    `- run_duration_ms: ${Date.now() - runEpoch}`,
+    `- terminated_early_reason: ${terminatedEarlyReason ?? "none"}`,
     "",
     "## Aggregate by Prompt Family",
     "| family | runs | pass_rate | intent_correct_rate | report_mode_correct_rate | stub_rate | latency_p50_ms | latency_p95_ms |",
@@ -706,6 +829,8 @@ const main = async () => {
     `- report_mode_correct_rate: ${(reportModeCorrectRate * 100).toFixed(2)}%`,
     `- relation_packet_built_rate: ${(relationPacketBuiltRate * 100).toFixed(2)}%`,
     `- relation_dual_domain_ok_rate: ${(relationDualDomainRate * 100).toFixed(2)}%`,
+    `- avg_attempts_per_run: ${avg(rawRuns.map((row) => row.attempts ?? 1)).toFixed(2)}`,
+    `- p95_attempts_per_run: ${percentile(rawRuns.map((row) => row.attempts ?? 1), 95).toFixed(0)}`,
     `- stub_text_detected_rate: ${(stubRate * 100).toFixed(2)}%`,
     `- deterministic_fallback_relation_rate: ${(relationFallbackRate * 100).toFixed(2)}%`,
     `- contract_parse_fail_relation_rate: ${(parseFailRelationRate * 100).toFixed(2)}%`,
