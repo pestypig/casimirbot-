@@ -112,6 +112,12 @@ import { telemetryCrosscheckDocsHandler, telemetryCrosscheckDocsSpec } from "../
 import { repoGraphSearchHandler, repoGraphSearchSpec } from "../skills/repo.graph.search";
 import { repoDiffReviewHandler, repoDiffReviewSpec } from "../skills/repo.diff.review";
 import { repoPatchSimulateHandler, repoPatchSimulateSpec } from "../skills/repo.patch.simulate";
+import { timeDilationDiagnosticsGetHandler, timeDilationDiagnosticsGetSpec } from "../skills/telemetry.time_dilation.diagnostics.get";
+import { timeDilationControlSetHandler, timeDilationControlSetSpec, timeDilationControlGetHandler, timeDilationControlGetSpec, timeDilationControlClearHandler, timeDilationControlClearSpec } from "../skills/telemetry.time_dilation.control";
+import { physicsCurvatureRunHandler, physicsCurvatureRunSpec } from "../skills/physics.curvature.run";
+import { physicsCurvatureResultGetHandler, physicsCurvatureResultGetSpec } from "../skills/physics.curvature.result.get";
+import { starSolarCurvatureRunHandler, starSolarCurvatureRunSpec } from "../skills/star.solar_curvature.run";
+import { runAdapterExecution } from "../services/adapter/run";
 import {
   matchHelixAskIntent,
   getDefaultHelixAskIntentProfile,
@@ -2321,6 +2327,18 @@ function selectToolForGoal(goal: string, manifest: ToolManifestEntry[]): string 
   }
   if (hasTool("vision.http.describe") && contains(normalized, /\b(image|photo|picture|screenshot|diagram|figure)\b/)) {
     return "vision.http.describe";
+  }
+  if (hasTool("telemetry.time_dilation.diagnostics.get") && contains(normalized, /(time\s*dilation|diagnostics|observe)/)) {
+    return "telemetry.time_dilation.diagnostics.get";
+  }
+  if (hasTool("telemetry.time_dilation.control.set") && contains(normalized, /(set|update|apply|control).*(time\s*dilation|warp)/)) {
+    return "telemetry.time_dilation.control.set";
+  }
+  if (hasTool("physics.curvature.run") && contains(normalized, /(run|execute).*(curvature|simulation|sim)/)) {
+    return "physics.curvature.run";
+  }
+  if (hasTool("physics.curvature.result.get") && contains(normalized, /(curvature).*(result|get)/)) {
+    return "physics.curvature.result.get";
   }
   if (hasTool(sttWhisperSpec.name) && contains(normalized, /\b(audio|transcribe|speech|voice|recording)\b/)) {
     return sttWhisperSpec.name;
@@ -10618,10 +10636,10 @@ function buildHelixAskIdeologySynthesisPrompt(
   const effectSentenceBudget =
     verbosity === "brief" ? "2-3" : verbosity === "normal" ? "2-4" : "2-4";
   const allowTechnicalAppendix =
-    /(include|add|with|show|provide|give|append)[\s\S]{0,40}(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)/i.test(
+    /\b(include|add|with|show|provide|give|append)\b[\s\S]{0,40}\b(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)\b/i.test(
       question,
     ) &&
-    !/(do not|don't|avoid|without|instead of|switch to plain-language)[\s\S]{0,120}(technical\s+notes?|compare\/report|report\s+format|report\s+mode)/i.test(
+    !/\b(do not|don't|avoid|without|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i.test(
       question,
     );
   if (conversationSeed) {
@@ -11867,6 +11885,15 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
     traceId: z.string().min(1).max(128).optional(),
     personaId: z.string().min(1).optional(),
     tuning: HelixAskTuningOverrides.optional(),
+    mode: z.enum(["read", "observe", "act", "verify"]).optional(),
+    allowTools: z.array(z.string().min(1)).max(24).optional(),
+    requiredEvidence: z.array(z.string().min(1)).max(24).optional(),
+    verify: z
+      .object({
+        mode: z.enum(["constraint-pack", "agent-loop"]).optional(),
+        packId: z.string().optional(),
+      })
+      .optional(),
   })
   .refine((value) => Boolean(value.prompt || value.question), {
     message: "prompt or question required",
@@ -12376,7 +12403,7 @@ const sanitizePlanClarifyLine = (value: string): string => {
   if (/did not cover key terms from the question/i.test(line)) {
     return "Repo evidence was required by the question but could not be confirmed. Please point to the relevant files or clarify the term.";
   }
-  if (/(?:[a-z0-9]+(?:-[a-z0-9]+)*-tree)/i.test(line)) {
+  if (/(?:\b[a-z0-9]+(?:-[a-z0-9]+)*-tree\b)/i.test(line)) {
     return "Repo evidence was incomplete for this request. Please point to the relevant files or clarify the term.";
   }
   return line;
@@ -14426,6 +14453,13 @@ async function ensureDefaultTools(): Promise<void> {
       console.warn(`[agi.plan] HULL_MODE: skipping external vision.http.describe (${visionHttpBase})`);
     }
   }
+  registerTool({ ...timeDilationDiagnosticsGetSpec, handler: timeDilationDiagnosticsGetHandler });
+  registerTool({ ...timeDilationControlSetSpec, handler: timeDilationControlSetHandler });
+  registerTool({ ...timeDilationControlGetSpec, handler: timeDilationControlGetHandler });
+  registerTool({ ...timeDilationControlClearSpec, handler: timeDilationControlClearHandler });
+  registerTool({ ...physicsCurvatureRunSpec, handler: physicsCurvatureRunHandler });
+  registerTool({ ...physicsCurvatureResultGetSpec, handler: physicsCurvatureResultGetHandler });
+  registerTool({ ...starSolarCurvatureRunSpec, handler: starSolarCurvatureRunHandler });
   if (process.env.ENABLE_PHYSICS === "1" && !getTool(PHYSICS_TOOL_NAME)) {
     const { curvatureUnitSpec, curvatureUnitHandler } = await import("../skills/physics.curvature");
     registerTool({ ...curvatureUnitSpec, handler: curvatureUnitHandler });
@@ -15116,6 +15150,70 @@ const executeHelixAsk = async ({
     let prompt = parsed.data.prompt?.trim();
     const question = parsed.data.question?.trim();
     let questionValue = question;
+    const askMode = parsed.data.mode ?? "read";
+    const askAllowTools = parsed.data.allowTools ?? [];
+    const askRequiredEvidence = parsed.data.requiredEvidence ?? [];
+    if (askMode === "act" || askMode === "verify" || askMode === "observe") {
+      await ensureDefaultTools();
+      const goalText = question ?? prompt ?? "";
+      const manifest = listTools();
+      const toolName = selectToolForGoal(goalText, manifest);
+      const tool = getTool(toolName);
+      if (!tool) {
+        responder.send(500, { ok: false, error: "tool_not_found", toolName });
+        return;
+      }
+      const toolAllowed = askAllowTools.length === 0 || askAllowTools.includes(toolName);
+      if (!toolAllowed && askMode !== "observe") {
+        responder.send(400, { ok: false, error: "tool_not_allowed", toolName });
+        return;
+      }
+      const actionStarted = Date.now();
+      let actionOutput: unknown = null;
+      try {
+        const payload: Record<string, unknown> = { question: goalText, prompt: prompt ?? goalText };
+        if (toolName === "telemetry.time_dilation.control.set") {
+          payload.command = "set";
+          payload.args = { goal: goalText };
+        }
+        if (toolName === "physics.curvature.result.get") {
+          payload.hash = (parsed.data as any)?.verify?.packId ?? "latest";
+        }
+        actionOutput = await tool.handler(payload, { personaId, sessionId: parsed.data.sessionId, traceId: askTraceId });
+      } catch (error) {
+        responder.send(500, { ok: false, error: "tool_execution_failed", message: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+      const adapter = await runAdapterExecution({
+        traceId: `${askTraceId}:proof`,
+        actions: [{ kind: "verify", params: { tool: toolName } }],
+      } as any, { tenantId: undefined });
+      const proof = {
+        verdict: adapter.verdict,
+        firstFail: adapter.firstFail ?? null,
+        certificate: adapter.certificate ?? null,
+        artifacts: adapter.artifacts,
+        evidence: [
+          { type: "tool", tool: toolName, durationMs: Math.max(0, Date.now() - actionStarted), output: actionOutput },
+          ...askRequiredEvidence.map((entry) => ({ type: "required", ref: entry })),
+        ],
+      };
+      if (askMode === "verify") {
+        const integrityOk = Boolean((proof.certificate as any)?.integrityOk);
+        if (proof.verdict !== "PASS" || !integrityOk) {
+          responder.send(200, { ok: false, mode: askMode, text: "Verification failed.", proof, action: { tool: toolName, output: actionOutput } });
+          return;
+        }
+      }
+      responder.send(200, {
+        ok: true,
+        mode: askMode,
+        text: askMode === "observe" ? "Observation complete." : "Action complete.",
+        action: { tool: toolName, output: actionOutput },
+        proof,
+      });
+      return;
+    }
     let sessionMemoryForTags: HelixAskSessionMemory | null = null;
     let sessionMemory: HelixAskSessionMemory | null = null;
     let memorySeedSlots: HelixAskSlotPlanEntry[] = [];
