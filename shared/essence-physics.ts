@@ -267,6 +267,46 @@ export const CurvatureSummary = z.object({
   k_metrics: CurvatureKMetrics,
   ridge_summary: CurvatureRidgeSummary,
   vector_roots: z.array(VectorRoot),
+  stress_energy_bridge: z.array(
+    z.object({
+      source: z.object({
+        channel: z.enum(["kappa_body", "kappa_drive", "kappa_u"]),
+        kappa_m2: z.number().finite(),
+      }),
+      surrogate: z.object({
+        t00_J_m3: z.number().finite(),
+        bounded: z.boolean(),
+        bound_abs_J_m3: z.number().positive(),
+      }),
+      units: UnitSystemSI.refine((units) => {
+        return (
+          units.system === SI_UNITS.system &&
+          units.length === SI_UNITS.length &&
+          units.time === SI_UNITS.time &&
+          units.mass === SI_UNITS.mass &&
+          units.energy === SI_UNITS.energy &&
+          units.density === SI_UNITS.density
+        );
+      }, "stress-energy bridge requires SI unit lock"),
+      provenance: z.object({
+        class: z.enum(["diagnostic", "reduced-order", "certified"]),
+        method: z.string().min(1),
+        reference: z.string().min(1).optional(),
+      }),
+      uncertainty: z.object({
+        model: z.enum(["bounded", "gaussian", "interval"]),
+        relative_1sigma: z.number().nonnegative(),
+        absolute_1sigma_J_m3: z.number().nonnegative(),
+        confidence: z.number().min(0).max(1),
+      }),
+      parity: z.object({
+        canonical_kappa_m2: z.number().finite(),
+        mismatch_rel: z.number().nonnegative(),
+        mismatch_threshold_rel: z.number().positive(),
+        pass: z.boolean(),
+      }),
+    }),
+  ).default([]),
 });
 
 export const CurvatureArtifacts = z.object({

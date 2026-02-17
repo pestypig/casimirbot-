@@ -4,7 +4,7 @@ import path from "node:path";
 import { C, C2, G, HBAR, PI } from "@shared/physics-const";
 import { curvatureProxyPrefactors, kappa_body, kappa_drive, kappa_drive_from_power, kappa_u } from "@shared/curvature-proxy";
 import { CollapseBenchmarkInput, CollapseBenchmarkResult, hazardProbability, collapseBenchmarkDiagnostics } from "@shared/collapse-benchmark";
-import { CurvatureUnitInput } from "@shared/essence-physics";
+import { CurvatureSummary, CurvatureUnitInput } from "@shared/essence-physics";
 import { SI_UNITS } from "@shared/unit-system";
 import { RasterEnergyField2D } from "@shared/raster-energy-field";
 import { DatasetManifest } from "@shared/dataset-manifest";
@@ -45,6 +45,49 @@ describe("Gate 0: shared physics constants (no drift)", () => {
     expect(parsed.units).toEqual(SI_UNITS);
     expect(parsed.constants.c).toBe(C);
     expect(parsed.constants.G).toBe(G);
+  });
+
+
+
+  it("validates curvature bridge output fields on summary schema", () => {
+    const parsed = CurvatureSummary.parse({
+      total_energy_J: 1,
+      mass_equivalent_kg: 1,
+      residual_rms: 0,
+      stability: {
+        iterations: 1,
+        nan_count: 0,
+        phi_min: 0,
+        phi_max: 0,
+        grad_rms: 0,
+        laplacian_rms: 0,
+        residual_max_abs: 0,
+      },
+      k_metrics: { k0: 0, k1: 0, k2: 0 },
+      ridge_summary: {
+        ridge_count: 0,
+        ridge_point_count: 0,
+        ridge_length_m: 0,
+        ridge_density: 0,
+        fragmentation_index: 0,
+        thresholds: { high: 0, low: 0 },
+      },
+      vector_roots: [],
+      stress_energy_bridge: [
+        {
+          source: { channel: "kappa_u", kappa_m2: 1e-10 },
+          surrogate: { t00_J_m3: 5, bounded: true, bound_abs_J_m3: 10 },
+          units: SI_UNITS,
+          provenance: { class: "diagnostic", method: "unit test" },
+          uncertainty: { model: "bounded", relative_1sigma: 0.1, absolute_1sigma_J_m3: 0.5, confidence: 0.95 },
+          parity: { canonical_kappa_m2: 1e-10, mismatch_rel: 0, mismatch_threshold_rel: 0.01, pass: true },
+        },
+      ],
+    });
+
+    expect(parsed.stress_energy_bridge[0].units.system).toBe("SI");
+    expect(parsed.stress_energy_bridge[0].provenance.class).toBe("diagnostic");
+    expect(parsed.stress_energy_bridge[0].uncertainty.absolute_1sigma_J_m3).toBe(0.5);
   });
 
   it("keeps warp-web ledger constants in-band", () => {
