@@ -41,28 +41,74 @@ describe("Helix Ask modes", () => {
     expect(payload.mode === undefined || payload.mode === "read").toBe(true);
   }, 30000);
 
-  it("returns proof packet for verify mode", async () => {
+  it("routes act mode date/time/place gravity query to halobank.time.compute", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        question: "readme summary",
+        question: "Compare tide gravity at this place/time",
+        mode: "act",
+        allowTools: ["halobank.time.compute"],
+        timestamp: "2025-03-01T12:00:00Z",
+        durationMs: 60000,
+        place: { lat: 40.7128, lon: -74.006 },
+        compare: {
+          timestamp: "2025-03-01T13:00:00Z",
+          durationMs: 120000,
+          place: { lat: 34.0522, lon: -118.2437 },
+        },
+        sessionId: "modes-act-halobank",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      mode?: string;
+      action?: { tool?: string; output?: { ok?: boolean; comparison?: { deltas?: Record<string, unknown> } } };
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.mode).toBe("act");
+    expect(payload.action?.tool).toBe("halobank.time.compute");
+    expect(payload.action?.output?.ok).toBe(true);
+    expect(payload.action?.output?.comparison?.deltas?.dDuration_s).toBeDefined();
+    expect(payload.action?.output?.comparison?.deltas?.dGravExposure_ns).toBeDefined();
+  }, 180000);
+
+  it("returns proof packet + action output for verify mode with halobank tool", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "time/place tide gravity check",
         mode: "verify",
-        allowTools: ["docs.readme"],
-        sessionId: "modes-verify",
+        allowTools: ["halobank.time.compute"],
+        timestamp: "2025-03-01T12:00:00Z",
+        place: { lat: 40.7128, lon: -74.006 },
+        sessionId: "modes-verify-halobank",
       }),
     });
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
       mode?: string;
-      proof?: { verdict?: string; firstFail?: unknown; certificate?: { certificateHash?: string | null; integrityOk?: boolean | null }; artifacts?: Array<{ kind: string; ref: string }> };
+      action?: { tool?: string; output?: { ok?: boolean } };
+      proof?: {
+        verdict?: string;
+        firstFail?: unknown;
+        certificate?: { certificateHash?: string | null; integrityOk?: boolean | null };
+        artifacts?: Array<{ kind: string; ref: string }>;
+      };
     };
     expect(payload.mode).toBe("verify");
+    expect(payload.action?.tool).toBe("halobank.time.compute");
+    expect(payload.action?.output?.ok).toBe(true);
     expect(payload.proof?.verdict).toBeDefined();
     expect(payload.proof?.artifacts?.some((entry) => entry.ref === "/api/agi/training-trace/export")).toBe(true);
   }, 70000);
 
   it("activates relation packet mode with dual-domain evidence", async () => {
+  }, 180000);
+
+  it("respects allowTools exclusions with tool_not_allowed", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -90,5 +136,22 @@ describe("Helix Ask modes", () => {
     expect(payload.debug?.relation_packet_built).toBe(true);
     expect(payload.debug?.relation_dual_domain_ok).toBe(true);
     expect(payload.debug?.relation_packet_bridge_count ?? 0).toBeGreaterThanOrEqual(2);
+        question: "time place tidal gravity",
+        mode: "act",
+        allowTools: ["docs.readme"],
+        sessionId: "modes-not-allowed",
+      }),
+    });
+    expect(response.status).toBe(400);
+    const payload = (await response.json()) as { error?: string; toolName?: string };
+    expect(payload.error).toBe("tool_not_allowed");
+    expect(payload.toolName).toBe("halobank.time.compute");
   }, 30000);
+
+  it("ensures tools manifest includes halobank.time.compute once defaults load", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/tools/manifest`);
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as Array<{ name?: string }>;
+    expect(payload.some((entry) => entry.name === "halobank.time.compute")).toBe(true);
+  });
 });
