@@ -109,6 +109,11 @@ const CIRCUIT_OPEN_RETRY_AFTER_CUTOFF_MS = Math.max(
   0,
   Number(process.env.HELIX_ASK_VERSATILITY_CIRCUIT_OPEN_RETRY_AFTER_CUTOFF_MS ?? 8000),
 );
+const GLOBAL_COOLDOWN_ON_CIRCUIT = (process.env.HELIX_ASK_VERSATILITY_GLOBAL_COOLDOWN_ON_CIRCUIT ?? "1") !== "0";
+const GLOBAL_COOLDOWN_CAP_MS = Math.max(
+  0,
+  Number(process.env.HELIX_ASK_VERSATILITY_GLOBAL_COOLDOWN_CAP_MS ?? 45000),
+);
 const STUB_RE = /llm\.local stub result/i;
 const REPORT_SECTION_RE = /(Executive summary:|Coverage map:|Point-by-point:|Report covers)/i;
 
@@ -189,6 +194,21 @@ const writeCheckpoint = async (outDir: string, runId: string, rows: RawRun[]) =>
     }, {}),
   };
   await fs.writeFile(path.resolve(outDir, "checkpoint.json"), `${JSON.stringify(checkpoint, null, 2)}\n`, "utf8");
+};
+
+const circuitRetryAfterFromRawRun = (row: RawRun): number => {
+  const trace = row.attempt_trace ?? [];
+  if (!trace.length) return 0;
+  const latest = trace[trace.length - 1];
+  if (!latest) return 0;
+  const error = String(latest.error ?? "").toLowerCase();
+  const message = String(latest.message ?? "").toLowerCase();
+  const isCircuit =
+    error === "helix_ask_temporarily_unavailable" ||
+    message.includes("circuit") ||
+    message.includes("temporarily unavailable");
+  if (!isCircuit) return 0;
+  return Math.max(0, latest.retry_after_ms ?? 0);
 };
 
 const makeRelationPrompts = (): PromptCase[] => {
@@ -533,10 +553,17 @@ const main = async () => {
   const rawRuns: RawRun[] = [];
   let terminatedEarlyReason: string | null = null;
   const runStartMs = Date.now();
+  let globalCooldownUntil = 0;
+  let globalCooldownAppliedMs = 0;
   try {
     outer: for (const entry of prompts) {
       for (const seed of SEEDS) {
         for (const temperature of TEMPS) {
+          if (globalCooldownUntil > Date.now()) {
+            const waitMs = globalCooldownUntil - Date.now();
+            await sleep(waitMs);
+            globalCooldownAppliedMs += waitMs;
+          }
           if (MAX_RUN_MS > 0 && Date.now() - runStartMs >= MAX_RUN_MS) {
             terminatedEarlyReason = `max_run_ms_exceeded:${MAX_RUN_MS}`;
             break outer;
@@ -568,6 +595,18 @@ const main = async () => {
             attempt_trace: attemptTrace,
           };
           rawRuns.push(raw);
+          if (
+            GLOBAL_COOLDOWN_ON_CIRCUIT &&
+            (raw.stop_reason === "circuit_open_short_circuit" || raw.status === 503)
+          ) {
+            const retryAfterMs = circuitRetryAfterFromRawRun(raw);
+            if (retryAfterMs > 0) {
+              const cooldownMs = Math.min(GLOBAL_COOLDOWN_CAP_MS, retryAfterMs);
+              if (cooldownMs > 0) {
+                globalCooldownUntil = Math.max(globalCooldownUntil, Date.now() + cooldownMs);
+              }
+            }
+          }
           const fileName = `${runId}-${entry.id}-s${seed}-t${String(temperature).replace(".", "p")}.json`;
           await fs.writeFile(path.resolve(OUT_DIR, "raw", fileName), `${JSON.stringify(raw, null, 2)}\n`, "utf8");
           if (rawRuns.length % CHECKPOINT_EVERY === 0) {
@@ -692,6 +731,7 @@ const main = async () => {
     ended_at: new Date().toISOString(),
     run_duration_ms: Date.now() - runEpoch,
     terminated_early_reason: terminatedEarlyReason,
+    global_cooldown_applied_ms: globalCooldownAppliedMs,
     base_url: BASE_URL,
     prompt_count: prompts.length,
     seed_count: SEEDS.length,
@@ -754,6 +794,7 @@ const main = async () => {
     decision: recommendationDecision,
     rationale: [
       `terminated_early_reason=${terminatedEarlyReason ?? "none"}`,
+      `global_cooldown_applied_ms=${globalCooldownAppliedMs}`,
       `stub_text_detected_rate=${stubRate.toFixed(3)}`,
       `relation_packet_built_rate=${relationPacketBuiltRate.toFixed(3)}`,
       `relation_dual_domain_ok_rate=${relationDualDomainRate.toFixed(3)}`,
@@ -818,6 +859,7 @@ const main = async () => {
     `- total_runs: ${rawRuns.length}`,
     `- run_duration_ms: ${Date.now() - runEpoch}`,
     `- terminated_early_reason: ${terminatedEarlyReason ?? "none"}`,
+    `- global_cooldown_applied_ms: ${globalCooldownAppliedMs}`,
     "",
     "## Aggregate by Prompt Family",
     "| family | runs | pass_rate | intent_correct_rate | report_mode_correct_rate | stub_rate | latency_p50_ms | latency_p95_ms |",
