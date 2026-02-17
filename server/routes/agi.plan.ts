@@ -19245,6 +19245,8 @@ const executeHelixAsk = async ({
     let runtimeBudgetRecommend: string | null = null;
     let runtimeMustIncludeOk = true;
     let runtimeViabilityMustIncludeOk = true;
+    let retrievalConfidence = 0;
+    let retrievalDocShare = 0;
     let evidenceCoreRequired = false;
     let evidenceCoreGate: EvidenceEligibility = {
       ok: true,
@@ -20727,8 +20729,8 @@ const executeHelixAsk = async ({
         const retrievalEvidenceRatio = evidenceCoreRequired
           ? Math.min(evidenceGate.matchRatio, evidenceCoreGate.matchRatio)
           : evidenceGate.matchRatio;
-        let retrievalConfidence = retrievalEvidenceRatio;
-        let retrievalDocShare = docShare;
+        retrievalConfidence = retrievalEvidenceRatio;
+        retrievalDocShare = docShare;
         if (mustIncludeOk) retrievalConfidence += 0.15;
         if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
         if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
