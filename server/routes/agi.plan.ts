@@ -20538,6 +20538,7 @@ const executeHelixAsk = async ({
           ? Math.min(evidenceGate.matchRatio, evidenceCoreGate.matchRatio)
           : evidenceGate.matchRatio;
         let retrievalConfidence = retrievalEvidenceRatio;
+        let retrievalDocShare = docShare;
         if (mustIncludeOk) retrievalConfidence += 0.15;
         if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
         if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
@@ -20913,6 +20914,7 @@ const executeHelixAsk = async ({
             ? Math.min(evidenceGate.matchRatio, evidenceCoreGate.matchRatio)
             : evidenceGate.matchRatio;
           retrievalConfidence = attemptEvidenceRatio;
+          retrievalDocShare = attemptDocShare;
           if (mustIncludeOk) retrievalConfidence += 0.15;
           if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
           if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
@@ -21733,13 +21735,17 @@ const executeHelixAsk = async ({
         }
 
       const promptRetrievalConfidence =
-        typeof debugPayload?.retrieval_confidence === "number"
-          ? debugPayload.retrieval_confidence
-          : 0;
+        typeof retrievalConfidence === "number"
+          ? retrievalConfidence
+          : typeof debugPayload?.retrieval_confidence === "number"
+            ? debugPayload.retrieval_confidence
+            : 0;
       const promptRetrievalDocShare =
-        typeof debugPayload?.retrieval_doc_share === "number"
-          ? debugPayload.retrieval_doc_share
-          : 0;
+        typeof retrievalDocShare === "number"
+          ? retrievalDocShare
+          : typeof debugPayload?.retrieval_doc_share === "number"
+            ? debugPayload.retrieval_doc_share
+            : 0;
       const toolResultsTreeWalk =
         treeWalkMetrics &&
         typeof treeWalkMetrics.boundCount === "number" &&
