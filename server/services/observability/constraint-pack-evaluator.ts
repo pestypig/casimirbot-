@@ -137,6 +137,12 @@ type ConstraintPackEvaluationInput = {
   ladderTier?: PolicyLadderTier;
 };
 
+type CanonicalFirstFailClass =
+  | "constraint"
+  | "certificate_integrity"
+  | "certificate_status"
+  | "certificate_missing";
+
 const TRUTHY_VALUES = new Set([
   "1",
   "true",
@@ -554,6 +560,20 @@ const resolveFirstFail = (
   return constraints.find((entry) => entry.status === "fail");
 };
 
+const toCanonicalFirstFail = (
+  entry: ConstraintPackConstraintResult,
+  canonicalClass: CanonicalFirstFailClass,
+): ConstraintPackConstraintResult => {
+  const notePrefix = `class=${canonicalClass}`;
+  const note = entry.note ? `${notePrefix},${entry.note}` : notePrefix;
+  return {
+    ...entry,
+    severity: entry.severity ?? "HARD",
+    status: "fail",
+    note,
+  };
+};
+
 const resolveProxyFlag = (
   inputProxy: boolean | undefined,
   constraints: ConstraintPackConstraintResult[],
@@ -586,7 +606,7 @@ export const evaluateConstraintPackFromMetrics = (
   );
   const allConstraints = [...constraintResults, ...proxyResults];
   let pass = resolvePass(pack, constraintResults);
-  const firstFail = resolveFirstFail(constraintResults);
+  let firstFail = resolveFirstFail(constraintResults);
   const proxy = resolveProxyFlag(input.proxy, allConstraints);
   const autoCertificate = !input.certificate;
   let certificate =
@@ -597,9 +617,9 @@ export const evaluateConstraintPackFromMetrics = (
       constraints: allConstraints,
       proxy,
     });
-  const certificateHash = certificate?.certificateHash ?? null;
+  const initialCertificateHash = certificate?.certificateHash ?? null;
   const hasCertificate =
-    typeof certificateHash === "string" && certificateHash.trim().length > 0;
+    typeof initialCertificateHash === "string" && initialCertificateHash.trim().length > 0;
   const certified =
     pass && hasCertificate && certificate?.integrityOk === true && !proxy;
   const ladderTier = resolveLadderTier({
@@ -615,6 +635,15 @@ export const evaluateConstraintPackFromMetrics = (
       ladderNotes.push(`ladder_actual=${ladderTier}`);
     }
   }
+
+  if (!firstFail && !pass) {
+    firstFail = {
+      id: "ADAPTER_CONSTRAINT_POLICY",
+      severity: "HARD",
+      status: "fail",
+      note: "policy_gate_failed",
+    };
+  }
   if (autoCertificate && certificate) {
     const status = pass
       ? proxy
@@ -622,6 +651,59 @@ export const evaluateConstraintPackFromMetrics = (
         : pack.certificate.admissibleStatus
       : "FAIL";
     certificate = { ...certificate, status };
+  }
+
+  if (!firstFail && certificate?.integrityOk === false) {
+    pass = false;
+    firstFail = {
+      id: "ADAPTER_CERTIFICATE_INTEGRITY",
+      severity: "HARD",
+      status: "fail",
+      note: "integrity_ok=false",
+    };
+  }
+
+  const certificateHash = certificate?.certificateHash;
+  const hasCertificateHash =
+    typeof certificateHash === "string" && certificateHash.trim().length > 0;
+  if (!firstFail && pack.certificate.treatMissingCertificateAsNotCertified && !hasCertificateHash) {
+    pass = false;
+    firstFail = {
+      id: "ADAPTER_CERTIFICATE_MISSING",
+      severity: "HARD",
+      status: "fail",
+      note: "certificate_hash_missing",
+    };
+  }
+
+  const certificateStatus = typeof certificate?.status === "string"
+    ? certificate.status.trim()
+    : "";
+  const admissibleStatus = pack.certificate.admissibleStatus.trim();
+  const marginalAllowed = pack.certificate.allowMarginalAsViable;
+  const certificateStatusAccepted =
+    !certificateStatus ||
+    certificateStatus === admissibleStatus ||
+    (marginalAllowed && certificateStatus.toUpperCase() === "MARGINAL");
+  if (!firstFail && !certificateStatusAccepted) {
+    pass = false;
+    firstFail = {
+      id: `ADAPTER_CERTIFICATE_STATUS_${certificateStatus || "UNKNOWN"}`,
+      severity: "HARD",
+      status: "fail",
+      note: `expected=${admissibleStatus},actual=${certificateStatus || "missing"}`,
+    };
+  }
+
+  if (firstFail) {
+    const canonicalClass: CanonicalFirstFailClass = firstFail.id === "ADAPTER_CERTIFICATE_INTEGRITY"
+      ? "certificate_integrity"
+      : firstFail.id === "ADAPTER_CERTIFICATE_MISSING"
+        ? "certificate_missing"
+        : firstFail.id.startsWith("ADAPTER_CERTIFICATE_STATUS_")
+          ? "certificate_status"
+          : "constraint";
+    firstFail = toCanonicalFirstFail(firstFail, canonicalClass);
   }
   const mergedNotes = [
     ...(input.notes ?? []),
