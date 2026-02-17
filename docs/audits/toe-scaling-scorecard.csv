@@ -1,0 +1,2 @@
+date_utc,ticket_id,commit,contract_pass,required_tests_pass,casimir_adapter_pass,casimir_run_id,casimir_integrity_ok,claim_tier,scope_drift,repeat_stability,scale_decision,notes
+2026-02-17,TOE-001-curvature-stress-bridge,e91f803d,true,true,true,17905,true,reduced-order,false,true,hold,"Need 2 more consecutive full-gate passes before scaling."
