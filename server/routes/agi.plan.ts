@@ -5279,6 +5279,56 @@ function buildHelixAskSearchQueries(
   return queries.slice(0, 10);
 }
 
+const HELIX_ASK_TOPIC_CARRYOVER_MIN_OVERLAP = clampNumber(
+  readNumber(process.env.HELIX_ASK_TOPIC_CARRYOVER_MIN_OVERLAP, 0.67),
+  0.34,
+  1,
+);
+
+const scoreTopicCarryoverOverlap = (
+  topicTag: string,
+  questionTokens: Set<string>,
+): number => {
+  const tagTokens = filterCriticTokens(
+    tokenizeAskQuery(String(topicTag || "").replace(/[_-]+/g, " ")),
+  );
+  if (tagTokens.length === 0) return 0;
+  let matchCount = 0;
+  for (const token of tagTokens) {
+    if (questionTokens.has(token)) matchCount += 1;
+  }
+  return matchCount / tagTokens.length;
+};
+
+const selectCarryoverTopicTags = (args: {
+  inferredTopics: HelixAskTopicTag[];
+  recentTopics: string[];
+  question: string;
+  searchQuery?: string;
+}): HelixAskTopicTag[] => {
+  if (!args.recentTopics.length) return [];
+  const inferredSet = new Set(args.inferredTopics);
+  const questionTokens = new Set(
+    filterCriticTokens(
+      tokenizeAskQuery([args.question, args.searchQuery ?? ""].filter(Boolean).join(" ")),
+    ),
+  );
+  const kept: HelixAskTopicTag[] = [];
+  for (const raw of args.recentTopics) {
+    const topic = String(raw || "").trim();
+    if (!topic || !/^[a-z_]+$/i.test(topic)) continue;
+    if (inferredSet.has(topic as HelixAskTopicTag)) {
+      kept.push(topic as HelixAskTopicTag);
+      continue;
+    }
+    const overlap = scoreTopicCarryoverOverlap(topic, questionTokens);
+    if (overlap >= HELIX_ASK_TOPIC_CARRYOVER_MIN_OVERLAP) {
+      kept.push(topic as HelixAskTopicTag);
+    }
+  }
+  return Array.from(new Set(kept));
+};
+
 function buildHybridConceptSkeleton(
   question: string,
   conceptMatch: HelixAskConceptMatch | null,
@@ -9076,6 +9126,7 @@ const filterFallbackDocBlocks = (
 
 const SCIENTIFIC_SECTION_HEADINGS = [
   "Confirmed:",
+  "Unverified:",
   "Reasoned connections (bounded):",
   "Hypotheses (optional):",
   "Next evidence:",
@@ -9175,7 +9226,8 @@ const buildSingleLlmShortAnswerFallback = (args: {
     );
   const codeBullets = codeSource.slice(0, codeLimit).map((span) => buildCodeEvidenceBullet(span));
   const normalizedEvidence = [...docBullets, ...codeBullets].map(stripEvidenceBulletPrefix);
-  const lines: string[] = ["Confirmed:"];
+  const hasConfirmedEvidence = docBullets.length > 0 || codeBullets.length > 0;
+  const lines: string[] = [hasConfirmedEvidence ? "Confirmed:" : "Unverified:"];
   if (docBullets.length === 0 && codeBullets.length === 0) {
     lines.push(
       `- ${
@@ -9475,15 +9527,15 @@ const repairSparseScientificSections = (
   const citations = citationPaths.filter(Boolean).slice(0, 3);
   const fallback = (fallbackSentences ?? []).filter(Boolean);
   let repaired = normalized;
-  if (/Confirmed:\s*\n\s*\nReasoned connections \(bounded\):/i.test(repaired)) {
+  if (/(Confirmed:|Unverified:)\s*\n\s*\nReasoned connections \(bounded\):/i.test(repaired)) {
     const confirmedLine =
       fallback[0] ??
       (citations.length
         ? `- Evidence spans were retrieved from ${citations.join(", ")}.`
         : "- Evidence spans were retrieved from the current repo context.");
     repaired = repaired.replace(
-      /Confirmed:\s*\n\s*\nReasoned connections \(bounded\):/i,
-      `Confirmed:\n${confirmedLine}\n\nReasoned connections (bounded):`,
+      /(Confirmed:|Unverified:)\s*\n\s*\nReasoned connections \(bounded\):/i,
+      `$1\n${confirmedLine}\n\nReasoned connections (bounded):`,
     );
   }
   if (/Reasoned connections \(bounded\):\s*\n\s*\nNext evidence:/i.test(repaired)) {
@@ -9516,6 +9568,10 @@ const extractScientificSectionBody = (text: string, heading: string): string => 
   return (match?.[1] ?? "").trim();
 };
 
+const extractScientificPrimaryBody = (text: string): string =>
+  extractScientificSectionBody(text, "Confirmed:") ||
+  extractScientificSectionBody(text, "Unverified:");
+
 const extractSectionBullets = (body: string): string[] =>
   body
     .split(/\r?\n/)
@@ -9536,7 +9592,7 @@ const isLowSignalScientificBullet = (value: string): boolean => {
 
 const hasWeakScientificSections = (text: string): boolean => {
   if (!isScientificMicroReport(text)) return false;
-  const confirmedBody = extractScientificSectionBody(text, "Confirmed:");
+  const confirmedBody = extractScientificPrimaryBody(text);
   const reasonedBody = extractScientificSectionBody(text, "Reasoned connections (bounded):");
   const confirmedRawBullets = extractSectionBullets(confirmedBody);
   const reasonedRawBullets = extractSectionBullets(reasonedBody);
@@ -9557,7 +9613,7 @@ const hasWeakScientificSections = (text: string): boolean => {
 
 const rewriteIdeologyScientificVoice = (text: string, question: string): string => {
   if (!isScientificMicroReport(text)) return text;
-  const confirmedBullets = extractSectionBullets(extractScientificSectionBody(text, "Confirmed:"));
+  const confirmedBullets = extractSectionBullets(extractScientificPrimaryBody(text));
   const reasonedBullets = extractSectionBullets(
     extractScientificSectionBody(text, "Reasoned connections (bounded):"),
   );
@@ -9615,7 +9671,7 @@ const shouldForceScientificFallback = (
   codeAlignment?: { spans?: Array<unknown> } | null,
 ): boolean => {
   if (!isScientificMicroReport(text)) return false;
-  const confirmedBody = extractScientificSectionBody(text, "Confirmed:");
+  const confirmedBody = extractScientificPrimaryBody(text);
   const reasonedBody = extractScientificSectionBody(text, "Reasoned connections (bounded):");
   const confirmedBullets = extractSectionBullets(confirmedBody).filter(
     (entry) => !isLowSignalScientificBullet(entry),
@@ -12256,7 +12312,7 @@ const sanitizePlanClarifyLine = (value: string): string => {
 };
 
 const SCIENTIFIC_REPORT_HEAD_RE =
-  /^(Confirmed:|Reasoned connections|Hypotheses \(optional\)|Next evidence:)/im;
+  /^(Confirmed:|Unverified:|Reasoned connections|Hypotheses \(optional\)|Next evidence:)/im;
 
 const isScientificMicroReport = (text: string): boolean =>
   Boolean(text && SCIENTIFIC_REPORT_HEAD_RE.test(text));
@@ -12407,6 +12463,7 @@ const buildScientificMicroReport = (args: {
   hypothesisEnabled?: boolean;
   hypothesisStyle?: "conservative" | "exploratory";
   requiresRepoEvidence?: boolean;
+  forceUnverified?: boolean;
 }): {
   text: string;
   nextEvidence: string[];
@@ -12417,7 +12474,7 @@ const buildScientificMicroReport = (args: {
     args.claimLedger?.filter((entry) => entry.supported && entry.type !== "question") ?? [];
   const confirmedItems = supportedClaims.map((entry) => ensureSentence(entry.text)).slice(0, 3);
   const lines: string[] = [];
-  lines.push("Confirmed:");
+  lines.push(args.forceUnverified || confirmedItems.length === 0 ? "Unverified:" : "Confirmed:");
   if (confirmedItems.length > 0) {
     confirmedItems.forEach((item) => lines.push(`- ${item}`));
   } else {
@@ -16799,6 +16856,7 @@ const executeHelixAsk = async ({
               hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
               hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
               requiresRepoEvidence: blockRepoContext,
+              forceUnverified: true,
             });
             blockAnswer = scientific.text;
             blockNextEvidence = scientific.nextEvidence;
@@ -16958,9 +17016,27 @@ const executeHelixAsk = async ({
           : null;
     }
       if (sessionMemoryForTags?.recentTopics?.length) {
-        topicTags = Array.from(
-          new Set([...topicTags, ...sessionMemoryForTags.recentTopics]),
-        ) as HelixAskTopicTag[];
+        const carryoverTopics = selectCarryoverTopicTags({
+          inferredTopics: topicTags,
+          recentTopics: sessionMemoryForTags.recentTopics,
+          question: blockScoped && blockSearchSeed ? blockSearchSeed : baseQuestion,
+          searchQuery: parsed.data.searchQuery,
+        });
+        if (carryoverTopics.length > 0) {
+          topicTags = Array.from(
+            new Set([...topicTags, ...carryoverTopics]),
+          ) as HelixAskTopicTag[];
+        }
+        if (sessionMemoryForTags.recentTopics.length > 0) {
+          logEvent(
+            "Topic carryover",
+            carryoverTopics.length > 0 ? "filtered" : "none",
+            `kept=${carryoverTopics.length}/${sessionMemoryForTags.recentTopics.length}`,
+          );
+        }
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).topic_carryover = carryoverTopics.slice(0, 8);
+        }
       }
       logEvent(
         "Topic tags",
@@ -17702,6 +17778,7 @@ const executeHelixAsk = async ({
           hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
           hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
           requiresRepoEvidence,
+          forceUnverified: true,
         });
         forcedAnswer = scientific.text;
         forcedAnswerIsHard = true;
@@ -22017,6 +22094,7 @@ const executeHelixAsk = async ({
             hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
             hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
             requiresRepoEvidence,
+            forceUnverified: true,
           });
           forcedAnswer = scientific.text;
           forcedAnswerIsHard = true;
@@ -22093,6 +22171,7 @@ const executeHelixAsk = async ({
             hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
             hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
             requiresRepoEvidence,
+            forceUnverified: true,
           });
           forcedAnswer = scientific.text;
           forcedAnswerIsHard = true;
@@ -23532,6 +23611,7 @@ const executeHelixAsk = async ({
             hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
             hypothesisStyle: HELIX_ASK_HYPOTHESIS_STYLE,
             requiresRepoEvidence,
+            forceUnverified: true,
           });
           cleaned = scientific.text;
           if (debugPayload) {
