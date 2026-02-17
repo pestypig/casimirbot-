@@ -35,6 +35,7 @@ import { trainingTraceRouter } from "./routes/training-trace";
 import { adapterRouter } from "./routes/agi.adapter";
 import { constraintPacksRouter } from "./routes/agi.constraint-packs";
 import { chatRouter } from "./routes/agi.chat";
+import { demonstrationRouter } from "./routes/agi.demonstration";
 import { requireJwtMiddleware } from "./auth/jwt";
 import { qiSnapHub } from "./qi/qi-snap-broadcaster";
 import { vectorizerRouter } from "./routes/vectorizer";
@@ -233,6 +234,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi/profile", profileRouter);
     app.use("/api/agi/contributions", contributionsRouter);
     app.use("/api/agi", chatRouter);
+    app.use("/api/agi/demonstration", demonstrationRouter);
     app.use("/api/agi", trainingTraceRouter);
     app.use("/api/agi", refineryRouter);
     app.use("/api/agi", constraintPacksRouter);

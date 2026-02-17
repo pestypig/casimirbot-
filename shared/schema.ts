@@ -2401,6 +2401,42 @@ export const trainingTraceCertificateSchema = z.object({
 });
 export type TrainingTraceCertificate = z.infer<typeof trainingTraceCertificateSchema>;
 
+export const movementEpisodeMetricsSchema = z.object({
+  optimism: z.number(),
+  entropy: z.number(),
+});
+export type MovementEpisodeMetrics = z.infer<typeof movementEpisodeMetricsSchema>;
+
+export const movementEpisodePhaseSchema = z.enum([
+  "sense",
+  "premeditate",
+  "act",
+  "compare",
+]);
+export type MovementEpisodePhase = z.infer<typeof movementEpisodePhaseSchema>;
+
+export const movementEpisodeEventSchema = z.object({
+  phase: movementEpisodePhaseSchema,
+  ts: z.string(),
+  candidateId: z.string().optional(),
+  controllerRef: z.string().optional(),
+  predictedDelta: z.number().optional(),
+  actualDelta: z.number().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+export type MovementEpisodeEvent = z.infer<typeof movementEpisodeEventSchema>;
+
+export const movementEpisodePayloadSchema = z.object({
+  episodeId: z.string(),
+  traceId: z.string().optional(),
+  primitivePath: z.array(z.string()).default([]),
+  metrics: movementEpisodeMetricsSchema,
+  events: z.array(movementEpisodeEventSchema).default([]),
+  replaySeed: z.string().optional(),
+  notes: z.array(z.string()).optional(),
+});
+export type MovementEpisodePayload = z.infer<typeof movementEpisodePayloadSchema>;
+
 export const trainingTracePayloadSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("trajectory"), data: agiTrajectorySchema }),
   z.object({ kind: z.literal("trajectory_gates"), data: agiGateReportSchema }),
@@ -2409,6 +2445,7 @@ export const trainingTracePayloadSchema = z.discriminatedUnion("kind", [
     data: agiRefinerySummarySchema,
   }),
   z.object({ kind: z.literal("dataset_export"), data: agiDatasetExportSchema }),
+  z.object({ kind: z.literal("movement_episode"), data: movementEpisodePayloadSchema }),
 ]);
 export type TrainingTracePayload = z.infer<typeof trainingTracePayloadSchema>;
 
@@ -2493,6 +2530,62 @@ export const adapterConstraintPackSchema = z.object({
 });
 export type AdapterConstraintPack = z.infer<typeof adapterConstraintPackSchema>;
 
+
+
+export const adapterPremeditationCandidateSchema = z.object({
+  id: z.string(),
+  valueLongevity: z.number(),
+  risk: z.number().nonnegative(),
+  entropy: z.number().nonnegative(),
+  ideologyAlignment: z.number().min(0).max(1).optional(),
+  coherenceAlignment: z.number().min(0).max(1).optional(),
+  tags: z.array(z.string()).optional(),
+});
+export type AdapterPremeditationCandidate = z.infer<typeof adapterPremeditationCandidateSchema>;
+
+export const adapterPremeditationInputSchema = z.object({
+  candidates: z.array(adapterPremeditationCandidateSchema).min(1),
+  lambda: z.number().nonnegative().default(1),
+  mu: z.number().nonnegative().default(1),
+  ideologyWeight: z.number().nonnegative().default(0),
+  coherenceWeight: z.number().nonnegative().default(0),
+});
+export type AdapterPremeditationInput = z.infer<typeof adapterPremeditationInputSchema>;
+
+export const adapterPremeditationScoredCandidateSchema = z.object({
+  id: z.string(),
+  score: z.number(),
+  optimism: z.number(),
+  entropy: z.number(),
+  rationaleTags: z.array(z.string()),
+});
+export type AdapterPremeditationScoredCandidate = z.infer<typeof adapterPremeditationScoredCandidateSchema>;
+
+export const adapterPremeditationResultSchema = z.object({
+  chosenCandidateId: z.string().optional(),
+  optimism: z.number(),
+  entropy: z.number(),
+  rationaleTags: z.array(z.string()),
+  scores: z.array(adapterPremeditationScoredCandidateSchema),
+});
+export type AdapterPremeditationResult = z.infer<typeof adapterPremeditationResultSchema>;
+
+
+
+export const adapterRoboticsSafetySchema = z.object({
+  collisionMargin_m: z.number(),
+  collisionMarginMin_m: z.number().nonnegative(),
+  torqueUsageRatio: z.number(),
+  torqueUsageMax: z.number().positive(),
+  speedUsageRatio: z.number(),
+  speedUsageMax: z.number().positive(),
+  stabilityMargin: z.number(),
+  stabilityMarginMin: z.number(),
+  certificateHash: z.string().nullable().optional(),
+  integrityOk: z.boolean().optional(),
+});
+export type AdapterRoboticsSafety = z.infer<typeof adapterRoboticsSafetySchema>;
+
 export const adapterArtifactRefSchema = z.object({
   kind: z.string(),
   ref: z.string(),
@@ -2507,6 +2600,8 @@ export const adapterRunRequestSchema = z.object({
   actions: z.array(adapterActionSchema).min(1).optional(),
   budget: adapterBudgetSchema.optional(),
   policy: adapterPolicySchema.optional(),
+  premeditation: adapterPremeditationInputSchema.optional(),
+  roboticsSafety: adapterRoboticsSafetySchema.optional(),
 });
 export type AdapterRunRequest = z.infer<typeof adapterRunRequestSchema>;
 
@@ -2517,6 +2612,7 @@ export const adapterRunResponseSchema = z.object({
   pass: z.boolean(),
   firstFail: trainingTraceConstraintSchema.nullable().optional(),
   deltas: z.array(trainingTraceDeltaSchema),
+  premeditation: adapterPremeditationResultSchema.optional(),
   artifacts: z.array(adapterArtifactRefSchema),
 });
 export type AdapterRunResponse = z.infer<typeof adapterRunResponseSchema>;
@@ -2684,4 +2780,3 @@ export const constraintPackEvaluationSchema = z.object({
 export type ConstraintPackEvaluation = z.infer<
   typeof constraintPackEvaluationSchema
 >;
-

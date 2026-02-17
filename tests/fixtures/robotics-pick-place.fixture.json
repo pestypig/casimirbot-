@@ -1,0 +1,23 @@
+{
+  "demo": {
+    "demoId": "benchmark-pick-place",
+    "traceId": "benchmark:pick-place",
+    "seed": "benchmark-seed-2026",
+    "frames": [
+      { "ts": 1000, "pose": [0.0, 0.0, 0.0], "joints": [0.0, 0.0, 0.0], "grip": 0.0 },
+      { "ts": 1200, "pose": [0.08, 0.0, 0.0], "joints": [0.12, 0.06, 0.02], "grip": 0.1 },
+      { "ts": 1400, "pose": [0.16, 0.02, 0.0], "joints": [0.2, 0.1, 0.05], "grip": 0.85 },
+      { "ts": 2300, "pose": [0.62, 0.24, 0.0], "joints": [0.34, 0.21, 0.1], "grip": 0.85 },
+      { "ts": 2500, "pose": [0.64, 0.24, 0.0], "joints": [0.35, 0.22, 0.1], "grip": 0.25 }
+    ],
+    "limits": {
+      "maxJointAbs": 2.5,
+      "maxStepNorm": 1.5,
+      "maxJointDelta": 0.9
+    }
+  },
+  "thresholds": {
+    "maxStepNormDelta": 0.35,
+    "maxJointDelta": 0.3
+  }
+}

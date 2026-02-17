@@ -113,3 +113,27 @@ export async function recheckWarpViabilityCertificate(cert: WarpViabilityCertifi
 
   return { integrityOk, physicsOk, differences: diffs.length ? diffs : undefined };
 }
+
+
+export type RoboticsSafetyCertificate = {
+  mode: "robotics-safety-v1";
+  checks: Array<{
+    id: string;
+    pass: boolean;
+    value: number;
+    limit: string;
+    severity: "HARD" | "SOFT";
+  }>;
+  certificateHash: string;
+};
+
+export function verifyRoboticsSafetyCertificateIntegrity(
+  cert: RoboticsSafetyCertificate,
+): boolean {
+  const payload = {
+    mode: cert.mode,
+    checks: cert.checks,
+  };
+  const expected = hashString(JSON.stringify(payload));
+  return expected === cert.certificateHash;
+}
