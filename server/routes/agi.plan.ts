@@ -3170,6 +3170,16 @@ const HELIX_ASK_RELATION_WARP_ANCHOR_RE =
   /(^|\/)(docs\/knowledge\/warp\/|modules\/warp\/|docs\/warp-console-architecture\.md|docs\/theta-semantics\.md)/i;
 const HELIX_ASK_RELATION_ETHOS_ANCHOR_RE =
   /(^|\/)(docs\/ethos\/|docs\/knowledge\/ethos\/|server\/routes\/ethos\.ts|client\/src\/components\/MissionEthosSourcePanel\.tsx|client\/src\/lib\/ideology-types\.ts)/i;
+const HELIX_ASK_QUALITY_MIN_TEXT_CHARS = clampNumber(
+  readNumber(process.env.HELIX_ASK_QUALITY_MIN_TEXT_CHARS, 220),
+  120,
+  1200,
+);
+const HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS = clampNumber(
+  readNumber(process.env.HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS, 260),
+  140,
+  1400,
+);
 const HELIX_ASK_IDEOLOGY_REPORT_BAN_RE = /\b(?:report|point[s]?|coverage|summary|compare|difference|between|each|step|slot|bullet|section)\b/i;
 const HELIX_ASK_IDEOLOGY_NARRATIVE_GUARD_RE = /\b(do not|don't|avoid|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i;
 const HELIX_ASK_DRIFT_REPAIR = String(process.env.HELIX_ASK_DRIFT_REPAIR ?? "1").trim() !== "0";
@@ -11674,6 +11684,59 @@ const detectRelationDeterministicFallbackReasons = (value: string): string[] => 
   return Array.from(reasons);
 };
 
+const detectRepoAnswerQualityFloorReasons = (args: {
+  text: string;
+  relationQuery: boolean;
+  relationPacket: boolean;
+  requiresRepoEvidence: boolean;
+  intentDomain: string;
+}): string[] => {
+  const reasons = new Set<string>();
+  const normalized = args.text.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    reasons.add("empty");
+    return Array.from(reasons);
+  }
+  if (RELATION_MODEL_PLACEHOLDER_RE.test(normalized)) {
+    reasons.add("placeholder");
+  }
+  if (/\bllm\.local\s+stub\s+result\b/i.test(normalized)) {
+    reasons.add("stub_text");
+  }
+  if (isDeterministicMetadataNoise(normalized)) {
+    reasons.add("metadata_noise");
+  }
+  if (RELATION_CODE_NOISE_RE.test(normalized)) {
+    reasons.add("code_noise");
+  }
+  const hasCitations =
+    extractFilePathsFromText(args.text).length > 0 || hasSourcesLine(args.text);
+  if (
+    (args.requiresRepoEvidence ||
+      args.intentDomain === "repo" ||
+      args.intentDomain === "hybrid" ||
+      args.relationQuery) &&
+    !hasCitations
+  ) {
+    reasons.add("citation_missing");
+  }
+  const minChars = args.relationQuery
+    ? HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS
+    : HELIX_ASK_QUALITY_MIN_TEXT_CHARS;
+  if (
+    (args.intentDomain === "repo" || args.intentDomain === "hybrid" || args.relationQuery) &&
+    normalized.length < minChars
+  ) {
+    reasons.add("text_too_short");
+  }
+  if (args.relationQuery && args.relationPacket) {
+    for (const reason of detectRelationDeterministicFallbackReasons(args.text)) {
+      reasons.add(`relation_${reason}`);
+    }
+  }
+  return Array.from(reasons);
+};
+
 const isDeterministicMetadataNoise = (value: string): boolean => {
   const normalized = value.toLowerCase();
   if (!normalized) return true;
@@ -13475,7 +13538,10 @@ const isWarpEthosRelationQuestion = (question: string): boolean => {
     HELIX_ASK_RELATION_CONNECTOR_RE.test(normalized) ||
     /\bdefine\b[\s\S]{0,120}\b(?:then|and)\b[\s\S]{0,80}\bconnect\b/i.test(normalized) ||
     /\bwhat(?:'s| is)\b[\s\S]{0,80}\bbridge\b/i.test(normalized);
-  return hasConnector;
+  const compactConnector = /\b(?:relation|relationship|connect(?:ion)?|link|bridge|interplay|fit)\b/i.test(
+    normalized,
+  );
+  return hasConnector || compactConnector;
 };
 
 const isExplicitReportRequest = (question: string): boolean => {
@@ -21958,6 +22024,19 @@ const executeHelixAsk = async ({
             failClosedReason = null;
           }
         }
+        if (
+          failClosedReason === "doc_slot_missing" &&
+          (warpEthosRelationQuery ||
+            HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
+            isWarpEthosRelationQuestion(baseQuestion) ||
+            intentProfile.id === "hybrid.warp_ethos_relation") &&
+          relationPacket &&
+          relationPacket.bridge_claims.length >= 2 &&
+          relationPacket.domains.includes("warp") &&
+          relationPacket.domains.includes("ethos")
+        ) {
+          failClosedReason = null;
+        }
         failClosedRepoEvidence = Boolean(failClosedReason);
         const hasHighStakesConstraints =
           intentTier === "F3" ||
@@ -23049,9 +23128,38 @@ const executeHelixAsk = async ({
         graphPack,
       });
       const relationAnchorsRequired = relationQuery && warpEthosRelationQuery;
-      const relationAnchorMissing =
-        relationAnchorsRequired && !relationTopology.dualDomainAnchors;
-      if (relationQuery && relationTopology.dualDomainAnchors && relationTopology.crossDomainBridge) {
+      const relationCoveredSlots = [
+        ...(coverageSlotSummary?.coveredSlots ?? []),
+        ...(docSlotSummary?.coveredSlots ?? []),
+      ];
+      const relationSlotDomainSignal = relationCoveredSlots.reduce(
+        (acc, slot) => {
+          const normalized = String(slot ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+          if (/\b(?:warp|bubble|alcubierre|natario|spacetime|qi|theta)\b/i.test(normalized)) {
+            acc.hasWarp = true;
+          }
+          if (/\b(?:mission|ethos|ideology|stewardship|compassion|governance)\b/i.test(normalized)) {
+            acc.hasEthos = true;
+          }
+          return acc;
+        },
+        { hasWarp: false, hasEthos: false },
+      );
+      const relationContextDomainSignal = {
+        hasWarp:
+          HELIX_ASK_RELATION_WARP_QUERY_RE.test(contextText) ||
+          HELIX_ASK_RELATION_WARP_QUERY_RE.test(evidenceText),
+        hasEthos:
+          HELIX_ASK_RELATION_ETHOS_QUERY_RE.test(contextText) ||
+          HELIX_ASK_RELATION_ETHOS_QUERY_RE.test(evidenceText),
+      };
+      let relationDualDomainOk =
+        relationTopology.dualDomainAnchors ||
+        (relationSlotDomainSignal.hasWarp && relationSlotDomainSignal.hasEthos) ||
+        (relationContextDomainSignal.hasWarp && relationContextDomainSignal.hasEthos);
+      const relationPacketActivationOk =
+        relationQuery && (relationTopology.crossDomainBridge || relationDualDomainOk);
+      if (relationPacketActivationOk) {
         relationPacket = buildRelationAssemblyPacket({
           question: baseQuestion,
           contextFiles,
@@ -23059,18 +23167,22 @@ const executeHelixAsk = async ({
           docBlocks,
           graphPack,
         });
+        const relationPacketDualDomain =
+          relationPacket.domains.includes("warp") && relationPacket.domains.includes("ethos");
+        relationDualDomainOk = relationDualDomainOk || relationPacketDualDomain;
         if (debugPayload) {
           debugPayload.relation_packet_built = true;
           debugPayload.relation_packet_evidence_count = relationPacket.evidence.length;
           debugPayload.relation_packet_bridge_count = relationPacket.bridge_claims.length;
-          debugPayload.relation_dual_domain_ok = relationTopology.dualDomainAnchors;
+          debugPayload.relation_dual_domain_ok = relationDualDomainOk;
           debugPayload.relation_missing_anchor_files = [];
         }
       } else if (debugPayload && relationQuery) {
         debugPayload.relation_packet_built = false;
-        debugPayload.relation_dual_domain_ok = relationTopology.dualDomainAnchors;
+        debugPayload.relation_dual_domain_ok = relationDualDomainOk;
         debugPayload.relation_missing_anchor_files = relationTopology.missingAnchors;
       }
+      const relationAnchorMissing = relationAnchorsRequired && !relationDualDomainOk;
       const relationCoverageWeak =
         relationQuery &&
         ((coverageSlotSummary?.coveredSlots.length ?? 0) < 2 &&
@@ -25908,6 +26020,82 @@ const executeHelixAsk = async ({
           if (debugPayload) {
             debugPayload.placeholder_fallback_applied = true;
             debugPayload.placeholder_fallback_reason = "model_placeholder_answer";
+          }
+        }
+      }
+      const relationQueryForFinalize =
+        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
+        isWarpEthosRelationQuestion(baseQuestion) ||
+        intentProfile.id === "hybrid.warp_ethos_relation";
+      const qualityFloorEligible =
+        intentDomain === "repo" ||
+        intentDomain === "hybrid" ||
+        relationQueryForFinalize ||
+        requiresRepoEvidence;
+      const qualityFloorReasons = qualityFloorEligible
+        ? detectRepoAnswerQualityFloorReasons({
+            text: cleaned,
+            relationQuery: relationQueryForFinalize,
+            relationPacket: Boolean(relationPacket),
+            requiresRepoEvidence,
+            intentDomain,
+          })
+        : [];
+      if (qualityFloorEligible && qualityFloorReasons.length > 0) {
+        const qualityFloorAllowedPaths = filterExistingEvidencePaths(
+          Array.from(
+            new Set([
+              ...allowedSourcePaths,
+              ...contextFiles,
+              ...extractFilePathsFromText(evidenceText),
+              ...(relationPacket ? relationPacket.evidence.map((entry) => entry.path) : []),
+            ]),
+          ),
+        );
+        const qualityFloorCitations = normalizeCitations([
+          ...qualityFloorAllowedPaths,
+          ...extractCitationTokensFromText(evidenceText),
+          ...(relationPacket ? Object.values(relationPacket.source_map) : []),
+        ]);
+        const qualityFloorContract = relationPacket
+          ? sanitizeHelixAskAnswerContract(
+              buildRelationModeContractFromPacket(relationPacket),
+              qualityFloorCitations,
+            )
+          : sanitizeHelixAskAnswerContract(
+              buildDeterministicAnswerContractFallback({
+                question: baseQuestion,
+                format: formatSpec.format,
+                definitionFocus,
+                docBlocks,
+                codeAlignment,
+                evidenceText: appendEvidenceSources(evidenceText, contextFiles, 8, contextText),
+                allowedCitations: qualityFloorCitations,
+              }),
+              qualityFloorCitations,
+            );
+        let qualityFloorRendered = renderHelixAskAnswerContract(
+          qualityFloorContract,
+          formatSpec.format,
+          baseQuestion,
+        );
+        qualityFloorRendered = sanitizeSourcesLine(
+          qualityFloorRendered,
+          qualityFloorAllowedPaths,
+          extractCitationTokensFromText(evidenceText),
+        );
+        if (qualityFloorRendered.trim()) {
+          cleaned = qualityFloorRendered.trim();
+          answerPath.push("qualityFloor:deterministic_contract");
+          logEvent(
+            "Answer quality floor",
+            "deterministic_contract",
+            qualityFloorReasons.join(","),
+            answerStart,
+          );
+          if (debugPayload) {
+            debugPayload.answer_quality_floor_applied = true;
+            debugPayload.answer_quality_floor_reasons = qualityFloorReasons;
           }
         }
       }

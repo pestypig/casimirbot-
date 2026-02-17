@@ -213,8 +213,9 @@ describe("Helix Ask live events", () => {
     expect(payload.debug?.relation_dual_domain_ok).toBe(true);
     expect(payload.debug?.relation_packet_bridge_count ?? 0).toBeGreaterThanOrEqual(2);
     expect(payload.debug?.relation_packet_evidence_count ?? 0).toBeGreaterThan(1);
-    expect(payload.text.length).toBeGreaterThan(0);
+    expect(payload.text.length).toBeGreaterThanOrEqual(220);
     expect(payload.text).not.toMatch(/llm\.local stub result/i);
+    expect(payload.text).not.toMatch(/\b(?:title|heading|slug)\s*:/i);
     expect(payload.text).toMatch(/warp bubble|warp/i);
     expect(payload.text).toMatch(/mission ethos|ethos/i);
     expect(payload.text).toMatch(/Sources:/i);
@@ -232,16 +233,21 @@ describe("Helix Ask live events", () => {
     });
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
+      text: string;
       debug?: {
         report_mode?: boolean;
         report_mode_reason?: string;
         intent_id?: string;
+        relation_packet_built?: boolean;
       };
     };
     expect(payload.debug?.report_mode).toBe(false);
     expect(payload.debug?.report_mode_reason).not.toBe("multi_slot");
     expect(payload.debug?.report_mode_reason).not.toBe("slot_plan");
     expect(payload.debug?.intent_id).toBe("hybrid.warp_ethos_relation");
+    expect(payload.debug?.relation_packet_built).toBe(true);
+    expect(payload.text).not.toMatch(/Executive summary:/i);
+    expect(payload.text).toMatch(/Sources:/i);
   }, 45000);
 
 });

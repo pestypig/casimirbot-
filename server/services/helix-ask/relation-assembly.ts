@@ -36,6 +36,20 @@ const ETHOS_ANCHOR_RE = /(^|\/)(docs\/ethos\/|docs\/knowledge\/ethos\/|server\/r
 
 const clip = (value: string, max = 260): string => value.replace(/\s+/g, " ").trim().slice(0, max).trim();
 
+const sanitizeSnippet = (value: string): string =>
+  value
+    .replace(/\(see\s+[^\)]*\)/gi, " ")
+    .replace(/\b(?:Doc|Title|Heading|Subheading|Section|Span|Code|Test):\s*[^.]+(?:\.)?/gi, " ")
+    .replace(
+      /\b(?:id|slug|label|aliases|scope|intenthints|topictags|mustincludefiles|version|rootid|nodes|children)\s*:\s*[^,;]+/gi,
+      " ",
+    )
+    .replace(/(^|\s)---(\s|$)/g, " ")
+    .replace(/\{[^{}]*\}/g, " ")
+    .replace(/[{}[\]"]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 const detectDomain = (path: string, snippet = ""): "warp" | "ethos" | "other" => {
   const hay = `${path}\n${snippet}`;
   if (WARP_ANCHOR_RE.test(hay) || /\b(warp|bubble|alcubierre|natario|quantum inequality|constraint gate)\b/i.test(hay)) {
@@ -56,8 +70,10 @@ const toCitation = (path: string, span: string): string => `${path}${span ? `#${
 
 const firstSentence = (text: string, fallback: string): string => {
   const first = text.split(/(?<=[.!?])\s+/)[0] ?? "";
-  const normalized = clip(first, 220);
-  return normalized || fallback;
+  const normalized = clip(sanitizeSnippet(first), 220);
+  if (normalized) return normalized;
+  const fallbackSanitized = clip(sanitizeSnippet(fallback), 220);
+  return fallbackSanitized || fallback;
 };
 
 export function resolveRelationTopologySignal(args: {
