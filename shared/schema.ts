@@ -2401,6 +2401,67 @@ export const trainingTraceCertificateSchema = z.object({
 });
 export type TrainingTraceCertificate = z.infer<typeof trainingTraceCertificateSchema>;
 
+const predictionObservationValueSchema = z.union([
+  z.number(),
+  z.array(z.number()),
+]);
+
+export const predictionObservationUncertaintySchema = z.object({
+  predictionStdDev: z.number().nonnegative().optional(),
+  observationStdDev: z.number().nonnegative().optional(),
+  combinedStdDev: z.number().nonnegative().optional(),
+  intervalLower: z.number().optional(),
+  intervalUpper: z.number().optional(),
+});
+export type PredictionObservationUncertainty = z.infer<
+  typeof predictionObservationUncertaintySchema
+>;
+
+export const predictionObservationTrendSchema = z.object({
+  window: z.string().optional(),
+  sampleCount: z.number().int().positive().optional(),
+  drift: z.number().optional(),
+  bias: z.number().optional(),
+  mae: z.number().nonnegative().optional(),
+  rmse: z.number().nonnegative().optional(),
+  slope: z.number().optional(),
+});
+export type PredictionObservationTrend = z.infer<typeof predictionObservationTrendSchema>;
+
+export const predictionObservationGateTuningRefSchema = z.object({
+  thresholdKey: z.string().optional(),
+  trendMetric: z.string().optional(),
+  adjustmentHint: z.string().optional(),
+});
+export type PredictionObservationGateTuningRef = z.infer<
+  typeof predictionObservationGateTuningRefSchema
+>;
+
+export const predictionObservationLedgerEntrySchema = z.object({
+  metric: z.string(),
+  prediction: predictionObservationValueSchema,
+  observation: predictionObservationValueSchema,
+  delta: z.number().optional(),
+  absoluteError: z.number().nonnegative().optional(),
+  relativeError: z.number().nonnegative().optional(),
+  unit: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  uncertainty: predictionObservationUncertaintySchema.optional(),
+  trend: predictionObservationTrendSchema.optional(),
+  gateTuning: predictionObservationGateTuningRefSchema.optional(),
+});
+export type PredictionObservationLedgerEntry = z.infer<
+  typeof predictionObservationLedgerEntrySchema
+>;
+
+export const predictionObservationLedgerSchema = z.object({
+  kind: z.literal("prediction_vs_observation"),
+  version: z.literal(1),
+  entries: z.array(predictionObservationLedgerEntrySchema).default([]),
+  trendRollup: predictionObservationTrendSchema.optional(),
+});
+export type PredictionObservationLedger = z.infer<typeof predictionObservationLedgerSchema>;
+
 export const movementEpisodeMetricsSchema = z.object({
   optimism: z.number(),
   entropy: z.number(),
@@ -2464,6 +2525,7 @@ export const trainingTraceSchema = z.object({
   metrics: trainingTraceMetricsSchema.optional(),
   firstFail: trainingTraceConstraintSchema.optional(),
   certificate: trainingTraceCertificateSchema.optional(),
+  predictionObservationLedger: predictionObservationLedgerSchema.optional(),
   payload: trainingTracePayloadSchema.optional(),
   notes: z.array(z.string()).optional(),
 });

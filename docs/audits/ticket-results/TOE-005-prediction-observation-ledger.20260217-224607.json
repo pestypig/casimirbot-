@@ -1,0 +1,24 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-005-prediction-observation-ledger",
+  "files_changed": [
+    "server/services/observability/training-trace-store.ts",
+    "server/routes/training-trace.ts",
+    "shared/schema.ts",
+    "tests/trace-api.spec.ts",
+    "tests/trace-export.spec.ts"
+  ],
+  "tests_run": [
+    "tests/trace-api.spec.ts",
+    "tests/trace-export.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:2abb4c66-db9a-4fc0-98b3-72214df53a78",
+    "run_id": "11",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

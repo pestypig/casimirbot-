@@ -9,6 +9,7 @@ import {
   type TrainingTraceMetrics,
   type TrainingTracePayload,
   type TrainingTraceRecord,
+  type PredictionObservationLedger,
   type TrainingTraceSignal,
   type TrainingTraceSource,
 } from "../../../shared/schema.js";
@@ -23,6 +24,7 @@ export type TrainingTraceInput = {
   metrics?: TrainingTraceMetrics;
   firstFail?: TrainingTraceConstraint;
   certificate?: TrainingTraceCertificate;
+  predictionObservationLedger?: PredictionObservationLedger;
   payload?: TrainingTracePayload;
   notes?: string[];
   ts?: string;
@@ -114,6 +116,7 @@ export function recordTrainingTrace(input: TrainingTraceInput): TrainingTraceRec
     metrics: input.metrics,
     firstFail: input.firstFail,
     certificate: input.certificate,
+    predictionObservationLedger: input.predictionObservationLedger,
     payload: input.payload,
     notes: input.notes,
   };
