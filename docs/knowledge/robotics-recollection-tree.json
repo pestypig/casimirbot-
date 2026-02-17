@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "rootId": "robotics-recollection",
+  "nodes": [
+    {
+      "id": "robotics-recollection",
+      "label": "Robotics Recollection",
+      "summary": "Demonstration ingestion, primitive DAG retargeting, replay traces, and controller-boundary safety.",
+      "links": [
+        { "to": "demonstration-ingest", "type": "child" },
+        { "to": "primitive-segmentation", "type": "child" },
+        { "to": "replay-certificate", "type": "child" }
+      ]
+    },
+    {
+      "id": "demonstration-ingest",
+      "label": "Demonstration Ingestion Boundary",
+      "summary": "Ingest skeleton/joint frames into a validated adapter boundary before planning.",
+      "links": [
+        { "to": "primitive-segmentation", "type": "child" }
+      ]
+    },
+    {
+      "id": "primitive-segmentation",
+      "label": "Primitive Segmentation",
+      "summary": "Segment demonstrations into reach/grasp/transport/place primitives with kinematic checks.",
+      "links": [
+        { "to": "replay-certificate", "type": "child" }
+      ]
+    },
+    {
+      "id": "replay-certificate",
+      "label": "Replay and Gate Artifacts",
+      "summary": "Persist movement episodes with deterministic trace IDs, deltas, and certificate-linked gate outputs."
+    }
+  ]
+}

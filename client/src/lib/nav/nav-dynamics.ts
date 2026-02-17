@@ -158,3 +158,45 @@ export const resolveNavVector = ({
     heading_deg: wrap360(heading_deg),
   };
 };
+
+
+const fnv1a32 = (input: string): number => {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+};
+
+export const createDeterministicNavTraceId = (input: {
+  seed: string;
+  waypoint?: Waypoint | null;
+  viz: VizIntent;
+  frame?: string;
+}): string => {
+  const waypoint = input.waypoint?.position_m?.map((value) => Number(value).toFixed(3)).join(",") ?? "none";
+  const raw = [
+    input.seed,
+    waypoint,
+    Number(input.viz.planar).toFixed(4),
+    Number(input.viz.rise).toFixed(4),
+    Number(input.viz.yaw ?? 0).toFixed(4),
+    input.frame ?? "heliocentric-ecliptic",
+  ].join("|");
+  return `nav:${fnv1a32(raw).toString(16).padStart(8, "0")}`;
+};
+
+const magnitude = (vector: [number, number, number]): number => {
+  const [x, y, z] = vector;
+  return Math.sqrt(x * x + y * y + z * z);
+};
+
+export const computeNavDelta = (input: {
+  predictedVelocity: [number, number, number];
+  actualVelocity: [number, number, number];
+}): number => {
+  const predicted = magnitude(input.predictedVelocity);
+  const actual = magnitude(input.actualVelocity);
+  return Math.abs(actual - predicted);
+};

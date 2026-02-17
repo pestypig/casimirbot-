@@ -76,6 +76,48 @@ describe("training-trace API", () => {
     expect(fetched.body?.trace?.signal?.kind).toBe("warp-viability");
   });
 
+
+
+  it("accepts movement episode payloads with optimism/entropy metrics", async () => {
+    const payload = {
+      traceId: "movement-episode:demo",
+      pass: true,
+      deltas: [],
+      payload: {
+        kind: "movement_episode",
+        data: {
+          episodeId: "episode-1",
+          primitivePath: ["approach", "grasp", "place"],
+          metrics: { optimism: 0.81, entropy: 0.12 },
+          events: [
+            { phase: "sense", ts: new Date().toISOString() },
+            { phase: "premeditate", ts: new Date().toISOString(), candidateId: "cand-a" },
+            { phase: "act", ts: new Date().toISOString(), controllerRef: "pid-v1" },
+            { phase: "compare", ts: new Date().toISOString(), predictedDelta: 0.03, actualDelta: 0.05 },
+          ],
+        },
+      },
+    };
+
+    const create = await request(app)
+      .post("/api/agi/training-trace")
+      .send(payload)
+      .expect(200);
+
+    expect(create.body?.trace?.payload?.kind).toBe("movement_episode");
+    expect(create.body?.trace?.payload?.data?.metrics?.optimism).toBe(0.81);
+    expect(create.body?.trace?.payload?.data?.metrics?.entropy).toBe(0.12);
+
+    const exported = await request(app)
+      .get("/api/agi/training-trace/export")
+      .expect(200);
+    const lines = (exported.text ?? "").trim().split("\n").filter(Boolean);
+    const parsed = lines.map((line) => JSON.parse(line));
+    const movement = parsed.find((entry) => entry.payload?.kind === "movement_episode");
+    expect(movement?.payload?.data?.metrics?.optimism).toBe(0.81);
+    expect(movement?.payload?.data?.metrics?.entropy).toBe(0.12);
+  });
+
   it("exports JSONL", async () => {
     await request(app)
       .post("/api/agi/training-trace")
