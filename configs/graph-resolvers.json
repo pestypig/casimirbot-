@@ -31,6 +31,41 @@
       "weight": 1.2
     },
     {
+      "id": "ideology-physics-bridge",
+      "label": "Ideology \u2194 Physics Bridge Walk",
+      "path": "docs/knowledge/bridges/ideology-physics-bridge-tree.json",
+      "topicTags": [
+        "ideology",
+        "warp",
+        "physics"
+      ],
+      "matchers": [
+        "mission ethos",
+        "warp bubble",
+        "relation",
+        "bridge",
+        "falsifiability",
+        "verification hook"
+      ],
+      "maxAnchors": 4,
+      "maxDepth": 3,
+      "maxNodes": 10,
+      "minAnchorScore": 3,
+      "preferGraph": true,
+      "edgePriority": {
+        "enables": 3,
+        "constrains": 3,
+        "verifies": 3,
+        "optimizes": 2,
+        "rollback_to": 2,
+        "escalates_to": 2,
+        "child": 1,
+        "parent": 1,
+        "see-also": 1
+      },
+      "weight": 1.25
+    },
+    {
       "id": "math",
       "label": "Math Maturity + Verification Walk",
       "path": "docs/knowledge/physics/math-tree.json",

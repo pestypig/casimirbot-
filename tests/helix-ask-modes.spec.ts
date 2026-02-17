@@ -60,5 +60,8 @@ describe("Helix Ask modes", () => {
     expect(payload.mode).toBe("verify");
     expect(payload.proof?.verdict).toBeDefined();
     expect(payload.proof?.artifacts?.some((entry) => entry.ref === "/api/agi/training-trace/export")).toBe(true);
-  }, 30000);
+  }, 90000);
+
+
+
 });

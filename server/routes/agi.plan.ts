@@ -222,6 +222,11 @@ import {
   renderTaggedSectionFallback,
   type HelixAskTypedFailReason,
 } from "../services/helix-ask/proof-packet";
+import {
+  buildRelationAssemblyPacket,
+  resolveRelationTopologySignal,
+  type RelationAssemblyPacket,
+} from "../services/helix-ask/relation-assembly";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
 import { runBeliefGraphLoop } from "../../modules/analysis/belief-graph-loop";
@@ -3143,7 +3148,7 @@ const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
 const HELIX_ASK_IDEOLOGY_QUERY_CUE_RE =
   /\b(?:mission\s+ethos|ethos|ideology|feedback\s+loop\s+hygiene|civic\s+signal|lifetime\s+trust\s+ledger|radiance\s+to\s+the\s+sun)\b/i;
 const HELIX_ASK_RELATION_QUERY_RE =
-  /\b(?:relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay|how .* relates?)\b/i;
+  /\b(?:relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay|fit\s+in\s+with|fit\s+together|how .* relates?|how .* fit)\b/i;
 const HELIX_ASK_RELATION_WARP_ANCHOR_RE =
   /(^|\/)(docs\/knowledge\/warp\/|modules\/warp\/|docs\/warp-console-architecture\.md|docs\/theta-semantics\.md)/i;
 const HELIX_ASK_RELATION_ETHOS_ANCHOR_RE =
@@ -11710,6 +11715,38 @@ const detectDeterministicContractNoiseReasons = (args: {
   return Array.from(reasons);
 };
 
+
+const evaluateRelationContractHardFail = (args: {
+  contract: HelixAskAnswerContract;
+  relationPacket: RelationAssemblyPacket | null;
+}): string[] => {
+  if (!args.relationPacket) return [];
+  const reasons: string[] = [];
+  if ((args.relationPacket.bridge_claims?.length ?? 0) < 2) reasons.push("bridge_claims_lt_2");
+  const sources = args.contract.sources ?? [];
+  const hasWarp = sources.some((entry) => /warp|physics|module/i.test(entry));
+  const hasEthos = sources.some((entry) => /ethos|ideology/i.test(entry));
+  if (!(hasWarp && hasEthos)) reasons.push("single_domain_citations");
+  const merged = [
+    args.contract.summary ?? "",
+    ...(args.contract.claims ?? []).map((claim) => claim.text),
+  ].join(" ");
+  if (/(?:title:|heading:|slug:|import\s+|export\s+|const\s+\w+\s*=)/i.test(merged)) {
+    reasons.push("metadata_or_code_noise");
+  }
+  if ((args.relationPacket.falsifiability_hooks?.length ?? 0) === 0) reasons.push("missing_falsifiability_hook");
+  return reasons;
+};
+
+const buildRelationModeContractFromPacket = (packet: RelationAssemblyPacket): HelixAskAnswerContract => ({
+  summary: `what_is_warp_bubble: ${packet.definitions.warp_definition}`,
+  claims: [
+    { text: `what_is_mission_ethos: ${packet.definitions.ethos_definition}`, evidence: Object.values(packet.source_map).slice(0, 2) },
+    { text: `how_they_connect: ${packet.bridge_claims.slice(0, 3).join(" ")}`, evidence: Object.values(packet.source_map).slice(0, 4) },
+    { text: `constraints_and_falsifiability: ${packet.constraints.join(" ")} ${packet.falsifiability_hooks[0] ?? ""}`, evidence: Object.values(packet.source_map).slice(0, 6) },
+  ],
+  sources: Object.values(packet.source_map).slice(0, 8),
+});
 const buildHelixAskAnswerContractPrompt = (
   question: string,
   evidence: string,
@@ -18395,6 +18432,7 @@ const executeHelixAsk = async ({
     let retrievalFilesSnapshot: string[] = [];
     let promptItems: HelixAskPromptItem[] = [];
     let toolResultsBlock = "";
+    let relationPacket: RelationAssemblyPacket | null = null;
     if (preIntentClarify) {
       if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
         const scientific = buildScientificMicroReport({
@@ -22885,21 +22923,43 @@ const executeHelixAsk = async ({
         }
       }
       const relationQuery = HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion);
-      const relationAnchorsRequired =
-        relationQuery && warpEthosRelationQuery;
-      const relationAnchorPaths = extractFilePathsFromText(contextText);
-      const relationWarpAnchorOk = relationAnchorPaths.some((filePath) =>
-        HELIX_ASK_RELATION_WARP_ANCHOR_RE.test(filePath),
-      );
-      const relationEthosAnchorOk = relationAnchorPaths.some((filePath) =>
-        HELIX_ASK_RELATION_ETHOS_ANCHOR_RE.test(filePath),
-      );
+      const relationTopology = resolveRelationTopologySignal({
+        question: baseQuestion,
+        relationIntent: relationQuery,
+        contextFiles: Array.from(new Set([...contextFiles, ...extractFilePathsFromText(contextText)])),
+        graphPack,
+      });
+      const relationAnchorsRequired = relationQuery && warpEthosRelationQuery;
       const relationAnchorMissing =
-        relationAnchorsRequired && (!relationWarpAnchorOk || !relationEthosAnchorOk);
+        relationAnchorsRequired && !relationTopology.dualDomainAnchors;
+      if (relationQuery && relationTopology.dualDomainAnchors && relationTopology.crossDomainBridge) {
+        relationPacket = buildRelationAssemblyPacket({
+          question: baseQuestion,
+          contextFiles,
+          contextText,
+          docBlocks,
+          graphPack,
+        });
+        if (debugPayload) {
+          debugPayload.relation_packet_built = true;
+          debugPayload.relation_packet_evidence_count = relationPacket.evidence.length;
+          debugPayload.relation_packet_bridge_count = relationPacket.bridge_claims.length;
+          debugPayload.relation_dual_domain_ok = relationTopology.dualDomainAnchors;
+          debugPayload.relation_missing_anchor_files = [];
+        }
+      } else if (debugPayload && relationQuery) {
+        debugPayload.relation_packet_built = false;
+        debugPayload.relation_dual_domain_ok = relationTopology.dualDomainAnchors;
+        debugPayload.relation_missing_anchor_files = relationTopology.missingAnchors;
+      }
       const relationCoverageWeak =
         relationQuery &&
         ((coverageSlotSummary?.coveredSlots.length ?? 0) < 2 &&
           (docSlotSummary?.coveredSlots.length ?? 0) < 2);
+      if (!forcedAnswer && relationAnchorsRequired && relationAnchorMissing) {
+        forcedAnswer = `Relation topology is missing anchors: ${relationTopology.missingAnchors.join(", ")}. Please provide files from both warp and mission-ethos domains.`;
+        forcedAnswerIsHard = true;
+      }
       const shouldClarifyNow =
         !promptIngested &&
         (intentDomain === "repo" || intentDomain === "hybrid") &&
@@ -23511,8 +23571,8 @@ const executeHelixAsk = async ({
         retrievalDocShare >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE;
       const relationQuestionFastPath =
         HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) &&
-        /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(baseQuestion) &&
-        /\b(mission ethos|ethos|ideology)\b/i.test(baseQuestion);
+        Boolean(relationPacket) &&
+        relationPacket.bridge_claims.length >= 2;
       const deterministicConceptualQuestion = !isImplementationQuestion(baseQuestion);
       if (
         HELIX_ASK_ANSWER_CONTRACT_PRIMARY &&
@@ -23550,8 +23610,13 @@ const executeHelixAsk = async ({
           conceptual: deterministicConceptualQuestion,
           relationQuery: relationQuestionFastPath,
         });
+        const relationHardFailReasons = evaluateRelationContractHardFail({
+          contract: deterministicSanitizedContract,
+          relationPacket,
+        });
         const deterministicQualityOk =
           deterministicNoiseReasons.length === 0 &&
+          relationHardFailReasons.length === 0 &&
           (deterministicGate.ok ||
             (!deterministicGate.hardFail &&
             deterministicGate.uniqueRatio >= 0.72 &&
@@ -23571,6 +23636,8 @@ const executeHelixAsk = async ({
               deterministicGate;
             (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_noise =
               deterministicNoiseReasons;
+            (debugPayload as Record<string, unknown>).answer_contract_primary_relation_hard_fail =
+              relationHardFailReasons;
           }
           logEvent(
             "LLM answer contract primary",
@@ -23583,7 +23650,7 @@ const executeHelixAsk = async ({
           if (debugPayload) {
             (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic = false;
             (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_rejected =
-              [...deterministicGate.reasons, ...deterministicNoiseReasons];
+              [...deterministicGate.reasons, ...deterministicNoiseReasons, ...relationHardFailReasons];
             (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_noise =
               deterministicNoiseReasons;
           }
@@ -23835,9 +23902,11 @@ const executeHelixAsk = async ({
                     ...contextFiles,
                   ]),
                 });
-                primaryContractResult = {
-                  text: JSON.stringify(deterministicPrimaryContract),
-                };
+                primaryContractResult = relationPacket
+                  ? { text: JSON.stringify(buildRelationModeContractFromPacket(relationPacket)) }
+                  : {
+                      text: JSON.stringify(deterministicPrimaryContract),
+                    };
                 answerContractPrimaryUsed = true;
                 recoveredContract = true;
                 answerPath.push("answerContract:primary_deterministic_fallback");
@@ -23853,6 +23922,8 @@ const executeHelixAsk = async ({
                     deterministicPrimaryContract.claims?.length ?? 0;
                   (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic =
                     true;
+                  (debugPayload as Record<string, unknown>).contract_parse_fail_rate_relation = relationPacket ? 1 : 0;
+                  (debugPayload as Record<string, unknown>).deterministic_fallback_used_relation = relationPacket ? true : false;
                 }
                 logStepEnd(
                   "LLM answer contract primary",
