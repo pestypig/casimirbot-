@@ -11,12 +11,14 @@ This folder is the entrypoint for cloud-agent audit contracts, gap reports, and 
 - Ticket result contract: `docs/audits/ticket-results/README.md`
 - ToE scaling scorecard: `docs/audits/toe-scaling-scorecard.md`
 - ToE scaling scorecard CSV: `docs/audits/toe-scaling-scorecard.csv`
+- ToE progress snapshot: `docs/audits/toe-progress-snapshot.json`
 
 ## Validation Commands
 
 - Checklist policy parity: `npm run audit:agent-context:check`
 - Ticket backlog schema/parity: `npx tsx scripts/validate-toe-ticket-backlog.ts`
 - Ticket result contract: `npx tsx scripts/validate-toe-ticket-results.ts`
+- ToE weighted progress snapshot: `npx tsx scripts/compute-toe-progress.ts`
 
 ## CI Gates
 

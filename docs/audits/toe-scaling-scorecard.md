@@ -2,6 +2,25 @@
 
 Use this scorecard to decide when Codex Cloud runs are reliable enough to scale multi-agent execution.
 
+## ToE Progress Percentage
+
+Track a weighted progress percentage across backlog tickets.
+
+- `diagnostic` ticket with verified Casimir PASS/integrity OK contributes `0.25`.
+- `reduced-order` ticket with verified Casimir PASS/integrity OK contributes `0.60`.
+- `certified` ticket with verified Casimir PASS/integrity OK contributes `1.00`.
+- Missing verification or integrity failure contributes `0.00`.
+
+Formula:
+
+- `toe_progress_pct = (sum(ticket_scores) / total_ticket_count) * 100`
+- `strict_ready_progress_pct = (tickets with reduced-order/certified + PASS+integrity) / total_ticket_count * 100`
+
+Compute snapshot:
+
+- `npx tsx scripts/compute-toe-progress.ts`
+- Snapshot output: `docs/audits/toe-progress-snapshot.json`
+
 ## Scale Decision Gate
 
 A run is eligible for scaling only when all are true:
@@ -33,9 +52,10 @@ Stop-scaling triggers:
 
 ## Run Log
 
-| Date (UTC) | Ticket | Commit | Contract | Required tests | Casimir adapter | Integrity | Claim tier | Scope drift | Repeat stability | Scale decision | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-02-17 | TOE-001-curvature-stress-bridge | e91f803d | PASS | PASS (`tests/stress-energy-units.spec.ts`, `tests/physics-contract.gate0.spec.ts`) | PASS (`run_id=17905`) | PASS | reduced-order | NO | PASS (repeatable local reruns) | HOLD (need 2 more consecutive pass runs) | Ticket result artifact added and validated. |
+| Date (UTC) | Ticket | Commit | Contract | Required tests | Casimir adapter | Integrity | Claim tier | Scope drift | Repeat stability | ToE % after run | Scale decision | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-02-17 | TOE-001-curvature-stress-bridge | e91f803d | PASS | PASS (`tests/stress-energy-units.spec.ts`, `tests/physics-contract.gate0.spec.ts`) | PASS (`run_id=17905`) | PASS | reduced-order | NO | PASS (repeatable local reruns) | 6.0 | HOLD (need 2 more consecutive pass runs) | Ticket result artifact added and validated. |
+| 2026-02-17 | TOE-002-semiclassical-coupling-contract | c605cd5e | PASS | PASS (`tests/gr-constraint-contract.spec.ts`, `tests/gr-constraint-gate.spec.ts`) | PASS (`run_id=18170` local reproduction) | PASS | diagnostic | NO | PASS (tests + adapter verify reproduced) | 8.5 | HOLD (need 1 more consecutive full-gate pass) | Implementation quality good; keep claim tier diagnostic pending stronger trace metadata in artifact. |
 
 ## Daily Summary Template
 
@@ -44,6 +64,8 @@ Stop-scaling triggers:
 - Full-gate passes:
 - Scope-drift incidents:
 - Adapter-fallback incidents:
+- ToE progress %:
+- Strict-ready progress %:
 - Rolling pass rate (last 10 runs):
 - Reviewer count:
 - Active agents:

@@ -1,0 +1,97 @@
+{
+  "schema_version": "toe_progress_snapshot/1",
+  "generated_at": "2026-02-17T21:32:07.968Z",
+  "source": {
+    "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
+    "results_dir": "docs/audits/ticket-results"
+  },
+  "weights": {
+    "diagnostic": 0.25,
+    "reduced-order": 0.6,
+    "certified": 1
+  },
+  "totals": {
+    "tickets_total": 10,
+    "tickets_with_evidence": 2,
+    "claim_tier_counts": {
+      "diagnostic": 1,
+      "reduced-order": 1,
+      "certified": 0
+    },
+    "weighted_score_sum": 0.85,
+    "toe_progress_pct": 8.5,
+    "strict_ready_progress_pct": 10
+  },
+  "tickets": [
+    {
+      "ticket_id": "TOE-001-curvature-stress-bridge",
+      "claim_tier": "reduced-order",
+      "verification_ok": true,
+      "score": 0.6,
+      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-205121.json"
+    },
+    {
+      "ticket_id": "TOE-002-semiclassical-coupling-contract",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "result_file": "docs/audits/ticket-results/TOE-002-semiclassical-coupling-contract.20260217-212231.json"
+    },
+    {
+      "ticket_id": "TOE-003-quantum-provenance-class",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-004-uncertainty-propagation-gates",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-005-prediction-observation-ledger",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-006-firstfail-taxonomy-normalization",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-007-ideology-hard-action-gates",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-008-certificate-authenticity-policy",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-009-verify-endpoint-hardening",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-010-unified-primitive-manifest",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    }
+  ]
+}
