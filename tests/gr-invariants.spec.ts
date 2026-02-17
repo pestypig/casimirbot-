@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildEvolutionBrick } from "../server/gr/evolution/index.js";
 import { createMinkowskiState, gridFromBounds } from "../modules/gr/bssn-state";
+import {
+  evaluateIntervalGate,
+  poissonResidualRMSInterval,
+} from "../server/services/physics/invariants";
 
 const maxAbs = (data: Float32Array) => {
   let out = 0;
@@ -26,5 +30,44 @@ describe("GR invariants", () => {
 
     expect(maxAbs(kretschmann)).toBeLessThan(1e-6);
     expect(maxAbs(ricci4)).toBeLessThan(1e-6);
+  });
+
+  it("uses propagated residual intervals for threshold gating", () => {
+    const nx = 3;
+    const ny = 3;
+    const phi = new Float32Array(nx * ny);
+    const rhoEff = new Float32Array(nx * ny);
+
+    const tight = poissonResidualRMSInterval(
+      phi,
+      rhoEff,
+      nx,
+      ny,
+      1,
+      1,
+      1,
+      1e-4,
+      0.95,
+    );
+    const conservativePass = evaluateIntervalGate("H_rms", tight, "<=", 1e-3);
+    expect(conservativePass.pass).toBe(true);
+    expect(conservativePass.reason).toContain("passed");
+    expect(conservativePass.confidence).toBeCloseTo(0.95, 12);
+
+    const loose = poissonResidualRMSInterval(
+      phi,
+      rhoEff,
+      nx,
+      ny,
+      1,
+      1,
+      1,
+      2e-3,
+      0.95,
+    );
+    const conservativeFail = evaluateIntervalGate("H_rms", loose, "<=", 1e-3);
+    expect(conservativeFail.pass).toBe(false);
+    expect(conservativeFail.reason).toContain("straddles threshold");
+    expect(conservativeFail.reason).toContain("95.0% confidence");
   });
 });

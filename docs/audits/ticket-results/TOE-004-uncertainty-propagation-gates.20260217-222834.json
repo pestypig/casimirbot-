@@ -1,0 +1,23 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-004-uncertainty-propagation-gates",
+  "files_changed": [
+    "server/services/physics/invariants.ts",
+    "server/services/physics/unit-signatures.ts",
+    "tests/gr-invariants.spec.ts",
+    "tests/stress-energy-integrals.spec.ts"
+  ],
+  "tests_run": [
+    "tests/gr-invariants.spec.ts",
+    "tests/stress-energy-integrals.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:5b8704cd-5206-44e4-a8c7-367cc33e1cf7",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}
