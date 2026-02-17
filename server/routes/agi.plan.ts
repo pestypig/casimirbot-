@@ -17140,6 +17140,7 @@ const executeHelixAsk = async ({
     let conceptFastPath = false;
     let forcedAnswer: string | null = null;
     let forcedAnswerIsHard = false;
+    let claimGateFailed = false;
     let conceptAnswer: string | null = null;
     const ideologyConversationalMode = Boolean(
       isIdeologyConversationalCandidate &&
@@ -22179,7 +22180,7 @@ const executeHelixAsk = async ({
       }
 
       let claimCoverage: ReturnType<typeof evaluateClaimCoverage> | null = null;
-      let claimGateFailed = false;
+      claimGateFailed = false;
       if (
         HELIX_ASK_EVIDENCE_CLAIM_GATE &&
         (repoScaffold || promptScaffold || generalScaffold)
