@@ -2,6 +2,7 @@
 
 - Runs per variant (total): 360
 - Primary metric computation: **valid runs only** (status=200)
+- Runs per variant: 360
 - Pairing: (prompt, seed)
 
 ## Variant metrics
@@ -23,6 +24,11 @@
     "p50": 961.5,
     "p95": 1980.4499999999991,
     "mean": 1086.65
+  "n": 360,
+  "latency_ms": {
+    "p50": 1,
+    "p95": 896.2,
+    "mean": 135.76111111111112
   },
   "stage_latency_ms": {
     "llm_evidence_cards": {
@@ -40,6 +46,7 @@
   "evidence_gate_ratio": 0.6428571428571429,
   "slot_coverage_pass_rate": 1,
   "claim_gate_supported_ratio": 0.8611111111111112,
+  "claim_gate_supported_ratio": 0.8472222222222222,
   "citation_validity_rate": 0.9459459459459459,
   "contract_success_rate": {
     "answer_contract_primary_applied": 0.75,
@@ -49,6 +56,11 @@
   "quality_proxy": {
     "grounded_sentence_rate": 0.4228429903429902,
     "contradiction_or_unsupported_rate": 0.2
+    "deterministic_fallback_frequency": 0.09166666666666666
+  },
+  "quality_proxy": {
+    "grounded_sentence_rate": 0.0704738317238317,
+    "contradiction_or_unsupported_rate": 0.03333333333333333
   }
 }
 ```
@@ -70,6 +82,11 @@
     "p50": 951.5,
     "p95": 1990.2499999999986,
     "mean": 1088.5333333333333
+  "n": 360,
+  "latency_ms": {
+    "p50": 1,
+    "p95": 882.25,
+    "mean": 141.0222222222222
   },
   "stage_latency_ms": {
     "llm_evidence_cards": {
@@ -87,6 +104,7 @@
   "evidence_gate_ratio": 0.6428571428571429,
   "slot_coverage_pass_rate": 1,
   "claim_gate_supported_ratio": 0.8472222222222222,
+  "claim_gate_supported_ratio": 0.8333333333333334,
   "citation_validity_rate": 0.9473684210526315,
   "contract_success_rate": {
     "answer_contract_primary_applied": 0.75,
@@ -96,6 +114,11 @@
   "quality_proxy": {
     "grounded_sentence_rate": 0.4228429903429902,
     "contradiction_or_unsupported_rate": 0.35
+    "deterministic_fallback_frequency": 0.05
+  },
+  "quality_proxy": {
+    "grounded_sentence_rate": 0.0704738317238317,
+    "contradiction_or_unsupported_rate": 0.058333333333333334
   }
 }
 ```
@@ -117,6 +140,11 @@
     "p50": 995.5,
     "p95": 2060.0499999999997,
     "mean": 1112.2833333333333
+  "n": 360,
+  "latency_ms": {
+    "p50": 1,
+    "p95": 852.4000000000001,
+    "mean": 137.4388888888889
   },
   "stage_latency_ms": {
     "llm_evidence_cards": {
@@ -134,6 +162,7 @@
   "evidence_gate_ratio": 0.6428571428571429,
   "slot_coverage_pass_rate": 1,
   "claim_gate_supported_ratio": 0.8425925925925926,
+  "claim_gate_supported_ratio": 0.8333333333333334,
   "citation_validity_rate": 0.9459459459459459,
   "contract_success_rate": {
     "answer_contract_primary_applied": 0.75,
@@ -148,6 +177,16 @@
 ```
 
 ## Paired deltas (bootstrap 95% CI; valid-pair only)
+    "deterministic_fallback_frequency": 0.058333333333333334
+  },
+  "quality_proxy": {
+    "grounded_sentence_rate": 0.0704738317238317,
+    "contradiction_or_unsupported_rate": 0.058333333333333334
+  }
+}
+```
+
+## Paired deltas (bootstrap 95% CI)
 
 ```json
 {
@@ -163,6 +202,14 @@
     },
     "grounded_sentence_rate": {
       "pair_count": 60,
+      "mean": -5.261111111111111,
+      "ci": {
+        "low": -11.514236111111112,
+        "high": -0.7916666666666666
+      },
+      "significant": true
+    },
+    "grounded_sentence_rate": {
       "mean": 0,
       "ci": {
         "low": 0,
@@ -192,6 +239,14 @@
     },
     "grounded_sentence_rate": {
       "pair_count": 60,
+      "mean": -3.5833333333333335,
+      "ci": {
+        "low": -6.297569444444445,
+        "high": -0.8662500000000023
+      },
+      "significant": true
+    },
+    "grounded_sentence_rate": {
       "mean": 0,
       "ci": {
         "low": 0,
@@ -237,6 +292,7 @@
       "B": 300,
       "C": 300
     }
+    "latency_p95_delta_B_minus_A": -0.01556572193706767
   }
 }
 ```

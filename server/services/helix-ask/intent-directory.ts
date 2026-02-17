@@ -215,7 +215,7 @@ const INTENT_PROFILES: HelixAskIntentProfile[] = [
       allowedEvidenceKinds: ["repo_chunk", "prompt_chunk"],
     },
     matchers: [
-      /\b(relate|relation|relationship|related|connect|connection|mapping|map to|interplay)\b/i,
+      /\b(relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay)\b/i,
       /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i,
       /\b(mission ethos|ethos|ideology)\b/i,
     ],

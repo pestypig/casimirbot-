@@ -112,6 +112,12 @@ import { telemetryCrosscheckDocsHandler, telemetryCrosscheckDocsSpec } from "../
 import { repoGraphSearchHandler, repoGraphSearchSpec } from "../skills/repo.graph.search";
 import { repoDiffReviewHandler, repoDiffReviewSpec } from "../skills/repo.diff.review";
 import { repoPatchSimulateHandler, repoPatchSimulateSpec } from "../skills/repo.patch.simulate";
+import { timeDilationDiagnosticsGetHandler, timeDilationDiagnosticsGetSpec } from "../skills/telemetry.time_dilation.diagnostics.get";
+import { timeDilationControlSetHandler, timeDilationControlSetSpec, timeDilationControlGetHandler, timeDilationControlGetSpec, timeDilationControlClearHandler, timeDilationControlClearSpec } from "../skills/telemetry.time_dilation.control";
+import { physicsCurvatureRunHandler, physicsCurvatureRunSpec } from "../skills/physics.curvature.run";
+import { physicsCurvatureResultGetHandler, physicsCurvatureResultGetSpec } from "../skills/physics.curvature.result.get";
+import { starSolarCurvatureRunHandler, starSolarCurvatureRunSpec } from "../skills/star.solar_curvature.run";
+import { runAdapterExecution } from "../services/adapter/run";
 import {
   matchHelixAskIntent,
   getDefaultHelixAskIntentProfile,
@@ -210,6 +216,12 @@ import {
 } from "../services/helix-ask/session-memory";
 import { isFastModeRuntimeMissingSymbolError } from "../services/helix-ask/runtime-errors";
 import { stripRunawayAnswerArtifacts } from "../services/helix-ask/answer-artifacts";
+import {
+  HELIX_ASK_TYPED_FAIL_REASONS,
+  renderDeterministicCitationsByEvidenceIds,
+  renderTaggedSectionFallback,
+  type HelixAskTypedFailReason,
+} from "../services/helix-ask/proof-packet";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
 import { runBeliefGraphLoop } from "../../modules/analysis/belief-graph-loop";
@@ -2322,6 +2334,18 @@ function selectToolForGoal(goal: string, manifest: ToolManifestEntry[]): string 
   if (hasTool("vision.http.describe") && contains(normalized, /\b(image|photo|picture|screenshot|diagram|figure)\b/)) {
     return "vision.http.describe";
   }
+  if (hasTool("telemetry.time_dilation.diagnostics.get") && contains(normalized, /(time\s*dilation|diagnostics|observe)/)) {
+    return "telemetry.time_dilation.diagnostics.get";
+  }
+  if (hasTool("telemetry.time_dilation.control.set") && contains(normalized, /(set|update|apply|control).*(time\s*dilation|warp)/)) {
+    return "telemetry.time_dilation.control.set";
+  }
+  if (hasTool("physics.curvature.run") && contains(normalized, /(run|execute).*(curvature|simulation|sim)/)) {
+    return "physics.curvature.run";
+  }
+  if (hasTool("physics.curvature.result.get") && contains(normalized, /(curvature).*(result|get)/)) {
+    return "physics.curvature.result.get";
+  }
   if (hasTool(sttWhisperSpec.name) && contains(normalized, /\b(audio|transcribe|speech|voice|recording)\b/)) {
     return sttWhisperSpec.name;
   }
@@ -2612,6 +2636,10 @@ const HELIX_ASK_ANSWER_CONTRACT_PRIMARY =
   String(process.env.HELIX_ASK_ANSWER_CONTRACT_PRIMARY ?? "1").trim() !== "0";
 const HELIX_ASK_EVIDENCE_CARDS_LLM =
   String(process.env.HELIX_ASK_EVIDENCE_CARDS_LLM ?? "0").trim() !== "0";
+const HELIX_ASK_PROOF_PACKET_P0 =
+  String(process.env.HELIX_ASK_PROOF_PACKET_P0 ?? "0").trim() !== "0";
+const HELIX_ASK_OPTION_C_FALLBACK =
+  String(process.env.HELIX_ASK_OPTION_C_FALLBACK ?? "0").trim() !== "0";
 const HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE = clampNumber(
   readNumber(
     process.env.HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE ??
@@ -2725,6 +2753,13 @@ const HELIX_ASK_QUERY_TOKENS = clampNumber(
   32,
   512,
 );
+const HELIX_ASK_QUERY_HINTS_TIMEOUT_MS = clampNumber(
+  readNumber(process.env.HELIX_ASK_QUERY_HINTS_TIMEOUT_MS ?? 12000, 12000),
+  500,
+  120000,
+);
+const HELIX_ASK_QUERY_HINTS_PREFLIGHT_SHORT_CIRCUIT =
+  String(process.env.HELIX_ASK_QUERY_HINTS_PREFLIGHT_SHORT_CIRCUIT ?? "1").trim() !== "0";
 const HELIX_ASK_QUERY_TOKENS_BLOCK = clampNumber(
   readNumber(
     process.env.HELIX_ASK_QUERY_TOKENS_BLOCK ??
@@ -3093,7 +3128,7 @@ const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
 const HELIX_ASK_IDEOLOGY_QUERY_CUE_RE =
   /\b(?:mission\s+ethos|ethos|ideology|feedback\s+loop\s+hygiene|civic\s+signal|lifetime\s+trust\s+ledger|radiance\s+to\s+the\s+sun)\b/i;
 const HELIX_ASK_RELATION_QUERY_RE =
-  /\b(?:relate|relation|relationship|related|connect|connection|linked?|mapping|map to|interplay|how .* relates?)\b/i;
+  /\b(?:relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay|how .* relates?)\b/i;
 const HELIX_ASK_RELATION_WARP_ANCHOR_RE =
   /(^|\/)(docs\/knowledge\/warp\/|modules\/warp\/|docs\/warp-console-architecture\.md|docs\/theta-semantics\.md)/i;
 const HELIX_ASK_RELATION_ETHOS_ANCHOR_RE =
@@ -6271,6 +6306,62 @@ const SLOT_IGNORE_TOKENS = new Set([
   "files",
 ]);
 
+// For warp+ethos relation prompts, navigation/tree slots are supporting context
+// and should not hard-fail grounded crossover answers.
+const HYBRID_RELATION_CORE_SLOTS = new Set(["warp_bubble", "mission_ethos", "ideology"]);
+const HYBRID_RELATION_OPTIONAL_SLOT_REGEXES = [
+  /(^|_)mission_ethos_tree$/,
+  /(^|_)mission_ethos_seeds?$/,
+  /^definition_mission_ethos_tree$/,
+  /^node_mission_ethos$/,
+  /^node_warp_bubble$/,
+  /^ethos_knowledge_tree$/,
+  /^warp_mechanics_tree$/,
+  /^bridge_/,
+  /^two_key_approval$/,
+  /^jurisdictional_floor$/,
+  /^capability_ambition_gradient$/,
+];
+
+const isHybridRelationAuxiliarySlot = (slotId: string): boolean => {
+  const normalized = normalizeSlotName(slotId);
+  if (!normalized) return false;
+  if (HYBRID_RELATION_CORE_SLOTS.has(normalized)) return false;
+  if (normalized.endsWith("_tree")) return true;
+  if (normalized.endsWith("_seeds")) return true;
+  if (normalized.startsWith("definition_")) return true;
+  if (normalized.startsWith("node_")) return true;
+  return HYBRID_RELATION_OPTIONAL_SLOT_REGEXES.some((re) => re.test(normalized));
+};
+
+type HelixAskSlotCoverageSummary = {
+  slots: string[];
+  coveredSlots: string[];
+  missingSlots: string[];
+  ratio: number;
+};
+
+const relaxHybridRelationCoverageSummary = <T extends HelixAskSlotCoverageSummary>(
+  summary: T | null,
+  enabled: boolean,
+): T | null => {
+  if (!enabled || !summary) return summary;
+  const nextSlots = summary.slots.filter((slot) => !isHybridRelationAuxiliarySlot(slot));
+  if (nextSlots.length === summary.slots.length) return summary;
+  const coveredSet = new Set(summary.coveredSlots.filter((slot) => nextSlots.includes(slot)));
+  const missingSet = new Set(summary.missingSlots.filter((slot) => nextSlots.includes(slot)));
+  const coveredSlots = nextSlots.filter((slot) => coveredSet.has(slot));
+  const missingSlots = nextSlots.filter((slot) => missingSet.has(slot));
+  const ratio = nextSlots.length > 0 ? coveredSlots.length / nextSlots.length : 1;
+  return {
+    ...summary,
+    slots: nextSlots,
+    coveredSlots,
+    missingSlots,
+    ratio,
+  };
+};
+
 const normalizeSlotId = (value: string): string => {
   const normalized = value
     .trim()
@@ -8778,7 +8869,10 @@ function buildDocEvidenceBullet(
   const prefix = referenceLines.length ? `${referenceLines.join(" ")} ` : "";
   const summary =
     snippet ? ensureSentence(snippet) : "See the documentation for more detail.";
-  return `- ${label}: ${prefix}${summary} (see ${block.path})`;
+  const pathRef = block.path?.trim();
+  return pathRef
+    ? `- ${label}: ${prefix}${summary} (see ${pathRef})`
+    : `- ${label}: ${prefix}${summary}`;
 }
 
 function buildDefinitionDocBullet(block: { path: string; block: string }): string {
@@ -8803,7 +8897,10 @@ function buildCodeEvidenceBullet(span: HelixAskCodeSpan): string {
   const snippet = clipAskText(span.snippet, 240);
   const prefix = span.isTest ? "Test" : "Code";
   const summary = snippet ? ensureSentence(snippet) : "See the implementation for details.";
-  return `- ${prefix}: ${spanLabel}${summary} (see ${span.filePath})`;
+  const pathRef = span.filePath?.trim();
+  return pathRef
+    ? `- ${prefix}: ${spanLabel}${summary} (see ${pathRef})`
+    : `- ${prefix}: ${spanLabel}${summary}`;
 }
 
 const SYMBOL_TOKEN_RE = /\b[A-Za-z_][A-Za-z0-9_]{2,}\b/g;
@@ -10638,10 +10735,10 @@ function buildHelixAskIdeologySynthesisPrompt(
   const effectSentenceBudget =
     verbosity === "brief" ? "2-3" : verbosity === "normal" ? "2-4" : "2-4";
   const allowTechnicalAppendix =
-    /(include|add|with|show|provide|give|append)[\s\S]{0,40}(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)/i.test(
+    /\b(include|add|with|show|provide|give|append)\b[\s\S]{0,40}\b(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)\b/i.test(
       question,
     ) &&
-    !/(do not|don't|avoid|without|instead of|switch to plain-language)[\s\S]{0,120}(technical\s+notes?|compare\/report|report\s+format|report\s+mode)/i.test(
+    !/\b(do not|don't|avoid|without|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i.test(
       question,
     );
   if (conversationSeed) {
@@ -11456,6 +11553,80 @@ type HelixAskAnswerContract = z.infer<typeof HELIX_ASK_ANSWER_CONTRACT_SCHEMA>;
 const normalizeContractText = (value: string, maxChars = 280): string =>
   value.replace(/\s+/g, " ").trim().slice(0, maxChars).trim();
 
+const sanitizeDeterministicContractLine = (value: string): string => {
+  const source = stripEvidenceBulletPrefix(value).replace(/\s+/g, " ").trim();
+  if (!source) return "";
+  const definitionMatch = source.match(/\bDefinition:\s*([\s\S]+)/i);
+  let candidate = definitionMatch ? definitionMatch[1] : source;
+  candidate = candidate
+    .replace(/\(see\s+[^\)]*\)/gi, " ")
+    .replace(/\b(?:Doc|Heading|Subheading|Section):\s*[^.]+(?:\.)?/gi, " ")
+    .replace(/\bSpan:\s*L\d+(?:-L?\d+)?\b/gi, " ")
+    .replace(/\{[^{}]*\}/g, " ")
+    .replace(/[{}]/g, " ")
+    .replace(/^(?:Definition|Evidence|Code|Test)\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!candidate) return "";
+  return ensureSentence(normalizeContractText(candidate, 280));
+};
+
+const DETERMINISTIC_METADATA_LINE_RE =
+  /\b(?:title|heading|subheading|id|slug|label|aliases|scope|intenthints|topictags|mustincludefiles|version|rootid|nodes|children)\b/i;
+const DETERMINISTIC_CODE_LINE_RE =
+  /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|useState|from\s+["']react["'])\b/i;
+const DETERMINISTIC_FACTUAL_VERB_RE =
+  /\b(?:is|are|means|describes?|defines?|refers?|implements?|models?)\b/i;
+
+const isDeterministicMetadataNoise = (value: string): boolean => {
+  const normalized = value.toLowerCase();
+  if (!normalized) return true;
+  if (normalized.startsWith("title:") || normalized.startsWith("heading:")) return true;
+  const matches = normalized.match(
+    /\b(?:title|heading|subheading|id|slug|label|aliases|scope|intenthints|topictags|mustincludefiles|version|rootid|nodes|children)\b/g,
+  );
+  return (matches?.length ?? 0) >= 2;
+};
+
+const collectDeterministicEvidenceClaims = (args: {
+  question: string;
+  evidenceText: string;
+  conceptual: boolean;
+}): string[] => {
+  const sentenceSource = splitGroundedSentences(args.evidenceText);
+  const lineSource = args.evidenceText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const ranked = [...sentenceSource, ...lineSource]
+    .map((line) => sanitizeDeterministicContractLine(line))
+    .filter((line) => line.length >= 24)
+    .filter((line) => !/^sources?:/i.test(line))
+    .filter((line) => !isDeterministicMetadataNoise(line))
+    .filter((line) => !(args.conceptual && DETERMINISTIC_CODE_LINE_RE.test(line)))
+    .map((line) => {
+      let score = 0;
+      if (DETERMINISTIC_FACTUAL_VERB_RE.test(line)) score += 2;
+      if (/\b(warp|bubble)\b/i.test(line)) score += 2;
+      if (/\b(mission|ethos|ideology)\b/i.test(line)) score += 2;
+      if (/\b(compassion|stewardship|constraint|physics)\b/i.test(line)) score += 1;
+      if (DETERMINISTIC_METADATA_LINE_RE.test(line)) score -= 3;
+      if (DETERMINISTIC_CODE_LINE_RE.test(line)) score -= 3;
+      return { line, score };
+    })
+    .sort((a, b) => b.score - a.score || b.line.length - a.line.length);
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of ranked) {
+    const key = item.line.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item.line);
+    if (out.length >= 6) break;
+  }
+  return out;
+};
+
 const buildHelixAskAnswerContractPrompt = (
   question: string,
   evidence: string,
@@ -11624,26 +11795,34 @@ const buildDeterministicAnswerContractFallback = (args: {
   evidenceText: string;
   allowedCitations: string[];
 }): HelixAskAnswerContract => {
+  const conceptualQuestion = !isImplementationQuestion(args.question);
   const fallbackDocBlocks = filterFallbackDocBlocks(args.docBlocks);
   const docSource = fallbackDocBlocks.length > 0 ? fallbackDocBlocks : args.docBlocks;
+  const evidenceClaims = collectDeterministicEvidenceClaims({
+    question: args.question,
+    evidenceText: args.evidenceText,
+    conceptual: conceptualQuestion,
+  });
   const docBullets = docSource
     .slice(0, Math.min(docSource.length, args.definitionFocus ? 4 : 3))
     .map((block, index) =>
       buildDocEvidenceBullet(block, args.definitionFocus && index === 0 ? "Definition" : "Evidence"),
     );
-  const codeBullets = (args.codeAlignment?.spans ?? [])
-    .filter((span) => isCodeEvidencePath(span.filePath) || span.isTest)
-    .slice(0, 2)
-    .map((span) => buildCodeEvidenceBullet(span));
+  const codeBullets = conceptualQuestion
+    ? []
+    : (args.codeAlignment?.spans ?? [])
+        .filter((span) => isCodeEvidencePath(span.filePath) || span.isTest)
+        .slice(0, 2)
+        .map((span) => buildCodeEvidenceBullet(span));
 
-  const derivedClaimLines = [...docBullets, ...codeBullets]
-    .map((line) => ensureSentence(normalizeContractText(summarizeForExtension(line), 280)))
-    .filter(Boolean);
+  const derivedClaimLines = [...evidenceClaims, ...docBullets, ...codeBullets]
+    .map((line) => sanitizeDeterministicContractLine(summarizeForExtension(line)))
+    .filter((line) => line.length >= 20);
   if (derivedClaimLines.length === 0) {
-    const evidenceClaims = splitGroundedSentences(args.evidenceText)
-      .map((line) => ensureSentence(normalizeContractText(summarizeForExtension(line), 280)))
+    const fallbackClaims = splitGroundedSentences(args.evidenceText)
+      .map((line) => sanitizeDeterministicContractLine(summarizeForExtension(line)))
       .filter((line) => line.length >= 24 && !/^sources?:/i.test(line));
-    derivedClaimLines.push(...evidenceClaims.slice(0, 4));
+    derivedClaimLines.push(...fallbackClaims.slice(0, 4));
   }
 
   const uniqueClaims = Array.from(
@@ -11884,6 +12063,39 @@ const renderHelixAskAnswerContract = (
   return text;
 };
 
+
+type HelixAskFailureClass = "infra_fail" | "parse_fail";
+
+const classifyHelixAskFailure = (
+  reason: HelixAskTypedFailReason,
+): HelixAskFailureClass => (reason === "TIMEOUT" || reason === "GENERIC_COLLAPSE" ? "infra_fail" : "parse_fail");
+
+const buildHelixAskTypedFailReasonFromStatus = (status: string): HelixAskTypedFailReason => {
+  const normalized = String(status || "").toLowerCase();
+  const inferred: HelixAskTypedFailReason = normalized.includes("timeout")
+    ? "TIMEOUT"
+    : normalized.includes("schema")
+      ? "SCHEMA_ERROR"
+      : normalized.includes("validation") || normalized.includes("gate") || normalized.includes("unsupported")
+        ? "VALIDATION_FAIL"
+        : normalized.includes("low_evidence") || normalized.includes("evidence_utilization")
+          ? "LOW_EVIDENCE_UTILIZATION"
+          : "GENERIC_COLLAPSE";
+  return HELIX_ASK_TYPED_FAIL_REASONS.includes(inferred) ? inferred : "GENERIC_COLLAPSE";
+};
+
+const attachHelixAskStageTiming = (
+  debugPayload: Record<string, unknown> | undefined,
+  key: string,
+  durationMs: number,
+): void => {
+  if (!debugPayload) return;
+  const previous = debugPayload.stage_timing_ms;
+  const base = previous && typeof previous === "object" ? (previous as Record<string, number>) : {};
+  debugPayload.stage_timing_ms = { ...base, [key]: Number.isFinite(durationMs) ? Math.max(0, durationMs) : 0 };
+};
+
+
 function buildHelixAskDriftRepairPrompt(
   question: string,
   answer: string,
@@ -11962,6 +12174,15 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
     traceId: z.string().min(1).max(128).optional(),
     personaId: z.string().min(1).optional(),
     tuning: HelixAskTuningOverrides.optional(),
+    mode: z.enum(["read", "observe", "act", "verify"]).optional(),
+    allowTools: z.array(z.string().min(1)).max(24).optional(),
+    requiredEvidence: z.array(z.string().min(1)).max(24).optional(),
+    verify: z
+      .object({
+        mode: z.enum(["constraint-pack", "agent-loop"]).optional(),
+        packId: z.string().optional(),
+      })
+      .optional(),
   })
   .refine((value) => Boolean(value.prompt || value.question), {
     message: "prompt or question required",
@@ -12471,7 +12692,7 @@ const sanitizePlanClarifyLine = (value: string): string => {
   if (/did not cover key terms from the question/i.test(line)) {
     return "Repo evidence was required by the question but could not be confirmed. Please point to the relevant files or clarify the term.";
   }
-  if (/(?:[a-z0-9]+(?:-[a-z0-9]+)*-tree)/i.test(line)) {
+  if (/(?:\b[a-z0-9]+(?:-[a-z0-9]+)*-tree\b)/i.test(line)) {
     return "Repo evidence was incomplete for this request. Please point to the relevant files or clarify the term.";
   }
   return line;
@@ -14521,6 +14742,13 @@ async function ensureDefaultTools(): Promise<void> {
       console.warn(`[agi.plan] HULL_MODE: skipping external vision.http.describe (${visionHttpBase})`);
     }
   }
+  registerTool({ ...timeDilationDiagnosticsGetSpec, handler: timeDilationDiagnosticsGetHandler });
+  registerTool({ ...timeDilationControlSetSpec, handler: timeDilationControlSetHandler });
+  registerTool({ ...timeDilationControlGetSpec, handler: timeDilationControlGetHandler });
+  registerTool({ ...timeDilationControlClearSpec, handler: timeDilationControlClearHandler });
+  registerTool({ ...physicsCurvatureRunSpec, handler: physicsCurvatureRunHandler });
+  registerTool({ ...physicsCurvatureResultGetSpec, handler: physicsCurvatureResultGetHandler });
+  registerTool({ ...starSolarCurvatureRunSpec, handler: starSolarCurvatureRunHandler });
   if (process.env.ENABLE_PHYSICS === "1" && !getTool(PHYSICS_TOOL_NAME)) {
     const { curvatureUnitSpec, curvatureUnitHandler } = await import("../skills/physics.curvature");
     registerTool({ ...curvatureUnitSpec, handler: curvatureUnitHandler });
@@ -15211,6 +15439,70 @@ const executeHelixAsk = async ({
     let prompt = parsed.data.prompt?.trim();
     const question = parsed.data.question?.trim();
     let questionValue = question;
+    const askMode = parsed.data.mode ?? "read";
+    const askAllowTools = parsed.data.allowTools ?? [];
+    const askRequiredEvidence = parsed.data.requiredEvidence ?? [];
+    if (askMode === "act" || askMode === "verify" || askMode === "observe") {
+      await ensureDefaultTools();
+      const goalText = question ?? prompt ?? "";
+      const manifest = listTools();
+      const toolName = selectToolForGoal(goalText, manifest);
+      const tool = getTool(toolName);
+      if (!tool) {
+        responder.send(500, { ok: false, error: "tool_not_found", toolName });
+        return;
+      }
+      const toolAllowed = askAllowTools.length === 0 || askAllowTools.includes(toolName);
+      if (!toolAllowed && askMode !== "observe") {
+        responder.send(400, { ok: false, error: "tool_not_allowed", toolName });
+        return;
+      }
+      const actionStarted = Date.now();
+      let actionOutput: unknown = null;
+      try {
+        const payload: Record<string, unknown> = { question: goalText, prompt: prompt ?? goalText };
+        if (toolName === "telemetry.time_dilation.control.set") {
+          payload.command = "set";
+          payload.args = { goal: goalText };
+        }
+        if (toolName === "physics.curvature.result.get") {
+          payload.hash = (parsed.data as any)?.verify?.packId ?? "latest";
+        }
+        actionOutput = await tool.handler(payload, { personaId, sessionId: parsed.data.sessionId, traceId: askTraceId });
+      } catch (error) {
+        responder.send(500, { ok: false, error: "tool_execution_failed", message: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+      const adapter = await runAdapterExecution({
+        traceId: `${askTraceId}:proof`,
+        actions: [{ kind: "verify", params: { tool: toolName } }],
+      } as any, { tenantId: undefined });
+      const proof = {
+        verdict: adapter.verdict,
+        firstFail: adapter.firstFail ?? null,
+        certificate: adapter.certificate ?? null,
+        artifacts: adapter.artifacts,
+        evidence: [
+          { type: "tool", tool: toolName, durationMs: Math.max(0, Date.now() - actionStarted), output: actionOutput },
+          ...askRequiredEvidence.map((entry) => ({ type: "required", ref: entry })),
+        ],
+      };
+      if (askMode === "verify") {
+        const integrityOk = Boolean((proof.certificate as any)?.integrityOk);
+        if (proof.verdict !== "PASS" || !integrityOk) {
+          responder.send(200, { ok: false, mode: askMode, text: "Verification failed.", proof, action: { tool: toolName, output: actionOutput } });
+          return;
+        }
+      }
+      responder.send(200, {
+        ok: true,
+        mode: askMode,
+        text: askMode === "observe" ? "Observation complete." : "Action complete.",
+        action: { tool: toolName, output: actionOutput },
+        proof,
+      });
+      return;
+    }
     let sessionMemoryForTags: HelixAskSessionMemory | null = null;
     let sessionMemory: HelixAskSessionMemory | null = null;
     let memorySeedSlots: HelixAskSlotPlanEntry[] = [];
@@ -17193,6 +17485,10 @@ const executeHelixAsk = async ({
       hasFilePathHints ||
       HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
       HELIX_ASK_REPO_EXPECTS.test(baseQuestion);
+    const warpEthosRelationQuery =
+      HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) &&
+      /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(baseQuestion) &&
+      /\b(mission ethos|ethos|ideology)\b/i.test(baseQuestion);
     let topicTags = inferHelixAskTopicTags(
       blockScoped && blockSearchSeed ? blockSearchSeed : baseQuestion,
       parsed.data.searchQuery,
@@ -19003,6 +19299,7 @@ const executeHelixAsk = async ({
     let generalScaffold = "";
     let repoScaffold = "";
     let repoScaffoldForPrompt = "";
+    var repoScaffoldForPrompt = "";
     let promptScaffold = "";
     let topicMustIncludeOk: boolean | undefined;
     let pipelineEvidence: string | null = null;
@@ -19031,6 +19328,8 @@ const executeHelixAsk = async ({
     let runtimeBudgetRecommend: string | null = null;
     let runtimeMustIncludeOk = true;
     let runtimeViabilityMustIncludeOk = true;
+    let retrievalConfidence = 0;
+    let retrievalDocShare = 0;
     let evidenceCoreRequired = false;
     let evidenceCoreGate: EvidenceEligibility = {
       ok: true,
@@ -19089,6 +19388,18 @@ const executeHelixAsk = async ({
       let forceHybridNoEvidence = false;
       if (isRepoQuestion) {
         let queryHints: string[] = [];
+        const deterministicQueryHints = mergeHelixAskQueries(
+          buildHelixAskSearchQueries(baseQuestion, topicTags),
+          [
+            ...verificationAnchorHints,
+            ...graphHintTerms,
+            ...(preflightContext?.files ?? []).slice(0, HELIX_ASK_QUERY_HINTS_MAX),
+          ],
+          HELIX_ASK_QUERY_HINTS_MAX,
+        )
+          .map((hint) => hint.trim())
+          .filter((hint) => hint.length > 0)
+          .slice(0, HELIX_ASK_QUERY_HINTS_MAX);
         if (!dryRun) {
           if (fastQualityMode) {
             const queryStart = Date.now();
@@ -19133,6 +19444,21 @@ const executeHelixAsk = async ({
               logProgress("Query hints ready", `${queryHints.length} hints`, queryStart);
               logEvent("Query hints ready", "fast_mode", `${queryHints.length} deterministic hints`, queryStart);
             }
+          } else if (
+            HELIX_ASK_QUERY_HINTS_PREFLIGHT_SHORT_CIRCUIT &&
+            preflightSignalsOk &&
+            (preflightContext?.files?.length ?? 0) >= HELIX_ASK_PREFLIGHT_MIN_FILES
+          ) {
+            const queryStart = Date.now();
+            queryHints = deterministicQueryHints;
+            planDirectives = null;
+            logProgress("Query hints ready", `${queryHints.length} hints`, queryStart);
+            logEvent(
+              "Query hints ready",
+              "preflight_short_circuit",
+              `${queryHints.length} deterministic hints`,
+              queryStart,
+            );
           } else if (HELIX_ASK_SINGLE_LLM) {
             const queryStart = Date.now();
             queryHints = [];
@@ -19182,6 +19508,9 @@ const executeHelixAsk = async ({
                 anchorHints: verificationAnchorRequired ? verificationAnchorHints : [],
               });
               const queryMaxTokens = blockScoped ? HELIX_ASK_QUERY_TOKENS_BLOCK : HELIX_ASK_QUERY_TOKENS;
+              const queryRuntimeBudgetMs = fastQualityMode
+                ? FAST_QUALITY_QUERY_HINTS_BUDGET_MS
+                : HELIX_ASK_QUERY_HINTS_TIMEOUT_MS;
               queryStart = logStepStart(
                 "LLM query hints",
                 `tokens=${queryMaxTokens}`,
@@ -19194,9 +19523,33 @@ const executeHelixAsk = async ({
               );
               const queryHelperResult = await runHelperWithRuntimeGuard(
                 "query_hints_llm",
-                FAST_QUALITY_QUERY_HINTS_BUDGET_MS,
+                queryRuntimeBudgetMs,
                 () =>
-                  runHelixAskLocalWithOverflowRetry(
+                  !fastQualityMode
+                    ? withTimeout(
+                        runHelixAskLocalWithOverflowRetry(
+                          {
+                            prompt: queryPrompt,
+                            max_tokens: queryMaxTokens,
+                            temperature: Math.min(parsed.data.temperature ?? 0.2, 0.4),
+                            seed: parsed.data.seed,
+                            stop: parsed.data.stop,
+                          },
+                          {
+                            personaId,
+                            sessionId: parsed.data.sessionId,
+                            traceId: askTraceId,
+                          },
+                          {
+                            fallbackMaxTokens: queryMaxTokens,
+                            allowContextDrop: true,
+                            label: "query_hints",
+                          },
+                        ),
+                        queryRuntimeBudgetMs,
+                        "query_hints_llm",
+                      )
+                    : runHelixAskLocalWithOverflowRetry(
                       {
                         prompt: queryPrompt,
                         max_tokens: queryMaxTokens,
@@ -19217,9 +19570,15 @@ const executeHelixAsk = async ({
                     ),
               );
               if (!queryHelperResult) {
-                queryHints = [];
+                queryHints = deterministicQueryHints;
                 planDirectives = null;
                 pushFastQualityDecision("query_hints_llm", "deadline", "helper_timeout_fallback");
+                logEvent(
+                  "LLM query hints",
+                  "fallback",
+                  `deterministic hints=${queryHints.length}`,
+                  queryStart ?? undefined,
+                );
               } else {
                 const { result: queryResult, overflow: queryOverflow } = queryHelperResult;
                 recordOverflow("query_hints", queryOverflow);
@@ -19292,6 +19651,11 @@ const executeHelixAsk = async ({
                 );
               }
               queryHints = [];
+              if (deterministicQueryHints.length > 0) {
+                queryHints = deterministicQueryHints;
+                planDirectives = null;
+                logEvent("LLM query hints", "fallback", `deterministic hints=${queryHints.length}`);
+              }
             }
           }
         }
@@ -19799,6 +20163,9 @@ const executeHelixAsk = async ({
                 : requiredSlotIds
               : [];
           }
+          if (warpEthosRelationQuery && docSlotTargets.length > 0) {
+            docSlotTargets = docSlotTargets.filter((slot) => !isHybridRelationAuxiliarySlot(slot));
+          }
           if (planScope?.docsFirst && docSlotTargets.length > 0) {
             logEvent(
               "Docs-first slots",
@@ -19826,6 +20193,11 @@ const executeHelixAsk = async ({
                   })
                 : coverageSlotSummary;
           }
+          coverageSlotSummary = relaxHybridRelationCoverageSummary(
+            coverageSlotSummary,
+            warpEthosRelationQuery,
+          );
+          docSlotSummary = relaxHybridRelationCoverageSummary(docSlotSummary, warpEthosRelationQuery);
           if (debugPayload && docSlotSummary?.ratio !== undefined) {
             debugPayload.slot_doc_coverage_rate = Math.max(
               debugPayload.slot_doc_coverage_rate ?? 0,
@@ -20440,7 +20812,8 @@ const executeHelixAsk = async ({
         const retrievalEvidenceRatio = evidenceCoreRequired
           ? Math.min(evidenceGate.matchRatio, evidenceCoreGate.matchRatio)
           : evidenceGate.matchRatio;
-        let retrievalConfidence = retrievalEvidenceRatio;
+        retrievalConfidence = retrievalEvidenceRatio;
+        retrievalDocShare = docShare;
         if (mustIncludeOk) retrievalConfidence += 0.15;
         if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
         if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
@@ -20778,6 +21151,9 @@ const executeHelixAsk = async ({
             const requiredSlotIds = resolveRequiredSlots(slotPlan);
             docSlotTargets = docRequiredSlots.length > 0 ? docRequiredSlots : requiredSlotIds;
           }
+          if (warpEthosRelationQuery && docSlotTargets.length > 0) {
+            docSlotTargets = docSlotTargets.filter((slot) => !isHybridRelationAuxiliarySlot(slot));
+          }
           if (slotPlan && docSlotTargets.length > 0) {
             docSlotSummary = evaluateDocSlotCoverage(slotPlan, attemptDocBlocks, docSlotTargets);
           } else if (attemptDocText.trim().length > 0) {
@@ -20792,6 +21168,11 @@ const executeHelixAsk = async ({
               includeQuestionTokens: coverageSlots.length === 0,
             });
           }
+          coverageSlotSummary = relaxHybridRelationCoverageSummary(
+            coverageSlotSummary,
+            warpEthosRelationQuery,
+          );
+          docSlotSummary = relaxHybridRelationCoverageSummary(docSlotSummary, warpEthosRelationQuery);
           if (debugPayload && docSlotSummary?.ratio !== undefined) {
             debugPayload.slot_doc_coverage_rate = Math.max(
               debugPayload.slot_doc_coverage_rate ?? 0,
@@ -20816,6 +21197,7 @@ const executeHelixAsk = async ({
             ? Math.min(evidenceGate.matchRatio, evidenceCoreGate.matchRatio)
             : evidenceGate.matchRatio;
           retrievalConfidence = attemptEvidenceRatio;
+          retrievalDocShare = attemptDocShare;
           if (mustIncludeOk) retrievalConfidence += 0.15;
           if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
           if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
@@ -21275,6 +21657,16 @@ const executeHelixAsk = async ({
             failClosedReason = "evidence_gate_failed";
           }
         }
+        if (failClosedReason === "doc_slot_missing" && warpEthosRelationQuery && evidenceGateOk) {
+          const unresolvedSlots =
+            docSlotSummary?.missingSlots?.length
+              ? docSlotSummary.missingSlots
+              : coverageSlotSummary?.missingSlots ?? [];
+          const unresolvedCore = unresolvedSlots.filter((slot) => !isHybridRelationAuxiliarySlot(slot));
+          if (unresolvedCore.length === 0) {
+            failClosedReason = null;
+          }
+        }
         failClosedRepoEvidence = Boolean(failClosedReason);
         const hasHighStakesConstraints =
           intentTier === "F3" ||
@@ -21636,13 +22028,17 @@ const executeHelixAsk = async ({
         }
 
       const promptRetrievalConfidence =
-        typeof debugPayload?.retrieval_confidence === "number"
-          ? debugPayload.retrieval_confidence
-          : 0;
+        typeof retrievalConfidence === "number"
+          ? retrievalConfidence
+          : typeof debugPayload?.retrieval_confidence === "number"
+            ? debugPayload.retrieval_confidence
+            : 0;
       const promptRetrievalDocShare =
-        typeof debugPayload?.retrieval_doc_share === "number"
-          ? debugPayload.retrieval_doc_share
-          : 0;
+        typeof retrievalDocShare === "number"
+          ? retrievalDocShare
+          : typeof debugPayload?.retrieval_doc_share === "number"
+            ? debugPayload.retrieval_doc_share
+            : 0;
       const toolResultsTreeWalk =
         treeWalkMetrics &&
         typeof treeWalkMetrics.boundCount === "number" &&
@@ -22026,7 +22422,8 @@ const executeHelixAsk = async ({
         }
       }
 
-      if (repoScaffold && codeAlignment?.spans?.length) {
+      const includeCodeEvidenceCards = isImplementationQuestion(baseQuestion);
+      if (includeCodeEvidenceCards && repoScaffold && codeAlignment?.spans?.length) {
         const codeEvidence = codeAlignment.spans
           .slice(0, 2)
           .map((span) => buildCodeEvidenceBullet(span))
@@ -22348,9 +22745,7 @@ const executeHelixAsk = async ({
       }
       const relationQuery = HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion);
       const relationAnchorsRequired =
-        relationQuery &&
-        /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(baseQuestion) &&
-        /\b(mission ethos|ethos|ideology)\b/i.test(baseQuestion);
+        relationQuery && warpEthosRelationQuery;
       const relationAnchorPaths = extractFilePathsFromText(contextText);
       const relationWarpAnchorOk = relationAnchorPaths.some((filePath) =>
         HELIX_ASK_RELATION_WARP_ANCHOR_RE.test(filePath),
@@ -22375,7 +22770,7 @@ const executeHelixAsk = async ({
             slotCoverageFailed ||
             docSlotCoverageFailed)) ||
           relationAnchorMissing ||
-          relationCoverageWeak ||
+          (relationCoverageWeak && !evidenceGateOk) ||
           (!evidenceGateOk && ambiguityTerms.length > 0));
       const skipIdeologyClarify =
         isIdeologyReferenceIntent && Boolean(conceptMatch) && !relationQuery;
@@ -22513,7 +22908,7 @@ const executeHelixAsk = async ({
         ? scrubUnsupportedPaths(repoScaffold, repoPromptPaths).text || repoScaffold
         : repoScaffold;
       if (intentStrategy === "hybrid_explain" && generalEvidence) {
-        const hasRepoEvidence = !forceHybridNoEvidence && Boolean(repoScaffoldForPrompt.trim());
+        const hasRepoEvidence = !forceHybridNoEvidence && Boolean(String(repoScaffoldForPrompt ?? "").trim());
         if (conceptMatch) {
           const coreSentences: string[] = [];
           if (conceptMatch.card.definition) {
@@ -22964,7 +23359,91 @@ const executeHelixAsk = async ({
         return;
       }
       let primaryContractResult: LocalAskResult | null = null;
-      if (HELIX_ASK_ANSWER_CONTRACT_PRIMARY && !HELIX_ASK_SINGLE_LLM && evidenceText.trim()) {
+      const strongDeterministicContractSignals =
+        evidenceGateOk &&
+        runtimeMustIncludeOk &&
+        topicMustIncludeOk &&
+        runtimeViabilityMustIncludeOk &&
+        (coverageSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+        (docSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+        retrievalConfidence >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE &&
+        retrievalDocShare >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE;
+      const relationQuestionFastPath =
+        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) &&
+        /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(baseQuestion) &&
+        /\b(mission ethos|ethos|ideology)\b/i.test(baseQuestion);
+      if (
+        HELIX_ASK_ANSWER_CONTRACT_PRIMARY &&
+        !HELIX_ASK_SINGLE_LLM &&
+        evidenceText.trim() &&
+        !primaryContractResult &&
+        (strongDeterministicContractSignals || relationQuestionFastPath)
+      ) {
+        const deterministicAllowedCitations = normalizeCitations([
+          ...extractFilePathsFromText(evidenceText),
+          ...extractCitationTokensFromText(evidenceText),
+          ...contextFiles,
+        ]);
+        const deterministicPrimaryContract = buildDeterministicAnswerContractFallback({
+          question: baseQuestion,
+          format: formatSpec.format,
+          definitionFocus,
+          docBlocks,
+          codeAlignment,
+          evidenceText: appendEvidenceSources(evidenceText, contextFiles, 8, contextText),
+          allowedCitations: deterministicAllowedCitations,
+        });
+        const deterministicSanitizedContract = sanitizeHelixAskAnswerContract(
+          deterministicPrimaryContract,
+          deterministicAllowedCitations,
+        );
+        const deterministicGate = evaluateHelixAskAnswerContractGate(
+          deterministicSanitizedContract,
+          formatSpec.format,
+          deterministicAllowedCitations,
+          requiresRepoEvidence,
+        );
+        const deterministicQualityOk =
+          deterministicGate.ok ||
+          (!deterministicGate.hardFail &&
+            deterministicGate.uniqueRatio >= 0.72 &&
+            (deterministicSanitizedContract.claims?.length ?? 0) >= 2 &&
+            (deterministicSanitizedContract.sources?.length ?? 0) >= 2);
+        if (deterministicQualityOk) {
+          primaryContractResult = { text: JSON.stringify(deterministicSanitizedContract) };
+          answerContractPrimaryUsed = true;
+          answerPath.push("answerContract:deterministic_pre_llm");
+          if (debugPayload) {
+            (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic = true;
+            (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_reason =
+              strongDeterministicContractSignals
+                ? "strong_repo_evidence"
+                : "relation_question_fastpath";
+            (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_gate =
+              deterministicGate;
+          }
+          logEvent(
+            "LLM answer contract primary",
+            "skipped",
+            `deterministic_pre_llm | claims=${deterministicSanitizedContract.claims?.length ?? 0}`,
+            answerStart,
+          );
+        } else {
+          answerPath.push("answerContract:deterministic_pre_llm_rejected");
+          if (debugPayload) {
+            (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic = false;
+            (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic_rejected =
+              deterministicGate.reasons;
+          }
+          logEvent(
+            "LLM answer contract primary",
+            "rejected",
+            `deterministic_pre_llm_rejected | reasons=${deterministicGate.reasons.join(",") || "none"}`,
+            answerStart,
+          );
+        }
+      }
+      if (!primaryContractResult && HELIX_ASK_ANSWER_CONTRACT_PRIMARY && !HELIX_ASK_SINGLE_LLM && evidenceText.trim()) {
         const contractPrimaryBudget = canStartFastHelper(
           "answer_contract_primary",
           fastQualityBudgets.helperMinMs,
@@ -23167,9 +23646,10 @@ const executeHelixAsk = async ({
                       },
                     );
                   } else {
+                    const typedFailReason = buildHelixAskTypedFailReasonFromStatus("parse_fail");
                     logStepEnd(
                       "LLM answer contract repair",
-                      "parse_fail",
+                      `parse_fail:${typedFailReason}`,
                       contractRepairStart,
                       false,
                       {
@@ -23179,8 +23659,13 @@ const executeHelixAsk = async ({
                             : 0,
                         fn: "runHelixAskLocalWithOverflowRetry",
                         label: "answer_contract_primary_repair",
+                        failureClass: classifyHelixAskFailure(typedFailReason),
                       },
                     );
+                    if (debugPayload) {
+                      (debugPayload as Record<string, unknown>).helix_ask_fail_reason = typedFailReason;
+                      (debugPayload as Record<string, unknown>).helix_ask_fail_class = classifyHelixAskFailure(typedFailReason);
+                    }
                   }
                 }
               }
@@ -23503,11 +23988,13 @@ const executeHelixAsk = async ({
     let cleanedText: string | undefined;
     let answerExtension: HelixAskAnswerExtensionResult | null = null;
     if (typeof result.text === "string" && result.text.trim()) {
-      let cleaned = formatHelixAskAnswer(stripPromptEchoFromAnswer(result.text, baseQuestion));
+      const rawAnswerBase = stripPromptEchoFromAnswer(result.text, baseQuestion).trim();
+      let answerContract = parseHelixAskAnswerContractPayload(rawAnswerBase);
+      const rawAnswerText = answerContract
+        ? rawAnswerBase
+        : stripInlineJsonArtifacts(rawAnswerBase).trim();
+      let cleaned = formatHelixAskAnswer(rawAnswerText);
       cleaned = stripInlineJsonArtifacts(cleaned);
-      const rawAnswerText = stripInlineJsonArtifacts(
-        stripPromptEchoFromAnswer(result.text, baseQuestion),
-      ).trim();
       const rawAnswerSentences = extractOrderedAnswerSentences(rawAnswerText, 3);
       const rawPreview = clipAskText(
         rawAnswerText.replace(/\s+/g, " ").trim(),
@@ -23522,7 +24009,6 @@ const executeHelixAsk = async ({
       const toolResultsPresent = Boolean(toolResultsBlock?.trim());
       const hasToolEvidence =
         docBlocks.length > 0 || (codeAlignment?.spans?.length ?? 0) > 0;
-      let answerContract = parseHelixAskAnswerContractPayload(rawAnswerText);
       let answerContractApplied = false;
       let answerContractSource: "inline" | "helper" | "primary" | "none" = answerContract
         ? (answerContractPrimaryUsed ? "primary" : "inline")
@@ -23651,17 +24137,23 @@ const executeHelixAsk = async ({
                 },
               );
             } else {
+              const typedFailReason = buildHelixAskTypedFailReasonFromStatus("parse_fail");
               logStepEnd(
                 "LLM answer contract fill",
-                "parse_fail",
+                `parse_fail:${typedFailReason}`,
                 fillStart,
                 false,
                 {
                   textLength: typeof fillResult?.text === "string" ? fillResult.text.length : 0,
                   fn: "runHelixAskLocalWithOverflowRetry",
                   label: "answer_contract_fill",
+                  failureClass: classifyHelixAskFailure(typedFailReason),
                 },
               );
+              if (debugPayload) {
+                (debugPayload as Record<string, unknown>).helix_ask_fail_reason = typedFailReason;
+                (debugPayload as Record<string, unknown>).helix_ask_fail_class = classifyHelixAskFailure(typedFailReason);
+              }
             }
           }
         }
@@ -23951,7 +24443,7 @@ const executeHelixAsk = async ({
         extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
       if (!answerContractApplied) {
         const hasRepoEvidence =
-          intentStrategy === "hybrid_explain" && Boolean(repoScaffoldForPrompt.trim());
+          intentStrategy === "hybrid_explain" && Boolean(String(repoScaffoldForPrompt ?? "").trim());
         const hasHybridPlaceholder =
           /(map to this system|repo evidence bullets|paragraph\s*2|paragraph\s*1)/i.test(cleaned);
         if (allowHybridFallback && hasRepoEvidence && (!hasRepoCitations() || hasHybridPlaceholder)) {
@@ -24216,6 +24708,20 @@ const executeHelixAsk = async ({
       let driftRepairApplied = false;
       let driftRepairAttempts = 0;
       let driftRepairImproved = false;
+      const driftRepairSkipStrongGrounding =
+        evidenceGateOk &&
+        !claimGateFailed &&
+        retrievalConfidence >= 0.75 &&
+        (coverageSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+        (docSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+        platonicResult.coverageSummary.coverageRatio >= 0.75 &&
+        platonicResult.beliefSummary.unsupportedRate <= 0 &&
+        !platonicResult.coverageGateApplied &&
+        !platonicResult.beliefGateApplied &&
+        platonicResult.rattlingGateApplied;
+      if (driftRepairSkipStrongGrounding) {
+        logEvent("Drift repair", "skipped", "strong_grounding");
+      }
       if (
         HELIX_ASK_DRIFT_REPAIR &&
         !HELIX_ASK_SINGLE_LLM &&
@@ -24223,6 +24729,7 @@ const executeHelixAsk = async ({
         !answerContractApplied &&
         (!fastQualityMode || canStartHelperCall("drift_repair", FAST_QUALITY_FINALIZE_BY_MS)) &&
         !lockedByIdeologyTemplate &&
+        !driftRepairSkipStrongGrounding &&
         (platonicResult.beliefGateApplied || platonicResult.rattlingGateApplied) &&
         !platonicResult.coverageGateApplied &&
         evidenceText.trim().length > 0 &&
@@ -24869,6 +25376,23 @@ const executeHelixAsk = async ({
         allowedSourcePaths,
         extractCitationTokensFromText(evidenceText),
       );
+      if (HELIX_ASK_PROOF_PACKET_P0 && HELIX_ASK_OPTION_C_FALLBACK && answerContractApplied && answerContract) {
+        const proofEvidence = normalizeCitations([
+          ...(answerContract.sources ?? []),
+          ...extractCitationTokensFromText(evidenceText),
+          ...contextFiles,
+        ]).map((citation, index) => ({ id: `ev_${index + 1}`, citation }));
+        const claimEvidenceIds = proofEvidence.slice(0, 3).map((entry) => entry.id);
+        const renderedCitations = renderDeterministicCitationsByEvidenceIds(claimEvidenceIds, proofEvidence);
+        if (renderedCitations.length > 0) {
+          cleaned = renderTaggedSectionFallback({
+            summary: answerContract.summary,
+            claims: (answerContract.claims ?? []).map((claim) => claim.text),
+            citations: renderedCitations,
+          });
+          answerPath.push("answerContract:option_c_tagged_fallback");
+        }
+      }
       cleaned = stripRunawayAnswerArtifacts(cleaned);
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
@@ -24957,6 +25481,21 @@ const executeHelixAsk = async ({
         .filter((entry) => entry.decision === "deadline")
         .map((entry) => `${entry.stage}:${entry.reason}`);
     }
+    if (debugPayload) {
+      const timeline = Array.isArray((debugPayload as Record<string, unknown>).timeline)
+        ? ((debugPayload as Record<string, unknown>).timeline as Array<Record<string, unknown>>)
+        : [];
+      for (const entry of timeline) {
+        const stageKey = String(entry?.stage ?? entry?.name ?? "").trim();
+        const durationMs = Number(entry?.duration_ms ?? entry?.ms ?? 0);
+        if (!stageKey) continue;
+        attachHelixAskStageTiming(debugPayload as Record<string, unknown>, stageKey, durationMs);
+      }
+      if (!(debugPayload as Record<string, unknown>).helix_ask_fail_reason) {
+        (debugPayload as Record<string, unknown>).helix_ask_fail_reason = null;
+        (debugPayload as Record<string, unknown>).helix_ask_fail_class = null;
+      }
+    }
     const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
     logDebug("responder.send(200) start", {
       hasDebug: Boolean(debugPayload),
@@ -24978,6 +25517,8 @@ const executeHelixAsk = async ({
         text: clarifyLine,
         answer: clarifyLine,
         fallback: "fast_mode_runtime_missing",
+        fail_reason: "GENERIC_COLLAPSE",
+        fail_class: "infra_fail",
       });
       return;
     }
@@ -24986,12 +25527,26 @@ const executeHelixAsk = async ({
         "I hit an internal fast-mode helper runtime issue. Please retry once; if it persists, I can continue in deterministic clarify mode with one focused follow-up.";
       streamEmitter.finalize(clarifyLine);
       logProgress("Fallback", "helper_runtime_missing_clarify", undefined, false);
-      responder.send(200, { ok: true, text: clarifyLine, answer: clarifyLine, fallback: "helper_runtime_missing" });
+      responder.send(200, {
+        ok: true,
+        text: clarifyLine,
+        answer: clarifyLine,
+        fallback: "helper_runtime_missing",
+        fail_reason: "GENERIC_COLLAPSE",
+        fail_class: "infra_fail",
+      });
       return;
     }
     streamEmitter.finalize();
     logProgress("Failed", "llm_local_failed", undefined, false);
-    responder.send(500, { ok: false, error: "llm_local_failed", message, status: 500 });
+    responder.send(500, {
+      ok: false,
+      error: "llm_local_failed",
+      message,
+      status: 500,
+      fail_reason: "GENERIC_COLLAPSE",
+      fail_class: "infra_fail",
+    });
     return;
   } finally {
     recordHelixAskRuntimeSample(Date.now() - askRequestStartedAt);
