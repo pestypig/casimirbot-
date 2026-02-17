@@ -9862,6 +9862,27 @@ const shouldForceScientificFallback = (
   return false;
 };
 
+const isUnverifiedScaffoldScientificReport = (text: string): boolean => {
+  if (!isScientificMicroReport(text)) return false;
+  const primaryBullets = extractSectionBullets(extractScientificPrimaryBody(text));
+  const reasonedBullets = extractSectionBullets(
+    extractScientificSectionBody(text, "Reasoned connections (bounded):"),
+  );
+  const primaryPlaceholder =
+    primaryBullets.length === 0 ||
+    primaryBullets.every((entry) =>
+      /(No repo-evidenced claims were confirmed yet|No confirmed evidence was found yet)/i.test(
+        entry,
+      ),
+    );
+  const reasonedPlaceholder =
+    reasonedBullets.length === 0 ||
+    reasonedBullets.every((entry) =>
+      /Need at least two grounded points before drawing a connection/i.test(entry),
+    );
+  return primaryPlaceholder && reasonedPlaceholder;
+};
+
 type HelixAskTreeWalkMetrics = {
   treeCount: number;
   nodeCount: number;
@@ -11575,8 +11596,13 @@ const sanitizeDeterministicContractLine = (value: string): string => {
   let candidate = definitionMatch ? definitionMatch[1] : source;
   candidate = candidate
     .replace(/\(see\s+[^\)]*\)/gi, " ")
-    .replace(/\b(?:Doc|Heading|Subheading|Section):\s*[^.]+(?:\.)?/gi, " ")
+    .replace(/\b(?:Doc|Title|Heading|Subheading|Section):\s*[^.]+(?:\.)?/gi, " ")
     .replace(/\bSpan:\s*L\d+(?:-L?\d+)?\b/gi, " ")
+    .replace(
+      /\b(?:id|slug|label|aliases|scope|intenthints|topictags|mustincludefiles|version|rootid|nodes|children)\s*:\s*[^,;]+/gi,
+      " ",
+    )
+    .replace(/(^|\s)---(\s|$)/g, " ")
     .replace(/\{[^{}]*\}/g, " ")
     .replace(/[{}]/g, " ")
     .replace(/^(?:Definition|Evidence|Code|Test)\s*:\s*/i, "")
@@ -11596,6 +11622,14 @@ const DETERMINISTIC_FACTUAL_VERB_RE =
 const isDeterministicMetadataNoise = (value: string): boolean => {
   const normalized = value.toLowerCase();
   if (!normalized) return true;
+  if (
+    /\b(?:title|heading|subheading|id|slug|label|aliases|scope|intenthints|topictags|mustincludefiles|version|rootid|nodes|children)\s*:/i.test(
+      value,
+    )
+  ) {
+    return true;
+  }
+  if (/^\s*---\s*$/.test(normalized)) return true;
   if (normalized.startsWith("title:") || normalized.startsWith("heading:")) return true;
   const matches = normalized.match(
     /\b(?:title|heading|subheading|id|slug|label|aliases|scope|intenthints|topictags|mustincludefiles|version|rootid|nodes|children)\b/g,
@@ -11844,7 +11878,8 @@ const buildDeterministicAnswerContractFallback = (args: {
   evidenceText: string;
   allowedCitations: string[];
 }): HelixAskAnswerContract => {
-  const conceptualQuestion = !isImplementationQuestion(args.question);
+  const conceptualQuestion =
+    !isImplementationQuestion(args.question) || HELIX_ASK_RELATION_QUERY_RE.test(args.question);
   const fallbackDocBlocks = filterFallbackDocBlocks(args.docBlocks);
   const docSource = fallbackDocBlocks.length > 0 ? fallbackDocBlocks : args.docBlocks;
   const evidenceClaims = collectDeterministicEvidenceClaims({
@@ -18005,8 +18040,10 @@ const executeHelixAsk = async ({
           }
         }
       }
+      const shouldApplyPreIntentClarify =
+        ambiguityResolution.shouldClarify && !warpEthosRelationQuery;
       if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
-        debugPayload.ambiguity_resolver_applied = ambiguityResolution.shouldClarify;
+        debugPayload.ambiguity_resolver_applied = shouldApplyPreIntentClarify;
         debugPayload.ambiguity_resolver_reason = ambiguityResolution.reason;
         debugPayload.ambiguity_resolver_token_count = ambiguityResolution.tokenCount;
         debugPayload.ambiguity_resolver_short_prompt = ambiguityResolution.shortPrompt;
@@ -18021,7 +18058,7 @@ const executeHelixAsk = async ({
         }
         debugPayload.ambiguity_resolver_candidates = ambiguityCandidateLabels;
       }
-      if (ambiguityResolution.shouldClarify) {
+      if (shouldApplyPreIntentClarify) {
         preIntentClarify = buildPreIntentClarifyLine(
           baseQuestion,
           ambiguityCandidates,
@@ -18033,6 +18070,11 @@ const executeHelixAsk = async ({
           "clarify",
           ambiguityResolution.reason ?? "short_prompt",
         );
+      } else if (ambiguityResolution.shouldClarify && warpEthosRelationQuery) {
+        logEvent("Ambiguity resolver", "bypass_relation_query", "warp_ethos_relation");
+        if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
+          debugPayload.ambiguity_resolver_bypassed = "warp_ethos_relation";
+        }
       }
     }
     const intentMatch = matchHelixAskIntent({
@@ -24949,7 +24991,13 @@ const executeHelixAsk = async ({
           );
         }
     }
-    if (
+    const scientificReportSupportedClaims = (platonicResult.claimLedger ?? []).some(
+      (entry) => entry.supported && entry.type !== "question",
+    );
+    const scientificReportHasCitations =
+      extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
+    const allowRattlingScientificEscalation = !warpEthosRelationQuery;
+    const shouldRenderScientificMicroReport =
       HELIX_ASK_SCIENTIFIC_CLARIFY &&
       !isIdeologyReferenceIntent &&
       !lockedByIdeologyTemplate &&
@@ -24957,8 +25005,13 @@ const executeHelixAsk = async ({
       (platonicDomain === "repo" || platonicDomain === "hybrid" || platonicDomain === "falsifiable") &&
       (platonicResult.coverageGateApplied ||
         platonicResult.beliefGateApplied ||
-        platonicResult.rattlingGateApplied)
-    ) {
+        (allowRattlingScientificEscalation &&
+          platonicResult.rattlingGateApplied &&
+          (!evidenceGateOk ||
+            claimGateFailed ||
+            !scientificReportSupportedClaims ||
+            !scientificReportHasCitations)));
+    if (shouldRenderScientificMicroReport) {
       const missingSlots =
         docSlotSummary?.missingSlots?.length
           ? docSlotSummary.missingSlots
@@ -25468,18 +25521,38 @@ const executeHelixAsk = async ({
             slotPlanHeadingSeedSlots.length > 0 ? slotPlanHeadingSeedSlots : headingSeedSlots,
           requiresRepoEvidence,
         });
-        if (weakSectionFallback.trim()) {
+        const fallbackTrimmed = weakSectionFallback.trim();
+        const fallbackScaffoldOnly = isUnverifiedScaffoldScientificReport(fallbackTrimmed);
+        const hasSupportedClaims = (platonicResult.claimLedger ?? []).some(
+          (entry) => entry.supported && entry.type !== "question",
+        );
+        const currentHasCitations =
+          extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
+        const fallbackRegression =
+          fallbackScaffoldOnly && (hasSupportedClaims || currentHasCitations || evidenceGateOk);
+        if (fallbackTrimmed && !fallbackRegression) {
           cleaned = weakSectionFallback.trim();
           answerPath.push(`scientificFallback:${scientificFallbackReason}`);
           if (debugPayload) {
             debugPayload.answer_short_fallback_applied = true;
             debugPayload.answer_short_fallback_reason = scientificFallbackReason;
           }
+        } else if (fallbackRegression && debugPayload) {
+          debugPayload.answer_short_fallback_applied = false;
+          debugPayload.answer_short_fallback_reason = `${scientificFallbackReason}:regression_guard`;
         }
       }
-      if (claimGateFailed && (intentDomain === "repo" || intentDomain === "hybrid")) {
+      const shouldForceUnverifiedHeading =
+        claimGateFailed &&
+        (intentDomain === "repo" || intentDomain === "hybrid") &&
+        (!evidenceGateOk ||
+          !((platonicResult.claimLedger ?? []).some((entry) => entry.supported && entry.type !== "question")) ||
+          !(extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned)));
+      if (shouldForceUnverifiedHeading) {
         cleaned = enforceUnverifiedHeading(cleaned);
         answerPath.push("claimGate:force_unverified");
+      } else if (claimGateFailed && debugPayload) {
+        debugPayload.claim_gate_force_unverified_skipped = true;
       }
       cleaned = sanitizeSourcesLine(
         cleaned,
