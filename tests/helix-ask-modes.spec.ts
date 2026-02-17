@@ -39,6 +39,8 @@ describe("Helix Ask modes", () => {
     const payload = (await response.json()) as { mode?: string; text?: string };
     expect(typeof payload.text).toBe("string");
     expect(payload.mode === undefined || payload.mode === "read").toBe(true);
+    expect(payload.text ?? "").toMatch(/Sources:/i);
+    expect((payload.text ?? "").length).toBeGreaterThanOrEqual(220);
   }, 30000);
 
   it("routes act mode date/time/place gravity query to halobank.time.compute", async () => {
