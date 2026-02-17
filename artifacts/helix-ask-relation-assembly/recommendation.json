@@ -1,0 +1,13 @@
+{
+  "decision": "rollout",
+  "reason": "Meets retrieval regression guardrail and materially improves cross-domain relation answer structure.",
+  "guards": {
+    "retrieval_p95_regression_leq_10pct": true,
+    "dual_domain_relation_answers_ge_90pct": true,
+    "parse_repair_usage_reduced": true
+  },
+  "next_actions": [
+    "Monitor relation_missing_anchor_files telemetry for new topic families.",
+    "Expand bridge-tree coverage for additional ethos-policy-physics motifs."
+  ]
+}

@@ -184,4 +184,32 @@ describe("Helix Ask live events", () => {
     expect(payload.debug?.report_blocks_count ?? 0).toBeLessThanOrEqual(1);
     expect(payload.text).toMatch(/mission ethos|warp vessel|radiance/i);
   }, 45000);
+
+  it("routes dual-domain relation prompts through relation packet assembly", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "How does a warp bubble fit in with the mission ethos?",
+        debug: true,
+        sessionId: "test-relation-packet",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text: string;
+      debug?: {
+        relation_packet_built?: boolean;
+        relation_packet_bridge_count?: number;
+        relation_packet_evidence_count?: number;
+        relation_dual_domain_ok?: boolean;
+      };
+    };
+    expect(payload.debug?.relation_packet_built).toBe(true);
+    expect(payload.debug?.relation_dual_domain_ok).toBe(true);
+    expect(payload.debug?.relation_packet_bridge_count ?? 0).toBeGreaterThanOrEqual(2);
+    expect(payload.debug?.relation_packet_evidence_count ?? 0).toBeGreaterThan(1);
+    expect(payload.text).toMatch(/mission ethos|warp/i);
+  }, 45000);
+
 });

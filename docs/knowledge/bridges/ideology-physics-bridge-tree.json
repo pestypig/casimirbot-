@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "rootId": "ideology-physics-bridge",
+  "nodes": [
+    {
+      "id": "ideology-physics-bridge",
+      "title": "Ideology Physics Bridge",
+      "summary": "Explicit bridge topology connecting mission ethos strategy to warp verification flow.",
+      "tags": ["bridge", "ideology", "warp", "physics"],
+      "children": [
+        "expansion_frontier",
+        "candidate_generation",
+        "contraction_scaffold",
+        "viability_gate",
+        "dream_to_constraint_translation",
+        "verification_hook",
+        "alignment_under_constraint",
+        "resource_allocation_policy",
+        "collapse_event",
+        "last_certified_baseline"
+      ],
+      "links": []
+    },
+    {"id":"expansion_frontier","title":"Expansion Frontier","tags":["ideology"],"children":[],"links":[{"rel":"enables","to":"candidate_generation"}]},
+    {"id":"candidate_generation","title":"Candidate Generation","tags":["physics"],"children":[],"links":[{"rel":"constrains","to":"viability_gate"}]},
+    {"id":"contraction_scaffold","title":"Contraction Scaffold","tags":["ideology"],"children":[],"links":[{"rel":"constrains","to":"viability_gate"}]},
+    {"id":"viability_gate","title":"Viability Gate","tags":["warp","physics"],"children":[],"links":[{"rel":"verifies","to":"last_certified_baseline"}]},
+    {"id":"dream_to_constraint_translation","title":"Dream to Constraint Translation","tags":["ideology"],"children":[],"links":[{"rel":"verifies","to":"verification_hook"}]},
+    {"id":"verification_hook","title":"Verification Hook","tags":["physics","verify"],"children":[],"links":[{"rel":"escalates_to","to":"viability_gate"}]},
+    {"id":"alignment_under_constraint","title":"Alignment Under Constraint","tags":["ideology"],"children":[],"links":[{"rel":"optimizes","to":"resource_allocation_policy"}]},
+    {"id":"resource_allocation_policy","title":"Resource Allocation Policy","tags":["policy"],"children":[],"links":[{"rel":"rollback_to","to":"last_certified_baseline"}]},
+    {"id":"collapse_event","title":"Collapse Event","tags":["risk"],"children":[],"links":[{"rel":"rollback_to","to":"last_certified_baseline"}]},
+    {"id":"last_certified_baseline","title":"Last Certified Baseline","tags":["certification"],"children":[],"links":[]}
+  ]
+}

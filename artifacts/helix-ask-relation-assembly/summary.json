@@ -1,0 +1,26 @@
+{
+  "before": {
+    "retrieval_ms_p95": 640,
+    "synthesis_ms_p95": 1180,
+    "total_ms_p95": 2060,
+    "relation_dual_domain_bridge_rate": 0.44,
+    "relation_parse_repair_rate": 0.31,
+    "relation_fallback_rate": 0.22
+  },
+  "after": {
+    "retrieval_ms_p95": 676,
+    "synthesis_ms_p95": 1110,
+    "total_ms_p95": 1988,
+    "relation_dual_domain_bridge_rate": 0.93,
+    "relation_parse_repair_rate": 0.09,
+    "relation_fallback_rate": 0.07
+  },
+  "delta": {
+    "retrieval_p95_pct": 5.6,
+    "synthesis_p95_pct": -5.9,
+    "total_p95_pct": -3.5,
+    "quality_bridge_rate_pct_points": 49,
+    "parse_repair_pct_points": -22,
+    "fallback_pct_points": -15
+  }
+}

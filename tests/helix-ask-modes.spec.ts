@@ -103,6 +103,10 @@ describe("Helix Ask modes", () => {
     expect(payload.action?.output?.ok).toBe(true);
     expect(payload.proof?.verdict).toBeDefined();
     expect(payload.proof?.artifacts?.some((entry) => entry.ref === "/api/agi/training-trace/export")).toBe(true);
+  }, 90000);
+
+
+
   }, 180000);
 
   it("respects allowTools exclusions with tool_not_allowed", async () => {
