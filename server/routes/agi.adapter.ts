@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
+import crypto from "node:crypto";
 import { guardTenant, shouldRequireTenant } from "../auth/tenant";
 import { getConstraintPackById } from "@shared/constraint-packs";
 import {
@@ -36,6 +37,7 @@ import {
 import { applyConstraintPackOverrides } from "../services/constraint-packs/constraint-pack-policy.js";
 import { scorePremeditation } from "../services/premeditation-scorer.js";
 import { recordTrainingTrace } from "../services/observability/training-trace-store.js";
+import { runAdapterExecution } from "../services/adapter/run.js";
 
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -173,6 +175,42 @@ const hasForbiddenActuationCommand = (actions?: AdapterAction[]): boolean => {
   });
 };
 
+const normalizeCustomerId = (value?: string): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const buildActionProposals = (actions?: AdapterAction[]) => {
+  if (!actions?.length) return undefined;
+  return actions.map((action, index) => {
+    const params = (action.params ?? {}) as Record<string, unknown>;
+    const sigma =
+      typeof params.sigma === "number"
+        ? params.sigma
+        : typeof params.sigma === "string"
+          ? Number(params.sigma)
+          : 1;
+    const R =
+      typeof params.R === "number"
+        ? params.R
+        : typeof params.R === "string"
+          ? Number(params.R)
+          : 8;
+    const T =
+      typeof params.T === "number"
+        ? params.T
+        : typeof params.T === "string"
+          ? Number(params.T)
+          : 0.25;
+    const fallbackLabel = action.label?.trim() || `${action.kind ?? "proposal"}-${index + 1}`;
+    return {
+      label: fallbackLabel,
+      params: { sigma, R, T },
+    };
+  });
+};
+
 const adapterRouter = Router();
 
 adapterRouter.options("/run", (_req, res) => {
@@ -199,7 +237,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
     });
   }
 
-  const { actions, budget, policy, pack, mode, premeditation, roboticsSafety } = parsed.data;
+  const { actions, premeditation, roboticsSafety } = parsed.data;
 
   if (hasForbiddenActuationCommand(actions)) {
     return res.status(400).json({
@@ -208,222 +246,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
     });
   }
 
-  const isConstraintPackRun = mode === "constraint-pack" || !!pack;
-  if (isConstraintPackRun) {
-    if (!pack) {
-      return res.status(400).json({
-        error: "adapter-pack-missing",
-        message: "Provide pack details for constraint-pack mode.",
-      });
-    }
-    const resolvedPack = getConstraintPackById(pack.id);
-    if (!resolvedPack) {
-      return res.status(404).json({ error: "constraint-pack-not-found" });
-    }
-    const requestedCustomerId = normalizeCustomerId(pack.customerId);
-    if (
-      tenantGuard.tenantId &&
-      requestedCustomerId &&
-      tenantGuard.tenantId !== requestedCustomerId
-    ) {
-      return res.status(403).json({ error: "tenant-mismatch" });
-    }
-    const policyNotes: string[] = [];
-    const overrides: ConstraintPackOverride[] = [];
-    let effectiveTenantId = tenantGuard.tenantId ?? requestedCustomerId;
-    if (pack.policyProfileId) {
-      const profile = getConstraintPackPolicyProfileById(
-        pack.policyProfileId,
-      );
-      if (!profile) {
-        return res.status(404).json({ error: "policy-profile-not-found" });
-      }
-      if (tenantGuard.tenantId && profile.customerId !== tenantGuard.tenantId) {
-        return res.status(403).json({ error: "tenant-mismatch" });
-      }
-      if (requestedCustomerId && profile.customerId !== requestedCustomerId) {
-        return res.status(400).json({
-          error: "policy-profile-customer-mismatch",
-          message: "Policy profile does not match the requested customer.",
-        });
-      }
-      if (!effectiveTenantId) {
-        effectiveTenantId = profile.customerId;
-      }
-      const packOverride = profile.packs.find(
-        (entry) => entry.packId === resolvedPack.id,
-      );
-      if (packOverride) {
-        overrides.push(packOverride);
-        policyNotes.push(`policy_profile=${profile.id}`);
-        policyNotes.push(`policy_version=${profile.version}`);
-        policyNotes.push(`policy_customer=${profile.customerId}`);
-      } else {
-        policyNotes.push(`policy_profile_missing_pack=${resolvedPack.id}`);
-      }
-    }
-    if (pack.policyOverride) {
-      const inlineOverride = pack.policyOverride;
-      if (
-        inlineOverride.packId &&
-        inlineOverride.packId !== resolvedPack.id
-      ) {
-        return res.status(400).json({
-          error: "policy-override-pack-mismatch",
-          message: "policyOverride.packId must match the pack being evaluated.",
-        });
-      }
-      const normalizedOverride = { ...inlineOverride, packId: resolvedPack.id };
-      if (hasPolicyOverridePayload(normalizedOverride)) {
-        overrides.push(normalizedOverride);
-        policyNotes.push("policy_override=inline");
-      }
-    }
-    let effectivePack = resolvedPack;
-    if (overrides.length) {
-      const resolved = applyConstraintPackOverrides(
-        effectivePack,
-        overrides,
-      );
-      effectivePack = resolved.pack;
-      if (resolved.warnings.length) {
-        policyNotes.push(
-          ...resolved.warnings.map((warning) => `policy_${warning}`),
-        );
-      }
-    }
-    const shouldAutoTelemetry =
-      effectivePack.id === "provenance-safety"
-        ? pack.autoTelemetry !== false
-        : resolveAutoTelemetry({
-            autoTelemetry: pack.autoTelemetry,
-            telemetryPath: pack.telemetryPath,
-            junitPath: pack.junitPath,
-            vitestPath: pack.vitestPath,
-            jestPath: pack.jestPath,
-            eslintPath: pack.eslintPath,
-            tscPath: pack.tscPath,
-            toolLogTraceId: pack.toolLogTraceId,
-            toolLogWindowMs: pack.toolLogWindowMs,
-            toolLogLimit: pack.toolLogLimit,
-          });
-    let telemetry = pack.telemetry;
-    const autoTelemetryNotes: string[] = [];
-    if (shouldAutoTelemetry) {
-      if (effectivePack.id === "repo-convergence") {
-        const collected = await collectRepoConvergenceTelemetry({
-          autoTelemetry: shouldAutoTelemetry,
-          explicit: telemetry as RepoConvergenceTelemetry,
-          telemetryPath: pack.telemetryPath,
-          junitPath: pack.junitPath,
-          vitestPath: pack.vitestPath,
-          jestPath: pack.jestPath,
-          eslintPath: pack.eslintPath,
-          tscPath: pack.tscPath,
-        });
-        telemetry = collected.telemetry;
-        autoTelemetryNotes.push(...collected.notes);
-      } else if (effectivePack.id === "tool-use-budget") {
-        const collected = await collectToolUseBudgetTelemetry({
-          explicit: telemetry as ToolUseBudgetTelemetry,
-          telemetryPath: pack.telemetryPath,
-          toolLogTraceId: pack.toolLogTraceId,
-          toolLogWindowMs: pack.toolLogWindowMs,
-          toolLogLimit: pack.toolLogLimit,
-        });
-        telemetry = collected.telemetry;
-        autoTelemetryNotes.push(...collected.notes);
-      } else if (effectivePack.id === "provenance-safety") {
-        const collected = await collectAuditSafetyTelemetry({
-          autoTelemetry: shouldAutoTelemetry,
-          explicit: telemetry as AuditSafetyTelemetry,
-          telemetryPath: pack.telemetryPath,
-        });
-        telemetry = collected.telemetry;
-        autoTelemetryNotes.push(...collected.notes);
-      }
-    }
-    if (!hasAnyTelemetry(telemetry) && !hasAnyTelemetry(pack.metrics)) {
-      return res.status(400).json({
-        error: "constraint-pack-telemetry-missing",
-        message: "Provide telemetry or metrics to evaluate the pack.",
-      });
-    }
-
-    const metrics =
-      effectivePack.id === "repo-convergence"
-        ? buildRepoConvergenceMetrics(telemetry as RepoConvergenceTelemetry)
-        : effectivePack.id === "tool-use-budget"
-          ? buildToolUseBudgetMetrics(telemetry as ToolUseBudgetTelemetry)
-          : buildAuditSafetyMetrics(telemetry as AuditSafetyTelemetry);
-    mergeMetricOverrides(metrics, pack.metrics);
-    const evaluationNotes = [
-      ...(pack.notes ?? []),
-      ...policyNotes,
-      ...autoTelemetryNotes,
-    ];
-    const evaluation = evaluateConstraintPackFromMetrics(effectivePack, metrics, {
-      certificate: pack.certificate,
-      deltas: pack.deltas,
-      notes: evaluationNotes.length ? evaluationNotes : undefined,
-      proxy: pack.proxy,
-      ladderTier: pack.ladderTier,
-    });
-    const traceId = parsed.data.traceId ?? `adapter:${crypto.randomUUID()}`;
-    const trace = recordConstraintPackTrace({
-      traceId,
-      tenantId: effectiveTenantId,
-      pack: effectivePack,
-      evaluation,
-      metrics,
-      source: {
-        system: "constraint-pack",
-        component: "adapter",
-        tool: effectivePack.id,
-        version: String(effectivePack.version),
-      },
-    });
-    const artifacts = buildConstraintPackArtifacts({
-      packId: effectivePack.id,
-      traceId: trace.id,
-      certificateHash: evaluation.certificate?.certificateHash ?? null,
-      certificateId: evaluation.certificate?.certificateId ?? null,
-    });
-    return res.json({
-      traceId,
-      runId: trace.id,
-      verdict: trace.pass ? "PASS" : "FAIL",
-      pass: trace.pass,
-      firstFail: trace.firstFail ?? null,
-      deltas: trace.deltas,
-      certificate: evaluation.certificate ?? null,
-      artifacts,
-    });
-  }
-
-  const proposals = buildActionProposals(actions);
-  const proposalCount = proposals?.length ?? 0;
-  const resolvedMaxIterations =
-    budget?.maxIterations ?? (proposalCount > 0 ? Math.min(proposalCount, 50) : undefined);
-  const options: GrAgentLoopOptions = {
-    ...(proposals ? { proposals } : {}),
-    ...(resolvedMaxIterations !== undefined
-      ? { maxIterations: resolvedMaxIterations }
-      : {}),
-    ...(budget?.maxAttemptMs !== undefined || budget?.maxTotalMs !== undefined
-      ? {
-          budget: {
-            maxAttemptMs: budget?.maxAttemptMs,
-            maxTotalMs: budget?.maxTotalMs,
-          },
-        }
-      : {}),
-    ...(policy?.thresholds ? { thresholds: policy.thresholds } : {}),
-    ...(policy?.gate ? { policy: policy.gate } : {}),
-  };
-
   const traceId = parsed.data.traceId ?? `adapter:${crypto.randomUUID()}`;
-  const start = Date.now();
   const premeditationResult: AdapterPremeditationResult | undefined =
     premeditation ? scorePremeditation(premeditation) : undefined;
   if (roboticsSafety) {
@@ -458,35 +281,14 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
     const result = await runAdapterExecution(parsed.data, {
       tenantId: tenantGuard.tenantId,
     });
-    const terminalAttempt = resolveTerminalAttempt(
-      result.attempts,
-      result.acceptedIteration,
-    );
-    const firstFail = terminalAttempt
-      ? findFirstFailingHardConstraint(terminalAttempt.evaluation.constraints)
-      : undefined;
-    const baselineParams =
-      result.attempts.length > 0 ? result.attempts[0].proposal.params : undefined;
-    const terminalParams = terminalAttempt?.proposal.params;
-    const deltas = toTrainingTraceDeltas(
-      diffParams(
-        baselineParams as Record<string, unknown> | undefined,
-        terminalParams as Record<string, unknown> | undefined,
-      ),
-    );
-    const artifacts = buildArtifactRefs({
-      runId: run.id,
-      certificateHash: terminalAttempt?.evaluation.certificate.certificateHash,
-      certificateId: terminalAttempt?.evaluation.certificate.certificateId,
-    });
 
     if (premeditationResult) {
       const nowIso = new Date().toISOString();
       recordTrainingTrace({
         traceId,
         tenantId: tenantGuard.tenantId,
-        pass: result.accepted,
-        deltas,
+        pass: result.pass,
+        deltas: result.deltas,
         metrics: {
           optimism: premeditationResult.optimism,
           entropy: premeditationResult.entropy,
@@ -527,14 +329,14 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
 
     return res.json({
       traceId,
-      runId: run.id,
-      verdict: result.accepted ? "PASS" : "FAIL",
-      pass: result.accepted,
-      firstFail: firstFail ?? null,
-      deltas,
+      runId: result.runId,
+      verdict: result.verdict,
+      pass: result.pass,
+      firstFail: result.firstFail ?? null,
+      deltas: result.deltas,
       premeditation: premeditationResult,
-      certificate: terminalAttempt?.evaluation.certificate ?? null,
-      artifacts,
+      certificate: result.certificate ?? null,
+      artifacts: result.artifacts,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
