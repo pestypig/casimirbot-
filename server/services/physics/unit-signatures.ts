@@ -19,6 +19,13 @@ const PHYSICS_CONSTANT_UNITS: SymbolUnitMap = {
   PI: DIMENSIONLESS,
 };
 
+const UNCERTAINTY_SYMBOL_UNITS: SymbolUnitMap = {
+  confidence: DIMENSIONLESS,
+  threshold: DIMENSIONLESS,
+  lower_bound: DIMENSIONLESS,
+  upper_bound: DIMENSIONLESS,
+};
+
 const unitSignatureToPint = (signature: string): string | null => {
   const trimmed = signature.trim();
   if (!trimmed || trimmed === "1") {
@@ -81,7 +88,7 @@ export const buildSymbolUnitsFromRegistry = (opts?: {
   const signatures = filterRegistryEntries(opts);
   const merged = mergeUnitSignatures(signatures);
   if (opts?.includeConstants ?? true) {
-    return { ...PHYSICS_CONSTANT_UNITS, ...merged };
+    return { ...PHYSICS_CONSTANT_UNITS, ...UNCERTAINTY_SYMBOL_UNITS, ...merged };
   }
   return merged;
 };
