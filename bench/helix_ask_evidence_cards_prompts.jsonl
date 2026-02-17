@@ -1,0 +1,120 @@
+{"id": "generic_001", "bucket": "generic_ambiguous", "prompt": "Define lattice in plain English."}
+{"id": "generic_002", "bucket": "generic_ambiguous", "prompt": "What is a cavity, kinda?"}
+{"id": "generic_003", "bucket": "generic_ambiguous", "prompt": "Can you explain resonance quickly?"}
+{"id": "generic_004", "bucket": "generic_ambiguous", "prompt": "What does coherence mean here?"}
+{"id": "generic_005", "bucket": "generic_ambiguous", "prompt": "What's a manifold in this context?"}
+{"id": "generic_006", "bucket": "generic_ambiguous", "prompt": "Tell me what constraint means pls."}
+{"id": "generic_007", "bucket": "generic_ambiguous", "prompt": "What is a proof pack exactly?"}
+{"id": "generic_008", "bucket": "generic_ambiguous", "prompt": "Define admissible status in one paragraph."}
+{"id": "generic_009", "bucket": "generic_ambiguous", "prompt": "What's integrity_ok supposed to mean?"}
+{"id": "generic_010", "bucket": "generic_ambiguous", "prompt": "Explain 'gate' like I'm new."}
+{"id": "generic_011", "bucket": "generic_ambiguous", "prompt": "What is retrieval confidence?"}
+{"id": "generic_012", "bucket": "generic_ambiguous", "prompt": "Doc share? what is that metric"}
+{"id": "generic_013", "bucket": "generic_ambiguous", "prompt": "What's slot coverage?"}
+{"id": "generic_014", "bucket": "generic_ambiguous", "prompt": "What means evidence ratio?"}
+{"id": "generic_015", "bucket": "generic_ambiguous", "prompt": "Define arbiter mode quickly"}
+{"id": "generic_016", "bucket": "generic_ambiguous", "prompt": "What is hybrid mode for answers?"}
+{"id": "generic_017", "bucket": "generic_ambiguous", "prompt": "What's deterministic scaffold?"}
+{"id": "generic_018", "bucket": "generic_ambiguous", "prompt": "What are evidence cards anyway?"}
+{"id": "generic_019", "bucket": "generic_ambiguous", "prompt": "Explain grounding with an example"}
+{"id": "generic_020", "bucket": "generic_ambiguous", "prompt": "What does contradiction flag indicate?"}
+{"id": "generic_021", "bucket": "generic_ambiguous", "prompt": "What is parse fail in output contract?"}
+{"id": "generic_022", "bucket": "generic_ambiguous", "prompt": "what is fallback_reason used for"}
+{"id": "generic_023", "bucket": "generic_ambiguous", "prompt": "What is trace export, casually"}
+{"id": "generic_024", "bucket": "generic_ambiguous", "prompt": "Why does debug=true change response?"}
+{"id": "generic_025", "bucket": "generic_ambiguous", "prompt": "How does fast_quality_mode behave?"}
+{"id": "generic_026", "bucket": "generic_ambiguous", "prompt": "What does topK do in ask?"}
+{"id": "generic_027", "bucket": "generic_ambiguous", "prompt": "temperature 0.2 meaning?"}
+{"id": "generic_028", "bucket": "generic_ambiguous", "prompt": "Why would clarify trigger?"}
+{"id": "generic_029", "bucket": "generic_ambiguous", "prompt": "What's mission ethos in this repo?"}
+{"id": "generic_030", "bucket": "generic_ambiguous", "prompt": "what is ideology tree root?"}
+{"id": "generic_031", "bucket": "generic_ambiguous", "prompt": "Define Ford-Roman bound, short"}
+{"id": "generic_032", "bucket": "generic_ambiguous", "prompt": "What is theta calibration?"}
+{"id": "generic_033", "bucket": "generic_ambiguous", "prompt": "What's CL3 rho delta check?"}
+{"id": "generic_034", "bucket": "generic_ambiguous", "prompt": "TS ratio min means what?"}
+{"id": "generic_035", "bucket": "generic_ambiguous", "prompt": "VdB band.. explain please"}
+{"id": "generic_036", "bucket": "generic_ambiguous", "prompt": "What is repo-grounded mode"}
+{"id": "generic_037", "bucket": "generic_ambiguous", "prompt": "How do citations get repaired"}
+{"id": "generic_038", "bucket": "generic_ambiguous", "prompt": "Explain unsupported claim gate"}
+{"id": "generic_039", "bucket": "generic_ambiguous", "prompt": "what is belief graph here"}
+{"id": "generic_040", "bucket": "generic_ambiguous", "prompt": "What's uncertainty register for"}
+{"id": "warp_ethos_001", "bucket": "warp_ethos", "prompt": "How should warp viability constraints relate to mission ethos decision-making?"}
+{"id": "warp_ethos_002", "bucket": "warp_ethos", "prompt": "Connect FordRomanQI and ideology caution principles in this codebase."}
+{"id": "warp_ethos_003", "bucket": "warp_ethos", "prompt": "If ThetaAudit fails, what should Mission Ethos suggest operationally?"}
+{"id": "warp_ethos_004", "bucket": "warp_ethos", "prompt": "Map TS_ratio_min to societal-risk language from ideology tree."}
+{"id": "warp_ethos_005", "bucket": "warp_ethos", "prompt": "Explain how VdB_band soft constraint should be communicated to non-physicists via ethos."}
+{"id": "warp_ethos_006", "bucket": "warp_ethos", "prompt": "How do GR hard constraints and ethical guardrails co-exist in Helix Ask?"}
+{"id": "warp_ethos_007", "bucket": "warp_ethos", "prompt": "Give a short relation between admissible warp status and feedback loop hygiene."}
+{"id": "warp_ethos_008", "bucket": "warp_ethos", "prompt": "When CL3_RhoDelta drifts, what mission-ethos branch is most relevant?"}
+{"id": "warp_ethos_009", "bucket": "warp_ethos", "prompt": "What does ideology say about uncertain warp evidence?"}
+{"id": "warp_ethos_010", "bucket": "warp_ethos", "prompt": "Relate uncertainty register to mission ethos humility."}
+{"id": "warp_ethos_011", "bucket": "warp_ethos", "prompt": "Can Helix Ask tie proof-pack strict parity to ethical transparency?"}
+{"id": "warp_ethos_012", "bucket": "warp_ethos", "prompt": "How should contradiction flags influence mission decisions for warp plans?"}
+{"id": "warp_ethos_013", "bucket": "warp_ethos", "prompt": "Bridge quantum inequality limits with practical governance in ethos."}
+{"id": "warp_ethos_014", "bucket": "warp_ethos", "prompt": "If evidence is thin but urgency is high, how does ethos guide warp claims?"}
+{"id": "warp_ethos_015", "bucket": "warp_ethos", "prompt": "Explain warp constraint gate with a civic-safety framing."}
+{"id": "warp_ethos_016", "bucket": "warp_ethos", "prompt": "How should Three Tenets Loop respond to a non-admissible warp config?"}
+{"id": "warp_ethos_017", "bucket": "warp_ethos", "prompt": "Relate Civic Signal Loop to training-trace export for warp analytics."}
+{"id": "warp_ethos_018", "bucket": "warp_ethos", "prompt": "What ideology node best matches conservative defaults for risky warp outputs?"}
+{"id": "warp_ethos_019", "bucket": "warp_ethos", "prompt": "How do you explain 'do not over-claim exploratory math' to operators?"}
+{"id": "warp_ethos_020", "bucket": "warp_ethos", "prompt": "Tie math maturity stages to mission-ethos communication style."}
+{"id": "warp_ethos_021", "bucket": "warp_ethos", "prompt": "Could mission ethos justify disabling LLM evidence cards for warp asks?"}
+{"id": "warp_ethos_022", "bucket": "warp_ethos", "prompt": "How should Helix Ask narrate hard-vs-soft warp constraints?"}
+{"id": "warp_ethos_023", "bucket": "warp_ethos", "prompt": "What is the ethical posture when certificate integrity is missing?"}
+{"id": "warp_ethos_024", "bucket": "warp_ethos", "prompt": "Link admissible oracle status to public-facing messaging policy."}
+{"id": "warp_ethos_025", "bucket": "warp_ethos", "prompt": "How do you combine repo evidence and ethos references without hallucinating?"}
+{"id": "warp_ethos_026", "bucket": "warp_ethos", "prompt": "What does ideology imply about latency-vs-safety tradeoffs in warp advice?"}
+{"id": "warp_ethos_027", "bucket": "warp_ethos", "prompt": "How should slot coverage enforce ethical completeness for warp prompts?"}
+{"id": "warp_ethos_028", "bucket": "warp_ethos", "prompt": "What if user asks to declare viability before hard constraints pass?"}
+{"id": "warp_ethos_029", "bucket": "warp_ethos", "prompt": "How should fail-closed behavior align with mission ethos?"}
+{"id": "warp_ethos_030", "bucket": "warp_ethos", "prompt": "Relate agent loop stop reasons to governance accountability."}
+{"id": "warp_ethos_031", "bucket": "warp_ethos", "prompt": "How can contradiction detection support anti-rumor policy in mission ethos?"}
+{"id": "warp_ethos_032", "bucket": "warp_ethos", "prompt": "Explain why deterministic evidence might be preferred for certification narratives."}
+{"id": "warp_ethos_033", "bucket": "warp_ethos", "prompt": "How should Helix Ask cite docs/ethos and warp tests together?"}
+{"id": "warp_ethos_034", "bucket": "warp_ethos", "prompt": "What ethos branch maps to cautious interpretation of TS clocking detail?"}
+{"id": "warp_ethos_035", "bucket": "warp_ethos", "prompt": "If retrieval confidence is high, should style become less hedged?"}
+{"id": "warp_ethos_036", "bucket": "warp_ethos", "prompt": "How does ideology root-to-leaf framing help explain warp caveats?"}
+{"id": "warp_ethos_037", "bucket": "warp_ethos", "prompt": "Can you map warp verification artifacts to human trust signals?"}
+{"id": "warp_ethos_038", "bucket": "warp_ethos", "prompt": "How should unsupported claims be narrated in mission briefings?"}
+{"id": "warp_ethos_039", "bucket": "warp_ethos", "prompt": "What is the relationship between proof obligations and ethical obligations?"}
+{"id": "warp_ethos_040", "bucket": "warp_ethos", "prompt": "typo-ish: how iz warpp admissible tied 2 mission ethos??"}
+{"id": "code_grounded_001", "bucket": "code_grounded", "prompt": "Where in repo is HELIX_ASK_EVIDENCE_CARDS_LLM read?"}
+{"id": "code_grounded_002", "bucket": "code_grounded", "prompt": "Where is strongRepoEvidenceForDeterministicCards computed?"}
+{"id": "code_grounded_003", "bucket": "code_grounded", "prompt": "Which function builds doc evidence scaffold and where is it used?"}
+{"id": "code_grounded_004", "bucket": "code_grounded", "prompt": "Where does /api/agi/ask parse fast_quality_mode?"}
+{"id": "code_grounded_005", "bucket": "code_grounded", "prompt": "Point me to code that sets answer_contract_primary_applied."}
+{"id": "code_grounded_006", "bucket": "code_grounded", "prompt": "Where are slot_coverage_ratio and slot_coverage_ok populated?"}
+{"id": "code_grounded_007", "bucket": "code_grounded", "prompt": "Which file logs \"LLM evidence cards\" stage events?"}
+{"id": "code_grounded_008", "bucket": "code_grounded", "prompt": "Where does citation repair append Sources line?"}
+{"id": "code_grounded_009", "bucket": "code_grounded", "prompt": "Where is evidence_claim_gate_ok decided?"}
+{"id": "code_grounded_010", "bucket": "code_grounded", "prompt": "Where is grounded_sentence_rate stored in debug?"}
+{"id": "code_grounded_011", "bucket": "code_grounded", "prompt": "What code path triggers fail_closed reason slot_coverage_failed?"}
+{"id": "code_grounded_012", "bucket": "code_grounded", "prompt": "Where is retrieval_doc_share threshold configured?"}
+{"id": "code_grounded_013", "bucket": "code_grounded", "prompt": "Find env var HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE usage."}
+{"id": "code_grounded_014", "bucket": "code_grounded", "prompt": "Where does repoScaffoldForPrompt get constructed?"}
+{"id": "code_grounded_015", "bucket": "code_grounded", "prompt": "What part picks deterministic vs llm evidence cards?"}
+{"id": "code_grounded_016", "bucket": "code_grounded", "prompt": "Where is appendEvidenceSources defined?"}
+{"id": "code_grounded_017", "bucket": "code_grounded", "prompt": "Where are live_events added to debug payload?"}
+{"id": "code_grounded_018", "bucket": "code_grounded", "prompt": "Where is answer parse/contract fallback handled?"}
+{"id": "code_grounded_019", "bucket": "code_grounded", "prompt": "Which test covers helix ask graph resolver?"}
+{"id": "code_grounded_020", "bucket": "code_grounded", "prompt": "Where is ideology.json referenced in ask flow?"}
+{"id": "code_grounded_021", "bucket": "code_grounded", "prompt": "what file has intent-directory rules for helix ask"}
+{"id": "code_grounded_022", "bucket": "code_grounded", "prompt": "show me code for topic tagging helix ask prompts"}
+{"id": "code_grounded_023", "bucket": "code_grounded", "prompt": "where does evidence_gate_ok get flipped false"}
+{"id": "code_grounded_024", "bucket": "code_grounded", "prompt": "where is preflight_evidence_ratio computed"}
+{"id": "code_grounded_025", "bucket": "code_grounded", "prompt": "where is claim ledger built"}
+{"id": "code_grounded_026", "bucket": "code_grounded", "prompt": "which module handles platonic gates"}
+{"id": "code_grounded_027", "bucket": "code_grounded", "prompt": "where is sanitizeSourcesLine applied"}
+{"id": "code_grounded_028", "bucket": "code_grounded", "prompt": "where are unsupported citations scrubbed"}
+{"id": "code_grounded_029", "bucket": "code_grounded", "prompt": "where is deterministic_fast_mode label emitted"}
+{"id": "code_grounded_030", "bucket": "code_grounded", "prompt": "where does runHelixAskLocalWithOverflowRetry get called for evidence"}
+{"id": "code_grounded_031", "bucket": "code_grounded", "prompt": "where are debug.gates assembled"}
+{"id": "code_grounded_032", "bucket": "code_grounded", "prompt": "where is contract parse fail counted??"}
+{"id": "code_grounded_033", "bucket": "code_grounded", "prompt": "typo: whre iz arbiter_repo_ratio set"}
+{"id": "code_grounded_034", "bucket": "code_grounded", "prompt": "typo: wch file defines HELIX_ASK_SINGLE_LLM"}
+{"id": "code_grounded_035", "bucket": "code_grounded", "prompt": "conversational: can u point exact path for ask route registration?"}
+{"id": "code_grounded_036", "bucket": "code_grounded", "prompt": "where is /api/agi/adapter/run endpoint implemented"}
+{"id": "code_grounded_037", "bucket": "code_grounded", "prompt": "where does training-trace export endpoint live"}
+{"id": "code_grounded_038", "bucket": "code_grounded", "prompt": "where are required warp tests listed"}
+{"id": "code_grounded_039", "bucket": "code_grounded", "prompt": "where in workflow is casimir verify enforced"}
+{"id": "code_grounded_040", "bucket": "code_grounded", "prompt": "where is evidence_cards_deterministic_fastpath flag assigned"}
