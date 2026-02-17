@@ -2628,6 +2628,26 @@ const HELIX_ASK_SINGLE_LLM =
   String(process.env.HELIX_ASK_SINGLE_LLM ?? "1").trim() !== "0";
 const HELIX_ASK_ANSWER_CONTRACT_PRIMARY =
   String(process.env.HELIX_ASK_ANSWER_CONTRACT_PRIMARY ?? "1").trim() !== "0";
+const HELIX_ASK_EVIDENCE_CARDS_LLM =
+  String(process.env.HELIX_ASK_EVIDENCE_CARDS_LLM ?? "1").trim() !== "0";
+const HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE ??
+      process.env.VITE_HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE,
+    0.72,
+  ),
+  0,
+  1,
+);
+const HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE ??
+      process.env.VITE_HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE,
+    0.32,
+  ),
+  0,
+  1,
+);
 const HELIX_ASK_SCAFFOLD_TOKENS = clampNumber(
   readNumber(process.env.HELIX_ASK_SCAFFOLD_TOKENS ?? process.env.VITE_HELIX_ASK_SCAFFOLD_TOKENS, 1024),
   64,
@@ -11611,6 +11631,81 @@ const deriveFallbackContractSources = (
   ]);
   if (merged.length > 0) return merged.slice(0, limit);
   return normalizeCitations(allowedCitations).slice(0, limit);
+};
+
+const buildDeterministicAnswerContractFallback = (args: {
+  question: string;
+  format: HelixAskFormat;
+  definitionFocus: boolean;
+  docBlocks: Array<{ path: string; block: string }>;
+  codeAlignment?: HelixAskCodeAlignment | null;
+  evidenceText: string;
+  allowedCitations: string[];
+}): HelixAskAnswerContract => {
+  const fallbackDocBlocks = filterFallbackDocBlocks(args.docBlocks);
+  const docSource = fallbackDocBlocks.length > 0 ? fallbackDocBlocks : args.docBlocks;
+  const docBullets = docSource
+    .slice(0, Math.min(docSource.length, args.definitionFocus ? 4 : 3))
+    .map((block, index) =>
+      buildDocEvidenceBullet(block, args.definitionFocus && index === 0 ? "Definition" : "Evidence"),
+    );
+  const codeBullets = (args.codeAlignment?.spans ?? [])
+    .filter((span) => isCodeEvidencePath(span.filePath) || span.isTest)
+    .slice(0, 2)
+    .map((span) => buildCodeEvidenceBullet(span));
+
+  const derivedClaimLines = [...docBullets, ...codeBullets]
+    .map((line) => ensureSentence(normalizeContractText(summarizeForExtension(line), 280)))
+    .filter(Boolean);
+  if (derivedClaimLines.length === 0) {
+    const evidenceClaims = splitGroundedSentences(args.evidenceText)
+      .map((line) => ensureSentence(normalizeContractText(summarizeForExtension(line), 280)))
+      .filter((line) => line.length >= 24 && !/^sources?:/i.test(line));
+    derivedClaimLines.push(...evidenceClaims.slice(0, 4));
+  }
+
+  const uniqueClaims = Array.from(
+    new Set(derivedClaimLines.map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean)),
+  ).slice(0, 4);
+  const summary =
+    ensureSentence(
+      normalizeContractText(uniqueClaims[0] ?? "Answer grounded in retrieved evidence.", 360),
+    ) || "Answer grounded in retrieved evidence.";
+  const sources = normalizeCitations([
+    ...args.allowedCitations,
+    ...extractFilePathsFromText(args.evidenceText),
+  ]).slice(0, 8);
+  const claimEvidence = sources.slice(0, 3);
+  const claimTexts = uniqueClaims.length > 0 ? uniqueClaims : [summary];
+  const claims = claimTexts.map((text) => {
+    if (claimEvidence.length > 0) return { text, evidence: claimEvidence };
+    return { text };
+  });
+
+  const contract: HelixAskAnswerContract = {
+    summary,
+    claims,
+    uncertainty:
+      sources.length === 0
+        ? "Evidence is limited; add the relevant repo file paths for stronger grounding."
+        : undefined,
+    tone: /\bplain language\b/i.test(args.question) ? "plain" : undefined,
+    sources: sources.length > 0 ? sources : undefined,
+  };
+
+  if (args.format === "steps") {
+    contract.steps = claimTexts.slice(0, 6);
+  } else if (args.format === "compare") {
+    contract.comparisons = claimTexts.slice(0, 3).map((detail, index) => {
+      const label = index === 0 ? "Definition" : index === 1 ? "Evidence" : "Constraint";
+      if (claimEvidence.length > 0) {
+        return { label, detail, evidence: claimEvidence };
+      }
+      return { label, detail };
+    });
+  }
+
+  return contract;
 };
 
 type HelixAskAnswerContractGateResult = {
@@ -21641,6 +21736,10 @@ const executeHelixAsk = async ({
         typeof debugPayload?.retrieval_confidence === "number"
           ? debugPayload.retrieval_confidence
           : 0;
+      const promptRetrievalDocShare =
+        typeof debugPayload?.retrieval_doc_share === "number"
+          ? debugPayload.retrieval_doc_share
+          : 0;
       const toolResultsTreeWalk =
         treeWalkMetrics &&
         typeof treeWalkMetrics.boundCount === "number" &&
@@ -21776,6 +21875,21 @@ const executeHelixAsk = async ({
             conceptMatch &&
             (!definitionFocus ||
               (conceptMatch.card.sourcePath && isDefinitionDocPath(conceptMatch.card.sourcePath)));
+        const strongRepoEvidenceForDeterministicCards =
+          evidenceGateOk &&
+          runtimeMustIncludeOk &&
+          topicMustIncludeOk &&
+          runtimeViabilityMustIncludeOk &&
+          (coverageSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+          (docSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+          promptRetrievalConfidence >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE &&
+          promptRetrievalDocShare >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE;
+        const preferDeterministicEvidenceCards =
+          HELIX_ASK_SINGLE_LLM ||
+          fastQualityMode ||
+          forceDeterministicScaffolds ||
+          !HELIX_ASK_EVIDENCE_CARDS_LLM ||
+          strongRepoEvidenceForDeterministicCards;
         if (allowConceptFastPath && conceptMatch) {
           repoSynthesisPath = "concept";
           const evidenceStart = Date.now();
@@ -21805,9 +21919,14 @@ const executeHelixAsk = async ({
             evidenceStart,
           );
         } else if (evidenceContext) {
-          if (HELIX_ASK_SINGLE_LLM || fastQualityMode || forceDeterministicScaffolds) {
+          if (preferDeterministicEvidenceCards) {
             repoSynthesisPath = "deterministic";
             const evidenceStart = Date.now();
+            if (strongRepoEvidenceForDeterministicCards && debugPayload) {
+              (debugPayload as Record<string, unknown>).evidence_cards_deterministic_fastpath = true;
+              (debugPayload as Record<string, unknown>).evidence_cards_deterministic_reason =
+                "retrieval_high_confidence";
+            }
             if (fastQualityMode) {
               const fastEvidenceCheck = canStartFastHelper(
                 "evidence_cards",
@@ -23163,11 +23282,43 @@ const executeHelixAsk = async ({
                 }
               }
               if (!recoveredContract) {
+                const deterministicPrimaryContract = buildDeterministicAnswerContractFallback({
+                  question: baseQuestion,
+                  format: formatSpec.format,
+                  definitionFocus,
+                  docBlocks,
+                  codeAlignment,
+                  evidenceText: appendEvidenceSources(evidenceText, contextFiles, 8, contextText),
+                  allowedCitations: normalizeCitations([
+                    ...extractFilePathsFromText(evidenceText),
+                    ...extractCitationTokensFromText(evidenceText),
+                    ...contextFiles,
+                  ]),
+                });
+                primaryContractResult = {
+                  text: JSON.stringify(deterministicPrimaryContract),
+                };
+                answerContractPrimaryUsed = true;
+                recoveredContract = true;
+                answerPath.push("answerContract:primary_deterministic_fallback");
+                logEvent(
+                  "Answer contract fallback",
+                  "deterministic",
+                  `claims=${deterministicPrimaryContract.claims?.length ?? 0} | sources=${deterministicPrimaryContract.sources?.length ?? 0}`,
+                  answerStart,
+                );
+                if (debugPayload) {
+                  debugPayload.answer_contract_primary_applied = true;
+                  debugPayload.answer_contract_primary_claim_count =
+                    deterministicPrimaryContract.claims?.length ?? 0;
+                  (debugPayload as Record<string, unknown>).answer_contract_primary_deterministic =
+                    true;
+                }
                 logStepEnd(
                   "LLM answer contract primary",
-                  "parse_fail",
+                  "parse_fail_deterministic_fallback",
                   contractPrimaryStart,
-                  false,
+                  true,
                   {
                     textLength:
                       typeof contractPrimaryCall?.text === "string"
