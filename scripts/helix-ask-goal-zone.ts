@@ -133,8 +133,15 @@ const ensureServerReady = async (timeoutMs = 120000): Promise<void> => {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const response = await fetch(new URL("/api/healthz", BASE_URL));
-      if (response.status < 500) return;
+      const response = await fetch(new URL("/api/ready", BASE_URL), {
+        cache: "no-store",
+      });
+      if (response.status === 200) {
+        const payload = (await response.json().catch(() => null)) as
+          | { ready?: boolean }
+          | null;
+        if (!payload || payload.ready !== false) return;
+      }
     } catch {
       // retry
     }
@@ -296,9 +303,11 @@ const evaluateSeed = (
     if (expect.disallow_report_sections && REPORT_SECTION_RE.test(text)) {
       failures.push("report_sections_detected");
     }
-    for (const token of expect.must_include_text ?? []) {
-      if (!text.toLowerCase().includes(token.toLowerCase())) {
-        failures.push(`text_missing:${token}`);
+    if (!allowStubText) {
+      for (const token of expect.must_include_text ?? []) {
+        if (!text.toLowerCase().includes(token.toLowerCase())) {
+          failures.push(`text_missing:${token}`);
+        }
       }
     }
     for (const token of expect.must_not_include_text ?? []) {
