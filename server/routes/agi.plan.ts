@@ -117,6 +117,7 @@ import { timeDilationControlSetHandler, timeDilationControlSetSpec, timeDilation
 import { physicsCurvatureRunHandler, physicsCurvatureRunSpec } from "../skills/physics.curvature.run";
 import { physicsCurvatureResultGetHandler, physicsCurvatureResultGetSpec } from "../skills/physics.curvature.result.get";
 import { starSolarCurvatureRunHandler, starSolarCurvatureRunSpec } from "../skills/star.solar_curvature.run";
+import { haloBankTimeComputeHandler, haloBankTimeComputeSpec } from "../skills/halobank.time.compute";
 import { runAdapterExecution } from "../services/adapter/run";
 import {
   matchHelixAskIntent,
@@ -2353,6 +2354,15 @@ function selectToolForGoal(goal: string, manifest: ToolManifestEntry[]): string 
   }
   if (hasTool(sttWhisperSpec.name) && contains(normalized, /\b(audio|transcribe|speech|voice|recording)\b/)) {
     return sttWhisperSpec.name;
+  }
+  const mentionsTime = contains(normalized, /\b(date|time|timestamp|duration|utc|timezone|clock|when)\b/);
+  const mentionsPlace = contains(normalized, /\b(place|location|lat|lon|longitude|latitude|earth|where|timezone|tz)\b/);
+  const mentionsGravity = contains(normalized, /\b(tide|tidal|gravity|gravitational|lunar|solar|moon|sun)\b/);
+  if (
+    hasTool(haloBankTimeComputeSpec.name) &&
+    ((mentionsTime && mentionsPlace) || (mentionsTime && mentionsGravity) || (mentionsPlace && mentionsGravity))
+  ) {
+    return haloBankTimeComputeSpec.name;
   }
   return fallback;
 }
@@ -12283,6 +12293,22 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
   .object({
     prompt: z.string().min(1).optional(),
     question: z.string().min(1).optional(),
+    place: z.object({ lat: z.number(), lon: z.number(), tz: z.string().optional(), label: z.string().optional() }).optional(),
+    timestamp: z.union([z.string().min(1), z.number()]).optional(),
+    durationMs: z.coerce.number().positive().optional(),
+    compare: z
+      .object({
+        place: z.object({ lat: z.number(), lon: z.number(), tz: z.string().optional(), label: z.string().optional() }).optional(),
+        timestamp: z.union([z.string().min(1), z.number()]).optional(),
+        durationMs: z.coerce.number().positive().optional(),
+      })
+      .optional(),
+    model: z
+      .object({
+        includeEnvelope: z.boolean().optional(),
+        includeCausal: z.boolean().optional(),
+      })
+      .optional(),
     debug: z.boolean().optional(),
     dryRun: z.boolean().optional(),
     verbosity: z.enum(["brief", "normal", "extended"]).optional(),
@@ -14741,6 +14767,9 @@ async function ensureDefaultTools(): Promise<void> {
   if (!getTool(sttWhisperSpec.name)) {
     registerTool({ ...sttWhisperSpec, handler: sttWhisperHandler });
   }
+  if (!getTool(haloBankTimeComputeSpec.name)) {
+    registerTool({ ...haloBankTimeComputeSpec, handler: haloBankTimeComputeHandler });
+  }
   if (!getTool(warpAskSpec.name)) {
     registerTool({ ...warpAskSpec, handler: warpAskHandler });
   }
@@ -15592,6 +15621,16 @@ const executeHelixAsk = async ({
         }
         if (toolName === "physics.curvature.result.get") {
           payload.hash = (parsed.data as any)?.verify?.packId ?? "latest";
+        }
+        if (toolName === haloBankTimeComputeSpec.name) {
+          const sourceText = question ?? prompt ?? "";
+          payload.question = sourceText;
+          payload.prompt = prompt ?? sourceText;
+          if (parsed.data.place) payload.place = parsed.data.place;
+          if (parsed.data.timestamp !== undefined) payload.timestamp = parsed.data.timestamp;
+          if (typeof parsed.data.durationMs === "number") payload.durationMs = parsed.data.durationMs;
+          if (parsed.data.compare) payload.compare = parsed.data.compare;
+          if (parsed.data.model) payload.model = parsed.data.model;
         }
         actionOutput = await tool.handler(payload, { personaId, sessionId: parsed.data.sessionId, traceId: askTraceId });
       } catch (error) {
@@ -26522,8 +26561,9 @@ planRouter.post("/plan", async (req, res) => {
 });
 
 // Lightweight manifest endpoint for quick adapter visibility checks
-planRouter.get("/tools/manifest", (_req, res) => {
+planRouter.get("/tools/manifest", async (_req, res) => {
   try {
+    await ensureDefaultTools();
     const manifest = listTools();
     res.json(manifest);
   } catch (err) {

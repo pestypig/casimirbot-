@@ -79,10 +79,72 @@ export type LocalAskProof = {
   evidence?: unknown[];
 };
 
+export type HaloBankPlace = {
+  lat: number;
+  lon: number;
+  tz?: string;
+  label?: string;
+};
+
+export type HaloBankComparisonDeltas = {
+  dDuration_s?: number;
+  dGravExposure_ns?: number;
+  dKinExposure_ns?: number;
+  dCombExposure_ns?: number;
+  dSunExposure_uGal_s?: number;
+  dMoonExposure_uGal_s?: number;
+  dNetExposure_uGal_s?: number;
+  dSunCausal_s?: number;
+  dMoonCausal_s?: number;
+  overSun?: number;
+  overMoon?: number;
+  dUbar1m?: number;
+  dUbar1h?: number;
+  dTS1m?: number;
+  dTS1h?: number;
+  dNetBearing?: number;
+  dNetMag?: number;
+  dLightAlong_ms?: number;
+  dP2sun?: number;
+  dP2moon?: number;
+  dPhaseSyn?: number;
+  dNodal?: number;
+  dPerigee?: number;
+};
+
+export type HaloBankActionOutput = {
+  ok?: boolean;
+  message?: string;
+  model?: {
+    name?: string;
+    version?: string;
+    maturity?: string;
+    assumptions?: string[];
+  };
+  primary?: {
+    timestamp?: string;
+    timestampMs?: number;
+    place?: HaloBankPlace;
+    durationMs?: number;
+    duration_s?: number;
+    tides?: { sun_uGal?: number; moon_uGal?: number; net_uGal?: number };
+    voxel?: { grav_ns_per_1s?: number; kin_ns_per_1s?: number; combined_ns_per_1s?: number; sunLightTime_s?: number; moonLightTime_s?: number };
+    envelope?: { Ubar_1m?: number; Ubar_1h?: number; TS_envelope_1m?: number; TS_envelope_1h?: number };
+    tideNet?: { ah_uGal?: number; bearingDeg?: number; x_uGal?: number; y_uGal?: number };
+    geometryP2?: { P2sun?: number; P2moon?: number };
+    sunMoon?: { phaseDeg?: number; nodalPhaseDeg?: number; perigeePhaseDeg?: number };
+  };
+  comparison?: {
+    primary?: { timestamp?: string; place?: HaloBankPlace; durationMs?: number };
+    secondary?: { timestamp?: string; place?: HaloBankPlace; durationMs?: number };
+    deltas?: HaloBankComparisonDeltas;
+  };
+};
+
 export type LocalAskResponse = {
   text: string;
   mode?: "read" | "observe" | "act" | "verify";
-  action?: { tool?: string; output?: unknown };
+  action?: { tool?: string; output?: unknown | HaloBankActionOutput };
   proof?: LocalAskProof;
   envelope?: HelixAskResponseEnvelope;
   viewer_launch?: AtomicViewerLaunch;
@@ -902,6 +964,11 @@ export async function askLocal(
     allowTools?: string[];
     requiredEvidence?: string[];
     verify?: { mode?: "constraint-pack" | "agent-loop"; packId?: string };
+    place?: HaloBankPlace;
+    timestamp?: string | number;
+    durationMs?: number;
+    compare?: { place?: HaloBankPlace; timestamp?: string | number; durationMs?: number };
+    model?: { includeEnvelope?: boolean; includeCausal?: boolean };
   },
 ): Promise<LocalAskResponse> {
   const body: Record<string, unknown> = {};
@@ -936,6 +1003,11 @@ export async function askLocal(
   if (options?.allowTools?.length) body.allowTools = options.allowTools;
   if (options?.requiredEvidence?.length) body.requiredEvidence = options.requiredEvidence;
   if (options?.verify) body.verify = options.verify;
+  if (options?.place) body.place = options.place;
+  if (options?.timestamp !== undefined) body.timestamp = options.timestamp;
+  if (typeof options?.durationMs === "number") body.durationMs = options.durationMs;
+  if (options?.compare) body.compare = options.compare;
+  if (options?.model) body.model = options.model;
   const signal = options?.signal;
   if (isNavigatorOffline()) {
     await waitForOnline(signal);
