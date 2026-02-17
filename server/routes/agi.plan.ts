@@ -3159,13 +3159,13 @@ const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
 const HELIX_ASK_IDEOLOGY_QUERY_CUE_RE =
   /\b(?:mission\s+ethos|ethos|ideology|feedback\s+loop\s+hygiene|civic\s+signal|lifetime\s+trust\s+ledger|radiance\s+to\s+the\s+sun)\b/i;
 const HELIX_ASK_RELATION_QUERY_RE =
-  /\b(?:relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay|fit\s+in\s+with|fit\s+together|how .* relates?|how .* fit)\b/i;
+  /\b(?:relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay|fit\s+in\s+with|fit\s+together|constrain(?:ed|s|t)?|govern(?:ed|ance|s)?|cohere(?:nce)?|bind(?:ing|s)?|dependency|aligned?|alignment|how .* relates?|how .* fit)\b/i;
 const HELIX_ASK_RELATION_WARP_QUERY_RE =
   /\b(?:warp\s+bubble|warp\s+drive|warp|alcubierre|natario)\b/i;
 const HELIX_ASK_RELATION_ETHOS_QUERY_RE =
   /\b(?:mission\s+ethos|mission\s+ethics|ethos|ethic(?:s|al)?|ideology)\b/i;
 const HELIX_ASK_RELATION_CONNECTOR_RE =
-  /\b(?:relation(?:ship)?|relat(?:e|ed|ing)|connect(?:ed|ion)?|link(?:ed|ing)?|bridge|dependency|interplay|fit\s+in\s+with|fit\s+together|map(?:ping)?|govern(?:ed|ance|s)?|constrain(?:ed|s|t)|bind(?:ing|s)?|ties?|compare|versus|vs\.?|separate|policy\s+layer|technical\s+layer|matter\s+for)\b/i;
+  /\b(?:relation(?:ship)?|relat(?:e|ed|ing)|connect(?:ed|ion)?|link(?:ed|ing)?|bridge|dependency|interplay|fit\s+in\s+with|fit\s+together|map(?:ping)?|govern(?:ed|ance|s)?|constrain(?:ed|s|t)?|bind(?:ing|s)?|cohere(?:nce)?|aligned?|alignment|ties?|compare|versus|vs\.?|separate|policy\s+layer|technical\s+layer|matter\s+for)\b/i;
 const HELIX_ASK_RELATION_WARP_ANCHOR_RE =
   /(^|\/)(docs\/knowledge\/warp\/|modules\/warp\/|docs\/warp-console-architecture\.md|docs\/theta-semantics\.md)/i;
 const HELIX_ASK_RELATION_ETHOS_ANCHOR_RE =
@@ -13541,7 +13541,10 @@ const isWarpEthosRelationQuestion = (question: string): boolean => {
   const compactConnector = /\b(?:relation|relationship|connect(?:ion)?|link|bridge|interplay|fit)\b/i.test(
     normalized,
   );
-  return hasConnector || compactConnector;
+  const policyConnector = /\b(?:constrain(?:ed|s|t)?|govern(?:ed|ance|s)?|bind(?:ing|s)?|cohere(?:nce)?|alignment|policy\s+layer|technical\s+layer|dependency)\b/i.test(
+    normalized,
+  );
+  return hasConnector || compactConnector || policyConnector;
 };
 
 const isExplicitReportRequest = (question: string): boolean => {

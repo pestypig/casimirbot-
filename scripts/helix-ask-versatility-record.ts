@@ -28,6 +28,7 @@ type AskDebug = Record<string, unknown> & {
   answer_contract_primary_applied?: boolean;
   answer_contract_applied?: boolean;
   answer_token_budget?: number;
+  stage_timing_ms?: Record<string, number>;
   timeline?: Array<Record<string, unknown>>;
   answer_path?: string[];
 };
@@ -77,6 +78,7 @@ const BASE_URL = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5173";
 const OUT_DIR = process.env.HELIX_ASK_VERSATILITY_OUT ?? "artifacts/experiments/helix-ask-versatility";
 const REPORT_PATH = process.env.HELIX_ASK_VERSATILITY_REPORT ?? "reports/helix-ask-versatility-report.md";
 const ISOLATE_RUN_DIR = (process.env.HELIX_ASK_VERSATILITY_ISOLATE_RUN_DIR ?? "1") !== "0";
+const RESUME_FROM_LATEST = (process.env.HELIX_ASK_VERSATILITY_RESUME_FROM_LATEST ?? "1") !== "0";
 const FAIL_ON_INCOMPLETE = (process.env.HELIX_ASK_VERSATILITY_FAIL_ON_INCOMPLETE ?? "1") !== "0";
 const SEEDS = (process.env.HELIX_ASK_VERSATILITY_SEEDS ?? "7,11,13")
   .split(",")
@@ -120,6 +122,57 @@ const STUB_RE = /llm\.local stub result/i;
 const REPORT_SECTION_RE = /(Executive summary:|Coverage map:|Point-by-point:|Report covers)/i;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const runCaseKey = (promptId: string, seed: number, temperature: number): string =>
+  `${promptId}::s${seed}::t${temperature}`;
+
+const readJsonFile = async <T>(filePath: string): Promise<T | null> => {
+  try {
+    const raw = await fs.readFile(filePath, "utf8");
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
+const sleepInterruptible = async (ms: number, shouldStop: () => boolean): Promise<void> => {
+  let remaining = Math.max(0, Math.floor(ms));
+  while (remaining > 0) {
+    if (shouldStop()) return;
+    const slice = Math.min(250, remaining);
+    await sleep(slice);
+    remaining -= slice;
+  }
+};
+
+const loadExistingRawRunMap = async (runOutDir: string): Promise<Map<string, RawRun>> => {
+  const rawDir = path.resolve(runOutDir, "raw");
+  const map = new Map<string, RawRun>();
+  let files: string[] = [];
+  try {
+    files = await fs.readdir(rawDir);
+  } catch {
+    return map;
+  }
+  for (const name of files) {
+    if (!name.toLowerCase().endsWith(".json")) continue;
+    const record = await readJsonFile<RawRun>(path.resolve(rawDir, name));
+    if (!record || !record.prompt_id || !Number.isFinite(record.seed) || !Number.isFinite(record.temperature)) {
+      continue;
+    }
+    const key = runCaseKey(record.prompt_id, record.seed, record.temperature);
+    const previous = map.get(key);
+    if (!previous) {
+      map.set(key, record);
+      continue;
+    }
+    const prevTs = Date.parse(previous.timestamp || "");
+    const nextTs = Date.parse(record.timestamp || "");
+    if (Number.isFinite(nextTs) && (!Number.isFinite(prevTs) || nextTs >= prevTs)) {
+      map.set(key, record);
+    }
+  }
+  return map;
+};
 
 const ensureServerReady = async (timeoutMs = 120000) => {
   const start = Date.now();
@@ -407,6 +460,7 @@ const askWithRetry = async (
   seed: number,
   temperature: number,
   runId: string,
+  shouldAbort?: () => boolean,
 ) => {
   const begin = Date.now();
   let attempts = 0;
@@ -423,7 +477,15 @@ const askWithRetry = async (
     error: response.payload.error,
     message: response.payload.message,
   });
+  if (shouldAbort?.()) {
+    stopReason = "campaign_abort_requested";
+    return { response, attempts, stopReason, attemptTrace };
+  }
   while (attempts <= MAX_RETRIES && shouldRetryResponse(response, entry)) {
+    if (shouldAbort?.()) {
+      stopReason = "campaign_abort_requested";
+      break;
+    }
     const elapsedMs = Date.now() - begin;
     if (elapsedMs >= MAX_CASE_WALL_MS) {
       stopReason = "case_wall_exceeded";
@@ -446,7 +508,11 @@ const askWithRetry = async (
       stopReason = "case_wall_exceeded";
       break;
     }
-    await sleep(Math.min(delay, remaining));
+    await sleepInterruptible(Math.min(delay, remaining), () => Boolean(shouldAbort?.()));
+    if (shouldAbort?.()) {
+      stopReason = "campaign_abort_requested";
+      break;
+    }
     response = await askOnce(entry, seed, temperature, runId);
     attempts += 1;
     attemptTrace.push({
@@ -471,6 +537,10 @@ const collectTimings = (debug: AskDebug | null): { retrieval?: number; synthesis
   if (!debug) return {};
   const timeline = Array.isArray(debug.timeline) ? debug.timeline : [];
   const liveEvents = Array.isArray(debug.live_events) ? debug.live_events : [];
+  const stageTiming =
+    debug.stage_timing_ms && typeof debug.stage_timing_ms === "object"
+      ? debug.stage_timing_ms
+      : {};
   let retrieval = 0;
   let synthesis = 0;
   for (const step of timeline) {
@@ -487,6 +557,15 @@ const collectTimings = (debug: AskDebug | null): { retrieval?: number; synthesis
       if (!ms) continue;
       if (retrieval === 0 && /retrieve|evidence|search|context|tree walk|ambiguity/.test(stage)) retrieval += ms;
       if (synthesis === 0 && /synthesis|answer|contract|repair|cleaned|final/.test(stage)) synthesis += ms;
+    }
+  }
+  if (retrieval === 0 || synthesis === 0) {
+    for (const [stageKey, value] of Object.entries(stageTiming)) {
+      const stage = String(stageKey ?? "").toLowerCase();
+      const ms = toNum(value, 0);
+      if (!ms) continue;
+      if (retrieval === 0 && /retrieve|evidence|search|context|preflight/.test(stage)) retrieval += ms;
+      if (synthesis === 0 && /synth|answer|contract|repair|cleaned|final/.test(stage)) synthesis += ms;
     }
   }
   return {
@@ -533,12 +612,32 @@ const avg = (values: number[]): number => (values.length ? values.reduce((sum, v
 const main = async () => {
   const startedAt = new Date().toISOString();
   const runEpoch = Date.now();
-  const runId = `versatility-${Date.now()}`;
+  let runId = `versatility-${Date.now()}`;
   const outRootDir = path.resolve(OUT_DIR);
-  const runOutDir = ISOLATE_RUN_DIR ? path.join(outRootDir, runId) : outRootDir;
+  let runOutDir = ISOLATE_RUN_DIR ? path.join(outRootDir, runId) : outRootDir;
   const prompts = allPrompts();
   if (prompts.length < 90) throw new Error(`expected >=90 prompts, got ${prompts.length}`);
   const expectedRuns = prompts.length * SEEDS.length * TEMPS.length;
+
+  let resumedFromLatest = false;
+  let resumedRuns = 0;
+  if (ISOLATE_RUN_DIR && RESUME_FROM_LATEST) {
+    const latest = await readJsonFile<{ run_id?: string; output_run_dir?: string }>(
+      path.resolve(outRootDir, "latest.json"),
+    );
+    if (latest?.run_id && latest?.output_run_dir) {
+      const summary = await readJsonFile<{ expected_runs?: number; run_complete?: boolean }>(
+        path.resolve(latest.output_run_dir, "summary.json"),
+      );
+      const expectedMatch = !Number.isFinite(summary?.expected_runs) || summary?.expected_runs === expectedRuns;
+      const incomplete = summary?.run_complete !== true;
+      if (expectedMatch && incomplete) {
+        runId = latest.run_id;
+        runOutDir = path.resolve(latest.output_run_dir);
+        resumedFromLatest = true;
+      }
+    }
+  }
 
   await fs.mkdir(path.resolve(runOutDir, "raw"), { recursive: true });
   await fs.mkdir(path.resolve("reports"), { recursive: true });
@@ -555,19 +654,48 @@ const main = async () => {
     await ensureServerReady();
   }
 
-  const rawRuns: RawRun[] = [];
+  const rawRunByKey = resumedFromLatest ? await loadExistingRawRunMap(runOutDir) : new Map<string, RawRun>();
+  resumedRuns = rawRunByKey.size;
+  if (resumedRuns > 0) {
+    await writeCheckpoint(runOutDir, runId, Array.from(rawRunByKey.values()));
+    console.log(
+      `[versatility] resume run=${runId} restored_runs=${resumedRuns}/${expectedRuns} out=${runOutDir}`,
+    );
+  }
+
   let terminatedEarlyReason: string | null = null;
   const runStartMs = Date.now();
   let globalCooldownUntil = 0;
   let globalCooldownAppliedMs = 0;
+  let abortSignal: NodeJS.Signals | null = null;
+  const onAbortSignal = (signal: NodeJS.Signals) => {
+    abortSignal = signal;
+    if (!terminatedEarlyReason) {
+      terminatedEarlyReason = `signal:${signal}`;
+    }
+  };
+  process.once("SIGINT", onAbortSignal);
+  process.once("SIGTERM", onAbortSignal);
   try {
     outer: for (const entry of prompts) {
       for (const seed of SEEDS) {
         for (const temperature of TEMPS) {
+          const caseKey = runCaseKey(entry.id, seed, temperature);
+          if (rawRunByKey.has(caseKey)) continue;
+          if (abortSignal) {
+            terminatedEarlyReason = terminatedEarlyReason ?? `signal:${abortSignal}`;
+            break outer;
+          }
           if (globalCooldownUntil > Date.now()) {
             const waitMs = globalCooldownUntil - Date.now();
-            await sleep(waitMs);
-            globalCooldownAppliedMs += waitMs;
+            const cooldownStart = Date.now();
+            await sleepInterruptible(waitMs, () => Boolean(abortSignal));
+            const waitedMs = Math.max(0, Date.now() - cooldownStart);
+            if (abortSignal) {
+              terminatedEarlyReason = terminatedEarlyReason ?? `signal:${abortSignal}`;
+              break outer;
+            }
+            globalCooldownAppliedMs += waitedMs;
           }
           if (MAX_RUN_MS > 0 && Date.now() - runStartMs >= MAX_RUN_MS) {
             terminatedEarlyReason = `max_run_ms_exceeded:${MAX_RUN_MS}`;
@@ -578,7 +706,12 @@ const main = async () => {
             seed,
             temperature,
             runId,
+            () => Boolean(abortSignal),
           );
+          if (stopReason === "campaign_abort_requested") {
+            terminatedEarlyReason = terminatedEarlyReason ?? `signal:${abortSignal ?? "abort_requested"}`;
+            break outer;
+          }
           const failures = evaluateFailures(entry, response);
           const raw: RawRun = {
             run_id: runId,
@@ -599,7 +732,7 @@ const main = async () => {
             stop_reason: stopReason,
             attempt_trace: attemptTrace,
           };
-          rawRuns.push(raw);
+          rawRunByKey.set(caseKey, raw);
           if (
             GLOBAL_COOLDOWN_ON_CIRCUIT &&
             (raw.stop_reason === "circuit_open_short_circuit" || raw.status === 503)
@@ -614,15 +747,20 @@ const main = async () => {
           }
           const fileName = `${runId}-${entry.id}-s${seed}-t${String(temperature).replace(".", "p")}.json`;
           await fs.writeFile(path.resolve(runOutDir, "raw", fileName), `${JSON.stringify(raw, null, 2)}\n`, "utf8");
-          if (rawRuns.length % CHECKPOINT_EVERY === 0) {
-            await writeCheckpoint(runOutDir, runId, rawRuns);
+          if (rawRunByKey.size % CHECKPOINT_EVERY === 0) {
+            const checkpointRows = Array.from(rawRunByKey.values());
+            await writeCheckpoint(runOutDir, runId, checkpointRows);
+            console.log(`[versatility] progress ${checkpointRows.length}/${expectedRuns}`);
           }
         }
       }
     }
   } finally {
+    process.removeListener("SIGINT", onAbortSignal);
+    process.removeListener("SIGTERM", onAbortSignal);
     if (serverChild) await stopServer(serverChild);
   }
+  const rawRuns = Array.from(rawRunByKey.values());
   await writeCheckpoint(runOutDir, runId, rawRuns);
   const runComplete = rawRuns.length === expectedRuns && !terminatedEarlyReason;
   if (!runComplete && !terminatedEarlyReason) {
@@ -741,6 +879,8 @@ const main = async () => {
     run_duration_ms: Date.now() - runEpoch,
     terminated_early_reason: terminatedEarlyReason,
     global_cooldown_applied_ms: globalCooldownAppliedMs,
+    resumed_from_latest: resumedFromLatest,
+    resumed_runs: resumedRuns,
     output_root_dir: outRootDir,
     output_run_dir: runOutDir,
     base_url: BASE_URL,
@@ -814,6 +954,8 @@ const main = async () => {
       `total_runs=${rawRuns.length}`,
       `terminated_early_reason=${terminatedEarlyReason ?? "none"}`,
       `global_cooldown_applied_ms=${globalCooldownAppliedMs}`,
+      `resumed_from_latest=${String(resumedFromLatest)}`,
+      `resumed_runs=${resumedRuns}`,
       `stub_text_detected_rate=${stubRate.toFixed(3)}`,
       `relation_packet_built_rate=${relationPacketBuiltRate.toFixed(3)}`,
       `relation_dual_domain_ok_rate=${relationDualDomainRate.toFixed(3)}`,
@@ -887,6 +1029,8 @@ const main = async () => {
     `- run_duration_ms: ${Date.now() - runEpoch}`,
     `- terminated_early_reason: ${terminatedEarlyReason ?? "none"}`,
     `- global_cooldown_applied_ms: ${globalCooldownAppliedMs}`,
+    `- resumed_from_latest: ${String(resumedFromLatest)}`,
+    `- resumed_runs: ${resumedRuns}`,
     `- output_run_dir: ${runOutDir}`,
     "",
     "## Aggregate by Prompt Family",
