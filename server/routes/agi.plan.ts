@@ -2610,6 +2610,26 @@ const HELIX_ASK_SINGLE_LLM =
   String(process.env.HELIX_ASK_SINGLE_LLM ?? "1").trim() !== "0";
 const HELIX_ASK_ANSWER_CONTRACT_PRIMARY =
   String(process.env.HELIX_ASK_ANSWER_CONTRACT_PRIMARY ?? "1").trim() !== "0";
+const HELIX_ASK_EVIDENCE_CARDS_LLM =
+  String(process.env.HELIX_ASK_EVIDENCE_CARDS_LLM ?? "1").trim() !== "0";
+const HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE ??
+      process.env.VITE_HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE,
+    0.72,
+  ),
+  0,
+  1,
+);
+const HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE ??
+      process.env.VITE_HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE,
+    0.32,
+  ),
+  0,
+  1,
+);
 const HELIX_ASK_SCAFFOLD_TOKENS = clampNumber(
   readNumber(process.env.HELIX_ASK_SCAFFOLD_TOKENS ?? process.env.VITE_HELIX_ASK_SCAFFOLD_TOKENS, 1024),
   64,
@@ -21618,6 +21638,10 @@ const executeHelixAsk = async ({
         typeof debugPayload?.retrieval_confidence === "number"
           ? debugPayload.retrieval_confidence
           : 0;
+      const promptRetrievalDocShare =
+        typeof debugPayload?.retrieval_doc_share === "number"
+          ? debugPayload.retrieval_doc_share
+          : 0;
       const toolResultsTreeWalk =
         treeWalkMetrics &&
         typeof treeWalkMetrics.boundCount === "number" &&
@@ -21753,6 +21777,21 @@ const executeHelixAsk = async ({
             conceptMatch &&
             (!definitionFocus ||
               (conceptMatch.card.sourcePath && isDefinitionDocPath(conceptMatch.card.sourcePath)));
+        const strongRepoEvidenceForDeterministicCards =
+          evidenceGateOk &&
+          runtimeMustIncludeOk &&
+          topicMustIncludeOk &&
+          runtimeViabilityMustIncludeOk &&
+          (coverageSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+          (docSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+          promptRetrievalConfidence >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE &&
+          promptRetrievalDocShare >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE;
+        const preferDeterministicEvidenceCards =
+          HELIX_ASK_SINGLE_LLM ||
+          fastQualityMode ||
+          forceDeterministicScaffolds ||
+          !HELIX_ASK_EVIDENCE_CARDS_LLM ||
+          strongRepoEvidenceForDeterministicCards;
         if (allowConceptFastPath && conceptMatch) {
           repoSynthesisPath = "concept";
           const evidenceStart = Date.now();
@@ -21782,9 +21821,14 @@ const executeHelixAsk = async ({
             evidenceStart,
           );
         } else if (evidenceContext) {
-          if (HELIX_ASK_SINGLE_LLM || fastQualityMode || forceDeterministicScaffolds) {
+          if (preferDeterministicEvidenceCards) {
             repoSynthesisPath = "deterministic";
             const evidenceStart = Date.now();
+            if (strongRepoEvidenceForDeterministicCards && debugPayload) {
+              (debugPayload as Record<string, unknown>).evidence_cards_deterministic_fastpath = true;
+              (debugPayload as Record<string, unknown>).evidence_cards_deterministic_reason =
+                "retrieval_high_confidence";
+            }
             if (fastQualityMode) {
               const fastEvidenceCheck = canStartFastHelper(
                 "evidence_cards",
