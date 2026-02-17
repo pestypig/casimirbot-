@@ -22,6 +22,11 @@ const PROMPTS_PATH = process.env.HELIX_ASK_AB_PROMPTS ?? 'bench/helix_ask_eviden
 const OUT_ROOT = process.env.HELIX_ASK_AB_OUT ?? 'artifacts/evidence-cards-ab';
 const TEMP = Number(process.env.HELIX_ASK_AB_TEMPERATURE ?? 0.2);
 const SEEDS = (process.env.HELIX_ASK_AB_SEEDS ?? '7,11,13').split(',').map((s) => Number(s.trim()));
+const MAX_INVALID_RATE = Number(process.env.HELIX_ASK_AB_MAX_INVALID_RATE ?? 0.1);
+const MIN_VALID = Number(process.env.HELIX_ASK_AB_MIN_VALID ?? 200);
+const MIN_COMPLETION_RATE = Number(process.env.HELIX_ASK_AB_MIN_COMPLETION_RATE ?? 1);
+const FAIL_ON_QUALITY = (process.env.HELIX_ASK_AB_FAIL_ON_QUALITY ?? '1') === '1';
+const RUN_ANALYZE = (process.env.HELIX_ASK_AB_RUN_ANALYZE ?? '1') === '1';
 
 const variants: Variant[] = [
   {
@@ -108,6 +113,63 @@ const stopServer = async (child: ReturnType<typeof spawn>) => {
   });
 };
 
+const summarizeVariantRun = async (variantId: Variant['id'], expectedTotal: number) => {
+  const rawDir = path.join(OUT_ROOT, variantId, 'raw');
+  const files = (await fs.readdir(rawDir)).filter((name) => name.endsWith('.json'));
+  const status_counts: Record<string, number> = {};
+  let valid = 0;
+  for (const file of files) {
+    const row = JSON.parse(
+      await fs.readFile(path.join(rawDir, file), 'utf8'),
+    ) as { status: number };
+    const key = String(row.status);
+    status_counts[key] = (status_counts[key] ?? 0) + 1;
+    if (row.status === 200) valid += 1;
+  }
+  const total = files.length;
+  const invalid = Math.max(0, total - valid);
+  const invalid_rate = total > 0 ? invalid / total : 1;
+  const completion_rate = expectedTotal > 0 ? total / expectedTotal : 1;
+  const pass =
+    valid >= MIN_VALID &&
+    invalid_rate <= MAX_INVALID_RATE &&
+    completion_rate >= MIN_COMPLETION_RATE;
+  const summary = {
+    variant: variantId,
+    expected_total: expectedTotal,
+    n_total: total,
+    n_valid: valid,
+    n_invalid: invalid,
+    invalid_rate,
+    completion_rate,
+    status_counts,
+    gates: {
+      min_valid: MIN_VALID,
+      max_invalid_rate: MAX_INVALID_RATE,
+      min_completion_rate: MIN_COMPLETION_RATE,
+    },
+    pass,
+  };
+  const summaryPath = path.join(OUT_ROOT, variantId, 'summary.json');
+  await fs.writeFile(summaryPath, JSON.stringify(summary, null, 2), 'utf8');
+  return summary;
+};
+
+const runNodeCommand = async (command: string, args: string[]) => {
+  const child = spawn(command, args, {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: 'inherit',
+  });
+  await new Promise<void>((resolve, reject) => {
+    child.once('error', reject);
+    child.once('exit', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}`));
+    });
+  });
+};
+
 const ask = async (prompt: PromptRow, seed: number): Promise<{ payload: AskResponse; latency_ms: number; status: number }> => {
   const started = Date.now();
   const res = await fetch(new URL('/api/agi/ask', BASE_URL), {
@@ -143,6 +205,8 @@ const askWithRetry = async (prompt: PromptRow, seed: number): Promise<{ payload:
 
 const main = async () => {
   const prompts = await readPrompts();
+  const expectedTotal = prompts.length * SEEDS.length;
+  const failedVariants: string[] = [];
   for (const variant of variants) {
     const outDir = path.join(OUT_ROOT, variant.id, 'raw');
     await fs.mkdir(outDir, { recursive: true });
@@ -172,6 +236,21 @@ const main = async () => {
     } finally {
       await stopServer(server);
     }
+    const summary = await summarizeVariantRun(variant.id, expectedTotal);
+    console.log(
+      `[${variant.id}] valid=${summary.n_valid}/${summary.n_total} invalidRate=${summary.invalid_rate.toFixed(3)} completionRate=${summary.completion_rate.toFixed(3)}`,
+    );
+    if (!summary.pass) {
+      const reason = `[${variant.id}] run-quality gate failed: status=${JSON.stringify(summary.status_counts)} valid=${summary.n_valid} invalidRate=${summary.invalid_rate.toFixed(3)} completionRate=${summary.completion_rate.toFixed(3)}`;
+      console.error(reason);
+      failedVariants.push(reason);
+    }
+  }
+  if (RUN_ANALYZE) {
+    await runNodeCommand('npx', ['tsx', 'scripts/helix-ask-evidence-cards-analyze.ts']);
+  }
+  if (FAIL_ON_QUALITY && failedVariants.length > 0) {
+    throw new Error(`AB run failed quality gates:\n${failedVariants.join('\n')}`);
   }
 };
 
