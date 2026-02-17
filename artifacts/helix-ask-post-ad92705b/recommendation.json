@@ -1,0 +1,40 @@
+{
+  "result_type": "insufficient_run_quality",
+  "gates_passed": {
+    "reliability": {
+      "campaign_completed": false,
+      "terminated_early_reason_null": false,
+      "invalid_error_rate_le_10pct": true,
+      "no_dominant_circuit_or_case_wall": true,
+      "checkpoint_exists": true,
+      "checkpoint_stop_reason_coherent": false
+    },
+    "quality": {
+      "goal_zone_pass_100": true,
+      "intent_id_correct_rate": true,
+      "report_mode_correct_rate": false,
+      "relation_packet_built_rate": false,
+      "relation_dual_domain_ok_rate": false,
+      "stub_text_detected_rate": true,
+      "citation_presence_rate": false,
+      "min_text_length_pass_rate": true,
+      "latency_p95_ms": true,
+      "retrieval_latency_p95_ms": false
+    },
+    "casimir_verify_pass": true
+  },
+  "primary_blockers": [
+    "Versatility campaign did not reach expected 270 runs (only measured runs available).",
+    "Checkpoint accounting is incoherent with raw run artifacts.",
+    "Retrieval latency p95 is unavailable (sample count is zero).",
+    "report_mode_correct_rate below 0.90 threshold.",
+    "relation_packet_built_rate below 0.85 threshold.",
+    "relation_dual_domain_ok_rate below 0.85 threshold.",
+    "citation_presence_rate below 0.90 threshold."
+  ],
+  "top_3_next_patches": [
+    "Harden versatility runner termination and checkpoint finalization so campaign completion and stop-reason accounting are always coherent.",
+    "Improve relation packet assembly reliability to raise relation_packet_built_rate and relation_dual_domain_ok_rate above 0.85.",
+    "Enforce citation emission contract in Helix Ask outputs and emit retrieval latency telemetry in summary artifacts."
+  ]
+}

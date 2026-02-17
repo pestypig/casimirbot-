@@ -1,0 +1,69 @@
+{
+  "baseline_commit": "ad92705",
+  "result_type": "insufficient_run_quality",
+  "measured_runs": 98,
+  "expected_runs": 270,
+  "goal_zone": {
+    "pass": true,
+    "pass_rate": 1.0,
+    "failed_cases": 0
+  },
+  "versatility": {
+    "runs": 98,
+    "errors": 4,
+    "invalid_error_rate": 0.04081632653061224,
+    "intent_id_correct_rate": 0.8555555555555555,
+    "report_mode_correct_rate": 0.8979591836734694,
+    "relation_packet_built_rate": 0.7872340425531915,
+    "relation_dual_domain_ok_rate": 0.7872340425531915,
+    "stub_text_detected_rate": 0.02040816326530612,
+    "citation_presence_rate": 0.0,
+    "min_text_length_pass_rate": 0.9081632653061225,
+    "latency_p95_ms": 2162,
+    "retrieval_latency_p95_ms": null,
+    "retrieval_latency_sample_count": 0,
+    "stop_reasons": {
+      "done": 92,
+      "max_retries_reached": 2,
+      "circuit_open_short_circuit": 4
+    }
+  },
+  "reliability_gates": {
+    "campaign_completed": false,
+    "terminated_early_reason_null": false,
+    "invalid_error_rate_le_10pct": true,
+    "no_dominant_circuit_or_case_wall": true,
+    "checkpoint_exists": true,
+    "checkpoint_stop_reason_coherent": false
+  },
+  "quality_gates": {
+    "goal_zone_pass_100": true,
+    "intent_id_correct_rate": true,
+    "report_mode_correct_rate": false,
+    "relation_packet_built_rate": false,
+    "relation_dual_domain_ok_rate": false,
+    "stub_text_detected_rate": true,
+    "citation_presence_rate": false,
+    "min_text_length_pass_rate": true,
+    "latency_p95_ms": true,
+    "retrieval_latency_p95_ms": false
+  },
+  "casimir": {
+    "verdict": "PASS",
+    "certificateHash": "e58abff1a2ca7061cce7459eacbfd5cdc5466c56c84d17642108f2efdbb7c03f",
+    "integrityOk": true
+  },
+  "training_trace": {
+    "path": "artifacts/helix-ask-post-ad92705b/training-trace.jsonl",
+    "bytes": 190300
+  },
+  "primary_blockers": [
+    "Versatility campaign did not reach expected 270 runs (only measured runs available).",
+    "Checkpoint accounting is incoherent with raw run artifacts.",
+    "Retrieval latency p95 is unavailable (sample count is zero).",
+    "report_mode_correct_rate below 0.90 threshold.",
+    "relation_packet_built_rate below 0.85 threshold.",
+    "relation_dual_domain_ok_rate below 0.85 threshold.",
+    "citation_presence_rate below 0.90 threshold."
+  ]
+}
