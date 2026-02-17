@@ -1,6 +1,40 @@
 {
   "version": 1,
   "rootId": "mission-ethos",
+  "actionGatePolicy": {
+    "version": 1,
+    "claim_tier": "diagnostic",
+    "covered_action_tags": [
+      "covered-action",
+      "covered_action",
+      "ideology-gate-covered",
+      "requires-dual-key",
+      "requires_dual_key"
+    ],
+    "legal_key_tags": [
+      "legal-key",
+      "legal_key",
+      "legal-ok",
+      "legal_ok"
+    ],
+    "ethos_key_tags": [
+      "ethos-key",
+      "ethos_key",
+      "ethos-ok",
+      "ethos_ok"
+    ],
+    "jurisdiction_floor_ok_tags": [
+      "jurisdiction-floor-ok",
+      "jurisdiction_floor_ok",
+      "jurisdictional-floor-ok",
+      "jurisdictional_floor_ok"
+    ],
+    "hard_fail_ids": {
+      "missing_legal_key": "IDEOLOGY_MISSING_LEGAL_KEY",
+      "missing_ethos_key": "IDEOLOGY_MISSING_ETHOS_KEY",
+      "jurisdiction_floor_violation": "IDEOLOGY_JURISDICTIONAL_FLOOR_VIOLATION"
+    }
+  },
   "nodes": [
     {
       "id": "mission-ethos",
