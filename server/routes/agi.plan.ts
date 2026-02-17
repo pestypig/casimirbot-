@@ -6296,6 +6296,62 @@ const SLOT_IGNORE_TOKENS = new Set([
   "files",
 ]);
 
+// For warp+ethos relation prompts, navigation/tree slots are supporting context
+// and should not hard-fail grounded crossover answers.
+const HYBRID_RELATION_CORE_SLOTS = new Set(["warp_bubble", "mission_ethos", "ideology"]);
+const HYBRID_RELATION_OPTIONAL_SLOT_REGEXES = [
+  /(^|_)mission_ethos_tree$/,
+  /(^|_)mission_ethos_seeds?$/,
+  /^definition_mission_ethos_tree$/,
+  /^node_mission_ethos$/,
+  /^node_warp_bubble$/,
+  /^ethos_knowledge_tree$/,
+  /^warp_mechanics_tree$/,
+  /^bridge_/,
+  /^two_key_approval$/,
+  /^jurisdictional_floor$/,
+  /^capability_ambition_gradient$/,
+];
+
+const isHybridRelationAuxiliarySlot = (slotId: string): boolean => {
+  const normalized = normalizeSlotName(slotId);
+  if (!normalized) return false;
+  if (HYBRID_RELATION_CORE_SLOTS.has(normalized)) return false;
+  if (normalized.endsWith("_tree")) return true;
+  if (normalized.endsWith("_seeds")) return true;
+  if (normalized.startsWith("definition_")) return true;
+  if (normalized.startsWith("node_")) return true;
+  return HYBRID_RELATION_OPTIONAL_SLOT_REGEXES.some((re) => re.test(normalized));
+};
+
+type HelixAskSlotCoverageSummary = {
+  slots: string[];
+  coveredSlots: string[];
+  missingSlots: string[];
+  ratio: number;
+};
+
+const relaxHybridRelationCoverageSummary = <T extends HelixAskSlotCoverageSummary>(
+  summary: T | null,
+  enabled: boolean,
+): T | null => {
+  if (!enabled || !summary) return summary;
+  const nextSlots = summary.slots.filter((slot) => !isHybridRelationAuxiliarySlot(slot));
+  if (nextSlots.length === summary.slots.length) return summary;
+  const coveredSet = new Set(summary.coveredSlots.filter((slot) => nextSlots.includes(slot)));
+  const missingSet = new Set(summary.missingSlots.filter((slot) => nextSlots.includes(slot)));
+  const coveredSlots = nextSlots.filter((slot) => coveredSet.has(slot));
+  const missingSlots = nextSlots.filter((slot) => missingSet.has(slot));
+  const ratio = nextSlots.length > 0 ? coveredSlots.length / nextSlots.length : 1;
+  return {
+    ...summary,
+    slots: nextSlots,
+    coveredSlots,
+    missingSlots,
+    ratio,
+  };
+};
+
 const normalizeSlotId = (value: string): string => {
   const normalized = value
     .trim()
@@ -8803,7 +8859,10 @@ function buildDocEvidenceBullet(
   const prefix = referenceLines.length ? `${referenceLines.join(" ")} ` : "";
   const summary =
     snippet ? ensureSentence(snippet) : "See the documentation for more detail.";
-  return `- ${label}: ${prefix}${summary} (see ${block.path})`;
+  const pathRef = block.path?.trim();
+  return pathRef
+    ? `- ${label}: ${prefix}${summary} (see ${pathRef})`
+    : `- ${label}: ${prefix}${summary}`;
 }
 
 function buildDefinitionDocBullet(block: { path: string; block: string }): string {
@@ -8828,7 +8887,10 @@ function buildCodeEvidenceBullet(span: HelixAskCodeSpan): string {
   const snippet = clipAskText(span.snippet, 240);
   const prefix = span.isTest ? "Test" : "Code";
   const summary = snippet ? ensureSentence(snippet) : "See the implementation for details.";
-  return `- ${prefix}: ${spanLabel}${summary} (see ${span.filePath})`;
+  const pathRef = span.filePath?.trim();
+  return pathRef
+    ? `- ${prefix}: ${spanLabel}${summary} (see ${pathRef})`
+    : `- ${prefix}: ${spanLabel}${summary}`;
 }
 
 const SYMBOL_TOKEN_RE = /\b[A-Za-z_][A-Za-z0-9_]{2,}\b/g;
@@ -17298,6 +17360,10 @@ const executeHelixAsk = async ({
       hasFilePathHints ||
       HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
       HELIX_ASK_REPO_EXPECTS.test(baseQuestion);
+    const warpEthosRelationQuery =
+      HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) &&
+      /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(baseQuestion) &&
+      /\b(mission ethos|ethos|ideology)\b/i.test(baseQuestion);
     let topicTags = inferHelixAskTopicTags(
       blockScoped && blockSearchSeed ? blockSearchSeed : baseQuestion,
       parsed.data.searchQuery,
@@ -19969,6 +20035,9 @@ const executeHelixAsk = async ({
                 : requiredSlotIds
               : [];
           }
+          if (warpEthosRelationQuery && docSlotTargets.length > 0) {
+            docSlotTargets = docSlotTargets.filter((slot) => !isHybridRelationAuxiliarySlot(slot));
+          }
           if (planScope?.docsFirst && docSlotTargets.length > 0) {
             logEvent(
               "Docs-first slots",
@@ -19996,6 +20065,11 @@ const executeHelixAsk = async ({
                   })
                 : coverageSlotSummary;
           }
+          coverageSlotSummary = relaxHybridRelationCoverageSummary(
+            coverageSlotSummary,
+            warpEthosRelationQuery,
+          );
+          docSlotSummary = relaxHybridRelationCoverageSummary(docSlotSummary, warpEthosRelationQuery);
           if (debugPayload && docSlotSummary?.ratio !== undefined) {
             debugPayload.slot_doc_coverage_rate = Math.max(
               debugPayload.slot_doc_coverage_rate ?? 0,
@@ -20949,6 +21023,9 @@ const executeHelixAsk = async ({
             const requiredSlotIds = resolveRequiredSlots(slotPlan);
             docSlotTargets = docRequiredSlots.length > 0 ? docRequiredSlots : requiredSlotIds;
           }
+          if (warpEthosRelationQuery && docSlotTargets.length > 0) {
+            docSlotTargets = docSlotTargets.filter((slot) => !isHybridRelationAuxiliarySlot(slot));
+          }
           if (slotPlan && docSlotTargets.length > 0) {
             docSlotSummary = evaluateDocSlotCoverage(slotPlan, attemptDocBlocks, docSlotTargets);
           } else if (attemptDocText.trim().length > 0) {
@@ -20963,6 +21040,11 @@ const executeHelixAsk = async ({
               includeQuestionTokens: coverageSlots.length === 0,
             });
           }
+          coverageSlotSummary = relaxHybridRelationCoverageSummary(
+            coverageSlotSummary,
+            warpEthosRelationQuery,
+          );
+          docSlotSummary = relaxHybridRelationCoverageSummary(docSlotSummary, warpEthosRelationQuery);
           if (debugPayload && docSlotSummary?.ratio !== undefined) {
             debugPayload.slot_doc_coverage_rate = Math.max(
               debugPayload.slot_doc_coverage_rate ?? 0,
@@ -21445,6 +21527,16 @@ const executeHelixAsk = async ({
             failClosedReason = "doc_slot_missing";
           } else if (!evidenceGateOk) {
             failClosedReason = "evidence_gate_failed";
+          }
+        }
+        if (failClosedReason === "doc_slot_missing" && warpEthosRelationQuery && evidenceGateOk) {
+          const unresolvedSlots =
+            docSlotSummary?.missingSlots?.length
+              ? docSlotSummary.missingSlots
+              : coverageSlotSummary?.missingSlots ?? [];
+          const unresolvedCore = unresolvedSlots.filter((slot) => !isHybridRelationAuxiliarySlot(slot));
+          if (unresolvedCore.length === 0) {
+            failClosedReason = null;
           }
         }
         failClosedRepoEvidence = Boolean(failClosedReason);
@@ -22524,9 +22616,7 @@ const executeHelixAsk = async ({
       }
       const relationQuery = HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion);
       const relationAnchorsRequired =
-        relationQuery &&
-        /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i.test(baseQuestion) &&
-        /\b(mission ethos|ethos|ideology)\b/i.test(baseQuestion);
+        relationQuery && warpEthosRelationQuery;
       const relationAnchorPaths = extractFilePathsFromText(contextText);
       const relationWarpAnchorOk = relationAnchorPaths.some((filePath) =>
         HELIX_ASK_RELATION_WARP_ANCHOR_RE.test(filePath),
@@ -22551,7 +22641,7 @@ const executeHelixAsk = async ({
             slotCoverageFailed ||
             docSlotCoverageFailed)) ||
           relationAnchorMissing ||
-          relationCoverageWeak ||
+          (relationCoverageWeak && !evidenceGateOk) ||
           (!evidenceGateOk && ambiguityTerms.length > 0));
       const skipIdeologyClarify =
         isIdeologyReferenceIntent && Boolean(conceptMatch) && !relationQuery;
@@ -24442,6 +24532,20 @@ const executeHelixAsk = async ({
       let driftRepairApplied = false;
       let driftRepairAttempts = 0;
       let driftRepairImproved = false;
+      const driftRepairSkipStrongGrounding =
+        evidenceGateOk &&
+        !claimGateFailed &&
+        retrievalConfidence >= 0.75 &&
+        (coverageSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+        (docSlotSummary?.missingSlots?.length ?? 0) === 0 &&
+        platonicResult.coverageSummary.coverageRatio >= 0.75 &&
+        platonicResult.beliefSummary.unsupportedRate <= 0 &&
+        !platonicResult.coverageGateApplied &&
+        !platonicResult.beliefGateApplied &&
+        platonicResult.rattlingGateApplied;
+      if (driftRepairSkipStrongGrounding) {
+        logEvent("Drift repair", "skipped", "strong_grounding");
+      }
       if (
         HELIX_ASK_DRIFT_REPAIR &&
         !HELIX_ASK_SINGLE_LLM &&
@@ -24449,6 +24553,7 @@ const executeHelixAsk = async ({
         !answerContractApplied &&
         (!fastQualityMode || canStartHelperCall("drift_repair", FAST_QUALITY_FINALIZE_BY_MS)) &&
         !lockedByIdeologyTemplate &&
+        !driftRepairSkipStrongGrounding &&
         (platonicResult.beliefGateApplied || platonicResult.rattlingGateApplied) &&
         !platonicResult.coverageGateApplied &&
         evidenceText.trim().length > 0 &&
