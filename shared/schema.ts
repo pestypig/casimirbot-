@@ -2612,6 +2612,7 @@ export const adapterRunResponseSchema = z.object({
   pass: z.boolean(),
   firstFail: trainingTraceConstraintSchema.nullable().optional(),
   deltas: z.array(trainingTraceDeltaSchema),
+  certificate: z.lazy(() => constraintPackCertificateResultSchema).nullable().optional(),
   premeditation: adapterPremeditationResultSchema.optional(),
   artifacts: z.array(adapterArtifactRefSchema),
 });
