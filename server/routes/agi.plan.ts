@@ -11553,6 +11553,24 @@ type HelixAskAnswerContract = z.infer<typeof HELIX_ASK_ANSWER_CONTRACT_SCHEMA>;
 const normalizeContractText = (value: string, maxChars = 280): string =>
   value.replace(/\s+/g, " ").trim().slice(0, maxChars).trim();
 
+const sanitizeDeterministicContractLine = (value: string): string => {
+  const source = stripEvidenceBulletPrefix(value).replace(/\s+/g, " ").trim();
+  if (!source) return "";
+  const definitionMatch = source.match(/\bDefinition:\s*([\s\S]+)/i);
+  let candidate = definitionMatch ? definitionMatch[1] : source;
+  candidate = candidate
+    .replace(/\(see\s+[^\)]*\)/gi, " ")
+    .replace(/\b(?:Doc|Heading|Subheading|Section):\s*[^.]+(?:\.)?/gi, " ")
+    .replace(/\bSpan:\s*L\d+(?:-L?\d+)?\b/gi, " ")
+    .replace(/\{[^{}]*\}/g, " ")
+    .replace(/[{}]/g, " ")
+    .replace(/^(?:Definition|Evidence|Code|Test)\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!candidate) return "";
+  return ensureSentence(normalizeContractText(candidate, 280));
+};
+
 const buildHelixAskAnswerContractPrompt = (
   question: string,
   evidence: string,
@@ -11734,11 +11752,11 @@ const buildDeterministicAnswerContractFallback = (args: {
     .map((span) => buildCodeEvidenceBullet(span));
 
   const derivedClaimLines = [...docBullets, ...codeBullets]
-    .map((line) => ensureSentence(normalizeContractText(summarizeForExtension(line), 280)))
-    .filter(Boolean);
+    .map((line) => sanitizeDeterministicContractLine(summarizeForExtension(line)))
+    .filter((line) => line.length >= 20);
   if (derivedClaimLines.length === 0) {
     const evidenceClaims = splitGroundedSentences(args.evidenceText)
-      .map((line) => ensureSentence(normalizeContractText(summarizeForExtension(line), 280)))
+      .map((line) => sanitizeDeterministicContractLine(summarizeForExtension(line)))
       .filter((line) => line.length >= 24 && !/^sources?:/i.test(line));
     derivedClaimLines.push(...evidenceClaims.slice(0, 4));
   }
@@ -23870,11 +23888,13 @@ const executeHelixAsk = async ({
     let cleanedText: string | undefined;
     let answerExtension: HelixAskAnswerExtensionResult | null = null;
     if (typeof result.text === "string" && result.text.trim()) {
-      let cleaned = formatHelixAskAnswer(stripPromptEchoFromAnswer(result.text, baseQuestion));
+      const rawAnswerBase = stripPromptEchoFromAnswer(result.text, baseQuestion).trim();
+      let answerContract = parseHelixAskAnswerContractPayload(rawAnswerBase);
+      const rawAnswerText = answerContract
+        ? rawAnswerBase
+        : stripInlineJsonArtifacts(rawAnswerBase).trim();
+      let cleaned = formatHelixAskAnswer(rawAnswerText);
       cleaned = stripInlineJsonArtifacts(cleaned);
-      const rawAnswerText = stripInlineJsonArtifacts(
-        stripPromptEchoFromAnswer(result.text, baseQuestion),
-      ).trim();
       const rawAnswerSentences = extractOrderedAnswerSentences(rawAnswerText, 3);
       const rawPreview = clipAskText(
         rawAnswerText.replace(/\s+/g, " ").trim(),
@@ -23889,7 +23909,6 @@ const executeHelixAsk = async ({
       const toolResultsPresent = Boolean(toolResultsBlock?.trim());
       const hasToolEvidence =
         docBlocks.length > 0 || (codeAlignment?.spans?.length ?? 0) > 0;
-      let answerContract = parseHelixAskAnswerContractPayload(rawAnswerText);
       let answerContractApplied = false;
       let answerContractSource: "inline" | "helper" | "primary" | "none" = answerContract
         ? (answerContractPrimaryUsed ? "primary" : "inline")
