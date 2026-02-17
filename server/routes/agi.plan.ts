@@ -225,6 +225,7 @@ import {
 } from "../services/helix-ask/proof-packet";
 import {
   buildRelationAssemblyPacket,
+  renderRelationAssemblyFallback,
   resolveRelationTopologySignal,
   type RelationAssemblyPacket,
 } from "../services/helix-ask/relation-assembly";
@@ -11633,6 +11634,39 @@ const DETERMINISTIC_CODE_LINE_RE =
   /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|useState|from\s+["']react["'])\b/i;
 const DETERMINISTIC_FACTUAL_VERB_RE =
   /\b(?:is|are|means|describes?|defines?|refers?|implements?|models?)\b/i;
+const RELATION_MODEL_PLACEHOLDER_RE =
+  /^(?:(?:\w+\.)?llm\.local(?:\s+stub result)?|placeholder|unable to answer|i cannot answer|model error)\b/i;
+const RELATION_CODE_NOISE_RE =
+  /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|usestate|from\s+["']react["'])\b/i;
+
+const detectRelationDeterministicFallbackReasons = (value: string): string[] => {
+  const reasons = new Set<string>();
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    reasons.add("empty");
+    return Array.from(reasons);
+  }
+  if (RELATION_MODEL_PLACEHOLDER_RE.test(normalized)) {
+    reasons.add("placeholder");
+  }
+  if (normalized.length < 160) {
+    reasons.add("too_short");
+  }
+  const hasWarpSignal =
+    /\b(warp|bubble|alcubierre|natario|spacetime|shift vector|expansion)\b/i.test(normalized);
+  const hasEthosSignal =
+    /\b(mission ethos|ethos|ideology|stewardship|compassion|governance)\b/i.test(normalized);
+  if (!hasWarpSignal || !hasEthosSignal) {
+    reasons.add("missing_dual_domain_terms");
+  }
+  if (isDeterministicMetadataNoise(normalized)) {
+    reasons.add("metadata_noise");
+  }
+  if (RELATION_CODE_NOISE_RE.test(normalized)) {
+    reasons.add("code_noise");
+  }
+  return Array.from(reasons);
+};
 
 const isDeterministicMetadataNoise = (value: string): boolean => {
   const normalized = value.toLowerCase();
@@ -24298,12 +24332,14 @@ const executeHelixAsk = async ({
       const hasToolEvidence =
         docBlocks.length > 0 || (codeAlignment?.spans?.length ?? 0) > 0;
       let answerContractApplied = false;
-      let answerContractSource: "inline" | "helper" | "primary" | "none" = answerContract
+      let answerContractSource: "inline" | "helper" | "primary" | "relation_packet" | "none" = answerContract
         ? (answerContractPrimaryUsed ? "primary" : "inline")
         : "none";
       const allowedContractCitations = normalizeCitations([
         ...extractFilePathsFromText(evidenceText),
         ...extractCitationTokensFromText(evidenceText),
+        ...(relationPacket ? Object.values(relationPacket.source_map) : []),
+        ...(relationPacket ? relationPacket.evidence.map((entry) => entry.path) : []),
       ]);
       const contractFillTokens = clampNumber(Math.round(repairTokens * 1.05), 128, 480);
       let answerContractGate: HelixAskAnswerContractGateResult | null = null;
@@ -24452,6 +24488,40 @@ const executeHelixAsk = async ({
             allowedContractCitations,
             requiresRepoEvidence,
           );
+        }
+        const relationContractHardFailReasons = evaluateRelationContractHardFail({
+          contract: sanitizedContract,
+          relationPacket,
+        });
+        if (debugPayload && relationPacket) {
+          debugPayload.answer_contract_relation_hard_fail =
+            relationContractHardFailReasons.slice();
+        }
+        if (relationPacket && relationContractHardFailReasons.length > 0) {
+          const relationContract = sanitizeHelixAskAnswerContract(
+            buildRelationModeContractFromPacket(relationPacket),
+            allowedContractCitations,
+          );
+          sanitizedContract = relationContract;
+          answerContractSource = "relation_packet";
+          answerContractGate = evaluateHelixAskAnswerContractGate(
+            sanitizedContract,
+            formatSpec.format,
+            allowedContractCitations,
+            requiresRepoEvidence,
+          );
+          answerPath.push("answerContract:relation_packet_fallback");
+          logEvent(
+            "Answer contract fallback",
+            "relation_packet",
+            `reasons=${relationContractHardFailReasons.join(",")}`,
+            answerStart,
+          );
+          if (debugPayload) {
+            debugPayload.answer_contract_relation_packet_fallback = true;
+            debugPayload.answer_contract_relation_packet_reason =
+              relationContractHardFailReasons.slice();
+          }
         }
         logEvent(
           "Answer contract gate",
@@ -25695,6 +25765,28 @@ const executeHelixAsk = async ({
         allowedSourcePaths,
         extractCitationTokensFromText(evidenceText),
       );
+      const relationDeterministicGuardEligible =
+        intentProfile.id === "hybrid.warp_ethos_relation" && Boolean(relationPacket);
+      if (relationDeterministicGuardEligible && relationPacket) {
+        const relationFallbackReasons = detectRelationDeterministicFallbackReasons(cleaned);
+        if (relationFallbackReasons.length > 0) {
+          cleaned = renderRelationAssemblyFallback(relationPacket);
+          answerPath.push("relationFallback:deterministic_guard");
+          logEvent(
+            "Relation fallback",
+            "deterministic_guard",
+            relationFallbackReasons.join(","),
+            answerStart,
+          );
+          if (debugPayload) {
+            debugPayload.relation_fallback_applied = true;
+            debugPayload.relation_fallback_reasons = relationFallbackReasons;
+          }
+        } else if (debugPayload) {
+          debugPayload.relation_fallback_applied = false;
+          debugPayload.relation_fallback_reasons = [];
+        }
+      }
       if (HELIX_ASK_PROOF_PACKET_P0 && HELIX_ASK_OPTION_C_FALLBACK && answerContractApplied && answerContract) {
         const proofEvidence = normalizeCitations([
           ...(answerContract.sources ?? []),

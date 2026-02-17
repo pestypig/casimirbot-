@@ -214,9 +214,9 @@ describe("Helix Ask live events", () => {
     expect(payload.debug?.relation_packet_bridge_count ?? 0).toBeGreaterThanOrEqual(2);
     expect(payload.debug?.relation_packet_evidence_count ?? 0).toBeGreaterThan(1);
     expect(payload.text.length).toBeGreaterThan(0);
-    if (!/llm\.local stub result/i.test(payload.text)) {
-      expect(payload.text).toMatch(/mission ethos|warp/i);
-    }
+    expect(payload.text).not.toMatch(/llm\.local stub result/i);
+    expect(payload.text).toMatch(/warp bubble|warp/i);
+    expect(payload.text).toMatch(/mission ethos|ethos/i);
   }, 45000);
 
   it("does not auto-fanout relation prompts into report mode", async () => {
