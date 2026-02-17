@@ -73,6 +73,12 @@ const grAgentLoopEscalationSchema = z.object({
   includeExtraAfter: z.number().int().nonnegative().optional(),
 });
 
+const grAgentLoopSemiclassicalHooksSchema = z.object({
+  mismatchMax: z.number().nonnegative().optional(),
+  severity: z.enum(["HARD", "SOFT"]).optional(),
+  firstFailId: z.string().min(1).optional(),
+});
+
 export const grAgentLoopOptionsSchema = z.object({
     maxIterations: z.number().int().min(1).max(50).optional(),
     proposals: z.array(grAgentLoopProposalSchema).optional(),
@@ -80,6 +86,7 @@ export const grAgentLoopOptionsSchema = z.object({
     warpConfig: z.record(z.unknown()).optional(),
     thresholds: grConstraintThresholdSchema.partial().optional(),
     policy: grConstraintPolicySchema.partial().optional(),
+    semiclassical: grAgentLoopSemiclassicalHooksSchema.optional(),
     useLiveSnapshot: z.boolean().optional(),
     commitAccepted: z.boolean().optional(),
     budget: grAgentLoopBudgetSchema.optional(),

@@ -7,7 +7,10 @@ import type {
 } from "../../shared/schema.js";
 import type { WarpConfig, WarpViabilityCertificate } from "../../types/warpViability.js";
 import type { GrPipelineDiagnostics } from "../energy-pipeline.js";
-import { evaluateGrConstraintGateFromDiagnostics } from "./constraint-evaluator.js";
+import {
+  evaluateGrConstraintGateFromDiagnostics,
+  type SemiclassicalPolicyHooks,
+} from "./constraint-evaluator.js";
 import { resolveGrConstraintPolicyBundle } from "./gr-constraint-policy.js";
 import { withSpan } from "../services/observability/otel-tracing.js";
 
@@ -16,6 +19,7 @@ export type GrEvaluationInput = {
   warpConfig?: WarpConfig;
   thresholds?: Partial<GrConstraintThresholds>;
   policy?: Partial<GrConstraintPolicy>;
+  semiclassical?: SemiclassicalPolicyHooks;
   useLiveSnapshot?: boolean;
 };
 
@@ -48,6 +52,7 @@ export async function runGrEvaluation(
         {
           thresholds: policyBundle.gate.thresholds,
           policy: policyBundle.gate.policy,
+          semiclassical: input.semiclassical,
         },
       );
       const certificate = await issueWarpViabilityCertificate(
@@ -70,6 +75,7 @@ export async function runGrEvaluation(
         M_rms: diagnostics?.constraints?.M_constraint?.rms,
         H_maxAbs: diagnostics?.constraints?.H_constraint?.maxAbs,
         M_maxAbs: diagnostics?.constraints?.M_constraint?.maxAbs,
+        semiclassical: gateEval.semiclassicalResiduals,
       };
 
       const notes = [...gateEval.notes];
@@ -80,6 +86,9 @@ export async function runGrEvaluation(
         );
       } else if (!Number.isFinite(cfl)) {
         notes.push("CFL is non-finite; check GR evolve step settings.");
+      }
+      if (gateEval.firstFailId) {
+        notes.push(`Deterministic first-fail id: ${gateEval.firstFailId}`);
       }
       if (!integrityOk) {
         notes.push("Warp viability certificate integrity check failed.");

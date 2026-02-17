@@ -1,0 +1,24 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-002-semiclassical-coupling-contract",
+  "files_changed": [
+    "server/gr/gr-agent-loop-schema.ts",
+    "server/gr/constraint-evaluator.ts",
+    "server/gr/gr-evaluation.ts",
+    "tests/gr-constraint-contract.spec.ts",
+    "tests/gr-constraint-gate.spec.ts"
+  ],
+  "tests_run": [
+    "tests/gr-constraint-contract.spec.ts",
+    "tests/gr-constraint-gate.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "toe-002-semiclassical-coupling-contract",
+    "run_id": "1",
+    "certificate_hash": "b95b28507f421b0592ab29f42b3169cfc90f41112a9c779bb9cf7131a7693e95",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

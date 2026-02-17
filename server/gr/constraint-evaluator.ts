@@ -14,10 +14,24 @@ import {
   type StencilParams,
 } from "../../modules/gr/bssn-evolve.js";
 
+export type SemiclassicalResiduals = {
+  G_mu_nu_rms?: number;
+  T_mu_nu_renorm_rms?: number;
+  mismatch_rms?: number;
+};
+
+export type SemiclassicalPolicyHooks = {
+  mismatchMax?: number;
+  severity?: "HARD" | "SOFT";
+  firstFailId?: string;
+};
+
 export type GrConstraintGateEvaluation = {
   constraints: GrConstraintEntry[];
   gate: GrConstraintGate;
   notes: string[];
+  semiclassicalResiduals?: SemiclassicalResiduals;
+  firstFailId?: string;
 };
 
 export const DEFAULT_GR_CONSTRAINT_THRESHOLDS: GrConstraintThresholds = {
@@ -158,10 +172,14 @@ const evaluateFromMetrics = (
     M_rms?: number;
     H_maxAbs?: number;
     M_maxAbs?: number;
+    semiclassical_G_mu_nu_rms?: number;
+    semiclassical_T_mu_nu_renorm_rms?: number;
+    semiclassical_mismatch_rms?: number;
   },
   options?: {
     thresholds?: Partial<GrConstraintThresholds>;
     policy?: Partial<GrConstraintPolicy>;
+    semiclassical?: SemiclassicalPolicyHooks;
   },
 ): GrConstraintGateEvaluation => {
   const thresholds = mergeOverrides(
@@ -201,6 +219,37 @@ const evaluateFromMetrics = (
       }),
     );
   }
+
+
+  const semiclassical = options?.semiclassical;
+  const semiclassicalResiduals =
+    Number.isFinite(metrics.semiclassical_G_mu_nu_rms) ||
+    Number.isFinite(metrics.semiclassical_T_mu_nu_renorm_rms) ||
+    Number.isFinite(metrics.semiclassical_mismatch_rms)
+      ? {
+          G_mu_nu_rms: Number.isFinite(metrics.semiclassical_G_mu_nu_rms)
+            ? metrics.semiclassical_G_mu_nu_rms
+            : undefined,
+          T_mu_nu_renorm_rms: Number.isFinite(metrics.semiclassical_T_mu_nu_renorm_rms)
+            ? metrics.semiclassical_T_mu_nu_renorm_rms
+            : undefined,
+          mismatch_rms: Number.isFinite(metrics.semiclassical_mismatch_rms)
+            ? metrics.semiclassical_mismatch_rms
+            : undefined,
+        }
+      : undefined;
+
+  if (Number.isFinite(semiclassical?.mismatchMax)) {
+    const mismatchEntry = buildEntry({
+      id: "SEMICLASSICAL_COUPLING_MISMATCH",
+      severity: semiclassical?.severity ?? "HARD",
+      value: metrics.semiclassical_mismatch_rms,
+      limit: semiclassical?.mismatchMax,
+      label: "semiclassical_mismatch_rms",
+    });
+    constraints.push(mismatchEntry);
+  }
+
   if (Number.isFinite(thresholds.M_maxAbs_max)) {
     constraints.push(
       buildEntry({
@@ -248,6 +297,11 @@ const evaluateFromMetrics = (
     notes.push("Missing GR constraint diagnostics; cannot evaluate.");
   }
 
+  const firstFail = relevant.find((entry) => entry.status === "fail" && entry.severity === "HARD");
+  const firstFailId = firstFail?.id === "SEMICLASSICAL_COUPLING_MISMATCH"
+    ? (semiclassical?.firstFailId ?? "SEMICLASSICAL_COUPLING_MISMATCH_HARD_FAIL")
+    : firstFail?.id;
+
   const gate: GrConstraintGate = {
     status,
     evaluatedAt: Date.now(),
@@ -255,24 +309,44 @@ const evaluateFromMetrics = (
     policy,
   };
 
-  return { constraints, gate, notes };
+  return {
+    constraints,
+    gate,
+    notes,
+    semiclassicalResiduals,
+    ...(firstFailId ? { firstFailId } : {}),
+  };
 };
 
 export function evaluateGrConstraintGateFromMetrics(
-  metrics: Partial<GrConstraintMetrics>,
+  metrics: Partial<
+    GrConstraintMetrics & {
+      semiclassical_G_mu_nu_rms?: number;
+      semiclassical_T_mu_nu_renorm_rms?: number;
+      semiclassical_mismatch_rms?: number;
+    }
+  >,
   options?: {
     thresholds?: Partial<GrConstraintThresholds>;
     policy?: Partial<GrConstraintPolicy>;
+    semiclassical?: SemiclassicalPolicyHooks;
   },
 ): GrConstraintGateEvaluation {
   return evaluateFromMetrics(metrics, options);
 }
 
 export function evaluateGrConstraintGateFromDiagnostics(
-  diagnostics?: GrPipelineDiagnostics["constraints"] | null,
+  diagnostics?: (GrPipelineDiagnostics["constraints"] & {
+    semiclassical?: {
+      G_mu_nu_rms?: number;
+      T_mu_nu_renorm_rms?: number;
+      mismatch_rms?: number;
+    };
+  }) | null,
   options?: {
     thresholds?: Partial<GrConstraintThresholds>;
     policy?: Partial<GrConstraintPolicy>;
+    semiclassical?: SemiclassicalPolicyHooks;
   },
 ): GrConstraintGateEvaluation {
   const metrics = {
@@ -280,6 +354,9 @@ export function evaluateGrConstraintGateFromDiagnostics(
     M_rms: diagnostics?.M_constraint?.rms,
     H_maxAbs: diagnostics?.H_constraint?.maxAbs,
     M_maxAbs: diagnostics?.M_constraint?.maxAbs,
+    semiclassical_G_mu_nu_rms: diagnostics?.semiclassical?.G_mu_nu_rms,
+    semiclassical_T_mu_nu_renorm_rms: diagnostics?.semiclassical?.T_mu_nu_renorm_rms,
+    semiclassical_mismatch_rms: diagnostics?.semiclassical?.mismatch_rms,
   };
   return evaluateFromMetrics(metrics, options);
 }
@@ -289,6 +366,7 @@ export function evaluateGrConstraintGateFromConstraintFields(
   options?: {
     thresholds?: Partial<GrConstraintThresholds>;
     policy?: Partial<GrConstraintPolicy>;
+    semiclassical?: SemiclassicalPolicyHooks;
   },
 ): GrConstraintGateEvaluation {
   const metrics = {
@@ -307,6 +385,7 @@ export function evaluateGrConstraintGateFromState(
     matter?: StressEnergyFieldSet | null;
     thresholds?: Partial<GrConstraintThresholds>;
     policy?: Partial<GrConstraintPolicy>;
+    semiclassical?: SemiclassicalPolicyHooks;
   } = {},
 ): GrConstraintGateEvaluation {
   const constraints = computeBssnConstraints(state, {
