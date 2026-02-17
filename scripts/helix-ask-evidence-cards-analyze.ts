@@ -45,6 +45,20 @@ const ratio = (vals: Array<boolean | null | undefined>) => {
 
 const numRatio = (num: number, den: number) => (den > 0 ? num / den : null);
 
+const isValidRun = (row: RawRun): boolean => row.status === 200;
+
+const buildStatusCounts = (rows: RawRun): Record<string, number> => {
+  const counts = new Map<number, number>();
+  for (const row of rows) {
+    counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
+  }
+  const out: Record<string, number> = {};
+  for (const [status, count] of counts.entries()) {
+    out[String(status)] = count;
+  }
+  return out;
+};
+
 const existsPath = async (p: string): Promise<boolean> => {
   try {
     await fs.access(path.join(REPO_ROOT, p));
@@ -71,7 +85,16 @@ const getStageLatency = (debug: Record<string, any> | undefined, stage: string):
 
 const loadRuns = async (variant: Variant): Promise<RawRun[]> => {
   const dir = path.join(ROOT, variant, 'raw');
-  const files = (await fs.readdir(dir)).filter((f) => f.endsWith('.json'));
+  let files: string[] = [];
+  try {
+    files = (await fs.readdir(dir)).filter((f) => f.endsWith('.json'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      console.warn(`[helix-ask-ab] missing variant directory: ${dir}`);
+      return [];
+    }
+    throw error;
+  }
   const rows: RawRun[] = [];
   for (const file of files) {
     rows.push(JSON.parse(await fs.readFile(path.join(dir, file), 'utf8')) as RawRun);
@@ -94,14 +117,25 @@ const bootstrapCI = (deltas: number[]) => {
 };
 
 const summarize = async (rows: RawRun[]) => {
-  const totalLatency = rows.map((r) => r.latency_ms);
-  const llmEvidenceStage = rows.map((r) => getStageLatency(r.response.debug, 'LLM evidence cards')).filter((v): v is number => v !== null);
-  const llmAnswerStage = rows.map((r) => getStageLatency(r.response.debug, 'LLM answer')).filter((v): v is number => v !== null);
+  const validRows = rows.filter(isValidRun);
+  const invalidRows = rows.filter((row) => !isValidRun(row));
+  const totalLatency = validRows.map((r) => r.latency_ms);
+  const totalLatencyAll = rows.map((r) => r.latency_ms);
+  const llmEvidenceStage = validRows
+    .map((r) => getStageLatency(r.response.debug, 'LLM evidence cards'))
+    .filter((v): v is number => v !== null);
+  const llmAnswerStage = validRows
+    .map((r) => getStageLatency(r.response.debug, 'LLM answer'))
+    .filter((v): v is number => v !== null);
 
-  const evidenceGate = ratio(rows.map((r) => r.response.debug?.evidence_gate_ok));
-  const slotCoverage = ratio(rows.map((r) => r.response.debug?.slot_coverage_ok));
-  const contractPrimary = ratio(rows.map((r) => r.response.debug?.answer_contract_primary_applied));
-  const deterministicFallback = ratio(rows.map((r) => String(r.response.debug?.synthesis_repo_path ?? '').includes('deterministic')));
+  const evidenceGate = ratio(validRows.map((r) => r.response.debug?.evidence_gate_ok));
+  const slotCoverage = ratio(validRows.map((r) => r.response.debug?.slot_coverage_ok));
+  const contractPrimary = ratio(validRows.map((r) => r.response.debug?.answer_contract_primary_applied));
+  const deterministicFallback = ratio(
+    validRows.map((r) =>
+      String(r.response.debug?.synthesis_repo_path ?? '').includes('deterministic'),
+    ),
+  );
 
   let claimSupported = 0;
   let claimTotal = 0;
@@ -112,7 +146,7 @@ const summarize = async (rows: RawRun[]) => {
   let citationTotal = 0;
   let parseFail = 0;
 
-  for (const row of rows) {
+  for (const row of validRows) {
     const d = row.response.debug ?? {};
     claimSupported += Number(d.evidence_claim_supported ?? 0);
     claimTotal += Number(d.evidence_claim_count ?? 0);
@@ -129,8 +163,13 @@ const summarize = async (rows: RawRun[]) => {
   }
 
   return {
-    n: rows.length,
+    n_total: rows.length,
+    n_valid: validRows.length,
+    n_invalid: invalidRows.length,
+    invalid_rate: numRatio(invalidRows.length, rows.length),
+    status_counts: buildStatusCounts(rows),
     latency_ms: stats(totalLatency),
+    latency_all_ms: stats(totalLatencyAll),
     stage_latency_ms: {
       llm_evidence_cards: stats(llmEvidenceStage),
       llm_answer: stats(llmAnswerStage),
@@ -142,12 +181,12 @@ const summarize = async (rows: RawRun[]) => {
     citation_validity_rate: numRatio(citationOk, citationTotal),
     contract_success_rate: {
       answer_contract_primary_applied: contractPrimary,
-      parse_fail_frequency: numRatio(parseFail, rows.length),
+      parse_fail_frequency: numRatio(parseFail, validRows.length),
       deterministic_fallback_frequency: deterministicFallback,
     },
     quality_proxy: {
       grounded_sentence_rate: numRatio(grounded, groundedDen),
-      contradiction_or_unsupported_rate: numRatio(contradictionCount, rows.length),
+      contradiction_or_unsupported_rate: numRatio(contradictionCount, validRows.length),
     },
   };
 };
@@ -162,13 +201,16 @@ const pairedDelta = (a: RawRun[], b: RawRun[], key: (r: RawRun) => number) => {
   }
   const mean = deltas.length ? deltas.reduce((x, y) => x + y, 0) / deltas.length : 0;
   const ci = bootstrapCI(deltas);
-  return { mean, ci, significant: !(ci.low <= 0 && ci.high >= 0) };
+  return { pair_count: deltas.length, mean, ci, significant: !(ci.low <= 0 && ci.high >= 0) };
 };
 
 const main = async () => {
   const A = await loadRuns('A');
   const B = await loadRuns('B');
   const C = await loadRuns('C');
+  const AValid = A.filter(isValidRun);
+  const BValid = B.filter(isValidRun);
+  const CValid = C.filter(isValidRun);
 
   const summary = {
     variants: {
@@ -178,17 +220,17 @@ const main = async () => {
     },
     paired_deltas: {
       A_vs_B: {
-        latency_ms: pairedDelta(B, A, (r) => r.latency_ms),
-        grounded_sentence_rate: pairedDelta(B, A, (r) => Number(r.response.debug?.grounded_sentence_rate ?? 0)),
-        citation_validity_indicator: pairedDelta(B, A, (r) => {
+        latency_ms: pairedDelta(BValid, AValid, (r) => r.latency_ms),
+        grounded_sentence_rate: pairedDelta(BValid, AValid, (r) => Number(r.response.debug?.grounded_sentence_rate ?? 0)),
+        citation_validity_indicator: pairedDelta(BValid, AValid, (r) => {
           const ps = extractPaths(r.response.text ?? '');
           return ps.length > 0 ? 1 : 0;
         }),
       },
       C_vs_B: {
-        latency_ms: pairedDelta(B, C, (r) => r.latency_ms),
-        grounded_sentence_rate: pairedDelta(B, C, (r) => Number(r.response.debug?.grounded_sentence_rate ?? 0)),
-        citation_validity_indicator: pairedDelta(B, C, (r) => {
+        latency_ms: pairedDelta(BValid, CValid, (r) => r.latency_ms),
+        grounded_sentence_rate: pairedDelta(BValid, CValid, (r) => Number(r.response.debug?.grounded_sentence_rate ?? 0)),
+        citation_validity_indicator: pairedDelta(BValid, CValid, (r) => {
           const ps = extractPaths(r.response.text ?? '');
           return ps.length > 0 ? 1 : 0;
         }),
