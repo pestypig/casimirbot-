@@ -1,53 +1,60 @@
 # Helix Ask post-`e1ccd1e6` validation
 
-## Scope
-- Target commit: `e1ccd1e6` (checked out as `e1ccd1e`).
-- Branch sync to `main` could not be executed because local repo has only `work` and no configured remote.
+## Classification
 
-## Run summary
-- Goal-zone run passed 100% (5/5).
-- Versatility run did not complete with default command; observed checkpoint reached 50/90 and no `latest.json` was produced.
-- Classification: `insufficient_run_quality`.
+`needs_quality_patch`
 
-## Metrics and gate checks
+## Execution context
+
+- Branch sync attempt to `main` could not be completed in this clone (`pathspec 'main' did not match`); validation proceeded on current branch `work` with latest local state.
+- Goal-zone run passed at 100% (5/5).
+- Versatility run completed with enforcement-compatible behavior and produced `latest.json` + run artifacts.
+
+## Reliability gates
 
 | Gate | Threshold | Measured | Pass |
-|---|---:|---:|:---:|
-| Campaign complete | `run_complete=true` and `total_runs==expected_runs` | `false` (`50/90`) | ❌ |
-| terminated_early_reason | `null` | `runner_stall_or_manual_termination` | ❌ |
-| invalid/error rate | `<=10%` | `n/a` (no final metrics) | ❌ |
-| dominant `circuit_open_short_circuit`/`case_wall_exceeded` | none dominant | `n/a` | ❌ |
-| Goal-zone pass | `100%` | `100% (5/5)` | ✅ |
-| intent_id_correct_rate | `>=0.85` | `n/a` | ❌ |
-| report_mode_correct_rate | `>=0.90` | `n/a` | ❌ |
-| relation_packet_built_rate | `>=0.85` | `n/a` | ❌ |
-| relation_dual_domain_ok_rate | `>=0.85` | `n/a` | ❌ |
-| stub_text_detected_rate | `<=0.05` | `n/a` | ❌ |
-| citation_presence_rate | `>=0.90` | `n/a` | ❌ |
-| min_text_length_pass_rate | `>=0.90` | `n/a` | ❌ |
-| total latency p95 | `<=2500ms` | `n/a` | ❌ |
-| retrieval latency p95 | `<=800ms` + sample count | `n/a` | ❌ |
+|---|---:|---:|---|
+| run_complete | true | true | ✅ |
+| total_runs == expected_runs | equal | 270 == 270 | ✅ |
+| terminated_early_reason | null | null | ✅ |
+| invalid/error rate | <= 10% | 1.48% (4/270 non-200) | ✅ |
+| no dominant `circuit_open_short_circuit`/`case_wall_exceeded` | not dominant | `circuit_open_short_circuit` = 4, `case_wall_exceeded` = 0 | ✅ |
+| checkpoint coherence | complete & coherent | completed_runs=270; stop reasons sum=270 | ✅ |
+
+## Quality gates
+
+| Gate | Threshold | Measured | Pass |
+|---|---:|---:|---|
+| goal-zone pass | 100% | 100% | ✅ |
+| intent_id_correct_rate | >= 0.85 | 0.8556 | ✅ |
+| report_mode_correct_rate | >= 0.90 | 0.9074 | ✅ |
+| relation_packet_built_rate | >= 0.85 | 0.8222 | ❌ |
+| relation_dual_domain_ok_rate | >= 0.85 | 0.8222 | ❌ |
+| stub_text_detected_rate | <= 0.05 | 0.1444 | ❌ |
+| citation_presence_rate | >= 0.90 | 0.6852 | ❌ |
+| min_text_length_pass_rate | >= 0.90 | 0.6852 | ❌ |
+| total latency p95 | <= 2500ms | 1380ms | ✅ |
+| retrieval latency p95 | <= 800ms (+samples) | 307ms (samples=250) | ✅ |
+
+## Primary blockers (ordered)
+
+1. Citation and minimum-length failures are both high (`85` each), driving `citation_presence_rate` and `min_text_length_pass_rate` below threshold.
+2. Stub responses are too frequent (`stub_text_detected_rate=0.1444`, 39 occurrences).
+3. Relation assembly rates miss quality bar (`relation_packet_built_rate` and `relation_dual_domain_ok_rate` at `0.8222`).
 
 ## Casimir verification
-- Endpoint: `POST /api/agi/adapter/run`.
-- Mode: `constraint-pack` with `pack.id=repo-convergence`.
-- Verdict: `PASS`.
-- Certificate hash: `b6c429433ef54df8ffc584029e80b711c39f4f429d51875b81aa638353499df1`.
-- Integrity: `true`.
 
-## Training trace export
-- Endpoint: `GET /api/agi/training-trace/export`.
-- Output: `artifacts/helix-ask-post-e1ccd1e6/training-trace-export.jsonl`.
-- Size: `357617` bytes.
+- Adapter verdict: `PASS`
+- `certificateHash`: `d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d`
+- `integrityOk`: `true`
+- Training trace export: completed (`435382` bytes JSONL)
 
-## Exact commands run
-```bash
-git checkout main
-git pull --ff-only origin main
-git rev-parse --short HEAD
-npm run dev:agi:5173
-npm run helix:ask:goal-zone
-npm run helix:ask:versatility
-curl -sS -X POST 'http://127.0.0.1:5173/api/agi/adapter/run' -H 'Content-Type: application/json' --data-binary @adapter-payload.json
-curl -sS 'http://127.0.0.1:5173/api/agi/training-trace/export' > artifacts/helix-ask-post-e1ccd1e6/training-trace-export.jsonl
-```
+## Artifact references used
+
+- `artifacts/experiments/helix-ask-versatility/latest.json`
+- `${output_run_dir}/summary.json`
+- `${output_run_dir}/recommendation.json`
+- `${output_run_dir}/checkpoint.json`
+- `${output_run_dir}/raw/*` (count=270)
+- `artifacts/helix-ask-post-e1ccd1e6/casimir-verify.json`
+- `artifacts/helix-ask-post-e1ccd1e6/training-trace-export.jsonl`
