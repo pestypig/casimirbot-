@@ -1088,6 +1088,52 @@ function toTs(input){
   return new Date(input).getTime(); // ISO with ±HH:MM offset → correct UTC epoch
 }
 
+function parseDurationMs(value){
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+
+function getRecordDurationMs(record){
+  if (!record || typeof record !== 'object') return null;
+  return (
+    parseDurationMs(record.durationMs) ??
+    parseDurationMs(record.memoryMeta?.durationMs) ??
+    parseDurationMs(record.states?.temporal?.durationMs)
+  );
+}
+
+function getRecordEffectiveDurationMs(record, fallbackMs = 1000){
+  return getRecordDurationMs(record) ?? fallbackMs;
+}
+
+function formatDurationMs(ms){
+  const value = parseDurationMs(ms);
+  if (value == null) return 'instant (~1 s model)';
+  if (value < 1000) return `${value} ms`;
+  const seconds = value / 1000;
+  if (seconds < 60) {
+    const text = seconds.toFixed(seconds >= 10 ? 1 : 2);
+    return `${text.replace(/\.0$/, '')} s`;
+  }
+  const minutes = seconds / 60;
+  if (minutes < 60) {
+    const text = minutes.toFixed(minutes >= 10 ? 1 : 2);
+    return `${text.replace(/\.0$/, '')} min`;
+  }
+  const hours = minutes / 60;
+  const text = hours.toFixed(hours >= 10 ? 1 : 2);
+  return `${text.replace(/\.0$/, '')} h`;
+}
+
+function intervalOverlapFraction(aStartMs, aEndMs, bStartMs, bEndMs){
+  const left = Math.max(aStartMs, bStartMs);
+  const right = Math.min(aEndMs, bEndMs);
+  const overlapMs = Math.max(0, right - left);
+  const lenA = Math.max(1, aEndMs - aStartMs);
+  const lenB = Math.max(1, bEndMs - bStartMs);
+  return overlapMs / Math.min(lenA, lenB);
+}
+
 // Build a human paragraph from two records + similarity score + diffs you already compute
 function makeNarrative(A, B, score, diffs, extras={}){
   // Lead
@@ -1121,6 +1167,9 @@ function makeNarrative(A, B, score, diffs, extras={}){
   if (Math.abs(diffs.dNs_grav||0) >= 1e-3) parts.push(`1-s tidal time-bias changed ${nice(diffs.dNs_grav,' ns/s')}`);
   if (Math.abs(diffs.dNs_kin||0) >= 1e-3) parts.push(`rotation/latitude rate changed ${nice(diffs.dNs_kin,' ns/s')}`);
   if (Math.abs(diffs.dNs_comb||0) >= 1e-3) parts.push(`combined rate shifted ${nice(diffs.dNs_comb,' ns/s')}`);
+  if (Math.abs(diffs.dDuration_s||0) >= 1e-2) parts.push(`capture duration model changed ${num(diffs.dDuration_s,2,' s')}`);
+  if (Math.abs(diffs.dCombExposure_ns||0) >= 0.1) parts.push(`duration-integrated proper-time delta ${nice(diffs.dCombExposure_ns, ' ns')}`);
+  if (Math.abs(diffs.dNetExposure_uGal_s||0) >= 0.5) parts.push(`net tidal exposure delta ${nice(diffs.dNetExposure_uGal_s, ' µGal·s')}`);
   if (typeof diffs.dOmegaDeg === 'number') parts.push(`Δω = ${angleSmartDeg(diffs.dOmegaDeg)}`);
   if (typeof diffs.dVarpiDeg === 'number') parts.push(`Δϖ = ${angleSmartDeg(diffs.dVarpiDeg)}`);
   if (extras.periA || extras.periB) parts.push(`perihelion A: ${extras.periA||'n/a'} → B: ${extras.periB||'n/a'}`);
@@ -1478,6 +1527,7 @@ async function buildRecordFromTimestamp(name, ts, opts={}) {
   const lat = (opts.lat ?? store.defaultSite?.lat ?? 34.05);
   const lon = (opts.lon ?? store.defaultSite?.lon ?? -118.25);
   const tz = opts.tz || store.defaultSite?.tz; // Store capture timezone
+  const durationMs = parseDurationMs(opts.durationMs);
 
   // Try precise ephemerides (BCRS/GCRS); fallback to approximations on failure
   let eph = null;
@@ -1573,10 +1623,14 @@ async function buildRecordFromTimestamp(name, ts, opts={}) {
     id, name, when: new Date(ts).toISOString(), tz: tz || Intl.DateTimeFormat().resolvedOptions().timeZone,
     where: { lat, lon, alt_m: (opts.alt_m ?? 120) },
     year,
+    durationMs,
     homeAngleDeg: +angleDeg.toFixed(2),
     cosmic: { x_AU: +(Math.cos(angle)*dist).toFixed(3), y_AU: +(Math.sin(angle)*dist).toFixed(3), z_AU: 0,
               drift_since_AU: +(((Date.now()-ts)/86400000/365.25) * 46 /* AU/yr */).toFixed(1) },
     states: {
+      temporal: {
+        durationMs
+      },
       dayPhase: dayPhaseTag(sunAlt),
       sunAltDeg: +sunAlt.toFixed(1),
       moonAltDeg: +moonAlt.toFixed(1),
@@ -2232,6 +2286,9 @@ function renderStates(){
     ['When', new Date(rec.when).toLocaleString(),
       'The file\'s timestamp (converted to your local time). It anchors the memory to a specific point on the orbit.'],
 
+    ['Capture duration', formatDurationMs(getRecordDurationMs(rec)),
+      'Span parsed from media metadata when available. Duration-weighted tidal and clock exposure comparisons use this span; otherwise a 1-second model is used.'],
+
     ['Frame', store.view.frame==='home' ? 'Home (co-moving)' : 'Cosmic (pinned)',
       'Home: memories move with our Solar-System rest patch. Cosmic: memories are pinned where the Solar System was in inertial space.'],
 
@@ -2367,6 +2424,46 @@ function renderStates(){
     const dNS   = (parseFloat(b.states.voxel.ns_per_1s) - parseFloat(a.states.voxel.ns_per_1s));
     const dKinNS = (b.states.voxel.kin_ns_per_1s - a.states.voxel.kin_ns_per_1s);
     const dCombNS = (b.states.voxel.combined_ns_per_1s - a.states.voxel.combined_ns_per_1s);
+    const aTs = Date.parse(a.when);
+    const bTs = Date.parse(b.when);
+    const durA_ms = getRecordDurationMs(a);
+    const durB_ms = getRecordDurationMs(b);
+    const effDurA_ms = getRecordEffectiveDurationMs(a);
+    const effDurB_ms = getRecordEffectiveDurationMs(b);
+    const effDurA_s = effDurA_ms / 1000;
+    const effDurB_s = effDurB_ms / 1000;
+    const gravExpA_ns = parseFloat(a.states.voxel.ns_per_1s || 0) * effDurA_s;
+    const gravExpB_ns = parseFloat(b.states.voxel.ns_per_1s || 0) * effDurB_s;
+    const kinExpA_ns = (a.states.voxel.kin_ns_per_1s || 0) * effDurA_s;
+    const kinExpB_ns = (b.states.voxel.kin_ns_per_1s || 0) * effDurB_s;
+    const combExpA_ns = (a.states.voxel.combined_ns_per_1s || 0) * effDurA_s;
+    const combExpB_ns = (b.states.voxel.combined_ns_per_1s || 0) * effDurB_s;
+    const sunExpA_uGal_s = (a.states.tides.sun_uGal || 0) * effDurA_s;
+    const sunExpB_uGal_s = (b.states.tides.sun_uGal || 0) * effDurB_s;
+    const moonExpA_uGal_s = (a.states.tides.moon_uGal || 0) * effDurA_s;
+    const moonExpB_uGal_s = (b.states.tides.moon_uGal || 0) * effDurB_s;
+    const netExpA_uGal_s = (a.states.tideNet?.ah_uGal || 0) * effDurA_s;
+    const netExpB_uGal_s = (b.states.tideNet?.ah_uGal || 0) * effDurB_s;
+
+    const sunRetA_ms = aTs - ((a.states.voxel.sunLightTime_s || 0) * 1000);
+    const sunRetB_ms = bTs - ((b.states.voxel.sunLightTime_s || 0) * 1000);
+    const moonRetA_ms = aTs - ((a.states.voxel.moonLightTime_s || 0) * 1000);
+    const moonRetB_ms = bTs - ((b.states.voxel.moonLightTime_s || 0) * 1000);
+    const sunAStart = sunRetA_ms - effDurA_ms / 2;
+    const sunAEnd = sunRetA_ms + effDurA_ms / 2;
+    const sunBStart = sunRetB_ms - effDurB_ms / 2;
+    const sunBEnd = sunRetB_ms + effDurB_ms / 2;
+    const moonAStart = moonRetA_ms - effDurA_ms / 2;
+    const moonAEnd = moonRetA_ms + effDurA_ms / 2;
+    const moonBStart = moonRetB_ms - effDurB_ms / 2;
+    const moonBEnd = moonRetB_ms + effDurB_ms / 2;
+    const overlapHorizonMs = 24 * 3600 * 1000;
+    const overSun = Math.abs(sunRetB_ms - sunRetA_ms) > overlapHorizonMs
+      ? null
+      : intervalOverlapFraction(sunAStart, sunAEnd, sunBStart, sunBEnd);
+    const overMoon = Math.abs(moonRetB_ms - moonRetA_ms) > overlapHorizonMs
+      ? null
+      : intervalOverlapFraction(moonAStart, moonAEnd, moonBStart, moonBEnd);
 
     // Tide vector differences
     const dSunVec = {
@@ -2423,17 +2520,31 @@ function renderStates(){
       dNs_grav: dNS,
       dNs_kin: dKinNS,
       dNs_comb: dCombNS,
+      durationA_s: effDurA_s,
+      durationB_s: effDurB_s,
+      dDuration_s: effDurB_s - effDurA_s,
+      dGravExposure_ns: gravExpB_ns - gravExpA_ns,
+      dKinExposure_ns: kinExpB_ns - kinExpA_ns,
+      dCombExposure_ns: combExpB_ns - combExpA_ns,
+      dSunExposure_uGal_s: sunExpB_uGal_s - sunExpA_uGal_s,
+      dMoonExposure_uGal_s: moonExpB_uGal_s - moonExpA_uGal_s,
+      dNetExposure_uGal_s: netExpB_uGal_s - netExpA_uGal_s,
       dOmegaDeg: dOmega,
       dVarpiDeg: dVarpi,
       // --- NEW causal/averaging differences ---
-      dSunCausal_s: Math.abs( (b.states.voxel.sunLightTime_s - a.states.voxel.sunLightTime_s) - ((Date.parse(b.when)-Date.parse(a.when))/1000) ),
-      dMoonCausal_s: Math.abs( (b.states.voxel.moonLightTime_s - a.states.voxel.moonLightTime_s) - ((Date.parse(b.when)-Date.parse(a.when))/1000) ),
+      dSunCausal_s: Math.abs((sunRetB_ms - sunRetA_ms) / 1000),
+      dMoonCausal_s: Math.abs((moonRetB_ms - moonRetA_ms) / 1000),
+      overSun,
+      overMoon,
       dUbar1m: (b.states.envelope?.Ubar_1m || 0) - (a.states.envelope?.Ubar_1m || 0),
       dUbar1h: (b.states.envelope?.Ubar_1h || 0) - (a.states.envelope?.Ubar_1h || 0),
       dTS1m: (b.states.envelope?.TS_envelope_1m || 0) - (a.states.envelope?.TS_envelope_1m || 0),
       dTS1h: (b.states.envelope?.TS_envelope_1h || 0) - (a.states.envelope?.TS_envelope_1h || 0),
       dNetBearing: ((b.states.tideNet?.bearingDeg || 0) - (a.states.tideNet?.bearingDeg || 0) + 540)%360 - 180,
       dNetMag: (b.states.tideNet?.ah_uGal || 0) - (a.states.tideNet?.ah_uGal || 0),
+      dLightAlong_ms: (a.states.lightBands && b.states.lightBands)
+        ? wrapMs(b.states.lightBands.msFromGreenwich - a.states.lightBands.msFromGreenwich)
+        : null,
       dP2sun: (b.states.geometryP2?.P2sun || 0) - (a.states.geometryP2?.P2sun || 0),
       dP2moon: (b.states.geometryP2?.P2moon || 0) - (a.states.geometryP2?.P2moon || 0),
       dPhaseSyn: (((b.states.sunMoon?.phaseDeg || 0) - (a.states.sunMoon?.phaseDeg || 0))+540)%360-180,
@@ -2495,6 +2606,8 @@ function renderStates(){
         diff.appendChild(lrlRow);
       }
 
+    const signedFixed = (value, dp = 3) => `${value >= 0 ? '+' : ''}${Number(value).toFixed(dp)}`;
+
     const diffs = [
       ['Δ Solar contribution', `${dSolar.toFixed(1)}%`,
         'Change in the Sun\'s gravitational tidal contribution (relative to its annual mean).'],
@@ -2520,6 +2633,21 @@ function renderStates(){
         'Change from latitude/rotation differences (orbital term is common).'],
       ['Δ Combined rate (1 s)', niceNsPerS(dCombNS),
         'Overall change in proper-time rate over the 1-s voxel.'],
+      ['Capture duration (A → B)',
+        `${formatDurationMs(durA_ms)} → ${formatDurationMs(durB_ms)} • model Δ ${signedFixed(diffData.dDuration_s, 2)} s`,
+        'Durations inferred from file metadata when available; otherwise each record falls back to a 1-second model for duration-weighted comparisons.'],
+      ['Δ Gravitational clock accumulation',
+        `${signedFixed(diffData.dGravExposure_ns, 3)} ns`,
+        'Difference in integrated gravitational clock shift over each capture duration (rate × duration).'],
+      ['Δ Kinematic clock accumulation',
+        `${signedFixed(diffData.dKinExposure_ns, 3)} ns`,
+        'Difference in integrated kinematic time dilation over each capture duration.'],
+      ['Δ Proper-time accumulation',
+        `${signedFixed(diffData.dCombExposure_ns, 3)} ns`,
+        'Difference in integrated total proper-time shift (gravitational + kinematic) across the capture spans.'],
+      ['Δ Tidal exposure (duration-weighted)',
+        `Sun ${signedFixed(diffData.dSunExposure_uGal_s, 2)} µGal·s • Moon ${signedFixed(diffData.dMoonExposure_uGal_s, 2)} µGal·s • Net ${signedFixed(diffData.dNetExposure_uGal_s, 2)} µGal·s`,
+        'Difference in tidal acceleration exposure integrated over each capture duration.'],
       // NEW causal/averaging rows
       ['Causal overlap (Sun)',
         diffData.overSun==null ? 'n/a (moments far apart)' :
@@ -5186,6 +5314,7 @@ window.addEventListener('perihelion:ready', () => {
       tz: tzGuess(),
       lat: null,
       lon: null,
+      durationMs: null,
       file: null,
       mime: ''
     };
@@ -5441,6 +5570,7 @@ window.addEventListener('perihelion:ready', () => {
       state.tz = tzGuess();
       state.lat = null;
       state.lon = null;
+      state.durationMs = null;
 
       if (refs.img) {
         refs.img.removeAttribute('src');
@@ -5483,6 +5613,7 @@ window.addEventListener('perihelion:ready', () => {
         state.tz = meta.tz;
         state.lat = meta.lat;
         state.lon = meta.lon;
+        state.durationMs = parseDurationMs(meta.durationMs);
 
         if (refs.when) refs.when.value = toLocalISO(state.ts, state.tz);
         if (refs.tz) refs.tz.value = state.tz;
@@ -5498,6 +5629,7 @@ window.addEventListener('perihelion:ready', () => {
       let tz = tzGuess();
       let lat = null;
       let lon = null;
+      let durationMs = null;
 
       if (file.type && file.type.startsWith('image/') && window.exifr?.parse) {
         try {
@@ -5516,7 +5648,47 @@ window.addEventListener('perihelion:ready', () => {
           console.warn('EXIF parse failed', err);
         }
       }
-      return { ts, tz, lat, lon };
+      durationMs = await readMediaDurationMs(file);
+      return { ts, tz, lat, lon, durationMs };
+    }
+
+    async function readMediaDurationMs(file) {
+      const type = String(file?.type || '').toLowerCase();
+      if (!(type.startsWith('video/') || type.startsWith('audio/'))) {
+        return null;
+      }
+      const tag = type.startsWith('video/') ? 'video' : 'audio';
+      const url = URL.createObjectURL(file);
+      try {
+        const media = document.createElement(tag);
+        media.preload = 'metadata';
+        media.src = url;
+        const seconds = await new Promise((resolve) => {
+          const done = (value) => {
+            cleanup();
+            resolve(value);
+          };
+          const onMeta = () => {
+            const n = Number(media.duration);
+            done(Number.isFinite(n) && n > 0 ? n : null);
+          };
+          const onErr = () => done(null);
+          const timeout = setTimeout(() => done(null), 4000);
+          const cleanup = () => {
+            clearTimeout(timeout);
+            media.removeEventListener('loadedmetadata', onMeta);
+            media.removeEventListener('error', onErr);
+          };
+          media.addEventListener('loadedmetadata', onMeta, { once: true });
+          media.addEventListener('error', onErr, { once: true });
+        });
+        return seconds != null ? Math.round(seconds * 1000) : null;
+      } catch (err) {
+        console.warn('Media duration parse failed', err);
+        return null;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     }
 
     function updatePreviewMedia(url, mime) {
@@ -5569,6 +5741,7 @@ window.addEventListener('perihelion:ready', () => {
         tz,
         lat,
         lon,
+        durationMs: parseDurationMs(state.durationMs),
         tags,
         fileURL: state.previewURL,
         mime: state.mime
@@ -5706,7 +5879,8 @@ window.addEventListener('perihelion:ready', () => {
           record = await window.buildRecordFromTimestamp(memory.name, memory.ts, {
             lat: memory.lat ?? undefined,
             lon: memory.lon ?? undefined,
-            tz: memory.tz
+            tz: memory.tz,
+            durationMs: memory.durationMs
           });
         } catch (err) {
           console.warn('buildRecordFromTimestamp fallback', err);
@@ -5719,6 +5893,7 @@ window.addEventListener('perihelion:ready', () => {
           when: new Date(memory.ts).toISOString(),
           tz: memory.tz,
           year: new Date(memory.ts).getUTCFullYear(),
+          durationMs: parseDurationMs(memory.durationMs),
           tags: [...memory.tags]
         };
       }
@@ -5726,6 +5901,12 @@ window.addEventListener('perihelion:ready', () => {
       record.name = memory.name;
       record.when = new Date(memory.ts).toISOString();
       record.tz = memory.tz;
+      record.durationMs = parseDurationMs(memory.durationMs);
+      if (!record.states) record.states = {};
+      record.states.temporal = {
+        ...(record.states.temporal || {}),
+        durationMs: record.durationMs
+      };
       record.tags = [...memory.tags];
       record.memoryMeta = memory;
       const storeRef = getStore();
@@ -5953,6 +6134,7 @@ window.addEventListener('perihelion:ready', () => {
       if (!item || !item.id) return null;
       const latNum = Number(item.lat);
       const lonNum = Number(item.lon);
+      const durationNum = Number(item.durationMs);
       const mem = {
         id: String(item.id),
         name: String(item.name || 'Memory'),
@@ -5960,6 +6142,7 @@ window.addEventListener('perihelion:ready', () => {
         tz: item.tz || tzGuess(),
         lat: Number.isFinite(latNum) ? latNum : null,
         lon: Number.isFinite(lonNum) ? lonNum : null,
+        durationMs: Number.isFinite(durationNum) && durationNum > 0 ? Math.round(durationNum) : null,
         tags: Array.isArray(item.tags) ? item.tags.map((t) => String(t).toLowerCase()) : [],
         fileURL: item.fileURL || '',
         mime: item.mime || ''
@@ -5986,6 +6169,7 @@ window.addEventListener('perihelion:ready', () => {
           tz: mem.tz,
           lat: mem.lat,
           lon: mem.lon,
+          durationMs: mem.durationMs,
           tags: mem.tags,
           fileURL: mem.fileURL,
           mime: mem.mime
