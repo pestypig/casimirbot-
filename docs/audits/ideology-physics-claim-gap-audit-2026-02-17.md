@@ -422,7 +422,7 @@ Use this runbook for every cloud/offloaded patch touching ideology, physics, via
   - `npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --trace-out artifacts/training-trace.jsonl --trace-limit 200 --json .cal/casimir-audit-payload-9.json`
 - Verdict: `PASS`
 - Trace ID: `audit:2026-02-17:ideology-physics-doc-v9-release-workflow-gate`
-- Run ID: `17901`
+- Run ID: `17902`
 - Certificate hash: `d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d`
 - Certificate ID: `constraint-pack:repo-convergence:d2821c7d650d`
 - Integrity: `integrityOk=true`

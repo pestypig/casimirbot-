@@ -2,6 +2,8 @@
 
 This backlog decomposes remaining ToE work into falsifiable, non-overlapping tickets for parallel Codex Cloud execution.
 
+Canonical machine-readable source: `docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json`.
+
 Global execution contract for every ticket:
 
 - Read: `docs/audits/ideology-physics-claim-gap-audit-2026-02-17.md`, `docs/audits/helix-agent-context-checklist-2026-02-17.json`, `WARP_AGENTS.md`
@@ -101,7 +103,8 @@ Return strict JSON only:
       "server/gr/constraint-evaluator.ts",
       "server/gr/gr-evaluation.ts",
       "server/gr/gr-agent-loop-schema.ts",
-      "tests/gr-constraint-contract.spec.ts"
+      "tests/gr-constraint-contract.spec.ts",
+      "tests/gr-constraint-gate.spec.ts"
     ],
     "required_tests": [
       "tests/gr-constraint-contract.spec.ts",
@@ -168,7 +171,8 @@ Return strict JSON only:
       "server/services/observability/training-trace-store.ts",
       "server/routes/training-trace.ts",
       "shared/schema.ts",
-      "tests/trace-api.spec.ts"
+      "tests/trace-api.spec.ts",
+      "tests/trace-export.spec.ts"
     ],
     "required_tests": [
       "tests/trace-api.spec.ts",
@@ -193,8 +197,7 @@ Return strict JSON only:
       "tests/runtime-frame-contract.spec.ts"
     ],
     "required_tests": [
-      "tests/runtime-frame-contract.spec.ts",
-      "tests/gr-constraint-gate.spec.ts"
+      "tests/runtime-frame-contract.spec.ts"
     ],
     "done_criteria": [
       "firstFail always present on FAIL with canonical class in {constraint,certificate_integrity,certificate_status,certificate_missing}",
@@ -212,7 +215,8 @@ Return strict JSON only:
       "server/routes/ethos.ts",
       "server/services/premeditation-scorer.ts",
       "docs/ethos/ideology.json",
-      "tests/agi-plan.spec.ts"
+      "tests/agi-plan.spec.ts",
+      "tests/helix-ask-evidence-gate.spec.ts"
     ],
     "required_tests": [
       "tests/agi-plan.spec.ts",
@@ -237,8 +241,7 @@ Return strict JSON only:
       "tests/verify-certificate-robotics.spec.ts"
     ],
     "required_tests": [
-      "tests/verify-certificate-robotics.spec.ts",
-      "tests/runtime-frame-contract.spec.ts"
+      "tests/verify-certificate-robotics.spec.ts"
     ],
     "done_criteria": [
       "Add required signer key-id trust policy for hardened profiles",
@@ -277,7 +280,8 @@ Return strict JSON only:
       "configs/warp-primitive-manifest.v1.json",
       "scripts/validate-agent-context-checklist.ts",
       "WARP_AGENTS.md",
-      "tests/startup-config.spec.ts"
+      "tests/startup-config.spec.ts",
+      "tests/theory-checks.spec.ts"
     ],
     "required_tests": [
       "tests/startup-config.spec.ts",
@@ -295,7 +299,7 @@ Return strict JSON only:
 ## Coordinator Prompt (Parallelization)
 
 ```md
-Create a worker batch from docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.md JSON tickets.
+Create a worker batch from docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json tickets.
 
 Rules:
 1) One agent per ticket.

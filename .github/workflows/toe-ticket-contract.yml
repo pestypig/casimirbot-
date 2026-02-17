@@ -1,0 +1,40 @@
+name: ToE Ticket Contract
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ticket-contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate ToE ticket backlog
+        run: npx tsx scripts/validate-toe-ticket-backlog.ts
+
+      - name: Validate ToE ticket results contract (PR)
+        if: ${{ github.event_name == 'pull_request' }}
+        run: >-
+          npx tsx scripts/validate-toe-ticket-results.ts
+          --require-for-ticket-path-changes
+          --base-sha ${{ github.event.pull_request.base.sha }}
+          --head-sha ${{ github.sha }}
+
+      - name: Validate ToE ticket results contract (manual)
+        if: ${{ github.event_name != 'pull_request' }}
+        run: npx tsx scripts/validate-toe-ticket-results.ts
