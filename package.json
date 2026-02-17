@@ -83,6 +83,7 @@
     "helix:ask:concept-audit": "tsx scripts/helix-ask-concept-audit.ts",
     "helix:ask:sweep": "tsx scripts/helix-ask-sweep.ts",
     "helix:ask:goal-zone": "tsx scripts/helix-ask-goal-zone.ts",
+    "helix:ask:versatility": "tsx scripts/helix-ask-versatility-record.ts",
     "helix:ask:latency-study": "cross-env HELIX_ASK_SWEEP_PACK=scripts/helix-ask-latency-study-pack.json HELIX_ASK_SWEEP_MATRIX=scripts/helix-ask-latency-matrix.json HELIX_ASK_SWEEP_OUT_DIR=artifacts/helix-ask-latency npm run helix:ask:sweep",
     "helix:ask:agent-eval": "tsx scripts/helix-ask-agent-eval.ts",
     "curvature:bundle:capture": "tsx scripts/curvature-bundle-capture.ts",

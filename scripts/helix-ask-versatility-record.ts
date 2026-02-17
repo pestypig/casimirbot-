@@ -88,7 +88,7 @@ const START_SERVER = (process.env.HELIX_ASK_VERSATILITY_START_SERVER ?? "0") ===
 const SERVER_COMMAND = process.env.HELIX_ASK_VERSATILITY_SERVER_CMD ?? "npm";
 const SERVER_ARGS =
   process.env.HELIX_ASK_VERSATILITY_SERVER_ARGS?.split(/\s+/).filter(Boolean) ?? ["run", "dev:agi:5173"];
-const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_ASK_VERSATILITY_TIMEOUT_MS ?? 45000);
+const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_ASK_VERSATILITY_TIMEOUT_MS ?? 15000);
 const MIN_TEXT_CHARS = Number(process.env.HELIX_ASK_VERSATILITY_MIN_TEXT_CHARS ?? 220);
 const MAX_RETRIES = Math.max(0, Number(process.env.HELIX_ASK_VERSATILITY_MAX_RETRIES ?? 3));
 const RETRY_BASE_MS = Math.max(100, Number(process.env.HELIX_ASK_VERSATILITY_RETRY_BASE_MS ?? 900));
@@ -97,7 +97,7 @@ const RETRY_AFTER_CAP_MS = Math.max(250, Number(process.env.HELIX_ASK_VERSATILIT
 const RETRY_STUB = (process.env.HELIX_ASK_VERSATILITY_RETRY_STUB ?? "1") !== "0";
 const MAX_CASE_WALL_MS = Math.max(
   REQUEST_TIMEOUT_MS,
-  Number(process.env.HELIX_ASK_VERSATILITY_MAX_CASE_WALL_MS ?? 90000),
+  Number(process.env.HELIX_ASK_VERSATILITY_MAX_CASE_WALL_MS ?? 25000),
 );
 const MAX_RUN_MS = Math.max(0, Number(process.env.HELIX_ASK_VERSATILITY_MAX_RUN_MS ?? 0));
 const CHECKPOINT_EVERY = Math.max(1, Number(process.env.HELIX_ASK_VERSATILITY_CHECKPOINT_EVERY ?? 10));
@@ -112,7 +112,7 @@ const CIRCUIT_OPEN_RETRY_AFTER_CUTOFF_MS = Math.max(
 const GLOBAL_COOLDOWN_ON_CIRCUIT = (process.env.HELIX_ASK_VERSATILITY_GLOBAL_COOLDOWN_ON_CIRCUIT ?? "1") !== "0";
 const GLOBAL_COOLDOWN_CAP_MS = Math.max(
   0,
-  Number(process.env.HELIX_ASK_VERSATILITY_GLOBAL_COOLDOWN_CAP_MS ?? 45000),
+  Number(process.env.HELIX_ASK_VERSATILITY_GLOBAL_COOLDOWN_CAP_MS ?? 30000),
 );
 const STUB_RE = /llm\.local stub result/i;
 const REPORT_SECTION_RE = /(Executive summary:|Coverage map:|Point-by-point:|Report covers)/i;
