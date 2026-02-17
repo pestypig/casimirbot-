@@ -45,6 +45,12 @@ jobs:
           git config user.name "casimir-release"
           git config user.email "actions@github.com"
 
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Validate agent context checklist
+        run: npm run audit:agent-context:check
+
       - name: Build + bump SDK
         if: ${{ inputs.package == 'sdk' || inputs.package == 'both' }}
         shell: bash

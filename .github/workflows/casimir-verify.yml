@@ -30,6 +30,9 @@ jobs:
       - name: Verify ideology verifiers pack
         run: npm run verify:ideology-verifiers
 
+      - name: Validate agent context checklist
+        run: npm run audit:agent-context:check
+
       - name: Validate math stages
         env:
           MATH_UNIT_WARNINGS_STRICT: "1"
