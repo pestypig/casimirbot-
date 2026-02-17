@@ -22,6 +22,7 @@ describe("trace export route", () => {
   let baseUrl = "http://127.0.0.1:0";
   let planRouter: Router;
   let traceRouter: Router;
+  let trainingTraceRouter: Router;
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL ?? "pg-mem://trace-export-tests";
@@ -36,13 +37,16 @@ describe("trace export route", () => {
 
     const planModule = await import("../server/routes/agi.plan");
     const traceModule = await import("../server/routes/agi.trace");
+    const trainingTraceModule = await import("../server/routes/training-trace");
     planRouter = planModule.planRouter;
     traceRouter = traceModule.traceRouter;
+    trainingTraceRouter = trainingTraceModule.trainingTraceRouter;
 
     const app = express();
     app.use(express.json());
     app.use("/api/agi/trace", traceRouter);
     app.use("/api/agi", planRouter);
+    app.use("/api/agi", trainingTraceRouter);
     await new Promise<void>((resolve) => {
       server = app.listen(0, () => {
         const address = server.address();
@@ -126,4 +130,58 @@ describe("trace export route", () => {
     const response = await fetch(`${baseUrl}/api/agi/trace/${traceId}/export`);
     expect(response.status).toBe(404);
   }, 20000);
+
+  it("exports prediction_vs_observation ledger via jsonl", async () => {
+    const createResponse = await fetch(`${baseUrl}/api/agi/training-trace`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        traceId: "toe-005-export",
+        tenantId: "toe-005",
+        pass: true,
+        predictionObservationLedger: {
+          kind: "prediction_vs_observation",
+          version: 1,
+          entries: [
+            {
+              metric: "ford_roman_margin",
+              prediction: [0.14, 0.13],
+              observation: [0.12, 0.11],
+              delta: -0.02,
+              absoluteError: 0.02,
+              confidence: 0.76,
+              trend: {
+                window: "last_16",
+                sampleCount: 16,
+                drift: -0.0011,
+                bias: -0.002,
+              },
+              gateTuning: {
+                thresholdKey: "ford_roman_k",
+                trendMetric: "drift",
+                adjustmentHint: "monitor_negative_drift",
+              },
+            },
+          ],
+        },
+      }),
+    });
+    expect(createResponse.status).toBe(200);
+
+    const exportResponse = await fetch(`${baseUrl}/api/agi/training-trace/export?limit=50&tenantId=toe-005`);
+    expect(exportResponse.status).toBe(200);
+    const raw = await exportResponse.text();
+    const lines = raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    const decoded = lines.map((line) => JSON.parse(line) as {
+      traceId?: string;
+      predictionObservationLedger?: { kind?: string; entries?: Array<{ gateTuning?: { trendMetric?: string } }> };
+    });
+    const match = decoded.find((entry) => entry.traceId === "toe-005-export");
+    expect(match?.predictionObservationLedger?.kind).toBe("prediction_vs_observation");
+    expect(match?.predictionObservationLedger?.entries?.[0]?.gateTuning?.trendMetric).toBe("drift");
+  });
+
 });
