@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-17T22:39:52.525Z",
+  "generated_at": "2026-02-17T22:52:13.372Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "results_dir": "docs/audits/ticket-results"
@@ -12,14 +12,14 @@
   },
   "totals": {
     "tickets_total": 10,
-    "tickets_with_evidence": 4,
+    "tickets_with_evidence": 5,
     "claim_tier_counts": {
-      "diagnostic": 3,
+      "diagnostic": 4,
       "reduced-order": 1,
       "certified": 0
     },
-    "weighted_score_sum": 1.35,
-    "toe_progress_pct": 13.5,
+    "weighted_score_sum": 1.6,
+    "toe_progress_pct": 16,
     "strict_ready_progress_pct": 10
   },
   "tickets": [
@@ -53,10 +53,10 @@
     },
     {
       "ticket_id": "TOE-005-prediction-observation-ledger",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "result_file": "docs/audits/ticket-results/TOE-005-prediction-observation-ledger.20260217-224607.json"
     },
     {
       "ticket_id": "TOE-006-firstfail-taxonomy-normalization",
