@@ -25858,6 +25858,59 @@ const executeHelixAsk = async ({
             beforeCitationGuard.trim() !== cleaned.trim();
         }
       }
+      const placeholderFallbackEligible =
+        RELATION_MODEL_PLACEHOLDER_RE.test(cleaned.trim()) &&
+        (intentDomain === "repo" || intentDomain === "hybrid" || requiresRepoEvidence);
+      if (placeholderFallbackEligible) {
+        const placeholderAllowedCitations = normalizeCitations([
+          ...extractFilePathsFromText(evidenceText),
+          ...extractCitationTokensFromText(evidenceText),
+          ...contextFiles,
+          ...(relationPacket ? Object.values(relationPacket.source_map) : []),
+          ...(relationPacket ? relationPacket.evidence.map((entry) => entry.path) : []),
+        ]);
+        const deterministicFallbackContract = relationPacket
+          ? sanitizeHelixAskAnswerContract(
+              buildRelationModeContractFromPacket(relationPacket),
+              placeholderAllowedCitations,
+            )
+          : sanitizeHelixAskAnswerContract(
+              buildDeterministicAnswerContractFallback({
+                question: baseQuestion,
+                format: formatSpec.format,
+                definitionFocus,
+                docBlocks,
+                codeAlignment,
+                evidenceText: appendEvidenceSources(evidenceText, contextFiles, 8, contextText),
+                allowedCitations: placeholderAllowedCitations,
+              }),
+              placeholderAllowedCitations,
+            );
+        let deterministicRendered = renderHelixAskAnswerContract(
+          deterministicFallbackContract,
+          formatSpec.format,
+          baseQuestion,
+        );
+        deterministicRendered = sanitizeSourcesLine(
+          deterministicRendered,
+          filterExistingEvidencePaths(Array.from(
+            new Set([
+              ...allowedSourcePaths,
+              ...(relationPacket ? relationPacket.evidence.map((entry) => entry.path) : []),
+            ]),
+          )),
+          extractCitationTokensFromText(evidenceText),
+        );
+        if (deterministicRendered.trim()) {
+          cleaned = deterministicRendered.trim();
+          answerPath.push("placeholderFallback:deterministic_contract");
+          logEvent("Placeholder fallback", "applied", "deterministic_contract", answerStart);
+          if (debugPayload) {
+            debugPayload.placeholder_fallback_applied = true;
+            debugPayload.placeholder_fallback_reason = "model_placeholder_answer";
+          }
+        }
+      }
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
         logEvent("Answer cleaned preview", "final", finalCleanedPreview, answerStart);

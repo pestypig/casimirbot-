@@ -36,6 +36,9 @@ type AskPayload = {
   text?: string;
   report_mode?: boolean;
   debug?: AskDebug;
+  error?: string;
+  message?: string;
+  retryAfterMs?: number;
 };
 
 type RawRun = {
@@ -53,6 +56,7 @@ type RawRun = {
   response_text: string;
   debug: AskDebug | null;
   failures: string[];
+  attempts?: number;
 };
 
 type FailureRecord = {
@@ -77,6 +81,10 @@ const SERVER_ARGS =
   process.env.HELIX_ASK_VERSATILITY_SERVER_ARGS?.split(/\s+/).filter(Boolean) ?? ["run", "dev:agi:5173"];
 const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_ASK_VERSATILITY_TIMEOUT_MS ?? 120000);
 const MIN_TEXT_CHARS = Number(process.env.HELIX_ASK_VERSATILITY_MIN_TEXT_CHARS ?? 220);
+const MAX_RETRIES = Math.max(0, Number(process.env.HELIX_ASK_VERSATILITY_MAX_RETRIES ?? 3));
+const RETRY_BASE_MS = Math.max(100, Number(process.env.HELIX_ASK_VERSATILITY_RETRY_BASE_MS ?? 900));
+const RETRY_MAX_MS = Math.max(RETRY_BASE_MS, Number(process.env.HELIX_ASK_VERSATILITY_RETRY_MAX_MS ?? 12000));
+const RETRY_STUB = (process.env.HELIX_ASK_VERSATILITY_RETRY_STUB ?? "1") !== "0";
 const STUB_RE = /llm\.local stub result/i;
 const REPORT_SECTION_RE = /(Executive summary:|Coverage map:|Point-by-point:|Report covers)/i;
 
@@ -131,6 +139,7 @@ const slug = (value: string) =>
     .slice(0, 72);
 
 const clampSessionId = (value: string): string => value.slice(0, 120);
+const RETRYABLE_STATUS = new Set([0, 408, 429, 500, 502, 503, 504]);
 
 const makeRelationPrompts = (): PromptCase[] => {
   const base = [
@@ -300,6 +309,44 @@ const askOnce = async (entry: PromptCase, seed: number, temperature: number, run
   }
 };
 
+const shouldRetryResponse = (
+  response: Awaited<ReturnType<typeof askOnce>>,
+  entry: PromptCase,
+): boolean => {
+  if (RETRYABLE_STATUS.has(response.status)) return true;
+  const text = String(response.payload.text ?? "");
+  if (RETRY_STUB && STUB_RE.test(text) && entry.family !== "ambiguous_general") {
+    return true;
+  }
+  return false;
+};
+
+const retryDelayMs = (
+  response: Awaited<ReturnType<typeof askOnce>>,
+  attempt: number,
+): number => {
+  const requestedRetry = Math.max(0, toNum(response.payload.retryAfterMs, 0));
+  const backoff = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.max(1, 2 ** attempt));
+  return Math.max(requestedRetry, backoff);
+};
+
+const askWithRetry = async (
+  entry: PromptCase,
+  seed: number,
+  temperature: number,
+  runId: string,
+) => {
+  let attempts = 0;
+  let response = await askOnce(entry, seed, temperature, runId);
+  attempts += 1;
+  while (attempts <= MAX_RETRIES && shouldRetryResponse(response, entry)) {
+    await sleep(retryDelayMs(response, attempts - 1));
+    response = await askOnce(entry, seed, temperature, runId);
+    attempts += 1;
+  }
+  return { response, attempts };
+};
+
 const toNum = (value: unknown, fallback = 0): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
@@ -392,7 +439,7 @@ const main = async () => {
     for (const entry of prompts) {
       for (const seed of SEEDS) {
         for (const temperature of TEMPS) {
-          const response = await askOnce(entry, seed, temperature, runId);
+          const { response, attempts } = await askWithRetry(entry, seed, temperature, runId);
           const failures = evaluateFailures(entry, response);
           const raw: RawRun = {
             run_id: runId,
@@ -409,6 +456,7 @@ const main = async () => {
             response_text: String(response.payload.text ?? ""),
             debug: response.payload.debug ?? null,
             failures,
+            attempts,
           };
           rawRuns.push(raw);
           const fileName = `${runId}-${entry.id}-s${seed}-t${String(temperature).replace(".", "p")}.json`;
