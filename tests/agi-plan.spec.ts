@@ -15,6 +15,7 @@ import { llmLocalHandler, llmLocalSpec } from "../server/skills/llm.local";
 import { registerTool } from "../server/skills";
 import { kvReset } from "../server/services/llm/kv-budgeter";
 import { __resetToolLogStore, getToolLogs } from "../server/services/observability/tool-log-store";
+import { scorePremeditation } from "../server/services/premeditation-scorer";
 
 const baseRecord: TMemoryRecord = {
   id: "m-base",
@@ -309,4 +310,40 @@ describe("Chat B planner", () => {
 
 
 
+});
+
+describe("TOE-007 ideology hard action gates", () => {
+  it("emits explicit firstFail when covered action violates jurisdictional floor", () => {
+    const result = scorePremeditation({
+      candidates: [
+        {
+          id: "candidate-covered-jurisdiction-fail",
+          valueLongevity: 0.8,
+          risk: 0.1,
+          entropy: 0.2,
+          tags: ["covered-action", "legal-key", "ethos-key"],
+        },
+      ],
+    });
+    expect(result.chosenCandidateId).toBeUndefined();
+    expect(result.rationaleTags).toContain(
+      "ideology_gate.firstFail:IDEOLOGY_JURISDICTIONAL_FLOOR_VIOLATION",
+    );
+  });
+
+  it("requires both legal and ethos key for covered actions", () => {
+    const result = scorePremeditation({
+      candidates: [
+        {
+          id: "candidate-covered-missing-ethos",
+          valueLongevity: 0.9,
+          risk: 0.1,
+          entropy: 0.1,
+          tags: ["covered-action", "legal-key", "jurisdiction-floor-ok"],
+        },
+      ],
+    });
+    expect(result.chosenCandidateId).toBeUndefined();
+    expect(result.rationaleTags).toContain("ideology_gate.firstFail:IDEOLOGY_MISSING_ETHOS_KEY");
+  });
 });

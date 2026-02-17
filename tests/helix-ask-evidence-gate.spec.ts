@@ -4,6 +4,7 @@ import {
   extractClaimCandidates,
   evaluateClaimCoverage,
 } from "../server/services/helix-ask/query";
+import { scorePremeditation } from "../server/services/premeditation-scorer";
 
 describe("Helix Ask evidence eligibility gate", () => {
   it("fails when context misses key tokens", () => {
@@ -81,5 +82,40 @@ describe("Helix Ask evidence eligibility gate", () => {
     });
     expect(fail.ok).toBe(false);
     expect(fail.supportedCount).toBe(0);
+  });
+});
+
+describe("Ideology dual-key hard gate scoring", () => {
+  it("emits explicit HARD firstFail for missing legal key on covered actions", () => {
+    const result = scorePremeditation({
+      candidates: [
+        {
+          id: "covered-missing-legal",
+          valueLongevity: 0.9,
+          risk: 0.2,
+          entropy: 0.1,
+          tags: ["covered-action", "ethos-key", "jurisdiction-floor-ok"],
+        },
+      ],
+    });
+    expect(result.chosenCandidateId).toBeUndefined();
+    expect(result.rationaleTags).toContain("ideology_gate.firstFail:IDEOLOGY_MISSING_LEGAL_KEY");
+    expect(result.rationaleTags).toContain("ideology_gate.severity:HARD");
+  });
+
+  it("keeps non-covered actions backward compatible", () => {
+    const result = scorePremeditation({
+      candidates: [
+        {
+          id: "legacy-safe",
+          valueLongevity: 0.7,
+          risk: 0.1,
+          entropy: 0.1,
+          tags: ["legacy-action"],
+        },
+      ],
+    });
+    expect(result.chosenCandidateId).toBe("legacy-safe");
+    expect(result.rationaleTags.join(" ")).not.toContain("ideology_gate.firstFail");
   });
 });

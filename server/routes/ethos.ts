@@ -23,6 +23,19 @@ type IdeologyNode = {
 type IdeologyDoc = {
   rootId: string;
   nodes: IdeologyNode[];
+  actionGatePolicy?: {
+    version?: number;
+    claim_tier?: string;
+    covered_action_tags?: string[];
+    legal_key_tags?: string[];
+    ethos_key_tags?: string[];
+    jurisdiction_floor_ok_tags?: string[];
+    hard_fail_ids?: {
+      missing_legal_key?: string;
+      missing_ethos_key?: string;
+      jurisdiction_floor_violation?: string;
+    };
+  };
 };
 
 const ideologyLinkSchema = z.object({
@@ -119,6 +132,25 @@ const loadIdeologyDoc = async (): Promise<IdeologyDoc> => {
     throw new Error(`Invalid ideology.json: ${parsed.error.message}`);
   }
   return parsed.data;
+};
+
+export const getIdeologyActionGatePolicy = async () => {
+  const doc = await loadIdeologyDoc();
+  return (
+    doc.actionGatePolicy ?? {
+      version: 1,
+      claim_tier: "diagnostic",
+      covered_action_tags: ["covered-action", "covered_action"],
+      legal_key_tags: ["legal-key", "legal_key"],
+      ethos_key_tags: ["ethos-key", "ethos_key"],
+      jurisdiction_floor_ok_tags: ["jurisdiction-floor-ok", "jurisdiction_floor_ok"],
+      hard_fail_ids: {
+        missing_legal_key: "IDEOLOGY_MISSING_LEGAL_KEY",
+        missing_ethos_key: "IDEOLOGY_MISSING_ETHOS_KEY",
+        jurisdiction_floor_violation: "IDEOLOGY_JURISDICTIONAL_FLOOR_VIOLATION",
+      },
+    }
+  );
 };
 
 type BeliefGraphEdge = {
@@ -369,6 +401,21 @@ ethosRouter.get("/artifacts/:id(*)/render", async (req, res) => {
       return;
     }
     res.status(500).json({ error: "artifact_render_failed", message });
+  }
+});
+
+ethosRouter.get("/ideology/action-gates", async (_req, res) => {
+  try {
+    const policy = await getIdeologyActionGatePolicy();
+    res.json({
+      claim_tier: policy.claim_tier ?? "diagnostic",
+      actionGatePolicy: policy,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "action-gate-policy-failed",
+      message: err instanceof Error ? err.message : String(err),
+    });
   }
 });
 
