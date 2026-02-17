@@ -60,17 +60,18 @@ Stop-scaling triggers:
 | 2026-02-17 | TOE-004-uncertainty-propagation-gates | ffc566bc | PASS | PASS (`tests/gr-invariants.spec.ts`, `tests/stress-energy-integrals.spec.ts`) | PASS (`run_id=1`) | PASS | diagnostic | NO | PASS (ticket-scoped tests and contract checks) | 13.5 | SCALE +1 (pilot) | TOE-004 receipt accepted and counted in weighted ToE proof progression. |
 | 2026-02-17 | TOE-005-prediction-observation-ledger | 7cf17bd7 | PASS | PASS (`tests/trace-api.spec.ts`, `tests/trace-export.spec.ts`) | PASS (`run_id=11`) | PASS | diagnostic | NO | PASS (ticket-scoped tests and contract checks) | 16.0 | SCALE +1 (pilot) | TOE-005 receipt accepted and counted in weighted ToE proof progression. |
 | 2026-02-17 | TOE-006-firstfail-taxonomy-normalization | f4d2548b | PASS | PASS (`tests/runtime-frame-contract.spec.ts`) | PASS (`run_id=5`) | PASS | diagnostic | NO | PASS (ticket-scoped tests and contract checks) | 18.5 | SCALE +1 (pilot) | TOE-006 receipt accepted and counted in weighted ToE proof progression. |
+| 2026-02-17 | TOE-007-ideology-hard-action-gates | f062b0a3 | PASS | PASS (`tests/agi-plan.spec.ts`, `tests/helix-ask-evidence-gate.spec.ts`) | PASS (`run_id=18276`) | PASS | diagnostic | NO | PASS (ticket-scoped tests and contract checks) | 21.0 | SCALE +1 (pilot) | TOE-007 receipt accepted and counted in weighted ToE proof progression (repair pass TOE-007-R1). |
 
 ## Daily Summary (2026-02-17)
 
 - Date: 2026-02-17
-- Runs completed: 6
-- Full-gate passes: 6
+- Runs completed: 7
+- Full-gate passes: 7
 - Scope-drift incidents: 0
 - Adapter-fallback incidents: 0
-- ToE progress %: 18.5
+- ToE progress %: 21.0
 - Strict-ready progress %: 10.0
-- Rolling pass rate (last 10 runs): 100% (6/6 observed)
+- Rolling pass rate (last 10 runs): 100% (7/7 observed)
 - Reviewer count: not recorded in current audit artifacts
 - Active agents: not set (policy baseline is `2 x active reviewers`)
 - Decision for next day: `scale +1` (pilot)

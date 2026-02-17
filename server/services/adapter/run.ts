@@ -9,6 +9,11 @@ import { collectAuditSafetyTelemetry, collectRepoConvergenceTelemetry, collectTo
 import { recordConstraintPackTrace } from "../observability/constraint-pack-normalizer.js";
 import { getConstraintPackPolicyProfileById } from "../constraint-packs/constraint-pack-policy-store.js";
 import { applyConstraintPackOverrides } from "../constraint-packs/constraint-pack-policy.js";
+import { scorePremeditation } from "../premeditation-scorer.js";
+import {
+  extractIdeologyHardFailFromPremeditationResult,
+  toIdeologyHardFailConstraint,
+} from "../ideology/action-gates.js";
 
 export type AdapterRunResult = {
   traceId?: string;
@@ -81,6 +86,25 @@ const buildConstraintPackArtifacts = (input: { packId: string; traceId: string; 
 
 export async function runAdapterExecution(parsed: AdapterRunRequest, opts?: { tenantId?: string }): Promise<AdapterRunResult> {
   const { actions, budget, policy, pack, mode } = parsed;
+  const traceId = parsed.traceId ?? `adapter:${crypto.randomUUID()}`;
+  const premeditationResult = parsed.premeditation
+    ? scorePremeditation(parsed.premeditation)
+    : undefined;
+  const ideologyHardFail = extractIdeologyHardFailFromPremeditationResult(
+    premeditationResult,
+  );
+  if (ideologyHardFail) {
+    return {
+      traceId,
+      runId: `ideology-veto:${crypto.randomUUID()}`,
+      verdict: "FAIL",
+      pass: false,
+      firstFail: toIdeologyHardFailConstraint(ideologyHardFail),
+      deltas: [],
+      certificate: null,
+      artifacts: [{ kind: "training-trace-export", ref: "/api/agi/training-trace/export" }],
+    };
+  }
   if (mode === "constraint-pack" || pack) {
     if (!pack) throw new Error("adapter-pack-missing");
     const resolvedPack = getConstraintPackById(pack.id); if (!resolvedPack) throw new Error("constraint-pack-not-found");
@@ -102,7 +126,6 @@ export async function runAdapterExecution(parsed: AdapterRunRequest, opts?: { te
     const metrics = effectivePack.id === "repo-convergence" ? buildRepoConvergenceMetrics(telemetry as RepoConvergenceTelemetry) : effectivePack.id === "tool-use-budget" ? buildToolUseBudgetMetrics(telemetry as ToolUseBudgetTelemetry) : buildAuditSafetyMetrics(telemetry as AuditSafetyTelemetry);
     mergeMetricOverrides(metrics, pack.metrics);
     const evaluation = evaluateConstraintPackFromMetrics(effectivePack, metrics, { certificate: pack.certificate, deltas: pack.deltas, notes: [...(pack.notes ?? []), ...policyNotes], proxy: pack.proxy, ladderTier: pack.ladderTier });
-    const traceId = parsed.traceId ?? `adapter:${crypto.randomUUID()}`;
     const trace = recordConstraintPackTrace({ traceId, tenantId: effectiveTenantId, pack: effectivePack, evaluation, metrics, source: { system: "constraint-pack", component: "adapter", tool: effectivePack.id, version: String(effectivePack.version) } });
     const verdict = trace.pass ? "PASS" : "FAIL";
     const certificate = evaluation.certificate ?? null;
@@ -111,7 +134,6 @@ export async function runAdapterExecution(parsed: AdapterRunRequest, opts?: { te
   const proposals = buildActionProposals(actions);
   const proposalCount = proposals?.length ?? 0;
   const options: GrAgentLoopOptions = { ...(proposals ? { proposals } : {}), ...(budget?.maxIterations !== undefined || proposalCount > 0 ? { maxIterations: budget?.maxIterations ?? Math.min(proposalCount, 50) } : {}), ...(budget?.maxAttemptMs !== undefined || budget?.maxTotalMs !== undefined ? { budget: { maxAttemptMs: budget.maxAttemptMs, maxTotalMs: budget.maxTotalMs } } : {}), ...(policy?.thresholds ? { thresholds: policy.thresholds } : {}), ...(policy?.gate ? { policy: policy.gate } : {}) };
-  const traceId = parsed.traceId ?? `adapter:${crypto.randomUUID()}`;
   const result = await runGrAgentLoop(options);
   const run = recordGrAgentLoopRun({ result, options, durationMs: 0, tenantId: opts?.tenantId });
   const terminalAttempt = resolveTerminalAttempt(result.attempts, result.acceptedIteration);

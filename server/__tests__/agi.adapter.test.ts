@@ -136,6 +136,33 @@ describe("agi adapter API", () => {
     expect(response.body?.premeditation?.entropy).toBeCloseTo(0.2, 8);
   });
 
+  it("fails covered actions missing legal/ethos keys before execution", async () => {
+    const response = await request(app)
+      .post("/api/agi/adapter/run")
+      .send({
+        traceId: "trace-premeditation-ideology-veto-1",
+        actions: [{ id: "a1", params: { dutyCycle: 0.004 } }],
+        premeditation: {
+          candidates: [
+            {
+              id: "covered-missing-legal",
+              valueLongevity: 0.9,
+              risk: 0.1,
+              entropy: 0.1,
+              tags: ["covered-action", "ethos-key", "jurisdiction-floor-ok"],
+            },
+          ],
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.verdict).toBe("FAIL");
+    expect(response.body?.pass).toBe(false);
+    expect(response.body?.firstFail?.id).toBe("IDEOLOGY_MISSING_LEGAL_KEY");
+    expect(response.body?.premeditation?.chosenCandidateId).toBeUndefined();
+    expect(runMock).not.toHaveBeenCalled();
+  });
+
 
 
   it("rejects direct motor actuation commands from adapter actions", async () => {

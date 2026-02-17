@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-17T23:15:56.365Z",
+  "generated_at": "2026-02-17T23:44:00.561Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "results_dir": "docs/audits/ticket-results"
@@ -12,14 +12,14 @@
   },
   "totals": {
     "tickets_total": 10,
-    "tickets_with_evidence": 6,
+    "tickets_with_evidence": 7,
     "claim_tier_counts": {
-      "diagnostic": 5,
+      "diagnostic": 6,
       "reduced-order": 1,
       "certified": 0
     },
-    "weighted_score_sum": 1.85,
-    "toe_progress_pct": 18.5,
+    "weighted_score_sum": 2.1,
+    "toe_progress_pct": 21,
     "strict_ready_progress_pct": 10
   },
   "tickets": [
@@ -67,10 +67,10 @@
     },
     {
       "ticket_id": "TOE-007-ideology-hard-action-gates",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-234300.json"
     },
     {
       "ticket_id": "TOE-008-certificate-authenticity-policy",

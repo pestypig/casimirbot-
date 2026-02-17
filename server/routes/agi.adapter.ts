@@ -285,11 +285,20 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
 
     if (premeditationResult) {
       const nowIso = new Date().toISOString();
+      const normalizedFirstFail = normalizeFailFirstFail(
+        result.verdict,
+        result.firstFail ?? null,
+        result.certificate as
+          | { status?: string; certificateHash?: string | null; integrityOk?: boolean }
+          | null,
+      );
       recordTrainingTrace({
         traceId,
         tenantId: tenantGuard.tenantId,
         pass: result.pass,
         deltas: result.deltas,
+        firstFail: normalizedFirstFail ?? undefined,
+        certificate: result.certificate ?? undefined,
         metrics: {
           optimism: premeditationResult.optimism,
           entropy: premeditationResult.entropy,
@@ -328,12 +337,20 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
       });
     }
 
+    const normalizedFirstFail = normalizeFailFirstFail(
+      result.verdict,
+      result.firstFail ?? null,
+      result.certificate as
+        | { status?: string; certificateHash?: string | null; integrityOk?: boolean }
+        | null,
+    );
+
     return res.json({
       traceId: result.traceId ?? traceId,
       runId: result.runId,
       verdict: result.verdict,
       pass: result.pass,
-      firstFail: normalizeFailFirstFail(result.verdict, result.firstFail ?? null, result.certificate as { status?: string; certificateHash?: string | null; integrityOk?: boolean } | null),
+      firstFail: normalizedFirstFail,
       deltas: result.deltas,
       premeditation: premeditationResult,
       certificate: result.certificate ?? null,

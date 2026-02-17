@@ -10,6 +10,10 @@ import {
 import { renderIdeologyPill } from "../services/ideology/render";
 import { getConsoleTelemetry, saveConsoleTelemetry } from "../services/console-telemetry/store";
 import { buildIdeologyPanelTelemetry } from "@shared/ideology-telemetry";
+import {
+  DEFAULT_IDEOLOGY_ACTION_GATE_POLICY,
+  type IdeologyActionGatePolicy,
+} from "../services/ideology/action-gates.js";
 
 export const ethosRouter = Router();
 
@@ -23,19 +27,7 @@ type IdeologyNode = {
 type IdeologyDoc = {
   rootId: string;
   nodes: IdeologyNode[];
-  actionGatePolicy?: {
-    version?: number;
-    claim_tier?: string;
-    covered_action_tags?: string[];
-    legal_key_tags?: string[];
-    ethos_key_tags?: string[];
-    jurisdiction_floor_ok_tags?: string[];
-    hard_fail_ids?: {
-      missing_legal_key?: string;
-      missing_ethos_key?: string;
-      jurisdiction_floor_violation?: string;
-    };
-  };
+  actionGatePolicy?: Partial<IdeologyActionGatePolicy>;
 };
 
 const ideologyLinkSchema = z.object({
@@ -136,21 +128,15 @@ const loadIdeologyDoc = async (): Promise<IdeologyDoc> => {
 
 export const getIdeologyActionGatePolicy = async () => {
   const doc = await loadIdeologyDoc();
-  return (
-    doc.actionGatePolicy ?? {
-      version: 1,
-      claim_tier: "diagnostic",
-      covered_action_tags: ["covered-action", "covered_action"],
-      legal_key_tags: ["legal-key", "legal_key"],
-      ethos_key_tags: ["ethos-key", "ethos_key"],
-      jurisdiction_floor_ok_tags: ["jurisdiction-floor-ok", "jurisdiction_floor_ok"],
-      hard_fail_ids: {
-        missing_legal_key: "IDEOLOGY_MISSING_LEGAL_KEY",
-        missing_ethos_key: "IDEOLOGY_MISSING_ETHOS_KEY",
-        jurisdiction_floor_violation: "IDEOLOGY_JURISDICTIONAL_FLOOR_VIOLATION",
-      },
-    }
-  );
+  const policy = doc.actionGatePolicy ?? {};
+  return {
+    ...DEFAULT_IDEOLOGY_ACTION_GATE_POLICY,
+    ...policy,
+    hard_fail_ids: {
+      ...DEFAULT_IDEOLOGY_ACTION_GATE_POLICY.hard_fail_ids,
+      ...(policy.hard_fail_ids ?? {}),
+    },
+  } as IdeologyActionGatePolicy;
 };
 
 type BeliefGraphEdge = {
