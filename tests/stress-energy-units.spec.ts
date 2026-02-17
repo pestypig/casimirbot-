@@ -6,6 +6,7 @@ import type {
 } from "../server/stress-energy-brick";
 import { buildStressEnergyFieldSetFromBrick } from "../server/gr/evolution/stress-energy";
 import { SI_TO_GEOM_STRESS } from "../shared/gr-units";
+import { bridgeCurvatureToStressEnergy, kappa_u } from "@shared/curvature-proxy";
 
 const makeBrick = (): StressEnergyBrick => {
   const t00 = new Float32Array([2]);
@@ -66,5 +67,41 @@ describe("stress-energy unit scaling", () => {
     expect(geom.rho[0]).toBeCloseTo(2, 12);
     expect(si.rho[0]).toBeCloseTo(2 * SI_TO_GEOM_STRESS, 12);
     expect(si.Sx[0]).toBeCloseTo(3 * SI_TO_GEOM_STRESS, 12);
+  });
+});
+
+
+describe("curvature-stress bridge primitive", () => {
+  it("preserves canonical kappa parity and SI unit lock", () => {
+    const t00 = 4.2e8;
+    const out = bridgeCurvatureToStressEnergy({
+      channel: "kappa_u",
+      kappa_m2: kappa_u(t00),
+      bound_abs_J_m3: 1e10,
+      mismatch_threshold_rel: 1e-12,
+      provenance: { class: "diagnostic", method: "TOE-001 bridge" },
+      uncertainty: { model: "bounded", relative_1sigma: 0.1, confidence: 0.9 },
+    });
+
+    expect(out.units.system).toBe("SI");
+    expect(out.units.density).toBe("J/m^3");
+    expect(out.provenance.class).toBe("diagnostic");
+    expect(out.parity.pass).toBe(true);
+    expect(out.surrogate.t00_J_m3).toBeCloseTo(t00, 6);
+  });
+
+  it("fails parity when mismatch threshold is stricter than observed mismatch", () => {
+    const t00 = 2.1e7;
+    const out = bridgeCurvatureToStressEnergy({
+      channel: "kappa_u",
+      kappa_m2: kappa_u(t00),
+      bound_abs_J_m3: t00 / 2,
+      mismatch_threshold_rel: 1e-8,
+      provenance: { class: "diagnostic", method: "TOE-001 mismatch" },
+    });
+
+    expect(out.surrogate.bounded).toBe(true);
+    expect(out.parity.mismatch_rel).toBeGreaterThan(out.parity.mismatch_threshold_rel);
+    expect(out.parity.pass).toBe(false);
   });
 });

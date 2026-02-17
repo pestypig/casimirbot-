@@ -42,3 +42,127 @@ export function kappa_u(u_J_m3: number): number {
   return curvatureProxyPrefactors.energy_density * u_J_m3;
 }
 
+
+
+export type CurvatureBridgeChannel = "kappa_body" | "kappa_drive" | "kappa_u";
+export type BridgeClaimTier = "diagnostic" | "reduced-order" | "certified";
+
+export interface CurvatureStressBridgeInput {
+  channel: CurvatureBridgeChannel;
+  kappa_m2: number;
+  bound_abs_J_m3: number;
+  mismatch_threshold_rel: number;
+  provenance: {
+    class: BridgeClaimTier;
+    method: string;
+    reference?: string;
+  };
+  uncertainty?: {
+    model?: "bounded" | "gaussian" | "interval";
+    relative_1sigma?: number;
+    confidence?: number;
+  };
+}
+
+export interface CurvatureStressBridgeOutput {
+  source: {
+    channel: CurvatureBridgeChannel;
+    kappa_m2: number;
+  };
+  surrogate: {
+    t00_J_m3: number;
+    bounded: boolean;
+    bound_abs_J_m3: number;
+  };
+  units: {
+    system: "SI";
+    length: "m";
+    time: "s";
+    mass: "kg";
+    energy: "J";
+    density: "J/m^3";
+  };
+  provenance: {
+    class: BridgeClaimTier;
+    method: string;
+    reference?: string;
+  };
+  uncertainty: {
+    model: "bounded" | "gaussian" | "interval";
+    relative_1sigma: number;
+    absolute_1sigma_J_m3: number;
+    confidence: number;
+  };
+  parity: {
+    canonical_kappa_m2: number;
+    mismatch_rel: number;
+    mismatch_threshold_rel: number;
+    pass: boolean;
+  };
+}
+
+const KAPPA_TO_T00_J_M3 = C4 / (8 * PI * G);
+
+const canonicalKappaFromChannel = (channel: CurvatureBridgeChannel, t00_J_m3: number): number => {
+  if (channel === "kappa_body") {
+    return kappa_body(t00_J_m3 / C2);
+  }
+  if (channel === "kappa_drive") {
+    return kappa_drive(t00_J_m3 * C, 1, 1);
+  }
+  return kappa_u(t00_J_m3);
+};
+
+export function bridgeCurvatureToStressEnergy(input: CurvatureStressBridgeInput): CurvatureStressBridgeOutput {
+  const t00Raw = input.kappa_m2 * KAPPA_TO_T00_J_M3;
+  const bounded = Number.isFinite(input.bound_abs_J_m3) && input.bound_abs_J_m3 > 0;
+  const t00Bounded = bounded
+    ? Math.max(-input.bound_abs_J_m3, Math.min(input.bound_abs_J_m3, t00Raw))
+    : Number.NaN;
+
+  const canonical_kappa_m2 = canonicalKappaFromChannel(input.channel, t00Bounded);
+  const denom = Math.max(1e-30, Math.abs(canonical_kappa_m2));
+  const mismatch_rel = Math.abs(canonical_kappa_m2 - input.kappa_m2) / denom;
+  const pass = Number.isFinite(mismatch_rel) && mismatch_rel <= input.mismatch_threshold_rel;
+
+  const rel1 = input.uncertainty?.relative_1sigma ?? 0;
+  const conf = input.uncertainty?.confidence ?? 0.95;
+  const abs1 = Math.abs(t00Bounded) * rel1;
+
+  return {
+    source: {
+      channel: input.channel,
+      kappa_m2: input.kappa_m2,
+    },
+    surrogate: {
+      t00_J_m3: t00Bounded,
+      bounded,
+      bound_abs_J_m3: input.bound_abs_J_m3,
+    },
+    units: {
+      system: "SI",
+      length: "m",
+      time: "s",
+      mass: "kg",
+      energy: "J",
+      density: "J/m^3",
+    },
+    provenance: {
+      class: input.provenance.class,
+      method: input.provenance.method,
+      reference: input.provenance.reference,
+    },
+    uncertainty: {
+      model: input.uncertainty?.model ?? "bounded",
+      relative_1sigma: rel1,
+      absolute_1sigma_J_m3: abs1,
+      confidence: conf,
+    },
+    parity: {
+      canonical_kappa_m2,
+      mismatch_rel,
+      mismatch_threshold_rel: input.mismatch_threshold_rel,
+      pass,
+    },
+  };
+}
