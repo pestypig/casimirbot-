@@ -306,7 +306,7 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
   const firstFailId = fallback
     ? "HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY"
     : !evidenceComplete
-      ? null
+      ? "HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE"
       : residualWithinEnvelope
         ? null
         : "HALOBANK_HORIZONS_RESIDUAL_OUT_OF_ENVELOPE";
@@ -314,10 +314,14 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
   const reasons = fallback
     ? ["Fallback ephemeris source detected; diagnostic-only and non-certifying."]
     : !evidenceComplete
-      ? ["Live ephemeris residual evidence is incomplete; conservative diagnostic downgrade applied."]
+      ? [
+          "Live ephemeris residual evidence is incomplete; deterministic conservative diagnostic downgrade applied.",
+        ]
       : residualWithinEnvelope
-        ? ["Live ephemeris residual is within bounded envelope with complete evidence."]
-        : ["Live ephemeris residual exceeds bounded envelope; consistency gate is non-pass."];
+        ? [
+            "Live ephemeris residual is within bounded envelope with complete evidence; reduced-order recommendation eligible.",
+          ]
+        : ["Live ephemeris residual exceeds bounded envelope; deterministic diagnostic downgrade applied."];
 
   const claimTierRecommendation: "diagnostic" | "reduced-order" =
     !firstFailId && source === "live" && residualStatus === "within_envelope" ? "reduced-order" : "diagnostic";
