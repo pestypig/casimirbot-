@@ -1486,6 +1486,44 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-064-warp-viability-reduced-order-counterexample-pack",
+      "tree_owner": "warp-mechanics",
+      "gap_refs": [
+        "F-COV-5",
+        "F-COV-6"
+      ],
+      "primitive": "Warp viability reduced-order counterexample pack primitive",
+      "primary_path_prefix": "docs/audits/research/TOE-064-tier-promotion-rationale.md",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts",
+        "tests/proof-pack-strict-parity.spec.ts",
+        "docs/audits/research/TOE-064-tier-promotion-rationale.md",
+        "docs/audits/research/TOE-064-comparative-evidence-pack.md",
+        "docs/audits/ticket-results/TOE-064-warp-viability-reduced-order-counterexample-pack.20260218T201702Z.json"
+      ],
+      "required_tests": [
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts",
+        "tests/proof-pack-strict-parity.spec.ts"
+      ],
+      "done_criteria": [
+        "Counterexample pack enumerates promotion failure modes and deterministic gate mappings for warp reduced-order claims",
+        "Tier rationale documents conservative interpretation boundaries and falsifiability hooks for admissibility-edge scenarios",
+        "Comparative evidence map anchors each counterexample class to explicit regression tests and expected first-fail behavior"
+      ],
+      "research_gate": {
+        "risk_class": "tier_promotion",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "tier-promotion-rationale",
+          "comparative-evidence-pack"
+        ]
+      }
     }
   ]
 }
