@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T05:34:34.642Z",
+  "generated_at": "2026-02-18T06:22:49.051Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -14,18 +14,18 @@
   },
   "totals": {
     "tickets_total": 51,
-    "tickets_with_evidence": 47,
+    "tickets_with_evidence": 48,
     "claim_tier_counts": {
-      "diagnostic": 46,
+      "diagnostic": 47,
       "reduced-order": 1,
       "certified": 0
     },
-    "weighted_score_sum": 12.1,
-    "toe_progress_pct": 23.7,
+    "weighted_score_sum": 12.35,
+    "toe_progress_pct": 24.2,
     "forest_owner_coverage_pct": 100,
     "strict_ready_progress_pct": 2,
-    "research_gated_tickets_total": 2,
-    "research_artifact_complete_tickets_total": 1
+    "research_gated_tickets_total": 3,
+    "research_artifact_complete_tickets_total": 2
   },
   "segments": {
     "core": {
@@ -44,31 +44,31 @@
     },
     "extension": {
       "tickets_total": 41,
-      "tickets_with_evidence": 37,
+      "tickets_with_evidence": 38,
       "claim_tier_counts": {
-        "diagnostic": 37,
+        "diagnostic": 38,
         "reduced-order": 0,
         "certified": 0
       },
-      "weighted_score_sum": 9.25,
-      "toe_progress_pct": 22.6,
+      "weighted_score_sum": 9.5,
+      "toe_progress_pct": 23.2,
       "strict_ready_progress_pct": 0,
-      "research_gated_tickets_total": 2,
-      "research_artifact_complete_tickets_total": 1
+      "research_gated_tickets_total": 3,
+      "research_artifact_complete_tickets_total": 2
     },
     "combined": {
       "tickets_total": 51,
-      "tickets_with_evidence": 47,
+      "tickets_with_evidence": 48,
       "claim_tier_counts": {
-        "diagnostic": 46,
+        "diagnostic": 47,
         "reduced-order": 1,
         "certified": 0
       },
-      "weighted_score_sum": 12.1,
-      "toe_progress_pct": 23.7,
+      "weighted_score_sum": 12.35,
+      "toe_progress_pct": 24.2,
       "strict_ready_progress_pct": 2,
-      "research_gated_tickets_total": 2,
-      "research_artifact_complete_tickets_total": 1
+      "research_gated_tickets_total": 3,
+      "research_artifact_complete_tickets_total": 2
     }
   },
   "tickets": [
@@ -79,7 +79,7 @@
       "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-1538.json"
+      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-205121.json"
     },
     {
       "ticket_id": "TOE-002-semiclassical-coupling-contract",
@@ -133,7 +133,7 @@
       "score": 0.25,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-232559.json"
+      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-234300.json"
     },
     {
       "ticket_id": "TOE-008-certificate-authenticity-policy",
@@ -488,10 +488,12 @@
     },
     {
       "ticket_id": "TOE-047-helix-ask-strict-e2e-contract",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-047-helix-ask-strict-e2e-contract.20260218T054023Z.json"
     },
     {
       "ticket_id": "TOE-048-halobank-horizons-physics-research-bridge",
