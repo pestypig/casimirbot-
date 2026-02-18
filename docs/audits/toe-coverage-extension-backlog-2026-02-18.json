@@ -1311,6 +1311,35 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-060-ideology-physics-counterexample-hardening",
+      "tree_owner": "ideology-physics-bridge",
+      "primitive": "Ideology-physics counterexample hardening",
+      "primary_path_prefix": "server/services/helix-ask/relation-assembly.ts",
+      "allowed_paths": [
+        "server/services/helix-ask/relation-assembly.ts",
+        "server/services/helix-ask/graph-resolver.ts",
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts",
+        "docs/audits/research/TOE-060-physics-research-brief.md",
+        "docs/audits/research/TOE-060-safety-envelope-analysis.md"
+      ],
+      "required_tests": [
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "safety-envelope-analysis"
+        ]
+      }
     }
   ]
 }
