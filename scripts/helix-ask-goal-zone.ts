@@ -148,6 +148,22 @@ const ensureServerReady = async (timeoutMs = 120000): Promise<void> => {
     }
     await sleep(1000);
   }
+  // Fallback probe: if /api/ready is unreliable, validate ask endpoint directly.
+  for (let i = 0; i < 5; i += 1) {
+    try {
+      const response = await fetch(new URL("/api/agi/ask", BASE_URL), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question: "health check", debug: false, temperature: 0 }),
+      });
+      if (response.status === 200) {
+        return;
+      }
+    } catch {
+      // ignore probe failures while waiting for readiness
+    }
+    await sleep(500);
+  }
   throw new Error(`server not ready at ${BASE_URL}`);
 };
 

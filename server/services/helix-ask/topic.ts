@@ -166,6 +166,8 @@ const PHYSICS_PATHS: RegExp[] = [
   /docs\/knowledge\/physics\//i,
   /docs\/knowledge\/warp\//i,
   /docs\/stellar-consciousness.*\.md/i,
+  /docs\/stellar-consciousness-ii\.md/i,
+  /docs\/stellar-consciousness-orch-or-review\.md/i,
   /docs\/papers(?:\/|\.md)/i,
   /docs\/knowledge\/stellar-restoration-tree\.json/i,
   /docs\/knowledge\/trees\/stellar-restoration-tree\.md/i,
@@ -475,6 +477,7 @@ const SECURITY_PATHS: RegExp[] = [
   /docs\/qi-guard-/i,
   /docs\/knowledge\/ethos\/no-bypass-guardrail\.md/i,
   /docs\/knowledge\/ethos\/metric-integrity-guardrail\.md/i,
+  /docs\/knowledge\/security-hull-guard-tree\.json/i,
 ];
 
 const SKILLS_PATHS: RegExp[] = [
@@ -777,6 +780,12 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
     allowlistTiers.push(SECURITY_PATHS);
     allowlistTiers.push([]);
     boostPaths.push(...SECURITY_PATHS);
+    mustIncludePaths.push(...SECURITY_PATHS);
+    mustIncludeFiles.push(
+      "docs/knowledge/security-hull-guard-tree.json",
+      "docs/knowledge/ethos/no-bypass-guardrail.md",
+      "docs/knowledge/ethos/metric-integrity-guardrail.md",
+    );
     minTierCandidates = Math.max(minTierCandidates, 2);
   }
 

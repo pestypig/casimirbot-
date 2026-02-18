@@ -5417,6 +5417,7 @@ function buildHelixAskSearchQueries(
     push("server/middleware/concurrency-guard.ts");
     push("docs/knowledge/ethos/no-bypass-guardrail.md");
     push("docs/knowledge/ethos/metric-integrity-guardrail.md");
+    push("docs/knowledge/security-hull-guard-tree.json");
     push("shared/hull-basis.ts");
   }
   if (hasTopic("queue") || hasTopic("jobs") || /queue|scheduler|orchestration/i.test(normalized)) {
@@ -11787,13 +11788,22 @@ const detectRepoAnswerQualityFloorReasons = (args: {
   const minChars = args.relationQuery
     ? HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS
     : HELIX_ASK_QUALITY_MIN_TEXT_CHARS;
+  const semanticFloorMinChars = Math.max(minChars, args.openWorldExplainer || args.securityRiskPrompt ? 260 : minChars);
   const enforceMinLength =
     args.enforceGlobalFloor ||
     args.intentDomain === "repo" ||
     args.intentDomain === "hybrid" ||
-    args.relationQuery;
-  if (enforceMinLength && normalized.length < minChars) {
+    args.relationQuery ||
+    Boolean(args.openWorldExplainer) ||
+    Boolean(args.securityRiskPrompt);
+  if (enforceMinLength && normalized.length < semanticFloorMinChars) {
     reasons.add("text_too_short");
+  }
+  const tokens = normalized.toLowerCase().split(/[^a-z0-9]+/).filter((token) => token.length >= 3);
+  const unique = new Set(tokens);
+  const semanticDensity = tokens.length > 0 ? unique.size / tokens.length : 0;
+  if ((args.openWorldExplainer || args.securityRiskPrompt) && semanticDensity < 0.42) {
+    reasons.add("semantic_density_low");
   }
   if (args.openWorldExplainer) {
     const claimCandidates = extractClaimCandidates(args.text, 8);
@@ -12393,7 +12403,7 @@ const renderHelixAskAnswerContract = (
 };
 
 const isOpenWorldExplainerQuestion = (question: string): boolean =>
-  /\b(how\s+does|how\s+can|why\s+does|why\s+can|explain|describe|produce|protect|prevent)\b/i.test(
+  /\b(how\s+does|how\s+can|why\s+does|why\s+can|what\s+are|what\s+is|is\s+life|explain|describe|produce|protect|prevent|inevitable|accident)\b/i.test(
     question,
   ) && !isImplementationQuestion(question);
 
@@ -12401,6 +12411,28 @@ const isSecurityRiskPrompt = (question: string): boolean =>
   /\b(hack|attack|fraud|scam|phish|phishing|steal|theft|financial|bank|identity|ransom|malware|exploit|protect itself)\b/i.test(
     question,
   );
+
+const classifyFallbackReason = (args: {
+  fallbackReason?: string | null;
+  failClosedReason?: string | null;
+  answerFallbackReason?: string | null;
+  answerShortFallbackReason?: string | null;
+  toolResultsFallbackReason?: string | null;
+  placeholderApplied?: boolean;
+  ambiguityApplied?: boolean;
+  qualityFloorReasons?: string[] | null;
+}): string => {
+  const base = String(args.fallbackReason ?? "").trim();
+  if (base) return base;
+  if (args.failClosedReason) return `fail_closed:${args.failClosedReason}`;
+  if (args.answerFallbackReason) return `answer_fallback:${args.answerFallbackReason}`;
+  if (args.answerShortFallbackReason) return `answer_short:${args.answerShortFallbackReason}`;
+  if (args.toolResultsFallbackReason) return `tool_results:${args.toolResultsFallbackReason}`;
+  if (args.placeholderApplied) return "quality_floor:placeholder_rewrite";
+  if (args.ambiguityApplied) return "clarify:ambiguity_gate";
+  if ((args.qualityFloorReasons ?? []).length > 0) return "quality_floor:enforced";
+  return "none";
+};
 
 const expandOpenWorldQualityFloor = (args: {
   text: string;
@@ -18598,7 +18630,8 @@ const executeHelixAsk = async ({
       }
       const openWorldClarifyBypass =
         !explicitRepoExpectation &&
-        repoExpectationLevel === "low" &&
+        !isSecurityRiskPrompt(baseQuestion) &&
+        (repoExpectationLevel === "low" || repoExpectationLevel === "medium") &&
         HELIX_ASK_OPEN_WORLD_EXPLAIN_RE.test(baseQuestion) &&
         HELIX_ASK_OPEN_WORLD_DOMAIN_RE.test(baseQuestion);
       const shouldApplyPreIntentClarify =
@@ -18675,6 +18708,16 @@ const executeHelixAsk = async ({
     }
     const isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
     const isIdeologyConversationalMode = isIdeologyReferenceIntent && ideologyConversationalMode;
+    const mandatorySecurityGuardrailRetrieval =
+      isSecurityRiskPrompt(baseQuestion) || topicTags.includes("security");
+    if (mandatorySecurityGuardrailRetrieval) {
+      requiresRepoEvidence = true;
+      hasRepoHints = true;
+      repoExpectationLevel = "high";
+      if (debugPayload) {
+        debugPayload.security_guardrail_retrieval_required = true;
+      }
+    }
     if (
       isIdeologyConversationalMode &&
       !blockScoped &&
@@ -23405,6 +23448,41 @@ const executeHelixAsk = async ({
         }
       }
 
+      const evidenceCardFloorEligible =
+        requiresRepoEvidence ||
+        intentDomain === "repo" ||
+        intentDomain === "hybrid" ||
+        isOpenWorldExplainerQuestion(baseQuestion) ||
+        isSecurityRiskPrompt(baseQuestion);
+      if (evidenceCardFloorEligible && !repoScaffold && !promptScaffold && !generalScaffold) {
+        const floorCitations = normalizeCitations([
+          ...contextFiles,
+          ...extractFilePathsFromText(contextText),
+          ...extractFilePathsFromText(promptContextText),
+          ...extractCitationTokensFromText(contextText),
+          ...extractCitationTokensFromText(promptContextText),
+          ...(topicProfile?.mustIncludeFiles ?? []),
+        ]);
+        const floorContract = sanitizeHelixAskAnswerContract(
+          buildDeterministicAnswerContractFallback({
+            question: baseQuestion,
+            format: formatSpec.format,
+            definitionFocus,
+            docBlocks,
+            codeAlignment,
+            evidenceText: appendEvidenceSources(contextText || promptContextText, contextFiles, 8, contextText),
+            allowedCitations: floorCitations,
+          }),
+          floorCitations,
+        );
+        repoScaffold = renderHelixAskAnswerContract(floorContract, formatSpec.format, baseQuestion).trim();
+        repoSynthesisPath = "deterministic";
+        if (debugPayload) {
+          debugPayload.evidence_cards_min_floor_applied = Boolean(repoScaffold);
+          debugPayload.evidence_cards_min_floor_citations = floorCitations.slice(0, 8);
+        }
+      }
+
       const llmSynthesisUsed =
         repoSynthesisPath === "llm" ||
         promptSynthesisPath === "llm" ||
@@ -26772,6 +26850,22 @@ const executeHelixAsk = async ({
           }
         }
       }
+      const contractCitationTokens = normalizeCitations([
+        ...allowedSourcePaths,
+        ...contextFiles,
+        ...extractFilePathsFromText(evidenceText),
+        ...extractCitationTokensFromText(evidenceText),
+        ...(topicProfile?.mustIncludeFiles ?? []),
+      ]);
+      if (contractCitationTokens.length > 0 && !hasSourcesLine(cleaned)) {
+        cleaned = `${cleaned}\n\nSources: ${contractCitationTokens.slice(0, 8).join(", ")}`.trim();
+        answerPath.push("citationContract:append_sources");
+        if (debugPayload) {
+          debugPayload.citation_contract_applied = true;
+          debugPayload.citation_contract_sources = contractCitationTokens.slice(0, 8);
+        }
+      }
+
       cleaned = enforceAtomicClaimTierNarration(cleaned, viewerLaunch);
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
@@ -26899,6 +26993,20 @@ const executeHelixAsk = async ({
         (debugPayload as Record<string, unknown>).helix_ask_fail_reason = null;
         (debugPayload as Record<string, unknown>).helix_ask_fail_class = null;
       }
+      const fallbackTaxonomy = classifyFallbackReason({
+        fallbackReason: debugPayload.fallback_reason,
+        failClosedReason,
+        answerFallbackReason: debugPayload.answer_fallback_reason,
+        answerShortFallbackReason: debugPayload.answer_short_fallback_reason,
+        toolResultsFallbackReason: debugPayload.tool_results_fallback_reason,
+        placeholderApplied: Boolean(debugPayload.placeholder_fallback_applied),
+        ambiguityApplied: Boolean(debugPayload.ambiguity_gate_applied),
+        qualityFloorReasons: Array.isArray(debugPayload.answer_quality_floor_reasons)
+          ? debugPayload.answer_quality_floor_reasons
+          : [],
+      });
+      debugPayload.fallback_reason = fallbackTaxonomy;
+      debugPayload.fallback_reason_taxonomy = fallbackTaxonomy;
     }
     const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
     logDebug("responder.send(200) start", {
