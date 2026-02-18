@@ -1,0 +1,23 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-031-warp-mechanics-provenance-claim-gate",
+  "files_changed": [
+    "tools/warpViability.ts",
+    "tools/warpViabilityCertificate.ts",
+    "tests/warp-viability.spec.ts",
+    "tests/warp-metric-adapter.spec.ts"
+  ],
+  "tests_run": [
+    "tests/warp-viability.spec.ts",
+    "tests/warp-metric-adapter.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:5604f9f5-ce86-4907-abb4-06cea330b668",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

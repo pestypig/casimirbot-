@@ -22,16 +22,16 @@
       "status": "covered_core"
     },
     "analysis-loops": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "atomic-systems": {
       "status": "covered_extension"
     },
     "brick-lattice-dataflow": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "casimir-tiles": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "certainty-framework": {
       "status": "unmapped"
@@ -43,10 +43,10 @@
       "status": "unmapped"
     },
     "dp-collapse": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "essence-luma-noise": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "ethos-knowledge": {
       "status": "unmapped"
@@ -58,7 +58,7 @@
       "status": "covered_core"
     },
     "hardware-telemetry": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "helix-ask": {
       "status": "covered_extension"
@@ -70,10 +70,10 @@
       "status": "unmapped"
     },
     "knowledge-ingestion": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "llm-runtime": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "math": {
       "status": "covered_core"
@@ -88,10 +88,10 @@
       "status": "covered_core"
     },
     "pipeline-ledger": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "queue-orchestration": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "resonance": {
       "status": "unmapped"
@@ -100,7 +100,7 @@
       "status": "covered_extension"
     },
     "sdk-integration": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "security-hull-guard": {
       "status": "covered_core"
@@ -109,7 +109,7 @@
       "status": "covered_extension"
     },
     "skills-tooling": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "star-materials-environment": {
       "status": "unmapped"
@@ -118,13 +118,13 @@
       "status": "unmapped"
     },
     "telemetry-console": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "trace-system": {
       "status": "covered_core"
     },
     "ui-backend-binding": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "ui-components": {
       "status": "unmapped"
@@ -133,7 +133,7 @@
       "status": "covered_core"
     },
     "warp-mechanics": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "zen-ladder-pack": {
       "status": "unmapped"

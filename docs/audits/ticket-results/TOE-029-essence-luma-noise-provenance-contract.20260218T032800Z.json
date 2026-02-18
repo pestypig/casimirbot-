@@ -1,20 +1,24 @@
 {
-  "ticket": "TOE-029-essence-luma-noise-provenance-contract",
-  "timestamp": "20260218T032800Z",
-  "status": "PASS",
-  "changes": [
-    "Added additive luma generation provenance/maturity helpers",
-    "Added luma route metadata enrichment endpoint and whispers provenance metadata",
-    "Extended luma tests for diagnostic fallback and deterministic additive metadata"
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-029-essence-luma-noise-provenance-contract",
+  "files_changed": [
+    "server/services/luma.ts",
+    "server/routes/luma.ts",
+    "server/routes/luma-whispers.ts",
+    "tests/luma-local.spec.ts",
+    "tests/luma-generate.spec.ts"
   ],
-  "verification": {
-    "vitest": "PASS",
-    "toeValidation": "PASS",
-    "casimirVerify": {
-      "verdict": "PASS",
-      "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
-      "integrityOk": true,
-      "status": "GREEN"
-    }
-  }
+  "tests_run": [
+    "tests/luma-local.spec.ts",
+    "tests/luma-generate.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:4fd14b0d-2698-43c9-8571-0929711a8b19",
+    "run_id": "19088",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
 }

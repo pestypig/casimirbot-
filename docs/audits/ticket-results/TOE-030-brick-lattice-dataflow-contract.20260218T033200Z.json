@@ -1,0 +1,26 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-030-brick-lattice-dataflow-contract",
+  "files_changed": [
+    "client/src/lib/lattice-frame.ts",
+    "client/src/lib/lattice-surface.ts",
+    "client/src/lib/lattice-sdf.ts",
+    "client/src/lib/lattice-frame.test.ts",
+    "client/src/lib/lattice-surface.test.ts",
+    "client/src/lib/lattice-sdf.test.ts"
+  ],
+  "tests_run": [
+    "client/src/lib/lattice-frame.test.ts",
+    "client/src/lib/lattice-surface.test.ts",
+    "client/src/lib/lattice-sdf.test.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:f3e683bd-c537-4df3-8cac-1818b1b53bb0",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}
