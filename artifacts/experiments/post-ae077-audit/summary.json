@@ -1,0 +1,49 @@
+{
+  "commit_requested": "ae07785054cdfe172de61aabe5e1d3ea524b7f1b",
+  "commit_evaluated": "UNRESOLVED_IN_LOCAL_REPO",
+  "generated_at": "2026-02-18T19:57:47.318127+00:00",
+  "run_config": {
+    "base": "http://127.0.0.1:5173",
+    "debug": true,
+    "seeds": [
+      7,
+      11,
+      13
+    ],
+    "temperature": 0.2,
+    "total_prompts": 26
+  },
+  "metrics": {
+    "total_runs": 78,
+    "status_200_rate": 1.0
+  },
+  "primary_stats": {
+    "life": {
+      "mean_len": 314
+    },
+    "security": {
+      "mean_len": 314
+    }
+  },
+  "required_retrieval_hits": {
+    "life": {
+      "docs/stellar-consciousness-orch-or-review.md": 0,
+      "docs/stellar-consciousness-ii.md": 0,
+      "docs/papers.md": 0,
+      "docs/knowledge/trees/stellar-restoration-tree.md": 0
+    },
+    "security": {
+      "docs/knowledge/security-hull-guard-tree.json": 0,
+      "docs/knowledge/ethos/no-bypass-guardrail.md": 0,
+      "docs/knowledge/ethos/metric-integrity-guardrail.md": 0
+    }
+  },
+  "failure_signatures": {
+    "mechanism_clarity_weak": 78,
+    "citation_missing": 78,
+    "readability_low": 78,
+    "placeholder_fallback": 69,
+    "novelty_low": 69,
+    "actionability_weak": 39
+  }
+}

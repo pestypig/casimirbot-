@@ -1,0 +1,20 @@
+{
+  "verdicts": {
+    "life": {
+      "before": "unknown (no baseline payload in this run)",
+      "after": "fail"
+    },
+    "security": {
+      "before": "unknown (no baseline payload in this run)",
+      "after": "fail"
+    }
+  },
+  "top_actions": [
+    "Eliminate fallback scaffold answer path for debug and non-debug routes.",
+    "Enforce retrieval citation mapping to required knowledge-tree paths for domain intents.",
+    "Increase mechanism-template depth for cosmology->abiogenesis->evolution chain.",
+    "Increase imperative, prioritized checklist rendering for security prompts.",
+    "Block tautological phrasing via lexical guardrail in answer finalizer."
+  ],
+  "decision": "not build-ready"
+}

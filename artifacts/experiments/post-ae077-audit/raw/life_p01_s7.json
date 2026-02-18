@@ -1,0 +1,1118 @@
+{
+  "topic": "life",
+  "prompt_index": 1,
+  "is_primary": false,
+  "prompt": "By what physical and chemical pathway can a lifeless universe give rise to living systems?",
+  "seed": 7,
+  "temperature": 0.2,
+  "request_ts": "2026-02-18T19:57:43.276025+00:00",
+  "latency_ms": 516.59,
+  "status": 200,
+  "payload": {
+    "prompt": "By what physical and chemical pathway can a lifeless universe give rise to living systems?",
+    "debug": true,
+    "seed": 7,
+    "temperature": 0.2
+  },
+  "response_json": {
+    "text": "Dependent systems make promises real; every public commitment is a dependency graph. Tags: systems, interdependence, coherence, dependencies.\n\nNo repo evidence was found for this system mapping; please point to the relevant files or modules.\n\nIn practice, those standards guide how evidence and justification are weighed in specific contexts.\n\nSources: docs/knowledge/ethos/interbeing-systems.md",
+    "envelope": {
+      "mode": "extended",
+      "tier": "F1",
+      "secondaryTier": "F0",
+      "answer": "Dependent systems make promises real; every public commitment is a dependency graph. Tags: systems, interdependence, coherence, dependencies.",
+      "sections": [
+        {
+          "title": "Details",
+          "body": "No repo evidence was found for this system mapping; please point to the relevant files or modules.",
+          "layer": "details",
+          "defaultOpen": true
+        },
+        {
+          "title": "In practice",
+          "body": "In practice, those standards guide how evidence and justification are weighed in specific contexts.",
+          "layer": "details",
+          "defaultOpen": true
+        },
+        {
+          "title": "Details",
+          "body": "Sources: docs/knowledge/ethos/interbeing-systems.md",
+          "citations": [
+            "docs/knowledge/ethos/interbeing-systems.md"
+          ],
+          "layer": "details",
+          "defaultOpen": true
+        },
+        {
+          "title": "Key files",
+          "body": "- docs/knowledge/ethos/interbeing-systems.md",
+          "citations": [
+            "docs/knowledge/ethos/interbeing-systems.md"
+          ],
+          "layer": "proof"
+        }
+      ]
+    },
+    "prompt_ingested": false,
+    "concept": {
+      "id": "interbeing-systems",
+      "label": "Interbeing Systems",
+      "source_path": "docs/knowledge/ethos/interbeing-systems.md",
+      "provenance_class": "inferred",
+      "claim_tier": "diagnostic",
+      "certifying": false
+    },
+    "claim_tier": "diagnostic",
+    "provenance_class": "inferred",
+    "certifying": false,
+    "debug": {
+      "two_pass": false,
+      "micro_pass": true,
+      "trace_id": "ask:4eaadd23-9bb2-4660-a91c-4f70e4144e95",
+      "tuning_enabled": false,
+      "fast_quality_mode": false,
+      "arbiter_repo_ratio": 0.45,
+      "arbiter_hybrid_ratio": 0.25,
+      "retry_topk_bonus": 4,
+      "format_enforcement": "strict",
+      "soft_expansion": 0,
+      "scaffold_tokens": 1024,
+      "evidence_tokens": 512,
+      "repair_tokens": 192,
+      "hypothesis_enabled": false,
+      "agent_loop_enabled": true,
+      "agent_loop_max_steps": 3,
+      "agent_loop_budget_ms": 120000,
+      "agent_action_budget_ms": 20000,
+      "clocka_tool_cap": 2,
+      "agent_loop_steps": 2,
+      "agent_loop_actions": [
+        {
+          "action": "expand_heading_aliases",
+          "reason": "doc_heading_seed_slots",
+          "expectedGain": "seed_slot_aliases",
+          "overBudget": false,
+          "ok": true,
+          "ts": "2026-02-18T19:57:42.773Z"
+        },
+        {
+          "action": "retrieve_docs_first",
+          "reason": "docs_first_scope",
+          "expectedGain": "prioritize_docs",
+          "overBudget": false,
+          "ok": true,
+          "ts": "2026-02-18T19:57:42.779Z"
+        },
+        {
+          "action": "slot_local_retry",
+          "reason": "slot_missing",
+          "expectedGain": "recover_missing_slots",
+          "observedDelta": "slots:0->0; evidence:fail->fail",
+          "durationMs": 21,
+          "overBudget": false,
+          "ok": true,
+          "ts": "2026-02-18T19:57:42.962Z"
+        }
+      ],
+      "agent_stop_reason": "clocka_tool_cap",
+      "agent_action_counts": {
+        "expand_heading_aliases": 1,
+        "retrieve_docs_first": 1,
+        "slot_local_retry": 1
+      },
+      "agent_attempts": [
+        "expand_heading_aliases",
+        "retrieve_docs_first",
+        "slot_local_retry"
+      ],
+      "single_llm": true,
+      "definition_focus": false,
+      "block_scoped": false,
+      "report_mode": false,
+      "report_mode_reason": "ideology_chat_mode",
+      "report_blocks_count": 0,
+      "slot_plan_pass_used": false,
+      "session_memory_used": false,
+      "concept_id": "interbeing-systems",
+      "concept_label": "Interbeing Systems",
+      "concept_source": "docs/knowledge/ethos/interbeing-systems.md",
+      "explicit_repo_expectation": false,
+      "repo_expectation_score": 2,
+      "repo_expectation_level": "medium",
+      "repo_expectation_signals": [
+        "concept_match"
+      ],
+      "ambiguity_resolver_applied": true,
+      "ambiguity_resolver_reason": "short_prompt_low_signal",
+      "ambiguity_resolver_token_count": 0,
+      "ambiguity_resolver_short_prompt": false,
+      "ambiguity_resolver_top_score": 24,
+      "ambiguity_resolver_margin": 0,
+      "slot_dominance_margin": 0,
+      "ambiguity_resolver_candidates": [
+        "Interbeing Systems",
+        "interbeing-systems",
+        "Definition: Dependent systems make promises real; every public commitment is a dependency graph"
+      ],
+      "format": "brief",
+      "stage_tags": false,
+      "verbosity": "extended",
+      "intent_id": "hybrid.concept_plus_system_mapping",
+      "intent_domain": "hybrid",
+      "intent_tier": "F1",
+      "intent_secondary_tier": "F0",
+      "intent_strategy": "hybrid_explain",
+      "intent_reason": "empty|obligation:repo_required|arbiter:clarify|topic_gate:missing_core",
+      "is_repo_question": true,
+      "scientific_response_applied": true,
+      "next_evidence_count": 4,
+      "next_evidence_coverage": 1,
+      "hypothesis_count": 0,
+      "hypothesis_rate": 0,
+      "clarify_triggered": true,
+      "fallback_reason": "ambiguity_clarify",
+      "ambiguity_clarify_rate": 1,
+      "topic_tags": [
+        "ideology"
+      ],
+      "topic_allowlist_tiers": 3,
+      "topic_must_include_files": [
+        "docs/ethos/ideology.json",
+        "docs/ethos/why.md"
+      ],
+      "graph_pack_skip_reason": "concept_fast_path",
+      "concept_fast_path": true,
+      "concept_fast_path_reason": "hybrid.concept_plus_system_mapping",
+      "concept_fast_path_source": "docs/knowledge/ethos/interbeing-systems.md",
+      "verification_anchor_required": false,
+      "context_deferred": true,
+      "micro_pass_enabled": true,
+      "fast_quality_plan_pass_suppressed": false,
+      "plan_pass_used": true,
+      "plan_pass_forced": true,
+      "micro_pass_reason": "concept_fast_path",
+      "slot_tiers": [
+        {
+          "id": "interbeing-systems",
+          "label": "Interbeing Systems",
+          "source": "concept",
+          "required": true,
+          "tier": "A"
+        },
+        {
+          "id": "units-systems",
+          "label": "units-systems",
+          "source": "concept",
+          "required": true,
+          "tier": "A"
+        },
+        {
+          "id": "access-to-counsel-pathway",
+          "label": "Access-to-Counsel Pathway",
+          "source": "concept",
+          "required": true,
+          "tier": "A"
+        },
+        {
+          "id": "fundamental-constants",
+          "label": "fundamental-constants",
+          "source": "concept",
+          "required": true,
+          "tier": "A"
+        }
+      ],
+      "slot_tier_counts": {
+        "A": 4,
+        "B": 0,
+        "C": 0
+      },
+      "slot_plan": [
+        {
+          "id": "interbeing-systems",
+          "label": "Interbeing Systems",
+          "required": true,
+          "source": "concept",
+          "weak": false,
+          "surfaces": [
+            "knowledge",
+            "docs",
+            "ethos"
+          ],
+          "aliases": [
+            "Interbeing Systems",
+            "interbeing-systems",
+            "interbeing systems",
+            "Definition: Dependent systems make promises real; every public commitment is a dependency graph",
+            "ideology",
+            "Overview"
+          ],
+          "evidence_criteria": []
+        },
+        {
+          "id": "units-systems",
+          "label": "units-systems",
+          "required": true,
+          "source": "concept",
+          "weak": false,
+          "surfaces": [
+            "knowledge",
+            "docs",
+            "code"
+          ],
+          "aliases": [
+            "SI units",
+            "geometrized units",
+            "natural units",
+            "units systems",
+            "Overview",
+            "Definition: Units systems define how length, time, mass, and energy are measured and converted; this repo uses geometrized units internally "
+          ],
+          "evidence_criteria": []
+        },
+        {
+          "id": "access-to-counsel-pathway",
+          "label": "Access-to-Counsel Pathway",
+          "required": true,
+          "source": "concept",
+          "weak": false,
+          "surfaces": [
+            "knowledge",
+            "docs",
+            "ethos"
+          ],
+          "aliases": [
+            "Access-to-Counsel Pathway",
+            "access-to-counsel-pathway",
+            "access to counsel pathway",
+            "Definition: Rights with access: counsel, language support, and clear timelines",
+            "ideology",
+            "Overview"
+          ],
+          "evidence_criteria": []
+        },
+        {
+          "id": "fundamental-constants",
+          "label": "fundamental-constants",
+          "required": true,
+          "source": "concept",
+          "weak": false,
+          "surfaces": [
+            "knowledge",
+            "docs",
+            "code"
+          ],
+          "aliases": [
+            "physical constants",
+            "c G hbar kB",
+            "speed of light",
+            "planck constant",
+            "fundamental constants",
+            "Overview"
+          ],
+          "evidence_criteria": []
+        }
+      ],
+      "slot_count": 4,
+      "slot_required_count": 4,
+      "hard_required_slots": [
+        "interbeing-systems",
+        "units-systems",
+        "access-to-counsel-pathway",
+        "fundamental-constants"
+      ],
+      "hard_required_slot_count": 4,
+      "coverage_slots_source": "concept",
+      "queries": [
+        "docs/knowledge/ethos/interbeing-systems.md",
+        "docs/ethos/ideology.json",
+        "docs/ethos/why.md",
+        "units-systems",
+        "fundamental-constants",
+        "units systems",
+        "SI units",
+        "geometrized units",
+        "natural units",
+        "math stage",
+        "physics constants",
+        "unitssystems"
+      ],
+      "docs_first_enabled": true,
+      "plan_scope_allowlist_tiers": 1,
+      "plan_scope_avoidlist": 0,
+      "plan_scope_must_include": 0,
+      "docs_first_used": true,
+      "docs_first_ok": true,
+      "doc_header_injected": 3,
+      "compaction_applied": false,
+      "compaction_dropped": 0,
+      "compaction_kept": 3,
+      "compaction_policy": "definition->policy->entrypoint->tests",
+      "compaction_budget": {
+        "maxBlocks": 12,
+        "maxBytes": 18000,
+        "maxPerFile": 2
+      },
+      "proof_span_rate": 1,
+      "slot_doc_coverage_rate": 1,
+      "docs_first_evidence_cards": 4,
+      "docs_first_min_cards": 4,
+      "slot_evidence": [
+        {
+          "id": "interbeing-systems",
+          "label": "Interbeing Systems",
+          "doc_card_count": 3,
+          "alias_card_count": 3,
+          "evidence_gate_ok": false,
+          "coverage_ratio": 1,
+          "missing_slots": []
+        },
+        {
+          "id": "units-systems",
+          "label": "units-systems",
+          "doc_card_count": 2,
+          "alias_card_count": 2,
+          "evidence_gate_ok": false,
+          "coverage_ratio": 1,
+          "missing_slots": []
+        },
+        {
+          "id": "access-to-counsel-pathway",
+          "label": "Access-to-Counsel Pathway",
+          "doc_card_count": 3,
+          "alias_card_count": 3,
+          "evidence_gate_ok": false,
+          "coverage_ratio": 1,
+          "missing_slots": []
+        },
+        {
+          "id": "fundamental-constants",
+          "label": "fundamental-constants",
+          "doc_card_count": 2,
+          "alias_card_count": 2,
+          "evidence_gate_ok": false,
+          "coverage_ratio": 1,
+          "missing_slots": []
+        }
+      ],
+      "slot_doc_hit_rate": 1,
+      "slot_alias_coverage_rate": 1,
+      "context_files": [
+        "docs/knowledge/ethos/interbeing-systems.md"
+      ],
+      "context_files_count": 4,
+      "topic_tier": 1,
+      "topic_must_include_ok": true,
+      "repo_search_terms": [
+        "interbeing-systems"
+      ],
+      "repo_search_paths": [
+        "docs/ethos",
+        "docs/knowledge/ethos",
+        "server/services/ideology",
+        "shared/ideology",
+        "docs/ethos/ideology.json",
+        "docs/ethos/why.md"
+      ],
+      "repo_search_reason": "evidence_gate_fail",
+      "repo_search_explicit": false,
+      "repo_search_hits": 20,
+      "repo_search_truncated": false,
+      "viability_must_include_ok": true,
+      "verification_anchor_ok": true,
+      "plan_must_include_ok": true,
+      "evidence_gate_ok": false,
+      "evidence_match_ratio": 1,
+      "evidence_match_count": 4,
+      "evidence_token_count": 4,
+      "evidence_core_required": true,
+      "evidence_core_ok": false,
+      "evidence_core_match_ratio": 0,
+      "evidence_core_match_count": 0,
+      "evidence_core_token_count": 0,
+      "evidence_use_question_tokens": true,
+      "evidence_signal_tokens": [
+        "ideology",
+        "interbeing-systems",
+        "Interbeing Systems"
+      ],
+      "evidence_tokens_preview": [
+        "ideology",
+        "interbeing-systems",
+        "interbeing",
+        "systems"
+      ],
+      "evidence_match_preview": [
+        "ideology",
+        "interbeing-systems",
+        "interbeing",
+        "systems"
+      ],
+      "retrieval_confidence": 0,
+      "retrieval_doc_share": 0.75,
+      "retrieval_doc_hits": 3,
+      "retrieval_context_file_count": 4,
+      "retrieval_query_hit_count": 3,
+      "retrieval_top_score": 0.02459016393442623,
+      "retrieval_score_gap": 0,
+      "retrieval_channel_hits": {
+        "lexical": 0,
+        "symbol": 0,
+        "fuzzy": 0,
+        "path": 3
+      },
+      "retrieval_channel_top_scores": {
+        "lexical": 0,
+        "symbol": 0,
+        "fuzzy": 0,
+        "path": 46
+      },
+      "retrieval_channel_weights": {
+        "lexical": 0.5,
+        "symbol": 0.4,
+        "fuzzy": 0.3,
+        "path": 1.5
+      },
+      "slot_coverage_required": [],
+      "slot_coverage_missing": [],
+      "slot_coverage_ratio": 1,
+      "slot_coverage_ok": true,
+      "coverage_slots_required": [
+        "interbeing-systems",
+        "units-systems",
+        "access-to-counsel-pathway",
+        "fundamental-constants"
+      ],
+      "coverage_slots_covered": [
+        "interbeing-systems",
+        "access-to-counsel-pathway"
+      ],
+      "coverage_slots_missing": [
+        "units-systems",
+        "fundamental-constants"
+      ],
+      "coverage_slots_ratio": 0.5,
+      "docs_first_slot_covered": [
+        "interbeing-systems",
+        "units-systems",
+        "access-to-counsel-pathway",
+        "fundamental-constants"
+      ],
+      "docs_first_slot_missing": [],
+      "docs_first_slot_ratio": 1,
+      "controller_steps": [
+        {
+          "step": "initial",
+          "evidenceOk": false,
+          "slotCoverageOk": true,
+          "docCoverageOk": true,
+          "missingSlots": [
+            "units-systems",
+            "fundamental-constants"
+          ],
+          "retrievalConfidence": 0
+        },
+        {
+          "step": "retry",
+          "action": "applied",
+          "reason": "slot_missing",
+          "evidenceOk": false,
+          "slotCoverageOk": true,
+          "docCoverageOk": true,
+          "missingSlots": [
+            "units-systems",
+            "fundamental-constants"
+          ],
+          "retrievalConfidence": 0
+        }
+      ],
+      "controller_attempts": 2,
+      "controller_stop_reason": "clocka_tool_cap",
+      "definition_doc_required": false,
+      "definition_doc_ok": true,
+      "definition_doc_blocks": 3,
+      "arbiter_mode": "clarify",
+      "arbiter_reason": "expect_repo_weak_evidence",
+      "arbiter_strictness": "med",
+      "arbiter_user_expects_repo": true,
+      "requires_repo_evidence": true,
+      "arbiter_repo_ok": false,
+      "arbiter_hybrid_ok": false,
+      "arbiter_ratio": 0,
+      "arbiter_topic_ok": true,
+      "arbiter_concept_match": true,
+      "runtime_budget_level": "OVER",
+      "runtime_budget_recommend": "reduce_output_tokens",
+      "runtime_budget_signals": {
+        "clockA_p95_ms": 202,
+        "tool_calls_last_tick": 2,
+        "kv_tokens": 0,
+        "queue_depth": 0,
+        "lane_pressure": {
+          "llm": 0.505,
+          "io": 0,
+          "media": 0.7317073170731707,
+          "physics": 0,
+          "perception": 0
+        }
+      },
+      "graph_node_acceptance_rate": 0,
+      "graph_node_acceptance_total": 0,
+      "graph_node_acceptance_rejected": 0,
+      "graph_node_acceptance_missing": [],
+      "code_alignment_applied": true,
+      "code_alignment_symbols": [
+        "Interbeing",
+        "Systems",
+        "Heading",
+        "Mission",
+        "Ethos",
+        "Seeds"
+      ],
+      "code_alignment_resolved": [
+        "client/src/components/MissionEthosSourcePanel.tsx",
+        "tests/essence-mix.spec.ts",
+        "client/src/components/MissionEthosSourcePanel.tsx",
+        "client/src/lib/whispers/seedWhispers-ethos.ts",
+        "tests/hce-core.spec.ts"
+      ],
+      "code_spans_added": 5,
+      "prompt_items": [
+        {
+          "type": "intent",
+          "hash": "c9b5dfaa6a88",
+          "size": 63
+        },
+        {
+          "type": "retrieval_summary",
+          "hash": "39b2a2bfd1df",
+          "size": 171
+        },
+        {
+          "type": "doc_spans",
+          "hash": "2f0c51501715",
+          "size": 146
+        },
+        {
+          "type": "code_spans",
+          "hash": "114eb5459674",
+          "size": 314
+        },
+        {
+          "type": "slot_coverage",
+          "hash": "abcdf2fe5b82",
+          "size": 95
+        }
+      ],
+      "prompt_item_count": 5,
+      "tool_results_block": "TOOL_RESULTS\n[retrieval_summary]\nqueries: docs/knowledge/ethos/interbeing-systems.md; Interbeing Systems; interbeing-systems; ideology; version: 1,; units-systems; units systems; SI units\nconfidence: 0.00\n\n[doc_spans]\n- Doc: ideology (docs/ethos/ideology.json)\n- Title: Interbeing Systems (docs/knowledge/ethos/interbeing-systems.md)\n- Doc: why (docs/ethos/why.md)\n\n[code_spans]\n- Mission Span: L1-L5 (client/src/components/MissionEthosSourcePanel.tsx)\n- Mission Span: L73-L77 (tests/essence-mix.spec.ts)\n- Ethos Span: L1-L5 (client/src/components/MissionEthosSourcePanel.tsx)\n- Seeds Span: L52-L56 (client/src/lib/whispers/seedWhispers-ethos.ts)\n- Seeds Span: L77-L81 (tests/hce-core.spec.ts)\n\nEND_TOOL_RESULTS",
+      "tool_results_present": true,
+      "tool_results_items": [
+        "retrieval_summary",
+        "doc_spans",
+        "code_spans"
+      ],
+      "tool_results_hash": "4669d8c4f952",
+      "synthesis_mode": "concept_scaffold",
+      "synthesis_mode_reasons": [
+        "single_llm",
+        "hybrid_route",
+        "fail_closed_repo_evidence"
+      ],
+      "synthesis_reason": "mode=concept_scaffold | repo=concept | prompt=none | general=none | repo_scaffold=yes | prompt_scaffold=no | general_scaffold=yes",
+      "synthesis_repo_path": "concept",
+      "synthesis_prompt_path": "none",
+      "synthesis_general_path": "none",
+      "evidence_cards": "General reasoning:\n- Definition: Dependent systems make promises real; every public commitment is a dependency graph.\n- Notes: Tags: systems, interdependence, coherence, dependencies.\n- Scope: \"ideology\"\n\nRepo evidence:\n- Definition: Dependent systems make promises real; every public commitment is a dependency graph.\n- Notes: Tags: systems, interdependence, coherence, dependencies.\n- Scope: \"ideology\"\n\nSources: docs/knowledge/ethos/interbeing-systems.md",
+      "answer_short_sentences": 4,
+      "answer_short_tokens": 86,
+      "answer_raw_text": "Dependent systems make promises real; every public commitment is a dependency graph. Tags: systems, interdependence, coherence, dependencies.\n\nNo repo evidence was found for this system mapping; please point to the relevant files or modules.\n\nIn practice, those standards guide how evidence and justification are weighed in specific contexts.",
+      "answer_contract_applied": false,
+      "answer_after_format": "Dependent systems make promises real; every public commitment is a dependency graph. Tags: systems, interdependence, coherence, dependencies.\n\nNo repo evidence was found for this system mapping; please point to the relevant files or modules.\n\nIn practice, those standards guide how evidence and justification are weighed in specific contexts.",
+      "claim_ref_rate": 1,
+      "answer_after_fallback": "Dependent systems make promises real; every public commitment is a dependency graph. Tags: systems, interdependence, coherence, dependencies.\n\nNo repo evidence was found for this system mapping; please point to the relevant files or modules.\n\nIn practice, those standards guide how evidence and justification are weighed in specific contexts.\n\nSources: docs/knowledge/ethos/interbeing-systems.md",
+      "junk_clean_applied": false,
+      "junk_clean_reasons": [],
+      "concept_lint_applied": false,
+      "concept_lint_reasons": [],
+      "physics_lint_applied": false,
+      "physics_lint_reasons": [],
+      "drift_repair_applied": false,
+      "drift_repair_attempts": 0,
+      "drift_repair_improved": false,
+      "coverage_token_count": 0,
+      "coverage_key_count": 4,
+      "coverage_missing_key_count": 2,
+      "coverage_ratio": 0.5,
+      "coverage_missing_keys": [
+        "units-systems",
+        "fundamental-constants"
+      ],
+      "coverage_gate_applied": false,
+      "claim_ledger": [
+        {
+          "id": "claim:1",
+          "type": "fact",
+          "supported": false,
+          "evidence_refs": [
+            "docs/knowledge/ethos/interbeing-systems.md"
+          ],
+          "proof": "source:docs/knowledge/ethos/interbeing-systems.md -> cite -> claim:1"
+        },
+        {
+          "id": "claim:2",
+          "type": "fact",
+          "supported": false,
+          "evidence_refs": [
+            "docs/knowledge/ethos/interbeing-systems.md"
+          ],
+          "proof": "source:docs/knowledge/ethos/interbeing-systems.md -> cite -> claim:2"
+        },
+        {
+          "id": "claim:3",
+          "type": "fact",
+          "supported": false,
+          "evidence_refs": [
+            "docs/knowledge/ethos/interbeing-systems.md"
+          ],
+          "proof": "source:docs/knowledge/ethos/interbeing-systems.md -> cite -> claim:3"
+        },
+        {
+          "id": "claim:4",
+          "type": "fact",
+          "supported": false,
+          "evidence_refs": [
+            "docs/knowledge/ethos/interbeing-systems.md"
+          ],
+          "proof": "source:docs/knowledge/ethos/interbeing-systems.md -> cite -> claim:4"
+        },
+        {
+          "id": "claim:5",
+          "type": "inference",
+          "supported": false,
+          "evidence_refs": [
+            "docs/knowledge/ethos/interbeing-systems.md"
+          ],
+          "proof": "source:docs/knowledge/ethos/interbeing-systems.md -> cite -> claim:5"
+        }
+      ],
+      "uncertainty_register": [
+        {
+          "id": "claim:1",
+          "type": "fact",
+          "reason": "missing_evidence"
+        },
+        {
+          "id": "claim:2",
+          "type": "fact",
+          "reason": "missing_evidence"
+        },
+        {
+          "id": "claim:3",
+          "type": "fact",
+          "reason": "missing_evidence"
+        },
+        {
+          "id": "claim:4",
+          "type": "fact",
+          "reason": "missing_evidence"
+        },
+        {
+          "id": "claim:5",
+          "type": "inference",
+          "reason": "missing_evidence"
+        }
+      ],
+      "constraint_matrix": {
+        "section_count": 4,
+        "constraints": [
+          {
+            "id": "citations_required",
+            "satisfied": true,
+            "detail": "citations=1"
+          }
+        ]
+      },
+      "belief_claim_count": 5,
+      "belief_supported_count": 0,
+      "belief_unsupported_count": 5,
+      "belief_unsupported_rate": 1,
+      "belief_contradictions": 0,
+      "belief_gate_applied": false,
+      "belief_graph_node_count": 6,
+      "belief_graph_edge_count": 5,
+      "belief_graph_claim_count": 5,
+      "belief_graph_definition_count": 2,
+      "belief_graph_conclusion_count": 1,
+      "belief_graph_evidence_ref_count": 1,
+      "belief_graph_constraint_count": 0,
+      "belief_graph_supports": 0,
+      "belief_graph_contradicts": 0,
+      "belief_graph_depends_on": 0,
+      "belief_graph_maps_to": 5,
+      "belief_graph_claim_ids": [
+        "claim:1",
+        "claim:2",
+        "claim:3",
+        "claim:4",
+        "claim:5"
+      ],
+      "belief_graph_unsupported_claim_ids": [
+        "claim:1",
+        "claim:2",
+        "claim:3",
+        "claim:4",
+        "claim:5"
+      ],
+      "belief_graph_contradiction_ids": [],
+      "rattling_score": 0.4772727272727273,
+      "rattling_gate_applied": false,
+      "grounded_sentence_rate": 0.2,
+      "tree_citation_share": 0,
+      "tree_citation_total": 1,
+      "tree_citation_tree": 0,
+      "tree_citation_non_tree": 1,
+      "clarify_precision": 1,
+      "rattling_base_distance": 0.4772727272727273,
+      "rattling_perturbation_distance": 0.33333333333333337,
+      "rattling_claim_set_count": 3,
+      "gates": {
+        "evidence": {
+          "ok": false,
+          "matchCount": 4,
+          "tokenCount": 4,
+          "matchRatio": 1
+        },
+        "coverage": {
+          "applied": false,
+          "ratio": 0.5,
+          "tokenCount": 0,
+          "keyCount": 4,
+          "missingKeyCount": 2,
+          "missingKeys": [
+            "units-systems",
+            "fundamental-constants"
+          ]
+        },
+        "belief": {
+          "applied": false,
+          "unsupportedRate": 1,
+          "unsupportedCount": 5,
+          "supportedCount": 0,
+          "claimCount": 5,
+          "contradictions": 0
+        },
+        "beliefGraph": {
+          "nodeCount": 6,
+          "edgeCount": 5,
+          "claimCount": 5,
+          "definitionCount": 2,
+          "conclusionCount": 1,
+          "evidenceRefCount": 1,
+          "constraintCount": 0,
+          "supports": 0,
+          "contradicts": 0,
+          "dependsOn": 0,
+          "mapsTo": 5
+        },
+        "rattling": {
+          "applied": false,
+          "score": 0.4772727272727273,
+          "baseDistance": 0.4772727272727273,
+          "perturbationDistance": 0.33333333333333337,
+          "claimSetCount": 3
+        },
+        "lint": {
+          "conceptApplied": false,
+          "conceptReasons": [],
+          "physicsApplied": false,
+          "physicsReasons": []
+        },
+        "variant": {},
+        "ambiguity": {
+          "resolverApplied": true,
+          "resolverReason": "short_prompt_low_signal",
+          "resolverTokenCount": 0,
+          "resolverShortPrompt": false,
+          "resolverTopScore": 24,
+          "resolverMargin": 0,
+          "resolverCandidates": [
+            "Interbeing Systems",
+            "interbeing-systems",
+            "Definition: Dependent systems make promises real; every public commitment is a dependency graph"
+          ]
+        }
+      },
+      "answer_path": [
+        "concept_fast_path:preintent",
+        "intent:hybrid.concept_plus_system_mapping",
+        "domain:hybrid",
+        "strategy:hybrid_explain",
+        "clarify:pre_intent",
+        "concept_fast_path",
+        "arbiter:clarify",
+        "answer:forced",
+        "citationRepair:skipped(intent)",
+        "citationFallback:sources",
+        "platonic:gates",
+        "citationPersistence:preserved"
+      ],
+      "citation_persistence_guard_applied": true,
+      "citation_persistence_sources": [
+        "docs/knowledge/ethos/interbeing-systems.md",
+        "docs/ethos/ideology.json"
+      ],
+      "citation_persistence_appended": false,
+      "answer_final_text": "Dependent systems make promises real; every public commitment is a dependency graph. Tags: systems, interdependence, coherence, dependencies.\n\nNo repo evidence was found for this system mapping; please point to the relevant files or modules.\n\nIn practice, those standards guide how evidence and justification are weighed in specific contexts.\n\nSources: docs/knowledge/ethos/interbeing-systems.md",
+      "answer_extension_available": false,
+      "answer_extension_items": 0,
+      "answer_extension_doc_items": 0,
+      "answer_extension_code_items": 0,
+      "answer_extension_appended": false,
+      "live_events": [
+        {
+          "ts": "2026-02-18T19:57:42.778Z",
+          "tool": "helix.ask.progress",
+          "stage": "Concept card ready",
+          "detail": "interbeing-systems",
+          "durationMs": 0,
+          "text": "Helix Ask: Concept card ready - interbeing-systems",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.778Z",
+          "tool": "helix.ask.progress",
+          "stage": "Query hints ready",
+          "detail": "skipped",
+          "durationMs": 0,
+          "text": "Helix Ask: Query hints ready - skipped",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.779Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: Retrieval - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.791Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval",
+          "detail": "done",
+          "ok": true,
+          "durationMs": 12,
+          "text": "Helix Ask: Retrieval - done",
+          "meta": {
+            "elapsedMs": 12
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.895Z",
+          "tool": "helix.ask.progress",
+          "stage": "Context ready",
+          "detail": "4 files",
+          "durationMs": 116,
+          "text": "Helix Ask: Context ready - 4 files",
+          "meta": {
+            "elapsedMs": 116
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.941Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval retry",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: Retrieval retry - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.962Z",
+          "tool": "helix.ask.progress",
+          "stage": "Context retry ready",
+          "detail": "3 files",
+          "durationMs": 21,
+          "text": "Helix Ask: Context retry ready - 3 files",
+          "meta": {
+            "elapsedMs": 21
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.962Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval retry",
+          "detail": "done",
+          "ok": true,
+          "durationMs": 21,
+          "text": "Helix Ask: Retrieval retry - done",
+          "meta": {
+            "elapsedMs": 21
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:43.260Z",
+          "tool": "helix.ask.progress",
+          "stage": "Evidence cards ready",
+          "detail": "concept",
+          "durationMs": 0,
+          "text": "Helix Ask: Evidence cards ready - concept",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:43.263Z",
+          "tool": "helix.ask.progress",
+          "stage": "Generating answer",
+          "durationMs": 0,
+          "text": "Helix Ask: Generating answer"
+        },
+        {
+          "ts": "2026-02-18T19:57:43.263Z",
+          "tool": "helix.ask.progress",
+          "stage": "Answer ready",
+          "detail": "concept",
+          "durationMs": 0,
+          "text": "Helix Ask: Answer ready - concept",
+          "meta": {
+            "elapsedMs": 0
+          }
+        }
+      ],
+      "trace_events": [
+        {
+          "ts": "2026-02-18T19:57:42.778Z",
+          "tool": "helix.ask.progress",
+          "stage": "Concept card ready",
+          "detail": "interbeing-systems",
+          "durationMs": 0,
+          "text": "Helix Ask: Concept card ready - interbeing-systems",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.778Z",
+          "tool": "helix.ask.progress",
+          "stage": "Query hints ready",
+          "detail": "skipped",
+          "durationMs": 0,
+          "text": "Helix Ask: Query hints ready - skipped",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.779Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: Retrieval - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.791Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval",
+          "detail": "done",
+          "ok": true,
+          "durationMs": 12,
+          "text": "Helix Ask: Retrieval - done",
+          "meta": {
+            "elapsedMs": 12
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.895Z",
+          "tool": "helix.ask.progress",
+          "stage": "Context ready",
+          "detail": "4 files",
+          "durationMs": 116,
+          "text": "Helix Ask: Context ready - 4 files",
+          "meta": {
+            "elapsedMs": 116
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.941Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval retry",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: Retrieval retry - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.962Z",
+          "tool": "helix.ask.progress",
+          "stage": "Context retry ready",
+          "detail": "3 files",
+          "durationMs": 21,
+          "text": "Helix Ask: Context retry ready - 3 files",
+          "meta": {
+            "elapsedMs": 21
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:42.962Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval retry",
+          "detail": "done",
+          "ok": true,
+          "durationMs": 21,
+          "text": "Helix Ask: Retrieval retry - done",
+          "meta": {
+            "elapsedMs": 21
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:43.260Z",
+          "tool": "helix.ask.progress",
+          "stage": "Evidence cards ready",
+          "detail": "concept",
+          "durationMs": 0,
+          "text": "Helix Ask: Evidence cards ready - concept",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:43.263Z",
+          "tool": "helix.ask.progress",
+          "stage": "Generating answer",
+          "durationMs": 0,
+          "text": "Helix Ask: Generating answer"
+        },
+        {
+          "ts": "2026-02-18T19:57:43.263Z",
+          "tool": "helix.ask.progress",
+          "stage": "Answer ready",
+          "detail": "concept",
+          "durationMs": 0,
+          "text": "Helix Ask: Answer ready - concept",
+          "meta": {
+            "elapsedMs": 0
+          }
+        }
+      ],
+      "trace_summary": [],
+      "helix_ask_fail_reason": null,
+      "helix_ask_fail_class": null
+    }
+  }
+}
