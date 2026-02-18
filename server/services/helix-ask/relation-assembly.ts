@@ -15,7 +15,9 @@ export type RelationAssemblyEvidence = {
 export type RelationAssemblyPacket = {
   question: string;
   domains: string[];
-  fail_reason?: "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING";
+  fail_reason?:
+    | "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING"
+    | "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY";
   definitions: {
     warp_definition: string;
     ethos_definition: string;
@@ -72,8 +74,6 @@ const buildEvidenceId = (path: string, span: string): string => {
 
 const toCitation = (path: string, span: string): string => `${path}${span ? `#${span}` : ""}`;
 
-
-
 type BridgeEvidenceContract = {
   provenance_class?: "measured" | "proxy" | "inferred";
   claim_tier?: "diagnostic" | "reduced-order" | "certified";
@@ -82,6 +82,13 @@ type BridgeEvidenceContract = {
 
 const isBridgeEvidenceContractComplete = (entry: BridgeEvidenceContract): boolean =>
   Boolean(entry.provenance_class && entry.claim_tier && typeof entry.certifying === "boolean");
+
+const hasBridgeEvidenceContractContradiction = (entry: BridgeEvidenceContract): boolean => {
+  if (!isBridgeEvidenceContractComplete(entry)) return false;
+  if (entry.certifying === true && entry.claim_tier !== "certified") return true;
+  if (entry.certifying === true && entry.provenance_class !== "measured") return true;
+  return false;
+};
 
 const firstSentence = (text: string, fallback: string): string => {
   const first = text.split(/(?<=[.!?])\s+/)[0] ?? "";
@@ -211,6 +218,9 @@ export function buildRelationAssemblyPacket(args: {
   const hasBridgeEvidenceMetadataGap = Array.from(graphEvidenceContract.values()).some(
     (entry) => !isBridgeEvidenceContractComplete(entry),
   );
+  const hasBridgeEvidenceContractContradictionAny = Array.from(graphEvidenceContract.values()).some((entry) =>
+    hasBridgeEvidenceContractContradiction(entry),
+  );
 
   return {
     question: args.question,
@@ -218,7 +228,9 @@ export function buildRelationAssemblyPacket(args: {
     fail_reason:
       strictBridgeEvidence && hasBridgeEvidenceMetadataGap
         ? "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING"
-        : undefined,
+        : strictBridgeEvidence && hasBridgeEvidenceContractContradictionAny
+          ? "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY"
+          : undefined,
     definitions: {
       warp_definition: warpDefinition,
       ethos_definition: ethosDefinition,

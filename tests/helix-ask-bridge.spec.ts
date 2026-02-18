@@ -91,7 +91,6 @@ describe("Helix Ask bridge nodes", () => {
         ).toBe(true);
       }
 
-
       const hasContractMetadata = evidence.some(
         (entry) => entry.provenance_class || entry.claim_tier || typeof entry.certifying === "boolean",
       );
@@ -149,6 +148,55 @@ describe("Helix Ask bridge nodes", () => {
     });
 
     expect(packet.fail_reason).toBe("IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING");
+  });
+
+  it("returns deterministic strict bridge fail_reason when bridge evidence metadata is contradictory", () => {
+    const packet = buildRelationAssemblyPacket({
+      question: "How does ideology bridge physics?",
+      contextFiles: ["docs/ethos/ideology.json", "docs/knowledge/physics/einstein-field-equations.md"],
+      contextText: "ideology and physics relation",
+      docBlocks: [],
+      strictBridgeEvidence: true,
+      graphPack: {
+        frameworks: [
+          {
+            treeId: "test",
+            sourcePath: "docs/ethos/ideology.json",
+            anchors: [],
+            path: [
+              {
+                id: "bridge-node",
+                title: "Bridge",
+                tags: [],
+                score: 1,
+                depth: 0,
+                nodeType: "bridge",
+                evidence: [
+                  {
+                    type: "doc",
+                    path: "docs/knowledge/physics/einstein-field-equations.md",
+                    scope: "left",
+                    provenance_class: "proxy",
+                    claim_tier: "diagnostic",
+                    certifying: true,
+                  },
+                ],
+              },
+            ],
+            scaffoldText: "",
+            contextText: "",
+            preferGraph: true,
+          },
+        ],
+        scaffoldText: "",
+        contextText: "",
+        preferGraph: true,
+        sourcePaths: ["docs/ethos/ideology.json"],
+        treeIds: ["test"],
+      },
+    });
+
+    expect(packet.fail_reason).toBe("IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY");
   });
 
   it("preserves non-strict bridge behavior when metadata is incomplete", () => {
