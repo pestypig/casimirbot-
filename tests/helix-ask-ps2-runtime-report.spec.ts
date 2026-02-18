@@ -4,6 +4,16 @@ import path from "node:path";
 import type { Server } from "http";
 import { describe, expect, it, beforeAll, afterAll, vi } from "vitest";
 
+type AskRow = {
+  question: string;
+  seed: number;
+  status: number;
+  latencyMs: number;
+  text: string;
+  debug: Record<string, unknown>;
+  beforeText: string;
+};
+
 describe("Helix Ask PS2 runtime report", () => {
   let server: Server;
   let baseUrl = "http://127.0.0.1:0";
@@ -16,6 +26,9 @@ describe("Helix Ask PS2 runtime report", () => {
     const { planRouter } = await import("../server/routes/agi.plan");
     const app = express();
     app.use(express.json({ limit: "5mb" }));
+    app.get("/api/ready", (_req, res) => {
+      res.json({ ok: true, ready: true });
+    });
     app.use("/api/agi", planRouter);
     await new Promise<void>((resolve) => {
       server = app.listen(0, () => {
@@ -39,9 +52,38 @@ describe("Helix Ask PS2 runtime report", () => {
     const questions = [
       "How does the universe produce life",
       "How can a Human protect itself from an AI financial hack",
+      "Why are dreams weird and sometimes coherent",
+      "Can unknown dark matter interactions influence daily electronics",
+      "What hidden factors shape sudden social panic online",
+      "How could a city respond to a surprise magnetic storm",
+      "What could explain déjà vu without mystical assumptions",
+      "How can a family plan food resilience for unknown disruptions",
     ];
     const seeds = [7, 11, 13];
-    const rows: Array<{ question: string; seed: number; status: number; latencyMs: number; text: string; debug: Record<string, unknown> }> = [];
+    const rows: AskRow[] = [];
+
+    const readyResponse = await fetch(`${baseUrl}/api/ready`);
+    const readyPayload = (await readyResponse.json()) as { ready?: boolean; ok?: boolean };
+    const readyOk = readyResponse.ok && (readyPayload.ready === true || readyPayload.ok === true);
+
+    const smokeCount = 12;
+    const smokeStatuses: number[] = [];
+    for (let i = 0; i < smokeCount; i += 1) {
+      const smokeResponse = await fetch(`${baseUrl}/api/agi/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `smoke-check-${i}: summarize fallback contract behavior`,
+          debug: false,
+          temperature: 0,
+          seed: i + 1,
+          sessionId: `ps2-smoke-${i}`,
+        }),
+      });
+      smokeStatuses.push(smokeResponse.status);
+    }
+    const smoke200Rate = smokeStatuses.filter((status) => status === 200).length / smokeStatuses.length;
+    const reliabilityStatus = readyOk && smoke200Rate >= 0.9 ? "pass" : "infra-blocked";
 
     for (const question of questions) {
       for (const seed of seeds) {
@@ -58,6 +100,9 @@ describe("Helix Ask PS2 runtime report", () => {
         } catch {
           payload = {};
         }
+        const beforeText = String(
+          payload.debug?.answer_before_fallback ?? payload.debug?.answer_raw_preview ?? "before unavailable",
+        );
         rows.push({
           question,
           seed,
@@ -65,6 +110,7 @@ describe("Helix Ask PS2 runtime report", () => {
           latencyMs,
           text: payload.text ?? "",
           debug: payload.debug ?? {},
+          beforeText,
         });
       }
     }
@@ -103,6 +149,29 @@ describe("Helix Ask PS2 runtime report", () => {
       non_200_rate: rate((row) => row.status !== 200),
     };
 
+    const semanticGates = {
+      runId,
+      thresholds: {
+        claim_citation_link_rate: 0.9,
+        unsupported_claim_rate: 0.1,
+        repetition_penalty_fail_rate: 0.1,
+        contradiction_flag_rate: 0.1,
+      },
+      measured: {
+        claim_citation_link_rate: metrics.claim_citation_link_rate,
+        unsupported_claim_rate: metrics.unsupported_claim_rate,
+        repetition_penalty_fail_rate: metrics.repetition_penalty_fail_rate,
+        contradiction_flag_rate: metrics.contradiction_flag_rate,
+      },
+      pass: {
+        claim_citation_link_rate: metrics.claim_citation_link_rate >= 0.9,
+        unsupported_claim_rate: metrics.unsupported_claim_rate <= 0.1,
+        repetition_penalty_fail_rate: metrics.repetition_penalty_fail_rate <= 0.1,
+        contradiction_flag_rate: metrics.contradiction_flag_rate <= 0.1,
+      },
+    };
+    fs.writeFileSync(path.join(baseDir, "semantic-gates.json"), JSON.stringify(semanticGates, null, 2));
+
     const summary = {
       runId,
       total: rows.length,
@@ -110,11 +179,18 @@ describe("Helix Ask PS2 runtime report", () => {
       temperature: 0.2,
       debug: true,
       metrics,
+      reliability_preflight: {
+        ready_ok: readyOk,
+        smoke_count: smokeCount,
+        smoke_200_rate: smoke200Rate,
+        status: reliabilityStatus,
+      },
     };
     fs.writeFileSync(path.join(baseDir, "summary.json"), JSON.stringify(summary, null, 2));
 
     const recommendation = {
       status:
+        reliabilityStatus === "pass" &&
         metrics.placeholder_fallback_rate === 0 &&
         metrics.empty_scaffold_rate === 0 &&
         metrics.mechanism_sentence_present_rate >= 0.95 &&
@@ -128,10 +204,12 @@ describe("Helix Ask PS2 runtime report", () => {
         metrics.non_200_rate <= 0.02
           ? "pass"
           : "fail",
-      notes: [
-        "PS2 runtime contract metrics generated from focused asks.",
-        "Use raw/responses.json for deep per-seed debugging.",
-      ],
+      notes: reliabilityStatus === "pass"
+        ? [
+            "PS2 runtime contract metrics generated from focused asks.",
+            "Use raw/responses.json for deep per-seed debugging.",
+          ]
+        : ["Reliability preflight failed; classify run as infra-blocked before quality scoring."],
     };
     fs.writeFileSync(path.join(baseDir, "recommendation.json"), JSON.stringify(recommendation, null, 2));
 
@@ -139,9 +217,10 @@ describe("Helix Ask PS2 runtime report", () => {
       question: row.question,
       seed: row.seed,
       beforeSnippet: String(
-        row.debug.answer_before_fallback ?? row.debug.answer_raw_preview ?? "before unavailable",
+        row.beforeText,
       ).slice(0, 280),
       afterSnippet: row.text.slice(0, 420),
+      citations: (row.text.match(/Sources:\s*([^\n]+)/i)?.[1] ?? "not-present").slice(0, 220),
     }));
     fs.writeFileSync(path.join(baseDir, "focused-qa.json"), JSON.stringify(focusedQa, null, 2));
 
@@ -165,6 +244,7 @@ describe("Helix Ask PS2 runtime report", () => {
       `# Helix Ask PS2 Runtime Contract (${runId})`,
       "",
       "Run config: seeds=7,11,13; temperature=0.2; debug=true.",
+      `Reliability preflight: ready_ok=${readyOk}; smoke_200_rate=${smoke200Rate.toFixed(3)}; status=${reliabilityStatus}.`,
       "",
       "| Gate | Threshold | Measured | Pass |",
       "|---|---:|---:|:--:|",
@@ -177,14 +257,15 @@ describe("Helix Ask PS2 runtime report", () => {
         `- Q: ${entry.question} (seed ${entry.seed})`,
         `  - Before: ${entry.beforeSnippet.replace(/\n+/g, " ")}`,
         `  - After: ${entry.afterSnippet.replace(/\n+/g, " ")}`,
+        `  - Citations: ${entry.citations}`,
       ]),
       "",
       `Artifacts: ${baseDir}`,
     ];
     fs.writeFileSync(reportPath, lines.join("\n"));
 
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(24);
+    expect(fs.existsSync(path.join(baseDir, "semantic-gates.json"))).toBe(true);
     expect(fs.existsSync(reportPath)).toBe(true);
   }, 180000);
 });
-
