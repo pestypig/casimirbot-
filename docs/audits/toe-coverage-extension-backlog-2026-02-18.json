@@ -423,6 +423,135 @@
         "Corpus and merge flows annotate ingestion decisions with deterministic policy reason codes",
         "Knowledge route and contract tests cover pass/fail paths for provenance budget enforcement"
       ]
+    },
+    {
+      "id": "TOE-027-casimir-tiles-resonance-contract",
+      "tree_owner": "casimir-tiles",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Casimir tiles resonance contract primitive",
+      "primary_path_prefix": "server/services/code-lattice/resonance.ts",
+      "allowed_paths": [
+        "server/services/code-lattice/resonance.ts",
+        "server/services/code-lattice/resonance.constants.ts",
+        "server/services/code-lattice/__tests__/casimir-resonance.spec.ts",
+        "server/services/code-lattice/__tests__/resonance.casimir.spec.ts"
+      ],
+      "required_tests": [
+        "server/services/code-lattice/__tests__/casimir-resonance.spec.ts",
+        "server/services/code-lattice/__tests__/resonance.casimir.spec.ts"
+      ],
+      "done_criteria": [
+        "Resonance service enforces deterministic casimir-tile contract invariants and emits stable rule ids for FAIL outcomes",
+        "Resonance constants and runtime paths preserve additive contract metadata without regressing existing response shape",
+        "Casimir resonance test suites validate pass/fail parity and firstFail determinism across lattice edge cases"
+      ]
+    },
+    {
+      "id": "TOE-028-dp-collapse-runtime-contract",
+      "tree_owner": "dp-collapse",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "DP collapse runtime contract primitive",
+      "primary_path_prefix": "shared/dp-collapse.ts",
+      "allowed_paths": [
+        "shared/dp-collapse.ts",
+        "server/services/mixer/collapse.ts",
+        "tests/dp-collapse.spec.ts",
+        "tests/collapse-mixer.spec.ts"
+      ],
+      "required_tests": [
+        "tests/dp-collapse.spec.ts",
+        "tests/collapse-mixer.spec.ts"
+      ],
+      "done_criteria": [
+        "DP collapse shared contract defines deterministic runtime fields for provenance, policy, and claim-safe defaults",
+        "Mixer collapse integration preserves collapse contract semantics across adapter boundaries and fallback behavior",
+        "DP collapse and mixer tests prove deterministic verdicting under nominal, degraded, and invalid contract inputs"
+      ]
+    },
+    {
+      "id": "TOE-029-essence-luma-noise-provenance-contract",
+      "tree_owner": "essence-luma-noise",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Essence luma noise provenance contract primitive",
+      "primary_path_prefix": "server/services/luma.ts",
+      "allowed_paths": [
+        "server/services/luma.ts",
+        "server/routes/luma.ts",
+        "server/routes/luma-whispers.ts",
+        "tests/luma-local.spec.ts",
+        "tests/luma-generate.spec.ts"
+      ],
+      "required_tests": [
+        "tests/luma-local.spec.ts",
+        "tests/luma-generate.spec.ts"
+      ],
+      "done_criteria": [
+        "Luma service outputs include explicit noise provenance class and maturity-safe claim annotations for generated artifacts",
+        "Luma and luma-whispers routes expose additive provenance contract fields while keeping backward-compatible response structure",
+        "Local and generate luma tests validate deterministic provenance propagation and conservative handling of missing evidence"
+      ]
+    },
+    {
+      "id": "TOE-030-brick-lattice-dataflow-contract",
+      "tree_owner": "brick-lattice-dataflow",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Brick lattice dataflow contract primitive",
+      "primary_path_prefix": "client/src/lib/lattice-frame.ts",
+      "allowed_paths": [
+        "client/src/lib/lattice-frame.ts",
+        "client/src/lib/lattice-surface.ts",
+        "client/src/lib/lattice-sdf.ts",
+        "client/src/lib/lattice-frame.test.ts",
+        "client/src/lib/lattice-surface.test.ts",
+        "client/src/lib/lattice-sdf.test.ts"
+      ],
+      "required_tests": [
+        "client/src/lib/lattice-frame.test.ts",
+        "client/src/lib/lattice-surface.test.ts",
+        "client/src/lib/lattice-sdf.test.ts"
+      ],
+      "done_criteria": [
+        "Lattice frame, surface, and SDF modules share a deterministic dataflow contract for provenance-safe state transitions",
+        "Client lattice primitives maintain additive contract compatibility across rendering and simulation helper boundaries",
+        "Frame, surface, and SDF tests enforce parity for contract outputs under nominal, sparse, and malformed lattice inputs"
+      ]
+    },
+    {
+      "id": "TOE-031-warp-mechanics-provenance-claim-gate",
+      "tree_owner": "warp-mechanics",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Warp mechanics provenance claim gate primitive",
+      "primary_path_prefix": "tools/warpViability.ts",
+      "allowed_paths": [
+        "tools/warpViability.ts",
+        "tools/warpViabilityCertificate.ts",
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts"
+      ],
+      "required_tests": [
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts"
+      ],
+      "done_criteria": [
+        "Warp viability tooling enforces provenance and claim-tier gating before emitting viability narratives or certificates",
+        "Warp viability certificate generation includes deterministic integrity metadata and explicit firstFail propagation on FAIL",
+        "Warp viability and metric adapter tests assert hard-constraint policy handling with conservative non-viable defaults"
+      ]
     }
   ]
 }
