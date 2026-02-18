@@ -1315,6 +1315,41 @@
       }
     },
     {
+      "id": "TOE-057-helix-ask-strict-ready-promotion-pack",
+      "tree_owner": "helix-ask",
+      "gap_refs": [
+        "F-COV-5"
+      ],
+      "primitive": "Helix Ask strict-ready promotion primitive",
+      "primary_path_prefix": "server/services/helix-ask/arbiter.ts",
+      "allowed_paths": [
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask/arbiter.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-modes.spec.ts",
+        "docs/audits/ticket-results/TOE-057-helix-ask-strict-ready-promotion-pack.20260218T194801Z.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-modes.spec.ts"
+      ],
+      "done_criteria": [
+        "Strict-ready certainty contract missing path emits deterministic strict fail_reason and clarify promotion mode",
+        "Route arbiter integration propagates strict-ready fail metadata without breaking strict concept precedence",
+        "Non-strict behavior remains backward-compatible while strict-ready paths are test-covered"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
       "id": "TOE-058-halobank-residual-reduced-order-promotion",
       "tree_owner": "simulation-systems",
       "gap_refs": [

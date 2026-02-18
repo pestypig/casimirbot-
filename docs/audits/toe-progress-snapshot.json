@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T19:57:36.693Z",
+  "generated_at": "2026-02-18T20:00:04.836Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -13,20 +13,20 @@
     "certified": 1
   },
   "totals": {
-    "tickets_total": 60,
-    "tickets_with_evidence": 60,
+    "tickets_total": 61,
+    "tickets_with_evidence": 61,
     "claim_tier_counts": {
-      "diagnostic": 57,
+      "diagnostic": 58,
       "reduced-order": 3,
       "certified": 0
     },
-    "weighted_score_sum": 16.05,
+    "weighted_score_sum": 16.3,
     "toe_progress_pct": 26.7,
     "forest_owner_coverage_pct": 100,
-    "strict_ready_progress_pct": 5,
-    "strict_ready_delta_ticket_count": 57,
-    "research_gated_tickets_total": 15,
-    "research_artifact_complete_tickets_total": 15
+    "strict_ready_progress_pct": 4.9,
+    "strict_ready_delta_ticket_count": 58,
+    "research_gated_tickets_total": 16,
+    "research_artifact_complete_tickets_total": 16
   },
   "segments": {
     "core": {
@@ -44,33 +44,33 @@
       "research_artifact_complete_tickets_total": 0
     },
     "extension": {
-      "tickets_total": 50,
-      "tickets_with_evidence": 50,
+      "tickets_total": 51,
+      "tickets_with_evidence": 51,
       "claim_tier_counts": {
-        "diagnostic": 48,
+        "diagnostic": 49,
         "reduced-order": 2,
         "certified": 0
       },
-      "weighted_score_sum": 13.2,
+      "weighted_score_sum": 13.45,
       "toe_progress_pct": 26.4,
-      "strict_ready_progress_pct": 4,
-      "research_gated_tickets_total": 15,
-      "research_artifact_complete_tickets_total": 15
+      "strict_ready_progress_pct": 3.9,
+      "research_gated_tickets_total": 16,
+      "research_artifact_complete_tickets_total": 16
     },
     "combined": {
-      "tickets_total": 60,
-      "tickets_with_evidence": 60,
+      "tickets_total": 61,
+      "tickets_with_evidence": 61,
       "claim_tier_counts": {
-        "diagnostic": 57,
+        "diagnostic": 58,
         "reduced-order": 3,
         "certified": 0
       },
-      "weighted_score_sum": 16.05,
+      "weighted_score_sum": 16.3,
       "toe_progress_pct": 26.7,
-      "strict_ready_progress_pct": 5,
-      "strict_ready_delta_ticket_count": 57,
-      "research_gated_tickets_total": 15,
-      "research_artifact_complete_tickets_total": 15
+      "strict_ready_progress_pct": 4.9,
+      "strict_ready_delta_ticket_count": 58,
+      "research_gated_tickets_total": 16,
+      "research_artifact_complete_tickets_total": 16
     }
   },
   "strict_ready_delta_targets": [
@@ -394,6 +394,12 @@
     },
     {
       "ticket_id": "TOE-056-strict-ready-scorecard-automation",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-057-helix-ask-strict-ready-promotion-pack",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": false
@@ -921,6 +927,15 @@
       "research_gated": true,
       "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-056-strict-ready-scorecard-automation.20260218T175215Z.json"
+    },
+    {
+      "ticket_id": "TOE-057-helix-ask-strict-ready-promotion-pack",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-057-helix-ask-strict-ready-promotion-pack.20260218T194801Z.json"
     },
     {
       "ticket_id": "TOE-058-halobank-residual-reduced-order-promotion",
