@@ -1,0 +1,30 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-068-helix-ask-strict-fail-reason-ledger",
+  "files_changed": [
+    "server/routes/agi.plan.ts",
+    "tests/helix-ask-modes.spec.ts",
+    "tests/helix-ask-evidence-gate.spec.ts",
+    "tests/helix-ask-bridge.spec.ts",
+    "docs/audits/toe-progress-snapshot.json"
+  ],
+  "tests_run": [
+    "tests/helix-ask-evidence-gate.spec.ts",
+    "tests/helix-ask-modes.spec.ts",
+    "tests/helix-ask-bridge.spec.ts",
+    "npx vitest run tests/helix-ask-evidence-gate.spec.ts tests/helix-ask-answer-artifacts.spec.ts tests/helix-ask-modes.spec.ts",
+    "npx vitest run tests/helix-ask-bridge.spec.ts"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:fabcf0f8-f36b-4c2e-a57f-84645bffd759",
+    "run_id": "15",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": [],
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ]
+}

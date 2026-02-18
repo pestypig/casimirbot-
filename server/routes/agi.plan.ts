@@ -26800,6 +26800,29 @@ const executeHelixAsk = async ({
             beforeCitationGuard.trim() !== cleaned.trim();
         }
       }
+      const securityRiskPrompt = isSecurityRiskPrompt(baseQuestion);
+      const groundednessScore = evidenceGateOk ? 1 : 0.35;
+      const uncertaintyScore = Math.min(1, Math.max(0, (coverageSlotSummary?.missingSlots?.length ?? 0) / Math.max(1, slotPlan?.slots?.length ?? 1)));
+      const safetyScore = securityRiskPrompt ? 1 : 0.3;
+      const coverageScore = Math.min(1, Math.max(0, coverageSlotSummary?.coverageRatio ?? (docSlotSummary?.slotCoverageRatio ?? 0)));
+      const selectedMove = selectDeterministicMove({
+        groundedness: groundednessScore,
+        uncertainty: uncertaintyScore,
+        safety: safetyScore,
+        coverage: coverageScore,
+      });
+      answerPath.push(`moveSelector:${selectedMove}`);
+      if (debugPayload) {
+        (debugPayload as Record<string, unknown>).fuzzy_move_selector = {
+          selected: selectedMove,
+          scores: {
+            groundedness: groundednessScore,
+            uncertainty: uncertaintyScore,
+            safety: safetyScore,
+            coverage: coverageScore,
+          },
+        };
+      }
       const weakEvidenceForDeterministicFallback =
         !evidenceGateOk ||
         claimGateFailed ||
@@ -26909,7 +26932,6 @@ const executeHelixAsk = async ({
         isWarpEthosRelationQuestion(baseQuestion) ||
         intentProfile.id === "hybrid.warp_ethos_relation";
       const openWorldExplainer = isOpenWorldExplainerQuestion(baseQuestion);
-      const securityRiskPrompt = isSecurityRiskPrompt(baseQuestion);
       const qualityFloorEligible =
         HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
         intentDomain === "repo" ||
@@ -26927,29 +26949,9 @@ const executeHelixAsk = async ({
         bridge_expansion_candidates: bridgeTraversalCandidates.length,
         non_blocking: true,
       };
-      const groundednessScore = evidenceGateOk ? 1 : 0.35;
-      const uncertaintyScore = Math.min(1, Math.max(0, (coverageSlotSummary?.missingSlots?.length ?? 0) / Math.max(1, slotPlan?.slots?.length ?? 1)));
-      const safetyScore = securityRiskPrompt ? 1 : 0.3;
-      const coverageScore = Math.min(1, Math.max(0, coverageSlotSummary?.coverageRatio ?? (docSlotSummary?.slotCoverageRatio ?? 0)));
-      const selectedMove = selectDeterministicMove({
-        groundedness: groundednessScore,
-        uncertainty: uncertaintyScore,
-        safety: safetyScore,
-        coverage: coverageScore,
-      });
-      answerPath.push(`moveSelector:${selectedMove}`);
       if (debugPayload) {
         (debugPayload as Record<string, unknown>).runtime_clock_a = clockASnapshot;
         (debugPayload as Record<string, unknown>).runtime_clock_b = clockBSnapshot;
-        (debugPayload as Record<string, unknown>).fuzzy_move_selector = {
-          selected: selectedMove,
-          scores: {
-            groundedness: groundednessScore,
-            uncertainty: uncertaintyScore,
-            safety: safetyScore,
-            coverage: coverageScore,
-          },
-        };
       }
       const qualityFloorReasons = qualityFloorEligible
         ? detectRepoAnswerQualityFloorReasons({

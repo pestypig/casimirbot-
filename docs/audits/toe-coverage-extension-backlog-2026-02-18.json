@@ -1892,6 +1892,48 @@
         "Before/after metric deltas are emitted with deterministic thresholds and pass/fail marks",
         "Strict fail determinism probe is measured and reported",
         "Receipt artifact records validator/preflight runs plus Casimir PASS certificate integrity"
+      "id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
+      "tree_owner": "stellar-ps1-bridges",
+      "primitive": "Stellar PS1 bridges resolver owner coverage contract",
+      "primary_path_prefix": "server/services/helix-ask/graph-resolver.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "configs/resolver-owner-coverage-manifest.v1.json",
+        "configs/graph-resolvers.json",
+        "server/services/helix-ask/graph-resolver.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+      "id": "TOE-075-helix-ask-strict-ready-verified-pass-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Helix Ask strict-ready verified PASS pack",
+      "primary_path_prefix": "server/routes/agi.plan.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "scripts/compute-toe-progress.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "scripts/validate-resolver-owner-coverage.ts"
+      ],
+      "done_criteria": [
+        "Stellar PS1 bridge resolver path remains deterministic and active under lock + path walk",
+        "Bridge resolver contract requires deterministic evidence metadata and at least one certifying evidence record",
+        "Resolver owner coverage marks stellar-ps1-bridges as covered_extension with validation green"
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts"
+      ],
+      "done_criteria": [
+        "Top strict-ready blockers are identified from current progress snapshot",
+        "Highest-impact Helix Ask blockers are promoted to verified PASS-ready state with deterministic gates",
+        "Strict fail reasons remain deterministic and replay-safe across fallback paths",
+        "Progress snapshot and ticket receipt capture before/after strict-ready counters"
       ],
       "research_gate": {
         "risk_class": "runtime_contract",

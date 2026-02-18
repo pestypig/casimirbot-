@@ -38,6 +38,8 @@ const parsePreviousReportMetrics = (reportPath: string): Record<string, number> 
     out[match[1]] = Number(match[2]);
   }
   return out;
+  debug: Record<string, unknown>;
+  beforeText: string;
 };
 
 describe("Helix Ask PS2 runtime report", () => {
@@ -52,6 +54,9 @@ describe("Helix Ask PS2 runtime report", () => {
     const { planRouter } = await import("../server/routes/agi.plan");
     const app = express();
     app.use(express.json({ limit: "5mb" }));
+    app.get("/api/ready", (_req, res) => {
+      res.json({ ok: true, ready: true });
+    });
     app.use("/api/agi", planRouter);
     await new Promise<void>((resolve) => {
       server = app.listen(0, () => {
@@ -142,6 +147,69 @@ describe("Helix Ask PS2 runtime report", () => {
           seed,
           attempt,
           key: `${result.status}:${reason}`,
+  it("runs focused PS2 asks and writes required artifacts", async () => {
+    const questions = [
+      "How does the universe produce life",
+      "How can a Human protect itself from an AI financial hack",
+      "Why are dreams weird and sometimes coherent",
+      "Can unknown dark matter interactions influence daily electronics",
+      "What hidden factors shape sudden social panic online",
+      "How could a city respond to a surprise magnetic storm",
+      "What could explain déjà vu without mystical assumptions",
+      "How can a family plan food resilience for unknown disruptions",
+    ];
+    const seeds = [7, 11, 13];
+    const rows: AskRow[] = [];
+
+    const readyResponse = await fetch(`${baseUrl}/api/ready`);
+    const readyPayload = (await readyResponse.json()) as { ready?: boolean; ok?: boolean };
+    const readyOk = readyResponse.ok && (readyPayload.ready === true || readyPayload.ok === true);
+
+    const smokeCount = 12;
+    const smokeStatuses: number[] = [];
+    for (let i = 0; i < smokeCount; i += 1) {
+      const smokeResponse = await fetch(`${baseUrl}/api/agi/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `smoke-check-${i}: summarize fallback contract behavior`,
+          debug: false,
+          temperature: 0,
+          seed: i + 1,
+          sessionId: `ps2-smoke-${i}`,
+        }),
+      });
+      smokeStatuses.push(smokeResponse.status);
+    }
+    const smoke200Rate = smokeStatuses.filter((status) => status === 200).length / smokeStatuses.length;
+    const reliabilityStatus = readyOk && smoke200Rate >= 0.9 ? "pass" : "infra-blocked";
+
+    for (const question of questions) {
+      for (const seed of seeds) {
+        const start = Date.now();
+        const response = await fetch(`${baseUrl}/api/agi/ask`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, debug: true, temperature: 0.2, seed, sessionId: `ps2-${seed}-${question.slice(0, 12)}` }),
+        });
+        const latencyMs = Date.now() - start;
+        let payload: { text?: string; debug?: Record<string, unknown> } = {};
+        try {
+          payload = (await response.json()) as { text?: string; debug?: Record<string, unknown> };
+        } catch {
+          payload = {};
+        }
+        const beforeText = String(
+          payload.debug?.answer_before_fallback ?? payload.debug?.answer_raw_preview ?? "before unavailable",
+        );
+        rows.push({
+          question,
+          seed,
+          status: response.status,
+          latencyMs,
+          text: payload.text ?? "",
+          debug: payload.debug ?? {},
+          beforeText,
         });
       }
     }
@@ -207,6 +275,28 @@ describe("Helix Ask PS2 runtime report", () => {
       measured,
       pass: thresholds[name].pass(measured),
     }));
+    const semanticGates = {
+      runId,
+      thresholds: {
+        claim_citation_link_rate: 0.9,
+        unsupported_claim_rate: 0.1,
+        repetition_penalty_fail_rate: 0.1,
+        contradiction_flag_rate: 0.1,
+      },
+      measured: {
+        claim_citation_link_rate: metrics.claim_citation_link_rate,
+        unsupported_claim_rate: metrics.unsupported_claim_rate,
+        repetition_penalty_fail_rate: metrics.repetition_penalty_fail_rate,
+        contradiction_flag_rate: metrics.contradiction_flag_rate,
+      },
+      pass: {
+        claim_citation_link_rate: metrics.claim_citation_link_rate >= 0.9,
+        unsupported_claim_rate: metrics.unsupported_claim_rate <= 0.1,
+        repetition_penalty_fail_rate: metrics.repetition_penalty_fail_rate <= 0.1,
+        contradiction_flag_rate: metrics.contradiction_flag_rate <= 0.1,
+      },
+    };
+    fs.writeFileSync(path.join(baseDir, "semantic-gates.json"), JSON.stringify(semanticGates, null, 2));
 
     const summary = {
       runId,
@@ -226,6 +316,52 @@ describe("Helix Ask PS2 runtime report", () => {
     fs.writeFileSync(path.join(baseDir, "summary.json"), JSON.stringify(summary, null, 2));
 
     const reportPath = path.join("reports", `helix-ask-ps2-runtime-contract-${runId}.md`);
+      reliability_preflight: {
+        ready_ok: readyOk,
+        smoke_count: smokeCount,
+        smoke_200_rate: smoke200Rate,
+        status: reliabilityStatus,
+      },
+    };
+    fs.writeFileSync(path.join(baseDir, "summary.json"), JSON.stringify(summary, null, 2));
+
+    const recommendation = {
+      status:
+        reliabilityStatus === "pass" &&
+        metrics.placeholder_fallback_rate === 0 &&
+        metrics.empty_scaffold_rate === 0 &&
+        metrics.mechanism_sentence_present_rate >= 0.95 &&
+        metrics.maturity_label_present_rate >= 0.95 &&
+        metrics.claim_citation_link_rate >= 0.90 &&
+        metrics.unsupported_claim_rate <= 0.10 &&
+        metrics.repetition_penalty_fail_rate <= 0.10 &&
+        metrics.contradiction_flag_rate <= 0.10 &&
+        metrics.min_text_length_pass_rate >= 0.95 &&
+        metrics.p95_latency_ms <= 2500 &&
+        metrics.non_200_rate <= 0.02
+          ? "pass"
+          : "fail",
+      notes: reliabilityStatus === "pass"
+        ? [
+            "PS2 runtime contract metrics generated from focused asks.",
+            "Use raw/responses.json for deep per-seed debugging.",
+          ]
+        : ["Reliability preflight failed; classify run as infra-blocked before quality scoring."],
+    };
+    fs.writeFileSync(path.join(baseDir, "recommendation.json"), JSON.stringify(recommendation, null, 2));
+
+    const focusedQa = rows.map((row) => ({
+      question: row.question,
+      seed: row.seed,
+      beforeSnippet: String(
+        row.beforeText,
+      ).slice(0, 280),
+      afterSnippet: row.text.slice(0, 420),
+      citations: (row.text.match(/Sources:\s*([^\n]+)/i)?.[1] ?? "not-present").slice(0, 220),
+    }));
+    fs.writeFileSync(path.join(baseDir, "focused-qa.json"), JSON.stringify(focusedQa, null, 2));
+
+    const reportPath = path.join("reports", `helix-ask-quake-frame-loop-${runId}.md`);
     fs.mkdirSync("reports", { recursive: true });
 
     const lines = [
@@ -233,6 +369,8 @@ describe("Helix Ask PS2 runtime report", () => {
       "",
       "Run config: fixed prompt set, seeds=7,11,13; temperature=0.2; debug=true.",
       previousPath ? `Baseline report: ${previousPath}` : "Baseline report: unavailable",
+      "Run config: seeds=7,11,13; temperature=0.2; debug=true.",
+      `Reliability preflight: ready_ok=${readyOk}; smoke_200_rate=${smoke200Rate.toFixed(3)}; status=${reliabilityStatus}.`,
       "",
       "| Metric | Threshold | Before | After | Delta | Pass |",
       "|---|---:|---:|---:|---:|:--:|",
@@ -249,12 +387,21 @@ describe("Helix Ask PS2 runtime report", () => {
       "| Seed | Attempt | Key |",
       "|---:|---:|---|",
       ...strictDeterminismRows.map((row) => `| ${row.seed} | ${row.attempt} | ${row.key} |`),
+      "## Before/after snippets",
+      ...focusedQa.flatMap((entry) => [
+        `- Q: ${entry.question} (seed ${entry.seed})`,
+        `  - Before: ${entry.beforeSnippet.replace(/\n+/g, " ")}`,
+        `  - After: ${entry.afterSnippet.replace(/\n+/g, " ")}`,
+        `  - Citations: ${entry.citations}`,
+      ]),
       "",
       `Artifacts: ${baseDir}`,
     ];
     fs.writeFileSync(reportPath, lines.join("\n"));
 
     expect(rows).toHaveLength(PS2_QUESTIONS.length * PS2_SEEDS.length);
+    expect(rows).toHaveLength(24);
+    expect(fs.existsSync(path.join(baseDir, "semantic-gates.json"))).toBe(true);
     expect(fs.existsSync(reportPath)).toBe(true);
   }, 240000);
 });
