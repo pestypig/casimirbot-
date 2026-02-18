@@ -1,7 +1,10 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildRelationAssemblyPacket } from "../server/services/helix-ask/relation-assembly";
+import {
+  __testOnlyClassifyStrictBridgeEvidenceFailure,
+  buildRelationAssemblyPacket,
+} from "../server/services/helix-ask/relation-assembly";
 
 type TreeNode = {
   id: string;
@@ -255,6 +258,40 @@ describe("Helix Ask bridge nodes", () => {
     });
 
     expect(packet.fail_reason).toBe("IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY");
+  });
+
+
+  it("stabilizes strict fail precedence for mixed missing/contradictory evidence under replay", () => {
+    const adversarialContracts = [
+      {
+        path: "docs/knowledge/physics/einstein-field-equations.md",
+        provenance_class: "proxy" as const,
+        claim_tier: "diagnostic" as const,
+        certifying: true,
+      },
+      {
+        path: "docs/knowledge/physics/einstein-field-equations.md",
+        provenance_class: "measured" as const,
+        claim_tier: "certified" as const,
+        certifying: true,
+      },
+      {
+        path: "docs/knowledge/physics/warp-metric.md",
+        provenance_class: "inferred" as const,
+        claim_tier: "diagnostic" as const,
+      },
+    ];
+
+    const verdicts = new Set<string>();
+    for (let idx = 0; idx < adversarialContracts.length; idx += 1) {
+      const replayOrder = [
+        ...adversarialContracts.slice(idx),
+        ...adversarialContracts.slice(0, idx),
+      ];
+      verdicts.add(__testOnlyClassifyStrictBridgeEvidenceFailure(replayOrder) ?? "__none__");
+    }
+
+    expect(Array.from(verdicts)).toEqual(["IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY"]);
   });
 
   it("preserves non-strict bridge behavior when metadata is incomplete", () => {

@@ -1598,6 +1598,42 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-072-ideology-physics-bridge-adversarial-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Ideology-physics bridge adversarial pack",
+      "primary_path_prefix": "server/services/helix-ask",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask",
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts",
+        "docs/audits/research/TOE-072-physics-research-brief.md",
+        "docs/audits/research/TOE-072-safety-envelope-analysis.md",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts"
+      ],
+      "done_criteria": [
+        "Adversarial contradiction classes produce deterministic strict fail reasons",
+        "Missing vs contradictory evidence precedence is stable under replay",
+        "Physics-unknown research artifacts define safety envelope and falsification hooks"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "safety-envelope-analysis"
+        ]
+      }
     }
   ]
 }

@@ -75,10 +75,16 @@ const buildEvidenceId = (path: string, span: string): string => {
 const toCitation = (path: string, span: string): string => `${path}${span ? `#${span}` : ""}`;
 
 type BridgeEvidenceContract = {
+  path?: string;
   provenance_class?: "measured" | "proxy" | "inferred";
   claim_tier?: "diagnostic" | "reduced-order" | "certified";
   certifying?: boolean;
 };
+
+type BridgeEvidenceStrictFailReason =
+  | "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING"
+  | "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY"
+  | undefined;
 
 const isBridgeEvidenceContractComplete = (entry: BridgeEvidenceContract): boolean =>
   Boolean(entry.provenance_class && entry.claim_tier && typeof entry.certifying === "boolean");
@@ -92,6 +98,41 @@ const hasBridgeEvidenceContractContradiction = (entry: BridgeEvidenceContract): 
 
 const bridgeEvidenceContractFingerprint = (entry: BridgeEvidenceContract): string =>
   [entry.provenance_class ?? "__missing__", entry.claim_tier ?? "__missing__", String(entry.certifying)].join("|");
+
+const classifyStrictBridgeEvidenceFailure = (contracts: BridgeEvidenceContract[]): BridgeEvidenceStrictFailReason => {
+  const canonical = [...contracts].sort(
+    (a, b) =>
+      (a.path ?? "").localeCompare(b.path ?? "") ||
+      bridgeEvidenceContractFingerprint(a).localeCompare(bridgeEvidenceContractFingerprint(b)),
+  );
+  const byPath = new Map<string, Set<string>>();
+  let hasGap = false;
+  let hasIntrinsicContradiction = false;
+
+  for (const contract of canonical) {
+    const path = contract.path?.trim();
+    const fingerprint = bridgeEvidenceContractFingerprint(contract);
+    if (path) {
+      if (!byPath.has(path)) {
+        byPath.set(path, new Set<string>());
+      }
+      byPath.get(path)?.add(fingerprint);
+    }
+    hasGap ||= !isBridgeEvidenceContractComplete(contract);
+    hasIntrinsicContradiction ||= hasBridgeEvidenceContractContradiction(contract);
+  }
+
+  const hasPathCollision = Array.from(byPath.values()).some((fingerprints) => fingerprints.size > 1);
+  if (hasIntrinsicContradiction || hasPathCollision) {
+    return "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY";
+  }
+  if (hasGap) {
+    return "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING";
+  }
+  return undefined;
+};
+
+export const __testOnlyClassifyStrictBridgeEvidenceFailure = classifyStrictBridgeEvidenceFailure;
 
 const firstSentence = (text: string, fallback: string): string => {
   const first = text.split(/(?<=[.!?])\s+/)[0] ?? "";
@@ -158,6 +199,7 @@ export function buildRelationAssemblyPacket(args: {
         const evidencePath = typeof evidence.path === "string" ? evidence.path.trim() : "";
         if (!evidencePath) continue;
         const contract: BridgeEvidenceContract = {
+          path: evidencePath,
           provenance_class: evidence.provenance_class,
           claim_tier: evidence.claim_tier,
           certifying: evidence.certifying,
@@ -236,20 +278,12 @@ export function buildRelationAssemblyPacket(args: {
   if (ethosEvidence.length > 0) domainSet.add("ethos");
 
   const strictBridgeEvidence = args.strictBridgeEvidence === true;
-  const hasBridgeEvidenceMetadataGap = graphEvidenceContracts.some((entry) => !isBridgeEvidenceContractComplete(entry));
-  const hasBridgeEvidenceContractContradictionAny =
-    graphEvidenceContracts.some((entry) => hasBridgeEvidenceContractContradiction(entry)) ||
-    Array.from(graphEvidenceContractsByPath.values()).some((fingerprints) => fingerprints.size > 1);
+  const strictFailReason = classifyStrictBridgeEvidenceFailure(graphEvidenceContracts);
 
   return {
     question: args.question,
     domains: Array.from(domainSet).sort(),
-    fail_reason:
-      strictBridgeEvidence && hasBridgeEvidenceContractContradictionAny
-        ? "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY"
-        : strictBridgeEvidence && hasBridgeEvidenceMetadataGap
-          ? "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING"
-          : undefined,
+    fail_reason: strictBridgeEvidence ? strictFailReason : undefined,
     definitions: {
       warp_definition: warpDefinition,
       ethos_definition: ethosDefinition,
