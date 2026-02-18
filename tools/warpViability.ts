@@ -318,6 +318,73 @@ type PromotionDecision = {
     | "eligible";
 };
 
+type PromotionCounterexampleClass =
+  | "none"
+  | "provenance_missing"
+  | "strict_disabled"
+  | "hard_constraint_regression"
+  | "status_regression"
+  | "strict_signal_gap";
+
+const PROMOTION_COUNTEREXAMPLE_CLASS_BY_REASON: Record<PromotionDecision["reason"], PromotionCounterexampleClass> = {
+  insufficient_provenance: "provenance_missing",
+  strict_mode_disabled: "strict_disabled",
+  hard_constraint_failed: "hard_constraint_regression",
+  status_non_admissible: "status_regression",
+  strict_signal_missing: "strict_signal_gap",
+  eligible: "none",
+};
+
+const resolvePromotionCounterexampleClass = (
+  reason: PromotionDecision["reason"],
+): PromotionCounterexampleClass =>
+  PROMOTION_COUNTEREXAMPLE_CLASS_BY_REASON[reason] ?? "status_regression";
+
+const buildPromotionReplayPack = (args: {
+  strictMode: boolean;
+  decision: PromotionDecision;
+  status: ViabilityStatus;
+  hardConstraintPass: boolean;
+  thetaMetricDerived: boolean;
+  tsMetricDerived: boolean;
+  qiMetricDerived: boolean;
+  provenanceClass: ProvenanceClass;
+}) => {
+  const counterexampleClass = resolvePromotionCounterexampleClass(args.decision.reason);
+  const deterministicKey = [
+    `strict=${args.strictMode ? 1 : 0}`,
+    `provenance=${args.provenanceClass}`,
+    `hard=${args.hardConstraintPass ? 1 : 0}`,
+    `status=${args.status}`,
+    `theta=${args.thetaMetricDerived ? 1 : 0}`,
+    `ts=${args.tsMetricDerived ? 1 : 0}`,
+    `qi=${args.qiMetricDerived ? 1 : 0}`,
+    `reason=${args.decision.reason}`,
+    `tier=${args.decision.tier}`,
+    `cx=${counterexampleClass}`,
+  ].join("|");
+
+  return {
+    version: "promotion-replay-pack/v1",
+    deterministic_key: deterministicKey,
+    outcome: {
+      tier: args.decision.tier,
+      reason: args.decision.reason,
+      status: args.status,
+      conservative_downgrade: args.decision.tier !== "certified",
+      counterexample_class: counterexampleClass,
+    },
+    inputs: {
+      strict_mode: args.strictMode,
+      hard_constraint_pass: args.hardConstraintPass,
+      theta_metric_derived: args.thetaMetricDerived,
+      ts_metric_derived: args.tsMetricDerived,
+      qi_metric_derived: args.qiMetricDerived,
+      provenance_class: args.provenanceClass,
+    },
+  };
+};
+
 const CONFIDENCE_BY_PROVENANCE: Record<ProvenanceClass, ConfidenceBand> = {
   measured: { low: 0.8, high: 0.99 },
   inferred: { low: 0.5, high: 0.79 },
@@ -1211,6 +1278,7 @@ export async function evaluateWarpViability(
   const anyHardFail = results.some((c) => c.severity === "HARD" && !c.passed);
   const anySoftFail = results.some((c) => c.severity === "SOFT" && !c.passed);
   const status: ViabilityStatus = anyHardFail ? "INADMISSIBLE" : anySoftFail ? "MARGINAL" : "ADMISSIBLE";
+  const qiMetricDerived = qiSourceIsMetric(qiGuard?.rhoSource);
   const promotionDecisionFinal = resolvePromotionDecision({
     strictMode: strictCongruence,
     warpMechanicsProvenanceClass,
@@ -1218,10 +1286,23 @@ export async function evaluateWarpViability(
     status,
     thetaMetricDerived,
     tsMetricDerived,
-    qiMetricDerived: qiSourceIsMetric(qiGuard?.rhoSource),
+    qiMetricDerived,
+  });
+  const promotionReplayPack = buildPromotionReplayPack({
+    strictMode: strictCongruence,
+    decision: promotionDecisionFinal,
+    status,
+    hardConstraintPass: !anyHardFail,
+    thetaMetricDerived,
+    tsMetricDerived,
+    qiMetricDerived,
+    provenanceClass: warpMechanicsProvenanceClass,
   });
   snapshot.warp_mechanics_claim_tier = promotionDecisionFinal.tier;
   snapshot.warp_mechanics_promotion_reason = promotionDecisionFinal.reason;
+  snapshot.warp_mechanics_promotion_counterexample_class =
+    promotionReplayPack.outcome.counterexample_class;
+  snapshot.warp_mechanics_promotion_replay = promotionReplayPack;
 
   return {
     status,

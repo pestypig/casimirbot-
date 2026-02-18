@@ -33,6 +33,7 @@ describe("halobank horizons consistency gate", () => {
         ephemerisEvidenceRef: "artifact:jpl-horizons:run-123",
         residualPpm: 0.5,
         residualSampleCount: 7,
+        residualWindowHours: 72,
       },
     });
 
@@ -57,6 +58,7 @@ describe("halobank horizons consistency gate", () => {
         ephemerisEvidenceRef: "artifact:jpl-horizons:run-456",
         residualPpm: 7.4,
         residualSampleCount: 8,
+        residualWindowHours: 72,
       },
     });
 
@@ -79,6 +81,7 @@ describe("halobank horizons consistency gate", () => {
         ephemerisEvidenceRef: "horizons-run-456",
         residualPpm: 1.1,
         residualSampleCount: 8,
+        residualWindowHours: 72,
       },
     });
 
@@ -86,6 +89,30 @@ describe("halobank horizons consistency gate", () => {
     expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
     expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_EVIDENCE_REF_INVALID");
     expect(result.ephemeris?.provenance.evidence.verified).toBe(false);
+  });
+
+
+
+  it("returns FAIL gate when evidence window is below long-window calibration minimum", () => {
+    const result = computeHaloBankTimeModel({
+      question: "orbital alignment with horizons",
+      timestamp: "2025-03-01T12:00:00Z",
+      place: { lat: 10, lon: 20 },
+      model: {
+        orbitalAlignment: true,
+        ephemerisSource: "live",
+        ephemerisEvidenceVerified: true,
+        ephemerisEvidenceRef: "artifact:jpl-horizons:run-457",
+        residualPpm: 1.1,
+        residualSampleCount: 8,
+        residualWindowHours: 6,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_LONG_WINDOW_REQUIRED");
+    expect(result.ephemeris?.provenance.evidence.residualWindowStatus).toBe("short_window");
   });
 
   it("returns FAIL gate with deterministic firstFail on fallback ephemeris", () => {

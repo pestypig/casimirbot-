@@ -30,6 +30,7 @@ const Input = z.object({
       ephemerisEvidenceRef: z.string().optional(),
       residualPpm: z.number().optional(),
       residualSampleCount: z.number().nonnegative().optional(),
+      residualWindowHours: z.number().nonnegative().optional(),
     })
     .optional(),
   question: z.string().optional(),

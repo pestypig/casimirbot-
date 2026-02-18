@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T21:02:37.770Z",
+  "generated_at": "2026-02-18T21:02:35.065Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -14,14 +14,14 @@
   },
   "totals": {
     "tickets_total": 67,
-    "tickets_with_evidence": 65,
+    "tickets_with_evidence": 64,
     "claim_tier_counts": {
-      "diagnostic": 61,
+      "diagnostic": 60,
       "reduced-order": 4,
       "certified": 0
     },
-    "weighted_score_sum": 17.65,
-    "toe_progress_pct": 26.3,
+    "weighted_score_sum": 17.4,
+    "toe_progress_pct": 26,
     "forest_owner_coverage_pct": 100,
     "strict_ready_progress_pct": 6,
     "strict_ready_delta_ticket_count": 63,
@@ -34,8 +34,8 @@
       "blocked_ticket_count": 63,
       "ready_ticket_count": 4
     },
-    "research_gated_tickets_total": 20,
-    "research_artifact_complete_tickets_total": 19
+    "research_gated_tickets_total": 19,
+    "research_artifact_complete_tickets_total": 18
   },
   "segments": {
     "core": {
@@ -54,28 +54,28 @@
     },
     "extension": {
       "tickets_total": 57,
-      "tickets_with_evidence": 55,
+      "tickets_with_evidence": 54,
       "claim_tier_counts": {
-        "diagnostic": 52,
+        "diagnostic": 51,
         "reduced-order": 3,
         "certified": 0
       },
-      "weighted_score_sum": 14.8,
-      "toe_progress_pct": 26,
+      "weighted_score_sum": 14.55,
+      "toe_progress_pct": 25.5,
       "strict_ready_progress_pct": 5.3,
-      "research_gated_tickets_total": 20,
-      "research_artifact_complete_tickets_total": 19
+      "research_gated_tickets_total": 19,
+      "research_artifact_complete_tickets_total": 18
     },
     "combined": {
       "tickets_total": 67,
-      "tickets_with_evidence": 65,
+      "tickets_with_evidence": 64,
       "claim_tier_counts": {
-        "diagnostic": 61,
+        "diagnostic": 60,
         "reduced-order": 4,
         "certified": 0
       },
-      "weighted_score_sum": 17.65,
-      "toe_progress_pct": 26.3,
+      "weighted_score_sum": 17.4,
+      "toe_progress_pct": 26,
       "strict_ready_progress_pct": 6,
       "strict_ready_delta_ticket_count": 63,
       "strict_ready_release_gate": {
@@ -87,8 +87,8 @@
         "blocked_ticket_count": 63,
         "ready_ticket_count": 4
       },
-      "research_gated_tickets_total": 20,
-      "research_artifact_complete_tickets_total": 19
+      "research_gated_tickets_total": 19,
+      "research_artifact_complete_tickets_total": 18
     }
   },
   "strict_ready_delta_targets": [
@@ -448,12 +448,6 @@
     },
     {
       "ticket_id": "TOE-063-halobank-residual-reduced-order-hardening-pack",
-      "next_strict_ready_claim_tier": "reduced-order",
-      "requires_verified_pass": true,
-      "requires_research_artifact_completion": false
-    },
-    {
-      "ticket_id": "TOE-072-ideology-physics-bridge-adversarial-pack",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": false
@@ -1051,13 +1045,11 @@
       "result_file": null
     },
     {
-      "ticket_id": "TOE-072-ideology-physics-bridge-adversarial-pack",
-      "claim_tier": "diagnostic",
-      "verification_ok": true,
-      "score": 0.25,
-      "research_gated": true,
-      "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-072-ideology-physics-bridge-adversarial-pack.20260218T210055Z.json"
+      "ticket_id": "TOE-068-helix-ask-strict-fail-reason-ledger",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
     }
   ]
 }
