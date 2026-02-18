@@ -27,6 +27,40 @@ export type HelixAskMathSolveResult = {
   selectedSolution?: string;
   admissibleSolutions?: string[];
   maturityStage?: MathStage;
+  provenance_class?: "measured" | "proxy" | "inferred";
+  claim_tier?: "diagnostic" | "reduced-order" | "certified";
+  certifying?: boolean;
+  fail_reason?: string;
+};
+
+export type HelixAskMathSolveOptions = {
+  strictCertainty?: boolean;
+  certaintyEvidenceOk?: boolean;
+};
+
+const DEFAULT_CERTAINTY = {
+  provenance_class: "inferred",
+  claim_tier: "diagnostic",
+  certifying: false,
+} as const;
+
+const CERTAINTY_FAIL_REASON = "CERTAINTY_EVIDENCE_MISSING" as const;
+
+const withDefaultCertainty = (
+  result: HelixAskMathSolveResult,
+  options?: HelixAskMathSolveOptions,
+): HelixAskMathSolveResult => {
+  const enriched: HelixAskMathSolveResult = {
+    ...DEFAULT_CERTAINTY,
+    ...result,
+  };
+  if (options?.strictCertainty === true && options?.certaintyEvidenceOk !== true) {
+    return {
+      ...enriched,
+      fail_reason: CERTAINTY_FAIL_REASON,
+    };
+  }
+  return enriched;
 };
 
 const MATH_TRIGGER =
@@ -538,10 +572,17 @@ const resolveMathMaturityStage = (result: HelixAskMathSolveResult): MathStage =>
   return result.domainPass || result.residualPass ? "reduced-order" : "exploratory";
 };
 
-const attachMathMaturityStage = (result: HelixAskMathSolveResult): HelixAskMathSolveResult => ({
-  ...result,
-  maturityStage: resolveMathMaturityStage(result),
-});
+const attachMathMaturityStage = (
+  result: HelixAskMathSolveResult,
+  options?: HelixAskMathSolveOptions,
+): HelixAskMathSolveResult =>
+  withDefaultCertainty(
+    {
+      ...result,
+      maturityStage: resolveMathMaturityStage(result),
+    },
+    options,
+  );
 
 function solveWithNerdamer(question: string): HelixAskMathSolveResult | null {
   const normalizedQuestion = normalizeExpression(question);
@@ -640,10 +681,11 @@ function solveWithNerdamer(question: string): HelixAskMathSolveResult | null {
 
 export async function solveHelixAskMathQuestion(
   question: string,
+  options?: HelixAskMathSolveOptions,
 ): Promise<HelixAskMathSolveResult | null> {
   if (!isHelixAskMathQuestion(question)) return null;
   const jsResult = solveWithNerdamer(question);
-  if (jsResult) return attachMathMaturityStage(jsResult);
+  if (jsResult) return attachMathMaturityStage(jsResult, options);
   if (process.env.ENABLE_PY_CHECKERS !== "1") return null;
   const pythonBin = process.env.PYTHON_BIN || "python";
   const payload = JSON.stringify({ question });
@@ -658,19 +700,21 @@ export async function solveHelixAskMathQuestion(
       stderr += chunk.toString();
     });
     child.on("error", (error) => {
-      resolve({ ok: false, reason: `spawn_error:${error.message}` });
+      resolve(withDefaultCertainty({ ok: false, reason: `spawn_error:${error.message}` }, options));
     });
     child.on("close", () => {
       if (!stdout.trim()) {
         const suffix = stderr.trim() ? `:${stderr.trim().slice(0, 160)}` : "";
-        resolve({ ok: false, reason: `python_exit_empty${suffix}` });
+        resolve(withDefaultCertainty({ ok: false, reason: `python_exit_empty${suffix}` }, options));
         return;
       }
       try {
         const parsed = JSON.parse(stdout) as HelixAskMathSolveResult;
-        resolve(attachMathMaturityStage(parsed));
+        resolve(attachMathMaturityStage(parsed, options));
       } catch (error) {
-        resolve({ ok: false, reason: `parse_error:${(error as Error).message}` });
+        resolve(
+          withDefaultCertainty({ ok: false, reason: `parse_error:${(error as Error).message}` }, options),
+        );
       }
     });
     child.stdin.write(payload);
