@@ -48,6 +48,11 @@ export type HelixAskTopicProfile = {
   mustIncludePaths: RegExp[];
   mustIncludeFiles?: string[];
   minTierCandidates: number;
+  routingMetadata?: {
+    provenance_class: "inferred";
+    claim_tier: "diagnostic";
+    certifying: false;
+  };
 };
 
 const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
@@ -554,6 +559,7 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
   const mustIncludePaths: RegExp[] = [];
   const mustIncludeFiles: string[] = [];
   let minTierCandidates = 0;
+  let routingMetadata: HelixAskTopicProfile["routingMetadata"];
 
   if (tags.includes("helix_ask")) {
     allowlistTiers.push(HELIX_ASK_CORE_PATHS);
@@ -665,6 +671,11 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
   if (uiTagged) {
     boostPaths.push(...UI_PATHS);
     minTierCandidates = Math.max(minTierCandidates, 2);
+    routingMetadata = {
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    };
   }
 
   if (tags.includes("backend")) {
@@ -794,6 +805,7 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
     mustIncludePaths: unique(mustIncludePaths),
     mustIncludeFiles: mustIncludeFiles.length ? unique(mustIncludeFiles) : undefined,
     minTierCandidates,
+    routingMetadata,
   };
 }
 

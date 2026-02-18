@@ -140,6 +140,21 @@ describe("Helix Ask topic routing", () => {
     expect(tags).toContain("ui");
   });
 
+
+  it("adds UI-components routing metadata for ui-tagged profiles", () => {
+    const profile = buildHelixAskTopicProfile(["ui"]);
+    expect(profile?.routingMetadata).toEqual({
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    });
+  });
+
+  it("keeps non-ui profiles backward compatible without routing metadata", () => {
+    const profile = buildHelixAskTopicProfile(["warp"]);
+    expect(profile?.routingMetadata).toBeUndefined();
+  });
+
   it("tags simulation prompts as simulation", () => {
     const tags = inferHelixAskTopicTags("How do the simulation systems stream results into the app?");
     expect(tags).toContain("simulation");

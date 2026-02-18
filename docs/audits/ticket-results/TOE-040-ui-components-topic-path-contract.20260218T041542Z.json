@@ -1,0 +1,23 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-040-ui-components-topic-path-contract",
+  "files_changed": [
+    "server/services/helix-ask/topic.ts",
+    "server/services/helix-ask/paths.ts",
+    "tests/helix-ask-topic.spec.ts",
+    "tests/helix-ask-paths.spec.ts"
+  ],
+  "tests_run": [
+    "tests/helix-ask-topic.spec.ts",
+    "tests/helix-ask-paths.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:d9258550-fc61-4b71-bcf3-be21ccd214f1",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}
