@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { lumaGenerateHandler } from "../server/skills/luma.generate";
 import { getEnvelope, resetEnvelopeStore } from "../server/services/essence/store";
+import { withLumaGenerationProvenance } from "../server/services/luma";
 
 describe("luma.generate tool", () => {
   beforeEach(async () => {
@@ -21,6 +22,16 @@ describe("luma.generate tool", () => {
     expect(result.slicing).toBe(true);
     expect(result.lora_adapter).toContain("lcm");
     expect(result.data_url).toMatch(/^data:image\/svg\+xml;base64,/);
+
+    const enriched = withLumaGenerationProvenance(result, {
+      provenance_class: "synthetic",
+      maturity: "certifying",
+      certifying: true,
+    });
+    expect(enriched.essence_id).toBe(result.essence_id);
+    expect(enriched.provenance.provenance_class).toBe("synthetic");
+    expect(enriched.provenance.maturity).toBe("diagnostic");
+    expect(enriched.provenance.certifying).toBe(false);
 
     const envelope = await getEnvelope(result.essence_id);
     expect(envelope).not.toBeNull();

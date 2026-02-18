@@ -2,6 +2,67 @@ import { ETHOS_PROMPT } from "./luma-prompt";
 
 export type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
 
+export type LumaProvenanceClass = "measured" | "live" | "synthetic" | "missing";
+export type LumaMaturity = "certifying" | "diagnostic";
+
+export type LumaGenerationProvenance = {
+  provenance_class: LumaProvenanceClass;
+  maturity: LumaMaturity;
+  claim_tier: "certifying" | "diagnostic";
+  certifying: boolean;
+  provenance_present: boolean;
+  provenance_synthetic: boolean;
+};
+
+export type LumaProvenanceInput = {
+  provenance_class?: string | null;
+  maturity?: string | null;
+  certifying?: boolean | null;
+};
+
+export function resolveLumaGenerationProvenance(
+  input?: LumaProvenanceInput | null,
+): LumaGenerationProvenance {
+  const hasInput = !!input && typeof input === "object";
+  const rawClass = typeof input?.provenance_class === "string" ? input.provenance_class : "";
+  const normalizedClass = rawClass.trim().toLowerCase();
+
+  const provenance_class: LumaProvenanceClass =
+    normalizedClass === "measured" || normalizedClass === "live"
+      ? (normalizedClass as "measured" | "live")
+      : normalizedClass === "synthetic"
+        ? "synthetic"
+        : "missing";
+
+  if (provenance_class === "missing" || provenance_class === "synthetic") {
+    return {
+      provenance_class,
+      maturity: "diagnostic",
+      claim_tier: "diagnostic",
+      certifying: false,
+      provenance_present: false,
+      provenance_synthetic: provenance_class === "synthetic",
+    };
+  }
+
+  const inputMaturity =
+    typeof input?.maturity === "string" && input.maturity.trim().toLowerCase() === "certifying"
+      ? "certifying"
+      : "diagnostic";
+  const inputCertifying = input?.certifying === true;
+  const certifying = inputMaturity === "certifying" && inputCertifying;
+  const maturity: LumaMaturity = certifying ? "certifying" : "diagnostic";
+
+  return {
+    provenance_class,
+    maturity,
+    claim_tier: maturity,
+    certifying,
+    provenance_present: hasInput,
+    provenance_synthetic: false,
+  };
+}
+
 type Provider = "openai" | "ollama" | "vllm";
 const PROVIDER = (process.env.LUMA_PROVIDER || "openai") as Provider;
 const DEFAULT_MODEL_BY_PROVIDER: Record<Provider, string> = {
@@ -200,4 +261,15 @@ Only produce diff hunks; if uncertain, leave TODO comments instead of speculativ
     diff += delta;
   }
   return diff.trim();
+}
+
+
+export function withLumaGenerationProvenance<T extends Record<string, unknown>>(
+  output: T,
+  input?: LumaProvenanceInput | null,
+): T & { provenance: LumaGenerationProvenance } {
+  return {
+    ...output,
+    provenance: resolveLumaGenerationProvenance(input),
+  };
 }

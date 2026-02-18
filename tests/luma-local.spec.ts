@@ -3,6 +3,7 @@ import { generateLocalResponse } from "../client/src/lib/llm/local-generator";
 import type { RankedChunk } from "../client/src/lib/rag/local-rag";
 import { performance } from "perf_hooks";
 import { randomUUID } from "crypto";
+import { resolveLumaGenerationProvenance, withLumaGenerationProvenance } from "../server/services/luma";
 
 const baseChunk = (overrides: Partial<RankedChunk["chunk"]>, score: number): RankedChunk => {
   const chunk: RankedChunk["chunk"] = {
@@ -165,5 +166,39 @@ describe("local LLM generator", () => {
     expect(elapsedMs).toBeLessThan(1_200);
     const tokensPerSecond = (result.usage.completion / Math.max(elapsedMs, 1)) * 1000;
     expect(tokensPerSecond).toBeGreaterThanOrEqual(10);
+  });
+});
+
+
+describe("luma generation provenance metadata", () => {
+  test("missing or synthetic provenance resolves to diagnostic non-certifying", () => {
+    const missing = resolveLumaGenerationProvenance();
+    expect(missing.maturity).toBe("diagnostic");
+    expect(missing.claim_tier).toBe("diagnostic");
+    expect(missing.certifying).toBe(false);
+
+    const synthetic = resolveLumaGenerationProvenance({ provenance_class: "synthetic", maturity: "certifying", certifying: true });
+    expect(synthetic.provenance_class).toBe("synthetic");
+    expect(synthetic.maturity).toBe("diagnostic");
+    expect(synthetic.certifying).toBe(false);
+  });
+
+  test("metadata enrichment is additive and deterministic", () => {
+    const base = { essence_id: "id-1", model: "sd15-lcm" };
+    const first = withLumaGenerationProvenance(base, {
+      provenance_class: "measured",
+      maturity: "certifying",
+      certifying: true,
+    });
+    const repeat = withLumaGenerationProvenance(base, {
+      provenance_class: "measured",
+      maturity: "certifying",
+      certifying: true,
+    });
+
+    expect(first).toEqual(repeat);
+    expect(first.essence_id).toBe("id-1");
+    expect(first.provenance.maturity).toBe("certifying");
+    expect(first.provenance.certifying).toBe(true);
   });
 });
