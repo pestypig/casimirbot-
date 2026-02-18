@@ -1,5 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
+  "generated_at": "2026-02-18T23:38:54.774Z",
   "generated_at": "2026-02-18T23:36:23.777Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
@@ -16,6 +17,15 @@
     "tickets_total": 74,
     "tickets_with_evidence": 74,
     "claim_tier_counts": {
+      "diagnostic": 69,
+      "reduced-order": 5,
+      "certified": 0
+    },
+    "weighted_score_sum": 20.25,
+    "toe_progress_pct": 27.4,
+    "forest_owner_coverage_pct": 100,
+    "strict_ready_progress_pct": 6.8,
+    "strict_ready_delta_ticket_count": 69,
       "diagnostic": 67,
       "reduced-order": 7,
       "certified": 0
@@ -28,8 +38,14 @@
     "strict_ready_release_gate": {
       "status": "blocked",
       "blocked_reasons": [
-        "missing_verified_pass"
+        "missing_verified_pass",
+        "missing_research_artifacts"
       ],
+      "blocked_ticket_count": 69,
+      "ready_ticket_count": 5
+    },
+    "research_gated_tickets_total": 29,
+    "research_artifact_complete_tickets_total": 28
       "blocked_ticket_count": 67,
       "ready_ticket_count": 7
     },
@@ -55,6 +71,15 @@
       "tickets_total": 64,
       "tickets_with_evidence": 64,
       "claim_tier_counts": {
+        "diagnostic": 60,
+        "reduced-order": 4,
+        "certified": 0
+      },
+      "weighted_score_sum": 17.4,
+      "toe_progress_pct": 27.2,
+      "strict_ready_progress_pct": 6.3,
+      "research_gated_tickets_total": 29,
+      "research_artifact_complete_tickets_total": 28
         "diagnostic": 58,
         "reduced-order": 6,
         "certified": 0
@@ -69,6 +94,14 @@
       "tickets_total": 74,
       "tickets_with_evidence": 74,
       "claim_tier_counts": {
+        "diagnostic": 69,
+        "reduced-order": 5,
+        "certified": 0
+      },
+      "weighted_score_sum": 20.25,
+      "toe_progress_pct": 27.4,
+      "strict_ready_progress_pct": 6.8,
+      "strict_ready_delta_ticket_count": 69,
         "diagnostic": 67,
         "reduced-order": 7,
         "certified": 0
@@ -80,8 +113,14 @@
       "strict_ready_release_gate": {
         "status": "blocked",
         "blocked_reasons": [
-          "missing_verified_pass"
+          "missing_verified_pass",
+          "missing_research_artifacts"
         ],
+        "blocked_ticket_count": 69,
+        "ready_ticket_count": 5
+      },
+      "research_gated_tickets_total": 29,
+      "research_artifact_complete_tickets_total": 28
         "blocked_ticket_count": 67,
         "ready_ticket_count": 7
       },
@@ -491,6 +530,12 @@
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": true
     }
   ],
   "tickets": [
@@ -1152,6 +1197,13 @@
       "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T224927Z.json"
     },
     {
+      "ticket_id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": false,
+      "result_file": "docs/audits/ticket-results/TOE-074-stellar-ps1-bridges-owner-coverage-contract.20260218T233836Z.json"
       "ticket_id": "TOE-075-helix-ask-strict-ready-verified-pass-pack",
       "claim_tier": "reduced-order",
       "verification_ok": true,

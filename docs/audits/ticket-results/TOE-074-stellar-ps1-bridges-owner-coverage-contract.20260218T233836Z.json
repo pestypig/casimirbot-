@@ -1,0 +1,28 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
+  "files_changed": [
+    "configs/resolver-owner-coverage-manifest.v1.json",
+    "server/services/helix-ask/graph-resolver.ts",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+    "docs/audits/toe-progress-snapshot.json"
+  ],
+  "tests_run": [
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "scripts/validate-toe-ticket-backlog.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "scripts/validate-resolver-owner-coverage.ts",
+    "scripts/compute-toe-progress.ts",
+    "cli/casimir-verify.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:6de55ea6-66ab-4d11-ab8c-1f9e6ace5904",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

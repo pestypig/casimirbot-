@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  __testOnlyHasStellarBridgeEvidenceContract,
   __testOnlyNormalizeGraphEvidenceEntry,
   __testOnlyResolveBridgeMissingEvidencePath,
   __testOnlyResolveTreeNeighborIds,
@@ -357,6 +358,64 @@ describe("helix ask graph resolver congruence overrides", () => {
     expect(entry?.provenance_class).toBe("measured");
     expect(entry?.claim_tier).toBe("diagnostic");
     expect(entry?.certifying).toBe(false);
+  });
+
+
+  it("enforces deterministic stellar bridge evidence contract fields", () => {
+    const validContract = __testOnlyHasStellarBridgeEvidenceContract({
+      path: [
+        {
+          id: "bridge-orch-or-to-stellar-coherence",
+          nodeType: "bridge",
+          evidence: [
+            {
+              type: "doc",
+              path: "docs/stellar-consciousness-orch-or-review.md",
+              scope: "left",
+              provenance_class: "inferred",
+              claim_tier: "diagnostic",
+              certifying: false,
+            },
+            {
+              type: "doc",
+              path: "docs/knowledge/physics/no-feasibility-claims.md",
+              scope: "right",
+              provenance_class: "measured",
+              claim_tier: "certified",
+              certifying: true,
+            },
+          ],
+        },
+      ],
+    });
+    const invalidContract = __testOnlyHasStellarBridgeEvidenceContract({
+      path: [
+        {
+          id: "bridge-noise-spectrum-to-collapse-proxy",
+          nodeType: "bridge",
+          evidence: [
+            {
+              type: "doc",
+              path: "docs/knowledge/physics/uncertainty-mechanics.md",
+              scope: "left",
+              claim_tier: "diagnostic",
+              certifying: false,
+            },
+            {
+              type: "doc",
+              path: "docs/knowledge/bridges/ideology-physics-bridge-tree.json",
+              scope: "sideways",
+              provenance_class: "inferred",
+              claim_tier: "diagnostic",
+              certifying: true,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(validContract).toBe(true);
+    expect(invalidContract).toBe(false);
   });
 
   it("registers stellar PS1 bridge tree and preserves deterministic traversal order", () => {

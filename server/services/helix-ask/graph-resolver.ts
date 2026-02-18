@@ -1057,6 +1057,57 @@ type GraphFrameworkCandidate = {
 const scoreGraphCandidate = (anchorScore: number, pathScore: number, hitCount: number): number =>
   anchorScore * 2 + pathScore + hitCount;
 
+const VALID_BRIDGE_EVIDENCE_SCOPE = new Set(["left", "right"]);
+
+const hasStellarBridgeEvidenceContract = (framework: HelixAskGraphFramework): boolean => {
+  if (framework.treeId !== "stellar-ps1-bridges") return true;
+  const bridgeNodes = framework.path.filter(
+    (node) => node.nodeType === "bridge" || node.id.includes("bridge-"),
+  );
+  if (bridgeNodes.length === 0) return false;
+  const hasCertifyingEvidence = bridgeNodes.some((node) =>
+    (node.evidence ?? []).some((entry) => entry.certifying === true),
+  );
+  if (!hasCertifyingEvidence) return false;
+  return bridgeNodes.every((node) => {
+    const evidence = node.evidence ?? [];
+    if (evidence.length === 0) return false;
+    return evidence.every((entry) => {
+      const hasContractFields =
+        typeof entry.provenance_class === "string" &&
+        typeof entry.claim_tier === "string" &&
+        typeof entry.certifying === "boolean";
+      if (!hasContractFields) return false;
+      if (entry.scope && !VALID_BRIDGE_EVIDENCE_SCOPE.has(entry.scope)) return false;
+      return true;
+    });
+  });
+};
+
+export function __testOnlyHasStellarBridgeEvidenceContract(input: {
+  treeId?: string;
+  path: Array<{ id: string; nodeType?: string; evidence?: HelixAskGraphEvidence[] }>;
+}): boolean {
+  return hasStellarBridgeEvidenceContract({
+    treeId: input.treeId ?? "stellar-ps1-bridges",
+    treeLabel: input.treeId,
+    sourcePath: "tests/fixtures/stellar-bridge-contract.json",
+    anchors: [],
+    path: input.path.map((entry, depth) => ({
+      id: entry.id,
+      title: entry.id,
+      tags: [],
+      score: 1,
+      depth,
+      nodeType: entry.nodeType,
+      evidence: entry.evidence,
+    })),
+    scaffoldText: "",
+    contextText: "",
+    preferGraph: true,
+  });
+}
+
 const resolveBridgeMissingEvidencePath = (input: {
   question: string;
   tree: GraphTree;
@@ -1641,6 +1692,9 @@ const buildFrameworkCandidate = (
     congruenceDiagnostics: tree.congruenceDiagnostics,
     missingEvidencePath,
   };
+  if (!hasStellarBridgeEvidenceContract(framework)) {
+    framework.pathFallbackReason = framework.pathFallbackReason ?? "stellar_bridge_contract_invalid";
+  }
   return { framework, score: weightedScore, anchorScore, pathScore, hitCount };
 };
 
