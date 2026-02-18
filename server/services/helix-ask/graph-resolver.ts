@@ -38,6 +38,10 @@ export type HelixAskGraphEvidence = {
   field?: string;
   contains?: string;
   note?: string;
+  scope?: string;
+  provenance_class?: "measured" | "proxy" | "inferred";
+  claim_tier?: "diagnostic" | "reduced-order" | "certified";
+  certifying?: boolean;
 };
 
 export type HelixAskGraphFramework = {
@@ -427,8 +431,23 @@ const normalizeEvidenceEntry = (value: unknown): HelixAskGraphEvidence | null =>
   assignString("field");
   assignString("contains");
   assignString("note");
+  assignString("scope");
+  const rawProvenanceClass =
+    typeof raw.provenance_class === "string" ? raw.provenance_class.trim().toLowerCase() : "";
+  if (rawProvenanceClass === "measured" || rawProvenanceClass === "proxy" || rawProvenanceClass === "inferred") {
+    entry.provenance_class = rawProvenanceClass;
+  }
+  const rawClaimTier = typeof raw.claim_tier === "string" ? raw.claim_tier.trim().toLowerCase() : "";
+  if (rawClaimTier === "diagnostic" || rawClaimTier === "reduced-order" || rawClaimTier === "certified") {
+    entry.claim_tier = rawClaimTier;
+  }
+  if (typeof raw.certifying === "boolean") {
+    entry.certifying = raw.certifying;
+  }
   return entry;
 };
+
+export const __testOnlyNormalizeGraphEvidenceEntry = normalizeEvidenceEntry;
 
 const normalizeEvidenceList = (value: unknown): HelixAskGraphEvidence[] => {
   if (!Array.isArray(value)) return [];

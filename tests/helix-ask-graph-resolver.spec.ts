@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  __testOnlyNormalizeGraphEvidenceEntry,
   __testOnlyResolveTreeNeighborIds,
   resolveHelixAskGraphPack,
 } from "../server/services/helix-ask/graph-resolver";
@@ -339,4 +340,22 @@ describe("helix ask graph resolver congruence overrides", () => {
       expect(path[0]?.id).toBe(framework.rootId);
     }
   });
+
+  it("normalizes bridge evidence contract metadata fields additively", () => {
+    const entry = __testOnlyNormalizeGraphEvidenceEntry({
+      type: "doc",
+      path: "docs/knowledge/physics/einstein-field-equations.md",
+      scope: "left",
+      provenance_class: "MEASURED",
+      claim_tier: "Diagnostic",
+      certifying: false,
+    });
+
+    expect(entry).toBeTruthy();
+    expect(entry?.scope).toBe("left");
+    expect(entry?.provenance_class).toBe("measured");
+    expect(entry?.claim_tier).toBe("diagnostic");
+    expect(entry?.certifying).toBe(false);
+  });
+
 });
