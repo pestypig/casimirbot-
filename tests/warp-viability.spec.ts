@@ -115,7 +115,8 @@ describe("warp viability congruence wiring", () => {
     expect((ts as any)?.claim_tier).toBe("certified");
     expect((ts as any)?.confidence_band).toEqual({ low: 0.8, high: 0.99 });
     expect((result.snapshot as any).warp_mechanics_provenance_class).toBe("measured");
-    expect((result.snapshot as any).warp_mechanics_claim_tier).toBe("certified");
+    expect((result.snapshot as any).warp_mechanics_claim_tier).toBe("reduced-order");
+    expect((result.snapshot as any).warp_mechanics_promotion_reason).toBe("hard_constraint_failed");
     expect(cl3?.details).toContain("source=warp.metric.T00.natario.shift");
     expect(cl3?.details).not.toContain("T00_ref=n/a");
   });
@@ -320,6 +321,7 @@ describe("warp viability congruence wiring", () => {
     const result = await evaluateWarpViability({});
     expect((result.snapshot as any).warp_mechanics_provenance_class).toBe("proxy");
     expect((result.snapshot as any).warp_mechanics_claim_tier).toBe("diagnostic");
+    expect((result.snapshot as any).warp_mechanics_promotion_reason).toBe("insufficient_provenance");
     const ts = result.constraints.find((c) => c.id === "TS_ratio_min");
     expect((ts as any)?.claim_tier).toBe("diagnostic");
   });
