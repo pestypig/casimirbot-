@@ -6,8 +6,7 @@
     "server/modules/stellar/local-rest.ts",
     "server/routes/stellar.ts",
     "tests/stellar-runtime-contract.spec.ts",
-    "server/__tests__/star-equilibrium.spec.ts",
-    "docs/audits/ticket-results/TOE-036-stellar-restoration-runtime-provenance-contract.20260218T035555Z.json"
+    "server/__tests__/star-equilibrium.spec.ts"
   ],
   "tests_run": [
     "tests/stellar-runtime-contract.spec.ts",

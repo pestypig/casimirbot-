@@ -5,8 +5,7 @@
     "server/services/helix-ask/concepts.ts",
     "server/routes/agi.plan.ts",
     "tests/helix-ask-concepts.spec.ts",
-    "tests/helix-ask-modes.spec.ts",
-    "docs/audits/ticket-results/TOE-034-concepts-ontology-claim-tier-contract.20260218T035836Z.json"
+    "tests/helix-ask-modes.spec.ts"
   ],
   "tests_run": [
     "tests/helix-ask-concepts.spec.ts",

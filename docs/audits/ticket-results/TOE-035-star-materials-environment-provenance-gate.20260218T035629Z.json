@@ -7,8 +7,7 @@
     "server/routes/star.ts",
     "tests/solar-guardrails.spec.ts",
     "tests/solar-energy-adapter.spec.ts",
-    "server/__tests__/star-equilibrium.spec.ts",
-    "docs/audits/ticket-results/TOE-035-star-materials-environment-provenance-gate.20260218T035629Z.json"
+    "server/__tests__/star-equilibrium.spec.ts"
   ],
   "tests_run": [
     "tests/solar-guardrails.spec.ts",

@@ -4,8 +4,7 @@
   "files_changed": [
     "server/services/code-lattice/resonance.constants.ts",
     "server/services/code-lattice/resonance.ts",
-    "server/services/code-lattice/__tests__/casimir-resonance.spec.ts",
-    "docs/audits/ticket-results/TOE-032-resonance-source-provenance-contract.20260218T035326Z.json"
+    "server/services/code-lattice/__tests__/casimir-resonance.spec.ts"
   ],
   "tests_run": [
     "server/services/code-lattice/__tests__/casimir-resonance.spec.ts",
@@ -21,7 +20,5 @@
     "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
     "integrity_ok": true
   },
-  "remaining_gaps": [
-    "validate-toe-ticket-results currently fails because ticket_id TOE-032-resonance-source-provenance-contract is not present in the backlog files."
-  ]
+  "remaining_gaps": []
 }
