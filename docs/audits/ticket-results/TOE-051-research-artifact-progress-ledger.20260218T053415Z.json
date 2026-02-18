@@ -1,0 +1,32 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-051-research-artifact-progress-ledger",
+  "files_changed": [
+    "scripts/compute-toe-progress.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "tests/toe-progress.spec.ts",
+    "docs/audits/toe-progress-snapshot.json",
+    "docs/audits/ticket-results/README.md"
+  ],
+  "tests_run": [
+    "tests/toe-progress.spec.ts",
+    "npx vitest run tests/toe-progress.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-backlog.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run validate:toe:research-gates",
+    "npx tsx scripts/compute-toe-progress.ts",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:e6712615-3fcd-4977-bd23-a74190482336",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}

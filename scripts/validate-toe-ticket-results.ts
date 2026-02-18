@@ -6,6 +6,9 @@ type BacklogTicket = {
   id?: string;
   allowed_paths?: string[];
   required_tests?: string[];
+  research_gate?: {
+    required_artifacts?: string[];
+  };
 };
 
 type Backlog = {
@@ -25,12 +28,14 @@ type TicketResult = {
     certificate_hash?: string;
     integrity_ok?: boolean;
   };
+  research_artifacts?: string[];
 };
 
 type TicketScope = {
   id: string;
   allowedPaths: string[];
   requiredTests: string[];
+  requiredArtifacts: string[];
 };
 
 const PRIMARY_BACKLOG_PATH = path.resolve(
@@ -141,10 +146,26 @@ function loadTicketScopes(): Map<string, TicketScope> {
       const existing = scopes.get(id);
       if (existing) {
         const mergedAllowed = Array.from(new Set([...existing.allowedPaths, ...allowedPaths]));
+        const requiredArtifacts = Array.isArray(ticket.research_gate?.required_artifacts)
+          ? ticket.research_gate.required_artifacts
+              .map((value) => normalizePath(String(value)))
+              .filter(Boolean)
+          : [];
         const mergedRequired = Array.from(new Set([...existing.requiredTests, ...requiredTests]));
-        scopes.set(id, { id, allowedPaths: mergedAllowed, requiredTests: mergedRequired });
+        const mergedArtifacts = Array.from(new Set([...existing.requiredArtifacts, ...requiredArtifacts]));
+        scopes.set(id, {
+          id,
+          allowedPaths: mergedAllowed,
+          requiredTests: mergedRequired,
+          requiredArtifacts: mergedArtifacts,
+        });
       } else {
-        scopes.set(id, { id, allowedPaths, requiredTests });
+        const requiredArtifacts = Array.isArray(ticket.research_gate?.required_artifacts)
+          ? ticket.research_gate.required_artifacts
+              .map((value) => normalizePath(String(value)))
+              .filter(Boolean)
+          : [];
+        scopes.set(id, { id, allowedPaths, requiredTests, requiredArtifacts });
       }
     }
   }
@@ -167,7 +188,11 @@ function isTicketResultPath(repoRelativePath: string): boolean {
   return normalized.startsWith(`${resultsPrefix}/`) && normalized.endsWith(".json");
 }
 
-function validateTicketResultFile(filePath: string, scopes: Map<string, TicketScope>): {
+function validateTicketResultFile(
+  filePath: string,
+  scopes: Map<string, TicketScope>,
+  enforceResearchArtifacts: boolean,
+): {
   ticketId: string | null;
   filesChanged: string[];
 } {
@@ -259,6 +284,20 @@ function validateTicketResultFile(filePath: string, scopes: Map<string, TicketSc
       }
     }
 
+    const researchArtifacts = Array.isArray(parsed.research_artifacts)
+      ? parsed.research_artifacts.map((value) => normalizePath(String(value))).filter(Boolean)
+      : [];
+    const shouldCheckResearchArtifacts =
+      enforceResearchArtifacts || (Array.isArray(parsed.research_artifacts) && scope.requiredArtifacts.length > 0);
+    if (shouldCheckResearchArtifacts) {
+      const researchArtifactSet = new Set(researchArtifacts);
+      for (const requiredArtifact of scope.requiredArtifacts) {
+        if (!researchArtifactSet.has(requiredArtifact)) {
+          fail(`${repoPath}: required research artifact missing from research_artifacts: ${requiredArtifact}`);
+        }
+      }
+    }
+
     const testsRunSet = new Set(testsRun);
     for (const requiredTest of scope.requiredTests) {
       if (!testsRunSet.has(requiredTest)) {
@@ -272,6 +311,7 @@ function validateTicketResultFile(filePath: string, scopes: Map<string, TicketSc
 
 function main() {
   const requireForTicketPathChanges = hasFlag("--require-for-ticket-path-changes");
+  const enforceResearchArtifacts = hasFlag("--enforce-research-artifacts");
   const baseSha = readFlag("--base-sha");
   const headSha = readFlag("--head-sha") ?? "HEAD";
 
@@ -327,7 +367,7 @@ function main() {
   const seenTicketIds = new Set<string>();
 
   for (const filePath of filesToValidate) {
-    const result = validateTicketResultFile(filePath, scopes);
+    const result = validateTicketResultFile(filePath, scopes, enforceResearchArtifacts);
     if (result.ticketId) {
       seenTicketIds.add(result.ticketId);
     }
