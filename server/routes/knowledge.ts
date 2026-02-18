@@ -101,7 +101,14 @@ knowledgeRouter.post("/projects/sync", async (req, res) => {
     validated = validateKnowledgeContext(payload);
   } catch (error) {
     if (error instanceof KnowledgeValidationError) {
-      return res.status(error.status).json({ error: "knowledge_context_invalid", message: error.message });
+      return res.status(error.status).json({
+        error: "knowledge_context_invalid",
+        message: error.message,
+        fail_reason: error.failReason,
+        claim_tier: error.audit?.claim_tier,
+        provenance: error.audit?.provenance,
+        audit: error.audit,
+      });
     }
     throw error;
   }
