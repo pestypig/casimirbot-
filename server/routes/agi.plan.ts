@@ -12904,6 +12904,9 @@ type LocalAskResult = {
   };
   fail_reason?: string;
   fail_class?: string;
+  provenance_class?: "measured" | "proxy" | "inferred";
+  claim_tier?: "diagnostic" | "reduced-order" | "certified";
+  certifying?: boolean;
   [key: string]: unknown;
 };
 
@@ -20214,6 +20217,25 @@ const executeHelixAsk = async ({
     let failClosedRepoEvidence = false;
     let failClosedReason: string | null = null;
     let runtimeBudgetRecommend: string | null = null;
+    const arbiterAnswerArtifacts: {
+      provenance_class: "measured" | "proxy" | "inferred";
+      claim_tier: "diagnostic" | "reduced-order" | "certified";
+      certifying: boolean;
+      fail_reason?: string;
+    } = {
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    };
+    const applyArbiterAnswerArtifacts = (target: LocalAskResult): void => {
+      target.provenance_class = arbiterAnswerArtifacts.provenance_class;
+      target.claim_tier = arbiterAnswerArtifacts.claim_tier;
+      target.certifying = arbiterAnswerArtifacts.certifying;
+      if (!target.fail_reason && arbiterAnswerArtifacts.fail_reason) {
+        target.fail_reason = arbiterAnswerArtifacts.fail_reason;
+        target.fail_class = "input_contract";
+      }
+    };
     let runtimeMustIncludeOk = true;
     let runtimeViabilityMustIncludeOk = true;
     let retrievalConfidence = 0;
@@ -22638,6 +22660,10 @@ const executeHelixAsk = async ({
           strictConceptProvenance === true && arbiterDecision.fail_reason
             ? arbiterDecision.fail_reason
             : null;
+        arbiterAnswerArtifacts.provenance_class = arbiterDecision.provenance_class;
+        arbiterAnswerArtifacts.claim_tier = arbiterDecision.claim_tier;
+        arbiterAnswerArtifacts.certifying = arbiterDecision.certifying;
+        arbiterAnswerArtifacts.fail_reason = arbiterDecision.fail_reason;
         logEvent(
           "Arbiter",
           arbiterMode,
@@ -24433,6 +24459,7 @@ const executeHelixAsk = async ({
             .filter((entry) => entry.decision === "deadline")
             .map((entry) => `${entry.stage}:${entry.reason}`);
         }
+        applyArbiterAnswerArtifacts(result);
         const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
         responder.send(200, responsePayload);
         return;
@@ -24501,6 +24528,7 @@ const executeHelixAsk = async ({
             .filter((entry) => entry.decision === "deadline")
             .map((entry) => `${entry.stage}:${entry.reason}`);
         }
+        applyArbiterAnswerArtifacts(fastResult);
         const responsePayload = debugPayload ? { ...fastResult, debug: debugPayload } : fastResult;
         responder.send(200, responsePayload);
         return;
@@ -27200,14 +27228,7 @@ const executeHelixAsk = async ({
       result.fail_reason = strictReadyFailReason;
       result.fail_class = "input_contract";
     }
-    result.claim_tier =
-      result.viewer_launch?.claim_tier ?? result.concept?.claim_tier ?? result.claim_tier ?? "diagnostic";
-    result.provenance_class =
-      result.viewer_launch?.provenance_class ??
-      result.concept?.provenance_class ??
-      result.provenance_class ??
-      "inferred";
-    result.certifying = result.viewer_launch?.params?.certifying ?? result.concept?.certifying ?? false;
+    applyArbiterAnswerArtifacts(result);
     if (debugPayload && captureLiveHistory) {
       const traceEvents = liveEventHistory.slice();
       debugPayload.live_events = traceEvents;
