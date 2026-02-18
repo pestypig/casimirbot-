@@ -88,6 +88,9 @@ describe("training-trace API", () => {
         data: {
           episodeId: "episode-1",
           primitivePath: ["approach", "grasp", "place"],
+          provenanceClass: "robotics.demonstration",
+          sensorChannelCoverage: ["camera.rgb", "force.torque"],
+          certificateRefs: ["cert-hash-1", "cert-id-1"],
           metrics: { optimism: 0.81, entropy: 0.12 },
           events: [
             { phase: "sense", ts: new Date().toISOString() },
@@ -116,6 +119,9 @@ describe("training-trace API", () => {
     const movement = parsed.find((entry) => entry.payload?.kind === "movement_episode");
     expect(movement?.payload?.data?.metrics?.optimism).toBe(0.81);
     expect(movement?.payload?.data?.metrics?.entropy).toBe(0.12);
+    expect(movement?.payload?.data?.provenanceClass).toBe("robotics.demonstration");
+    expect(movement?.payload?.data?.sensorChannelCoverage).toEqual(["camera.rgb", "force.torque"]);
+    expect(movement?.payload?.data?.certificateRefs).toEqual(["cert-hash-1", "cert-id-1"]);
   });
 
   it("exports JSONL", async () => {

@@ -26,7 +26,7 @@ const setCors = (res: Response) => {
 };
 
 
-type CanonicalFirstFailClass = "constraint" | "certificate_integrity" | "certificate_status" | "certificate_missing";
+type CanonicalFirstFailClass = "constraint" | "certificate_integrity" | "certificate_status" | "certificate_missing" | "robotics_safety";
 
 const normalizeFailFirstFail = (
   verdict: "PASS" | "FAIL",
@@ -50,7 +50,9 @@ const normalizeFailFirstFail = (
       ? "ADAPTER_CERTIFICATE_MISSING"
       : canonicalClass === "certificate_status"
         ? `ADAPTER_CERTIFICATE_STATUS_${certificateStatus.toUpperCase()}`
-        : "ADAPTER_CONSTRAINT_FAIL";
+        : canonicalClass === "robotics_safety"
+          ? "ROBOTICS_SAFETY_ENVELOPE_FAIL"
+          : "ADAPTER_CONSTRAINT_FAIL";
   return {
     id,
     severity: "HARD",
@@ -78,28 +80,28 @@ const buildRoboticsSafetyGate = (
 ): RoboticsSafetyGateResult => {
   const checks = [
     {
-      id: "collision.margin",
+      id: "ROBOTICS_SAFETY_COLLISION_MARGIN",
       pass: roboticsSafety.collisionMargin_m >= roboticsSafety.collisionMarginMin_m,
       value: roboticsSafety.collisionMargin_m,
       limit: `>= ${roboticsSafety.collisionMarginMin_m}`,
       severity: "HARD",
     },
     {
-      id: "torque.bounds",
+      id: "ROBOTICS_SAFETY_TORQUE_BOUNDS",
       pass: roboticsSafety.torqueUsageRatio <= roboticsSafety.torqueUsageMax,
       value: roboticsSafety.torqueUsageRatio,
       limit: `<= ${roboticsSafety.torqueUsageMax}`,
       severity: "HARD",
     },
     {
-      id: "speed.bounds",
+      id: "ROBOTICS_SAFETY_SPEED_BOUNDS",
       pass: roboticsSafety.speedUsageRatio <= roboticsSafety.speedUsageMax,
       value: roboticsSafety.speedUsageRatio,
       limit: `<= ${roboticsSafety.speedUsageMax}`,
       severity: "HARD",
     },
     {
-      id: "stability.margin",
+      id: "ROBOTICS_SAFETY_STABILITY_MARGIN",
       pass: roboticsSafety.stabilityMargin >= roboticsSafety.stabilityMarginMin,
       value: roboticsSafety.stabilityMargin,
       limit: `>= ${roboticsSafety.stabilityMarginMin}`,
@@ -123,7 +125,7 @@ const buildRoboticsSafetyGate = (
   const integrityOk = (roboticsSafety.integrityOk ?? true) && integrityByHash;
   const certificateFail = !integrityOk
     ? {
-        id: "robotics.certificate.integrity",
+        id: "ROBOTICS_CERTIFICATE_INTEGRITY",
         pass: false,
         value: 0,
         limit: "integrityOk=true",
@@ -171,7 +173,7 @@ const buildRoboticsSafetyGate = (
           status: "fail",
           value: firstFailCheck.value,
           limit: firstFailCheck.limit,
-          note: "robotics-safety-veto",
+          note: "class=robotics_safety,robotics-safety-veto",
         }
       : undefined,
     deltas,
@@ -183,6 +185,27 @@ const buildRoboticsSafetyGate = (
     },
   };
 };
+
+const deriveRoboticsEpisodeProvenance = (
+  roboticsSafety: AdapterRoboticsSafety,
+  certificate: { certificateHash: string | null; certificateId: string | null },
+) => ({
+  provenanceClass: "robotics.demonstration" as const,
+  sensorChannelCoverage: ["collision", "torque", "speed", "stability"],
+  certificateRefs: [certificate.certificateHash, certificate.certificateId].filter(
+    (value): value is string => Boolean(value),
+  ),
+  replaySeed: [
+    roboticsSafety.collisionMargin_m,
+    roboticsSafety.collisionMarginMin_m,
+    roboticsSafety.torqueUsageRatio,
+    roboticsSafety.torqueUsageMax,
+    roboticsSafety.speedUsageRatio,
+    roboticsSafety.speedUsageMax,
+    roboticsSafety.stabilityMargin,
+    roboticsSafety.stabilityMarginMin,
+  ].join("|"),
+});
 
 const hasForbiddenActuationCommand = (actions?: AdapterAction[]): boolean => {
   if (!Array.isArray(actions)) return false;
@@ -241,6 +264,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
   if (roboticsSafety) {
     const safety = buildRoboticsSafetyGate(roboticsSafety);
     if (!safety.pass) {
+      const roboticsProvenance = deriveRoboticsEpisodeProvenance(roboticsSafety, safety.certificate);
       recordTrainingTrace({
         traceId,
         tenantId: tenantGuard.tenantId,
@@ -248,6 +272,33 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         deltas: safety.deltas,
         firstFail: safety.firstFail,
         certificate: safety.certificate,
+        payload: {
+          kind: "movement_episode",
+          data: {
+            episodeId: `${traceId}:robotics-veto`,
+            traceId,
+            primitivePath: ["robotics-safety-v1", "gate-veto"],
+            provenanceClass: roboticsProvenance.provenanceClass,
+            sensorChannelCoverage: roboticsProvenance.sensorChannelCoverage,
+            certificateRefs: roboticsProvenance.certificateRefs,
+            metrics: {
+              optimism: 0,
+              entropy: 0,
+            },
+            events: [
+              {
+                phase: "compare",
+                ts: new Date().toISOString(),
+                metadata: {
+                  gate: "robotics-safety-v1",
+                  firstFailId: safety.firstFail?.id,
+                },
+              },
+            ],
+            replaySeed: roboticsProvenance.replaySeed,
+            notes: ["robotics-safety-veto"],
+          },
+        },
         notes: ["phase=5", "robotics-safety=veto"],
       });
       return res.json({
@@ -255,7 +306,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         runId: `robotics-veto:${crypto.randomUUID()}`,
         verdict: "FAIL",
         pass: false,
-        firstFail: normalizeFailFirstFail("FAIL", safety.firstFail ?? null, safety.certificate),
+        firstFail: safety.firstFail ?? normalizeFailFirstFail("FAIL", null, safety.certificate),
         deltas: safety.deltas,
         premeditation: premeditationResult,
         certificate: safety.certificate,
@@ -292,6 +343,9 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
           | { status?: string; certificateHash?: string | null; integrityOk?: boolean }
           | null,
       );
+      const certificateRefs = [result.certificate?.certificateHash, result.certificate?.certificateId].filter(
+        (value): value is string => Boolean(value),
+      );
       recordTrainingTrace({
         traceId,
         tenantId: tenantGuard.tenantId,
@@ -311,6 +365,9 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
             primitivePath: premeditationResult.chosenCandidateId
               ? [premeditationResult.chosenCandidateId]
               : [],
+            provenanceClass: "robotics.demonstration",
+            sensorChannelCoverage: ["controller.intent", "trajectory.replay"],
+            certificateRefs,
             metrics: {
               optimism: premeditationResult.optimism,
               entropy: premeditationResult.entropy,
@@ -330,10 +387,35 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
                 controllerRef: "gr-agent-loop",
               },
             ],
+            replaySeed: `${traceId}:${premeditationResult.chosenCandidateId ?? "none"}`,
             notes: premeditationResult.rationaleTags,
           },
         },
         notes: ["phase=2", "premeditation=enabled"],
+      });
+      recordTrainingTrace({
+        traceId,
+        tenantId: tenantGuard.tenantId,
+        pass: result.pass,
+        deltas: result.deltas,
+        firstFail: normalizedFirstFail ?? undefined,
+        certificate: result.certificate ?? undefined,
+        payload: {
+          kind: "trajectory_replay_summary",
+          data: {
+            createdAt: nowIso,
+            total: 1,
+            accepted: result.pass ? 1 : 0,
+            acceptanceRate: result.pass ? 1 : 0,
+            byFailure: normalizedFirstFail ? { [normalizedFirstFail.id]: 1 } : {},
+          },
+          provenance: {
+            provenanceClass: "robotics.demonstration",
+            sensorChannelCoverage: ["controller.intent", "trajectory.replay"],
+            certificateRefs,
+          },
+        },
+        notes: ["phase=3", "trajectory-replay-summary=linked"],
       });
     }
 

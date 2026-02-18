@@ -4,6 +4,7 @@ import request from "supertest";
 
 const runMock = vi.hoisted(() => vi.fn());
 const recordMock = vi.hoisted(() => vi.fn());
+const traceRecordMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../gr/gr-agent-loop.js", () => ({
   runGrAgentLoop: (...args: unknown[]) => runMock(...args),
@@ -12,6 +13,16 @@ vi.mock("../gr/gr-agent-loop.js", () => ({
 vi.mock("../services/observability/gr-agent-loop-store.js", () => ({
   recordGrAgentLoopRun: (...args: unknown[]) => recordMock(...args),
 }));
+
+vi.mock("../services/observability/training-trace-store.js", async () => {
+  const actual = await vi.importActual<typeof import("../services/observability/training-trace-store")>(
+    "../services/observability/training-trace-store",
+  );
+  return {
+    ...actual,
+    recordTrainingTrace: (...args: unknown[]) => traceRecordMock(...args),
+  };
+});
 
 type AdapterRouterModule = typeof import("../routes/agi.adapter");
 
@@ -64,6 +75,17 @@ beforeEach(() => {
   recordMock.mockReset();
   runMock.mockResolvedValue(mockResult);
   recordMock.mockReturnValue({ id: "run-1" });
+  traceRecordMock.mockReset();
+  traceRecordMock.mockImplementation((input: any) => ({
+    kind: "training-trace",
+    version: 1,
+    id: "trace-rec-1",
+    seq: 1,
+    ts: new Date().toISOString(),
+    pass: input?.pass ?? false,
+    deltas: input?.deltas ?? [],
+    ...input,
+  }));
 });
 
 describe("agi adapter API", () => {
@@ -198,9 +220,75 @@ describe("agi adapter API", () => {
 
     expect(response.body?.verdict).toBe("FAIL");
     expect(response.body?.pass).toBe(false);
-    expect(response.body?.firstFail?.id).toBe("collision.margin");
+    expect(response.body?.firstFail?.id).toBe("ROBOTICS_SAFETY_COLLISION_MARGIN");
     expect(response.body?.certificate?.integrityOk).toBe(true);
     expect(runMock).not.toHaveBeenCalled();
+    expect(traceRecordMock).toHaveBeenCalledTimes(1);
+    const traceInput = traceRecordMock.mock.calls[0]?.[0];
+    expect(traceInput?.payload?.kind).toBe("movement_episode");
+    expect(traceInput?.payload?.data?.provenanceClass).toBe("robotics.demonstration");
+    expect(traceInput?.payload?.data?.sensorChannelCoverage).toEqual([
+      "collision",
+      "torque",
+      "speed",
+      "stability",
+    ]);
+    expect(traceInput?.payload?.data?.certificateRefs).toEqual(
+      expect.arrayContaining([response.body?.certificate?.certificateHash, response.body?.certificate?.certificateId]),
+    );
+  });
+
+
+  it("records deterministic action -> gate -> certificate -> replay summary linkage", async () => {
+    runMock.mockResolvedValue({
+      ...mockResult,
+      accepted: true,
+      attempts: [
+        {
+          ...mockResult.attempts[0],
+          evaluation: {
+            constraints: [],
+            certificate: {
+              certificateHash: "cert-link-hash",
+              certificateId: "cert-link-id",
+              integrityOk: true,
+            },
+          },
+        },
+      ],
+    });
+
+    await request(app)
+      .post("/api/agi/adapter/run")
+      .send({
+        traceId: "trace-linkage-1",
+        actions: [{ id: "move-1", kind: "intent", params: { heading: 10 } }],
+        premeditation: {
+          candidates: [
+            {
+              id: "cand-link",
+              valueLongevity: 0.9,
+              risk: 0.1,
+              entropy: 0.2,
+            },
+          ],
+        },
+      })
+      .expect(200);
+
+    expect(traceRecordMock).toHaveBeenCalledTimes(2);
+    const movement = traceRecordMock.mock.calls[0]?.[0];
+    const replay = traceRecordMock.mock.calls[1]?.[0];
+    expect(movement?.payload?.kind).toBe("movement_episode");
+    expect(movement?.payload?.data?.primitivePath).toEqual(["cand-link"]);
+    expect(movement?.certificate?.certificateHash).toBe("cert-link-hash");
+    expect(replay?.payload?.kind).toBe("trajectory_replay_summary");
+    expect(replay?.payload?.provenance?.certificateRefs).toContain("cert-link-hash");
+    expect(replay?.payload?.provenance?.certificateRefs).toContain("cert-link-id");
+    expect(replay?.payload?.provenance?.sensorChannelCoverage).toEqual([
+      "controller.intent",
+      "trajectory.replay",
+    ]);
   });
 
   it("evaluates constraint pack runs via adapter", async () => {

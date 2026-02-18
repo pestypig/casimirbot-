@@ -22,6 +22,8 @@ describe("robotics handback bundle", () => {
     expect(bundle.openRisks.length).toBeGreaterThan(0);
     expect(bundle.nextRung.length).toBeGreaterThan(0);
     expect(bundle.runbookRef).toBe("docs/robotics-threshold-tuning-runbook.md");
+    expect(bundle.replayLinkage.movementEpisodeCount).toBeGreaterThanOrEqual(0);
+    expect(bundle.replayLinkage.replaySummaryCount).toBeGreaterThanOrEqual(0);
   });
 
   it("exposes handback summary endpoint", async () => {
@@ -38,5 +40,6 @@ describe("robotics handback bundle", () => {
     expect(response.body?.bundle?.benchmark?.traceId).toBe("benchmark:pick-place");
     expect(Array.isArray(response.body?.bundle?.openRisks)).toBe(true);
     expect(response.body?.bundle?.runbookRef).toBe("docs/robotics-threshold-tuning-runbook.md");
+    expect(response.body?.bundle?.replayLinkage).toBeTruthy();
   });
 });
