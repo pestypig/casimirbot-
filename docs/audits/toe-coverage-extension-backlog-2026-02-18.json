@@ -578,6 +578,132 @@
         "Route-level stellar responses preserve backward compatibility and include deterministic fallback fail_reason metadata",
         "Stellar runtime contract tests verify default, strict/fallback, and pass-through behaviors"
       ]
+    },
+    {
+      "id": "TOE-037-certainty-framework-claim-contract",
+      "tree_owner": "certainty-framework",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Certainty framework claim contract primitive",
+      "primary_path_prefix": "server/services/helix-ask/math.ts",
+      "allowed_paths": [
+        "server/services/helix-ask/math.ts",
+        "server/services/helix-ask/arbiter.ts",
+        "tests/helix-ask-math.spec.ts",
+        "tests/helix-ask-arbiter.spec.ts"
+      ],
+      "required_tests": [
+        "tests/helix-ask-math.spec.ts",
+        "tests/helix-ask-arbiter.spec.ts"
+      ],
+      "done_criteria": [
+        "Additive certainty metadata contract is present with conservative defaults",
+        "Strict certainty mode emits deterministic fail_reason on missing evidence",
+        "Math/arbiter tests verify default, strict, and passthrough behavior"
+      ]
+    },
+    {
+      "id": "TOE-038-ideology-physics-bridge-evidence-contract",
+      "tree_owner": "ideology-physics-bridge",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Ideology-physics bridge evidence contract primitive",
+      "primary_path_prefix": "server/services/helix-ask/graph-resolver.ts",
+      "allowed_paths": [
+        "server/services/helix-ask/graph-resolver.ts",
+        "server/services/helix-ask/relation-assembly.ts",
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts"
+      ],
+      "required_tests": [
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts"
+      ],
+      "done_criteria": [
+        "Bridge outputs include additive evidence provenance + claim-tier fields",
+        "Strict bridge mode emits deterministic fail_reason when bridge evidence is missing",
+        "Bridge + graph-resolver tests verify deterministic behavior and compatibility"
+      ]
+    },
+    {
+      "id": "TOE-039-ethos-knowledge-provenance-gate",
+      "tree_owner": "ethos-knowledge",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Ethos knowledge provenance gate primitive",
+      "primary_path_prefix": "server/routes/ethos.ts",
+      "allowed_paths": [
+        "server/routes/ethos.ts",
+        "server/services/ideology/render.ts",
+        "server/services/ideology/artifacts.ts",
+        "tests/ideology-dag.spec.ts",
+        "tests/ideology-telemetry.spec.ts"
+      ],
+      "required_tests": [
+        "tests/ideology-dag.spec.ts",
+        "tests/ideology-telemetry.spec.ts"
+      ],
+      "done_criteria": [
+        "Ethos knowledge responses expose additive provenance/claim-tier metadata",
+        "Strict provenance mode emits deterministic fail_reason on missing ethos evidence",
+        "Ideology DAG and telemetry tests validate strict/default behavior"
+      ]
+    },
+    {
+      "id": "TOE-040-ui-components-topic-path-contract",
+      "tree_owner": "ui-components",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "UI components topic/path contract primitive",
+      "primary_path_prefix": "server/services/helix-ask/topic.ts",
+      "allowed_paths": [
+        "server/services/helix-ask/topic.ts",
+        "server/services/helix-ask/paths.ts",
+        "tests/helix-ask-topic.spec.ts",
+        "tests/helix-ask-paths.spec.ts"
+      ],
+      "required_tests": [
+        "tests/helix-ask-topic.spec.ts",
+        "tests/helix-ask-paths.spec.ts"
+      ],
+      "done_criteria": [
+        "UI-components routing path selection is deterministic and provenance-tagged",
+        "Strict mode emits deterministic fail_reason on missing UI path evidence",
+        "Topic/paths tests verify additive compatibility and strict-fail behavior"
+      ]
+    },
+    {
+      "id": "TOE-041-packages-retrieval-provenance-contract",
+      "tree_owner": "packages",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Packages retrieval provenance contract primitive",
+      "primary_path_prefix": "server/services/helix-ask/repo-search.ts",
+      "allowed_paths": [
+        "server/services/helix-ask/repo-search.ts",
+        "server/services/helix-ask/intent-directory.ts",
+        "tests/helix-ask-repo-search.spec.ts",
+        "tests/helix-ask-routing.spec.ts"
+      ],
+      "required_tests": [
+        "tests/helix-ask-repo-search.spec.ts",
+        "tests/helix-ask-routing.spec.ts"
+      ],
+      "done_criteria": [
+        "Packages retrieval results include additive provenance_class/claim_tier/certifying",
+        "Strict packages mode emits deterministic fail_reason when package evidence is missing",
+        "Repo-search and routing tests verify default/strict/passthrough behavior"
+      ]
     }
   ]
 }
