@@ -26,6 +26,19 @@ export type EvidenceClaimCoverage = {
   unsupported: string[];
 };
 
+export type ClaimCitationLinkageFailReason =
+  | "CLAIM_CITATION_LINK_MISSING"
+  | "CLAIM_CITATION_LINK_WEAK";
+
+export type ClaimCitationLinkageResult = {
+  ok: boolean;
+  claimCount: number;
+  citationCount: number;
+  linkedCount: number;
+  unlinkedClaims: string[];
+  failReason?: ClaimCitationLinkageFailReason;
+};
+
 const HELIX_ASK_STOP_TOKENS = new Set([
   "the",
   "a",
@@ -142,6 +155,10 @@ const CLAIM_LINE_PREFIX = /^\s*(?:[-*]|\d+\.)\s+/;
 const CLAIM_CITATION_RE =
   /\s*\([^)]*(?:\/|\.tsx?|\.jsx?|\.json|\.md|\.yml|gate:|certificate:)[^)]*\)\s*[.!?]*\s*$/gi;
 const SENTENCE_SPLIT = /(?<=[.!?])\s+/;
+const CITATION_PATH_RE =
+  /\b[a-z0-9_./-]+\.(?:ts|tsx|js|jsx|json|md|yml|yaml|py|go|rs|java|cpp|c|h)\b/gi;
+const CITATION_TOKEN_RE = /\b(?:gate|certificate):[a-z0-9_./:-]+\b/gi;
+const SOURCES_LINE_RE = /^\s*sources?\s*:\s*(.+)$/i;
 
 const buildEligibilityTokens = (
   question: string,
@@ -290,5 +307,95 @@ export function evaluateClaimCoverage(
     supportRatio,
     supported,
     unsupported,
+  };
+}
+
+const extractCitationTokens = (value: string): string[] => {
+  if (!value) return [];
+  const out = new Set<string>();
+  const pathMatches = value.match(CITATION_PATH_RE) ?? [];
+  for (const token of pathMatches) {
+    out.add(token.trim());
+  }
+  const citeMatches = value.match(CITATION_TOKEN_RE) ?? [];
+  for (const token of citeMatches) {
+    out.add(token.trim());
+  }
+  return Array.from(out);
+};
+
+export function evaluateClaimCitationLinkage(
+  answerText: string,
+  citationHints: string[] = [],
+): ClaimCitationLinkageResult {
+  const claims = extractClaimCandidates(answerText, 12);
+  const claimCount = claims.length;
+  if (claimCount === 0) {
+    return {
+      ok: true,
+      claimCount,
+      citationCount: 0,
+      linkedCount: 0,
+      unlinkedClaims: [],
+    };
+  }
+
+  const inlineCitationTokens = extractCitationTokens(answerText);
+  const sourcesCitationTokens = answerText
+    .split(/\r?\n/)
+    .map((line) => line.match(SOURCES_LINE_RE))
+    .filter((match): match is RegExpMatchArray => Boolean(match?.[1]))
+    .flatMap((match) => extractCitationTokens(match[1]));
+  const citations = uniqueTokens([
+    ...inlineCitationTokens,
+    ...sourcesCitationTokens,
+    ...citationHints,
+  ]);
+
+  if (citations.length === 0) {
+    return {
+      ok: false,
+      claimCount,
+      citationCount: 0,
+      linkedCount: 0,
+      unlinkedClaims: claims,
+      failReason: "CLAIM_CITATION_LINK_MISSING",
+    };
+  }
+
+  const reserve = citations.slice();
+  const unlinkedClaims: string[] = [];
+  let linkedCount = 0;
+  for (const claim of claims) {
+    const claimCitations = extractCitationTokens(claim);
+    if (claimCitations.length > 0) {
+      linkedCount += 1;
+      continue;
+    }
+    if (reserve.length > 0) {
+      reserve.shift();
+      linkedCount += 1;
+      continue;
+    }
+    unlinkedClaims.push(claim);
+  }
+
+  if (unlinkedClaims.length > 0) {
+    return {
+      ok: false,
+      claimCount,
+      citationCount: citations.length,
+      linkedCount,
+      unlinkedClaims,
+      failReason: "CLAIM_CITATION_LINK_WEAK",
+    };
+  }
+
+  return {
+    ok: true,
+    claimCount,
+    citationCount: citations.length,
+    linkedCount,
+    unlinkedClaims: [],
   };
 }

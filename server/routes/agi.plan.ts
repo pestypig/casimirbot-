@@ -141,6 +141,7 @@ import {
 } from "../services/helix-ask/doc-sections";
 import {
   evaluateClaimCoverage,
+  evaluateClaimCitationLinkage,
   evaluateEvidenceEligibility,
   evaluateEvidenceCritic,
   extractClaimCandidates,
@@ -27095,6 +27096,26 @@ const executeHelixAsk = async ({
         if (debugPayload) {
           debugPayload.citation_contract_applied = true;
           debugPayload.citation_contract_sources = contractCitationTokens.slice(0, 8);
+        }
+      }
+
+      const claimCitationLinkage = evaluateClaimCitationLinkage(
+        cleaned,
+        contractCitationTokens,
+      );
+      if (debugPayload) {
+        debugPayload.claim_citation_link_claim_count = claimCitationLinkage.claimCount;
+        debugPayload.claim_citation_link_citation_count = claimCitationLinkage.citationCount;
+        debugPayload.claim_citation_link_linked_count = claimCitationLinkage.linkedCount;
+        debugPayload.claim_citation_link_ok = claimCitationLinkage.ok;
+        debugPayload.claim_citation_link_missing = claimCitationLinkage.unlinkedClaims.slice(0, 3);
+      }
+      if (strictConceptProvenance && !claimCitationLinkage.ok && !strictConceptFailReason) {
+        strictReadyFailReason = claimCitationLinkage.failReason ?? "CLAIM_CITATION_LINK_WEAK";
+        if (debugPayload) {
+          debugPayload.arbiter_fail_reason = strictReadyFailReason;
+          (debugPayload as Record<string, unknown>).helix_ask_fail_reason = strictReadyFailReason;
+          (debugPayload as Record<string, unknown>).helix_ask_fail_class = "evidence_contract";
         }
       }
 

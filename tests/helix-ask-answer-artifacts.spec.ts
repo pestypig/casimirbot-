@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { stripRunawayAnswerArtifacts } from "../server/services/helix-ask/answer-artifacts";
 import { buildQualityBaselineContract } from "../scripts/helix-ask-sweep";
+import { evaluateClaimCitationLinkage } from "../server/services/helix-ask/query";
 
 describe("stripRunawayAnswerArtifacts", () => {
   it("removes leaked instruction preamble and trailing debug sections", () => {
@@ -104,5 +105,23 @@ describe("buildQualityBaselineContract", () => {
       "min_avg_quality_score",
       "min_quality_rate",
     ]);
+  });
+});
+
+
+describe("Helix Ask semantic linkage contract artifacts", () => {
+  it("retained Sources lines satisfy deterministic claim linkage after cleanup", () => {
+    const input = [
+      "Deterministic fallback answer with retained retrieval evidence.",
+      "",
+      "Sources: server/services/helix-ask/repo-search.ts, server/routes/agi.plan.ts",
+      "",
+      "Ask debug",
+      "- fallback=clarify",
+    ].join("\n");
+    const cleaned = stripRunawayAnswerArtifacts(input);
+    const linkage = evaluateClaimCitationLinkage(cleaned);
+    expect(linkage.ok).toBe(true);
+    expect(linkage.failReason).toBeUndefined();
   });
 });
