@@ -63,6 +63,11 @@ type AskAttemptResult = {
   retryReason: string | null;
 };
 
+type ReadyProbeResult = {
+  ok: boolean;
+  reason: string | null;
+};
+
 const prompts = (): PromptCase[] => {
   const relation = [
     ['How does warp bubble viability relate to mission ethos constraints in this repo?', false],
@@ -117,15 +122,34 @@ const prompts = (): PromptCase[] => {
   return [...build('relation', relation), ...build('repo_technical', repo), ...build('ambiguous_general', amb)];
 };
 
-async function ensureReady() {
+async function ensureReady(): Promise<ReadyProbeResult> {
   for (let i=0;i<120;i++) {
     try {
       const r = await fetch(new URL('/api/ready', BASE_URL), {cache:'no-store'});
-      if (r.status === 200) return;
+      if (r.status === 200) {
+        const payload = (await r.json().catch(()=>null)) as { ready?: boolean } | null;
+        if (!payload || payload.ready !== false) {
+          return { ok: true, reason: null };
+        }
+      }
     } catch {}
     await new Promise((res)=>setTimeout(res, 1000));
   }
-  throw new Error(`server not ready at ${BASE_URL}`);
+  // Fallback probe: if /api/ready is unreliable, validate ask endpoint directly.
+  for (let i=0;i<5;i++) {
+    try {
+      const resp = await fetch(new URL('/api/agi/ask', BASE_URL), {
+        method: 'POST',
+        headers: {'content-type':'application/json'},
+        body: JSON.stringify({ question: 'health check', debug: false, temperature: 0 }),
+      });
+      if (resp.status === 200) {
+        return { ok: true, reason: null };
+      }
+    } catch {}
+    await new Promise((res)=>setTimeout(res, 500));
+  }
+  return { ok: false, reason: `server not ready at ${BASE_URL}` };
 }
 
 function hasCitation(text: string): boolean {
@@ -164,6 +188,10 @@ function inferRetryReason(status: number, payload: AskResponse | null): string |
 
 function shouldRetry(status: number, payload: AskResponse | null): boolean {
   return inferRetryReason(status, payload) !== null;
+}
+
+function isUsableRun(status: number, retryReason: string | null): boolean {
+  return status === 200 && retryReason === null;
 }
 
 async function askWithRetry(entry: PromptCase, seed: number): Promise<AskAttemptResult> {
@@ -248,14 +276,70 @@ function score(entry: PromptCase, payload: AskResponse | null): RawRecord['score
 }
 
 async function run() {
-  await ensureReady();
   const runId = new Date().toISOString().replace(/[.:]/g,'-');
   const variantDir = path.resolve(OUT_ROOT, VARIANT);
   const rawDir = path.resolve(variantDir, 'raw');
   await fs.mkdir(rawDir, {recursive:true});
+  const promptList = prompts();
+
+  const ready = await ensureReady();
+  if (!ready.ok) {
+    const summary = {
+      variant: VARIANT,
+      commit: COMMIT,
+      run_id: runId,
+      prompt_count: promptList.length,
+      run_count: 0,
+      avg_utility: 0,
+      answer_directness_rate: 0,
+      min_length_rate: 0,
+      citation_presence_rate: 0,
+      clarification_quality_rate: 0,
+      status_ok_rate: 0,
+      http_status_ok_rate: 0,
+      invalid_error_rate: 1,
+      avg_attempts: 0,
+      noisy_avg_utility: 0,
+      retry_reason_counts: { ready_gate_failed: 1 },
+      failure_counts: { request_failed: 0, citation_missing: 0, text_too_short: 0, low_directness: 0, ready_gate_failed: 1 },
+      result_type: 'insufficient_run_quality',
+      run_quality_pass: false,
+      quality_pass: false,
+      decision_thresholds: {
+        min_status_ok_rate: MIN_STATUS_OK_RATE,
+        max_invalid_rate: MAX_INVALID_RATE,
+        min_answer_directness_rate: MIN_DIRECTNESS_RATE,
+        min_length_rate: MIN_LENGTH_RATE,
+        min_citation_presence_rate: MIN_CITATION_RATE,
+      },
+      blockers: [ready.reason ?? `server not ready at ${BASE_URL}`],
+      timestamp: new Date().toISOString(),
+    };
+    await fs.writeFile(path.resolve(variantDir,'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    await fs.writeFile(
+      path.resolve(variantDir, 'recommendation.json'),
+      `${JSON.stringify({
+        variant: VARIANT,
+        commit: COMMIT,
+        run_id: runId,
+        result_type: 'insufficient_run_quality',
+        blockers: [ready.reason ?? `server not ready at ${BASE_URL}`],
+        recommendations: [
+          'Stabilize server readiness and endpoint availability before utility comparisons.',
+          'Re-run utility AB after ready gate passes.',
+        ],
+      }, null, 2)}\n`,
+      'utf8',
+    );
+    const promptPack = {count: promptList.length, prompts: promptList};
+    await fs.writeFile(path.resolve(OUT_ROOT, 'prompt-pack.json'), `${JSON.stringify(promptPack,null,2)}\n`, 'utf8');
+    console.error(`[${VARIANT}] ready gate failed: ${ready.reason}`);
+    process.exitCode = 2;
+    return;
+  }
 
   const rows: RawRecord[] = [];
-  for (const entry of prompts()) {
+  for (const entry of promptList) {
     for (const seed of SEEDS) {
       const asked = await askWithRetry(entry, seed);
       const status = asked.status;
@@ -288,7 +372,8 @@ async function run() {
     }
   }
 
-  const statusOkRate = rows.filter((r)=>r.status===200).length/Math.max(1,rows.length);
+  const httpStatusOkRate = rows.filter((r)=>r.status===200).length/Math.max(1,rows.length);
+  const statusOkRate = rows.filter((r)=>isUsableRun(r.status, r.retry_reason)).length/Math.max(1,rows.length);
   const invalidErrorRate = 1 - statusOkRate;
   const answerDirectnessRate = rows.reduce((a,b)=>a+b.score.answer_directness_pass,0)/Math.max(1,rows.length);
   const minLengthRate = rows.reduce((a,b)=>a+b.score.min_length_pass,0)/Math.max(1,rows.length);
@@ -304,7 +389,7 @@ async function run() {
   }, {});
 
   const failureCounts = {
-    request_failed: rows.filter((r)=>r.status!==200).length,
+    request_failed: rows.filter((r)=>!isUsableRun(r.status, r.retry_reason)).length,
     citation_missing: rows.filter((r)=>r.score.citation_presence_pass===0).length,
     text_too_short: rows.filter((r)=>r.score.min_length_pass===0).length,
     low_directness: rows.filter((r)=>r.score.answer_directness_pass===0).length,
@@ -342,6 +427,7 @@ async function run() {
     citation_presence_rate: citationPresenceRate,
     clarification_quality_rate: clarificationQualityRate,
     status_ok_rate: statusOkRate,
+    http_status_ok_rate: httpStatusOkRate,
     invalid_error_rate: invalidErrorRate,
     avg_attempts: avgAttempts,
     noisy_avg_utility: rows.filter((r)=>r.noisy).reduce((a,b)=>a+b.score.utility_score,0)/Math.max(1,rows.filter((r)=>r.noisy).length),
@@ -386,7 +472,7 @@ async function run() {
     'utf8',
   );
 
-  const promptPack = {count: prompts().length, prompts: prompts()};
+  const promptPack = {count: promptList.length, prompts: promptList};
   await fs.writeFile(path.resolve(OUT_ROOT, 'prompt-pack.json'), `${JSON.stringify(promptPack,null,2)}\n`, 'utf8');
 }
 
