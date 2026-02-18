@@ -54,6 +54,27 @@ describe("Helix Ask math solver", () => {
     expect(result?.solutions?.[0]).not.toMatch(/\bi\b/i);
   });
 
+
+
+  it("adds conservative certainty defaults for non-strict flows", async () => {
+    const result = await solveHelixAskMathQuestion("Solve for x: 2x + 5 = 17");
+    expect(result?.provenance_class).toBe("inferred");
+    expect(result?.claim_tier).toBe("diagnostic");
+    expect(result?.certifying).toBe(false);
+    expect(result?.fail_reason).toBeUndefined();
+  });
+
+  it("adds deterministic strict fail_reason when certainty evidence is missing", async () => {
+    const result = await solveHelixAskMathQuestion("Solve for x: 2x + 5 = 17", {
+      strictCertainty: true,
+      certaintyEvidenceOk: false,
+    });
+    expect(result?.provenance_class).toBe("inferred");
+    expect(result?.claim_tier).toBe("diagnostic");
+    expect(result?.certifying).toBe(false);
+    expect(result?.fail_reason).toBe("CERTAINTY_EVIDENCE_MISSING");
+  });
+
   it("refuses to claim a real solution when none exists", async () => {
     const result = await solveHelixAskMathQuestion("Solve: x^2 + 1 = 0");
     expect(result?.ok).toBe(true);

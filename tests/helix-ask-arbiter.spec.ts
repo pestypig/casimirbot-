@@ -105,4 +105,32 @@ describe("Helix Ask arbiter", () => {
     expect(result.reason).toBe("budget_queue_deep_work");
   });
 
+  it("adds conservative certainty defaults for non-strict arbiter flows", () => {
+    const result = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.2,
+      hasRepoHints: true,
+      intentDomain: "hybrid",
+    });
+    expect(result.provenance_class).toBe("inferred");
+    expect(result.claim_tier).toBe("diagnostic");
+    expect(result.certifying).toBe(false);
+    expect(result.fail_reason).toBeUndefined();
+  });
+
+  it("sets deterministic strict fail_reason when certainty evidence is missing", () => {
+    const result = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.2,
+      strictCertainty: true,
+      certaintyEvidenceOk: false,
+      intentDomain: "hybrid",
+    });
+    expect(result.fail_reason).toBe("CERTAINTY_EVIDENCE_MISSING");
+    expect(result.provenance_class).toBe("inferred");
+    expect(result.claim_tier).toBe("diagnostic");
+    expect(result.certifying).toBe(false);
+  });
+
+
 });

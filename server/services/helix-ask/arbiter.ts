@@ -16,6 +16,8 @@ export type HelixAskArbiterInput = {
   intentDomain?: "general" | "repo" | "hybrid" | "falsifiable";
   budgetLevel?: "OK" | "WARNING" | "OVER";
   budgetRecommend?: "none" | "reduce_tool_calls" | "force_clarify" | "queue_deep_work";
+  strictCertainty?: boolean;
+  certaintyEvidenceOk?: boolean;
 };
 
 export type HelixAskArbiterResult = {
@@ -27,7 +29,13 @@ export type HelixAskArbiterResult = {
   ratio: number;
   topicOk: boolean;
   conceptMatch: boolean;
+  provenance_class: "measured" | "proxy" | "inferred";
+  claim_tier: "diagnostic" | "reduced-order" | "certified";
+  certifying: boolean;
+  fail_reason?: string;
 };
+
+const CERTAINTY_FAIL_REASON = "CERTAINTY_EVIDENCE_MISSING" as const;
 
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -84,5 +92,12 @@ export function resolveHelixAskArbiter(input: HelixAskArbiterInput): HelixAskArb
     ratio,
     topicOk,
     conceptMatch: input.conceptMatch,
+    provenance_class: "inferred",
+    claim_tier: "diagnostic",
+    certifying: false,
+    fail_reason:
+      input.strictCertainty === true && input.certaintyEvidenceOk !== true
+        ? CERTAINTY_FAIL_REASON
+        : undefined,
   };
 }
