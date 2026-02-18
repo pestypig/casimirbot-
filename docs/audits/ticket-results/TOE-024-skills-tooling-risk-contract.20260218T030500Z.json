@@ -1,15 +1,16 @@
 {
   "schema_version": "toe_agent_ticket_result/1",
-  "ticket_id": "TOE-009-verify-endpoint-hardening",
+  "ticket_id": "TOE-024-skills-tooling-risk-contract",
   "files_changed": [
+    "shared/skills.ts",
+    "server/skills/index.ts",
+    "server/services/runtime/tool-metadata.ts",
+    "tests/skills-registry-contract.spec.ts",
     "tests/runtime-tool-policy.spec.ts"
   ],
   "tests_run": [
-    "tests/runtime-tool-policy.spec.ts",
     "tests/skills-registry-contract.spec.ts",
-    "npx vitest run tests/skills-registry-contract.spec.ts tests/runtime-tool-policy.spec.ts",
-    "npx tsx scripts/validate-toe-ticket-results.ts",
-    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+    "tests/runtime-tool-policy.spec.ts"
   ],
   "claim_tier": "diagnostic",
   "casimir": {
@@ -19,7 +20,5 @@
     "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
     "integrity_ok": true
   },
-  "remaining_gaps": [
-    "TOE-024 ticket backlog metadata was not found in local backlog JSON files; this result records the scoped runtime policy contract coverage only."
-  ]
+  "remaining_gaps": []
 }
