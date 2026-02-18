@@ -1,0 +1,178 @@
+{
+  "schema_version": "external_integration_evidence_manifest/1",
+  "generated_at": "2026-02-18T00:00:00.000Z",
+  "tree_path": "docs/knowledge/external-integrations-tree.json",
+  "entries": [
+    {
+      "external_node_id": "external-llm-stack",
+      "usage_surface": [
+        {
+          "path": "external/llama.cpp",
+          "kind": "directory"
+        },
+        {
+          "path": "external/whisplay-ai-chatbot",
+          "kind": "directory"
+        }
+      ],
+      "evidence": {
+        "provenance_class": "third-party",
+        "maturity_class": "diagnostic",
+        "source_refs": [
+          "docs/knowledge/external-integrations-tree.json",
+          "external/llama.cpp",
+          "external/whisplay-ai-chatbot"
+        ]
+      }
+    },
+    {
+      "external_node_id": "external-audio-stack",
+      "usage_surface": [
+        {
+          "path": "external/whisper",
+          "kind": "directory"
+        },
+        {
+          "path": "external/piper1-gpl",
+          "kind": "directory"
+        },
+        {
+          "path": "external/audiocraft",
+          "kind": "directory"
+        }
+      ],
+      "evidence": {
+        "provenance_class": "third-party",
+        "maturity_class": "diagnostic",
+        "source_refs": [
+          "docs/knowledge/external-integrations-tree.json",
+          "external/whisper",
+          "external/piper1-gpl",
+          "external/audiocraft"
+        ]
+      }
+    },
+    {
+      "external_node_id": "external-physics-stack",
+      "usage_surface": [
+        {
+          "path": "external/geodesic_raytracing",
+          "kind": "directory"
+        },
+        {
+          "path": "external/black-hole-skymap",
+          "kind": "directory"
+        },
+        {
+          "path": "external/WarpFactory",
+          "kind": "directory"
+        },
+        {
+          "path": "external/warp-engine-archive",
+          "kind": "directory"
+        }
+      ],
+      "evidence": {
+        "provenance_class": "third-party",
+        "maturity_class": "diagnostic",
+        "source_refs": [
+          "docs/knowledge/external-integrations-tree.json",
+          "external/geodesic_raytracing",
+          "external/black-hole-skymap",
+          "external/WarpFactory",
+          "external/warp-engine-archive"
+        ]
+      }
+    },
+    {
+      "external_node_id": "external-solar-stack",
+      "usage_surface": [
+        {
+          "path": "external/sunpy",
+          "kind": "directory"
+        }
+      ],
+      "evidence": {
+        "provenance_class": "third-party",
+        "maturity_class": "diagnostic",
+        "source_refs": [
+          "docs/knowledge/external-integrations-tree.json",
+          "external/sunpy"
+        ]
+      }
+    },
+    {
+      "external_node_id": "external-webgpu-stack",
+      "usage_surface": [
+        {
+          "path": "external/webgpu-volume-pathtracer",
+          "kind": "directory"
+        }
+      ],
+      "evidence": {
+        "provenance_class": "third-party",
+        "maturity_class": "diagnostic",
+        "source_refs": [
+          "docs/knowledge/external-integrations-tree.json",
+          "external/webgpu-volume-pathtracer"
+        ]
+      }
+    },
+    {
+      "external_node_id": "external-hardware-stack",
+      "usage_surface": [
+        {
+          "path": "external/piSugar-power-manager",
+          "kind": "directory"
+        }
+      ],
+      "evidence": {
+        "provenance_class": "third-party",
+        "maturity_class": "diagnostic",
+        "source_refs": [
+          "docs/knowledge/external-integrations-tree.json",
+          "external/piSugar-power-manager"
+        ]
+      }
+    },
+    {
+      "external_node_id": "external-architecture-stack",
+      "usage_surface": [
+        {
+          "path": "external/agentic-architectures",
+          "kind": "directory"
+        }
+      ],
+      "evidence": {
+        "provenance_class": "third-party",
+        "maturity_class": "diagnostic",
+        "source_refs": [
+          "docs/knowledge/external-integrations-tree.json",
+          "external/agentic-architectures"
+        ]
+      }
+    },
+    {
+      "external_node_id": "bridge-external-llm-stack-external-audio-stack",
+      "usage_surface": [
+        {
+          "path": "external/whisplay-ai-chatbot",
+          "kind": "directory"
+        },
+        {
+          "path": "external/whisper",
+          "kind": "directory"
+        }
+      ],
+      "evidence": {
+        "provenance_class": "third-party",
+        "maturity_class": "diagnostic",
+        "source_refs": [
+          "docs/knowledge/external-integrations-tree.json",
+          "external/whisplay-ai-chatbot",
+          "external/whisper"
+        ]
+      }
+    }
+  ]
+}

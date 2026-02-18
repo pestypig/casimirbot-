@@ -1,0 +1,26 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-015-external-integration-evidence-manifest",
+  "files_changed": [
+    "configs/external-integration-evidence-manifest.v1.json",
+    "scripts/validate-external-integration-manifest.ts",
+    "tests/external-integration-manifest.spec.ts",
+    "docs/audits/README.md"
+  ],
+  "tests_run": [
+    "tests/external-integration-manifest.spec.ts",
+    "npx vitest run tests/external-integration-manifest.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci",
+    "npx tsx scripts/compute-toe-progress.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:65f3111f-3c10-4489-b905-a7be45a262f2",
+    "run_id": "3",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

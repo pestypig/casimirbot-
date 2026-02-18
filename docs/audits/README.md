@@ -23,6 +23,7 @@ This folder is the entrypoint for cloud-agent audit contracts, gap reports, and 
 - Ticket backlog schema/parity: `npx tsx scripts/validate-toe-ticket-backlog.ts`
 - Ticket result contract: `npx tsx scripts/validate-toe-ticket-results.ts`
 - ToE weighted progress snapshot: `npx tsx scripts/compute-toe-progress.ts`
+- External integration evidence manifest: `npx tsx scripts/validate-external-integration-manifest.ts`
 
 ## CI Gates
 
