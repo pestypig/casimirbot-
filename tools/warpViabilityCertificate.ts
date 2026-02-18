@@ -75,11 +75,25 @@ export async function issueWarpViabilityCertificate(
         telemetryHeaders: live?.meta,
       });
 
+      const snapshot = viability.snapshot as Record<string, unknown>;
+      const warpMechanicsProvenanceClass =
+        typeof snapshot.warp_mechanics_provenance_class === "string"
+          ? String(snapshot.warp_mechanics_provenance_class)
+          : "proxy";
+      const warpMechanicsClaimTier =
+        typeof snapshot.warp_mechanics_claim_tier === "string"
+          ? String(snapshot.warp_mechanics_claim_tier)
+          : "diagnostic";
+
       const payload: WarpViabilityPayload = {
         status: viability.status,
         config,
         constraints: viability.constraints,
-        snapshot: viability.snapshot,
+        snapshot: {
+          ...viability.snapshot,
+          warp_mechanics_provenance_class: warpMechanicsProvenanceClass,
+          warp_mechanics_claim_tier: warpMechanicsClaimTier,
+        },
         citations: viability.citations,
         mitigation: viability.mitigation,
       };

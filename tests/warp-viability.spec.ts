@@ -112,7 +112,10 @@ describe("warp viability congruence wiring", () => {
     expect((result.snapshot as any).theta_confidence_band).toEqual({ low: 0.8, high: 0.99 });
     const ts = result.constraints.find((c) => c.id === "TS_ratio_min");
     expect((ts as any)?.provenance_class).toBe("measured");
+    expect((ts as any)?.claim_tier).toBe("certified");
     expect((ts as any)?.confidence_band).toEqual({ low: 0.8, high: 0.99 });
+    expect((result.snapshot as any).warp_mechanics_provenance_class).toBe("measured");
+    expect((result.snapshot as any).warp_mechanics_claim_tier).toBe("certified");
     expect(cl3?.details).toContain("source=warp.metric.T00.natario.shift");
     expect(cl3?.details).not.toContain("T00_ref=n/a");
   });
@@ -239,6 +242,8 @@ describe("warp viability congruence wiring", () => {
     expect(fr?.passed).toBe(false);
     expect(fr?.note).toBe("proxy_input");
     expect((fr as any)?.provenance_class).toBe("proxy");
+    expect((fr as any)?.claim_tier).toBe("diagnostic");
+    expect((fr as any)?.strict_provenance_reason).toBe("strict_provenance_non_measured");
     expect((fr as any)?.confidence_band).toEqual({ low: 0.2, high: 0.49 });
     expect((result.snapshot as any).qi_provenance_class).toBe("proxy");
     expect((result.snapshot as any).qi_confidence_band).toEqual({ low: 0.2, high: 0.49 });
@@ -288,7 +293,35 @@ describe("warp viability congruence wiring", () => {
     expect(fr?.note).toBe("proxy_input");
     expect(fr?.details).toContain("proxy_fallback_blocked");
     expect((fr as any)?.provenance_class).toBe("inferred");
+    expect((fr as any)?.claim_tier).toBe("diagnostic");
+    expect((fr as any)?.strict_provenance_reason).toBe("strict_provenance_non_measured");
     expect((fr as any)?.confidence_band).toEqual({ low: 0.5, high: 0.79 });
+  });
+
+
+  it("uses conservative non-certifying defaults when provenance metadata is missing", async () => {
+    runtime.pipeline = makePipeline({
+      tsMetricDerived: undefined,
+      tsMetricDerivedSource: undefined,
+      thetaCal: undefined,
+      warp: {
+        metricAdapter: {
+          chart: { label: "comoving_cartesian", contractStatus: "ok" },
+        },
+      },
+      qiGuardrail: {
+        marginRatio: 0.5,
+        lhs_Jm3: -1,
+        bound_Jm3: -2,
+        rhoSource: "unknown-source",
+      },
+    });
+
+    const result = await evaluateWarpViability({});
+    expect((result.snapshot as any).warp_mechanics_provenance_class).toBe("proxy");
+    expect((result.snapshot as any).warp_mechanics_claim_tier).toBe("diagnostic");
+    const ts = result.constraints.find((c) => c.id === "TS_ratio_min");
+    expect((ts as any)?.claim_tier).toBe("diagnostic");
   });
 
   it("fails VdB_band when region-II derivative evidence is missing", async () => {
