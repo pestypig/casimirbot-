@@ -5,12 +5,15 @@ import { collectPanelSnapshots, DEFAULT_PANEL_DESKTOP_ID } from "../services/tel
 const PanelsInput = z.object({
   desktopId: z.string().min(1).max(128).default(DEFAULT_PANEL_DESKTOP_ID),
   panelIds: z.array(z.string().min(1)).optional(),
+  strictProvenance: z.boolean().optional(),
 });
 
 const PanelsOutput = z.object({
   desktopId: z.string(),
   capturedAt: z.string(),
   panels: z.array(z.any()),
+  fail_reason: z.string().optional(),
+  fail_tag: z.string().optional(),
 });
 
 export const panelSnapshotSpec: ToolSpecShape = {
@@ -25,5 +28,9 @@ export const panelSnapshotSpec: ToolSpecShape = {
 
 export const panelSnapshotHandler: ToolHandler = async (rawInput) => {
   const input = PanelsInput.parse(rawInput ?? {});
-  return collectPanelSnapshots({ desktopId: input.desktopId, panelIds: input.panelIds });
+  return collectPanelSnapshots({
+    desktopId: input.desktopId,
+    panelIds: input.panelIds,
+    strictProvenance: input.strictProvenance,
+  });
 };

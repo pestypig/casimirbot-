@@ -7,6 +7,7 @@ const TelemetryInput = z.object({
   desktopId: z.string().min(1).max(128).default(DEFAULT_BADGE_TELEMETRY_DESKTOP),
   panelIds: z.array(z.string().min(1)).optional(),
   includeRaw: z.boolean().optional(),
+  strictProvenance: z.boolean().optional(),
 });
 
 const BadgeProofSchema = z.object({
@@ -28,6 +29,8 @@ const TelemetryOutput = z.object({
   total: z.number(),
   relatedPanels: z.array(z.string()).optional(),
   relationNotes: z.array(z.string()).optional(),
+  fail_reason: z.string().optional(),
+  fail_tag: z.string().optional(),
   entries: z.array(
     z.object({
       panelId: z.string(),
@@ -43,6 +46,10 @@ const TelemetryOutput = z.object({
       bands: z.array(z.any()).optional(),
       lastUpdated: z.string(),
       sourceIds: z.array(z.string()).optional(),
+      provenance_class: z.enum(["measured", "synthesized"]).optional(),
+      claim_tier: z.enum(["certified", "diagnostic"]).optional(),
+      certifying: z.boolean().optional(),
+      provenance_tag: z.string().optional(),
     }),
   ),
   raw: z.any().optional(),
@@ -58,11 +65,14 @@ export const badgeTelemetrySpec: ToolSpecShape = {
   safety: { risks: [] },
 };
 
-export const badgeTelemetryHandler: ToolHandler = async (rawInput): Promise<BadgeTelemetrySnapshot & { raw?: unknown }> => {
+export const badgeTelemetryHandler: ToolHandler = async (
+  rawInput,
+): Promise<BadgeTelemetrySnapshot & { raw?: unknown; fail_reason?: string; fail_tag?: string }> => {
   const input = TelemetryInput.parse(rawInput ?? {});
   const { snapshot, rawPanels } = collectBadgeTelemetry({
     desktopId: input.desktopId,
     panelIds: input.panelIds,
+    strictProvenance: input.strictProvenance,
   });
   return input.includeRaw ? { ...snapshot, raw: rawPanels } : snapshot;
 };
