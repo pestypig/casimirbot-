@@ -1600,38 +1600,36 @@
       }
     },
     {
-      "id": "TOE-071-warp-viability-promotion-replay-pack",
-      "tree_owner": "warp-mechanics",
-      "primitive": "Warp viability promotion replay pack",
-      "primary_path_prefix": "tools/warpViability.ts",
+      "id": "TOE-068-helix-ask-strict-fail-reason-ledger",
+      "tree_owner": "helix-ask",
+      "primitive": "Helix Ask strict fail-reason ledger",
+      "primary_path_prefix": "server/routes/agi.plan.ts",
       "allowed_paths": [
         "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
-        "tools/warpViability.ts",
-        "tools/warpViabilityCertificate.ts",
-        "tests/warp-viability.spec.ts",
-        "tests/warp-metric-adapter.spec.ts",
-        "tests/proof-pack-strict-parity.spec.ts",
-        "docs/audits/research/TOE-071-tier-promotion-rationale.md",
-        "docs/audits/research/TOE-071-comparative-evidence-pack.md",
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-bridge.spec.ts",
+        "docs/audits/helix-ask-quality",
         "docs/audits/toe-progress-snapshot.json"
       ],
       "required_tests": [
-        "tests/warp-viability.spec.ts",
-        "tests/warp-metric-adapter.spec.ts",
-        "tests/proof-pack-strict-parity.spec.ts"
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-bridge.spec.ts"
       ],
       "done_criteria": [
-        "Promotion replay outcomes are deterministic and reason-coded",
-        "Counterexample classes force conservative downgrade paths",
-        "Tier-promotion research artifacts document falsifiable boundaries"
+        "Strict fail reasons are emitted deterministically in ledger output",
+        "Fail-reason histogram artifact is generated for regression comparison",
+        "No non-strict behavior regression is introduced"
       ],
       "research_gate": {
-        "risk_class": "tier_promotion",
+        "risk_class": "runtime_contract",
         "requires_audit": true,
-        "requires_research": true,
+        "requires_research": false,
         "required_artifacts": [
-          "tier-promotion-rationale",
-          "comparative-evidence-pack"
+          "runtime-contract-audit"
         ]
       }
     }

@@ -25,3 +25,9 @@ Each research artifact should include:
    - source -> code path -> test path -> gate.
 5. Tier recommendation:
    - `diagnostic|reduced-order|certified`.
+
+## Standalone research prompt standard
+
+For reusable GPT Pro style standalone research prompts, use:
+- `docs/architecture/helix-ask-natural-philosophy-gap-closure-playbook.md`
+- Section: `Standalone GPT Pro research prompt standard`

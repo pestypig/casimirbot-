@@ -10,6 +10,8 @@ const MOON_DIST_M = 384_400_000;
 const RESIDUAL_ENVELOPE_PPM = 5;
 const RESIDUAL_MIN_SAMPLES = 3;
 const RESIDUAL_MAX_SAMPLES = 10_000;
+const RESIDUAL_LONG_WINDOW_MIN_HOURS = 24;
+const RESIDUAL_LONG_WINDOW_MAX_HOURS = 24 * 365;
 
 export type HaloBankPlace = {
   lat: number;
@@ -36,6 +38,7 @@ export type HaloBankTimeComputeInput = {
     ephemerisEvidenceRef?: string;
     residualPpm?: number;
     residualSampleCount?: number;
+    residualWindowHours?: number;
   };
   question?: string;
   prompt?: string;
@@ -70,6 +73,10 @@ export type HaloBankTimeComputeResult = {
         residualPpm: number | null;
         residualSampleCount: number | null;
         residualEnvelopePpm: number;
+        residualLongWindowMinHours: number;
+        residualLongWindowMaxHours: number;
+        residualWindowHours: number | null;
+        residualWindowStatus: "long_window" | "short_window" | "incomplete_evidence";
         residualStatus: "within_envelope" | "out_of_envelope" | "incomplete_evidence";
       };
       claim_tier_recommendation: "diagnostic" | "reduced-order";
@@ -290,6 +297,8 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
   const evidenceRef = typeof input.model?.ephemerisEvidenceRef === "string" ? input.model.ephemerisEvidenceRef.trim() : "";
   const hasEvidenceRef = evidenceRef.length > 0;
   const residualEnvelopePpm = RESIDUAL_ENVELOPE_PPM;
+  const residualLongWindowMinHours = RESIDUAL_LONG_WINDOW_MIN_HOURS;
+  const residualLongWindowMaxHours = RESIDUAL_LONG_WINDOW_MAX_HOURS;
   const residualPpm = Number.isFinite(input.model?.residualPpm) ? Number(input.model?.residualPpm) : null;
   const residualSampleCountRaw =
     Number.isFinite(input.model?.residualSampleCount) && Number(input.model?.residualSampleCount) >= 0
@@ -301,11 +310,30 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
     residualSampleCount !== null &&
     residualSampleCount >= RESIDUAL_MIN_SAMPLES &&
     residualSampleCount <= RESIDUAL_MAX_SAMPLES;
+  const residualWindowHours =
+    Number.isFinite(input.model?.residualWindowHours) && Number(input.model?.residualWindowHours) >= 0
+      ? Number(input.model?.residualWindowHours)
+      : null;
+  const hasLongWindowResidualEvidence =
+    residualWindowHours !== null &&
+    residualWindowHours >= residualLongWindowMinHours &&
+    residualWindowHours <= residualLongWindowMaxHours;
   const hasResidualValue = residualPpm !== null;
   const hasCanonicalEvidenceRef = hasEvidenceRef && /^artifact:[a-z0-9][\w.-]*(?::[\w./:+-]+)+$/i.test(evidenceRef);
-  const evidenceComplete = explicitEvidence && hasCanonicalEvidenceRef && hasResidualValue && hasMinimumResidualSamples;
+  const evidenceComplete =
+    explicitEvidence &&
+    hasCanonicalEvidenceRef &&
+    hasResidualValue &&
+    hasMinimumResidualSamples &&
+    hasLongWindowResidualEvidence;
   const residualWithinEnvelope = residualPpm !== null && Math.abs(residualPpm) <= residualEnvelopePpm;
   const verified = source === "live" ? evidenceComplete : false;
+  const residualWindowStatus: "long_window" | "short_window" | "incomplete_evidence" =
+    residualWindowHours === null
+      ? "incomplete_evidence"
+      : hasLongWindowResidualEvidence
+        ? "long_window"
+        : "short_window";
   const residualStatus: "within_envelope" | "out_of_envelope" | "incomplete_evidence" = !evidenceComplete
     ? "incomplete_evidence"
     : residualWithinEnvelope
@@ -316,6 +344,8 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
     ? "HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY"
     : explicitEvidence && hasEvidenceRef && !hasCanonicalEvidenceRef
       ? "HALOBANK_HORIZONS_EVIDENCE_REF_INVALID"
+      : !hasLongWindowResidualEvidence && residualWindowHours !== null
+        ? "HALOBANK_HORIZONS_LONG_WINDOW_REQUIRED"
       : !evidenceComplete
       ? "HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE"
       : residualWithinEnvelope
@@ -327,6 +357,10 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
     : explicitEvidence && hasEvidenceRef && !hasCanonicalEvidenceRef
       ? [
           "Live ephemeris evidence reference is not canonical; deterministic conservative diagnostic downgrade applied.",
+        ]
+      : !hasLongWindowResidualEvidence && residualWindowHours !== null
+      ? [
+          "Live ephemeris residual window is shorter than required long-window calibration horizon; deterministic diagnostic downgrade applied.",
         ]
       : !evidenceComplete
       ? [
@@ -362,6 +396,10 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
         residualPpm,
         residualSampleCount,
         residualEnvelopePpm,
+        residualLongWindowMinHours,
+        residualLongWindowMaxHours,
+        residualWindowHours,
+        residualWindowStatus,
         residualStatus,
       },
       claim_tier_recommendation: claimTierRecommendation,

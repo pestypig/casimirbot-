@@ -229,6 +229,7 @@ import {
   resolveRelationTopologySignal,
   type RelationAssemblyPacket,
 } from "../services/helix-ask/relation-assembly";
+import { buildHelixAskStrictFailReasonLedger } from "../services/helix-ask/strict-fail-reason-ledger";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
 import { runBeliefGraphLoop } from "../../modules/analysis/belief-graph-loop";
@@ -1896,7 +1897,7 @@ const completeCitations = async (args: {
     });
   }
   if (retrievalCandidates.length === 0 && retrievalSelected.length === 0) {
-    const nextCitations = baseCitations.length > 0 ? [] : baseCitations;
+    const nextCitations = baseCitations;
     return finalize({
       citations: nextCitations,
       retrievalCandidates,
@@ -26985,6 +26986,25 @@ planRouter.post("/ask", async (req, res) => {
     intervalMs: HELIX_ASK_HTTP_KEEPALIVE_MS,
   });
   const safeSend: HelixAskResponder["send"] = (status, payload) => {
+    const strictFailLedger = buildHelixAskStrictFailReasonLedger({
+      strictEnabled: parsed.data.strictProvenance === true,
+      payload,
+    });
+    if (strictFailLedger && payload && typeof payload === "object") {
+      const typedPayload = payload as Record<string, unknown>;
+      typedPayload.strict_fail_reason_ledger = strictFailLedger.entries;
+      typedPayload.strict_fail_reason_histogram = strictFailLedger.histogram;
+      typedPayload.strict_fail_reason_histogram_artifact = strictFailLedger.histogram_artifact;
+      const typedDebug =
+        typedPayload.debug && typeof typedPayload.debug === "object"
+          ? (typedPayload.debug as Record<string, unknown>)
+          : null;
+      if (typedDebug) {
+        typedDebug.strict_fail_reason_ledger = strictFailLedger.entries;
+        typedDebug.strict_fail_reason_histogram = strictFailLedger.histogram;
+        typedDebug.strict_fail_reason_histogram_artifact = strictFailLedger.histogram_artifact;
+      }
+    }
     if (status >= 500) {
       recordHelixAskFailure(payload);
     } else if (status < 400) {
