@@ -12598,6 +12598,9 @@ function parseMoodHintResult(raw: string): {
 
 type LocalAskResult = {
   text?: string;
+  provenance_class?: "measured" | "proxy" | "inferred" | "simulation";
+  claim_tier?: "diagnostic" | "reduced-order" | "certified";
+  certifying?: boolean;
   prompt_ingested?: boolean;
   prompt_ingest_source?: string;
   prompt_ingest_reason?: string;
@@ -12614,6 +12617,8 @@ type LocalAskResult = {
   fail_class?: string;
   [key: string]: unknown;
 };
+
+const STRICT_EVIDENCE_CONTRACT_FAIL_REASON = "EVIDENCE_CONTRACT_FIELD_MISSING" as const;
 
 type HelixAskAtomicLaunchModel = "quantum" | "classical";
 type HelixAskAtomicClaimTier = "diagnostic" | "reduced-order" | "certified";
@@ -15824,6 +15829,36 @@ const executeHelixAsk = async ({
           if (typeof parsed.data.durationMs === "number") payload.durationMs = parsed.data.durationMs;
           if (parsed.data.compare) payload.compare = parsed.data.compare;
           if (parsed.data.model) payload.model = parsed.data.model;
+          if (
+            askMode === "verify" &&
+            parsed.data.strictProvenance === true &&
+            parsed.data.model?.ephemerisSource === "live" &&
+            (parsed.data.model.ephemerisEvidenceVerified !== true ||
+              !parsed.data.model.ephemerisEvidenceRef)
+          ) {
+            responder.send(200, {
+              ok: false,
+              mode: askMode,
+              text: "Verification failed.",
+              fail_reason: STRICT_EVIDENCE_CONTRACT_FAIL_REASON,
+              fail_class: "input_contract",
+              claim_tier: "diagnostic",
+              provenance_class: "inferred",
+              certifying: false,
+              proof: {
+                verdict: "FAIL",
+                firstFail: {
+                  id: STRICT_EVIDENCE_CONTRACT_FAIL_REASON,
+                  severity: "HARD",
+                  status: "fail",
+                  note: "strict_ephemeris_evidence_contract_missing",
+                },
+                certificate: null,
+                artifacts: [{ kind: "training-trace-export", ref: "/api/agi/training-trace/export" }],
+              },
+            });
+            return;
+          }
         }
         actionOutput = await tool.handler(payload, { personaId, sessionId: parsed.data.sessionId, traceId: askTraceId });
       } catch (error) {
@@ -15918,7 +15953,16 @@ const executeHelixAsk = async ({
         const integrityOk = Boolean((proof.certificate as any)?.integrityOk);
         const consistencyGateFailed = proof.consistencyGate?.verdict === "FAIL";
         if (proof.verdict !== "PASS" || !integrityOk || consistencyGateFailed) {
-          responder.send(200, { ok: false, mode: askMode, text: "Verification failed.", proof, action: { tool: toolName, output: actionOutput } });
+          responder.send(200, {
+            ok: false,
+            mode: askMode,
+            text: "Verification failed.",
+            claim_tier: "diagnostic",
+            provenance_class: "inferred",
+            certifying: false,
+            proof,
+            action: { tool: toolName, output: actionOutput },
+          });
           return;
         }
       }
@@ -15926,6 +15970,9 @@ const executeHelixAsk = async ({
         ok: true,
         mode: askMode,
         text: askMode === "observe" ? "Observation complete." : "Action complete.",
+        claim_tier: "diagnostic",
+        provenance_class: "inferred",
+        certifying: false,
         action: { tool: toolName, output: actionOutput },
         proof,
       });
@@ -26593,6 +26640,14 @@ const executeHelixAsk = async ({
       result.fail_reason = strictConceptFailReason;
       result.fail_class = "input_contract";
     }
+    result.claim_tier =
+      result.viewer_launch?.claim_tier ?? result.concept?.claim_tier ?? result.claim_tier ?? "diagnostic";
+    result.provenance_class =
+      result.viewer_launch?.provenance_class ??
+      result.concept?.provenance_class ??
+      result.provenance_class ??
+      "inferred";
+    result.certifying = result.viewer_launch?.params?.certifying ?? result.concept?.certifying ?? false;
     if (debugPayload && captureLiveHistory) {
       const traceEvents = liveEventHistory.slice();
       debugPayload.live_events = traceEvents;
