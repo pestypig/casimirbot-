@@ -35,6 +35,8 @@ type RawRecord = {
     min_length_pass: 0|1;
     citation_presence_pass: 0|1;
     clarification_quality_pass: 0|1;
+    novelty_score: number;
+    novel_response_pass: 0|1;
     utility_score: number;
   };
 };
@@ -56,6 +58,10 @@ const MAX_INVALID_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB
 const MIN_DIRECTNESS_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_DIRECTNESS_RATE ?? '0.85')));
 const MIN_LENGTH_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_LENGTH_RATE ?? '0.90')));
 const MIN_CITATION_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_CITATION_RATE ?? '0.90')));
+const MIN_NOVEL_RESPONSE_RATE_OVERALL = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_NOVEL_RESPONSE_RATE_OVERALL ?? '0.82')));
+const MIN_NOVEL_RESPONSE_RATE_RELATION = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_NOVEL_RESPONSE_RATE_RELATION ?? '0.80')));
+const MIN_NOVEL_RESPONSE_RATE_REPO_TECHNICAL = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_NOVEL_RESPONSE_RATE_REPO_TECHNICAL ?? '0.85')));
+const MIN_NOVEL_RESPONSE_RATE_AMBIGUOUS_GENERAL = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_NOVEL_RESPONSE_RATE_AMBIGUOUS_GENERAL ?? '0.75')));
 
 type AskAttemptResult = {
   status: number;
@@ -322,8 +328,52 @@ function score(entry: PromptCase, payload: AskResponse | null): RawRecord['score
   const answer_directness_pass: 0|1 = text.length > 0 && (directSignal || clarification_quality_pass === 1) ? 1 : 0;
   const min_length_pass: 0|1 = text.length >= MIN_LEN ? 1 : 0;
   const citation_presence_pass: 0|1 = hasCitation(text) ? 1 : 0;
-  const utility_score = Number((0.35*answer_directness_pass + 0.25*min_length_pass + 0.25*citation_presence_pass + 0.15*clarification_quality_pass).toFixed(3));
-  return {answer_directness_pass, min_length_pass, citation_presence_pass, clarification_quality_pass, utility_score};
+
+  const lines = text.split(/\n+/).map((line)=>line.trim()).filter(Boolean);
+  const sentenceChunks = text.split(/[.!?]+/).map((part)=>part.trim().toLowerCase()).filter((part)=>part.length >= 25);
+  const sentenceCounts = sentenceChunks.reduce<Map<string, number>>((acc, chunk) => {
+    acc.set(chunk, (acc.get(chunk) ?? 0) + 1);
+    return acc;
+  }, new Map<string, number>());
+  const repeatedSentencePenalty = Array.from(sentenceCounts.values()).reduce((sum, count) => sum + Math.max(0, count - 1), 0);
+
+  const boilerplatePatterns = [
+    /in plain language/i,
+    /bounded linkage/i,
+    /metadata scaffolding/i,
+    /here(?:'| i)s a structured response/i,
+    /summary:\s*[^\n]*sources?:/i,
+    /report scaffolding/i,
+  ];
+  const boilerplateHits = boilerplatePatterns.reduce((count, pattern) => count + (pattern.test(text) ? 1 : 0), 0);
+
+  const wordTokens = low.match(/[a-z0-9]{2,}/g) ?? [];
+  const uniqueTokens = new Set(wordTokens);
+  const lexicalDiversity = wordTokens.length > 0 ? uniqueTokens.size / wordTokens.length : 0;
+  const questionTokens = new Set((entry.question.toLowerCase().match(/[a-z0-9]{2,}/g) ?? []));
+  const copiedPromptCount = wordTokens.filter((token)=>questionTokens.has(token)).length;
+  const promptCopyRatio = wordTokens.length > 0 ? copiedPromptCount / wordTokens.length : 1;
+  const repetitionRatio = sentenceChunks.length > 0 ? repeatedSentencePenalty / sentenceChunks.length : 1;
+
+  let noveltyScore = 1;
+  noveltyScore -= Math.min(0.45, boilerplateHits * 0.15);
+  noveltyScore -= Math.min(0.35, repetitionRatio * 0.7);
+  noveltyScore -= lexicalDiversity < 0.34 ? Math.min(0.3, (0.34 - lexicalDiversity) * 2.5) : 0;
+  noveltyScore -= promptCopyRatio > 0.6 ? Math.min(0.35, (promptCopyRatio - 0.6) * 0.9) : 0;
+  noveltyScore -= lines.length <= 1 ? 0.12 : 0;
+  noveltyScore = Number(Math.max(0, Math.min(1, noveltyScore)).toFixed(3));
+
+  const groundingRequired = entry.family === 'relation' || entry.family === 'repo_technical';
+  const noveltyHardPass =
+    boilerplateHits === 0 &&
+    repetitionRatio <= 0.2 &&
+    lexicalDiversity >= 0.34 &&
+    promptCopyRatio <= 0.6 &&
+    noveltyScore >= 0.55;
+  const novel_response_pass: 0|1 = answer_directness_pass === 1 && noveltyHardPass && (!groundingRequired || citation_presence_pass === 1) ? 1 : 0;
+
+  const utility_score = Number((0.30*answer_directness_pass + 0.20*min_length_pass + 0.20*citation_presence_pass + 0.10*clarification_quality_pass + 0.20*noveltyScore).toFixed(3));
+  return {answer_directness_pass, min_length_pass, citation_presence_pass, clarification_quality_pass, novelty_score: noveltyScore, novel_response_pass, utility_score};
 }
 
 async function run() {
@@ -358,12 +408,17 @@ async function run() {
       result_type: 'insufficient_run_quality',
       run_quality_pass: false,
       quality_pass: false,
+      novelty_pass: false,
       decision_thresholds: {
         min_status_ok_rate: MIN_STATUS_OK_RATE,
         max_invalid_rate: MAX_INVALID_RATE,
         min_answer_directness_rate: MIN_DIRECTNESS_RATE,
         min_length_rate: MIN_LENGTH_RATE,
         min_citation_presence_rate: MIN_CITATION_RATE,
+        min_novel_response_rate_overall: MIN_NOVEL_RESPONSE_RATE_OVERALL,
+        min_novel_response_rate_relation: MIN_NOVEL_RESPONSE_RATE_RELATION,
+        min_novel_response_rate_repo_technical: MIN_NOVEL_RESPONSE_RATE_REPO_TECHNICAL,
+        min_novel_response_rate_ambiguous_general: MIN_NOVEL_RESPONSE_RATE_AMBIGUOUS_GENERAL,
       },
       blockers: [ready.reason ?? `server not ready at ${BASE_URL}`],
       timestamp: new Date().toISOString(),
@@ -437,6 +492,7 @@ async function run() {
   const minLengthRate = qualityRows.reduce((a,b)=>a+b.score.min_length_pass,0)/Math.max(1,qualityRows.length);
   const citationPresenceRate = qualityRows.reduce((a,b)=>a+b.score.citation_presence_pass,0)/Math.max(1,qualityRows.length);
   const clarificationQualityRate = qualityRows.reduce((a,b)=>a+b.score.clarification_quality_pass,0)/Math.max(1,qualityRows.length);
+  const novelResponseRate = qualityRows.reduce((a,b)=>a+b.score.novel_response_pass,0)/Math.max(1,qualityRows.length);
   const avgUtility = qualityRows.reduce((a,b)=>a+b.score.utility_score,0)/Math.max(1,qualityRows.length);
   const avgAttempts = rows.reduce((a,b)=>a+b.attempt_count,0)/Math.max(1,rows.length);
 
@@ -451,6 +507,14 @@ async function run() {
     citation_missing: rows.filter((r)=>r.score.citation_presence_pass===0).length,
     text_too_short: rows.filter((r)=>r.score.min_length_pass===0).length,
     low_directness: rows.filter((r)=>r.score.answer_directness_pass===0).length,
+    novelty_failed: rows.filter((r)=>r.score.novel_response_pass===0).length,
+  };
+
+  const qualityRowsByFamily = (family: Family) => qualityRows.filter((r)=>r.family===family);
+  const novelRateByFamily = {
+    relation: qualityRowsByFamily('relation').reduce((a,b)=>a+b.score.novel_response_pass,0)/Math.max(1,qualityRowsByFamily('relation').length),
+    repo_technical: qualityRowsByFamily('repo_technical').reduce((a,b)=>a+b.score.novel_response_pass,0)/Math.max(1,qualityRowsByFamily('repo_technical').length),
+    ambiguous_general: qualityRowsByFamily('ambiguous_general').reduce((a,b)=>a+b.score.novel_response_pass,0)/Math.max(1,qualityRowsByFamily('ambiguous_general').length),
   };
 
   const runQualityPass = statusOkRate >= MIN_STATUS_OK_RATE && invalidErrorRate <= MAX_INVALID_RATE;
@@ -458,11 +522,16 @@ async function run() {
     answerDirectnessRate >= MIN_DIRECTNESS_RATE &&
     minLengthRate >= MIN_LENGTH_RATE &&
     citationPresenceRate >= MIN_CITATION_RATE;
+  const noveltyPass =
+    novelResponseRate >= MIN_NOVEL_RESPONSE_RATE_OVERALL &&
+    novelRateByFamily.relation >= MIN_NOVEL_RESPONSE_RATE_RELATION &&
+    novelRateByFamily.repo_technical >= MIN_NOVEL_RESPONSE_RATE_REPO_TECHNICAL &&
+    novelRateByFamily.ambiguous_general >= MIN_NOVEL_RESPONSE_RATE_AMBIGUOUS_GENERAL;
 
   const resultType =
     !runQualityPass
       ? 'insufficient_run_quality'
-      : !qualityPass
+      : !qualityPass || !noveltyPass
         ? 'needs_quality_patch'
         : 'pass';
 
@@ -472,6 +541,10 @@ async function run() {
   if (answerDirectnessRate < MIN_DIRECTNESS_RATE) blockers.push(`answer_directness_rate ${answerDirectnessRate.toFixed(3)} < ${MIN_DIRECTNESS_RATE.toFixed(3)}`);
   if (minLengthRate < MIN_LENGTH_RATE) blockers.push(`min_length_rate ${minLengthRate.toFixed(3)} < ${MIN_LENGTH_RATE.toFixed(3)}`);
   if (citationPresenceRate < MIN_CITATION_RATE) blockers.push(`citation_presence_rate ${citationPresenceRate.toFixed(3)} < ${MIN_CITATION_RATE.toFixed(3)}`);
+  if (novelResponseRate < MIN_NOVEL_RESPONSE_RATE_OVERALL) blockers.push(`novel_response_rate ${novelResponseRate.toFixed(3)} < ${MIN_NOVEL_RESPONSE_RATE_OVERALL.toFixed(3)}`);
+  if (novelRateByFamily.relation < MIN_NOVEL_RESPONSE_RATE_RELATION) blockers.push(`novel_response_rate_relation ${novelRateByFamily.relation.toFixed(3)} < ${MIN_NOVEL_RESPONSE_RATE_RELATION.toFixed(3)}`);
+  if (novelRateByFamily.repo_technical < MIN_NOVEL_RESPONSE_RATE_REPO_TECHNICAL) blockers.push(`novel_response_rate_repo_technical ${novelRateByFamily.repo_technical.toFixed(3)} < ${MIN_NOVEL_RESPONSE_RATE_REPO_TECHNICAL.toFixed(3)}`);
+  if (novelRateByFamily.ambiguous_general < MIN_NOVEL_RESPONSE_RATE_AMBIGUOUS_GENERAL) blockers.push(`novel_response_rate_ambiguous_general ${novelRateByFamily.ambiguous_general.toFixed(3)} < ${MIN_NOVEL_RESPONSE_RATE_AMBIGUOUS_GENERAL.toFixed(3)}`);
 
   const summary = {
     summary_schema_version: 2,
@@ -487,6 +560,8 @@ async function run() {
     min_length_rate: minLengthRate,
     citation_presence_rate: citationPresenceRate,
     clarification_quality_rate: clarificationQualityRate,
+    novel_response_rate: novelResponseRate,
+    novel_response_rate_by_family: novelRateByFamily,
     status_ok_rate: statusOkRate,
     http_status_ok_rate: httpStatusOkRate,
     invalid_error_rate: invalidErrorRate,
@@ -497,12 +572,17 @@ async function run() {
     result_type: resultType,
     run_quality_pass: runQualityPass,
     quality_pass: qualityPass,
+    novelty_pass: noveltyPass,
     decision_thresholds: {
       min_status_ok_rate: MIN_STATUS_OK_RATE,
       max_invalid_rate: MAX_INVALID_RATE,
       min_answer_directness_rate: MIN_DIRECTNESS_RATE,
       min_length_rate: MIN_LENGTH_RATE,
       min_citation_presence_rate: MIN_CITATION_RATE,
+      min_novel_response_rate_overall: MIN_NOVEL_RESPONSE_RATE_OVERALL,
+      min_novel_response_rate_relation: MIN_NOVEL_RESPONSE_RATE_RELATION,
+      min_novel_response_rate_repo_technical: MIN_NOVEL_RESPONSE_RATE_REPO_TECHNICAL,
+      min_novel_response_rate_ambiguous_general: MIN_NOVEL_RESPONSE_RATE_AMBIGUOUS_GENERAL,
     },
     blockers,
     timestamp: new Date().toISOString(),
