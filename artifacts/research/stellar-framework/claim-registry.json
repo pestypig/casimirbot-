@@ -1,8 +1,8 @@
 {
   "paper_id": "stellar-consciousness-orch-or-review-2025",
   "source_status": {
-    "pdf_available_in_repo": false,
-    "note": "Attachment not present as a local file during build pass; framework derived from provided page images + anchored repo docs."
+    "pdf_available_in_repo": true,
+    "note": "Full paper is materialized in-repo and each claim is bound to direct source page evidence in source-provenance-map.json."
   },
   "claims": [
     {
@@ -30,7 +30,12 @@
       "falsifiers": [
         "No observed tau scaling with inferred E_G across regimes"
       ],
-      "maturity_stage": "exploratory"
+      "maturity_stage": "exploratory",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "1",
+        "content_hash": "91f3812c6569b2fff99260f379e4ed36f6c40b038922791427ec83ec07102831"
+      }
     },
     {
       "claim_id": "SCOR-C002",
@@ -54,7 +59,12 @@
       "falsifiers": [
         "Lack of repeatable 25 ms periodicity tied to proposed mechanism"
       ],
-      "maturity_stage": "exploratory"
+      "maturity_stage": "exploratory",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "2",
+        "content_hash": "984f16f42f4fc140905dbf6c309cdf37aeee4f4bee8bf0698f8294ede29c8288"
+      }
     },
     {
       "claim_id": "SCOR-C003",
@@ -79,7 +89,12 @@
       "falsifiers": [
         "Energy estimates inconsistent with dimensional checks or measured thresholds"
       ],
-      "maturity_stage": "reduced-order"
+      "maturity_stage": "reduced-order",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "3",
+        "content_hash": "95893e3f052a0e5c8d0700738e6bc14a5ed87697353207faacaedeb521ced5de"
+      }
     },
     {
       "claim_id": "SCOR-C004",
@@ -109,7 +124,12 @@
       "falsifiers": [
         "No coherence contrast trend with the proposed scaling"
       ],
-      "maturity_stage": "exploratory"
+      "maturity_stage": "exploratory",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "4",
+        "content_hash": "34f993db165ee8faaa302e1442dddc96635262a5384955de501f323f83624603"
+      }
     },
     {
       "claim_id": "SCOR-C005",
@@ -134,7 +154,12 @@
       "falsifiers": [
         "Rates fail to respond to Delta t or barrier parameters as predicted"
       ],
-      "maturity_stage": "diagnostic"
+      "maturity_stage": "diagnostic",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "5",
+        "content_hash": "22036a192dd0d2b0d4d0ebf352d141c06dfd14fb61dab33f7886ef7e885c6a47"
+      }
     },
     {
       "claim_id": "SCOR-C006",
@@ -163,7 +188,12 @@
       "falsifiers": [
         "Measured spectra diverge from n^2/a^2 spacing"
       ],
-      "maturity_stage": "diagnostic"
+      "maturity_stage": "diagnostic",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "6",
+        "content_hash": "28c4931200724c37819cb2219b31cac399ef05093ea1185bac3a427ab6c120d3"
+      }
     },
     {
       "claim_id": "SCOR-C007",
@@ -196,7 +226,12 @@
       "falsifiers": [
         "Interaction data incompatible with r^-6 dependence"
       ],
-      "maturity_stage": "diagnostic"
+      "maturity_stage": "diagnostic",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "7",
+        "content_hash": "df38e6e8e97915160a7fdcb9091132c524a4e5aa7e0b5249b7b5f8f1ee739599"
+      }
     },
     {
       "claim_id": "SCOR-C008",
@@ -226,7 +261,12 @@
       "falsifiers": [
         "No differential decoherence under predicted noise coupling"
       ],
-      "maturity_stage": "reduced-order"
+      "maturity_stage": "reduced-order",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "8",
+        "content_hash": "d0563cb3b8b2ea874537f00cdccbe80d73a49b6809bb029254a381f420abda17"
+      }
     },
     {
       "claim_id": "SCOR-C009",
@@ -251,7 +291,12 @@
       "falsifiers": [
         "Best-fit kernels consistently non-Gaussian"
       ],
-      "maturity_stage": "diagnostic"
+      "maturity_stage": "diagnostic",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "9",
+        "content_hash": "c9b75d613759511b1e2322b78da93277f1af3d70c5e5752562cebc4c908baa59"
+      }
     },
     {
       "claim_id": "SCOR-C010",
@@ -279,7 +324,12 @@
       "falsifiers": [
         "No Lorentzian-like peak structure in measured spectra"
       ],
-      "maturity_stage": "reduced-order"
+      "maturity_stage": "reduced-order",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "10",
+        "content_hash": "e5ffa89f80a9759982a644efc68a1c85d909d0e5c51f3e8e36f60d8737963cd3"
+      }
     },
     {
       "claim_id": "SCOR-C011",
@@ -319,7 +369,12 @@
       "falsifiers": [
         "Observed stellar populations violate expected scaling bands"
       ],
-      "maturity_stage": "diagnostic"
+      "maturity_stage": "diagnostic",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "11",
+        "content_hash": "d76dc4de3b008f86cd78cdaa35e7398038f5a7b345d2ad04f86ba69f16891f8a"
+      }
     },
     {
       "claim_id": "SCOR-C012",
@@ -355,7 +410,12 @@
       "falsifiers": [
         "Profiles incompatible with any admissible Parker branch"
       ],
-      "maturity_stage": "diagnostic"
+      "maturity_stage": "diagnostic",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "12",
+        "content_hash": "71504036ea38db4f1a230a717f0b95d95c01bcbaac69612ac81d652b7fe0e6d3"
+      }
     },
     {
       "claim_id": "SCOR-C013",
@@ -381,7 +441,18 @@
       "falsifiers": [
         "No shared statistical signature across domains"
       ],
-      "maturity_stage": "exploratory"
+      "maturity_stage": "exploratory",
+      "source_evidence": {
+        "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+        "page_span": "13",
+        "content_hash": "22284f1d5bc51f35760eec1c5e71db7f6ed704a1574391c2ed90a10eb803b988"
+      }
     }
-  ]
+  ],
+  "metadata": {
+    "provenance_status": "locked",
+    "source_document": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+    "source_document_sha256": "867b7903cb14221901084add37a011653f394e97a697f2489094af4e598b101c",
+    "updated_at": "2026-02-18T22:42:18Z"
+  }
 }

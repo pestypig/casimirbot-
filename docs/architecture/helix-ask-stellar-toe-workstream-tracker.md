@@ -170,3 +170,13 @@ Mandatory Casimir + trace export and full gate table.
   - semantic gate table
   - Casimir PASS block
   - updated TOE progress snapshot delta
+
+### Handoff Snapshot 2026-02-18T22:44:11Z
+- Branch/HEAD: work / cab3729
+- Result type: pass
+- Stage completed: Stage A (A1 source provenance lock + A2 TOE reconciliation)
+- Gates passed: source provenance lock, toe progress recompute, ticket result validation
+- Gates failed: none
+- Casimir: PASS, certificateHash=6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45, integrityOk=true
+- New artifacts: docs/papers/stellar-consciousness-orch-or-review-full.pdf; artifacts/research/stellar-framework/source-provenance-map.json
+- Next single highest-priority task: Stage B runtime integration (P0/P1 bridge wiring and tests).

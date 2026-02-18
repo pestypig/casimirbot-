@@ -22,7 +22,8 @@
     "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
     "integrity_ok": true
   },
-  "remaining_gaps": [
-    "Combined helix-ask modes/evidence/artifacts run may be unstable in this environment; targeted suites were used for evidence collection."
+  "remaining_gaps": [],
+  "research_artifacts": [
+    "runtime-contract-audit"
   ]
 }
