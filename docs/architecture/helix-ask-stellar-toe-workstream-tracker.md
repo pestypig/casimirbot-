@@ -1,0 +1,172 @@
+# Helix Ask Stellar+TOE Workstream Tracker
+
+## Objective
+Close the gap between research-framework artifacts and decision-grade Helix Ask runtime utility, while preserving Casimir/TOE gate integrity.
+
+This tracker exists to reduce handoff drift between agents.
+
+## Current baseline (bookkept)
+- Framework pass completed from stellar paper and merged (`ac4b3faa` lineage).
+- Artifacts present under `artifacts/research/stellar-framework/`:
+  - `claim-registry.json`
+  - `equation-targets.json`
+  - `variable-dictionary.json`
+  - `maturity-matrix.json`
+  - `repo-congruence-map.json`
+  - `missing-tree-dag-bridges.json`
+  - `retrieval-contract-deltas.json`
+  - `build-backlog.json`
+  - `summary.json`
+- Report present:
+  - `reports/helix-ask-stellar-equation-framework.md`
+- PS2 runtime contract merged (`60c594cb` merge, `725f3fbd` patch lineage).
+
+## Workstream stages
+
+### Stage A: Provenance + TOE reconciliation
+Goal: convert framework artifacts into TOE-complete evidence surfaces.
+
+- A1: Source provenance lock
+  - Ensure full paper is in-repo (`docs/papers/stellar-consciousness-orch-or-review-full.pdf`).
+  - Add source-hash + page-span mapping for claim registry entries.
+- A2: TOE reconciliation
+  - Map runtime-contract artifacts to required TOE research/runtime fields.
+  - Recompute and verify `docs/audits/toe-progress-snapshot.json`.
+  - Target: reduce `missing_research_artifacts` blockers in strict-ready release gate.
+
+### Stage B: Runtime integration
+Goal: improve unknown/open-world answer quality from framework inputs.
+
+- B1 (PS1): Bridge integration
+  - Implement P0/P1 bridges from `missing-tree-dag-bridges.json`.
+  - Wire resolver traversal and add tests.
+- B2 (PS2.5): Quake-frame runtime hardening
+  - Event pump parity + deterministic fallback path + fixed tick split.
+  - Semantic gates: claim-citation link, unsupported claim, repetition, contradiction.
+- B3 (PS3): Falsifier schema validation
+  - Enforce exploratory-claim falsifier fields and maturity-safe narration.
+
+## Progress ledger template (update each handoff)
+Use this exact block in every agent response and append to this file when major state changes happen.
+
+```md
+### Handoff Snapshot <UTC timestamp>
+- Branch/HEAD:
+- Result type: pass | needs_quality_patch | needs_reliability_patch | insufficient_run_quality
+- Stage completed:
+- Gates passed:
+- Gates failed:
+- Casimir: PASS/FAIL, certificateHash=..., integrityOk=...
+- New artifacts:
+- Next single highest-priority task:
+```
+
+## Active gate targets
+- placeholder_fallback_rate == 0
+- empty_scaffold_rate == 0
+- mechanism_sentence_present_rate >= 0.95
+- maturity_label_present_rate >= 0.95
+- claim_citation_link_rate >= 0.90
+- unsupported_claim_rate <= 0.10
+- contradiction_flag_rate <= 0.10
+- p95_latency <= 2500ms
+- non_200_rate <= 0.02
+
+## Codex Cloud prompt: Stage A (A1 + A2 combined)
+Use this first to stabilize provenance and TOE bookkeeping.
+
+```md
+Run Stage A for Helix Ask stellar workstream.
+
+Inputs:
+- artifacts/research/stellar-framework/*
+- reports/helix-ask-stellar-equation-framework.md
+- docs/audits/toe-progress-snapshot.json
+- docs/audits/toe-coverage-extension-backlog-2026-02-18.json
+- docs/audits/ticket-results/*
+
+Goals:
+1) Source provenance lock for stellar framework artifacts.
+2) TOE reconciliation so progress snapshot reflects completed research/runtime artifacts correctly.
+
+Required tasks:
+1. Ensure source PDF exists at:
+   - docs/papers/stellar-consciousness-orch-or-review-full.pdf
+   If absent, record explicit provenance warning and hash available source proxy.
+2. Add/refresh provenance map artifact:
+   - artifacts/research/stellar-framework/source-provenance-map.json
+   Include claim_id -> source_path -> page_span -> content_hash.
+3. Reconcile TOE metadata for relevant Helix Ask tickets:
+   - TOE-062, TOE-067, TOE-068, TOE-069 (and related strict-ready tickets if impacted).
+4. Recompute TOE progress snapshot and validate schema/tooling:
+   - scripts/compute-toe-progress.ts
+   - scripts/validate-toe-ticket-results.ts
+   - scripts/validate-toe-ticket-backlog.ts
+5. Emit reconciliation report with before/after blocker counts.
+
+Required outputs:
+- reports/helix-ask-stellar-toe-reconciliation-<run-id>.md
+- artifacts/research/stellar-framework/source-provenance-map.json
+- artifacts/research/stellar-framework/toe-reconciliation-summary.json
+
+Mandatory Casimir:
+- POST /api/agi/adapter/run (constraint-pack repo-convergence)
+- GET /api/agi/training-trace/export
+
+Final response format:
+1) Executive summary
+2) Strict-ready blocker delta (before/after)
+3) Updated TOE ticket status table
+4) Exact commands run
+5) ✅/⚠️/❌ tests
+6) Casimir block
+7) Commit hash
+```
+
+## Codex Cloud prompt: Stage B1 (PS1 bridge integration)
+Run this after Stage A is green.
+
+```md
+Implement PS1 bridge integration from:
+- artifacts/research/stellar-framework/missing-tree-dag-bridges.json
+- artifacts/research/stellar-framework/build-backlog.json
+
+Goals:
+- Add P0/P1 nodes/bridges and wire resolver traversal deterministically.
+- Add tests for bridge retrieval and fail-safe behavior.
+
+Required outputs:
+- reports/helix-ask-stellar-ps1-bridge-integration-<run-id>.md
+- artifacts/experiments/helix-ask-stellar-ps1/<run-id>/summary.json
+- artifacts/experiments/helix-ask-stellar-ps1/<run-id>/recommendation.json
+
+Mandatory Casimir + trace export and full gate table.
+```
+
+## Codex Cloud prompt: Stage B2 (PS2.5 Quake frame loop hardening)
+Run this after B1.
+
+```md
+Implement PS2.5 runtime hardening from:
+- docs/helix-ask-scientific-method-gap.md (Quake frame loop spec section)
+
+Goals:
+- Deterministic fallback as engine path.
+- Event pump parity + semantic gates.
+- No generic placeholder final output.
+
+Required outputs:
+- reports/helix-ask-quake-frame-loop-<run-id>.md
+- artifacts/experiments/helix-ask-quake-frame-loop/<run-id>/summary.json
+- artifacts/experiments/helix-ask-quake-frame-loop/<run-id>/recommendation.json
+- artifacts/experiments/helix-ask-quake-frame-loop/<run-id>/focused-qa.json
+
+Mandatory Casimir + trace export and full gate table.
+```
+
+## Operator notes
+- If a run passes local gates but strict-ready remains blocked, treat that as a TOE reconciliation failure, not a model-quality success.
+- Do not merge runtime-quality claims without:
+  - semantic gate table
+  - Casimir PASS block
+  - updated TOE progress snapshot delta

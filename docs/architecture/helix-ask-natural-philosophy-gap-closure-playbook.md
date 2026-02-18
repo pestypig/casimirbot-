@@ -233,3 +233,8 @@ If `main/origin` unavailable, continue on current HEAD and emit provenance warni
 ### Recommended workflow variants
 - Scan -> Synthesis -> Build for new domains.
 - Scan -> Build for known, narrow regressions.
+
+## Active tracker
+
+For multi-agent handoffs on stellar/math-congruence + TOE promotion, use:
+- `docs/architecture/helix-ask-stellar-toe-workstream-tracker.md`
