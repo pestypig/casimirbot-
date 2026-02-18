@@ -18223,6 +18223,7 @@ const executeHelixAsk = async ({
     const strictConceptProvenance = parsed.data.strictProvenance === true;
     const STRICT_CONCEPT_PROVENANCE_FAIL_REASON = "CONCEPTS_PROVENANCE_MISSING" as const;
     let strictConceptFailReason: string | null = null;
+    let strictReadyFailReason: string | null = null;
     const ideologyConversationalMode = Boolean(
       isIdeologyConversationalCandidate &&
         shouldUseIdeologyConversationalMode(
@@ -22438,6 +22439,13 @@ const executeHelixAsk = async ({
           lanePressure,
         });
         runtimeBudgetRecommend = budgetState.recommend;
+        const strictReadyContractEvidenceOk =
+          strictConceptProvenance !== true ||
+          (mustIncludeOk &&
+            runtimeViabilityMustIncludeOk &&
+            topicMustIncludeOk !== false &&
+            evidenceGate.ok &&
+            !strictConceptFailReason);
         const arbiterDecision = resolveHelixAskArbiter({
           retrievalConfidence,
           repoThreshold: arbiterRepoRatio,
@@ -22456,6 +22464,8 @@ const executeHelixAsk = async ({
           intentDomain,
           budgetLevel: budgetState.level,
           budgetRecommend: budgetState.recommend,
+          strictCertainty: strictConceptProvenance,
+          certaintyEvidenceOk: strictReadyContractEvidenceOk,
         });
         const rawArbiterMode = arbiterDecision.mode;
         const isIdeologyIntent = intentProfile.id === "repo.ideology_reference";
@@ -22467,6 +22477,10 @@ const executeHelixAsk = async ({
         const arbiterStrictness = arbiterDecision.strictness;
         const arbiterRepoOk = arbiterDecision.repoOk;
         const arbiterHybridOk = arbiterDecision.hybridOk;
+        strictReadyFailReason =
+          strictConceptProvenance === true && arbiterDecision.fail_reason
+            ? arbiterDecision.fail_reason
+            : null;
         logEvent(
           "Arbiter",
           arbiterMode,
@@ -22493,6 +22507,7 @@ const executeHelixAsk = async ({
           debugPayload.runtime_budget_level = budgetState.level;
           debugPayload.runtime_budget_recommend = budgetState.recommend;
           debugPayload.runtime_budget_signals = budgetState.signals;
+          debugPayload.arbiter_fail_reason = strictReadyFailReason;
         }
         if (
           intentProfile.id === "repo.ideology_reference" &&
@@ -26834,6 +26849,9 @@ const executeHelixAsk = async ({
     }
     if (strictConceptFailReason) {
       result.fail_reason = strictConceptFailReason;
+      result.fail_class = "input_contract";
+    } else if (strictReadyFailReason) {
+      result.fail_reason = strictReadyFailReason;
       result.fail_class = "input_contract";
     }
     result.claim_tier =

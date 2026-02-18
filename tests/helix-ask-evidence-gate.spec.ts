@@ -5,6 +5,7 @@ import {
   evaluateClaimCoverage,
 } from "../server/services/helix-ask/query";
 import { scorePremeditation } from "../server/services/premeditation-scorer";
+import { resolveHelixAskArbiter } from "../server/services/helix-ask/arbiter";
 
 describe("Helix Ask evidence eligibility gate", () => {
   it("fails when context misses key tokens", () => {
@@ -117,5 +118,56 @@ describe("Ideology dual-key hard gate scoring", () => {
     });
     expect(result.chosenCandidateId).toBe("legacy-safe");
     expect(result.rationaleTags.join(" ")).not.toContain("ideology_gate.firstFail");
+  });
+});
+
+
+describe("Helix Ask strict-ready arbiter promotion", () => {
+  it("promotes strict-ready missing certainty evidence to clarify with deterministic fail_reason", () => {
+    const result = resolveHelixAskArbiter({
+      retrievalConfidence: 0.92,
+      repoThreshold: 0.8,
+      hybridThreshold: 0.5,
+      mustIncludeOk: true,
+      viabilityMustIncludeOk: true,
+      topicMustIncludeOk: true,
+      conceptMatch: true,
+      hasRepoHints: true,
+      topicTags: ["helix_ask"],
+      verificationAnchorRequired: false,
+      verificationAnchorOk: true,
+      userExpectsRepo: true,
+      hasHighStakesConstraints: false,
+      strictCertainty: true,
+      certaintyEvidenceOk: false,
+    });
+
+    expect(result.mode).toBe("clarify");
+    expect(result.reason).toBe("strict_ready_contract_missing");
+    expect(result.fail_reason).toBe("CERTAINTY_EVIDENCE_MISSING");
+  });
+
+  it("keeps non-strict arbiter behavior backward-compatible", () => {
+    const result = resolveHelixAskArbiter({
+      retrievalConfidence: 0.92,
+      repoThreshold: 0.8,
+      hybridThreshold: 0.5,
+      mustIncludeOk: true,
+      viabilityMustIncludeOk: true,
+      topicMustIncludeOk: true,
+      conceptMatch: true,
+      hasRepoHints: true,
+      topicTags: ["helix_ask"],
+      verificationAnchorRequired: false,
+      verificationAnchorOk: true,
+      userExpectsRepo: true,
+      hasHighStakesConstraints: false,
+      strictCertainty: false,
+      certaintyEvidenceOk: false,
+    });
+
+    expect(result.mode).toBe("repo_grounded");
+    expect(result.reason).toBe("repo_ratio");
+    expect(result.fail_reason).toBeUndefined();
   });
 });
