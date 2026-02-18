@@ -11,6 +11,8 @@ type Backlog = {
   tickets?: BacklogTicket[];
 };
 
+type BacklogSegment = "core" | "extension";
+
 type TicketResult = {
   schema_version?: string;
   ticket_id?: string;
@@ -32,6 +34,10 @@ type ResolverOwnerCoverageManifest = {
 const BACKLOG_PATH = path.resolve(
   process.env.TOE_BACKLOG_PATH ??
     path.join("docs", "audits", "toe-cloud-agent-ticket-backlog-2026-02-17.json"),
+);
+const EXTENSION_BACKLOG_PATH = path.resolve(
+  process.env.TOE_EXTENSION_BACKLOG_PATH ??
+    path.join("docs", "audits", "toe-coverage-extension-backlog-2026-02-18.json"),
 );
 const RESULTS_DIR = path.resolve(
   process.env.TOE_RESULTS_DIR ?? path.join("docs", "audits", "ticket-results"),
@@ -108,25 +114,65 @@ function computeForestOwnerCoveragePct(): number {
   return coveredCount / ownerNames.length;
 }
 
+function readBacklogTicketIds(filePath: string, segment: BacklogSegment): string[] {
+  const backlog = readJson<Backlog>(filePath);
+  const expectedSchemaVersion =
+    segment === "core" ? "toe_cloud_ticket_backlog/1" : "toe_coverage_extension_backlog/1";
+
+  if (backlog.schema_version !== expectedSchemaVersion) {
+    throw new Error(
+      `Unexpected ${segment} backlog schema_version: ${String(backlog.schema_version)}`,
+    );
+  }
+
+  return (backlog.tickets ?? [])
+    .map((ticket) => ticket.id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+}
+
+type SegmentSummary = {
+  tickets_total: number;
+  tickets_with_evidence: number;
+  claim_tier_counts: Record<TierKey, number>;
+  weighted_score_sum: number;
+  toe_progress_pct: number;
+  strict_ready_progress_pct: number;
+};
+
+function emptySegmentSummary(): SegmentSummary {
+  return {
+    tickets_total: 0,
+    tickets_with_evidence: 0,
+    claim_tier_counts: {
+      diagnostic: 0,
+      "reduced-order": 0,
+      certified: 0,
+    },
+    weighted_score_sum: 0,
+    toe_progress_pct: 0,
+    strict_ready_progress_pct: 0,
+  };
+}
+
 function main() {
   if (!fs.existsSync(BACKLOG_PATH)) {
     throw new Error(`Backlog file missing: ${BACKLOG_PATH}`);
   }
 
-  const backlog = readJson<Backlog>(BACKLOG_PATH);
-  if (backlog.schema_version !== "toe_cloud_ticket_backlog/1") {
-    throw new Error(
-      `Unexpected backlog schema_version: ${String(backlog.schema_version)}`,
-    );
-  }
+  const coreTicketIds = readBacklogTicketIds(BACKLOG_PATH, "core");
+  const extensionBacklogPresent = fs.existsSync(EXTENSION_BACKLOG_PATH);
+  const extensionTicketIds = extensionBacklogPresent
+    ? readBacklogTicketIds(EXTENSION_BACKLOG_PATH, "extension")
+    : [];
 
-  const ticketIds = (backlog.tickets ?? [])
-    .map((ticket) => ticket.id)
-    .filter((id): id is string => typeof id === "string" && id.length > 0);
+  const ticketIds = [...new Set([...coreTicketIds, ...extensionTicketIds])];
 
   if (ticketIds.length === 0) {
     throw new Error("No tickets found in backlog.");
   }
+
+  const coreTicketIdSet = new Set(coreTicketIds);
+  const extensionTicketIdSet = new Set(extensionTicketIds);
 
   const latestByTicket = new Map<
     string,
@@ -162,6 +208,8 @@ function main() {
     "reduced-order": 0,
     certified: 0,
   };
+  const coreSummary = emptySegmentSummary();
+  const extensionSummary = emptySegmentSummary();
 
   let weightedScoreSum = 0;
   let ticketsWithEvidence = 0;
@@ -187,18 +235,42 @@ function main() {
 
     if (claimTier) {
       claimTierCounts[claimTier] += 1;
+      if (coreTicketIdSet.has(ticketId)) {
+        coreSummary.claim_tier_counts[claimTier] += 1;
+      }
+      if (extensionTicketIdSet.has(ticketId)) {
+        extensionSummary.claim_tier_counts[claimTier] += 1;
+      }
     }
     if (score > 0) {
       ticketsWithEvidence += 1;
+      if (coreTicketIdSet.has(ticketId)) {
+        coreSummary.tickets_with_evidence += 1;
+      }
+      if (extensionTicketIdSet.has(ticketId)) {
+        extensionSummary.tickets_with_evidence += 1;
+      }
     }
     if (
       verificationOk &&
       (claimTier === "reduced-order" || claimTier === "certified")
     ) {
       strictReadyCount += 1;
+      if (coreTicketIdSet.has(ticketId)) {
+        coreSummary.strict_ready_progress_pct += 1;
+      }
+      if (extensionTicketIdSet.has(ticketId)) {
+        extensionSummary.strict_ready_progress_pct += 1;
+      }
     }
 
     weightedScoreSum += score;
+    if (coreTicketIdSet.has(ticketId)) {
+      coreSummary.weighted_score_sum += score;
+    }
+    if (extensionTicketIdSet.has(ticketId)) {
+      extensionSummary.weighted_score_sum += score;
+    }
     return {
       ticket_id: ticketId,
       claim_tier: claimTier,
@@ -209,15 +281,41 @@ function main() {
   });
 
   const totalTickets = ticketIds.length;
-  const normalizedProgress = weightedScoreSum / totalTickets;
-  const strictReadyProgress = strictReadyCount / totalTickets;
+  const normalizedProgress = totalTickets > 0 ? weightedScoreSum / totalTickets : 0;
+  const strictReadyProgress = totalTickets > 0 ? strictReadyCount / totalTickets : 0;
   const forestOwnerCoverage = computeForestOwnerCoveragePct();
+
+  coreSummary.tickets_total = coreTicketIdSet.size;
+  extensionSummary.tickets_total = extensionTicketIdSet.size;
+  coreSummary.toe_progress_pct =
+    coreSummary.tickets_total > 0
+      ? toProgressPercent(coreSummary.weighted_score_sum / coreSummary.tickets_total)
+      : 0;
+  extensionSummary.toe_progress_pct =
+    extensionSummary.tickets_total > 0
+      ? toProgressPercent(extensionSummary.weighted_score_sum / extensionSummary.tickets_total)
+      : 0;
+  coreSummary.strict_ready_progress_pct =
+    coreSummary.tickets_total > 0
+      ? toProgressPercent(coreSummary.strict_ready_progress_pct / coreSummary.tickets_total)
+      : 0;
+  extensionSummary.strict_ready_progress_pct =
+    extensionSummary.tickets_total > 0
+      ? toProgressPercent(extensionSummary.strict_ready_progress_pct / extensionSummary.tickets_total)
+      : 0;
+
+  coreSummary.weighted_score_sum = Math.round(coreSummary.weighted_score_sum * 1000) / 1000;
+  extensionSummary.weighted_score_sum =
+    Math.round(extensionSummary.weighted_score_sum * 1000) / 1000;
 
   const snapshot = {
     schema_version: "toe_progress_snapshot/1",
     generated_at: new Date().toISOString(),
     source: {
       backlog: normalizePath(path.relative(process.cwd(), BACKLOG_PATH)),
+      extension_backlog: extensionBacklogPresent
+        ? normalizePath(path.relative(process.cwd(), EXTENSION_BACKLOG_PATH))
+        : null,
       results_dir: normalizePath(path.relative(process.cwd(), RESULTS_DIR)),
       resolver_owner_coverage_manifest: normalizePath(
         path.relative(process.cwd(), RESOLVER_OWNER_COVERAGE_MANIFEST_PATH),
@@ -232,6 +330,18 @@ function main() {
       toe_progress_pct: toProgressPercent(normalizedProgress),
       forest_owner_coverage_pct: toProgressPercent(forestOwnerCoverage),
       strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
+    },
+    segments: {
+      core: coreSummary,
+      extension: extensionSummary,
+      combined: {
+        tickets_total: totalTickets,
+        tickets_with_evidence: ticketsWithEvidence,
+        claim_tier_counts: claimTierCounts,
+        weighted_score_sum: Math.round(weightedScoreSum * 1000) / 1000,
+        toe_progress_pct: toProgressPercent(normalizedProgress),
+        strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
+      },
     },
     tickets,
   };
