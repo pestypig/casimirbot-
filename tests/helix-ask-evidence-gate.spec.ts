@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { __testScoreDeterministicClaimCitationLinkage } from "../server/routes/agi.plan";
 import {
   evaluateEvidenceEligibility,
   extractClaimCandidates,
@@ -226,5 +227,44 @@ describe("Helix Ask strict fail-reason ledger", () => {
     });
 
     expect(ledger).toBeNull();
+  });
+});
+
+
+describe("Helix Ask semantic claim-citation linkage scorer", () => {
+  it("fails with CLAIM_CITATION_LINK_MISSING when claims have no citation tokens", () => {
+    const score = __testScoreDeterministicClaimCitationLinkage(
+      "Deterministic quality gates enforce strict response contracts. Final outputs preserve semantic structure.",
+    );
+
+    expect(score.claimCount).toBe(2);
+    expect(score.linkedClaimCount).toBe(0);
+    expect(score.linkRate).toBe(0);
+    expect(score.failReasons).toEqual(["CLAIM_CITATION_LINK_MISSING"]);
+  });
+
+  it("fails with CLAIM_CITATION_LINK_WEAK when only a subset of claims link to citations", () => {
+    const score = __testScoreDeterministicClaimCitationLinkage([
+      "Quality floor appends source anchors from server/routes/agi.plan.ts.",
+      "Semantic scoring also evaluates unsupported claim rates.",
+      "Sources: server/routes/agi.plan.ts",
+    ].join("\n\n"));
+
+    expect(score.claimCount).toBe(2);
+    expect(score.linkedClaimCount).toBe(1);
+    expect(score.failReasons).toEqual(["CLAIM_CITATION_LINK_WEAK"]);
+  });
+
+  it("passes when every final claim sentence links to a citation token/path", () => {
+    const score = __testScoreDeterministicClaimCitationLinkage([
+      "Quality floor appends source anchors from server/routes/agi.plan.ts.",
+      "Gate enforcement is tested in tests/helix-ask-evidence-gate.spec.ts.",
+      "Sources: server/routes/agi.plan.ts, tests/helix-ask-evidence-gate.spec.ts",
+    ].join("\n\n"));
+
+    expect(score.claimCount).toBe(2);
+    expect(score.linkedClaimCount).toBe(2);
+    expect(score.linkRate).toBe(1);
+    expect(score.failReasons).toEqual([]);
   });
 });

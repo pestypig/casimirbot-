@@ -1828,6 +1828,37 @@
           "safety-envelope-analysis"
         ]
       }
+    },
+    {
+      "id": "TOE-073-helix-ask-semantic-claim-citation-contract",
+      "tree_owner": "helix-ask",
+      "primitive": "Helix Ask semantic claim-citation contract primitive",
+      "primary_path_prefix": "server/routes/agi.plan.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "server/routes/agi.plan.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-evidence-gate.spec.ts"
+      ],
+      "done_criteria": [
+        "Final claim sentences require deterministic citation-linkage checks",
+        "Semantic gate emits deterministic fail reasons for missing vs weak claim-citation linkage",
+        "Regression tests pin deterministic linkage scoring behavior"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
     }
   ]
 }
