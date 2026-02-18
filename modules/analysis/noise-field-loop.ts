@@ -4,6 +4,7 @@ import {
   type ConstraintLoopGate,
   type ConstraintLoopHandlers,
   type ConstraintLoopResult,
+  type ConstraintLoopProvenance,
 } from "./constraint-loop.js";
 
 export type NoiseFieldState = {
@@ -35,6 +36,8 @@ export type NoiseFieldLoopOptions = {
   thresholds?: Partial<NoiseFieldThresholds>;
   clamp?: { min: number; max: number };
   initialState?: NoiseFieldState;
+  provenance?: ConstraintLoopProvenance;
+  strictProvenance?: boolean;
 };
 
 export type NoiseFieldAttempt = ConstraintLoopAttempt<
@@ -199,5 +202,7 @@ export function runNoiseFieldLoop(options: NoiseFieldLoopOptions = {}): NoiseFie
     initialState,
     maxIterations: options.maxIterations ?? 6,
     handlers,
+    provenance: options.provenance,
+    strictProvenance: options.strictProvenance,
   });
 }

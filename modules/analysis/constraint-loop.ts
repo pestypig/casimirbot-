@@ -4,6 +4,16 @@ export type ConstraintLoopGate = {
   status: ConstraintLoopGateStatus;
   residuals: Record<string, number>;
   note?: string;
+  fail_reason?: string;
+};
+
+export type ConstraintLoopProvenanceClass = "measured" | "proxy" | "inferred";
+export type ConstraintLoopClaimTier = "diagnostic" | "reduced-order" | "certified";
+
+export type ConstraintLoopProvenance = {
+  provenance_class: ConstraintLoopProvenanceClass;
+  claim_tier: ConstraintLoopClaimTier;
+  certifying: boolean;
 };
 
 export type ConstraintLoopAttempt<S, D, C> = {
@@ -20,6 +30,7 @@ export type ConstraintLoopResult<S, D, C> = {
   acceptedIteration?: number;
   attempts: Array<ConstraintLoopAttempt<S, D, C>>;
   finalState: S;
+  provenance?: ConstraintLoopProvenance;
 };
 
 export type ConstraintLoopContext = {
@@ -50,7 +61,12 @@ type ConstraintLoopInput<S, D, C> = {
   initialState: S;
   maxIterations?: number;
   handlers: ConstraintLoopHandlers<S, D, C>;
+  provenance?: ConstraintLoopProvenance;
+  strictProvenance?: boolean;
 };
+
+export const CONSTRAINT_LOOP_FAIL_REASON_PROVENANCE_MISSING =
+  "ANALYSIS_LOOP_PROVENANCE_MISSING" as const;
 
 const cloneValue = <T>(value: T): T => {
   if (typeof structuredClone === "function") {
@@ -75,13 +91,24 @@ export function runConstraintLoop<S, D, C>(
     ? handlers.cloneState(input.initialState)
     : input.initialState;
   let acceptedIteration: number | undefined;
+  const strictProvenanceFail = input.strictProvenance === true && !input.provenance;
 
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
     const ctx: ConstraintLoopContext = { iteration, maxIterations };
     const derivatives = handlers.derive(state, ctx);
     const constraints = handlers.constrain(state, derivatives, ctx);
     const gate = handlers.gate(constraints, ctx);
-    const accepted = gate.status === "pass";
+    const gateWithProvenance = strictProvenanceFail
+      ? {
+          ...gate,
+          status: "fail" as const,
+          fail_reason: CONSTRAINT_LOOP_FAIL_REASON_PROVENANCE_MISSING,
+          note: [gate.note, CONSTRAINT_LOOP_FAIL_REASON_PROVENANCE_MISSING]
+            .filter(Boolean)
+            .join(";"),
+        }
+      : gate;
+    const accepted = gateWithProvenance.status === "pass";
     const snapshot = capture({ state, derivatives, constraints });
 
     attempts.push({
@@ -89,7 +116,7 @@ export function runConstraintLoop<S, D, C>(
       state: snapshot.state,
       derivatives: snapshot.derivatives,
       constraints: snapshot.constraints,
-      gate,
+      gate: gateWithProvenance,
       accepted,
     });
 
@@ -108,5 +135,6 @@ export function runConstraintLoop<S, D, C>(
     acceptedIteration,
     attempts,
     finalState: state,
+    provenance: input.provenance,
   };
 }
