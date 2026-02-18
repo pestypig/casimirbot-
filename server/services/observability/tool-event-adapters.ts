@@ -1,6 +1,7 @@
 import { appendToolLog, type ToolLogPolicyFlags } from "./tool-log-store";
 import { stableJsonStringify } from "../../utils/stable-json";
 import { sha256Hex } from "../../utils/information-boundary";
+import { emitEventSpine } from "./event-spine.js";
 
 export type ToolEventCommon = {
   runId: string;
@@ -363,6 +364,18 @@ export const createToolEventAdapter = (
       debateId: event.debateId,
       strategy: event.strategy,
     });
+    emitEventSpine({
+      kind: "tool.start",
+      traceId: event.traceId ?? options.traceId,
+      sessionId: event.sessionId ?? options.sessionId,
+      runId: event.runId,
+      ts: new Date(startMs).toISOString(),
+      payload: {
+        tool,
+        paramsHash,
+        stepId: event.stepId,
+      },
+    });
   };
 
   const finish = (
@@ -401,6 +414,19 @@ export const createToolEventAdapter = (
       text: event.text ?? cached?.text,
       debateId: event.debateId ?? cached?.debateId,
       strategy: event.strategy ?? cached?.strategy,
+    });
+    emitEventSpine({
+      kind: ok ? "tool.success" : "tool.error",
+      traceId: event.traceId ?? cached?.traceId ?? options.traceId,
+      sessionId: event.sessionId ?? cached?.sessionId ?? options.sessionId,
+      runId: event.runId,
+      ts: new Date(endMs).toISOString(),
+      payload: {
+        tool,
+        durationMs,
+        paramsHash,
+        ok,
+      },
     });
   };
 

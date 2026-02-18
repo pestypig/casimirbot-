@@ -45,6 +45,23 @@ Constraint pack mode (pack-agnostic)
 }
 ```
 
+
+Authenticity ladder policy (optional)
+```json
+{
+  "policy": {
+    "authenticity": {
+      "consequence": "low|medium|high",
+      "required": false,
+      "trustedSignerKeyIds": ["robotics-prod-signer"]
+    }
+  }
+}
+```
+- Default consequence is `low` (integrity-only, authenticity not enforced).
+- `high` consequence enforces authenticity by default.
+- `required: true` enforces authenticity for any consequence.
+
 Response (example)
 ```json
 {
@@ -63,7 +80,11 @@ Response (example)
     "status": "ADMISSIBLE",
     "certificateHash": "sha256:deadbeef",
     "certificateId": "cert-001",
-    "integrityOk": true
+    "integrityOk": true,
+    "authenticityOk": true,
+    "authenticityRequired": true,
+    "authenticityConsequence": "high",
+    "authenticityReasonCodes": []
   },
   "deltas": [
     { "key": "dutyCycle", "from": 0.004, "to": 0.002, "delta": -0.002, "change": "changed" }
@@ -79,6 +100,14 @@ Response (example)
 
 Notes
 - `actions[].params` map directly to the GR pipeline parameter overrides.
+- `policy.verify.mode` supports `strict` and `permissive`:
+  - `strict` is fail-closed for verification flows: missing certificate evidence,
+    certificate integrity failure, or adapter failure must degrade to FAIL.
+  - `permissive` keeps execution available but must be labeled
+    `non_verified_degraded` by callers when verification evidence is incomplete.
+- Canonical fail IDs for verification degradation include
+  `ADAPTER_CERTIFICATE_MISSING`, `ADAPTER_CERTIFICATE_INTEGRITY`, and
+  `ADAPTER_CONSTRAINT_FAIL` (plus adapter-error-specific deterministic IDs).
 - For `mode: "constraint-pack"`, provide `pack.id` and telemetry/metrics; the
   adapter evaluates the pack and emits a training trace.
 - When available, the adapter response includes a `certificate` object with     
@@ -96,16 +125,4 @@ Notes
 - `deltas` reflect the net parameter changes between the first and terminal
   attempt; if no change is detected, the list can be empty.
 
-
-Replay operator surface (debug tooling)
-- Script: `npm run agi:replay -- ...`
-- Backward-compatible flags remain: `--limit`, `--tenant`, `--force`, `--no-emit`.
-- Additional operator flags:
-  - `--from-seq <n>` replay window start at training-trace sequence `n` (event spine order).
-  - `--from-trace <id>` replay window start at matching `traceId` or record id.
-  - `--step` force step mode (single-item replay batches).
-  - `--stop-on-first-fail` stop replay on first rejected gate verdict.
-  - `--stop-on-verdict <pass|fail>` stop replay when a matching verdict is observed.
-  - `--speed <multiplier>` increase replay batch width while preserving sequence order.
-- Replay output includes `navDeltaDiff` rows derived from movement-episode `compare`
-  events (`actualDelta - predictedDelta`) for predicted-vs-actual navigation analysis.
+- When authenticity is required and fails, `firstFail.id` is `ADAPTER_CERTIFICATE_AUTHENTICITY_REQUIRED` (class `certificate_authenticity_required`).

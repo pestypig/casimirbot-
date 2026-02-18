@@ -200,3 +200,11 @@ export const computeNavDelta = (input: {
   const actual = magnitude(input.actualVelocity);
   return Math.abs(actual - predicted);
 };
+
+export const shouldRecordNavPhase = (tick: number, phase: "sense" | "premeditate" | "act"): boolean => {
+  if (!Number.isFinite(tick) || tick <= 0) return false;
+  const mod = tick % 10;
+  if (phase === "sense") return mod === 1;
+  if (phase === "premeditate") return mod === 2;
+  return mod === 3;
+};

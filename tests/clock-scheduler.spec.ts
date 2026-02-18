@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ClockScheduler } from "../server/services/runtime/clock-scheduler";
+import { useNavPoseStore } from "../client/src/store/useNavPoseStore";
 import { loadRuntimeFrameContract } from "../server/services/runtime/frame-contract";
 
 describe("clock scheduler", () => {
@@ -91,4 +92,36 @@ describe("clock scheduler", () => {
     expect(result.tasks[0]?.error).toBe("cancelled_on_deadline");
   });
 
+});
+
+
+describe("nav pose deterministic stepping", () => {
+  it("uses provided dt_s for ingest integration", () => {
+    const state = useNavPoseStore.getState();
+    const base = state.navPose;
+    useNavPoseStore.setState({
+      navPose: {
+        ...base,
+        position_m: [0, 0, 0],
+        velocity_mps: [0, 0, 0],
+        frame: "heliocentric-ecliptic",
+        timestamp_ms: 1000,
+      },
+      source: "sim",
+      hasLivePose: false,
+      _lastIngestMs: 1000,
+    });
+
+    useNavPoseStore.getState().ingestDriveVector({
+      velocity_mps: [10, 0, 0],
+      now_ms: 5000,
+      dt_s: 0.25,
+      frame: "heliocentric-ecliptic",
+    });
+
+    const pose = useNavPoseStore.getState().navPose;
+    expect(pose.position_m[0]).toBeCloseTo(2.5, 8);
+    expect(pose.timestamp_ms).toBe(5000);
+    expect(useNavPoseStore.getState().source).toBe("derived");
+  });
 });

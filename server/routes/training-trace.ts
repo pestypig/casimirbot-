@@ -54,6 +54,7 @@ const trainingTraceInputSchema = z.object({
   predictionObservationLedger: predictionObservationLedgerSchema.optional(),
   payload: trainingTracePayloadSchema.optional(),
   notes: z.array(z.string()).optional(),
+  eventRefs: z.array(z.string()).optional(),
   ts: z.string().optional(),
   id: z.string().optional(),
 });
