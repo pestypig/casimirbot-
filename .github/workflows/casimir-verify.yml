@@ -50,9 +50,14 @@ jobs:
           node -e "const url='http://localhost:5173/api/agi/constraint-packs'; const timeoutMs=60000; const start=Date.now(); const delay=ms=>new Promise(r=>setTimeout(r,ms)); (async()=>{ while(true){ try { const res=await fetch(url); if(res.ok){ console.log('AGI API is up'); process.exit(0);} } catch {} if(Date.now()-start>timeoutMs){ console.error('Timed out waiting for AGI API'); process.exit(1);} await delay(1000);} })();"
 
       - name: Run Casimir verify
+        env:
+          ADAPTER_VERIFY_URL: http://localhost:5173/api/agi/adapter/run
+          TRACE_EXPORT_URL: http://localhost:5173/api/agi/training-trace/export
         run: |
+          set -euo pipefail
           mkdir -p artifacts
-          npm run casimir:verify -- --params '{"traceId":"ci:casimir","actions":[{"id":"ci-proposal","params":{"dutyEffectiveFR":0.0025}}],"budget":{"maxIterations":1,"maxTotalMs":60000}}' --trace-out artifacts/training-trace.jsonl --trace-limit 200 --url http://localhost:5173/api/agi/adapter/run
+          npm run casimir:verify -- --params '{"traceId":"ci:casimir","actions":[{"id":"ci-proposal","params":{"dutyEffectiveFR":0.0025}}],"budget":{"maxIterations":1,"maxTotalMs":60000}}' --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci --url "$ADAPTER_VERIFY_URL" --export-url "$TRACE_EXPORT_URL" | tee artifacts/casimir-verify-response.json
+          node -e 'const fs=require("fs"); const adapter=process.env.ADAPTER_VERIFY_URL; const raw=fs.readFileSync("artifacts/casimir-verify-response.json","utf8"); const j=JSON.parse(raw); const verdict=(j.verdict ?? (j.pass ? "PASS" : "FAIL")); const cert=j.certificate ?? {}; const integrity=(cert.integrityOk===true?"OK":"NOT_OK"); console.log(`[casimir-verify] adapter_url=${adapter} verdict=${verdict} cert_integrity=${integrity}`);'
 
       - name: Generate math report
         if: always()
