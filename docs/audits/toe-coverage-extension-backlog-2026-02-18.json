@@ -1311,6 +1311,34 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-057-helix-ask-strict-ready-promotion-pack",
+      "ticket": "TOE-057-helix-ask-strict-ready-promotion-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Helix Ask strict-ready promotion pack",
+      "primary_path_prefix": "server/routes/agi.plan.ts",
+      "allowed_paths": [
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask/arbiter.ts",
+        "server/services/helix-ask/answer-artifacts.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-modes.spec.ts"
+      ],
+      "required_tests": [
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-modes.spec.ts"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
     }
   ]
 }

@@ -83,6 +83,16 @@ export function resolveHelixAskArbiter(input: HelixAskArbiterInput): HelixAskArb
     reason = "no_repo_expectation";
   }
 
+  const strictFailReason =
+    input.strictCertainty === true && input.certaintyEvidenceOk !== true
+      ? CERTAINTY_FAIL_REASON
+      : undefined;
+  const strictMode = input.strictCertainty === true;
+  if (strictMode && strictFailReason && mode !== "clarify") {
+    mode = "clarify";
+    reason = "strict_ready_contract_missing";
+  }
+
   return {
     mode,
     reason,
@@ -95,9 +105,6 @@ export function resolveHelixAskArbiter(input: HelixAskArbiterInput): HelixAskArb
     provenance_class: "inferred",
     claim_tier: "diagnostic",
     certifying: false,
-    fail_reason:
-      input.strictCertainty === true && input.certaintyEvidenceOk !== true
-        ? CERTAINTY_FAIL_REASON
-        : undefined,
+    fail_reason: strictFailReason,
   };
 }
