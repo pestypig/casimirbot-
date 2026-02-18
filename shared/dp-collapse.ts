@@ -159,6 +159,10 @@ export type DpCollapseResult = {
     status: "ok" | "exceeds" | "missing_inputs";
     checks: Array<{ name: string; value?: number; limit?: number; ok?: boolean }>;
   };
+  provenance_class: "measured" | "proxy" | "inferred";
+  claim_tier: "diagnostic" | "reduced-order" | "certified";
+  certifying: boolean;
+  fail_reason?: "DP_COLLAPSE_PROVENANCE_NON_ADMISSIBLE" | "DP_COLLAPSE_PROVENANCE_UNKNOWN";
   notes?: string[];
 };
 
@@ -203,8 +207,19 @@ export const DpCollapseResultSchema = z.object({
       ),
     })
     .optional(),
+  provenance_class: z.enum(["measured", "proxy", "inferred"]),
+  claim_tier: z.enum(["diagnostic", "reduced-order", "certified"]),
+  certifying: z.boolean(),
+  fail_reason: z
+    .enum(["DP_COLLAPSE_PROVENANCE_NON_ADMISSIBLE", "DP_COLLAPSE_PROVENANCE_UNKNOWN"])
+    .optional(),
   notes: z.array(z.string()).optional(),
 });
+
+const DP_COLLAPSE_FAIL_REASON = {
+  nonAdmissible: "DP_COLLAPSE_PROVENANCE_NON_ADMISSIBLE",
+  unknown: "DP_COLLAPSE_PROVENANCE_UNKNOWN",
+} as const;
 
 const TWO_PI = 2 * PI;
 
@@ -525,6 +540,43 @@ const evaluateConstraints = (
   return { status, checks };
 };
 
+const resolveProvenanceContract = (
+  branchA: { lattice_generation_hash?: string },
+  branchB: { lattice_generation_hash?: string },
+  input: TDpCollapseInput,
+): Pick<DpCollapseResult, "provenance_class" | "claim_tier" | "certifying" | "fail_reason"> => {
+  const isDensityGridPath = input.branch_a.kind === "density_grid" && input.branch_b.kind === "density_grid";
+  const hasHashes =
+    typeof branchA.lattice_generation_hash === "string" &&
+    branchA.lattice_generation_hash.trim().length > 0 &&
+    typeof branchB.lattice_generation_hash === "string" &&
+    branchB.lattice_generation_hash.trim().length > 0;
+
+  if (isDensityGridPath && hasHashes) {
+    return {
+      provenance_class: "measured",
+      claim_tier: "certified",
+      certifying: true,
+    };
+  }
+
+  if (isDensityGridPath) {
+    return {
+      provenance_class: "proxy",
+      claim_tier: "reduced-order",
+      certifying: false,
+      fail_reason: DP_COLLAPSE_FAIL_REASON.unknown,
+    };
+  }
+
+  return {
+    provenance_class: "inferred",
+    claim_tier: "diagnostic",
+    certifying: false,
+    fail_reason: DP_COLLAPSE_FAIL_REASON.nonAdmissible,
+  };
+};
+
 export const computeDpCollapse = (input: TDpCollapseInput): DpCollapseResult => {
   const parsed = DpCollapseInput.parse(input);
   const grid = parsed.grid;
@@ -573,6 +625,7 @@ export const computeDpCollapse = (input: TDpCollapseInput): DpCollapseResult => 
 
   const sideEffects = normalizeSideEffects(parsed.side_effects);
   const constraints = evaluateConstraints(sideEffects, parsed.constraints);
+  const provenance = resolveProvenanceContract(branchA, branchB, parsed);
 
   return {
     deltaE_J,
@@ -595,6 +648,10 @@ export const computeDpCollapse = (input: TDpCollapseInput): DpCollapseResult => 
     },
     side_effects: sideEffects,
     constraints,
+    provenance_class: provenance.provenance_class,
+    claim_tier: provenance.claim_tier,
+    certifying: provenance.certifying,
+    fail_reason: provenance.fail_reason,
     notes: parsed.notes,
   };
 };

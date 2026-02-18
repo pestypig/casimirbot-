@@ -1,0 +1,23 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-028-dp-collapse-runtime-contract",
+  "files_changed": [
+    "shared/dp-collapse.ts",
+    "server/services/mixer/collapse.ts",
+    "tests/dp-collapse.spec.ts",
+    "tests/collapse-mixer.spec.ts"
+  ],
+  "tests_run": [
+    "tests/dp-collapse.spec.ts",
+    "tests/collapse-mixer.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:20e7a573-1bd9-449e-ad74-c0ffd6f27d25",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

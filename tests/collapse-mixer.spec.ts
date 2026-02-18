@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TEssenceEnvelope } from "@shared/essence-schema";
-import { collapseMix, MissingEssenceInputError } from "../server/services/mixer/collapse";
+import { applyCollapseStrategy, collapseMix, MissingEssenceInputError } from "../server/services/mixer/collapse";
 
 const now = new Date().toISOString();
 
@@ -70,6 +70,55 @@ describe("collapseMix", () => {
     expect(first.feature.sources.text).toEqual(["env_text"]);
     expect(first.feature.sources.image).toEqual(["env_img"]);
     expect(first.feature.sources.audio).toEqual(["env_audio"]);
+  });
+
+
+
+  it("adds additive provenance contract fields for collapse feature", async () => {
+    const recipe = {
+      kind: "collapse_mixer" as const,
+      dim: 16,
+      inputs: { text: ["env_text"] },
+      knobs: {},
+    };
+
+    const { feature } = await collapseMix({
+      recipe,
+      fetchEnvelope: async (id: string) => fixtures[id] ?? null,
+    });
+
+    const contract = feature as unknown as {
+      provenance_class?: string;
+      claim_tier?: string;
+      certifying?: boolean;
+      fail_reason?: string;
+    };
+
+    expect(contract.provenance_class).toBe("inferred");
+    expect(contract.claim_tier).toBe("diagnostic");
+    expect(contract.certifying).toBe(false);
+    expect(contract.fail_reason).toBe("COLLAPSE_PROVENANCE_NON_ADMISSIBLE");
+  });
+
+  it("returns deterministic unknown fail_reason for unknown provenance strategy paths", async () => {
+    const recipe = {
+      kind: "collapse_mixer" as const,
+      dim: 16,
+      inputs: { text: ["env_text"] },
+      knobs: {},
+    };
+
+    const { feature, strategy } = await applyCollapseStrategy(
+      {
+        recipe,
+        fetchEnvelope: async (id: string) => fixtures[id] ?? null,
+      },
+      "unrecognized-strategy",
+    );
+
+    const contract = feature as unknown as { fail_reason?: string };
+    expect(strategy).toBe("deterministic_hash_v1");
+    expect(contract.fail_reason).toBe("COLLAPSE_PROVENANCE_UNKNOWN");
   });
 
   it("throws when an input envelope is missing", async () => {

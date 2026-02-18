@@ -10,6 +10,18 @@ type FetchEnvelopeFn = (id: string) => Promise<TEssenceEnvelope | null>;
 
 export type CollapseStrategyName = "deterministic_hash_v1" | "embedding_v1" | "micro_llm_v1";
 
+const COLLAPSE_FAIL_REASON = {
+  nonAdmissible: "COLLAPSE_PROVENANCE_NON_ADMISSIBLE",
+  unknown: "COLLAPSE_PROVENANCE_UNKNOWN",
+} as const;
+
+type CollapseProvenanceContract = {
+  provenance_class: "measured" | "proxy" | "inferred";
+  claim_tier: "diagnostic" | "reduced-order" | "certified";
+  certifying: boolean;
+  fail_reason?: (typeof COLLAPSE_FAIL_REASON)[keyof typeof COLLAPSE_FAIL_REASON];
+};
+
 export interface CollapseStrategy {
   name: CollapseStrategyName;
   apply: (params: CollapseMixParams) => Promise<{ fused: Float32Array; feature: CollapseMixerFeature }>;
@@ -46,6 +58,43 @@ const DEFAULT_KNOBS: Required<Omit<CollapseMixerKnobs, "seed">> = {
   lambda: 0.5,
   drive_norm: 1,
   conditioning: {},
+};
+
+const resolveProvenanceContract = (strategy: CollapseStrategyName): CollapseProvenanceContract => {
+  switch (strategy) {
+    case "embedding_v1":
+      return {
+        provenance_class: "proxy",
+        claim_tier: "reduced-order",
+        certifying: false,
+        fail_reason: COLLAPSE_FAIL_REASON.nonAdmissible,
+      };
+    case "micro_llm_v1":
+      return {
+        provenance_class: "proxy",
+        claim_tier: "diagnostic",
+        certifying: false,
+        fail_reason: COLLAPSE_FAIL_REASON.unknown,
+      };
+    default:
+      return {
+        provenance_class: "inferred",
+        claim_tier: "diagnostic",
+        certifying: false,
+        fail_reason: COLLAPSE_FAIL_REASON.nonAdmissible,
+      };
+  }
+};
+
+const withProvenanceContract = (
+  feature: CollapseMixerFeature,
+  strategy: CollapseStrategyName,
+): CollapseMixerFeature => {
+  const provenance = resolveProvenanceContract(strategy);
+  return {
+    ...feature,
+    ...provenance,
+  } as CollapseMixerFeature;
 };
 
 export async function collapseMix(params: CollapseMixParams): Promise<{
@@ -96,16 +145,19 @@ export async function collapseMix(params: CollapseMixParams): Promise<{
 
   const fused = fuseVectors(vectors, dim, knobs.drive_norm);
 
-  const feature: CollapseMixerFeature = {
-    kind: "collapse/mixer",
-    version: "1.0",
-    knobs,
-    sources: {
-      text: recipe.inputs.text,
-      image: recipe.inputs.image,
-      audio: recipe.inputs.audio,
+  const feature: CollapseMixerFeature = withProvenanceContract(
+    {
+      kind: "collapse/mixer",
+      version: "1.0",
+      knobs,
+      sources: {
+        text: recipe.inputs.text,
+        image: recipe.inputs.image,
+        audio: recipe.inputs.audio,
+      },
     },
-  };
+    "deterministic_hash_v1",
+  );
 
   return { fused, feature };
 }
@@ -270,7 +322,23 @@ export async function applyCollapseStrategy(
   preferredStrategy?: string | null,
 ): Promise<{ fused: Float32Array; feature: CollapseMixerFeature; strategy: CollapseStrategyName }> {
   const strategy = getCollapseStrategy(preferredStrategy);
+  const requestedStrategy = normalizeStrategy(preferredStrategy ?? null);
+  const requestedWasUnknown =
+    typeof preferredStrategy === "string" &&
+    preferredStrategy.trim().length > 0 &&
+    requestedStrategy === "deterministic_hash_v1" &&
+    !preferredStrategy.toLowerCase().includes("deterministic") &&
+    !preferredStrategy.toLowerCase().startsWith("embed") &&
+    !preferredStrategy.toLowerCase().startsWith("micro") &&
+    !preferredStrategy.toLowerCase().includes("llm");
+
   const result = await strategy.apply(params);
-  const feature: CollapseMixerFeature = { ...result.feature, strategy: strategy.name };
+  const featureWithProvenance = withProvenanceContract(result.feature, strategy.name) as CollapseMixerFeature & {
+    fail_reason?: string;
+  };
+  if (requestedWasUnknown) {
+    featureWithProvenance.fail_reason = COLLAPSE_FAIL_REASON.unknown;
+  }
+  const feature: CollapseMixerFeature = { ...featureWithProvenance, strategy: strategy.name };
   return { fused: result.fused, feature, strategy: strategy.name };
 }

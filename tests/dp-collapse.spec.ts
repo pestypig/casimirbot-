@@ -144,6 +144,54 @@ describe("dp-collapse: core behavior", () => {
     expect(relErr).toBeLessThan(0.8);
   });
 
+
+
+  it("adds provenance contract fields for analytic paths with deterministic non-admissible fail_reason", () => {
+    const result = computeDpCollapse({
+      schema_version: "dp_collapse/1",
+      ell_m: 2e-10,
+      grid: baseGrid,
+      method: baseMethod,
+      branch_a: {
+        kind: "analytic",
+        primitives: [gaussian(1e-15, 2e-9, [0, 0, 0])],
+      },
+      branch_b: {
+        kind: "analytic",
+        primitives: [gaussian(1e-15, 2e-9, [0, 0, 0])],
+      },
+    });
+
+    expect(result.provenance_class).toBe("inferred");
+    expect(result.claim_tier).toBe("diagnostic");
+    expect(result.certifying).toBe(false);
+    expect(result.fail_reason).toBe("DP_COLLAPSE_PROVENANCE_NON_ADMISSIBLE");
+  });
+
+  it("returns deterministic unknown fail_reason for density-grid paths missing provenance hashes", () => {
+    const density = {
+      encoding: "base64" as const,
+      dtype: "float32" as const,
+      endian: "little" as const,
+      order: "row-major" as const,
+      data_b64: Buffer.alloc(24 * 24 * 24 * 4).toString("base64"),
+    };
+
+    const result = computeDpCollapse({
+      schema_version: "dp_collapse/1",
+      ell_m: 2e-10,
+      grid: baseGrid,
+      method: baseMethod,
+      branch_a: { kind: "density_grid", rho_kg_m3: density },
+      branch_b: { kind: "density_grid", rho_kg_m3: density },
+    });
+
+    expect(result.provenance_class).toBe("proxy");
+    expect(result.claim_tier).toBe("reduced-order");
+    expect(result.certifying).toBe(false);
+    expect(result.fail_reason).toBe("DP_COLLAPSE_PROVENANCE_UNKNOWN");
+  });
+
   it("point-pair Plummer baseline is finite and monotonic", () => {
     const mass = 3e-16;
     const ell = 2e-10;
