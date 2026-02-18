@@ -12,6 +12,11 @@ function writeFile(filePath: string, content: string) {
   fs.writeFileSync(filePath, content, "utf8");
 }
 
+function writeJson(filePath: string, data: unknown) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+}
+
 function setupFakeWorkspace(failingStageId?: string) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "toe-preflight-"));
   const stageFiles = [
@@ -81,5 +86,45 @@ describe("toe-agent-preflight", () => {
     );
     expect(stage.status).toBe("fail");
     expect(stage.pass).toBe(false);
+  });
+
+  it("surfaces strict-ready stall warning when strict-ready progress is stalled", () => {
+    const workspaceRoot = setupFakeWorkspace();
+    writeJson(path.join(workspaceRoot, "docs", "audits", "toe-progress-snapshot.json"), {
+      schema_version: "toe_progress_snapshot/1",
+      totals: {
+        strict_ready_progress_pct: 0,
+      },
+      strict_ready_delta_targets: [{ ticket_id: "TOE-TEST-001" }],
+    });
+
+    const result = runPreflight(workspaceRoot);
+    expect(result.status).toBe(0);
+
+    const summary = JSON.parse(result.stdout);
+    expect(summary.strict_ready_stall_warning).toEqual({
+      warning: "strict_ready_stall",
+      strict_ready_progress_pct: 0,
+      strict_ready_delta_ticket_count: 1,
+      guidance:
+        "strict_ready_progress_pct is stalled; resolve strict_ready_delta_targets in toe-progress snapshot before scaling.",
+    });
+  });
+
+  it("does not emit strict-ready stall warning when strict-ready progress has increased", () => {
+    const workspaceRoot = setupFakeWorkspace();
+    writeJson(path.join(workspaceRoot, "docs", "audits", "toe-progress-snapshot.json"), {
+      schema_version: "toe_progress_snapshot/1",
+      totals: {
+        strict_ready_progress_pct: 10,
+      },
+      strict_ready_delta_targets: [{ ticket_id: "TOE-TEST-001" }],
+    });
+
+    const result = runPreflight(workspaceRoot);
+    expect(result.status).toBe(0);
+
+    const summary = JSON.parse(result.stdout);
+    expect(summary.strict_ready_stall_warning).toBeNull();
   });
 });

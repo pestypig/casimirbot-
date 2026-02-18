@@ -175,6 +175,13 @@ type SegmentSummary = {
   strict_ready_progress_pct: number;
 };
 
+type StrictReadyDeltaTarget = {
+  ticket_id: string;
+  next_strict_ready_claim_tier: Extract<TierKey, "reduced-order" | "certified">;
+  requires_verified_pass: true;
+  requires_research_artifact_completion: boolean;
+};
+
 function emptySegmentSummary(): SegmentSummary {
   return {
     tickets_total: 0,
@@ -263,6 +270,7 @@ function main() {
   let coreResearchArtifactCompleteTickets = 0;
   let extensionResearchGatedTickets = 0;
   let extensionResearchArtifactCompleteTickets = 0;
+  const strictReadyDeltaTargets: StrictReadyDeltaTarget[] = [];
 
   const tickets = ticketIds.map((ticketId) => {
     const latest = latestByTicket.get(ticketId);
@@ -293,6 +301,8 @@ function main() {
     const researchArtifactComplete =
       requiredArtifacts.size === 0 ||
       [...requiredArtifacts].every((requiredArtifact) => reportedResearchArtifacts.has(requiredArtifact));
+    const strictReadyEligibleTier = claimTier === "reduced-order" || claimTier === "certified";
+    const isStrictReady = verificationOk && strictReadyEligibleTier;
 
     if (isResearchGated) {
       researchGatedTickets += 1;
@@ -331,10 +341,7 @@ function main() {
         extensionSummary.tickets_with_evidence += 1;
       }
     }
-    if (
-      verificationOk &&
-      (claimTier === "reduced-order" || claimTier === "certified")
-    ) {
+    if (isStrictReady) {
       strictReadyCount += 1;
       if (coreTicketIdSet.has(ticketId)) {
         coreSummary.strict_ready_progress_pct += 1;
@@ -342,6 +349,15 @@ function main() {
       if (extensionTicketIdSet.has(ticketId)) {
         extensionSummary.strict_ready_progress_pct += 1;
       }
+    }
+
+    if (!isStrictReady) {
+      strictReadyDeltaTargets.push({
+        ticket_id: ticketId,
+        next_strict_ready_claim_tier: claimTier === "certified" ? "certified" : "reduced-order",
+        requires_verified_pass: true,
+        requires_research_artifact_completion: isResearchGated && !researchArtifactComplete,
+      });
     }
 
     weightedScoreSum += score;
@@ -366,6 +382,7 @@ function main() {
   const normalizedProgress = totalTickets > 0 ? weightedScoreSum / totalTickets : 0;
   const strictReadyProgress = totalTickets > 0 ? strictReadyCount / totalTickets : 0;
   const forestOwnerCoverage = computeForestOwnerCoveragePct();
+  const strictReadyDeltaTicketCount = Math.max(totalTickets - strictReadyCount, 0);
 
   coreSummary.tickets_total = coreTicketIdSet.size;
   extensionSummary.tickets_total = extensionTicketIdSet.size;
@@ -412,6 +429,7 @@ function main() {
       toe_progress_pct: toProgressPercent(normalizedProgress),
       forest_owner_coverage_pct: toProgressPercent(forestOwnerCoverage),
       strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
+      strict_ready_delta_ticket_count: strictReadyDeltaTicketCount,
       research_gated_tickets_total: researchGatedTickets,
       research_artifact_complete_tickets_total: researchArtifactCompleteTickets,
     },
@@ -433,10 +451,12 @@ function main() {
         weighted_score_sum: Math.round(weightedScoreSum * 1000) / 1000,
         toe_progress_pct: toProgressPercent(normalizedProgress),
         strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
+        strict_ready_delta_ticket_count: strictReadyDeltaTicketCount,
         research_gated_tickets_total: researchGatedTickets,
         research_artifact_complete_tickets_total: researchArtifactCompleteTickets,
       },
     },
+    strict_ready_delta_targets: strictReadyDeltaTargets,
     tickets,
   };
 
