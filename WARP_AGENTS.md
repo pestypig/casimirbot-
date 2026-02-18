@@ -90,3 +90,14 @@ constraints pass and the viability oracle has produced an `ADMISSIBLE` status.
   }
 }
 ```
+
+
+## Primitive manifest contract
+
+The unified primitive manifest is stored at `configs/warp-primitive-manifest.v1.json`.
+For TOE parity checks, each primitive entry must include:
+- `primitive_id`
+- `policy_source.path`
+- `evaluator.path`
+- `tests[]`
+- `tree_owner`
