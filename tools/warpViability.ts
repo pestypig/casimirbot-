@@ -307,6 +307,17 @@ type ProvenanceClass = "measured" | "proxy" | "inferred";
 type ConfidenceBand = { low: number; high: number };
 type ClaimTier = "diagnostic" | "reduced-order" | "certified";
 
+type PromotionDecision = {
+  tier: ClaimTier;
+  reason:
+    | "insufficient_provenance"
+    | "strict_mode_disabled"
+    | "hard_constraint_failed"
+    | "status_non_admissible"
+    | "strict_signal_missing"
+    | "eligible";
+};
+
 const CONFIDENCE_BY_PROVENANCE: Record<ProvenanceClass, ConfidenceBand> = {
   measured: { low: 0.8, high: 0.99 },
   inferred: { low: 0.5, high: 0.79 },
@@ -327,6 +338,34 @@ const determineClaimTier = (
   if (!provenanceClass) return "diagnostic";
   if (provenanceClass === "measured" && strictMode && passed) return "certified";
   return CLAIM_TIER_BY_PROVENANCE[provenanceClass];
+};
+
+const resolvePromotionDecision = (args: {
+  strictMode: boolean;
+  warpMechanicsProvenanceClass: ProvenanceClass;
+  hardConstraintPass: boolean;
+  status: ViabilityStatus;
+  thetaMetricDerived: boolean;
+  tsMetricDerived: boolean;
+  qiMetricDerived: boolean;
+}): PromotionDecision => {
+  if (args.warpMechanicsProvenanceClass !== "measured") {
+    return { tier: "diagnostic", reason: "insufficient_provenance" };
+  }
+  if (!args.strictMode) {
+    return { tier: "reduced-order", reason: "strict_mode_disabled" };
+  }
+  if (!args.hardConstraintPass) {
+    return { tier: "reduced-order", reason: "hard_constraint_failed" };
+  }
+  if (args.status !== "ADMISSIBLE") {
+    return { tier: "reduced-order", reason: "status_non_admissible" };
+  }
+  if (!args.thetaMetricDerived || !args.tsMetricDerived || !args.qiMetricDerived) {
+    return { tier: "reduced-order", reason: "strict_signal_missing" };
+  }
+
+  return { tier: "certified", reason: "eligible" };
 };
 
 const resolveProvenanceClass = (value: unknown): ProvenanceClass => {
@@ -794,11 +833,16 @@ export async function evaluateWarpViability(
           tsProvenanceClass === "inferred"
         ? "inferred"
         : "proxy";
-  const warpMechanicsClaimTier = determineClaimTier(
+  const promotionDecision = resolvePromotionDecision({
+    strictMode: strictCongruence,
     warpMechanicsProvenanceClass,
-    strictCongruence,
-    warpMechanicsProvenanceClass === "measured",
-  );
+    hardConstraintPass: false,
+    status: "INADMISSIBLE",
+    thetaMetricDerived,
+    tsMetricDerived,
+    qiMetricDerived: qiSourceIsMetric(qiGuard?.rhoSource),
+  });
+  const warpMechanicsClaimTier = promotionDecision.tier;
 
   const snapshot: WarpViabilitySnapshot = {
     bubbleRadius_m: config.bubbleRadius_m ?? pipeline.shipRadius_m,
@@ -841,6 +885,7 @@ export async function evaluateWarpViability(
     qi_confidence_band: qiConfidenceBand,
     warp_mechanics_provenance_class: warpMechanicsProvenanceClass,
     warp_mechanics_claim_tier: warpMechanicsClaimTier,
+    warp_mechanics_promotion_reason: promotionDecision.reason,
     T00_min: (pipeline as any).T00_min ?? T00Value,
     T00_avg: T00Value,
     sectorPeriod_ms: pipeline.sectorPeriod_ms,
@@ -1166,6 +1211,17 @@ export async function evaluateWarpViability(
   const anyHardFail = results.some((c) => c.severity === "HARD" && !c.passed);
   const anySoftFail = results.some((c) => c.severity === "SOFT" && !c.passed);
   const status: ViabilityStatus = anyHardFail ? "INADMISSIBLE" : anySoftFail ? "MARGINAL" : "ADMISSIBLE";
+  const promotionDecisionFinal = resolvePromotionDecision({
+    strictMode: strictCongruence,
+    warpMechanicsProvenanceClass,
+    hardConstraintPass: !anyHardFail,
+    status,
+    thetaMetricDerived,
+    tsMetricDerived,
+    qiMetricDerived: qiSourceIsMetric(qiGuard?.rhoSource),
+  });
+  snapshot.warp_mechanics_claim_tier = promotionDecisionFinal.tier;
+  snapshot.warp_mechanics_promotion_reason = promotionDecisionFinal.reason;
 
   return {
     status,
