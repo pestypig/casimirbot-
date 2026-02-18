@@ -1,7 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T22:54:04.745Z",
-  "generated_at": "2026-02-18T22:55:04.400Z",
+  "generated_at": "2026-02-18T23:18:12.534Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -23,7 +22,7 @@
     },
     "weighted_score_sum": 20,
     "toe_progress_pct": 27.4,
-    "forest_owner_coverage_pct": 100,
+    "forest_owner_coverage_pct": 97.6,
     "strict_ready_progress_pct": 6.8,
     "strict_ready_delta_ticket_count": 68,
     "strict_ready_release_gate": {
@@ -508,7 +507,7 @@
       "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-1538.json"
+      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-205121.json"
     },
     {
       "ticket_id": "TOE-002-semiclassical-coupling-contract",
@@ -562,7 +561,7 @@
       "score": 0.25,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-232559.json"
+      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-234300.json"
     },
     {
       "ticket_id": "TOE-008-certificate-authenticity-policy",
@@ -1157,7 +1156,6 @@
       "research_gated": true,
       "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T225336Z.json"
-      "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T224927Z.json"
     }
   ]
 }
