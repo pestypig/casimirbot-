@@ -3,6 +3,7 @@ import {
   handleInformationEvent,
   getTelemetrySnapshot,
 } from "../services/star/service";
+import { resolveStellarRestorationProvenance } from "../modules/stellar/evolution";
 import {
   EQUILIBRIUM_DISPERSION_MAX,
   EQUILIBRIUM_HOLD_MS,

@@ -1,0 +1,27 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-036-stellar-restoration-runtime-provenance-contract",
+  "files_changed": [
+    "server/modules/stellar/evolution.ts",
+    "server/modules/stellar/local-rest.ts",
+    "server/routes/stellar.ts",
+    "tests/stellar-runtime-contract.spec.ts",
+    "server/__tests__/star-equilibrium.spec.ts",
+    "docs/audits/ticket-results/TOE-036-stellar-restoration-runtime-provenance-contract.20260218T035555Z.json"
+  ],
+  "tests_run": [
+    "tests/stellar-runtime-contract.spec.ts",
+    "server/__tests__/star-equilibrium.spec.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "cli/casimir-verify.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:1c3f48e4-b063-4cf3-95cf-8a079d65949b",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

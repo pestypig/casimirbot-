@@ -5,6 +5,46 @@ import type {
   HRCategoryLiteral,
 } from "@shared/stellar-evolution";
 
+export type StellarRestorationProvenanceClass = "inferred" | "measured" | "simulated";
+export type StellarRestorationClaimTier = "diagnostic" | "reduced-order" | "certified";
+
+export interface StellarRestorationProvenance {
+  provenance_class: StellarRestorationProvenanceClass;
+  claim_tier: StellarRestorationClaimTier;
+  certifying: boolean;
+}
+
+export const STELLAR_RESTORATION_PROVENANCE_MISSING = "STELLAR_RESTORATION_PROVENANCE_MISSING" as const;
+
+const DEFAULT_STELLAR_RESTORATION_PROVENANCE: StellarRestorationProvenance = {
+  provenance_class: "inferred",
+  claim_tier: "diagnostic",
+  certifying: false,
+};
+
+const PROVENANCE_CLASSES = new Set<StellarRestorationProvenanceClass>(["inferred", "measured", "simulated"]);
+const CLAIM_TIERS = new Set<StellarRestorationClaimTier>(["diagnostic", "reduced-order", "certified"]);
+
+export function resolveStellarRestorationProvenance(
+  input?: Partial<StellarRestorationProvenance> | null,
+): StellarRestorationProvenance {
+  const provenance_class =
+    input?.provenance_class && PROVENANCE_CLASSES.has(input.provenance_class)
+      ? input.provenance_class
+      : DEFAULT_STELLAR_RESTORATION_PROVENANCE.provenance_class;
+  const claim_tier =
+    input?.claim_tier && CLAIM_TIERS.has(input.claim_tier)
+      ? input.claim_tier
+      : DEFAULT_STELLAR_RESTORATION_PROVENANCE.claim_tier;
+  const certifying = provenance_class !== "inferred" && claim_tier === "certified" && input?.certifying === true;
+
+  return {
+    provenance_class,
+    claim_tier,
+    certifying,
+  };
+}
+
 // Physical constants (SI unless noted)
 const G = 6.6743e-11; // m^3 kg^-1 s^-2
 const kB = 1.380649e-23; // J/K
