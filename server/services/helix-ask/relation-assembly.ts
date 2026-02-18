@@ -7,11 +7,15 @@ export type RelationAssemblyEvidence = {
   span: string;
   snippet: string;
   domain: "warp" | "ethos" | "other";
+  provenance_class?: "measured" | "proxy" | "inferred";
+  claim_tier?: "diagnostic" | "reduced-order" | "certified";
+  certifying?: boolean;
 };
 
 export type RelationAssemblyPacket = {
   question: string;
   domains: string[];
+  fail_reason?: "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING";
   definitions: {
     warp_definition: string;
     ethos_definition: string;
@@ -68,6 +72,17 @@ const buildEvidenceId = (path: string, span: string): string => {
 
 const toCitation = (path: string, span: string): string => `${path}${span ? `#${span}` : ""}`;
 
+
+
+type BridgeEvidenceContract = {
+  provenance_class?: "measured" | "proxy" | "inferred";
+  claim_tier?: "diagnostic" | "reduced-order" | "certified";
+  certifying?: boolean;
+};
+
+const isBridgeEvidenceContractComplete = (entry: BridgeEvidenceContract): boolean =>
+  Boolean(entry.provenance_class && entry.claim_tier && typeof entry.certifying === "boolean");
+
 const firstSentence = (text: string, fallback: string): string => {
   const first = text.split(/(?<=[.!?])\s+/)[0] ?? "";
   const normalized = clip(sanitizeSnippet(first), 220);
@@ -109,6 +124,7 @@ export function buildRelationAssemblyPacket(args: {
   contextText: string;
   docBlocks: Array<{ path: string; block: string }>;
   graphPack: HelixAskGraphPack | null;
+  strictBridgeEvidence?: boolean;
 }): RelationAssemblyPacket {
   const evidenceSeed: Array<{ path: string; block: string }> = [];
   for (const block of args.docBlocks ?? []) {
@@ -119,11 +135,22 @@ export function buildRelationAssemblyPacket(args: {
       evidenceSeed.push({ path, block: args.contextText || "" });
     }
   }
+  const graphEvidenceContract = new Map<string, BridgeEvidenceContract>();
   for (const framework of args.graphPack?.frameworks ?? []) {
     for (const node of framework.path ?? []) {
       const sourcePath = node.sourcePath ?? framework.sourcePath;
       if (sourcePath) {
         evidenceSeed.push({ path: sourcePath, block: `${node.title ?? ""}. ${node.summary ?? node.excerpt ?? ""}` });
+      }
+      if (node.nodeType !== "bridge") continue;
+      for (const evidence of node.evidence ?? []) {
+        const evidencePath = typeof evidence.path === "string" ? evidence.path.trim() : "";
+        if (!evidencePath) continue;
+        graphEvidenceContract.set(evidencePath, {
+          provenance_class: evidence.provenance_class,
+          claim_tier: evidence.claim_tier,
+          certifying: evidence.certifying,
+        });
       }
     }
   }
@@ -137,12 +164,16 @@ export function buildRelationAssemblyPacket(args: {
     const span = "L1-L1";
     const evidence_id = buildEvidenceId(path, span);
     if (dedup.has(evidence_id)) continue;
+    const bridgeContract = graphEvidenceContract.get(path);
     dedup.set(evidence_id, {
       evidence_id,
       path,
       span,
       snippet: firstSentence(item.block, path),
       domain,
+      provenance_class: bridgeContract?.provenance_class,
+      claim_tier: bridgeContract?.claim_tier,
+      certifying: bridgeContract?.certifying,
     });
   }
 
@@ -176,9 +207,18 @@ export function buildRelationAssemblyPacket(args: {
   if (warpEvidence.length > 0) domainSet.add("warp");
   if (ethosEvidence.length > 0) domainSet.add("ethos");
 
+  const strictBridgeEvidence = args.strictBridgeEvidence === true;
+  const hasBridgeEvidenceMetadataGap = Array.from(graphEvidenceContract.values()).some(
+    (entry) => !isBridgeEvidenceContractComplete(entry),
+  );
+
   return {
     question: args.question,
     domains: Array.from(domainSet).sort(),
+    fail_reason:
+      strictBridgeEvidence && hasBridgeEvidenceMetadataGap
+        ? "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING"
+        : undefined,
     definitions: {
       warp_definition: warpDefinition,
       ethos_definition: ethosDefinition,

@@ -1,13 +1,19 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { buildRelationAssemblyPacket } from "../server/services/helix-ask/relation-assembly";
 
 type TreeNode = {
   id: string;
   nodeType?: string;
   links?: Array<{ rel: string; to: string }>;
   bridge?: { left: string; right: string; relation?: string };
-  evidence?: Array<{ scope?: string }>;
+  evidence?: Array<{
+    scope?: string;
+    provenance_class?: "measured" | "proxy" | "inferred";
+    claim_tier?: "diagnostic" | "reduced-order" | "certified";
+    certifying?: boolean;
+  }>;
 };
 
 type TreeFile = { nodes: TreeNode[] };
@@ -84,6 +90,110 @@ describe("Helix Ask bridge nodes", () => {
           `${file} ${node.id} missing left/right scoped evidence`,
         ).toBe(true);
       }
+
+
+      const hasContractMetadata = evidence.some(
+        (entry) => entry.provenance_class || entry.claim_tier || typeof entry.certifying === "boolean",
+      );
+      if (hasContractMetadata) {
+        for (const entry of evidence) {
+          expect(entry.provenance_class, `${file} ${node.id} missing provenance_class`).toBeTruthy();
+          expect(entry.claim_tier, `${file} ${node.id} missing claim_tier`).toBeTruthy();
+          expect(typeof entry.certifying, `${file} ${node.id} missing certifying`).toBe("boolean");
+        }
+      }
     }
   });
+
+  it("returns deterministic strict bridge fail_reason when bridge evidence metadata is incomplete", () => {
+    const packet = buildRelationAssemblyPacket({
+      question: "How does ideology bridge physics?",
+      contextFiles: ["docs/ethos/ideology.json", "docs/knowledge/physics/einstein-field-equations.md"],
+      contextText: "ideology and physics relation",
+      docBlocks: [],
+      strictBridgeEvidence: true,
+      graphPack: {
+        frameworks: [
+          {
+            treeId: "test",
+            sourcePath: "docs/ethos/ideology.json",
+            anchors: [],
+            path: [
+              {
+                id: "bridge-node",
+                title: "Bridge",
+                tags: [],
+                score: 1,
+                depth: 0,
+                nodeType: "bridge",
+                evidence: [
+                  {
+                    type: "doc",
+                    path: "docs/knowledge/physics/einstein-field-equations.md",
+                    scope: "left",
+                  },
+                ],
+              },
+            ],
+            scaffoldText: "",
+            contextText: "",
+            preferGraph: true,
+          },
+        ],
+        scaffoldText: "",
+        contextText: "",
+        preferGraph: true,
+        sourcePaths: ["docs/ethos/ideology.json"],
+        treeIds: ["test"],
+      },
+    });
+
+    expect(packet.fail_reason).toBe("IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING");
+  });
+
+  it("preserves non-strict bridge behavior when metadata is incomplete", () => {
+    const packet = buildRelationAssemblyPacket({
+      question: "How does ideology bridge physics?",
+      contextFiles: ["docs/ethos/ideology.json", "docs/knowledge/physics/einstein-field-equations.md"],
+      contextText: "ideology and physics relation",
+      docBlocks: [],
+      graphPack: {
+        frameworks: [
+          {
+            treeId: "test",
+            sourcePath: "docs/ethos/ideology.json",
+            anchors: [],
+            path: [
+              {
+                id: "bridge-node",
+                title: "Bridge",
+                tags: [],
+                score: 1,
+                depth: 0,
+                nodeType: "bridge",
+                evidence: [
+                  {
+                    type: "doc",
+                    path: "docs/knowledge/physics/einstein-field-equations.md",
+                    scope: "left",
+                  },
+                ],
+              },
+            ],
+            scaffoldText: "",
+            contextText: "",
+            preferGraph: true,
+          },
+        ],
+        scaffoldText: "",
+        contextText: "",
+        preferGraph: true,
+        sourcePaths: ["docs/ethos/ideology.json"],
+        treeIds: ["test"],
+      },
+    });
+
+    expect(packet.fail_reason).toBeUndefined();
+  });
+
 });

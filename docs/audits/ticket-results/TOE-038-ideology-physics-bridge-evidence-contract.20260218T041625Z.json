@@ -1,0 +1,26 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-038-ideology-physics-bridge-evidence-contract",
+  "files_changed": [
+    "server/services/helix-ask/graph-resolver.ts",
+    "server/services/helix-ask/relation-assembly.ts",
+    "tests/helix-ask-bridge.spec.ts",
+    "tests/helix-ask-graph-resolver.spec.ts"
+  ],
+  "tests_run": [
+    "tests/helix-ask-bridge.spec.ts",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "cli/casimir-verify.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:eab99dae-50b8-4fb9-9629-9aabcb8d878c",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true,
+    "status": "GREEN"
+  },
+  "remaining_gaps": []
+}
