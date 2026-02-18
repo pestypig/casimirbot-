@@ -92,7 +92,7 @@
     "helix:ask:fast-quality:canary-sweep": "cross-env HELIX_ASK_SWEEP_PACK=scripts/helix-ask-fast-quality-canary-pack.json HELIX_ASK_SWEEP_MATRIX=scripts/helix-ask-latency-matrix.json HELIX_ASK_SWEEP_OUT_DIR=artifacts/helix-ask-latency npm run helix:ask:sweep",
     "helix:ask:fast-quality:gate": "tsx scripts/helix-ask-fast-quality-promotion-gate.ts",
     "robotics:benchmark": "tsx scripts/robotics-benchmark-report.ts",
-    "audit:toe:preflight": "tsx scripts/toe-agent-preflight.ts"
+    "validate:toe:research-gates": "tsx scripts/validate-toe-research-gate-policy.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",

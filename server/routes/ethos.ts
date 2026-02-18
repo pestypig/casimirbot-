@@ -336,7 +336,19 @@ ethosRouter.get("/artifacts", (req, res) => {
     strictProvenance
   });
 
-  res.json(result);
+  const includesZenSociety = result.items.some((item) =>
+    item.nodeId === "citizens-arc" || (item.tags ?? []).some((tag) => ["society", "governance"].includes(tag.toLowerCase())),
+  );
+
+  res.json({
+    ...result,
+    ...(includesZenSociety
+      ? {
+          resolver_owner: "zen-society",
+          provenance_contract: "Zen society governance provenance contract primitive",
+        }
+      : {}),
+  });
 });
 
 ethosRouter.get("/artifacts/:id(*)", (req, res) => {

@@ -5,7 +5,7 @@ import {
   type IdeologyArtifactSearchResponse
 } from "@shared/ideology/ideology-artifacts";
 
-export const ETHOS_KNOWLEDGE_STRICT_FAIL_REASON = "ETHOS_KNOWLEDGE_PROVENANCE_MISSING";
+export const ZEN_SOCIETY_STRICT_FAIL_REASON = "ZEN_SOCIETY_PROVENANCE_MISSING";
 
 export type EthosKnowledgeProvenance = {
   provenance_class: "inferred";
@@ -37,6 +37,17 @@ const withKnowledgeProvenance = (artifact: IdeologyArtifact): IdeologyArtifactWi
   ...artifact,
   ...DEFAULT_ETHOS_KNOWLEDGE_PROVENANCE,
 });
+
+const isZenSocietyArtifact = (artifact: IdeologyArtifact): boolean => {
+  const tags = (artifact.tags ?? []).map(normalize);
+  if (artifact.nodeId === "citizens-arc") return true;
+  return tags.includes("society") || tags.includes("governance");
+};
+
+const hasEvidenceProvenance = (artifact: IdeologyArtifact): boolean => {
+  const tags = (artifact.tags ?? []).map(normalize);
+  return artifact.nodeId === "provenance-protocol" || tags.includes("provenance");
+};
 
 const normalize = (value?: string) => value?.trim().toLowerCase() ?? "";
 
@@ -81,14 +92,19 @@ export const searchIdeologyArtifacts = (
   const pagedItems = filtered.slice(offset, offset + limit);
   const items = pagedItems.map(withKnowledgeProvenance);
   const strictMissingProvenance =
-    params.strictProvenance === true && pagedItems.some((item) => !hasCompleteKnowledgeProvenance(item as Partial<IdeologyArtifactWithProvenance>));
+    params.strictProvenance === true &&
+    pagedItems.some(
+      (item) =>
+        isZenSocietyArtifact(item) &&
+        (!hasCompleteKnowledgeProvenance(item as Partial<IdeologyArtifactWithProvenance>) || !hasEvidenceProvenance(item)),
+    );
 
   return {
     query,
     items,
     total: filtered.length,
     filters: { panelId, nodeId, tags },
-    ...(strictMissingProvenance ? { fail_reason: ETHOS_KNOWLEDGE_STRICT_FAIL_REASON } : {}),
+    ...(strictMissingProvenance ? { fail_reason: ZEN_SOCIETY_STRICT_FAIL_REASON } : {}),
   };
 };
 

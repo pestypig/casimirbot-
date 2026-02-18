@@ -862,27 +862,31 @@
       ]
     },
     {
-      "id": "TOE-046-toe-agent-preflight-orchestrator",
-      "tree_owner": "ops-deployment",
+      "id": "TOE-044-zen-society-governance-provenance-contract",
+      "tree_owner": "zen-society",
       "gap_refs": [
         "F-COV-1",
         "F-COV-5"
       ],
-      "primitive": "TOE agent preflight orchestrator primitive",
-      "primary_path_prefix": "scripts/toe-agent-preflight.ts",
+      "primitive": "Zen society governance provenance contract primitive",
+      "primary_path_prefix": "server/routes/ethos.ts",
       "allowed_paths": [
-        "scripts/toe-agent-preflight.ts",
-        "tests/toe-agent-preflight.spec.ts",
-        "package.json",
+        "server/routes/ethos.ts",
+        "server/services/ideology/artifacts.ts",
+        "server/services/ideology/render.ts",
+        "tests/ideology-dag.spec.ts",
+        "tests/ideology-telemetry.spec.ts",
+        "configs/resolver-owner-coverage-manifest.v1.json",
         "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
       ],
       "required_tests": [
-        "tests/toe-agent-preflight.spec.ts"
+        "tests/ideology-dag.spec.ts",
+        "tests/ideology-telemetry.spec.ts"
       ],
       "done_criteria": [
-        "Single command orchestrates TOE backlog/results/owner-coverage validation plus progress compute",
-        "Preflight JSON output includes stage-level pass/fail status and non-zero exit on failure",
-        "Tests cover all-pass and required-stage failure behavior including optional research-gate skip"
+        "Zen-society responses include additive provenance_class/claim_tier/certifying metadata",
+        "Strict mode emits deterministic fail_reason ZEN_SOCIETY_PROVENANCE_MISSING when evidence provenance is absent",
+        "Resolver owner coverage marks zen-society as covered_extension and validation remains green"
       ]
     }
   ]
