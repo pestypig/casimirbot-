@@ -95,3 +95,17 @@ Notes
 - `budget` and `policy` are optional; omit them to use defaults.
 - `deltas` reflect the net parameter changes between the first and terminal
   attempt; if no change is detected, the list can be empty.
+
+
+Replay operator surface (debug tooling)
+- Script: `npm run agi:replay -- ...`
+- Backward-compatible flags remain: `--limit`, `--tenant`, `--force`, `--no-emit`.
+- Additional operator flags:
+  - `--from-seq <n>` replay window start at training-trace sequence `n` (event spine order).
+  - `--from-trace <id>` replay window start at matching `traceId` or record id.
+  - `--step` force step mode (single-item replay batches).
+  - `--stop-on-first-fail` stop replay on first rejected gate verdict.
+  - `--stop-on-verdict <pass|fail>` stop replay when a matching verdict is observed.
+  - `--speed <multiplier>` increase replay batch width while preserving sequence order.
+- Replay output includes `navDeltaDiff` rows derived from movement-episode `compare`
+  events (`actualDelta - predictedDelta`) for predicted-vs-actual navigation analysis.
