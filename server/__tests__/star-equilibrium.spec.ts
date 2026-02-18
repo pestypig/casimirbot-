@@ -81,4 +81,32 @@ describe("star equilibrium gate", () => {
       EQUILIBRIUM_HOLD_MS,
     );
   });
+
+  it("preserves telemetry compatibility when provenance query-like metadata is present", () => {
+    const session_id = `eq-prov-${Date.now()}`;
+    const t0 = Date.now() + 5;
+
+    handleInformationEvent({
+      ...baseEvent,
+      session_id,
+      artifact_flags: { gamma_artifact_pass: 1 },
+      metadata: {
+        provenance_class: "proxy",
+        claim_tier: "diagnostic",
+        strict_measured_provenance: false,
+      },
+      timestamp: t0,
+    });
+
+    handleInformationEvent({
+      ...baseEvent,
+      session_id,
+      artifact_flags: { gamma_artifact_pass: 1 },
+      timestamp: t0 + EQUILIBRIUM_HOLD_MS + 20,
+    });
+
+    const snapshot = getTelemetrySnapshot(session_id, "lab");
+    expect(snapshot.equilibrium).toBe(true);
+  });
+
 });

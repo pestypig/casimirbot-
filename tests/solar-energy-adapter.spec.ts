@@ -66,6 +66,9 @@ describe("solar energy adapter", () => {
     expect(energyField.inputs_hash).toBe(energyField.information_boundary.inputs_hash);
     expect(energyField.features_hash).toBe(energyField.information_boundary.features_hash);
     expect(energyField.information_boundary.mode).toBe("observables");
+    expect((energyField.meta as any)?.provenance_class).toBe("inferred");
+    expect((energyField.meta as any)?.claim_tier).toBe("diagnostic");
+    expect((energyField.meta as any)?.certifying).toBe(false);
 
     const buf = Buffer.from(energyField.components.u_total_Jm3.data_b64, "base64");
     const arr = new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4);
@@ -103,6 +106,21 @@ describe("solar energy adapter", () => {
     expect(a.features_hash).toBe(b.features_hash);
     expect(a.information_boundary.inputs_hash).toBe(b.information_boundary.inputs_hash);
     expect(a.information_boundary.features_hash).toBe(b.information_boundary.features_hash);
+  });
+
+
+  it("marks strict non-measured provenance with deterministic fail_reason", () => {
+    const payload = basePayload();
+    const energyField = buildEnergyFieldFromSunpy(payload, {
+      provenanceClass: "proxy",
+      claimTier: "certified",
+      strictMeasuredProvenance: true,
+    });
+
+    expect((energyField.meta as any)?.provenance_class).toBe("proxy");
+    expect((energyField.meta as any)?.claim_tier).toBe("diagnostic");
+    expect((energyField.meta as any)?.certifying).toBe(false);
+    expect((energyField.meta as any)?.fail_reason).toBe("STAR_MATERIALS_PROVENANCE_NON_MEASURED");
   });
 
   it("runs curvature unit on the calibrated u_field and respects data_cutoff", async () => {

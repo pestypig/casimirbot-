@@ -8,6 +8,9 @@ const starRouter = Router();
 const TelemetryQuery = z.object({
   session_id: z.string().min(3),
   session_type: z.string().optional(),
+  provenance_class: z.string().optional(),
+  claim_tier: z.string().optional(),
+  strict_measured_provenance: z.union([z.literal("0"), z.literal("1"), z.literal("true"), z.literal("false")]).optional(),
 });
 
 const CollapseInput = z.object({
@@ -15,6 +18,9 @@ const CollapseInput = z.object({
   session_type: z.string().optional(),
   branch_id: z.string().optional(),
   reason: z.string().optional(),
+  provenance_class: z.string().optional(),
+  claim_tier: z.string().optional(),
+  strict_measured_provenance: z.boolean().optional(),
 });
 
 starRouter.post("/event", (req, res) => {
