@@ -1598,6 +1598,40 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-068-helix-ask-strict-fail-reason-ledger",
+      "tree_owner": "helix-ask",
+      "primitive": "Helix Ask strict fail-reason ledger",
+      "primary_path_prefix": "server/routes/agi.plan.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-bridge.spec.ts",
+        "docs/audits/helix-ask-quality",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-bridge.spec.ts"
+      ],
+      "done_criteria": [
+        "Strict fail reasons are emitted deterministically in ledger output",
+        "Fail-reason histogram artifact is generated for regression comparison",
+        "No non-strict behavior regression is introduced"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
     }
   ]
 }
