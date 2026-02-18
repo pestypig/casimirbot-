@@ -13,6 +13,67 @@ const DEFAULT_GUARDRAIL_VERSION =
 
 const guardrailCache = new Map<string, TSolarGuardrailConfig>();
 
+const STAR_MATERIALS_PROVENANCE_NON_MEASURED =
+  "STAR_MATERIALS_PROVENANCE_NON_MEASURED" as const;
+
+type StarMaterialsProvenanceClass = "measured" | "proxy" | "inferred";
+type StarMaterialsClaimTier = "diagnostic" | "reduced-order" | "certified";
+
+type StarMaterialsProvenanceEnvelope = {
+  provenance_class: StarMaterialsProvenanceClass;
+  claim_tier: StarMaterialsClaimTier;
+  certifying: boolean;
+  fail_reason?: typeof STAR_MATERIALS_PROVENANCE_NON_MEASURED;
+};
+
+const normalizeProvenanceClass = (
+  value: unknown,
+): StarMaterialsProvenanceClass => {
+  if (value === "measured" || value === "proxy" || value === "inferred") {
+    return value;
+  }
+  return "inferred";
+};
+
+const normalizeClaimTier = (value: unknown): StarMaterialsClaimTier => {
+  if (
+    value === "diagnostic" ||
+    value === "reduced-order" ||
+    value === "certified"
+  ) {
+    return value;
+  }
+  return "diagnostic";
+};
+
+const resolveStarMaterialsProvenance = (
+  opts?: {
+    provenanceClass?: unknown;
+    claimTier?: unknown;
+    strictMeasuredProvenance?: boolean;
+  },
+): StarMaterialsProvenanceEnvelope => {
+  const provenanceClass = normalizeProvenanceClass(opts?.provenanceClass);
+  const requestedClaimTier = normalizeClaimTier(opts?.claimTier);
+  const certifying = provenanceClass === "measured" && requestedClaimTier === "certified";
+  const claimTier = certifying ? requestedClaimTier : "diagnostic";
+
+  if (opts?.strictMeasuredProvenance && provenanceClass !== "measured") {
+    return {
+      provenance_class: provenanceClass,
+      claim_tier: "diagnostic",
+      certifying: false,
+      fail_reason: STAR_MATERIALS_PROVENANCE_NON_MEASURED,
+    };
+  }
+
+  return {
+    provenance_class: provenanceClass,
+    claim_tier: claimTier,
+    certifying,
+  };
+};
+
 export const solarGuardrailConfigPath = (
   version = DEFAULT_GUARDRAIL_VERSION,
 ): string =>
@@ -33,9 +94,22 @@ export function loadSolarGuardrailConfig(
 
 export function runSolarGuardrails(
   inputs: SolarGuardrailInputs | null | undefined,
-  opts?: { configVersion?: string; generatedAtIso?: string },
-): TSolarGuardrailReport {
+  opts?: {
+    configVersion?: string;
+    generatedAtIso?: string;
+    provenanceClass?: unknown;
+    claimTier?: unknown;
+    strictMeasuredProvenance?: boolean;
+  },
+): TSolarGuardrailReport & StarMaterialsProvenanceEnvelope {
   const version = opts?.configVersion ?? DEFAULT_GUARDRAIL_VERSION;
   const config = loadSolarGuardrailConfig(version);
-  return evaluateSolarGuardrails(inputs, config, opts?.generatedAtIso);
+  const report = evaluateSolarGuardrails(inputs, config, opts?.generatedAtIso);
+  const provenance = resolveStarMaterialsProvenance(opts);
+  return {
+    ...report,
+    ...provenance,
+  };
 }
+
+export { STAR_MATERIALS_PROVENANCE_NON_MEASURED };

@@ -41,4 +41,44 @@ describe("solar guardrails", () => {
     expect(report.summary.hard_fail_count).toBeGreaterThan(0);
     expect(report.summary.requires_followup).toBe(true);
   });
+  it("adds conservative provenance defaults when metadata is missing", () => {
+    const report = runSolarGuardrails(
+      {
+        density_kg_m3: 5e-6,
+        pressure_Pa: 5e4,
+        scale_height_km: 150,
+        opacity_regime: "H-",
+      },
+      { configVersion: "v1", generatedAtIso: "2026-01-17T00:00:00.000Z" },
+    );
+
+    expect(report.provenance_class).toBe("inferred");
+    expect(report.claim_tier).toBe("diagnostic");
+    expect(report.certifying).toBe(false);
+    expect(report.fail_reason).toBeUndefined();
+  });
+
+  it("fails strict measured provenance with deterministic reason", () => {
+    const report = runSolarGuardrails(
+      {
+        density_kg_m3: 5e-6,
+        pressure_Pa: 5e4,
+        scale_height_km: 150,
+        opacity_regime: "H-",
+      },
+      {
+        configVersion: "v1",
+        generatedAtIso: "2026-01-17T00:00:00.000Z",
+        provenanceClass: "proxy",
+        claimTier: "certified",
+        strictMeasuredProvenance: true,
+      },
+    );
+
+    expect(report.provenance_class).toBe("proxy");
+    expect(report.claim_tier).toBe("diagnostic");
+    expect(report.certifying).toBe(false);
+    expect(report.fail_reason).toBe("STAR_MATERIALS_PROVENANCE_NON_MEASURED");
+  });
+
 });

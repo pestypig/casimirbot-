@@ -31,6 +31,11 @@ import {
 import { buildDebateTurnPrompt } from "./prompts";
 import { buildWarpMessages as buildWarpAgentMessages } from "./warpPromptHelpers";
 import type { WarpGrounding } from "./types";
+import {
+  DEFAULT_DEBATE_EVIDENCE_PROVENANCE,
+  DEBATE_STRICT_PROVENANCE_FAIL_REASON,
+  type DebateEvidenceProvenance,
+} from "./types";
 
 type DebateStatus = "pending" | "running" | "completed" | "timeout" | "aborted";
 
@@ -39,7 +44,10 @@ export type DebateScoreboard = {
   skeptic: number;
 };
 
-export type StoredDebateTurn = TDebateTurn & { essence_id?: string };
+export type StoredDebateTurn = TDebateTurn & { essence_id?: string } & DebateEvidenceProvenance;
+export type StoredDebateOutcome = TDebateOutcome & DebateEvidenceProvenance & {
+  fail_reason?: typeof DEBATE_STRICT_PROVENANCE_FAIL_REASON;
+};
 type DebateRoleLiteral = TDebateTurn["role"];
 
 type DebateRecord = {
@@ -51,7 +59,7 @@ type DebateRecord = {
   status: DebateStatus;
   config: TDebateConfig;
   turns: StoredDebateTurn[];
-  outcome?: TDebateOutcome;
+  outcome?: StoredDebateOutcome;
   scoreboard: DebateScoreboard;
   startedAt: number;
   endedAt?: number;
@@ -93,7 +101,7 @@ export type DebateStreamEvent =
       type: "outcome";
       seq: number;
       debateId: string;
-      outcome: TDebateOutcome;
+      outcome: StoredDebateOutcome;
       scoreboard: DebateScoreboard;
       metrics?: TDebateRoundMetrics;
     };
@@ -117,7 +125,7 @@ export type DebateSnapshot = {
   updated_at: string;
   turns: StoredDebateTurn[];
   scoreboard: DebateScoreboard;
-  outcome: TDebateOutcome | null;
+  outcome: StoredDebateOutcome | null;
   context?: TDebateContext | null;
 };
 
@@ -137,7 +145,7 @@ type DebateEventPayload =
     }
   | {
       type: "outcome";
-      outcome: TDebateOutcome;
+      outcome: StoredDebateOutcome;
       scoreboard: DebateScoreboard;
       metrics?: TDebateRoundMetrics;
     };
@@ -150,6 +158,34 @@ const listeners = new Map<string, Set<EventListener>>();
 const MAX_EVENT_BUFFER = 500;
 const USE_STAR_COLLAPSE = process.env.DEBATE_STAR_COLLAPSE === "1";
 const LLM_TOOL_NAME = "llm.http.generate";
+
+const isStrictProvenanceEnabled = (record: DebateRecord): boolean => {
+  if (process.env.DEBATE_STRICT_PROVENANCE === "1") return true;
+  return (record.context?.knowledge_hints as Record<string, unknown> | undefined)?.strict_provenance === true;
+};
+
+const resolveDebateEvidenceProvenance = (record: DebateRecord): DebateEvidenceProvenance => {
+  const warp = record.context?.warp_grounding;
+  if (!warp) {
+    return { ...DEFAULT_DEBATE_EVIDENCE_PROVENANCE };
+  }
+  const hasHardFail = (warp.constraints ?? []).some((entry) => entry?.severity === "HARD" && entry?.passed === false);
+  const certifying = Boolean(warp.certificateHash) && warp.status === "ADMISSIBLE" && !hasHardFail;
+  if (certifying) {
+    return { provenance_class: "measured", claim_tier: "certified", certifying: true };
+  }
+  if (warp.certificateHash || (warp.constraints ?? []).length > 0) {
+    return { provenance_class: "inferred", claim_tier: "reduced-order", certifying: false };
+  }
+  return { ...DEFAULT_DEBATE_EVIDENCE_PROVENANCE };
+};
+
+const hasEvidenceProvenance = (record: DebateRecord): boolean => {
+  const context = record.context;
+  if (!context) return false;
+  if (context.warp_grounding) return true;
+  return Boolean(context.attachments && context.attachments.length > 0);
+};
 
 export async function startDebate(rawConfig: TDebateConfig): Promise<{ debateId: string }> {
   const parsed = DebateConfig.parse(rawConfig);
@@ -271,7 +307,7 @@ export function getDebateOwner(debateId: string): string | null {
   return debates.get(debateId)?.personaId ?? null;
 }
 
-export async function waitForDebateOutcome(debateId: string, timeoutMs?: number): Promise<TDebateOutcome | null> {
+export async function waitForDebateOutcome(debateId: string, timeoutMs?: number): Promise<StoredDebateOutcome | null> {
   const snapshot = getDebateSnapshot(debateId);
   if (!snapshot) {
     return null;
@@ -284,7 +320,7 @@ export async function waitForDebateOutcome(debateId: string, timeoutMs?: number)
       ? Math.max(0, timeoutMs)
       : snapshot.config.max_wall_ms + 2000;
 
-  return await new Promise<TDebateOutcome | null>((resolve) => {
+  return await new Promise<StoredDebateOutcome | null>((resolve) => {
     let finished = false;
     const finish = (outcome: TDebateOutcome | null) => {
       if (finished) return;
@@ -308,7 +344,7 @@ export async function waitForDebateOutcome(debateId: string, timeoutMs?: number)
 
 export async function startDebateAndWaitForOutcome(
   rawConfig: TDebateConfig,
-): Promise<{ debateId: string; outcome: TDebateOutcome | null }> {
+): Promise<{ debateId: string; outcome: StoredDebateOutcome | null }> {
   const { debateId } = await startDebate(rawConfig);
   const outcome = await waitForDebateOutcome(debateId, rawConfig.max_wall_ms);
   return { debateId, outcome };
@@ -504,6 +540,7 @@ async function advanceDebate(debateId: string): Promise<void> {
           verdict: stopDecision.verdict,
           stopReason: stopDecision.reason,
           metrics: metricsState,
+          failReason: stopDecision.failReason,
         });
         break;
       }
@@ -538,6 +575,7 @@ async function synthesizeTurn(record: DebateRecord, role: DebateRoleLiteral, rou
   const createdAt = new Date().toISOString();
   const { text, essenceId: llmEssenceId } = await generateTurnText(record, role, round);
   const citations = collectCitations(record);
+  const provenance = resolveDebateEvidenceProvenance(record);
   const turn: StoredDebateTurn = {
     id: randomUUID(),
     debate_id: record.id,
@@ -547,6 +585,7 @@ async function synthesizeTurn(record: DebateRecord, role: DebateRoleLiteral, rou
     citations,
     verifier_results: [],
     created_at: createdAt,
+    ...provenance,
   };
   const essenceId = llmEssenceId ?? (await persistEssenceForTurn(record, turn));
   if (essenceId) {
@@ -567,6 +606,7 @@ async function synthesizeRefereeTurn(
     metricsState,
   });
   const citations = collectCitations(record);
+  const provenance = resolveDebateEvidenceProvenance(record);
   const turn: StoredDebateTurn = {
     id: randomUUID(),
     debate_id: record.id,
@@ -576,6 +616,7 @@ async function synthesizeRefereeTurn(
     citations,
     verifier_results: verifierResults,
     created_at: createdAt,
+    ...provenance,
   };
   const essenceId = llmEssenceId ?? (await persistEssenceForTurn(record, turn));
   if (essenceId) {
@@ -1068,7 +1109,12 @@ function computeRoundMetrics(
   };
 }
 
-type StopDecision = { status: DebateStatus; verdict: string; reason: string };
+type StopDecision = {
+  status: DebateStatus;
+  verdict: string;
+  reason: string;
+  failReason?: typeof DEBATE_STRICT_PROVENANCE_FAIL_REASON;
+};
 
 async function maybeSyncStarTelemetry(
   record: DebateRecord,
@@ -1237,6 +1283,14 @@ function evaluateStopRules(
   if (shouldTimeout(record)) {
     return { status: "timeout", verdict: "Debate exceeded wall-clock budget.", reason: "timeout" };
   }
+  if (isStrictProvenanceEnabled(record) && !hasEvidenceProvenance(record)) {
+    return {
+      status: "completed",
+      verdict: "Strict provenance gate failed: evidence provenance metadata is required.",
+      reason: "strict_provenance_missing",
+      failReason: DEBATE_STRICT_PROVENANCE_FAIL_REASON,
+    };
+  }
   if (record.toolCallsUsed >= record.config.max_tool_calls) {
     return { status: "completed", verdict: "Tool call budget exhausted.", reason: "max_tool_calls" };
   }
@@ -1284,7 +1338,12 @@ function evaluateStopRules(
 function finalizeDebate(
   record: DebateRecord,
   status: DebateStatus,
-  metadata?: { verdict?: string; stopReason?: string; metrics?: TDebateRoundMetrics },
+  metadata?: {
+    verdict?: string;
+    stopReason?: string;
+    metrics?: TDebateRoundMetrics;
+    failReason?: typeof DEBATE_STRICT_PROVENANCE_FAIL_REASON;
+  },
 ): void {
   if (isTerminal(record.status)) {
     return;
@@ -1324,8 +1383,13 @@ function finalizeDebate(
 
 function buildOutcome(
   record: DebateRecord,
-  metadata?: { verdict?: string; stopReason?: string; metrics?: TDebateRoundMetrics },
-): TDebateOutcome {
+  metadata?: {
+    verdict?: string;
+    stopReason?: string;
+    metrics?: TDebateRoundMetrics;
+    failReason?: typeof DEBATE_STRICT_PROVENANCE_FAIL_REASON;
+  },
+): StoredDebateOutcome {
   const diff = record.scoreboard.proponent - record.scoreboard.skeptic;
   const total = Math.max(record.scoreboard.proponent + record.scoreboard.skeptic, 1);
   const winning_role = diff > 0 ? "proponent" : diff < 0 ? "skeptic" : undefined;
@@ -1340,6 +1404,7 @@ function buildOutcome(
     .slice(-5)
     .map((turn) => turn.id)
     .filter(Boolean);
+  const provenance = resolveDebateEvidenceProvenance(record);
   return {
     debate_id: record.id,
     verdict,
@@ -1351,6 +1416,8 @@ function buildOutcome(
     stop_reason: metadata?.stopReason ?? record.reason,
     metrics: metricsState,
     created_at: record.updatedAt,
+    ...provenance,
+    fail_reason: metadata?.failReason,
   };
 }
 
