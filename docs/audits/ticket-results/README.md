@@ -2,7 +2,8 @@
 
 Store one JSON result file per ticket execution in this folder.
 Only `TOE-*` receipts that follow the schema below belong here. Keep non-ToE
-bookkeeping artifacts (for example `SPINE-*`) outside this directory.
+bookkeeping artifacts (for example `SPINE-*` or `HELIX-*`) outside this
+directory (`docs/audits/spine-results/`, `docs/audits/helix-results/`).
 
 ## Filename convention
 

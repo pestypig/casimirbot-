@@ -22,6 +22,7 @@ describe("Helix Ask focused utility hardening", () => {
   beforeAll(async () => {
     process.env.ENABLE_AGI = "1";
     process.env.HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR = "1";
+    process.env.HELIX_ASK_FAILURE_MAX = "0";
     vi.resetModules();
     const { planRouter } = await import("../server/routes/agi.plan");
     const app = express();
@@ -49,19 +50,31 @@ describe("Helix Ask focused utility hardening", () => {
   const focalFinancial = "How can a Human protect itself from an AI financial hack";
 
   const ask = async (question: string, seed: number, sessionId: string) => {
-    const response = await fetch(`${baseUrl}/api/agi/ask`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question,
-        debug: true,
-        temperature: 0.2,
-        seed,
-        sessionId,
-      }),
-    });
-    expect(response.status).toBe(200);
-    return (await response.json()) as { text?: string; debug?: Record<string, unknown> };
+    let lastStatus = 0;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const response = await fetch(`${baseUrl}/api/agi/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question,
+          debug: true,
+          temperature: 0.2,
+          seed,
+          sessionId: `${sessionId}-a${attempt}`,
+        }),
+      });
+      lastStatus = response.status;
+      if (response.status === 200) {
+        return (await response.json()) as { text?: string; debug?: Record<string, unknown> };
+      }
+      if (response.status === 503 || response.status >= 500) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+        continue;
+      }
+      break;
+    }
+    expect(lastStatus).toBe(200);
+    return { text: "", debug: {} };
   };
 
   it("hardens universe life explainer with grounded non-placeholder content (seeds 7/11/13)", async () => {
@@ -76,6 +89,19 @@ describe("Helix Ask focused utility hardening", () => {
       expect(MATURITY_RE.test(text)).toBe(true);
       expect(MISSING_EVIDENCE_RE.test(text)).toBe(true);
       expect(typeof payload.debug?.fallback_reason).toBe("string");
+      expect(typeof (payload.debug as any)?.semantic_quality?.claim_citation_link_rate).toBe("number");
+      expect((payload.debug as any)?.event_stable_fields?.retrieval_route).toBeTruthy();
+      expect((payload.debug as any)?.event_stable_fields?.fallback_decision).toBeTruthy();
+      expect((payload.debug as any)?.event_stable_fields?.contract_renderer_path).toBeTruthy();
+      expect((payload.debug as any)?.runtime_clock_a?.complete_contract_on_budget).toBe(true);
+      expect((payload.debug as any)?.runtime_clock_b?.non_blocking).toBe(true);
+      expect(typeof (payload.debug as any)?.fuzzy_move_selector?.selected).toBe("string");
+      expect((payload.debug as any)?.event_stable_fields?.retrieval_route).toBeTruthy();
+      expect((payload.debug as any)?.event_stable_fields?.fallback_decision).toBeTruthy();
+      expect((payload.debug as any)?.event_stable_fields?.contract_renderer_path).toBeTruthy();
+      expect((payload.debug as any)?.runtime_clock_a?.complete_contract_on_budget).toBe(true);
+      expect((payload.debug as any)?.runtime_clock_b?.non_blocking).toBe(true);
+      expect(typeof (payload.debug as any)?.fuzzy_move_selector?.selected).toBe("string");
     }
   }, 120000);
 

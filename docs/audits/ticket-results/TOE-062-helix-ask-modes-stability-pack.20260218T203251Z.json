@@ -22,5 +22,8 @@
     "Primary 3-file Vitest command currently emits full execution logs but does not terminate cleanly in this container; package-level and companion checks were run to verify stability behavior and guardrail scripts.",
     "Casimir verification passed with integrity OK against local adapter/export endpoints while the AGI server was running in-process."
   ],
-  "remaining_gaps": []
+  "remaining_gaps": [],
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ]
 }

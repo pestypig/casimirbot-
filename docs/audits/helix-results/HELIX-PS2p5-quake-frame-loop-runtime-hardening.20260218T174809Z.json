@@ -1,0 +1,188 @@
+{
+  "schema_version": "helix_build_session_bookkeeping/1",
+  "ticket_id": "HELIX-PS2p5-quake-frame-loop-runtime-hardening",
+  "recorded_at": "2026-02-18T17:48:09Z",
+  "executive_summary": [
+    "Implemented a PS2.5 Quake-frame-loop hardening pass for Helix Ask by adding deterministic runtime primitives and wiring them into /api/agi/ask.",
+    "Added runtime helpers for deterministic move selection, semantic quality scoring, bounded bridge traversal precompute, and stable event field shaping.",
+    "Added engine-level deterministic fallback syscall path RenderPlatonicFallback(...) and enforced it under weak-evidence conditions plus final-output anti-generic guard.",
+    "Added fixed-tick split diagnostics (runtime_clock_a, runtime_clock_b), deterministic fuzzy move selector, and AAS-style bridge traversal candidate precompute.",
+    "Added semantic quality gates in finalization path and exposed them in debug payload.",
+    "Added deterministic event-journal parity payload with stable fields (retrieval_route, fallback_decision, contract_renderer_path, gate_outcomes).",
+    "Updated PS2 runtime report tests and added a dedicated semantic-quality test suite."
+  ],
+  "run_reference": {
+    "run_id": "2026-02-18T22-35-25-928Z"
+  },
+  "metrics": [
+    {
+      "gate": "placeholder_fallback_rate",
+      "threshold": "== 0",
+      "measured": 0.0,
+      "pass": true
+    },
+    {
+      "gate": "empty_scaffold_rate",
+      "threshold": "== 0",
+      "measured": 0.0,
+      "pass": true
+    },
+    {
+      "gate": "mechanism_sentence_present_rate",
+      "threshold": ">= 0.95",
+      "measured": 0.0,
+      "pass": false
+    },
+    {
+      "gate": "maturity_label_present_rate",
+      "threshold": ">= 0.95",
+      "measured": 0.0,
+      "pass": false
+    },
+    {
+      "gate": "claim_citation_link_rate",
+      "threshold": ">= 0.90",
+      "measured": 0.0,
+      "pass": false
+    },
+    {
+      "gate": "unsupported_claim_rate",
+      "threshold": "<= 0.10",
+      "measured": 1.0,
+      "pass": false
+    },
+    {
+      "gate": "repetition_penalty_fail_rate",
+      "threshold": "<= 0.10",
+      "measured": 0.0,
+      "pass": true
+    },
+    {
+      "gate": "contradiction_flag_rate",
+      "threshold": "<= 0.10",
+      "measured": 0.0,
+      "pass": true
+    },
+    {
+      "gate": "p95_latency",
+      "threshold": "<= 2500ms",
+      "measured": 2238.0,
+      "pass": true
+    },
+    {
+      "gate": "non_200_rate",
+      "threshold": "<= 0.02",
+      "measured": 1.0,
+      "pass": false
+    }
+  ],
+  "before_after_examples": [
+    {
+      "question": "How does the universe produce life",
+      "seed": 7,
+      "before": "before unavailable",
+      "after": ""
+    },
+    {
+      "question": "How does the universe produce life",
+      "seed": 11,
+      "before": "before unavailable",
+      "after": ""
+    },
+    {
+      "question": "How does the universe produce life",
+      "seed": 13,
+      "before": "before unavailable",
+      "after": ""
+    },
+    {
+      "question": "How can a Human protect itself from an AI financial hack",
+      "seed": 7,
+      "before": "before unavailable",
+      "after": ""
+    },
+    {
+      "question": "How can a Human protect itself from an AI financial hack",
+      "seed": 11,
+      "before": "before unavailable",
+      "after": ""
+    },
+    {
+      "question": "How can a Human protect itself from an AI financial hack",
+      "seed": 13,
+      "before": "before unavailable",
+      "after": ""
+    }
+  ],
+  "files_changed": [
+    "server/services/helix-ask/quake-frame-loop.ts",
+    "server/routes/agi.plan.ts",
+    "tests/helix-ask-ps2-runtime-report.spec.ts",
+    "tests/helix-ask-focused-utility-hardening.spec.ts",
+    "tests/helix-ask-semantic-quality.spec.ts"
+  ],
+  "generated_reports": [
+    "reports/helix-ask-quake-frame-loop-2026-02-18T22-34-08-304Z.md",
+    "reports/helix-ask-quake-frame-loop-2026-02-18T22-34-42-297Z.md",
+    "reports/helix-ask-quake-frame-loop-2026-02-18T22-35-25-928Z.md"
+  ],
+  "commands_run": [
+    "npx vitest run tests/helix-ask-semantic-quality.spec.ts tests/helix-ask-ps2-runtime-report.spec.ts",
+    "npx vitest run tests/helix-ask-focused-utility-hardening.spec.ts",
+    "npm run -s helix:ask:goal-zone",
+    "timeout 180 npm run -s helix:ask:versatility",
+    "timeout 120 node --import tsx scripts/helix-ask-utility-ab.ts",
+    "npm run -s smoke:check",
+    "node --import tsx -e '...POST /api/agi/adapter/run ... GET /api/agi/training-trace/export ...'",
+    "git commit -m \"Harden Helix Ask quake frame loop runtime\"",
+    "git rev-parse HEAD"
+  ],
+  "test_results": [
+    {
+      "status": "PASS",
+      "item": "npx vitest run tests/helix-ask-semantic-quality.spec.ts tests/helix-ask-ps2-runtime-report.spec.ts"
+    },
+    {
+      "status": "FAIL",
+      "item": "npx vitest run tests/helix-ask-focused-utility-hardening.spec.ts",
+      "detail": "runtime llm_local_failed yielded 500s"
+    },
+    {
+      "status": "WARN",
+      "item": "npm run -s helix:ask:goal-zone",
+      "detail": "server not ready at http://127.0.0.1:5173"
+    },
+    {
+      "status": "WARN",
+      "item": "timeout 180 npm run -s helix:ask:versatility",
+      "detail": "server not ready at http://127.0.0.1:5173"
+    },
+    {
+      "status": "WARN",
+      "item": "timeout 120 node --import tsx scripts/helix-ask-utility-ab.ts",
+      "detail": "timed out in this environment"
+    },
+    {
+      "status": "WARN",
+      "item": "npm run -s smoke:check",
+      "detail": "ECONNREFUSED to expected local service"
+    }
+  ],
+  "casimir": {
+    "adapter_run": {
+      "method": "POST",
+      "path": "/api/agi/adapter/run",
+      "http_status": 404
+    },
+    "trace_export": {
+      "method": "GET",
+      "path": "/api/agi/training-trace/export",
+      "http_status": 404,
+      "response_bytes": 168
+    },
+    "verdict": "unavailable",
+    "certificate_hash": "unavailable",
+    "integrity_ok": "unavailable"
+  },
+  "commit_hash": "7051409389f8cce3c242280ed823f360148fd661"
+}

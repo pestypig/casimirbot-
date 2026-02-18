@@ -1,0 +1,86 @@
+{
+  "schema_version": "stellar_source_provenance_map/1",
+  "generated_at": "2026-02-18T22:42:18Z",
+  "source_document": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+  "source_document_sha256": "867b7903cb14221901084add37a011653f394e97a697f2489094af4e598b101c",
+  "entries": [
+    {
+      "claim_id": "SCOR-C001",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "1",
+      "content_hash": "91f3812c6569b2fff99260f379e4ed36f6c40b038922791427ec83ec07102831"
+    },
+    {
+      "claim_id": "SCOR-C002",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "2",
+      "content_hash": "984f16f42f4fc140905dbf6c309cdf37aeee4f4bee8bf0698f8294ede29c8288"
+    },
+    {
+      "claim_id": "SCOR-C003",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "3",
+      "content_hash": "95893e3f052a0e5c8d0700738e6bc14a5ed87697353207faacaedeb521ced5de"
+    },
+    {
+      "claim_id": "SCOR-C004",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "4",
+      "content_hash": "34f993db165ee8faaa302e1442dddc96635262a5384955de501f323f83624603"
+    },
+    {
+      "claim_id": "SCOR-C005",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "5",
+      "content_hash": "22036a192dd0d2b0d4d0ebf352d141c06dfd14fb61dab33f7886ef7e885c6a47"
+    },
+    {
+      "claim_id": "SCOR-C006",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "6",
+      "content_hash": "28c4931200724c37819cb2219b31cac399ef05093ea1185bac3a427ab6c120d3"
+    },
+    {
+      "claim_id": "SCOR-C007",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "7",
+      "content_hash": "df38e6e8e97915160a7fdcb9091132c524a4e5aa7e0b5249b7b5f8f1ee739599"
+    },
+    {
+      "claim_id": "SCOR-C008",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "8",
+      "content_hash": "d0563cb3b8b2ea874537f00cdccbe80d73a49b6809bb029254a381f420abda17"
+    },
+    {
+      "claim_id": "SCOR-C009",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "9",
+      "content_hash": "c9b75d613759511b1e2322b78da93277f1af3d70c5e5752562cebc4c908baa59"
+    },
+    {
+      "claim_id": "SCOR-C010",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "10",
+      "content_hash": "e5ffa89f80a9759982a644efc68a1c85d909d0e5c51f3e8e36f60d8737963cd3"
+    },
+    {
+      "claim_id": "SCOR-C011",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "11",
+      "content_hash": "d76dc4de3b008f86cd78cdaa35e7398038f5a7b345d2ad04f86ba69f16891f8a"
+    },
+    {
+      "claim_id": "SCOR-C012",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "12",
+      "content_hash": "71504036ea38db4f1a230a717f0b95d95c01bcbaac69612ac81d652b7fe0e6d3"
+    },
+    {
+      "claim_id": "SCOR-C013",
+      "source_path": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+      "page_span": "13",
+      "content_hash": "22284f1d5bc51f35760eec1c5e71db7f6ed704a1574391c2ed90a10eb803b988"
+    }
+  ]
+}

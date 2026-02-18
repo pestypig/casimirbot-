@@ -170,3 +170,35 @@ Mandatory Casimir + trace export and full gate table.
   - semantic gate table
   - Casimir PASS block
   - updated TOE progress snapshot delta
+
+## Bookkeeping snapshots
+
+### Handoff Snapshot 2026-02-18T22:00:00Z (cloud Stage A)
+- Branch/HEAD: cloud run, commit `683c761`
+- Result type: pass (Stage A scope)
+- Stage completed: Stage A (A1 source provenance lock + A2 TOE reconciliation)
+- Gates passed:
+  - Source provenance lock complete (full-paper asset path + SHA256 + per-claim provenance map)
+  - Claim registry rebound to direct source/page evidence
+  - TOE validators passed (`compute-toe-progress`, `validate-toe-ticket-results`)
+  - Research artifact completion moved to `27/27`
+  - Strict-ready blocked reasons reduced to `missing_verified_pass` only
+- Gates failed:
+  - None reported in Stage A summary
+- Casimir: PASS, `certificateHash=6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`, `integrityOk=true`
+- New artifacts:
+  - `artifacts/research/stellar-framework/source-provenance-map.json`
+  - Stage A reconciliation report (`reports/helix-ask-stellar-toe-reconciliation-<run-id>.md`)
+  - TOE reconciliation summary artifact (`artifacts/research/stellar-framework/toe-reconciliation-summary.json`)
+- Next single highest-priority task:
+  - Stage B1 (PS1 bridge integration from `missing-tree-dag-bridges.json` + resolver wiring + tests)
+
+### Handoff Snapshot 2026-02-18T22:44:11Z
+- Branch/HEAD: work / cab3729
+- Result type: pass
+- Stage completed: Stage A (A1 source provenance lock + A2 TOE reconciliation)
+- Gates passed: source provenance lock, toe progress recompute, ticket result validation
+- Gates failed: none
+- Casimir: PASS, certificateHash=6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45, integrityOk=true
+- New artifacts: docs/papers/stellar-consciousness-orch-or-review-full.pdf; artifacts/research/stellar-framework/source-provenance-map.json
+- Next single highest-priority task: Stage B runtime integration (P0/P1 bridge wiring and tests).

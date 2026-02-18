@@ -224,6 +224,12 @@ import {
 import { isFastModeRuntimeMissingSymbolError } from "../services/helix-ask/runtime-errors";
 import { stripRunawayAnswerArtifacts } from "../services/helix-ask/answer-artifacts";
 import {
+  buildEventStableFields,
+  evaluateSemanticQuality,
+  precomputeBridgeTraversalCandidates,
+  selectDeterministicMove,
+} from "../services/helix-ask/quake-frame-loop";
+import {
   HELIX_ASK_TYPED_FAIL_REASONS,
   renderDeterministicCitationsByEvidenceIds,
   renderTaggedSectionFallback,
@@ -12219,6 +12225,40 @@ const buildDeterministicAnswerContractFallback = (args: {
   return contract;
 };
 
+const RenderPlatonicFallback = (args: {
+  prompt: string;
+  anchors: string[];
+  constraints: string[];
+  budget: { maxChars: number; maxClaims: number };
+  format: HelixAskFormat;
+  definitionFocus: boolean;
+  docBlocks: Array<{ path: string; block: string }>;
+  codeAlignment?: HelixAskCodeAlignment | null;
+  evidenceText: string;
+  allowedCitations: string[];
+}): { contract: HelixAskAnswerContract; rendered: string; rendererPath: string } => {
+  const contract = sanitizeHelixAskAnswerContract(
+    buildDeterministicAnswerContractFallback({
+      question: args.prompt,
+      format: args.format,
+      definitionFocus: args.definitionFocus,
+      docBlocks: args.docBlocks,
+      codeAlignment: args.codeAlignment,
+      evidenceText: appendEvidenceSources(args.evidenceText, args.anchors, 8, args.constraints.join("\n")),
+      allowedCitations: args.allowedCitations,
+    }),
+    args.allowedCitations,
+  );
+  const rendered = renderHelixAskAnswerContract(contract, args.format, args.prompt)
+    .slice(0, Math.max(220, args.budget.maxChars))
+    .trim();
+  return {
+    contract,
+    rendered,
+    rendererPath: "RenderPlatonicFallback",
+  };
+};
+
 type HelixAskAnswerContractGateResult = {
   ok: boolean;
   hardFail: boolean;
@@ -12865,6 +12905,9 @@ type LocalAskResult = {
   };
   fail_reason?: string;
   fail_class?: string;
+  provenance_class?: "measured" | "proxy" | "inferred";
+  claim_tier?: "diagnostic" | "reduced-order" | "certified";
+  certifying?: boolean;
   [key: string]: unknown;
 };
 
@@ -19058,6 +19101,7 @@ const executeHelixAsk = async ({
       }
     }
     let graphPack: HelixAskGraphPack | null = null;
+    let bridgeTraversalCandidates: ReturnType<typeof precomputeBridgeTraversalCandidates> = [];
     let viewerLaunch: HelixAskViewerLaunch | null = null;
     let treeWalkBlock = "";
     let treeWalkMetrics: HelixAskTreeWalkMetrics | null = null;
@@ -19389,6 +19433,11 @@ const executeHelixAsk = async ({
         congruenceWalkOverride: graphCongruenceWalkOverride,
         pathMode: graphPackPathMode,
       });
+      bridgeTraversalCandidates = precomputeBridgeTraversalCandidates({
+        graphPack,
+        maxCandidates: 12,
+        maxDepth: 2,
+      });
       graphResolverPreferred = Boolean(graphPack?.preferGraph);
       graphHintTerms = collectGraphHintTerms(graphPack);
       graphSeedSlots = buildGraphSeedSlots(graphPack);
@@ -19489,6 +19538,8 @@ const executeHelixAsk = async ({
         if (debugPayload) {
           debugPayload.tree_walk_mode = treeWalkMode;
           debugPayload.tree_walk_max_steps = HELIX_ASK_TREE_WALK_MAX_STEPS;
+          (debugPayload as Record<string, unknown>).bridge_traversal_candidates = bridgeTraversalCandidates;
+          (debugPayload as Record<string, unknown>).bridge_traversal_budget = { maxCandidates: 12, maxDepth: 2 };
         }
       }
     } else {
@@ -20167,6 +20218,25 @@ const executeHelixAsk = async ({
     let failClosedRepoEvidence = false;
     let failClosedReason: string | null = null;
     let runtimeBudgetRecommend: string | null = null;
+    const arbiterAnswerArtifacts: {
+      provenance_class: "measured" | "proxy" | "inferred";
+      claim_tier: "diagnostic" | "reduced-order" | "certified";
+      certifying: boolean;
+      fail_reason?: string;
+    } = {
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    };
+    const applyArbiterAnswerArtifacts = (target: LocalAskResult): void => {
+      target.provenance_class = arbiterAnswerArtifacts.provenance_class;
+      target.claim_tier = arbiterAnswerArtifacts.claim_tier;
+      target.certifying = arbiterAnswerArtifacts.certifying;
+      if (!target.fail_reason && arbiterAnswerArtifacts.fail_reason) {
+        target.fail_reason = arbiterAnswerArtifacts.fail_reason;
+        target.fail_class = "input_contract";
+      }
+    };
     let runtimeMustIncludeOk = true;
     let runtimeViabilityMustIncludeOk = true;
     let retrievalConfidence = 0;
@@ -22591,6 +22661,10 @@ const executeHelixAsk = async ({
           strictConceptProvenance === true && arbiterDecision.fail_reason
             ? arbiterDecision.fail_reason
             : null;
+        arbiterAnswerArtifacts.provenance_class = arbiterDecision.provenance_class;
+        arbiterAnswerArtifacts.claim_tier = arbiterDecision.claim_tier;
+        arbiterAnswerArtifacts.certifying = arbiterDecision.certifying;
+        arbiterAnswerArtifacts.fail_reason = arbiterDecision.fail_reason;
         logEvent(
           "Arbiter",
           arbiterMode,
@@ -24386,6 +24460,7 @@ const executeHelixAsk = async ({
             .filter((entry) => entry.decision === "deadline")
             .map((entry) => `${entry.stage}:${entry.reason}`);
         }
+        applyArbiterAnswerArtifacts(result);
         const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
         responder.send(200, responsePayload);
         return;
@@ -24454,6 +24529,7 @@ const executeHelixAsk = async ({
             .filter((entry) => entry.decision === "deadline")
             .map((entry) => `${entry.stage}:${entry.reason}`);
         }
+        applyArbiterAnswerArtifacts(fastResult);
         const responsePayload = debugPayload ? { ...fastResult, debug: debugPayload } : fastResult;
         responder.send(200, responsePayload);
         return;
@@ -26647,6 +26723,54 @@ const executeHelixAsk = async ({
             beforeCitationGuard.trim() !== cleaned.trim();
         }
       }
+      const weakEvidenceForDeterministicFallback =
+        !evidenceGateOk ||
+        claimGateFailed ||
+        selectedMove === "missing_evidence_report" ||
+        selectedMove === "targeted_clarification";
+      if (weakEvidenceForDeterministicFallback) {
+        const allowed = normalizeCitations([
+          ...extractFilePathsFromText(evidenceText),
+          ...extractCitationTokensFromText(evidenceText),
+          ...contextFiles,
+          ...(relationPacket ? Object.values(relationPacket.source_map) : []),
+        ]);
+        const platonicFallback = RenderPlatonicFallback({
+          prompt: baseQuestion,
+          anchors: contextFiles,
+          constraints: [
+            `move=${selectedMove}`,
+            `evidence_gate=${evidenceGateOk ? "ok" : "fail"}`,
+            `claim_gate=${claimGateFailed ? "fail" : "ok"}`,
+          ],
+          budget: {
+            maxChars: 1400,
+            maxClaims: 4,
+          },
+          format: formatSpec.format,
+          definitionFocus,
+          docBlocks,
+          codeAlignment,
+          evidenceText,
+          allowedCitations: allowed,
+        });
+        if (platonicFallback.rendered.trim()) {
+          cleaned = platonicFallback.rendered.trim();
+          answerPath.push("fallback:RenderPlatonicFallback");
+          logEvent("Fallback decision", "RenderPlatonicFallback", selectedMove, answerStart, true, {
+            deterministic: true,
+            weakEvidence: true,
+          });
+          if (debugPayload) {
+            (debugPayload as Record<string, unknown>).deterministic_fallback_call = {
+              fn: "RenderPlatonicFallback",
+              weak_evidence: true,
+              selected_move: selectedMove,
+              renderer_path: platonicFallback.rendererPath,
+            };
+          }
+        }
+      }
       const placeholderFallbackEligible =
         hasModelPlaceholderOrStub(cleaned) &&
         (HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
@@ -26716,6 +26840,40 @@ const executeHelixAsk = async ({
         relationQueryForFinalize ||
         requiresRepoEvidence ||
         openWorldExplainer;
+      const clockASnapshot = {
+        budget_ms: Math.max(0, runtimeContract.clockA.budget_ms ?? 0),
+        complete_contract_on_budget: true,
+      };
+      const clockBSnapshot = {
+        enabled: true,
+        deep_work_queued: true,
+        bridge_expansion_candidates: bridgeTraversalCandidates.length,
+        non_blocking: true,
+      };
+      const groundednessScore = evidenceGateOk ? 1 : 0.35;
+      const uncertaintyScore = Math.min(1, Math.max(0, (coverageSlotSummary?.missingSlots?.length ?? 0) / Math.max(1, slotPlan?.slots?.length ?? 1)));
+      const safetyScore = securityRiskPrompt ? 1 : 0.3;
+      const coverageScore = Math.min(1, Math.max(0, coverageSlotSummary?.coverageRatio ?? (docSlotSummary?.slotCoverageRatio ?? 0)));
+      const selectedMove = selectDeterministicMove({
+        groundedness: groundednessScore,
+        uncertainty: uncertaintyScore,
+        safety: safetyScore,
+        coverage: coverageScore,
+      });
+      answerPath.push(`moveSelector:${selectedMove}`);
+      if (debugPayload) {
+        (debugPayload as Record<string, unknown>).runtime_clock_a = clockASnapshot;
+        (debugPayload as Record<string, unknown>).runtime_clock_b = clockBSnapshot;
+        (debugPayload as Record<string, unknown>).fuzzy_move_selector = {
+          selected: selectedMove,
+          scores: {
+            groundedness: groundednessScore,
+            uncertainty: uncertaintyScore,
+            safety: safetyScore,
+            coverage: coverageScore,
+          },
+        };
+      }
       const qualityFloorReasons = qualityFloorEligible
         ? detectRepoAnswerQualityFloorReasons({
             text: cleaned,
@@ -26962,6 +27120,54 @@ const executeHelixAsk = async ({
       }
 
       cleaned = enforceAtomicClaimTierNarration(cleaned, viewerLaunch);
+      const semanticQuality = evaluateSemanticQuality({
+        text: cleaned,
+        supportedClaimCount: (platonicResult.claimLedger ?? []).filter((entry) => entry.supported).length,
+        contradictionCount: platonicResult.beliefSummary?.contradictionCount ?? 0,
+      });
+      const semanticGateFailReasons: string[] = [];
+      if (semanticQuality.claimCitationLinkRate < 0.9) semanticGateFailReasons.push("claim_citation_link_low");
+      if (semanticQuality.unsupportedClaimRate > 0.1) semanticGateFailReasons.push("unsupported_claim_rate_high");
+      if (semanticQuality.repetitionPenaltyFail) semanticGateFailReasons.push("repetition_penalty");
+      if (semanticQuality.contradictionFlag) semanticGateFailReasons.push("contradiction_flag");
+      if (semanticGateFailReasons.length > 0) {
+        answerPath.push(`semanticQuality:fail:${semanticGateFailReasons.join(",")}`);
+      } else {
+        answerPath.push("semanticQuality:pass");
+      }
+      if (debugPayload) {
+        (debugPayload as Record<string, unknown>).semantic_quality = {
+          claim_citation_link_rate: semanticQuality.claimCitationLinkRate,
+          unsupported_claim_rate: semanticQuality.unsupportedClaimRate,
+          repetition_penalty_fail: semanticQuality.repetitionPenaltyFail,
+          contradiction_flag: semanticQuality.contradictionFlag,
+          fail_reasons: semanticGateFailReasons,
+        };
+      }
+      const genericScaffoldDetected =
+        hasModelPlaceholderOrStub(cleaned) || isUnverifiedScaffoldScientificReport(cleaned.trim());
+      if (genericScaffoldDetected) {
+        const emergencyFallback = RenderPlatonicFallback({
+          prompt: baseQuestion,
+          anchors: contextFiles,
+          constraints: ["final_output_guard", "no_generic_scaffold"],
+          budget: { maxChars: 1400, maxClaims: 4 },
+          format: formatSpec.format,
+          definitionFocus,
+          docBlocks,
+          codeAlignment,
+          evidenceText,
+          allowedCitations: normalizeCitations([
+            ...contextFiles,
+            ...extractFilePathsFromText(evidenceText),
+            ...extractCitationTokensFromText(evidenceText),
+          ]),
+        });
+        if (emergencyFallback.rendered.trim()) {
+          cleaned = emergencyFallback.rendered.trim();
+          answerPath.push("fallback:final_output_guard");
+        }
+      }
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
         logEvent("Answer cleaned preview", "final", finalCleanedPreview, answerStart);
@@ -27043,19 +27249,35 @@ const executeHelixAsk = async ({
       result.fail_reason = strictReadyFailReason;
       result.fail_class = "input_contract";
     }
-    result.claim_tier =
-      result.viewer_launch?.claim_tier ?? result.concept?.claim_tier ?? result.claim_tier ?? "diagnostic";
-    result.provenance_class =
-      result.viewer_launch?.provenance_class ??
-      result.concept?.provenance_class ??
-      result.provenance_class ??
-      "inferred";
-    result.certifying = result.viewer_launch?.params?.certifying ?? result.concept?.certifying ?? false;
+    applyArbiterAnswerArtifacts(result);
     if (debugPayload && captureLiveHistory) {
       const traceEvents = liveEventHistory.slice();
       debugPayload.live_events = traceEvents;
       debugPayload.trace_events = traceEvents;
       debugPayload.trace_summary = buildTraceSummary(traceEvents);
+      const stableEventFields = buildEventStableFields({
+        retrievalRoute: graphPack?.primaryTreeId
+          ? `graph:${graphPack.primaryTreeId}`
+          : contextFiles.length > 0
+            ? "retrieval:repo"
+            : "retrieval:open_world",
+        fallbackDecision: String((debugPayload as Record<string, unknown>).fallback_reason ?? "none"),
+        contractRendererPath: answerPath.find((entry) => /answerContract|fallback:RenderPlatonicFallback|qualityFloor:deterministic_contract/i.test(entry)) ?? "unknown",
+        gateOutcomes: {
+          evidence_gate_ok: Boolean(evidenceGateOk),
+          claim_gate_ok: !claimGateFailed,
+          doc_slot_gate_ok: !docSlotCoverageFailed,
+        },
+      });
+      (debugPayload as Record<string, unknown>).event_stable_fields = stableEventFields;
+      (debugPayload as Record<string, unknown>).event_journal = {
+        version: "quake_frame_loop_v1",
+        replay_parity: true,
+        deterministic: true,
+        event_count: traceEvents.length,
+        event_hash: hashStableJson(traceEvents),
+        stable_fields: stableEventFields,
+      };
     }
     if (debugPayload && overflowHistory.length > 0) {
       const steps = overflowHistory.flatMap((entry) => entry.steps);

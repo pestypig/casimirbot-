@@ -82,6 +82,9 @@ describe("Helix Ask modes", () => {
     });
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
+      provenance_class?: string;
+      claim_tier?: string;
+      certifying?: boolean;
       concept?: {
         id?: string;
         provenance_class?: string;
@@ -93,6 +96,9 @@ describe("Helix Ask modes", () => {
       provenance_class?: string;
       certifying?: boolean;
     };
+    expect(payload.provenance_class).toBe("inferred");
+    expect(payload.claim_tier).toBe("diagnostic");
+    expect(payload.certifying).toBe(false);
     expect(payload.concept?.id).toBe("epistemology");
     expect(payload.concept?.provenance_class).toBe("inferred");
     expect(payload.concept?.claim_tier).toBe("diagnostic");
@@ -116,6 +122,9 @@ describe("Helix Ask modes", () => {
     });
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
+      provenance_class?: string;
+      claim_tier?: string;
+      certifying?: boolean;
       fail_reason?: string;
       fail_class?: string;
       strict_fail_reason_ledger?: Array<{ fail_reason?: string; category?: string; stage?: string }>;
@@ -124,6 +133,9 @@ describe("Helix Ask modes", () => {
         id?: string;
       };
     };
+    expect(payload.provenance_class).toBe("inferred");
+    expect(payload.claim_tier).toBe("diagnostic");
+    expect(payload.certifying).toBe(false);
     expect(payload.concept?.id).toBe("epistemology");
     expect(payload.fail_reason).toBe("CONCEPTS_PROVENANCE_MISSING");
     expect(payload.fail_class).toBe("input_contract");

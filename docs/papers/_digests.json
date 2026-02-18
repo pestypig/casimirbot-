@@ -1,10 +1,15 @@
 {
   "ford-roman-qi-1995": {
-    "title": "Ford–Roman Quantum Inequality (QI)",
+    "title": "Ford\u2013Roman Quantum Inequality (QI)",
     "file": "papers/ford-roman-qi-1995.md"
   },
   "vanden-broeck-1999": {
     "title": "Van den Broeck Warp Pocket Compression",
     "file": "papers/vanden-broeck-1999.md"
+  },
+  "stellar-consciousness-orch-or-review-full": {
+    "title": "Stellar Consciousness Orch-OR Review (full)",
+    "file": "papers/stellar-consciousness-orch-or-review-full.pdf",
+    "sha256": "867b7903cb14221901084add37a011653f394e97a697f2489094af4e598b101c"
   }
 }

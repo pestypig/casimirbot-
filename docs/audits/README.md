@@ -19,6 +19,7 @@ This folder is the entrypoint for cloud-agent audit contracts, gap reports, and 
 - ToE research context pack (standalone prompt anchor): `docs/audits/research/toe-research-context-pack-2026-02-18.md`
 - Ticket result contract: `docs/audits/ticket-results/README.md`
 - SPINE bookkeeping receipts (non-ToE): `docs/audits/spine-results/`
+- HELIX bookkeeping receipts (non-ToE): `docs/audits/helix-results/`
 - ToE scaling scorecard: `docs/audits/toe-scaling-scorecard.md`
 - ToE scaling scorecard CSV: `docs/audits/toe-scaling-scorecard.csv`
 - ToE progress snapshot: `docs/audits/toe-progress-snapshot.json`

@@ -24,5 +24,8 @@
     "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
     "integrity_ok": true
   },
-  "remaining_gaps": []
+  "remaining_gaps": [],
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ]
 }
