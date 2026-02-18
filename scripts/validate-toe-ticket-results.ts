@@ -33,9 +33,14 @@ type TicketScope = {
   requiredTests: string[];
 };
 
-const BACKLOG_PATH = path.resolve(
+const PRIMARY_BACKLOG_PATH = path.resolve(
   process.env.TOE_TICKET_BACKLOG_PATH ??
     path.join("docs", "audits", "toe-cloud-agent-ticket-backlog-2026-02-17.json"),
+);
+
+const EXTENSION_BACKLOG_PATH = path.resolve(
+  process.env.TOE_TICKET_EXTENSION_BACKLOG_PATH ??
+    path.join("docs", "audits", "toe-coverage-extension-backlog-2026-02-18.json"),
 );
 
 const RESULTS_DIR = path.resolve(
@@ -107,27 +112,41 @@ function includesScope(pathValue: string, scopeValue: string): boolean {
 }
 
 function loadTicketScopes(): Map<string, TicketScope> {
-  if (!fs.existsSync(BACKLOG_PATH)) {
-    throw new Error(`Backlog file not found: ${BACKLOG_PATH}`);
+  if (!fs.existsSync(PRIMARY_BACKLOG_PATH)) {
+    throw new Error(`Backlog file not found: ${PRIMARY_BACKLOG_PATH}`);
   }
 
-  const parsed = JSON.parse(fs.readFileSync(BACKLOG_PATH, "utf8")) as Backlog;
+  const backlogPaths = [PRIMARY_BACKLOG_PATH];
+  if (fs.existsSync(EXTENSION_BACKLOG_PATH)) {
+    backlogPaths.push(EXTENSION_BACKLOG_PATH);
+  }
   const scopes = new Map<string, TicketScope>();
 
-  for (const ticket of parsed.tickets ?? []) {
-    const id = typeof ticket.id === "string" ? ticket.id.trim() : "";
-    if (!id) {
-      continue;
+  for (const backlogPath of backlogPaths) {
+    const parsed = JSON.parse(fs.readFileSync(backlogPath, "utf8")) as Backlog;
+
+    for (const ticket of parsed.tickets ?? []) {
+      const id = typeof ticket.id === "string" ? ticket.id.trim() : "";
+      if (!id) {
+        continue;
+      }
+
+      const allowedPaths = Array.isArray(ticket.allowed_paths)
+        ? ticket.allowed_paths.map((value) => normalizePath(String(value))).filter(Boolean)
+        : [];
+      const requiredTests = Array.isArray(ticket.required_tests)
+        ? ticket.required_tests.map((value) => normalizePath(String(value))).filter(Boolean)
+        : [];
+
+      const existing = scopes.get(id);
+      if (existing) {
+        const mergedAllowed = Array.from(new Set([...existing.allowedPaths, ...allowedPaths]));
+        const mergedRequired = Array.from(new Set([...existing.requiredTests, ...requiredTests]));
+        scopes.set(id, { id, allowedPaths: mergedAllowed, requiredTests: mergedRequired });
+      } else {
+        scopes.set(id, { id, allowedPaths, requiredTests });
+      }
     }
-
-    const allowedPaths = Array.isArray(ticket.allowed_paths)
-      ? ticket.allowed_paths.map((value) => normalizePath(String(value))).filter(Boolean)
-      : [];
-    const requiredTests = Array.isArray(ticket.required_tests)
-      ? ticket.required_tests.map((value) => normalizePath(String(value))).filter(Boolean)
-      : [];
-
-    scopes.set(id, { id, allowedPaths, requiredTests });
   }
 
   return scopes;

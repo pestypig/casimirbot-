@@ -5,9 +5,12 @@ This folder is the entrypoint for cloud-agent audit contracts, gap reports, and 
 ## Core Contracts
 
 - Ideology/physics gap audit: `docs/audits/ideology-physics-claim-gap-audit-2026-02-17.md`
+- Repo forest coverage audit: `docs/audits/repo-forest-coverage-audit-2026-02-18.md`
 - Agent execution checklist (machine-readable): `docs/audits/helix-agent-context-checklist-2026-02-17.json`
 - ToE ticket backlog (human-readable): `docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.md`
 - ToE ticket backlog (machine-readable): `docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json`
+- ToE coverage-extension backlog (human-readable): `docs/audits/toe-coverage-extension-backlog-2026-02-18.md`
+- ToE coverage-extension backlog (machine-readable): `docs/audits/toe-coverage-extension-backlog-2026-02-18.json`
 - Ticket result contract: `docs/audits/ticket-results/README.md`
 - ToE scaling scorecard: `docs/audits/toe-scaling-scorecard.md`
 - ToE scaling scorecard CSV: `docs/audits/toe-scaling-scorecard.csv`

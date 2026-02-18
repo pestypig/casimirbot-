@@ -48,4 +48,18 @@ describe('server/utils/horizons-proxy getHorizonsElements', () => {
     expect(result.provenance.note.toLowerCase()).toContain('non-certifying');
     expect(result.epochISO).toBe('2026-01-01T12:00:00.000Z');
   });
+
+  it('falls back when live payload is parse-incomplete', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      text: async () => 'A= 1.00000123',
+    });
+
+    const { getHorizonsElements } = await import('../server/utils/horizons-proxy');
+    const result = await getHorizonsElements('2026');
+
+    expect(result.provenance.sourceClass).toBe('fallback');
+    expect(result.provenance.diagnostic).toBe(true);
+    expect(result.provenance.certifying).toBe(false);
+  });
 });

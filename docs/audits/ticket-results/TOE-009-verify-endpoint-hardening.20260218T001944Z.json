@@ -1,6 +1,15 @@
 {
   "schema_version": "toe_agent_ticket_result/1",
   "ticket_id": "TOE-009-verify-endpoint-hardening",
+  "files_changed": [
+    "cli/casimir-verify.ts",
+    ".github/workflows/casimir-verify.yml",
+    ".github/workflows/release-packages.yml",
+    "tests/runtime-tool-policy.spec.ts"
+  ],
+  "tests_run": [
+    "tests/runtime-tool-policy.spec.ts"
+  ],
   "claim_tier": "diagnostic",
   "casimir": {
     "verdict": "PASS",
@@ -9,6 +18,7 @@
     "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
     "integrity_ok": true
   },
+  "remaining_gaps": [],
   "notes": [
     "CI/release verification requires explicit adapter URL and blocks synthetic fallback in certifying lanes.",
     "Workflow logs now include adapter_url, verdict, cert_integrity."

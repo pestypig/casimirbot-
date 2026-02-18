@@ -1,0 +1,154 @@
+{
+  "schema_version": "toe_coverage_extension_backlog/1",
+  "kind": "toe_coverage_extension_backlog",
+  "created_at": "2026-02-18T00:00:00Z",
+  "name": "ToE Coverage Extension Backlog",
+  "source_report": "docs/audits/repo-forest-coverage-audit-2026-02-18.md",
+  "parent_backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
+  "tickets": [
+    {
+      "id": "TOE-011-orbital-ephemeris-provenance-bridge",
+      "tree_owner": "simulation-systems",
+      "gap_refs": ["F-COV-2", "F-COV-6"],
+      "primitive": "Orbital ephemeris provenance bridge primitive",
+      "primary_path_prefix": "server/utils/horizons-proxy.ts",
+      "allowed_paths": [
+        "server/utils/horizons-proxy.ts",
+        "server/routes.ts",
+        "server/horizons-proxy.ts",
+        "tests/horizons-proxy.spec.ts",
+        "tests/routes-horizons.spec.ts"
+      ],
+      "required_tests": [
+        "tests/horizons-proxy.spec.ts",
+        "tests/routes-horizons.spec.ts"
+      ],
+      "done_criteria": [
+        "/api/horizons response includes explicit provenance source class in {live,fallback}",
+        "Fallback paths are marked diagnostic and non-certifying in response payload",
+        "Tests cover parser success, fallback semantics, and response-shape parity"
+      ]
+    },
+    {
+      "id": "TOE-012-halobank-horizons-consistency-gate",
+      "tree_owner": "helix-ask",
+      "gap_refs": ["F-COV-2"],
+      "primitive": "Halobank-orbital consistency gate primitive",
+      "primary_path_prefix": "server/services/halobank/time-model.ts",
+      "allowed_paths": [
+        "server/services/halobank/time-model.ts",
+        "server/skills/halobank.time.compute.ts",
+        "server/routes/agi.plan.ts",
+        "tests/halobank-time-model.spec.ts",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts"
+      ],
+      "required_tests": [
+        "tests/halobank-time-model.spec.ts",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts"
+      ],
+      "done_criteria": [
+        "Halobank outputs include ephemeris consistency/provenance fields when orbital alignment is requested",
+        "Verify-mode proof packet includes consistency gate verdict and deterministic firstFail id on FAIL",
+        "Fallback ephemeris conditions remain claim-tier diagnostic and are explicitly surfaced in output"
+      ]
+    },
+    {
+      "id": "TOE-013-atomic-systems-claim-tier-contract",
+      "tree_owner": "atomic-systems",
+      "gap_refs": ["F-COV-3", "F-COV-5"],
+      "primitive": "Atomic systems claim-tier and provenance contract primitive",
+      "primary_path_prefix": "server/routes/agi.plan.ts",
+      "allowed_paths": [
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask/topic.ts",
+        "client/src/lib/atomic-orbitals.ts",
+        "shared/schema.ts",
+        "tests/atomic-orbital-claim-tier.spec.ts",
+        "tests/helix-ask-modes.spec.ts"
+      ],
+      "required_tests": [
+        "tests/atomic-orbital-claim-tier.spec.ts",
+        "tests/helix-ask-modes.spec.ts"
+      ],
+      "done_criteria": [
+        "Atomic/orbital outputs include claim_tier and provenance class fields",
+        "Proxy/sim-only atomic outputs cannot be narrated as certified in ask-time responses",
+        "Tests cover classical and quantum branches with non-overclaim policy assertions"
+      ]
+    },
+    {
+      "id": "TOE-014-robotics-recollection-provenance-contract",
+      "tree_owner": "robotics-recollection",
+      "gap_refs": ["F-COV-4"],
+      "primitive": "Robotics recollection provenance and replay contract primitive",
+      "primary_path_prefix": "shared/schema.ts",
+      "allowed_paths": [
+        "shared/schema.ts",
+        "server/routes/agi.adapter.ts",
+        "server/services/observability/training-trace-store.ts",
+        "server/services/robotics-handback.ts",
+        "server/__tests__/training-trace.test.ts",
+        "server/__tests__/agi.adapter.test.ts",
+        "server/__tests__/robotics-handback.test.ts"
+      ],
+      "required_tests": [
+        "server/__tests__/training-trace.test.ts",
+        "server/__tests__/agi.adapter.test.ts",
+        "server/__tests__/robotics-handback.test.ts"
+      ],
+      "done_criteria": [
+        "Movement/replay trace records carry provenance class, sensor-channel coverage, and certificate refs",
+        "Robotics FAIL paths emit deterministic firstFail ids under canonical taxonomy",
+        "Tests prove deterministic linkage action -> gate -> certificate -> replay summary"
+      ]
+    },
+    {
+      "id": "TOE-015-external-integration-evidence-manifest",
+      "tree_owner": "external-integrations",
+      "gap_refs": ["F-COV-5"],
+      "primitive": "External integration evidence manifest primitive",
+      "primary_path_prefix": "configs/external-integration-evidence-manifest.v1.json",
+      "allowed_paths": [
+        "configs/external-integration-evidence-manifest.v1.json",
+        "docs/knowledge/external-integrations-tree.json",
+        "scripts/validate-external-integration-manifest.ts",
+        "tests/external-integration-manifest.spec.ts",
+        "docs/audits/README.md"
+      ],
+      "required_tests": [
+        "tests/external-integration-manifest.spec.ts"
+      ],
+      "done_criteria": [
+        "Manifest maps external integration node -> in-repo usage surface -> provenance/maturity class",
+        "Validator fails on missing/dangling node references and missing evidence fields",
+        "Test fixtures include pass and fail cases for manifest policy"
+      ]
+    },
+    {
+      "id": "TOE-016-resolver-forest-owner-coverage-manifest",
+      "tree_owner": "helix-ask",
+      "gap_refs": ["F-COV-1", "F-COV-5"],
+      "primitive": "Resolver forest owner coverage manifest primitive",
+      "primary_path_prefix": "configs/resolver-owner-coverage-manifest.v1.json",
+      "allowed_paths": [
+        "configs/resolver-owner-coverage-manifest.v1.json",
+        "configs/graph-resolvers.json",
+        "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "scripts/compute-toe-progress.ts",
+        "scripts/validate-resolver-owner-coverage.ts",
+        "tests/toe-progress.spec.ts"
+      ],
+      "required_tests": [
+        "tests/toe-progress.spec.ts"
+      ],
+      "done_criteria": [
+        "Manifest maps resolver tree owner -> ticket coverage status in {covered_core,covered_extension,unmapped}",
+        "Progress tooling reports forest_owner_coverage_pct separately from toe_progress_pct",
+        "Validation fails when high-priority owners remain unmapped"
+      ]
+    }
+  ]
+}

@@ -4,6 +4,20 @@ This backlog decomposes remaining ToE work into falsifiable, non-overlapping tic
 
 Canonical machine-readable source: `docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json`.
 
+## Coverage Notice (2026-02-18)
+
+This backlog remains valid for the current 10-ticket execution lane. A follow-up forest scan found the resolver graph defines more owners than this lane currently covers.
+
+- Coverage audit: `docs/audits/repo-forest-coverage-audit-2026-02-18.md`
+- Coverage-extension backlog: `docs/audits/toe-coverage-extension-backlog-2026-02-18.md`
+- Progress context: treat `toe_progress_pct` as scoped progress for the active lane until coverage-extension tickets are added.
+
+Recommended planning policy:
+
+1. Keep current queue through `TOE-010` stable.
+2. Add post-010 coverage-extension tickets for unrepresented high-impact owners (orbital/halobank, atomic-systems, robotics-recollection, external-integrations, resolver-owner manifest).
+3. Resume strict sequencing with `TOE-008`/`TOE-009` hardening once coverage freeze is documented for the next batch.
+
 Global execution contract for every ticket:
 
 - Read: `docs/audits/ideology-physics-claim-gap-audit-2026-02-17.md`, `docs/audits/helix-agent-context-checklist-2026-02-17.json`, `WARP_AGENTS.md`

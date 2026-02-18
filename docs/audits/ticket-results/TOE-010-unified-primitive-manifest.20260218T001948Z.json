@@ -11,9 +11,8 @@
     "tests/theory-checks.spec.ts"
   ],
   "tests_run": [
-    "npx vitest run tests/startup-config.spec.ts tests/theory-checks.spec.ts",
-    "npm run audit:agent-context:check",
-    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+    "tests/startup-config.spec.ts",
+    "tests/theory-checks.spec.ts"
   ],
   "casimir": {
     "verdict": "PASS",

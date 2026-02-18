@@ -3,6 +3,16 @@
   "ticket_id": "TOE-011-orbital-ephemeris-provenance-bridge",
   "tree_owner": "simulation-systems",
   "primitive": "Orbital ephemeris provenance bridge primitive",
+  "files_changed": [
+    "server/utils/horizons-proxy.ts",
+    "server/horizons-proxy.ts",
+    "tests/horizons-proxy.spec.ts",
+    "tests/routes-horizons.spec.ts"
+  ],
+  "tests_run": [
+    "tests/horizons-proxy.spec.ts",
+    "tests/routes-horizons.spec.ts"
+  ],
   "claim_tier": "diagnostic",
   "casimir": {
     "verdict": "PASS",
@@ -11,8 +21,5 @@
     "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
     "integrity_ok": true
   },
-  "tests": [
-    "npx vitest run tests/horizons-proxy.spec.ts tests/routes-horizons.spec.ts",
-    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
-  ]
+  "remaining_gaps": []
 }

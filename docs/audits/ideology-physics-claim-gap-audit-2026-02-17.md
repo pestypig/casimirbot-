@@ -426,3 +426,24 @@ Use this runbook for every cloud/offloaded patch touching ideology, physics, via
 - Certificate hash: `d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d`
 - Certificate ID: `constraint-pack:repo-convergence:d2821c7d650d`
 - Integrity: `integrityOk=true`
+
+## 9) Coverage Addendum (2026-02-18)
+
+A follow-up forest scan was run to reduce scope-blind spots in ToE planning. See:
+
+- `docs/audits/repo-forest-coverage-audit-2026-02-18.md`
+
+Key addendum outcomes:
+
+- Current ToE ticket map covers `9` owners while resolver forest currently defines `41` tree owners.
+- Coverage ratio for active ToE owners is therefore about `21.95%` of currently configured resolver owners.
+- This means current `toe_progress_pct` should be interpreted as progress on the active 10-ticket lane, not full-forest completion.
+- High-value defined but under-ticketed domains include:
+  - Halobank/orbital/horizons runtime surfaces
+  - atomic-systems lane
+  - robotics-recollection lane
+  - external-integrations evidence lane
+
+Planning impact:
+
+- It is acceptable to delay `TOE-008` briefly while adding a coverage-expansion planning pass, as long as safety/security hardening remains queued and explicit in backlog governance.

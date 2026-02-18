@@ -88,38 +88,71 @@ export async function getHorizonsElements(year: number | string): Promise<Horizo
 
 function parseHorizonsElements(horizonsOutput: string, year: string): Omit<HorizonsElements, 'provenance'> {
   const lines = horizonsOutput.split('\n');
-  let a_AU = 1.0;
-  let e = 0.0167;
-  let i_deg = 0.0;
-  let Omega_deg = 0.0;
-  let omega_deg = 0.0;
-  let M_deg = 0.0;
+  let a_AU: number | null = null;
+  let e: number | null = null;
+  let i_deg: number | null = null;
+  let Omega_deg: number | null = null;
+  let omega_deg: number | null = null;
+  let M_deg: number | null = null;
 
   for (const line of lines) {
     if (line.includes('A=')) {
       const match = line.match(/(?:^|\s)A=\s*([0-9.E+-]+)/);
-      if (match) a_AU = parseFloat(match[1]);
+      if (match) {
+        const parsed = parseFloat(match[1]);
+        a_AU = Number.isFinite(parsed) ? parsed : a_AU;
+      }
     }
     if (line.includes('EC=')) {
       const match = line.match(/(?:^|\s)EC=\s*([0-9.E+-]+)/);
-      if (match) e = parseFloat(match[1]);
+      if (match) {
+        const parsed = parseFloat(match[1]);
+        e = Number.isFinite(parsed) ? parsed : e;
+      }
     }
     if (line.includes('IN=')) {
       const match = line.match(/(?:^|\s)IN=\s*([0-9.E+-]+)/);
-      if (match) i_deg = parseFloat(match[1]);
+      if (match) {
+        const parsed = parseFloat(match[1]);
+        i_deg = Number.isFinite(parsed) ? parsed : i_deg;
+      }
     }
     if (line.includes('OM=')) {
       const match = line.match(/(?:^|\s)OM=\s*([0-9.E+-]+)/);
-      if (match) Omega_deg = parseFloat(match[1]);
+      if (match) {
+        const parsed = parseFloat(match[1]);
+        Omega_deg = Number.isFinite(parsed) ? parsed : Omega_deg;
+      }
     }
     if (line.includes('W=')) {
       const match = line.match(/(?:^|\s)W=\s*([0-9.E+-]+)/);
-      if (match) omega_deg = parseFloat(match[1]);
+      if (match) {
+        const parsed = parseFloat(match[1]);
+        omega_deg = Number.isFinite(parsed) ? parsed : omega_deg;
+      }
     }
     if (line.includes('MA=')) {
       const match = line.match(/(?:^|\s)MA=\s*([0-9.E+-]+)/);
-      if (match) M_deg = parseFloat(match[1]);
+      if (match) {
+        const parsed = parseFloat(match[1]);
+        M_deg = Number.isFinite(parsed) ? parsed : M_deg;
+      }
     }
+  }
+
+  const missing: string[] = [];
+  if (a_AU === null) missing.push('A');
+  if (e === null) missing.push('EC');
+  if (i_deg === null) missing.push('IN');
+  if (Omega_deg === null) missing.push('OM');
+  if (omega_deg === null) missing.push('W');
+  if (M_deg === null) missing.push('MA');
+  if (missing.length > 0) {
+    throw new Error(`Incomplete Horizons elements: missing ${missing.join(',')}`);
+  }
+
+  if (a_AU < 0.5 || a_AU > 2.0 || e < 0 || e > 0.5) {
+    throw new Error('Invalid orbital elements received');
   }
 
   return {
