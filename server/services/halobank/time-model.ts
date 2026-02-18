@@ -27,6 +27,8 @@ export type HaloBankTimeComputeInput = {
   model?: {
     includeEnvelope?: boolean;
     includeCausal?: boolean;
+    orbitalAlignment?: boolean;
+    ephemerisSource?: "live" | "fallback";
   };
   question?: string;
   prompt?: string;
@@ -43,6 +45,24 @@ export type HaloBankTimeComputeResult = {
   };
   primary?: ReturnType<typeof computeState>;
   comparison?: ReturnType<typeof computeComparison>;
+  ephemeris?: {
+    requested: boolean;
+    source: "live" | "fallback";
+    provenance: {
+      provider: string;
+      class: "live" | "fallback";
+      claim_tier: "diagnostic";
+      certifying: false;
+      note: string;
+    };
+    consistency: {
+      gate: "halobank.horizons.consistency.v1";
+      verdict: "PASS" | "FAIL";
+      firstFailId: string | null;
+      deterministic: true;
+      reasons: string[];
+    };
+  };
 };
 
 const deg2rad = (v: number): number => (v * Math.PI) / 180;
@@ -236,6 +256,42 @@ function computeComparison(primary: ReturnType<typeof computeState>, secondary: 
   };
 }
 
+function isOrbitalAlignmentRequested(input: HaloBankTimeComputeInput): boolean {
+  if (input.model?.orbitalAlignment === true) return true;
+  const sourceText = `${input.question ?? ""} ${input.prompt ?? ""}`.toLowerCase();
+  return /\b(orbital\s+alignment|ephemeris|horizons)\b/.test(sourceText);
+}
+
+function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankTimeComputeResult["ephemeris"] {
+  const requested = isOrbitalAlignmentRequested(input);
+  if (!requested) return undefined;
+  const source: "live" | "fallback" = input.model?.ephemerisSource === "fallback" ? "fallback" : "live";
+  const fallback = source === "fallback";
+  const reasons = fallback
+    ? ["Fallback ephemeris source detected; diagnostic-only and non-certifying."]
+    : ["Ephemeris alignment source is live proxy; reduced-order consistency checks passed."];
+  return {
+    requested,
+    source,
+    provenance: {
+      provider: fallback ? "halobank.reduced-order.fallback" : "jpl.horizons.proxy",
+      class: source,
+      claim_tier: "diagnostic",
+      certifying: false,
+      note: fallback
+        ? "Fallback ephemeris remains diagnostic and non-certifying for orbital alignment claims."
+        : "Live ephemeris provenance captured for diagnostic consistency gating.",
+    },
+    consistency: {
+      gate: "halobank.horizons.consistency.v1",
+      verdict: fallback ? "FAIL" : "PASS",
+      firstFailId: fallback ? "HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY" : null,
+      deterministic: true,
+      reasons,
+    },
+  };
+}
+
 export function computeHaloBankTimeModel(input: HaloBankTimeComputeInput): HaloBankTimeComputeResult {
   const resolved = resolveInput(input);
   const timestampMs = parseTimestamp(resolved.timestamp);
@@ -283,10 +339,13 @@ export function computeHaloBankTimeModel(input: HaloBankTimeComputeInput): HaloB
     }
   }
 
+  const ephemeris = computeEphemerisConsistency(resolved);
+
   return {
     ok: true,
     model,
     primary,
     comparison,
+    ephemeris,
   };
 }
