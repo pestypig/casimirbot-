@@ -1,0 +1,46 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-076-helix-ask-system-quality-delta-pack",
+  "files_changed": [
+    "tests/helix-ask-focused-utility-hardening.spec.ts",
+    "tests/helix-ask-mechanism-maturity-contract.spec.ts",
+    "tests/helix-ask-ps2-runtime-report.spec.ts",
+    "tests/casimir-verify-ps2.spec.ts",
+    "reports/helix-ask-ps2-runtime-contract-2026-02-18T23-37-14-987Z.md",
+    "docs/audits/helix-results/HELIX-PS2-TOE-076-system-quality-delta-pack.20260218T234000Z.json",
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+    "docs/audits/toe-progress-snapshot.json"
+  ],
+  "tests_run": [
+    "tests/helix-ask-focused-utility-hardening.spec.ts",
+    "tests/helix-ask-mechanism-maturity-contract.spec.ts",
+    "tests/helix-ask-ps2-runtime-report.spec.ts",
+    "tests/casimir-verify-ps2.spec.ts",
+    "npx vitest run tests/helix-ask-focused-utility-hardening.spec.ts tests/helix-ask-mechanism-maturity-contract.spec.ts tests/helix-ask-ps2-runtime-report.spec.ts tests/casimir-verify-ps2.spec.ts --reporter=dot",
+    "npx tsx scripts/toe-agent-preflight.ts",
+    "npx tsx scripts/validate-toe-ticket-backlog.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run -s validate:toe:research-gates",
+    "npx tsx scripts/compute-toe-progress.ts",
+    "npm run -s casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:5d460841-d12c-4a0d-9dbc-5c79c24b8b4a",
+    "run_id": "349",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": [
+    "claim_citation_linkage_pass_rate below threshold in current environment run",
+    "mechanism/maturity/citation rates below threshold in current environment run"
+  ],
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "receipt": {
+    "report_artifact": "reports/helix-ask-ps2-runtime-contract-2026-02-18T23-37-14-987Z.md",
+    "helix_result": "docs/audits/helix-results/HELIX-PS2-TOE-076-system-quality-delta-pack.20260218T234000Z.json"
+  }
+}

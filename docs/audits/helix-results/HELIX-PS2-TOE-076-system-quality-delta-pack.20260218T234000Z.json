@@ -1,0 +1,28 @@
+{
+  "schema_version": "helix_build_session_bookkeeping/1",
+  "ticket_id": "HELIX-PS2-TOE-076-system-quality-delta-pack",
+  "recorded_at": "2026-02-18T23:40:00Z",
+  "executive_summary": [
+    "Ran the fixed PS2 prompt pack (2 prompts x seeds 7/11/13) and generated a new runtime contract report with before/after deltas.",
+    "Added strict-fail determinism probing and deterministic threshold pass/fail marking for TOE utility metrics.",
+    "Validated preflight and TOE validators, then executed Casimir verify with PASS and integrity OK."
+  ],
+  "run_reference": {
+    "report": "reports/helix-ask-ps2-runtime-contract-2026-02-18T23-37-14-987Z.md"
+  },
+  "metrics": [
+    { "gate": "claim_citation_linkage_pass_rate", "threshold": ">= 0.90", "before": null, "measured": 0.0, "pass": false },
+    { "gate": "mechanism_sentence_present_rate", "threshold": ">= 0.95", "before": 1.0, "measured": 0.0, "pass": false },
+    { "gate": "maturity_label_present_rate", "threshold": ">= 0.95", "before": 1.0, "measured": 0.0, "pass": false },
+    { "gate": "citation_presence_rate", "threshold": ">= 0.95", "before": 1.0, "measured": 0.0, "pass": false },
+    { "gate": "strict_fail_determinism_rate", "threshold": "== 1.00", "before": null, "measured": 1.0, "pass": true },
+    { "gate": "p95_latency_ms", "threshold": "<= 2500", "before": null, "measured": 1133.0, "pass": true }
+  ],
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:5d460841-d12c-4a0d-9dbc-5c79c24b8b4a",
+    "run_id": "349",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  }
+}

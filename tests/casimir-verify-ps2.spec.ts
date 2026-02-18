@@ -73,6 +73,9 @@ describe("Casimir verify for PS2 patch", () => {
     fs.writeFileSync(path.join(outDir, "casimir-verify-latest.json"), JSON.stringify(out, null, 2));
 
     expect(verifyRes.status).toBe(200);
+    expect((verify as { verdict?: string }).verdict).toBe("PASS");
+    expect(((verify as { certificate?: { integrityOk?: boolean } }).certificate?.integrityOk) ?? false).toBe(true);
+    expect(typeof ((verify as { certificate?: { certificateHash?: string | null } }).certificate?.certificateHash ?? "")).toBe("string");
     expect(traceRes.status).toBe(200);
   }, 120000);
 });
