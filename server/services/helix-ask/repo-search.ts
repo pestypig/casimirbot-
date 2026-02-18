@@ -14,7 +14,29 @@ export type RepoSearchPlan = {
   explicit: boolean;
   reason: string;
   mode?: "fallback" | "preflight" | "explicit";
+  retrievalMetadata?: RepoSearchRetrievalMetadata;
+  fail_reason?: "PACKAGES_EVIDENCE_PROVENANCE_MISSING";
 };
+
+export type RepoSearchRetrievalMetadata = {
+  provenance_class: "inferred" | "proxy" | "measured";
+  claim_tier: "diagnostic" | "reduced-order" | "certified";
+  certifying: boolean;
+};
+
+export const PACKAGES_RETRIEVAL_FAIL_REASON = "PACKAGES_EVIDENCE_PROVENANCE_MISSING" as const;
+
+const PACKAGES_RETRIEVAL_METADATA: RepoSearchRetrievalMetadata = {
+  provenance_class: "inferred",
+  claim_tier: "diagnostic",
+  certifying: false,
+};
+
+export function resolvePackagesRetrievalMetadata(
+  tags: HelixAskTopicTag[],
+): RepoSearchRetrievalMetadata | null {
+  return tags.includes("packages") ? { ...PACKAGES_RETRIEVAL_METADATA } : null;
+}
 
 export type RepoSearchHit = {
   filePath: string;
@@ -360,6 +382,7 @@ export function buildRepoSearchPlan(input: {
   promptIngested?: boolean;
   topicProfile?: HelixAskTopicProfile | null;
   mode?: "fallback" | "preflight" | "explicit";
+  strictProvenance?: boolean;
 }): RepoSearchPlan | null {
   if (!REPO_SEARCH_ENABLED) return null;
   const explicit = REPO_SEARCH_EXPLICIT_ENABLED && EXPLICIT_SEARCH_RE.test(input.question);
@@ -377,12 +400,18 @@ export function buildRepoSearchPlan(input: {
     mode === "preflight" ? terms.slice(0, REPO_SEARCH_PREFLIGHT_MAX_TERMS) : terms;
   const paths = selectRepoSearchPaths(input.topicTags, input.topicProfile?.mustIncludeFiles);
   if (paths.length === 0) return null;
+  const retrievalMetadata = resolvePackagesRetrievalMetadata(input.topicTags);
   return {
     terms: clippedTerms,
     paths,
     explicit,
     reason: explicit ? "explicit_request" : mode === "preflight" ? "preflight" : "evidence_gate_fail",
     mode,
+    retrievalMetadata: retrievalMetadata ?? undefined,
+    fail_reason:
+      input.strictProvenance && input.topicTags.includes("packages") && !retrievalMetadata
+        ? PACKAGES_RETRIEVAL_FAIL_REASON
+        : undefined,
   };
 }
 

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { matchHelixAskIntent } from "../server/services/helix-ask/intent-directory";
+import {
+  matchHelixAskIntent,
+  STRICT_PACKAGES_PROVENANCE_FAIL_REASON,
+} from "../server/services/helix-ask/intent-directory";
 import { resolveHelixAskFormat } from "../server/services/helix-ask/format";
 
 type IntentCase = {
@@ -184,5 +187,22 @@ describe("Helix Ask intent routing", () => {
     const hasRepoHints = /cite files?/i.test(question);
     const match = matchHelixAskIntent({ question, hasRepoHints, hasFilePathHints });
     expect(match.profile.domain).toBe("repo");
+  });
+
+  it("keeps repo routing behavior while exposing additive packages provenance contract", () => {
+    const question = "Where is the packages API route and module path?";
+    const match = matchHelixAskIntent({
+      question,
+      hasRepoHints: true,
+      hasFilePathHints: false,
+    });
+    expect(match.profile.id).toBe("repo.repo_api_lookup");
+    expect(match.profile.evidencePolicy.allowedEvidenceKinds).toContain("packages_retrieval");
+    expect(match.profile.retrievalProvenance).toEqual({
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    });
+    expect(match.profile.strictProvenanceFailReason).toBe(STRICT_PACKAGES_PROVENANCE_FAIL_REASON);
   });
 });
