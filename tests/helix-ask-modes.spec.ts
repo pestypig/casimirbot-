@@ -43,6 +43,58 @@ describe("Helix Ask modes", () => {
     expect((payload.text ?? "").length).toBeGreaterThanOrEqual(220);
   }, 30000);
 
+
+  it("returns concept provenance metadata for concept answers", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "What is epistemology?",
+        mode: "read",
+        sessionId: "modes-concept-provenance",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      concept?: {
+        id?: string;
+        provenance_class?: string;
+        claim_tier?: string;
+        certifying?: boolean;
+      };
+      fail_reason?: string | null;
+    };
+    expect(payload.concept?.id).toBe("epistemology");
+    expect(payload.concept?.provenance_class).toBe("inferred");
+    expect(payload.concept?.claim_tier).toBe("diagnostic");
+    expect(payload.concept?.certifying).toBe(false);
+    expect(payload.fail_reason ?? null).toBeNull();
+  }, 90000);
+
+  it("returns deterministic strict provenance fail_reason for concepts missing explicit provenance", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "What is epistemology?",
+        mode: "read",
+        strictProvenance: true,
+        sessionId: "modes-concept-provenance-strict",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      fail_reason?: string;
+      fail_class?: string;
+      concept?: {
+        id?: string;
+      };
+    };
+    expect(payload.concept?.id).toBe("epistemology");
+    expect(payload.fail_reason).toBe("CONCEPTS_PROVENANCE_MISSING");
+    expect(payload.fail_class).toBe("input_contract");
+  }, 90000);
+
   it("routes act mode date/time/place gravity query to halobank.time.compute", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",

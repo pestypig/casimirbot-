@@ -12464,6 +12464,7 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
     mode: z.enum(["read", "observe", "act", "verify"]).optional(),
     allowTools: z.array(z.string().min(1)).max(24).optional(),
     requiredEvidence: z.array(z.string().min(1)).max(24).optional(),
+    strictProvenance: z.boolean().optional(),
     verify: z
       .object({
         mode: z.enum(["constraint-pack", "agent-loop"]).optional(),
@@ -12601,6 +12602,16 @@ type LocalAskResult = {
   prompt_ingest_source?: string;
   prompt_ingest_reason?: string;
   viewer_launch?: HelixAskViewerLaunch;
+  concept?: {
+    id: string;
+    label?: string;
+    source_path: string;
+    provenance_class: "measured" | "proxy" | "inferred";
+    claim_tier: "diagnostic" | "reduced-order" | "certified";
+    certifying: boolean;
+  };
+  fail_reason?: string;
+  fail_class?: string;
   [key: string]: unknown;
 };
 
@@ -18016,6 +18027,9 @@ const executeHelixAsk = async ({
     let forcedAnswerIsHard = false;
     let claimGateFailed = false;
     let conceptAnswer: string | null = null;
+    const strictConceptProvenance = parsed.data.strictProvenance === true;
+    const STRICT_CONCEPT_PROVENANCE_FAIL_REASON = "CONCEPTS_PROVENANCE_MISSING" as const;
+    let strictConceptFailReason: string | null = null;
     const ideologyConversationalMode = Boolean(
       isIdeologyConversationalCandidate &&
         shouldUseIdeologyConversationalMode(
@@ -18830,6 +18844,22 @@ const executeHelixAsk = async ({
         }
       }
     }
+    if (
+      strictConceptProvenance &&
+      conceptMatch &&
+      !conceptMatch.card.provenanceDeclared
+    ) {
+      strictConceptFailReason = STRICT_CONCEPT_PROVENANCE_FAIL_REASON;
+      claimGateFailed = true;
+      forcedAnswer = `I can't certify this concept response in strict provenance mode because provenance metadata is missing for ${conceptMatch.card.label ?? conceptMatch.card.id}.`;
+      forcedAnswerIsHard = true;
+      answerPath.push("concept:strict_provenance_missing");
+      if (debugPayload) {
+        (debugPayload as Record<string, unknown>).helix_ask_fail_reason = strictConceptFailReason;
+        (debugPayload as Record<string, unknown>).helix_ask_fail_class = "input_contract";
+      }
+    }
+
     const normalizeConceptTags = (tags?: string[]): HelixAskTopicTag[] => {
       if (!tags) return [];
       const allowed = new Set<HelixAskTopicTag>([
@@ -23959,6 +23989,20 @@ const executeHelixAsk = async ({
         if (viewerLaunch) {
           result.viewer_launch = viewerLaunch;
         }
+        if (conceptMatch?.card) {
+          result.concept = {
+            id: conceptMatch.card.id,
+            label: conceptMatch.card.label,
+            source_path: conceptMatch.card.sourcePath,
+            provenance_class: conceptMatch.card.provenance_class,
+            claim_tier: conceptMatch.card.claim_tier,
+            certifying: conceptMatch.card.certifying,
+          };
+        }
+        if (strictConceptFailReason) {
+          result.fail_reason = strictConceptFailReason;
+          result.fail_class = "input_contract";
+        }
         logDebug("streamEmitter.finalize start", {
           cleanedLength: forcedFinalText.length,
         });
@@ -24007,6 +24051,21 @@ const executeHelixAsk = async ({
           answer: fastText,
           evidence: evidenceText || undefined,
           prompt_ingested: promptIngested,
+          ...(conceptMatch?.card
+            ? {
+                concept: {
+                  id: conceptMatch.card.id,
+                  label: conceptMatch.card.label,
+                  source_path: conceptMatch.card.sourcePath,
+                  provenance_class: conceptMatch.card.provenance_class,
+                  claim_tier: conceptMatch.card.claim_tier,
+                  certifying: conceptMatch.card.certifying,
+                },
+              }
+            : {}),
+          ...(strictConceptFailReason
+            ? { fail_reason: strictConceptFailReason, fail_class: "input_contract" }
+            : {}),
         };
         if (debugPayload) {
           debugPayload.clarify_triggered = true;
@@ -26519,6 +26578,20 @@ const executeHelixAsk = async ({
     }
     if (viewerLaunch) {
       result.viewer_launch = viewerLaunch;
+    }
+    if (conceptMatch?.card) {
+      result.concept = {
+        id: conceptMatch.card.id,
+        label: conceptMatch.card.label,
+        source_path: conceptMatch.card.sourcePath,
+        provenance_class: conceptMatch.card.provenance_class,
+        claim_tier: conceptMatch.card.claim_tier,
+        certifying: conceptMatch.card.certifying,
+      };
+    }
+    if (strictConceptFailReason) {
+      result.fail_reason = strictConceptFailReason;
+      result.fail_class = "input_contract";
     }
     if (debugPayload && captureLiveHistory) {
       const traceEvents = liveEventHistory.slice();
