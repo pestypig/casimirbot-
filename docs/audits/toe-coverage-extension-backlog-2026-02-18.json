@@ -1486,6 +1486,38 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-066-strict-ready-release-gate-automation",
+      "tree_owner": "ops-deployment",
+      "primitive": "Strict-ready release gate automation",
+      "primary_path_prefix": "scripts/toe-agent-preflight.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "scripts/toe-agent-preflight.ts",
+        "scripts/compute-toe-progress.ts",
+        "tests/toe-agent-preflight.spec.ts",
+        "tests/toe-progress.spec.ts",
+        "docs/audits/toe-progress-snapshot.json",
+        "docs/audits/ticket-results/TOE-066-strict-ready-release-gate-automation.20260218T201957Z.json"
+      ],
+      "required_tests": [
+        "tests/toe-agent-preflight.spec.ts",
+        "tests/toe-progress.spec.ts"
+      ],
+      "done_criteria": [
+        "Progress snapshot publishes strict-ready release gate status and blocked reasons for automation consumption",
+        "Preflight can enforce strict-ready release gate as a blocking condition when automation flag is enabled",
+        "Tests cover release gate blocked semantics and snapshot parity"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
     }
   ]
 }
