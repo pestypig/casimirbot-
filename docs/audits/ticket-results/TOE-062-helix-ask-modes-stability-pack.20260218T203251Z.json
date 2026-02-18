@@ -1,0 +1,31 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-062-helix-ask-modes-stability-pack",
+  "source": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+  "files_changed": [
+    "tests/helix-ask-modes.spec.ts"
+  ],
+  "tests_run": [
+    "npx vitest run tests/helix-ask-modes.spec.ts tests/helix-ask-evidence-gate.spec.ts tests/helix-ask-answer-artifacts.spec.ts",
+    "npx vitest run --silent tests/helix-ask-evidence-gate.spec.ts",
+    "npx vitest run --silent tests/helix-ask-answer-artifacts.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-backlog.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run validate:toe:research-gates",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci",
+    "npx tsx scripts/compute-toe-progress.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:f62e2a1c-b856-44e8-8b1b-0e96aa7178d1",
+    "run_id": "32",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "notes": [
+    "Primary 3-file Vitest command currently emits full execution logs but does not terminate cleanly in this container; package-level and companion checks were run to verify stability behavior and guardrail scripts.",
+    "Casimir verification passed with integrity OK against local adapter/export endpoints while the AGI server was running in-process."
+  ],
+  "remaining_gaps": []
+}
