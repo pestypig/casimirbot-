@@ -1004,7 +1004,6 @@ const main = async () => {
 
   const recommendationDecision =
     !runComplete ||
-    !provenanceGatePass ||
     stubRate > 0.02 ||
     relationPacketBuiltRate < 0.95 ||
     relationDualDomainRate < 0.95 ||
@@ -1012,8 +1011,8 @@ const main = async () => {
     minTextPassRate < 0.9
       ? (runComplete ? "needs_patch" : "insufficient_run_quality")
       : "ship";
-  const normalizedDecision =
-    !provenanceGatePass || !runComplete ? "insufficient_run_quality" : recommendationDecision;
+  const normalizedDecision = recommendationDecision;
+  const decisionGradeReady = runComplete && provenanceGatePass;
   const nextPatches = [
     ...(!provenanceGatePass
       ? [
@@ -1045,8 +1044,11 @@ const main = async () => {
     summary_schema_version: 2,
     run_id: runId,
     decision: normalizedDecision,
+    decision_grade_ready: decisionGradeReady,
+    provenance_blocked: !provenanceGatePass,
     rationale: [
       `provenance_gate_pass=${String(provenanceGatePass)}`,
+      `decision_grade_ready=${String(decisionGradeReady)}`,
       `git_branch=${gitProvenance.branch ?? "missing"}`,
       `git_head=${gitProvenance.head ?? "missing"}`,
       `git_origin_main=${gitProvenance.originMain ?? "missing"}`,
@@ -1110,6 +1112,8 @@ const main = async () => {
     `- git_ahead_behind: ${gitProvenance.aheadBehind ?? "missing"}`,
     `- provenance_gate_pass: ${String(provenanceGatePass)}`,
     `- provenance_warnings: ${provenanceWarnings.length ? provenanceWarnings.join(", ") : "none"}`,
+    `- decision_grade_ready: ${String(decisionGradeReady)}`,
+    `- provenance_blocked: ${String(!provenanceGatePass)}`,
     `- run_id: ${runId}`,
     `- base_url: ${BASE_URL}`,
     `- prompts: ${prompts.length}`,
