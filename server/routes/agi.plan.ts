@@ -149,6 +149,11 @@ import {
   tokenizeAskQuery,
 } from "../services/helix-ask/query";
 import { resolveHelixAskArbiter } from "../services/helix-ask/arbiter";
+import {
+  buildHelixAskVerifyDegradedFirstFail,
+  resolveHelixAskVerifyDegradeReason,
+  resolveHelixAskVerifyPolicy,
+} from "../services/helix-ask/verify-policy";
 import { evaluateRuntimeBudgetState } from "../services/runtime/budget-model";
 import { loadRuntimeFrameContract } from "../services/runtime/frame-contract";
 import {
@@ -16047,6 +16052,11 @@ const executeHelixAsk = async ({
       const defaultProofArtifacts = [
         { kind: "training-trace-export", ref: "/api/agi/training-trace/export" },
       ];
+      const verifyPolicy = resolveHelixAskVerifyPolicy({
+        requestedMode: parsed.data.verify?.mode === "constraint-pack" ? "permissive" : "strict",
+        strictProvenance: parsed.data.strictProvenance === true,
+        repoGrounded: askMode === "verify",
+      });
       let adapter:
         | {
             verdict: "PASS" | "FAIL";
@@ -16061,58 +16071,49 @@ const executeHelixAsk = async ({
           {
             traceId: `${askTraceId}:proof`,
             actions: [{ kind: "verify", params: { tool: toolName } }],
+            policy: { verify: { mode: verifyPolicy.mode } },
           } as any,
           { tenantId: undefined },
         );
       } catch (error) {
         adapterErrorMessage = error instanceof Error ? error.message : String(error);
         logEvent("Verify proof", "adapter_error", adapterErrorMessage, undefined, false);
-        try {
-          adapter = await runAdapterExecution(
-            {
-              traceId: `${askTraceId}:proof:fallback`,
-              mode: "constraint-pack",
-              pack: {
-                id: "repo-convergence",
-                autoTelemetry: false,
-                telemetry: {
-                  build: { status: "pass", durationMs: 0 },
-                  tests: { failed: 0, total: 1 },
-                  schema: { contracts: true },
-                  deps: { coherence: true },
-                },
-                notes: [`helix_ask_verify_fallback:${adapterErrorMessage}`],
-              },
-            } as any,
-            { tenantId: undefined },
-          );
-          logEvent("Verify proof", "fallback_adapter_ok", "constraint_pack_repo_convergence");
-        } catch (fallbackError) {
-          const fallbackMessage =
-            fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-          adapterErrorMessage = `${adapterErrorMessage}; fallback=${fallbackMessage}`;
-          logEvent("Verify proof", "fallback_adapter_error", fallbackMessage, undefined, false);
-        }
       }
       const halobankConsistency =
         toolName === haloBankTimeComputeSpec.name
           ? ((actionOutput as { ephemeris?: { consistency?: { gate?: string; verdict?: string; firstFailId?: string | null; deterministic?: boolean } } } | null)?.ephemeris
               ?.consistency ?? null)
           : null;
+      const policyDegradeReason = resolveHelixAskVerifyDegradeReason({
+        adapterErrorMessage,
+        adapterVerdict: adapter?.verdict ?? null,
+        certificate: (adapter?.certificate as Record<string, unknown> | null | undefined) ?? null,
+      });
+      const consistencyGateFailed = halobankConsistency?.verdict === "FAIL";
+      const degradeReason = policyDegradeReason ?? (consistencyGateFailed ? "VERDICT_FAIL" : null);
       const proof = {
         verdict: adapter?.verdict ?? "FAIL",
         firstFail:
           adapter?.firstFail ??
-          (halobankConsistency?.verdict === "FAIL" && halobankConsistency.firstFailId
-            ? {
-                id: halobankConsistency.firstFailId,
-                severity: "HARD",
-                status: "fail",
-                note: "halobank_consistency_gate_failed",
-              }
-            : null),
+          (degradeReason
+            ? buildHelixAskVerifyDegradedFirstFail(degradeReason)
+            : halobankConsistency?.verdict === "FAIL" && halobankConsistency.firstFailId
+              ? {
+                  id: halobankConsistency.firstFailId,
+                  severity: "HARD",
+                  status: "fail",
+                  note: "halobank_consistency_gate_failed",
+                }
+              : null),
         certificate: adapter?.certificate ?? null,
         artifacts: adapter?.artifacts?.length ? adapter.artifacts : defaultProofArtifacts,
+        verifyPolicy: {
+          mode: verifyPolicy.mode,
+          failClosed: verifyPolicy.failClosed,
+          degraded: Boolean(degradeReason),
+          label: degradeReason ? verifyPolicy.degradedLabel : "verified",
+          fail_reason: degradeReason,
+        },
         consistencyGate:
           halobankConsistency && typeof halobankConsistency === "object"
             ? {
@@ -16129,13 +16130,12 @@ const executeHelixAsk = async ({
         ],
       };
       if (askMode === "verify") {
-        const integrityOk = Boolean((proof.certificate as any)?.integrityOk);
-        const consistencyGateFailed = proof.consistencyGate?.verdict === "FAIL";
-        if (proof.verdict !== "PASS" || !integrityOk || consistencyGateFailed) {
+        if (degradeReason || consistencyGateFailed) {
           responder.send(200, {
             ok: false,
             mode: askMode,
             text: "Verification failed.",
+            fail_reason: degradeReason ?? "VERDICT_FAIL",
             claim_tier: "diagnostic",
             provenance_class: "inferred",
             certifying: false,

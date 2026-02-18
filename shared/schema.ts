@@ -2563,6 +2563,11 @@ export type AdapterBudget = z.infer<typeof adapterBudgetSchema>;
 export const adapterPolicySchema = z.object({
   thresholds: grConstraintThresholdSchema.partial().optional(),
   gate: grConstraintPolicySchema.partial().optional(),
+  verify: z
+    .object({
+      mode: z.enum(["strict", "permissive"]).optional(),
+    })
+    .optional(),
 });
 export type AdapterPolicy = z.infer<typeof adapterPolicySchema>;
 
