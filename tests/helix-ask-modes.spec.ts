@@ -159,6 +159,48 @@ describe("Helix Ask modes", () => {
     expect(payload.toolName).toBe("halobank.time.compute");
   }, 30000);
 
+  it("returns atomic viewer launch claim tier metadata and blocks certified narration", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "Show hydrogen 2p electron orbital and certify the result",
+        mode: "read",
+        sessionId: "modes-atomic-claim-tier",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text?: string;
+      viewer_launch?: {
+        claim_tier?: string;
+        provenance_class?: string;
+        policy?: {
+          allowedCL?: string;
+          allowConceptual?: boolean;
+          allowProxies?: boolean;
+          chart?: string;
+        };
+        params?: {
+          model?: string;
+          claim_tier?: string;
+          provenance_class?: string;
+          certifying?: boolean;
+        };
+      };
+    };
+    expect(payload.viewer_launch?.claim_tier).toBe("diagnostic");
+    expect(payload.viewer_launch?.provenance_class).toMatch(/^(simulation|proxy)$/);
+    expect(payload.viewer_launch?.policy?.allowedCL).toBe("CL4");
+    expect(payload.viewer_launch?.policy?.allowConceptual).toBe(false);
+    expect(payload.viewer_launch?.policy?.allowProxies).toBe(false);
+    expect(payload.viewer_launch?.policy?.chart).toBe("comoving_cartesian");
+    expect(payload.viewer_launch?.params?.claim_tier).toBe("diagnostic");
+    expect(payload.viewer_launch?.params?.provenance_class).toMatch(/^(simulation|proxy)$/);
+    expect(payload.viewer_launch?.params?.certifying).toBe(false);
+    expect(payload.text ?? "").not.toMatch(/\bcertified\b/i);
+  }, 90000);
+
   it("ensures tools manifest includes halobank.time.compute once defaults load", async () => {
     const response = await fetch(`${baseUrl}/api/agi/tools/manifest`);
     expect(response.status).toBe(200);
