@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { stripRunawayAnswerArtifacts } from "../server/services/helix-ask/answer-artifacts";
+import { buildQualityBaselineContract } from "../scripts/helix-ask-sweep";
 
 describe("stripRunawayAnswerArtifacts", () => {
   it("removes leaked instruction preamble and trailing debug sections", () => {
@@ -33,5 +34,58 @@ describe("stripRunawayAnswerArtifacts", () => {
       "",
       "Sources: docs/knowledge/ethos/feedback-loop-hygiene.md, docs/ethos/ideology.json",
     ].join("\n"));
+  });
+});
+
+
+describe("buildQualityBaselineContract", () => {
+  it("marks baseline PASS when summary meets thresholds", () => {
+    const contract = buildQualityBaselineContract(
+      {
+        config: "baseline",
+        total: 10,
+        ok: 9,
+        hard_fail: 1,
+        clarify_rate: 0.2,
+        prompt_leak_rate: 0,
+        decorative_citation_rate: 0,
+        avg_quality_score: 0.82,
+        quality_rate: 0.8,
+      },
+      "artifacts/helix-ask-sweep.mock.json",
+      "2026-02-18T00:00:00.000Z",
+    );
+
+    expect(contract.evaluation.status).toBe("pass");
+    expect(contract.evaluation.failing_thresholds).toEqual([]);
+    expect(contract.evaluation.ok_rate).toBe(0.9);
+  });
+
+  it("marks baseline FAIL with deterministic failing thresholds", () => {
+    const contract = buildQualityBaselineContract(
+      {
+        config: "baseline",
+        total: 10,
+        ok: 6,
+        hard_fail: 4,
+        clarify_rate: 0.6,
+        prompt_leak_rate: 0.1,
+        decorative_citation_rate: 0.4,
+        avg_quality_score: 0.55,
+        quality_rate: 0.2,
+      },
+      "artifacts/helix-ask-sweep.mock.json",
+      "2026-02-18T00:00:00.000Z",
+    );
+
+    expect(contract.evaluation.status).toBe("fail");
+    expect(contract.evaluation.failing_thresholds).toEqual([
+      "min_ok_rate",
+      "max_clarify_rate",
+      "max_prompt_leak_rate",
+      "max_decorative_citation_rate",
+      "min_avg_quality_score",
+      "min_quality_rate",
+    ]);
   });
 });

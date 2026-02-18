@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 type CitationsPolicy = "require" | "forbid" | "optional";
 
@@ -117,6 +118,31 @@ type SweepSummary = {
   quality_rate: number;
 };
 
+type QualityBaselineThresholds = {
+  min_ok_rate: number;
+  max_clarify_rate: number;
+  max_prompt_leak_rate: number;
+  max_decorative_citation_rate: number;
+  min_avg_quality_score: number;
+  min_quality_rate: number;
+};
+
+type QualityBaselineEvaluation = {
+  ok_rate: number;
+  status: "pass" | "fail";
+  failing_thresholds: string[];
+};
+
+export type QualityBaselineContract = {
+  schema_version: "helix_ask_quality_baseline_contract/1";
+  generated_at: string;
+  source_report: string;
+  config: string;
+  summary: SweepSummary;
+  thresholds: QualityBaselineThresholds;
+  evaluation: QualityBaselineEvaluation;
+};
+
 const BASE_URL =
   process.env.HELIX_ASK_BASE_URL ??
   process.env.EVAL_BASE_URL ??
@@ -127,6 +153,18 @@ const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_ASK_SWEEP_TIMEOUT_MS ?? 1200
 const PACK_PATH = process.env.HELIX_ASK_SWEEP_PACK ?? "scripts/helix-ask-sweep-pack.json";
 const MATRIX_PATH = process.env.HELIX_ASK_SWEEP_MATRIX;
 const OUTPUT_DIR = process.env.HELIX_ASK_SWEEP_OUT_DIR ?? "artifacts";
+const QUALITY_BASELINE_OUT_PATH =
+  process.env.HELIX_ASK_QUALITY_BASELINE_OUT_PATH ??
+  path.join("docs", "audits", "helix-ask-quality", "baseline-contract.json");
+
+const DEFAULT_BASELINE_THRESHOLDS: QualityBaselineThresholds = {
+  min_ok_rate: 0.8,
+  max_clarify_rate: 0.35,
+  max_prompt_leak_rate: 0,
+  max_decorative_citation_rate: 0.1,
+  min_avg_quality_score: 0.7,
+  min_quality_rate: 0.6,
+};
 
 const DEFAULT_MATRIX: SweepConfig[] = [
   {
@@ -438,6 +476,56 @@ const summarize = (configName: string, results: CaseResult[]): SweepSummary => {
   };
 };
 
+export const buildQualityBaselineContract = (
+  summary: SweepSummary,
+  sourceReport: string,
+  generatedAt = new Date().toISOString(),
+  thresholds: QualityBaselineThresholds = DEFAULT_BASELINE_THRESHOLDS,
+): QualityBaselineContract => {
+  const okRate = summary.total > 0 ? summary.ok / summary.total : 0;
+  const failingThresholds: string[] = [];
+  if (okRate < thresholds.min_ok_rate) failingThresholds.push("min_ok_rate");
+  if (summary.clarify_rate > thresholds.max_clarify_rate) failingThresholds.push("max_clarify_rate");
+  if (summary.prompt_leak_rate > thresholds.max_prompt_leak_rate) {
+    failingThresholds.push("max_prompt_leak_rate");
+  }
+  if (summary.decorative_citation_rate > thresholds.max_decorative_citation_rate) {
+    failingThresholds.push("max_decorative_citation_rate");
+  }
+  if (summary.avg_quality_score < thresholds.min_avg_quality_score) {
+    failingThresholds.push("min_avg_quality_score");
+  }
+  if (summary.quality_rate < thresholds.min_quality_rate) failingThresholds.push("min_quality_rate");
+
+  return {
+    schema_version: "helix_ask_quality_baseline_contract/1",
+    generated_at: generatedAt,
+    source_report: sourceReport,
+    config: summary.config,
+    summary,
+    thresholds,
+    evaluation: {
+      ok_rate: Number(okRate.toFixed(3)),
+      status: failingThresholds.length === 0 ? "pass" : "fail",
+      failing_thresholds: failingThresholds,
+    },
+  };
+};
+
+const writeQualityBaselineContract = async (
+  runResults: Array<{ config: SweepConfig; summary: SweepSummary }>,
+  sourceReport: string,
+) => {
+  const baseline = runResults.find((entry) => entry.config.name === "baseline") ?? runResults[0];
+  if (!baseline) return;
+  const contract = buildQualityBaselineContract(baseline.summary, sourceReport);
+  await fs.mkdir(path.dirname(QUALITY_BASELINE_OUT_PATH), { recursive: true });
+  await fs.writeFile(QUALITY_BASELINE_OUT_PATH, JSON.stringify(contract, null, 2) + "\n", "utf8");
+  console.log(
+    `Saved quality baseline contract: ${QUALITY_BASELINE_OUT_PATH} (${contract.evaluation.status.toUpperCase()})`,
+  );
+};
+
 const toPercentDelta = (a: number, b: number): string => {
   if (!Number.isFinite(a) || !Number.isFinite(b) || a === 0) return "n/a";
   return `${(((b - a) / a) * 100).toFixed(1)}%`;
@@ -520,9 +608,12 @@ async function main(): Promise<void> {
   const outPath = path.join(OUTPUT_DIR, `helix-ask-sweep.${stamp}.json`);
   await fs.writeFile(outPath, JSON.stringify(runResults, null, 2), "utf8");
   console.log(`Saved sweep report: ${outPath}`);
+  await writeQualityBaselineContract(runResults, outPath);
 }
 
-main().catch((error) => {
-  console.error("[helix-ask-sweep] failed:", error);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error("[helix-ask-sweep] failed:", error);
+    process.exit(1);
+  });
+}
