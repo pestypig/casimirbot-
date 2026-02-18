@@ -17,7 +17,17 @@ export type HelixAskEvidenceKind =
   | "prompt_chunk"
   | "gate_json"
   | "certificate"
-  | "test_log";
+  | "test_log"
+  | "packages_retrieval";
+
+export type HelixAskRetrievalProvenanceContract = {
+  provenance_class: "inferred" | "proxy" | "measured";
+  claim_tier: "diagnostic" | "reduced-order" | "certified";
+  certifying: boolean;
+};
+
+export const STRICT_PACKAGES_PROVENANCE_FAIL_REASON =
+  "PACKAGES_EVIDENCE_PROVENANCE_MISSING" as const;
 
 export type HelixAskEvidencePolicy = {
   allowRepoCitations: boolean;
@@ -35,6 +45,8 @@ export type HelixAskIntentProfile = {
   formatPolicy: HelixAskFormatPolicy;
   stageTags: HelixAskStageTagPolicy;
   evidencePolicy: HelixAskEvidencePolicy;
+  retrievalProvenance?: HelixAskRetrievalProvenanceContract;
+  strictProvenanceFailReason?: typeof STRICT_PACKAGES_PROVENANCE_FAIL_REASON;
   gatesRequired?: string[];
   matchers: RegExp[];
   requireRepoHints?: boolean;
@@ -365,8 +377,14 @@ const INTENT_PROFILES: HelixAskIntentProfile[] = [
     evidencePolicy: {
       allowRepoCitations: true,
       requireCitations: true,
-      allowedEvidenceKinds: ["repo_chunk"],
+      allowedEvidenceKinds: ["repo_chunk", "packages_retrieval"],
     },
+    retrievalProvenance: {
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    },
+    strictProvenanceFailReason: STRICT_PACKAGES_PROVENANCE_FAIL_REASON,
     matchers: [/\b(endpoint|api|route|path|file|module|component)\b/i],
     requireRepoHints: true,
     priority: 30,
@@ -553,6 +571,9 @@ export function matchHelixAskIntent(input: HelixAskIntentMatchInput): HelixAskIn
 const cloneProfile = (profile: HelixAskIntentProfile): HelixAskIntentProfile => ({
   ...profile,
   evidencePolicy: { ...profile.evidencePolicy },
+  retrievalProvenance: profile.retrievalProvenance
+    ? { ...profile.retrievalProvenance }
+    : undefined,
   gatesRequired: profile.gatesRequired ? [...profile.gatesRequired] : undefined,
 });
 
