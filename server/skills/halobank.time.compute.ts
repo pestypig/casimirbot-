@@ -28,6 +28,8 @@ const Input = z.object({
       ephemerisSource: z.enum(["live", "fallback"]).optional(),
       ephemerisEvidenceVerified: z.boolean().optional(),
       ephemerisEvidenceRef: z.string().optional(),
+      residualPpm: z.number().optional(),
+      residualSampleCount: z.number().nonnegative().optional(),
     })
     .optional(),
   question: z.string().optional(),

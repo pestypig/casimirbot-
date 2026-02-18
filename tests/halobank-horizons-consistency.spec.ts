@@ -13,7 +13,7 @@ describe("halobank horizons consistency gate", () => {
     expect(result.ok).toBe(true);
     expect(result.ephemeris?.consistency.gate).toBe("halobank.horizons.consistency.v1");
     expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
-    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_LIVE_UNVERIFIED_EVIDENCE");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE");
     expect(result.ephemeris?.consistency.deterministic).toBe(true);
     expect(result.ephemeris?.provenance.class).toBe("live");
     expect(result.ephemeris?.provenance.claim_tier).toBe("diagnostic");
@@ -31,6 +31,8 @@ describe("halobank horizons consistency gate", () => {
         ephemerisSource: "live",
         ephemerisEvidenceVerified: true,
         ephemerisEvidenceRef: "artifact:jpl-horizons:run-123",
+        residualPpm: 0.5,
+        residualSampleCount: 7,
       },
     });
 
@@ -39,6 +41,29 @@ describe("halobank horizons consistency gate", () => {
     expect(result.ephemeris?.consistency.firstFailId).toBeNull();
     expect(result.ephemeris?.provenance.evidence.verified).toBe(true);
     expect(result.ephemeris?.provenance.evidence.reference).toBe("artifact:jpl-horizons:run-123");
+  });
+
+
+
+  it("returns FAIL gate when residual is outside envelope despite complete evidence", () => {
+    const result = computeHaloBankTimeModel({
+      question: "orbital alignment with horizons",
+      timestamp: "2025-03-01T12:00:00Z",
+      place: { lat: 10, lon: 20 },
+      model: {
+        orbitalAlignment: true,
+        ephemerisSource: "live",
+        ephemerisEvidenceVerified: true,
+        ephemerisEvidenceRef: "artifact:jpl-horizons:run-456",
+        residualPpm: 7.4,
+        residualSampleCount: 8,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_OUT_OF_ENVELOPE");
+    expect(result.ephemeris?.provenance.evidence.residualStatus).toBe("out_of_envelope");
   });
 
   it("returns FAIL gate with deterministic firstFail on fallback ephemeris", () => {
