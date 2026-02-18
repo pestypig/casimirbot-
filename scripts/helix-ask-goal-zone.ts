@@ -78,6 +78,7 @@ type IterationResult = {
   case_results: CaseResult[];
   failure_counts: Record<string, number>;
   next_patch_targets: string[];
+  consistency_warnings?: string[];
 };
 
 const BASE_URL = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5173";
@@ -392,6 +393,9 @@ const renderMarkdown = (result: IterationResult): string => {
   lines.push(`- pass_rate: ${(result.pass_rate * 100).toFixed(1)}%`);
   lines.push(`- failed_cases: ${result.failed_cases}/${result.total_cases}`);
   lines.push(`- duration_ms: ${result.duration_ms}`);
+  if (result.consistency_warnings?.length) {
+    lines.push(`- consistency_warnings: ${result.consistency_warnings.length}`);
+  }
   lines.push("");
   lines.push("## Case Summary");
   for (const entry of result.case_results) {
@@ -414,8 +418,67 @@ const renderMarkdown = (result: IterationResult): string => {
   for (const target of result.next_patch_targets) {
     lines.push(`- ${target}`);
   }
+  if (result.consistency_warnings?.length) {
+    lines.push("");
+    lines.push("## Consistency Warnings");
+    for (const warning of result.consistency_warnings) {
+      lines.push(`- ${warning}`);
+    }
+  }
   lines.push("");
   return lines.join("\n");
+};
+
+const normalizeIterationResult = (
+  result: IterationResult,
+): IterationResult => {
+  const warnings: string[] = [];
+  const totalCases = result.case_results.length;
+  const failedCases = result.case_results.filter((entry) => !entry.pass).length;
+  const passRate =
+    totalCases > 0
+      ? result.case_results.filter((entry) => entry.pass).length / totalCases
+      : 0;
+  const pass = failedCases === 0;
+  const failureCounts = toFailureCounts(result.case_results);
+
+  if (result.total_cases !== totalCases) {
+    warnings.push(
+      `total_cases corrected ${result.total_cases} -> ${totalCases}`,
+    );
+  }
+  if (result.failed_cases !== failedCases) {
+    warnings.push(
+      `failed_cases corrected ${result.failed_cases} -> ${failedCases}`,
+    );
+  }
+  if (Math.abs(result.pass_rate - passRate) > 1e-6) {
+    warnings.push(
+      `pass_rate corrected ${(result.pass_rate * 100).toFixed(1)}% -> ${(passRate * 100).toFixed(1)}%`,
+    );
+  }
+  if (result.pass !== pass) {
+    warnings.push(`pass corrected ${result.pass ? "yes" : "no"} -> ${pass ? "yes" : "no"}`);
+  }
+  if (JSON.stringify(result.failure_counts) !== JSON.stringify(failureCounts)) {
+    warnings.push("failure_counts corrected from seed_results");
+  }
+
+  return {
+    ...result,
+    pass,
+    pass_rate: passRate,
+    failed_cases: failedCases,
+    total_cases: totalCases,
+    failure_counts: failureCounts,
+    consistency_warnings: warnings.length ? warnings : undefined,
+  };
+};
+
+const writeAtomic = async (filePath: string, content: string) => {
+  const tmpPath = `${filePath}.tmp`;
+  await fs.writeFile(tmpPath, content, "utf8");
+  await fs.rename(tmpPath, filePath);
 };
 
 const runIteration = async (
@@ -466,17 +529,22 @@ const runIteration = async (
 };
 
 const writeIterationArtifacts = async (result: IterationResult) => {
+  const normalized = normalizeIterationResult(result);
   const iterDir = path.join(OUT_DIR, `iter-${String(result.iteration).padStart(2, "0")}`);
   await fs.mkdir(iterDir, { recursive: true });
-  await fs.writeFile(
+  await writeAtomic(
     path.join(iterDir, "results.json"),
-    JSON.stringify(result, null, 2),
-    "utf8",
+    JSON.stringify(normalized, null, 2),
   );
-  await fs.writeFile(path.join(OUT_DIR, "latest.json"), JSON.stringify(result, null, 2), "utf8");
-  const markdown = renderMarkdown(result);
+  await writeAtomic(path.join(OUT_DIR, "latest.json"), JSON.stringify(normalized, null, 2));
+  const markdown = renderMarkdown(normalized);
   await fs.mkdir(path.dirname(REPORT_PATH), { recursive: true });
-  await fs.writeFile(REPORT_PATH, markdown, "utf8");
+  await writeAtomic(REPORT_PATH, markdown);
+  if (normalized.consistency_warnings?.length) {
+    console.warn(
+      `[goal-zone] normalized iteration ${normalized.iteration}: ${normalized.consistency_warnings.join("; ")}`,
+    );
+  }
 };
 
 const main = async () => {

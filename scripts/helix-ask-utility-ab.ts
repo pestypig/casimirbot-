@@ -23,6 +23,8 @@ type RawRecord = {
   temperature: number;
   status: number;
   latency_ms: number;
+  attempt_count: number;
+  retry_reason: string | null;
   timestamp: string;
   response_text: string;
   response_payload: AskResponse | null;
@@ -44,6 +46,22 @@ const COMMIT = process.env.HELIX_ASK_AB_COMMIT ?? 'unknown';
 const SEEDS = (process.env.HELIX_ASK_AB_SEEDS ?? '7,11,13').split(',').map((v)=>Number(v.trim())).filter(Number.isFinite);
 const TEMPERATURE = Number(process.env.HELIX_ASK_AB_TEMP ?? '0.2');
 const MIN_LEN = Number(process.env.HELIX_ASK_AB_MIN_LEN ?? '220');
+const REQUEST_TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_AB_TIMEOUT_MS ?? '20000'));
+const MAX_ATTEMPTS = Math.max(1, Number(process.env.HELIX_ASK_AB_MAX_ATTEMPTS ?? '3'));
+const RETRY_BASE_MS = Math.max(50, Number(process.env.HELIX_ASK_AB_RETRY_BASE_MS ?? '450'));
+const MIN_STATUS_OK_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_STATUS_OK_RATE ?? '0.90')));
+const MAX_INVALID_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MAX_INVALID_RATE ?? '0.10')));
+const MIN_DIRECTNESS_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_DIRECTNESS_RATE ?? '0.85')));
+const MIN_LENGTH_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_LENGTH_RATE ?? '0.90')));
+const MIN_CITATION_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_CITATION_RATE ?? '0.90')));
+
+type AskAttemptResult = {
+  status: number;
+  payload: AskResponse | null;
+  latencyMs: number;
+  attemptCount: number;
+  retryReason: string | null;
+};
 
 const prompts = (): PromptCase[] => {
   const relation = [
@@ -111,7 +129,106 @@ async function ensureReady() {
 }
 
 function hasCitation(text: string): boolean {
-  return /\[[^\]]+\]\([^)]+\)|\b(source|citation|evidence|ref)\b/i.test(text);
+  if (!text) return false;
+  if (/\[[^\]]+\]\([^)]+\)|\(see [^)]+\)/i.test(text)) return true;
+  if (/^\s*sources?\s*:/im.test(text)) return true;
+  if (/\b(source|citation|evidence|references?)\b/i.test(text) && /[:\-]/.test(text)) return true;
+  if (/(?:^|\s)(docs|server|modules|client|scripts|tests|shared)\/[^\s,;)\]]+/i.test(text)) return true;
+  return false;
+}
+
+function retryDelayMs(attempt: number): number {
+  return Math.min(5000, RETRY_BASE_MS * Math.pow(2, Math.max(0, attempt - 1)));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve)=>setTimeout(resolve, ms));
+}
+
+function payloadText(payload: AskResponse | null): string {
+  return `${String(payload?.text ?? '')}\n${JSON.stringify(payload ?? {})}`.toLowerCase();
+}
+
+function inferRetryReason(status: number, payload: AskResponse | null): string | null {
+  if (status === 429) return 'rate_limited';
+  if (status === 503) return 'service_unavailable';
+  if (status === 408 || status === 504) return 'timeout';
+  if (status === 0) return 'network_or_timeout';
+  if (status >= 500) return 'server_error';
+  const text = payloadText(payload);
+  if (/circuit[_\s-]?open|short[_\s-]?circuit/.test(text)) return 'circuit_open_short_circuit';
+  if (/cooldown|temporarily unavailable|retry later/.test(text)) return 'cooldown_or_unavailable';
+  if (/autoscale|not settled/.test(text)) return 'autoscale_not_settled';
+  return null;
+}
+
+function shouldRetry(status: number, payload: AskResponse | null): boolean {
+  return inferRetryReason(status, payload) !== null;
+}
+
+async function askWithRetry(entry: PromptCase, seed: number): Promise<AskAttemptResult> {
+  const started = Date.now();
+  let lastStatus = 0;
+  let lastPayload: AskResponse | null = null;
+  let lastRetryReason: string | null = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    let status = 0;
+    let payload: AskResponse | null = null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const resp = await fetch(new URL('/api/agi/ask', BASE_URL), {
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body: JSON.stringify({
+          question: entry.question,
+          debug: true,
+          seed,
+          temperature: TEMPERATURE,
+          sessionId: `utility-ab:${VARIANT}:${entry.id}:s${seed}:a${attempt}`.slice(0,120),
+        }),
+        signal: controller.signal,
+      });
+      status = resp.status;
+      const contentType = resp.headers.get('content-type') ?? '';
+      if (contentType.includes('application/json')) {
+        payload = await resp.json() as AskResponse;
+      } else {
+        payload = { text: await resp.text() } as AskResponse;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : typeof error === 'string' ? error : 'request_failed';
+      payload = { text: message } as AskResponse;
+      status = 0;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    lastStatus = status;
+    lastPayload = payload;
+    lastRetryReason = inferRetryReason(status, payload);
+
+    if (!shouldRetry(status, payload) || attempt === MAX_ATTEMPTS) {
+      return {
+        status: lastStatus,
+        payload: lastPayload,
+        latencyMs: Date.now() - started,
+        attemptCount: attempt,
+        retryReason: lastRetryReason,
+      };
+    }
+
+    await sleep(retryDelayMs(attempt));
+  }
+
+  return {
+    status: lastStatus,
+    payload: lastPayload,
+    latencyMs: Date.now() - started,
+    attemptCount: MAX_ATTEMPTS,
+    retryReason: lastRetryReason,
+  };
 }
 
 function score(entry: PromptCase, payload: AskResponse | null): RawRecord['score'] {
@@ -140,17 +257,9 @@ async function run() {
   const rows: RawRecord[] = [];
   for (const entry of prompts()) {
     for (const seed of SEEDS) {
-      const started = Date.now();
-      let status = 0;
-      let payload: AskResponse | null = null;
-      try {
-        const resp = await fetch(new URL('/api/agi/ask', BASE_URL), {
-          method:'POST', headers:{'content-type':'application/json'},
-          body: JSON.stringify({question: entry.question, debug: true, seed, temperature: TEMPERATURE, sessionId: `utility-ab:${VARIANT}:${entry.id}:s${seed}`.slice(0,120)}),
-        });
-        status = resp.status;
-        payload = await resp.json() as AskResponse;
-      } catch {}
+      const asked = await askWithRetry(entry, seed);
+      const status = asked.status;
+      const payload = asked.payload;
       const rec: RawRecord = {
         variant: VARIANT,
         commit: COMMIT,
@@ -162,7 +271,9 @@ async function run() {
         seed,
         temperature: TEMPERATURE,
         status,
-        latency_ms: Date.now()-started,
+        latency_ms: asked.latencyMs,
+        attempt_count: asked.attemptCount,
+        retry_reason: asked.retryReason,
         timestamp: new Date().toISOString(),
         response_text: String(payload?.text ?? ''),
         response_payload: payload,
@@ -173,9 +284,51 @@ async function run() {
       rows.push(rec);
       const f = path.resolve(rawDir, `${entry.id}__s${seed}.json`);
       await fs.writeFile(f, `${JSON.stringify(rec, null, 2)}\n`, 'utf8');
-      console.log(`[${VARIANT}] ${entry.id} seed=${seed} status=${status} utility=${rec.score.utility_score}`);
+      console.log(`[${VARIANT}] ${entry.id} seed=${seed} status=${status} attempt=${asked.attemptCount} utility=${rec.score.utility_score}`);
     }
   }
+
+  const statusOkRate = rows.filter((r)=>r.status===200).length/Math.max(1,rows.length);
+  const invalidErrorRate = 1 - statusOkRate;
+  const answerDirectnessRate = rows.reduce((a,b)=>a+b.score.answer_directness_pass,0)/Math.max(1,rows.length);
+  const minLengthRate = rows.reduce((a,b)=>a+b.score.min_length_pass,0)/Math.max(1,rows.length);
+  const citationPresenceRate = rows.reduce((a,b)=>a+b.score.citation_presence_pass,0)/Math.max(1,rows.length);
+  const clarificationQualityRate = rows.reduce((a,b)=>a+b.score.clarification_quality_pass,0)/Math.max(1,rows.length);
+  const avgUtility = rows.reduce((a,b)=>a+b.score.utility_score,0)/Math.max(1,rows.length);
+  const avgAttempts = rows.reduce((a,b)=>a+b.attempt_count,0)/Math.max(1,rows.length);
+
+  const retryReasonCounts = rows.reduce<Record<string, number>>((acc, row) => {
+    const key = row.retry_reason ?? 'none';
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const failureCounts = {
+    request_failed: rows.filter((r)=>r.status!==200).length,
+    citation_missing: rows.filter((r)=>r.score.citation_presence_pass===0).length,
+    text_too_short: rows.filter((r)=>r.score.min_length_pass===0).length,
+    low_directness: rows.filter((r)=>r.score.answer_directness_pass===0).length,
+  };
+
+  const runQualityPass = statusOkRate >= MIN_STATUS_OK_RATE && invalidErrorRate <= MAX_INVALID_RATE;
+  const qualityPass =
+    answerDirectnessRate >= MIN_DIRECTNESS_RATE &&
+    minLengthRate >= MIN_LENGTH_RATE &&
+    citationPresenceRate >= MIN_CITATION_RATE;
+
+  const resultType =
+    !runQualityPass
+      ? 'insufficient_run_quality'
+      : !qualityPass
+        ? 'needs_quality_patch'
+        : 'pass';
+
+  const blockers: string[] = [];
+  if (statusOkRate < MIN_STATUS_OK_RATE) blockers.push(`status_ok_rate ${statusOkRate.toFixed(3)} < ${MIN_STATUS_OK_RATE.toFixed(3)}`);
+  if (invalidErrorRate > MAX_INVALID_RATE) blockers.push(`invalid_error_rate ${invalidErrorRate.toFixed(3)} > ${MAX_INVALID_RATE.toFixed(3)}`);
+  if (answerDirectnessRate < MIN_DIRECTNESS_RATE) blockers.push(`answer_directness_rate ${answerDirectnessRate.toFixed(3)} < ${MIN_DIRECTNESS_RATE.toFixed(3)}`);
+  if (minLengthRate < MIN_LENGTH_RATE) blockers.push(`min_length_rate ${minLengthRate.toFixed(3)} < ${MIN_LENGTH_RATE.toFixed(3)}`);
+  if (citationPresenceRate < MIN_CITATION_RATE) blockers.push(`citation_presence_rate ${citationPresenceRate.toFixed(3)} < ${MIN_CITATION_RATE.toFixed(3)}`);
 
   const summary = {
     variant: VARIANT,
@@ -183,17 +336,55 @@ async function run() {
     run_id: runId,
     prompt_count: prompts().length,
     run_count: rows.length,
-    avg_utility: rows.reduce((a,b)=>a+b.score.utility_score,0)/Math.max(1,rows.length),
-    answer_directness_rate: rows.reduce((a,b)=>a+b.score.answer_directness_pass,0)/Math.max(1,rows.length),
-    min_length_rate: rows.reduce((a,b)=>a+b.score.min_length_pass,0)/Math.max(1,rows.length),
-    citation_presence_rate: rows.reduce((a,b)=>a+b.score.citation_presence_pass,0)/Math.max(1,rows.length),
-    clarification_quality_rate: rows.reduce((a,b)=>a+b.score.clarification_quality_pass,0)/Math.max(1,rows.length),
-    status_ok_rate: rows.filter((r)=>r.status===200).length/Math.max(1,rows.length),
+    avg_utility: avgUtility,
+    answer_directness_rate: answerDirectnessRate,
+    min_length_rate: minLengthRate,
+    citation_presence_rate: citationPresenceRate,
+    clarification_quality_rate: clarificationQualityRate,
+    status_ok_rate: statusOkRate,
+    invalid_error_rate: invalidErrorRate,
+    avg_attempts: avgAttempts,
     noisy_avg_utility: rows.filter((r)=>r.noisy).reduce((a,b)=>a+b.score.utility_score,0)/Math.max(1,rows.filter((r)=>r.noisy).length),
+    retry_reason_counts: retryReasonCounts,
+    failure_counts: failureCounts,
+    result_type: resultType,
+    run_quality_pass: runQualityPass,
+    quality_pass: qualityPass,
+    decision_thresholds: {
+      min_status_ok_rate: MIN_STATUS_OK_RATE,
+      max_invalid_rate: MAX_INVALID_RATE,
+      min_answer_directness_rate: MIN_DIRECTNESS_RATE,
+      min_length_rate: MIN_LENGTH_RATE,
+      min_citation_presence_rate: MIN_CITATION_RATE,
+    },
+    blockers,
     timestamp: new Date().toISOString(),
   };
 
   await fs.writeFile(path.resolve(variantDir,'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+  await fs.writeFile(
+    path.resolve(variantDir, 'recommendation.json'),
+    `${JSON.stringify({
+      variant: VARIANT,
+      commit: COMMIT,
+      run_id: runId,
+      result_type: resultType,
+      blockers,
+      recommendations:
+        resultType === 'insufficient_run_quality'
+          ? [
+              'Stabilize endpoint availability and retry policy before utility comparisons.',
+              'Re-run campaign only after status_ok_rate and invalid/error gates pass.',
+            ]
+          : resultType === 'needs_quality_patch'
+            ? [
+                'Patch citation persistence and minimum answer length handling.',
+                'Re-run utility A/B and compare deltas on citation and length pass rates.',
+              ]
+            : ['No blocking issues detected in this run.'],
+    }, null, 2)}\n`,
+    'utf8',
+  );
 
   const promptPack = {count: prompts().length, prompts: prompts()};
   await fs.writeFile(path.resolve(OUT_ROOT, 'prompt-pack.json'), `${JSON.stringify(promptPack,null,2)}\n`, 'utf8');
