@@ -860,6 +860,40 @@
         "snapshot totals represent full-program progress while preserving backward-compatible fields",
         "tests verify combined scoring, dedupe behavior, and fallback when extension backlog is absent"
       ]
+    },
+    {
+      "id": "TOE-045-toe-research-gate-policy-contract",
+      "tree_owner": "ops-deployment",
+      "gap_refs": [
+        "F-COV-5"
+      ],
+      "primitive": "TOE research gate policy contract primitive",
+      "primary_path_prefix": "configs/toe-research-gate-policy.v1.json",
+      "allowed_paths": [
+        "configs/toe-research-gate-policy.v1.json",
+        "scripts/validate-toe-research-gate-policy.ts",
+        "scripts/validate-toe-ticket-backlog.ts",
+        "tests/toe-research-gate-policy.spec.ts",
+        "package.json",
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
+      ],
+      "required_tests": [
+        "tests/toe-research-gate-policy.spec.ts"
+      ],
+      "done_criteria": [
+        "Research gate policy manifest defines deterministic contract fields for TOE risk classes",
+        "Backlog and policy validators enforce research artifacts for physics_unknown and tier_promotion tickets",
+        "Validation script and tests cover backward compatibility when research_gate metadata is absent"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "safety-envelope-analysis"
+        ]
+      }
     }
   ]
 }

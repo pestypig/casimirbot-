@@ -1,0 +1,44 @@
+{
+  "schema_version": "toe_research_gate_policy/1",
+  "kind": "toe_research_gate_policy",
+  "deterministic_gate_fields": [
+    "risk_class",
+    "requires_audit",
+    "requires_research",
+    "required_artifacts"
+  ],
+  "risk_policies": {
+    "contract_only": {
+      "risk_class": "contract_only",
+      "requires_audit": false,
+      "requires_research": false,
+      "required_artifacts": []
+    },
+    "runtime_contract": {
+      "risk_class": "runtime_contract",
+      "requires_audit": true,
+      "requires_research": false,
+      "required_artifacts": [
+        "runtime-contract-audit"
+      ]
+    },
+    "physics_unknown": {
+      "risk_class": "physics_unknown",
+      "requires_audit": true,
+      "requires_research": true,
+      "required_artifacts": [
+        "physics-research-brief",
+        "safety-envelope-analysis"
+      ]
+    },
+    "tier_promotion": {
+      "risk_class": "tier_promotion",
+      "requires_audit": true,
+      "requires_research": true,
+      "required_artifacts": [
+        "tier-promotion-rationale",
+        "comparative-evidence-pack"
+      ]
+    }
+  }
+}

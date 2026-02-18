@@ -10,6 +10,12 @@ type Ticket = {
   allowed_paths?: string[];
   required_tests?: string[];
   done_criteria?: string[];
+  research_gate?: {
+    risk_class?: "contract_only" | "runtime_contract" | "physics_unknown" | "tier_promotion";
+    requires_audit?: boolean;
+    requires_research?: boolean;
+    required_artifacts?: string[];
+  };
 };
 
 type Backlog = {
@@ -36,6 +42,8 @@ const VALID_TREE_OWNERS = new Set<string>([
 ]);
 
 const errors: string[] = [];
+const RISK_CLASSES = new Set(["contract_only", "runtime_contract", "physics_unknown", "tier_promotion"]);
+const RESEARCH_GATED_RISK_CLASSES = new Set(["physics_unknown", "tier_promotion"]);
 
 function fail(message: string) {
   errors.push(message);
@@ -152,6 +160,45 @@ function main() {
       : [];
     if (doneCriteria.length < 3) {
       fail(`${loc}.done_criteria must contain at least 3 entries.`);
+    }
+
+    const researchGate = ticket.research_gate;
+    if (researchGate !== undefined) {
+      const riskClass =
+        typeof researchGate.risk_class === "string" ? researchGate.risk_class.trim() : "";
+      if (!RISK_CLASSES.has(riskClass)) {
+        fail(`${loc}.research_gate.risk_class must be one of contract_only|runtime_contract|physics_unknown|tier_promotion.`);
+      }
+
+      if (typeof researchGate.requires_audit !== "boolean") {
+        fail(`${loc}.research_gate.requires_audit must be boolean.`);
+      }
+
+      if (typeof researchGate.requires_research !== "boolean") {
+        fail(`${loc}.research_gate.requires_research must be boolean.`);
+      }
+
+      const requiredArtifacts = Array.isArray(researchGate.required_artifacts)
+        ? researchGate.required_artifacts.map((value) => String(value).trim()).filter(Boolean)
+        : [];
+      if (!Array.isArray(researchGate.required_artifacts)) {
+        fail(`${loc}.research_gate.required_artifacts must be an array.`);
+      } else if (requiredArtifacts.length !== researchGate.required_artifacts.length) {
+        fail(`${loc}.research_gate.required_artifacts must not contain empty entries.`);
+      }
+
+      if (requiredArtifacts.length !== new Set(requiredArtifacts).size) {
+        fail(`${loc}.research_gate.required_artifacts must not contain duplicates.`);
+      }
+
+      if (
+        (RESEARCH_GATED_RISK_CLASSES.has(riskClass) || researchGate.requires_research === true) &&
+        requiredArtifacts.length === 0
+      ) {
+        fail(
+          `${loc}.research_gate.required_artifacts must be non-empty when risk_class is physics_unknown|tier_promotion or requires_research=true.`,
+        );
+      }
     }
 
     for (const pathValue of allowed) {
