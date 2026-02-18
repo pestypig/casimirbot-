@@ -1,6 +1,6 @@
 {
   "paper_id": "stellar-consciousness-orch-or-review-2025",
-  "generated_artifacts": 9,
+  "generated_artifacts": 10,
   "quality_gates": {
     "required_anchor_hit_rate": {
       "target": 1.0,
@@ -33,8 +33,8 @@
       "pass": true
     }
   },
-  "provenance_warnings": [
-    "Input PDF filename was requested but not found locally; framework extracted from provided attachment images and anchored repo docs."
-  ],
-  "no_speculative_overclaims": true
+  "provenance_warnings": [],
+  "no_speculative_overclaims": true,
+  "source_document": "docs/papers/stellar-consciousness-orch-or-review-full.pdf",
+  "source_document_sha256": "867b7903cb14221901084add37a011653f394e97a697f2489094af4e598b101c"
 }

@@ -4,7 +4,7 @@
 - Built a repository-grounded framework for equation/claim targets from the attached Stellar Consciousness review.
 - Maintained maturity discipline: consciousness linkage remains exploratory unless repo evidence provides stronger status.
 - Applied anchor set: docs + tree schemas + ideology bridge + WARP constraints.
-- Provenance warning: requested PDF path `docs/papers/stellar-consciousness-orch-or-review-full.pdf` could not be materialized from local filesystem because the source attachment file was not present as a direct file.
+- Provenance lock: full paper is now materialized at `docs/papers/stellar-consciousness-orch-or-review-full.pdf` with SHA256 `867b7903cb14221901084add37a011653f394e97a697f2489094af4e598b101c`, and claims are rebound in `artifacts/research/stellar-framework/source-provenance-map.json`.
 
 ## Anchor coverage
 All required anchors were loaded and used for mapping, schema alignment, and maturity policy:

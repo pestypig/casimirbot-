@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T22:28:46.335Z",
+  "generated_at": "2026-02-18T22:42:29.703Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -28,14 +28,13 @@
     "strict_ready_release_gate": {
       "status": "blocked",
       "blocked_reasons": [
-        "missing_verified_pass",
-        "missing_research_artifacts"
+        "missing_verified_pass"
       ],
       "blocked_ticket_count": 67,
       "ready_ticket_count": 5
     },
     "research_gated_tickets_total": 27,
-    "research_artifact_complete_tickets_total": 23
+    "research_artifact_complete_tickets_total": 27
   },
   "segments": {
     "core": {
@@ -64,7 +63,7 @@
       "toe_progress_pct": 27.3,
       "strict_ready_progress_pct": 6.5,
       "research_gated_tickets_total": 27,
-      "research_artifact_complete_tickets_total": 23
+      "research_artifact_complete_tickets_total": 27
     },
     "combined": {
       "tickets_total": 72,
@@ -81,14 +80,13 @@
       "strict_ready_release_gate": {
         "status": "blocked",
         "blocked_reasons": [
-          "missing_verified_pass",
-          "missing_research_artifacts"
+          "missing_verified_pass"
         ],
         "blocked_ticket_count": 67,
         "ready_ticket_count": 5
       },
       "research_gated_tickets_total": 27,
-      "research_artifact_complete_tickets_total": 23
+      "research_artifact_complete_tickets_total": 27
     }
   },
   "strict_ready_delta_targets": [
@@ -444,7 +442,7 @@
       "ticket_id": "TOE-062-helix-ask-modes-stability-pack",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
-      "requires_research_artifact_completion": true
+      "requires_research_artifact_completion": false
     },
     {
       "ticket_id": "TOE-063-halobank-residual-reduced-order-hardening-pack",
@@ -468,19 +466,19 @@
       "ticket_id": "TOE-067-helix-ask-quality-baseline-contract",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
-      "requires_research_artifact_completion": true
+      "requires_research_artifact_completion": false
     },
     {
       "ticket_id": "TOE-068-helix-ask-strict-fail-reason-ledger",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
-      "requires_research_artifact_completion": true
+      "requires_research_artifact_completion": false
     },
     {
       "ticket_id": "TOE-069-helix-ask-retrieval-citation-persistence-pack",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
-      "requires_research_artifact_completion": true
+      "requires_research_artifact_completion": false
     },
     {
       "ticket_id": "TOE-070-halobank-horizons-long-window-calibration-pack",
@@ -503,7 +501,7 @@
       "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-205121.json"
+      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-1538.json"
     },
     {
       "ticket_id": "TOE-002-semiclassical-coupling-contract",
@@ -557,7 +555,7 @@
       "score": 0.25,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-234300.json"
+      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-232559.json"
     },
     {
       "ticket_id": "TOE-008-certificate-authenticity-policy",
@@ -1051,7 +1049,7 @@
       "verification_ok": true,
       "score": 0.25,
       "research_gated": true,
-      "research_artifact_complete": false,
+      "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-062-helix-ask-modes-stability-pack.20260218T203251Z.json"
     },
     {
@@ -1096,7 +1094,7 @@
       "verification_ok": true,
       "score": 0.25,
       "research_gated": true,
-      "research_artifact_complete": false,
+      "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-067-helix-ask-quality-baseline-contract.20260218T211900Z.json"
     },
     {
@@ -1105,7 +1103,7 @@
       "verification_ok": true,
       "score": 0.25,
       "research_gated": true,
-      "research_artifact_complete": false,
+      "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-068-helix-ask-strict-fail-reason-ledger.20260218T210353Z.json"
     },
     {
@@ -1114,7 +1112,7 @@
       "verification_ok": true,
       "score": 0.25,
       "research_gated": true,
-      "research_artifact_complete": false,
+      "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-069-helix-ask-retrieval-citation-persistence-pack.20260218T210123Z.json"
     },
     {
