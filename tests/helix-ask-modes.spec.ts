@@ -69,6 +69,28 @@ describe("Helix Ask modes", () => {
     expect((payload.text ?? "").length).toBeGreaterThanOrEqual(220);
   }, 30000);
 
+  it("does not hit selectedMove initialization crash on weak-evidence fallback path", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "Summarize unknown private project details with no evidence.",
+        sessionId: "modes-selected-move-tdz-regression",
+        debug: true,
+        temperature: 0,
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      error?: string;
+      debug?: { fuzzy_move_selector?: { selected?: string } };
+      text?: string;
+    };
+    expect(payload.error).toBeUndefined();
+    expect(payload.debug?.fuzzy_move_selector?.selected).toBeTruthy();
+    expect((payload.text ?? "").toLowerCase()).not.toContain("selectedmove");
+  }, 30000);
+
 
   it("returns concept provenance metadata for concept answers", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {

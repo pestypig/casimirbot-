@@ -26765,6 +26765,7 @@ const executeHelixAsk = async ({
         intentDomain === "repo" ||
         intentDomain === "hybrid" ||
         relationDeterministicGuardEligible;
+      const securityRiskPrompt = isSecurityRiskPrompt(baseQuestion);
       if (citationPersistenceGuardEligible) {
         const citationGuardAllowedPaths = filterExistingEvidencePaths(Array.from(
           new Set([
@@ -26799,6 +26800,38 @@ const executeHelixAsk = async ({
           debugPayload.citation_persistence_appended =
             beforeCitationGuard.trim() !== cleaned.trim();
         }
+      }
+      const groundednessScore = evidenceGateOk ? 1 : 0.35;
+      const uncertaintyScore = Math.min(1, Math.max(0, (coverageSlotSummary?.missingSlots?.length ?? 0) / Math.max(1, slotPlan?.slots?.length ?? 1)));
+      const safetyScore = securityRiskPrompt ? 1 : 0.3;
+      const coverageScore = Math.min(1, Math.max(0, coverageSlotSummary?.coverageRatio ?? (docSlotSummary?.slotCoverageRatio ?? 0)));
+      const selectedMove = selectDeterministicMove({
+        groundedness: groundednessScore,
+        uncertainty: uncertaintyScore,
+        safety: safetyScore,
+        coverage: coverageScore,
+      });
+      answerPath.push(`moveSelector:${selectedMove}`);
+      if (debugPayload) {
+        (debugPayload as Record<string, unknown>).runtime_clock_a = {
+          budget_ms: Math.max(0, runtimeContract.clockA.budget_ms ?? 0),
+          complete_contract_on_budget: true,
+        };
+        (debugPayload as Record<string, unknown>).runtime_clock_b = {
+          enabled: true,
+          deep_work_queued: true,
+          bridge_expansion_candidates: bridgeTraversalCandidates.length,
+          non_blocking: true,
+        };
+        (debugPayload as Record<string, unknown>).fuzzy_move_selector = {
+          selected: selectedMove,
+          scores: {
+            groundedness: groundednessScore,
+            uncertainty: uncertaintyScore,
+            safety: safetyScore,
+            coverage: coverageScore,
+          },
+        };
       }
       const weakEvidenceForDeterministicFallback =
         !evidenceGateOk ||
@@ -26909,7 +26942,6 @@ const executeHelixAsk = async ({
         isWarpEthosRelationQuestion(baseQuestion) ||
         intentProfile.id === "hybrid.warp_ethos_relation";
       const openWorldExplainer = isOpenWorldExplainerQuestion(baseQuestion);
-      const securityRiskPrompt = isSecurityRiskPrompt(baseQuestion);
       const qualityFloorEligible =
         HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
         intentDomain === "repo" ||
@@ -26917,40 +26949,6 @@ const executeHelixAsk = async ({
         relationQueryForFinalize ||
         requiresRepoEvidence ||
         openWorldExplainer;
-      const clockASnapshot = {
-        budget_ms: Math.max(0, runtimeContract.clockA.budget_ms ?? 0),
-        complete_contract_on_budget: true,
-      };
-      const clockBSnapshot = {
-        enabled: true,
-        deep_work_queued: true,
-        bridge_expansion_candidates: bridgeTraversalCandidates.length,
-        non_blocking: true,
-      };
-      const groundednessScore = evidenceGateOk ? 1 : 0.35;
-      const uncertaintyScore = Math.min(1, Math.max(0, (coverageSlotSummary?.missingSlots?.length ?? 0) / Math.max(1, slotPlan?.slots?.length ?? 1)));
-      const safetyScore = securityRiskPrompt ? 1 : 0.3;
-      const coverageScore = Math.min(1, Math.max(0, coverageSlotSummary?.coverageRatio ?? (docSlotSummary?.slotCoverageRatio ?? 0)));
-      const selectedMove = selectDeterministicMove({
-        groundedness: groundednessScore,
-        uncertainty: uncertaintyScore,
-        safety: safetyScore,
-        coverage: coverageScore,
-      });
-      answerPath.push(`moveSelector:${selectedMove}`);
-      if (debugPayload) {
-        (debugPayload as Record<string, unknown>).runtime_clock_a = clockASnapshot;
-        (debugPayload as Record<string, unknown>).runtime_clock_b = clockBSnapshot;
-        (debugPayload as Record<string, unknown>).fuzzy_move_selector = {
-          selected: selectedMove,
-          scores: {
-            groundedness: groundednessScore,
-            uncertainty: uncertaintyScore,
-            safety: safetyScore,
-            coverage: coverageScore,
-          },
-        };
-      }
       const qualityFloorReasons = qualityFloorEligible
         ? detectRepoAnswerQualityFloorReasons({
             text: cleaned,
