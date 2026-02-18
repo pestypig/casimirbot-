@@ -1,0 +1,29 @@
+{
+  "schema_version": "warp_primitive_manifest/1",
+  "updated_at": "2026-02-18T00:00:00Z",
+  "primitives": [
+    {
+      "primitive_id": "TOE-010-unified-primitive-manifest",
+      "tree_owner": "math",
+      "policy_source": {
+        "path": "WARP_AGENTS.md",
+        "selector": "json:warp-agents"
+      },
+      "evaluator": {
+        "path": "scripts/validate-agent-context-checklist.ts",
+        "symbol": "validateManifest"
+      },
+      "tests": [
+        "tests/startup-config.spec.ts",
+        "tests/theory-checks.spec.ts"
+      ],
+      "checklist_refs": [
+        "docs/audits/helix-agent-context-checklist-2026-02-17.json"
+      ],
+      "audit_refs": [
+        "docs/audits/ideology-physics-claim-gap-audit-2026-02-17.md",
+        "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json"
+      ]
+    }
+  ]
+}

@@ -31,3 +31,30 @@ describe("Ford–Roman duty clamp symbol exists", () => {
     expect(read("server/energy-pipeline.ts")).toMatch(/dutyEffectiveFR|frDuty(Max|Clamp|Ceil)/i);
   });
 });
+
+describe("Primitive manifest parity", () => {
+  it("maps TOE-010 primitive policy/runtime/tests/tree-owner fields", () => {
+    const manifest = JSON.parse(read("configs/warp-primitive-manifest.v1.json")) as {
+      primitives?: Array<{
+        primitive_id?: string;
+        tree_owner?: string;
+        policy_source?: { path?: string };
+        evaluator?: { path?: string };
+        tests?: string[];
+      }>;
+    };
+
+    const primitive = (manifest.primitives ?? []).find(
+      (entry) => entry.primitive_id === "TOE-010-unified-primitive-manifest",
+    );
+
+    expect(primitive).toBeTruthy();
+    expect(primitive?.tree_owner).toBe("math");
+    expect(primitive?.policy_source?.path).toBe("WARP_AGENTS.md");
+    expect(primitive?.evaluator?.path).toBe("scripts/validate-agent-context-checklist.ts");
+    expect(primitive?.tests).toEqual([
+      "tests/startup-config.spec.ts",
+      "tests/theory-checks.spec.ts",
+    ]);
+  });
+});

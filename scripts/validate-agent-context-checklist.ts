@@ -17,8 +17,28 @@ type Checklist = {
   };
 };
 
+type PrimitiveManifest = {
+  schema_version?: string;
+  primitives?: PrimitiveEntry[];
+};
+
+type PrimitiveEntry = {
+  primitive_id?: string;
+  tree_owner?: string;
+  policy_source?: { path?: string; selector?: string };
+  evaluator?: { path?: string; symbol?: string };
+  tests?: string[];
+};
+
+type ToeBacklog = {
+  tickets?: Array<{
+    id?: string;
+    tree_owner?: string;
+    required_tests?: string[];
+  }>;
+};
+
 const repoRoot = process.cwd();
-const errors: string[] = [];
 
 const CHECKLIST_PATH = path.resolve(
   process.env.AGENT_CONTEXT_CHECKLIST_PATH ??
@@ -26,6 +46,14 @@ const CHECKLIST_PATH = path.resolve(
 );
 const WARP_AGENTS_PATH = path.resolve(
   process.env.WARP_AGENTS_PATH ?? path.join(repoRoot, "WARP_AGENTS.md"),
+);
+const PRIMITIVE_MANIFEST_PATH = path.resolve(
+  process.env.WARP_PRIMITIVE_MANIFEST_PATH ??
+    path.join(repoRoot, "configs", "warp-primitive-manifest.v1.json"),
+);
+const TOE_BACKLOG_PATH = path.resolve(
+  process.env.TOE_BACKLOG_PATH ??
+    path.join(repoRoot, "docs", "audits", "toe-cloud-agent-ticket-backlog-2026-02-17.json"),
 );
 
 const REQUIRED_DEFAULTS = {
@@ -62,10 +90,6 @@ const REQUIRED_STEP_IDS = [
 
 const REQUIRED_TIERS = ["diagnostic", "reduced-order", "certified"];
 
-function fail(message: string) {
-  errors.push(message);
-}
-
 function fileExists(filePath: string): boolean {
   return fs.existsSync(filePath);
 }
@@ -84,20 +108,21 @@ function parseWarpAgentsRequiredTests(markdown: string): string[] {
     .filter((value) => value.length > 0);
 }
 
-function validateChecklist(checklist: Checklist) {
+function validateChecklist(checklist: Checklist): string[] {
+  const errors: string[] = [];
   if (checklist.schema_version !== "helix_agent_context_checklist/1") {
-    fail(
+    errors.push(
       `schema_version must be helix_agent_context_checklist/1 (received ${String(checklist.schema_version)}).`,
     );
   }
   if (checklist.kind !== "agent_execution_checklist") {
-    fail(`kind must be agent_execution_checklist (received ${String(checklist.kind)}).`);
+    errors.push(`kind must be agent_execution_checklist (received ${String(checklist.kind)}).`);
   }
 
   const defaults = checklist.tree_dag_guardrails?.required_defaults ?? {};
   for (const [key, expected] of Object.entries(REQUIRED_DEFAULTS)) {
     if ((defaults as Record<string, unknown>)[key] !== expected) {
-      fail(
+      errors.push(
         `tree_dag_guardrails.required_defaults.${key} must be ${JSON.stringify(expected)}.`,
       );
     }
@@ -110,7 +135,7 @@ function validateChecklist(checklist: Checklist) {
   );
   for (const id of REQUIRED_CONTEXT_IDS) {
     if (!contextIds.has(id)) {
-      fail(`major_context_areas missing required id: ${id}`);
+      errors.push(`major_context_areas missing required id: ${id}`);
     }
   }
 
@@ -121,7 +146,7 @@ function validateChecklist(checklist: Checklist) {
   );
   for (const id of REQUIRED_STEP_IDS) {
     if (!stepIds.has(id)) {
-      fail(`execution_steps missing required id: ${id}`);
+      errors.push(`execution_steps missing required id: ${id}`);
     }
   }
 
@@ -132,24 +157,27 @@ function validateChecklist(checklist: Checklist) {
   );
   for (const tier of REQUIRED_TIERS) {
     if (!tiers.has(tier)) {
-      fail(`claim_tiers missing required tier: ${tier}`);
+      errors.push(`claim_tiers missing required tier: ${tier}`);
     }
   }
 
   const requiredTests = checklist.required_tests ?? [];
   if (!Array.isArray(requiredTests) || requiredTests.length === 0) {
-    fail("required_tests must be a non-empty array.");
+    errors.push("required_tests must be a non-empty array.");
   }
 
   if (checklist.verification_contract?.casimir_verify_required !== true) {
-    fail("verification_contract.casimir_verify_required must be true.");
+    errors.push("verification_contract.casimir_verify_required must be true.");
   }
   if (checklist.verification_contract?.certificate_required_for_certified !== true) {
-    fail("verification_contract.certificate_required_for_certified must be true.");
+    errors.push("verification_contract.certificate_required_for_certified must be true.");
   }
+
+  return errors;
 }
 
-function validateRequiredTestsParity(checklistTests: string[], warpTests: string[]) {
+function validateRequiredTestsParity(checklistTests: string[], warpTests: string[]): string[] {
+  const errors: string[] = [];
   const checklistSet = new Set(checklistTests);
   const warpSet = new Set(warpTests);
 
@@ -157,23 +185,128 @@ function validateRequiredTestsParity(checklistTests: string[], warpTests: string
   const extraInChecklist = [...checklistSet].filter((entry) => !warpSet.has(entry));
 
   if (missingFromChecklist.length > 0) {
-    fail(
+    errors.push(
       `required_tests missing entries from WARP_AGENTS: ${missingFromChecklist.join(", ")}`,
     );
   }
   if (extraInChecklist.length > 0) {
-    fail(
+    errors.push(
       `required_tests has entries not present in WARP_AGENTS: ${extraInChecklist.join(", ")}`,
     );
   }
+
+  return errors;
+}
+
+export function validateManifest(
+  manifest: PrimitiveManifest,
+  backlog: ToeBacklog,
+  expectedChecklistTests: string[],
+  baseDir: string = repoRoot,
+): string[] {
+  const errors: string[] = [];
+
+  if (manifest.schema_version !== "warp_primitive_manifest/1") {
+    errors.push(
+      `primitive manifest schema_version must be warp_primitive_manifest/1 (received ${String(
+        manifest.schema_version,
+      )}).`,
+    );
+  }
+
+  const primitives = manifest.primitives ?? [];
+  if (!Array.isArray(primitives) || primitives.length === 0) {
+    errors.push("primitive manifest must define a non-empty primitives array.");
+    return errors;
+  }
+
+  const backlogMap = new Map(
+    (backlog.tickets ?? [])
+      .filter((entry) => typeof entry.id === "string" && entry.id.length > 0)
+      .map((entry) => [entry.id as string, entry]),
+  );
+
+  const primitiveIds = new Set<string>();
+  for (const primitive of primitives) {
+    const primitiveId = primitive.primitive_id?.trim() ?? "";
+    if (!primitiveId) {
+      errors.push("primitive entry missing primitive_id.");
+      continue;
+    }
+    if (primitiveIds.has(primitiveId)) {
+      errors.push(`primitive manifest has duplicate primitive_id: ${primitiveId}`);
+    }
+    primitiveIds.add(primitiveId);
+
+    if (!primitive.policy_source?.path?.trim()) {
+      errors.push(`manifest ${primitiveId} missing policy_source.path.`);
+    } else if (!fileExists(path.resolve(baseDir, primitive.policy_source.path))) {
+      errors.push(`manifest ${primitiveId} policy_source.path does not exist: ${primitive.policy_source.path}`);
+    }
+
+    if (!primitive.evaluator?.path?.trim()) {
+      errors.push(`manifest ${primitiveId} missing evaluator.path.`);
+    } else if (!fileExists(path.resolve(baseDir, primitive.evaluator.path))) {
+      errors.push(`manifest ${primitiveId} evaluator.path does not exist: ${primitive.evaluator.path}`);
+    }
+
+    const tests = (primitive.tests ?? []).map((entry) => entry.trim()).filter(Boolean);
+    if (tests.length === 0) {
+      errors.push(`manifest ${primitiveId} must include at least one test.`);
+    }
+    for (const testPath of tests) {
+      if (!fileExists(path.resolve(baseDir, testPath))) {
+        errors.push(`manifest ${primitiveId} test path does not exist: ${testPath}`);
+      }
+    }
+
+    const backlogEntry = backlogMap.get(primitiveId);
+    if (!backlogEntry) {
+      errors.push(`manifest ${primitiveId} has no matching ticket in TOE backlog.`);
+      continue;
+    }
+
+    if ((backlogEntry.tree_owner ?? "") !== (primitive.tree_owner ?? "")) {
+      errors.push(
+        `manifest ${primitiveId} tree_owner mismatch (manifest=${String(
+          primitive.tree_owner,
+        )}, backlog=${String(backlogEntry.tree_owner)}).`,
+      );
+    }
+
+    const backlogTests = new Set((backlogEntry.required_tests ?? []).map((entry) => String(entry)));
+    const missingBacklogTests = tests.filter((entry) => !backlogTests.has(entry));
+    if (missingBacklogTests.length > 0) {
+      errors.push(
+        `manifest ${primitiveId} tests missing from backlog required_tests: ${missingBacklogTests.join(", ")}`,
+      );
+    }
+
+    const checklistSet = new Set(expectedChecklistTests);
+    const overlapChecklistTests = tests.filter((entry) => checklistSet.has(entry));
+    if (overlapChecklistTests.length === 0) {
+      errors.push(
+        `manifest ${primitiveId} must include at least one test from checklist required_tests.`,
+      );
+    }
+  }
+
+  return errors;
 }
 
 function main() {
+  const errors: string[] = [];
   if (!fileExists(CHECKLIST_PATH)) {
-    fail(`Checklist file not found: ${CHECKLIST_PATH}`);
+    errors.push(`Checklist file not found: ${CHECKLIST_PATH}`);
   }
   if (!fileExists(WARP_AGENTS_PATH)) {
-    fail(`WARP agents file not found: ${WARP_AGENTS_PATH}`);
+    errors.push(`WARP agents file not found: ${WARP_AGENTS_PATH}`);
+  }
+  if (!fileExists(PRIMITIVE_MANIFEST_PATH)) {
+    errors.push(`Primitive manifest file not found: ${PRIMITIVE_MANIFEST_PATH}`);
+  }
+  if (!fileExists(TOE_BACKLOG_PATH)) {
+    errors.push(`TOE backlog file not found: ${TOE_BACKLOG_PATH}`);
   }
   if (errors.length > 0) {
     for (const error of errors) console.error(`- ${error}`);
@@ -182,7 +315,7 @@ function main() {
 
   const checklistRaw = fs.readFileSync(CHECKLIST_PATH, "utf8");
   const checklist = JSON.parse(checklistRaw) as Checklist;
-  validateChecklist(checklist);
+  errors.push(...validateChecklist(checklist));
 
   const checklistTests = (checklist.required_tests ?? [])
     .map((entry) => String(entry))
@@ -190,7 +323,14 @@ function main() {
 
   const warpRaw = fs.readFileSync(WARP_AGENTS_PATH, "utf8");
   const warpTests = parseWarpAgentsRequiredTests(warpRaw);
-  validateRequiredTestsParity(checklistTests, warpTests);
+  errors.push(...validateRequiredTestsParity(checklistTests, warpTests));
+
+  const manifestRaw = fs.readFileSync(PRIMITIVE_MANIFEST_PATH, "utf8");
+  const manifest = JSON.parse(manifestRaw) as PrimitiveManifest;
+
+  const backlogRaw = fs.readFileSync(TOE_BACKLOG_PATH, "utf8");
+  const backlog = JSON.parse(backlogRaw) as ToeBacklog;
+  errors.push(...validateManifest(manifest, backlog, checklistTests));
 
   if (errors.length > 0) {
     console.error("agent-context-checklist validation failed:");
@@ -201,8 +341,10 @@ function main() {
   }
 
   console.log(
-    `agent-context-checklist validation OK. checklist_tests=${checklistTests.length} warp_tests=${warpTests.length}`,
+    `agent-context-checklist validation OK. checklist_tests=${checklistTests.length} warp_tests=${warpTests.length} primitives=${manifest.primitives?.length ?? 0}`,
   );
 }
 
-main();
+if (!process.env.VITEST) {
+  main();
+}
