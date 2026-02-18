@@ -2,6 +2,11 @@ import type { Request, Response } from "express";
 import { Router } from "express";
 import { z } from "zod";
 import { DebateConfig } from "@shared/essence-debate";
+import {
+  DEBATE_CLAIM_TIERS,
+  DEBATE_PROVENANCE_CLASSES,
+  type DebateEvidenceProvenance,
+} from "../services/debate/types";
 import { personaPolicy } from "../auth/policy";
 import {
   getDebateOwner,
@@ -45,8 +50,20 @@ debateRouter.post("/start", async (req, res) => {
   if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
     return res.status(403).json({ error: "forbidden" });
   }
-  const { debateId } = await startDebate({ ...parsed.data, persona_id: personaId });
-  res.json({ debateId });
+  const config = { ...parsed.data, persona_id: personaId };
+  const { debateId } = await startDebate(config);
+  const snapshot = getDebateSnapshot(debateId);
+  res.json({
+    debateId,
+    evidence_provenance: snapshot?.outcome
+      ? {
+          provenance_class: snapshot.outcome.provenance_class,
+          claim_tier: snapshot.outcome.claim_tier,
+          certifying: snapshot.outcome.certifying,
+          fail_reason: snapshot.outcome.fail_reason ?? undefined,
+        }
+      : normalizeDebateEvidenceProvenance(config.context),
+  });
 });
 
 debateRouter.get("/stream", (req, res) => {
@@ -143,11 +160,69 @@ function normalizeStartPayload(raw: unknown): Record<string, unknown> {
       : typeof input.personaId === "string"
         ? input.personaId
         : undefined;
+  const evidenceProvenance = parseEvidenceProvenance(input.evidence_provenance);
+  const strictProvenance = input.strict_provenance === true;
+  const contextInput =
+    input.context && typeof input.context === "object"
+      ? ({ ...(input.context as Record<string, unknown>) } as Record<string, unknown>)
+      : undefined;
+
+  if (strictProvenance) {
+    const knowledgeHints =
+      contextInput?.knowledge_hints && typeof contextInput.knowledge_hints === "object"
+        ? ({ ...(contextInput.knowledge_hints as Record<string, unknown>) } as Record<string, unknown>)
+        : {};
+    knowledgeHints.strict_provenance = true;
+    if (contextInput) {
+      contextInput.knowledge_hints = knowledgeHints;
+    }
+  }
+
+  if (evidenceProvenance) {
+    const existingWarp =
+      contextInput?.warp_grounding && typeof contextInput.warp_grounding === "object"
+        ? ({ ...(contextInput.warp_grounding as Record<string, unknown>) } as Record<string, unknown>)
+        : {};
+    if (evidenceProvenance.certifying) {
+      existingWarp.status = existingWarp.status ?? "ADMISSIBLE";
+      existingWarp.certificateHash = existingWarp.certificateHash ?? "manual:debate-start";
+    }
+    if (contextInput) {
+      contextInput.warp_grounding = existingWarp;
+    }
+  }
+
   return {
     ...input,
     goal,
     persona_id,
+    context: contextInput ?? input.context,
   };
+}
+
+function parseEvidenceProvenance(input: unknown): DebateEvidenceProvenance | undefined {
+  if (!input || typeof input !== "object") return undefined;
+  const candidate = input as Record<string, unknown>;
+  if (!DEBATE_PROVENANCE_CLASSES.includes(candidate.provenance_class as any)) return undefined;
+  if (!DEBATE_CLAIM_TIERS.includes(candidate.claim_tier as any)) return undefined;
+  if (typeof candidate.certifying !== "boolean") return undefined;
+  return {
+    provenance_class: candidate.provenance_class as DebateEvidenceProvenance["provenance_class"],
+    claim_tier: candidate.claim_tier as DebateEvidenceProvenance["claim_tier"],
+    certifying: candidate.certifying,
+  };
+}
+
+function normalizeDebateEvidenceProvenance(context: unknown): DebateEvidenceProvenance {
+  const warp =
+    context && typeof context === "object" && (context as Record<string, unknown>).warp_grounding
+      ? ((context as Record<string, unknown>).warp_grounding as Record<string, unknown>)
+      : undefined;
+  const certifying = warp?.status === "ADMISSIBLE" && typeof warp?.certificateHash === "string";
+  if (certifying) {
+    return { provenance_class: "measured", claim_tier: "certified", certifying: true };
+  }
+  return { provenance_class: "proxy", claim_tier: "diagnostic", certifying: false };
 }
 
 function sendEvent(res: Response, event: DebateStreamEvent): void {
