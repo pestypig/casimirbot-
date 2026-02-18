@@ -84,6 +84,20 @@ export type AdapterArtifactRef = {
   label?: string;
 };
 
+export type RuntimeClaimTier = "diagnostic" | "reduced-order" | "certified";
+
+export type AdapterRuntimeEnvelopeMetadata = {
+  claim_tier?: RuntimeClaimTier | string;
+  provenance?: string;
+  certifying?: boolean;
+};
+
+export type NormalizedAdapterRuntimeEnvelopeMetadata = {
+  claim_tier: RuntimeClaimTier;
+  provenance: string;
+  certifying: boolean;
+};
+
 export type AdapterRunResponse = {
   traceId?: string;
   runId: string;
@@ -92,6 +106,7 @@ export type AdapterRunResponse = {
   firstFail?: TrainingTraceConstraint | null;
   deltas: TrainingTraceDelta[];
   artifacts: AdapterArtifactRef[];
+  metadata?: AdapterRuntimeEnvelopeMetadata;
 };
 
 export type TrainingTraceSource = {
