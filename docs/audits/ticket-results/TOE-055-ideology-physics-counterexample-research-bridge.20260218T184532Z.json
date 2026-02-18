@@ -1,0 +1,33 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-055-ideology-physics-counterexample-research-bridge",
+  "files_changed": [
+    "server/services/helix-ask/relation-assembly.ts",
+    "tests/helix-ask-bridge.spec.ts",
+    "docs/audits/research/TOE-055-physics-research-brief.md",
+    "docs/audits/research/TOE-055-safety-envelope-analysis.md"
+  ],
+  "tests_run": [
+    "tests/helix-ask-bridge.spec.ts",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "tests/ideology-dag.spec.ts",
+    "npx vitest run tests/helix-ask-bridge.spec.ts tests/helix-ask-graph-resolver.spec.ts tests/ideology-dag.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-backlog.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run validate:toe:research-gates",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:3f135407-14a8-4a3b-81ff-8f20e046be51",
+    "run_id": "19163",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "physics-research-brief",
+    "safety-envelope-analysis"
+  ],
+  "remaining_gaps": []
+}

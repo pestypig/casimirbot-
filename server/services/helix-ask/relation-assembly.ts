@@ -90,6 +90,9 @@ const hasBridgeEvidenceContractContradiction = (entry: BridgeEvidenceContract): 
   return false;
 };
 
+const bridgeEvidenceContractFingerprint = (entry: BridgeEvidenceContract): string =>
+  [entry.provenance_class ?? "__missing__", entry.claim_tier ?? "__missing__", String(entry.certifying)].join("|");
+
 const firstSentence = (text: string, fallback: string): string => {
   const first = text.split(/(?<=[.!?])\s+/)[0] ?? "";
   const normalized = clip(sanitizeSnippet(first), 220);
@@ -142,7 +145,8 @@ export function buildRelationAssemblyPacket(args: {
       evidenceSeed.push({ path, block: args.contextText || "" });
     }
   }
-  const graphEvidenceContract = new Map<string, BridgeEvidenceContract>();
+  const graphEvidenceContracts: BridgeEvidenceContract[] = [];
+  const graphEvidenceContractsByPath = new Map<string, Set<string>>();
   for (const framework of args.graphPack?.frameworks ?? []) {
     for (const node of framework.path ?? []) {
       const sourcePath = node.sourcePath ?? framework.sourcePath;
@@ -153,11 +157,17 @@ export function buildRelationAssemblyPacket(args: {
       for (const evidence of node.evidence ?? []) {
         const evidencePath = typeof evidence.path === "string" ? evidence.path.trim() : "";
         if (!evidencePath) continue;
-        graphEvidenceContract.set(evidencePath, {
+        const contract: BridgeEvidenceContract = {
           provenance_class: evidence.provenance_class,
           claim_tier: evidence.claim_tier,
           certifying: evidence.certifying,
-        });
+        };
+        graphEvidenceContracts.push(contract);
+
+        if (!graphEvidenceContractsByPath.has(evidencePath)) {
+          graphEvidenceContractsByPath.set(evidencePath, new Set<string>());
+        }
+        graphEvidenceContractsByPath.get(evidencePath)?.add(bridgeEvidenceContractFingerprint(contract));
       }
     }
   }
@@ -171,7 +181,18 @@ export function buildRelationAssemblyPacket(args: {
     const span = "L1-L1";
     const evidence_id = buildEvidenceId(path, span);
     if (dedup.has(evidence_id)) continue;
-    const bridgeContract = graphEvidenceContract.get(path);
+    const bridgeContractSet = graphEvidenceContractsByPath.get(path);
+    const bridgeContract =
+      bridgeContractSet && bridgeContractSet.size === 1
+        ? (() => {
+            const [provenance_class, claim_tier, certifying] = Array.from(bridgeContractSet)[0]!.split("|");
+            return {
+              provenance_class: provenance_class === "__missing__" ? undefined : (provenance_class as BridgeEvidenceContract["provenance_class"]),
+              claim_tier: claim_tier === "__missing__" ? undefined : (claim_tier as BridgeEvidenceContract["claim_tier"]),
+              certifying: certifying === "undefined" ? undefined : certifying === "true",
+            };
+          })()
+        : undefined;
     dedup.set(evidence_id, {
       evidence_id,
       path,
@@ -215,21 +236,19 @@ export function buildRelationAssemblyPacket(args: {
   if (ethosEvidence.length > 0) domainSet.add("ethos");
 
   const strictBridgeEvidence = args.strictBridgeEvidence === true;
-  const hasBridgeEvidenceMetadataGap = Array.from(graphEvidenceContract.values()).some(
-    (entry) => !isBridgeEvidenceContractComplete(entry),
-  );
-  const hasBridgeEvidenceContractContradictionAny = Array.from(graphEvidenceContract.values()).some((entry) =>
-    hasBridgeEvidenceContractContradiction(entry),
-  );
+  const hasBridgeEvidenceMetadataGap = graphEvidenceContracts.some((entry) => !isBridgeEvidenceContractComplete(entry));
+  const hasBridgeEvidenceContractContradictionAny =
+    graphEvidenceContracts.some((entry) => hasBridgeEvidenceContractContradiction(entry)) ||
+    Array.from(graphEvidenceContractsByPath.values()).some((fingerprints) => fingerprints.size > 1);
 
   return {
     question: args.question,
     domains: Array.from(domainSet).sort(),
     fail_reason:
-      strictBridgeEvidence && hasBridgeEvidenceMetadataGap
-        ? "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING"
-        : strictBridgeEvidence && hasBridgeEvidenceContractContradictionAny
-          ? "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY"
+      strictBridgeEvidence && hasBridgeEvidenceContractContradictionAny
+        ? "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY"
+        : strictBridgeEvidence && hasBridgeEvidenceMetadataGap
+          ? "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING"
           : undefined,
     definitions: {
       warp_definition: warpDefinition,

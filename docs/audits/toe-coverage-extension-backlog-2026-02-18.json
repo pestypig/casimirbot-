@@ -957,6 +957,7 @@
       "primary_path_prefix": "server/routes/agi.plan.ts",
       "allowed_paths": [
         "server/routes/agi.plan.ts",
+        "server/services/halobank/time-model.ts",
         "server/services/helix-ask/arbiter.ts",
         "server/services/helix-ask/answer-artifacts.ts",
         "tests/helix-ask-evidence-gate.spec.ts",
@@ -1176,6 +1177,7 @@
       "primary_path_prefix": "server/routes/agi.plan.ts",
       "allowed_paths": [
         "server/routes/agi.plan.ts",
+        "server/services/halobank/time-model.ts",
         "server/services/helix-ask/arbiter.ts",
         "server/services/helix-ask/answer-artifacts.ts",
         "tests/helix-ask-evidence-gate.spec.ts",
@@ -1313,23 +1315,21 @@
       }
     },
     {
-      "id": "TOE-057-helix-ask-strict-ready-promotion-pack",
-      "ticket": "TOE-057-helix-ask-strict-ready-promotion-pack",
-      "tree_owner": "helix-ask",
-      "primitive": "Helix Ask strict-ready promotion pack",
-      "primary_path_prefix": "server/routes/agi.plan.ts",
+      "id": "TOE-061-strict-ready-enforcement-gate",
+      "tree_owner": "ops-deployment",
+      "primitive": "Strict-ready enforcement gate",
+      "primary_path_prefix": "scripts/toe-agent-preflight.ts",
       "allowed_paths": [
-        "server/routes/agi.plan.ts",
-        "server/services/helix-ask/arbiter.ts",
-        "server/services/helix-ask/answer-artifacts.ts",
-        "tests/helix-ask-evidence-gate.spec.ts",
-        "tests/helix-ask-answer-artifacts.spec.ts",
-        "tests/helix-ask-modes.spec.ts"
+        "scripts/toe-agent-preflight.ts",
+        "scripts/compute-toe-progress.ts",
+        "tests/toe-agent-preflight.spec.ts",
+        "tests/toe-progress.spec.ts",
+        "docs/audits/toe-scaling-scorecard.md",
+        "docs/audits/toe-progress-snapshot.json"
       ],
       "required_tests": [
-        "tests/helix-ask-evidence-gate.spec.ts",
-        "tests/helix-ask-answer-artifacts.spec.ts",
-        "tests/helix-ask-modes.spec.ts"
+        "tests/toe-agent-preflight.spec.ts",
+        "tests/toe-progress.spec.ts"
       ],
       "research_gate": {
         "risk_class": "runtime_contract",

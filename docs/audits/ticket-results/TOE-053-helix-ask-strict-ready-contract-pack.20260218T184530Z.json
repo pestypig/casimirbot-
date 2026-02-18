@@ -1,0 +1,29 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-053-helix-ask-strict-ready-contract-pack",
+  "files_changed": [
+    "server/services/halobank/time-model.ts"
+  ],
+  "tests_run": [
+    "tests/helix-ask-evidence-gate.spec.ts",
+    "tests/helix-ask-answer-artifacts.spec.ts",
+    "tests/helix-ask-modes.spec.ts",
+    "npx vitest run tests/helix-ask-evidence-gate.spec.ts tests/helix-ask-answer-artifacts.spec.ts tests/helix-ask-modes.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-backlog.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run validate:toe:research-gates",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:cd73cae1-b060-4659-82f8-2c85dd840ee6",
+    "run_id": "15",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}

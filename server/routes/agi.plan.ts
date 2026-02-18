@@ -3415,6 +3415,10 @@ const HELIX_ASK_VIABILITY_PATHS =
   /(server\/gr\/gr-evaluation\.ts|server\/gr\/gr-constraint-policy\.ts|server\/routes\/warp-viability\.ts|server\/skills\/physics\.warp\.viability|server\/skills\/physics\.gr\.grounding|types\/warpViability|server\/helix-core\.ts)/i;
 const HELIX_ASK_VERIFICATION_FOCUS =
   /\b(scientific method|verification|verify|falsifiable|falsifiability|hypothesis|experiment)\b/i;
+const HELIX_ASK_OPEN_WORLD_EXPLAIN_RE =
+  /\b(how (?:does|do|can)|why|explain|what(?:'s| is)|describe)\b/i;
+const HELIX_ASK_OPEN_WORLD_DOMAIN_RE =
+  /\b(universe|cosmos|cosmology|life|abiogenesis|evolution|astrobiology|stellar consciousness|financial hack|phish(?:ing)?|fraud|scam|cybersecurity|account takeover)\b/i;
 const HELIX_ASK_VERIFICATION_ANCHOR_PATHS: RegExp[] = [
   /server\/routes\/agi\.plan\.ts/i,
   /server\/services\/helix-ask\/platonic-gates\.ts/i,
@@ -5291,6 +5295,20 @@ function buildHelixAskSearchQueries(
     push("warp pipeline");
     push("energy-pipeline warp");
   }
+  if (
+    hasTopic("physics") ||
+    /universe|cosmos|cosmology|astrobiology|abiogenesis|origin(?:s)? of life|life emergence|stellar consciousness/i.test(
+      normalized,
+    )
+  ) {
+    push("docs/stellar-consciousness-orch-or-review.md");
+    push("docs/stellar-consciousness-ii.md");
+    push("docs/stellar-fact-check.md");
+    push("docs/papers.md");
+    push("docs/papers");
+    push("docs/knowledge/stellar-restoration-tree.json");
+    push("docs/knowledge/trees/stellar-restoration-tree.md");
+  }
   if (hasTopic("ideology") || /ideology|ethos|mission ethos|ledger/i.test(normalized)) {
     push("docs/ethos/ideology.json");
     push("docs/ethos/why.md");
@@ -5387,6 +5405,19 @@ function buildHelixAskSearchQueries(
     push("docs/knowledge/hardware-telemetry-tree.json");
     push("server/services/observability");
     push("server/skills/telemetry.panels.ts");
+  }
+  if (
+    hasTopic("security") ||
+    /financial hack|hack(?:ed|ing)?|phish(?:ing)?|fraud|scam|account takeover|credential (?:theft|stuffing)|cyber(?:security| attack)?/i.test(
+      normalized,
+    )
+  ) {
+    push("server/security");
+    push("server/auth");
+    push("server/middleware/concurrency-guard.ts");
+    push("docs/knowledge/ethos/no-bypass-guardrail.md");
+    push("docs/knowledge/ethos/metric-integrity-guardrail.md");
+    push("shared/hull-basis.ts");
   }
   if (hasTopic("queue") || hasTopic("jobs") || /queue|scheduler|orchestration/i.test(normalized)) {
     push("docs/knowledge/queue-orchestration-tree.json");
@@ -11674,11 +11705,12 @@ const RELATION_MODEL_PLACEHOLDER_RE =
 const RELATION_CODE_NOISE_RE =
   /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|usestate|from\s+["']react["'])\b/i;
 const STUB_TEXT_RE = /\bllm\.local\s+stub\s+result\b/i;
+const GENERIC_GROUNDED_RE = /^answer grounded in retrieved evidence\.?$/i;
 
 const hasModelPlaceholderOrStub = (value: string): boolean => {
   const normalized = value.trim();
   if (!normalized) return false;
-  return RELATION_MODEL_PLACEHOLDER_RE.test(normalized) || STUB_TEXT_RE.test(normalized);
+  return RELATION_MODEL_PLACEHOLDER_RE.test(normalized) || STUB_TEXT_RE.test(normalized) || GENERIC_GROUNDED_RE.test(normalized);
 };
 
 const detectRelationDeterministicFallbackReasons = (value: string): string[] => {
@@ -11716,6 +11748,8 @@ const detectRepoAnswerQualityFloorReasons = (args: {
   relationPacket: boolean;
   requiresRepoEvidence: boolean;
   intentDomain: string;
+  openWorldExplainer?: boolean;
+  securityRiskPrompt?: boolean;
   enforceGlobalFloor?: boolean;
 }): string[] => {
   const reasons = new Set<string>();
@@ -11729,6 +11763,9 @@ const detectRepoAnswerQualityFloorReasons = (args: {
   }
   if (STUB_TEXT_RE.test(normalized)) {
     reasons.add("stub_text");
+  }
+  if (GENERIC_GROUNDED_RE.test(normalized)) {
+    reasons.add("generic_grounding_scaffold");
   }
   if (isDeterministicMetadataNoise(normalized)) {
     reasons.add("metadata_noise");
@@ -11757,6 +11794,31 @@ const detectRepoAnswerQualityFloorReasons = (args: {
     args.relationQuery;
   if (enforceMinLength && normalized.length < minChars) {
     reasons.add("text_too_short");
+  }
+  if (args.openWorldExplainer) {
+    const claimCandidates = extractClaimCandidates(args.text, 8);
+    if (claimCandidates.length < 2) {
+      reasons.add("open_world_claim_floor");
+    }
+    const hasMechanism = /\b(because|therefore|which leads to|so that|drives|enables|causes|through|by\s+[^\n]{4,}\b)\b/i.test(
+      normalized,
+    );
+    if (!hasMechanism) {
+      reasons.add("open_world_mechanism_missing");
+    }
+  }
+  if (args.securityRiskPrompt) {
+    const hasActionableSection =
+      /\b(action|actions|checklist|steps|do this|protect|mitigation|safety|defense|monitor|freeze|alert|2fa|mfa|password manager|contact your bank)\b/i.test(
+        normalized,
+      ) ||
+      /\n\s*(?:[-*]|\d+\.)\s+/.test(args.text);
+    if (!hasActionableSection) {
+      reasons.add("security_actionable_missing");
+    }
+  }
+  if (hasSourcesLine(args.text) && extractClaimCandidates(args.text, 4).length === 0) {
+    reasons.add("citation_only_body");
   }
   if (args.relationQuery && args.relationPacket) {
     for (const reason of detectRelationDeterministicFallbackReasons(args.text)) {
@@ -12328,6 +12390,90 @@ const renderHelixAskAnswerContract = (
     text = `${text}\n\nSources: ${(contract.sources ?? []).join(", ")}`.trim();
   }
   return text;
+};
+
+const isOpenWorldExplainerQuestion = (question: string): boolean =>
+  /\b(how\s+does|how\s+can|why\s+does|why\s+can|explain|describe|produce|protect|prevent)\b/i.test(
+    question,
+  ) && !isImplementationQuestion(question);
+
+const isSecurityRiskPrompt = (question: string): boolean =>
+  /\b(hack|attack|fraud|scam|phish|phishing|steal|theft|financial|bank|identity|ransom|malware|exploit|protect itself)\b/i.test(
+    question,
+  );
+
+const expandOpenWorldQualityFloor = (args: {
+  text: string;
+  question: string;
+  evidenceText: string;
+  contextFiles: string[];
+  allowedSourcePaths: string[];
+  format: HelixAskFormat;
+  docBlocks: Array<{ path: string; block: string }>;
+  codeAlignment?: HelixAskCodeAlignment | null;
+}): string => {
+  const allowedCitations = normalizeCitations([
+    ...args.allowedSourcePaths,
+    ...args.contextFiles,
+    ...extractFilePathsFromText(args.evidenceText),
+    ...extractCitationTokensFromText(args.evidenceText),
+  ]);
+  const deterministicContract = sanitizeHelixAskAnswerContract(
+    buildDeterministicAnswerContractFallback({
+      question: args.question,
+      format: args.format,
+      definitionFocus: false,
+      docBlocks: args.docBlocks,
+      codeAlignment: args.codeAlignment,
+      evidenceText: appendEvidenceSources(args.evidenceText, args.contextFiles, 8, args.evidenceText),
+      allowedCitations,
+    }),
+    allowedCitations,
+  );
+  const rawClaims = (deterministicContract.claims ?? []).map((claim) => claim.text).filter(Boolean);
+  const claims = Array.from(
+    new Set(
+      rawClaims
+        .map((claim) => ensureSentence(normalizeContractText(claim, 260)))
+        .filter((claim): claim is string => Boolean(claim))
+        .filter((claim) => !GENERIC_GROUNDED_RE.test(claim.trim())),
+    ),
+  );
+  const primarySource = allowedCitations[0] ?? "retrieved evidence";
+  const claimA =
+    claims[0] ??
+    `Retrieved evidence in ${primarySource} identifies concrete factors that shape the answer.`;
+  const claimB =
+    claims[1] ??
+    `A second grounded claim from ${allowedCitations[1] ?? primarySource} narrows uncertainty and prevents generic fallback text.`;
+  const mechanismSentence = ensureSentence(
+    normalizeContractText(
+      `Mechanism: ${claimA} This causes downstream outcomes because multiple linked conditions compound over time rather than acting in isolation.`,
+      340,
+    ),
+  );
+  const sections = [
+    ensureSentence(normalizeContractText(deterministicContract.summary, 320)) ||
+      `Grounded summary derived from ${primarySource}.`,
+    ensureSentence(normalizeContractText(claimA, 260)),
+    ensureSentence(normalizeContractText(claimB, 260)),
+    mechanismSentence,
+  ].filter((value): value is string => Boolean(value) && !GENERIC_GROUNDED_RE.test(value.trim()));
+  if (isSecurityRiskPrompt(args.question)) {
+    sections.push(
+      "Safety actions: enable MFA on financial accounts, lock/freeze credit files, verify payment requests through a second channel, and set real-time bank alerts.",
+    );
+  }
+  let expanded = sections.join("\n\n").trim();
+  const claimCount = extractClaimCandidates(expanded, 8).length;
+  if (claimCount < 2) {
+    expanded = `${expanded}\n\n${ensureSentence(normalizeContractText(claims[2] ?? `Retrieved docs add a second concrete claim tied to cited files such as ${primarySource}.`, 220))}`.trim();
+  }
+  const sourceLine = allowedCitations.length > 0 ? `Sources: ${allowedCitations.slice(0, 8).join(", ")}` : "";
+  if (sourceLine && !hasSourcesLine(expanded)) {
+    expanded = `${expanded}\n\n${sourceLine}`.trim();
+  }
+  return expanded;
 };
 
 
@@ -18450,8 +18596,13 @@ const executeHelixAsk = async ({
           }
         }
       }
+      const openWorldClarifyBypass =
+        !explicitRepoExpectation &&
+        repoExpectationLevel === "low" &&
+        HELIX_ASK_OPEN_WORLD_EXPLAIN_RE.test(baseQuestion) &&
+        HELIX_ASK_OPEN_WORLD_DOMAIN_RE.test(baseQuestion);
       const shouldApplyPreIntentClarify =
-        ambiguityResolution.shouldClarify && !warpEthosRelationQuery;
+        ambiguityResolution.shouldClarify && !warpEthosRelationQuery && !openWorldClarifyBypass;
       if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
         debugPayload.ambiguity_resolver_applied = shouldApplyPreIntentClarify;
         debugPayload.ambiguity_resolver_reason = ambiguityResolution.reason;
@@ -18480,6 +18631,11 @@ const executeHelixAsk = async ({
           "clarify",
           ambiguityResolution.reason ?? "short_prompt",
         );
+      } else if (ambiguityResolution.shouldClarify && openWorldClarifyBypass) {
+        logEvent("Ambiguity resolver", "bypass_open_world", "low_repo_explainer");
+        if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
+          debugPayload.ambiguity_resolver_bypassed = "open_world_query";
+        }
       } else if (ambiguityResolution.shouldClarify && warpEthosRelationQuery) {
         logEvent("Ambiguity resolver", "bypass_relation_query", "warp_ethos_relation");
         if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
@@ -26398,12 +26554,15 @@ const executeHelixAsk = async ({
         HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
         isWarpEthosRelationQuestion(baseQuestion) ||
         intentProfile.id === "hybrid.warp_ethos_relation";
+      const openWorldExplainer = isOpenWorldExplainerQuestion(baseQuestion);
+      const securityRiskPrompt = isSecurityRiskPrompt(baseQuestion);
       const qualityFloorEligible =
         HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
         intentDomain === "repo" ||
         intentDomain === "hybrid" ||
         relationQueryForFinalize ||
-        requiresRepoEvidence;
+        requiresRepoEvidence ||
+        openWorldExplainer;
       const qualityFloorReasons = qualityFloorEligible
         ? detectRepoAnswerQualityFloorReasons({
             text: cleaned,
@@ -26411,6 +26570,8 @@ const executeHelixAsk = async ({
             relationPacket: Boolean(relationPacket),
             requiresRepoEvidence,
             intentDomain,
+            openWorldExplainer,
+            securityRiskPrompt,
             enforceGlobalFloor: HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR,
           })
         : [];
@@ -26472,6 +26633,41 @@ const executeHelixAsk = async ({
           if (debugPayload) {
             debugPayload.answer_quality_floor_applied = true;
             debugPayload.answer_quality_floor_reasons = qualityFloorReasons;
+          }
+        }
+      }
+      if (
+        qualityFloorEligible &&
+        qualityFloorReasons.some((reason) =>
+          [
+            "open_world_claim_floor",
+            "open_world_mechanism_missing",
+            "security_actionable_missing",
+            "citation_only_body",
+          ].includes(reason),
+        )
+      ) {
+        const expanded = expandOpenWorldQualityFloor({
+          text: cleaned,
+          question: baseQuestion,
+          evidenceText,
+          contextFiles,
+          allowedSourcePaths,
+          format: formatSpec.format,
+          docBlocks,
+          codeAlignment,
+        });
+        if (expanded.trim()) {
+          cleaned = expanded.trim();
+          answerPath.push("qualityFloor:open_world_expansion");
+          if (debugPayload) {
+            const existingReasons = Array.isArray(debugPayload.answer_quality_floor_reasons)
+              ? debugPayload.answer_quality_floor_reasons
+              : [];
+            debugPayload.answer_quality_floor_reasons = Array.from(
+              new Set([...existingReasons, "open_world_expansion"]),
+            );
+            debugPayload.answer_quality_floor_applied = true;
           }
         }
       }

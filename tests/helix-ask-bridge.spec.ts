@@ -199,6 +199,64 @@ describe("Helix Ask bridge nodes", () => {
     expect(packet.fail_reason).toBe("IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY");
   });
 
+
+  it("returns contradictory fail_reason when same evidence path has conflicting bridge contracts", () => {
+    const packet = buildRelationAssemblyPacket({
+      question: "How does ideology bridge physics?",
+      contextFiles: ["docs/ethos/ideology.json", "docs/knowledge/physics/einstein-field-equations.md"],
+      contextText: "ideology and physics relation",
+      docBlocks: [],
+      strictBridgeEvidence: true,
+      graphPack: {
+        frameworks: [
+          {
+            treeId: "test",
+            sourcePath: "docs/ethos/ideology.json",
+            anchors: [],
+            path: [
+              {
+                id: "bridge-node",
+                title: "Bridge",
+                tags: [],
+                score: 1,
+                depth: 0,
+                nodeType: "bridge",
+                evidence: [
+                  {
+                    type: "doc",
+                    path: "docs/knowledge/physics/einstein-field-equations.md",
+                    scope: "left",
+                    provenance_class: "proxy",
+                    claim_tier: "diagnostic",
+                    certifying: false,
+                  },
+                  {
+                    type: "doc",
+                    path: "docs/knowledge/physics/einstein-field-equations.md",
+                    scope: "right",
+                    provenance_class: "measured",
+                    claim_tier: "certified",
+                    certifying: true,
+                  },
+                ],
+              },
+            ],
+            scaffoldText: "",
+            contextText: "",
+            preferGraph: true,
+          },
+        ],
+        scaffoldText: "",
+        contextText: "",
+        preferGraph: true,
+        sourcePaths: ["docs/ethos/ideology.json"],
+        treeIds: ["test"],
+      },
+    });
+
+    expect(packet.fail_reason).toBe("IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY");
+  });
+
   it("preserves non-strict bridge behavior when metadata is incomplete", () => {
     const packet = buildRelationAssemblyPacket({
       question: "How does ideology bridge physics?",

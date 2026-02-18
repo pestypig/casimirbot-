@@ -61,7 +61,7 @@ const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
     /\b(helix ask|helixask|ask pipeline|ask system|ask mode|agi ask|\/api\/agi\/ask|helix ask pill|intent routing|route intent|topic tags?|format router|format policy|evidence gate|coverage gate|belief gate|rattling gate|citation repair|cite repair|repair citations|answer path)\b/i,
   warp: /\b(warp|alcubierre|natario|warp bubble|warp drive)\b/i,
   physics:
-    /\b(casimir|quantum inequality|ford-roman|energy condition|stress[-\s]?energy|spacetime|metric|riemann|ricci|einstein tensor|general relativity|gr\b|adm\b|york time|atom(?:ic)?|electron(?:s)?|orbital(?:s)?|wavefunction|bohr|hydrogenic)\b/i,
+    /\b(casimir|quantum inequality|ford-roman|energy condition|stress[-\s]?energy|spacetime|metric|riemann|ricci|einstein tensor|general relativity|gr\b|adm\b|york time|atom(?:ic)?|electron(?:s)?|orbital(?:s)?|wavefunction|bohr|hydrogenic|universe|cosmos|cosmology|astrobiology|abiogenesis|origin(?:s)? of life|life emergence|stellar consciousness)\b/i,
   energy_pipeline:
     /\b(energy pipeline|energy-pipeline|energypipeline|energy\s+pipeline|calculateenergy|drivewarpfrompipeline)\b/i,
   trace: /\b(trace|task trace|tasktrace|trajectory|essence|casimir)\b/i,
@@ -98,7 +98,7 @@ const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
   debate: /\b(debate|referee|proponent|skeptic|debate loop|debate telemetry)\b/i,
   specialists: /\b(specialists?|solver|verifier|specialist plan)\b/i,
   security:
-    /\b(security|guardrail|guardrails|hull guard|hull mode|tenant|authorization|auth guard|concurrency guard)\b/i,
+    /\b(security|guardrail|guardrails|hull guard|hull mode|tenant|authorization|auth guard|concurrency guard|hack(?:ed|ing)?|phish(?:ing)?|fraud|scam|account takeover|credential (?:theft|stuffing)|ransom(?:ware)?|cyber(?:security| attack)?|financial hack)\b/i,
   skills: /\b(skills?|tool registry|tooling|tool spec|skill catalog|tool manifest)\b/i,
   materials: /\b(materials?|hull materials|needle hull|dlc|diamond stack|hull glb)\b/i,
   environment: /\b(environment model|environment tags?|environment alignment|essence environment)\b/i,
@@ -165,6 +165,10 @@ const WARP_CORE_PATHS: RegExp[] = [
 const PHYSICS_PATHS: RegExp[] = [
   /docs\/knowledge\/physics\//i,
   /docs\/knowledge\/warp\//i,
+  /docs\/stellar-consciousness.*\.md/i,
+  /docs\/papers(?:\/|\.md)/i,
+  /docs\/knowledge\/stellar-restoration-tree\.json/i,
+  /docs\/knowledge\/trees\/stellar-restoration-tree\.md/i,
   /client\/src\/components\/ElectronOrbitalPanel\.tsx/i,
   /client\/src\/hooks\/useElectronOrbitSim\.ts/i,
   /client\/src\/lib\/atomic-orbitals\.ts/i,
@@ -770,6 +774,8 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
   }
 
   if (tags.includes("security")) {
+    allowlistTiers.push(SECURITY_PATHS);
+    allowlistTiers.push([]);
     boostPaths.push(...SECURITY_PATHS);
     minTierCandidates = Math.max(minTierCandidates, 2);
   }
