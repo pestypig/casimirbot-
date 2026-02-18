@@ -45,6 +45,23 @@ Constraint pack mode (pack-agnostic)
 }
 ```
 
+
+Authenticity ladder policy (optional)
+```json
+{
+  "policy": {
+    "authenticity": {
+      "consequence": "low|medium|high",
+      "required": false,
+      "trustedSignerKeyIds": ["robotics-prod-signer"]
+    }
+  }
+}
+```
+- Default consequence is `low` (integrity-only, authenticity not enforced).
+- `high` consequence enforces authenticity by default.
+- `required: true` enforces authenticity for any consequence.
+
 Response (example)
 ```json
 {
@@ -63,7 +80,11 @@ Response (example)
     "status": "ADMISSIBLE",
     "certificateHash": "sha256:deadbeef",
     "certificateId": "cert-001",
-    "integrityOk": true
+    "integrityOk": true,
+    "authenticityOk": true,
+    "authenticityRequired": true,
+    "authenticityConsequence": "high",
+    "authenticityReasonCodes": []
   },
   "deltas": [
     { "key": "dutyCycle", "from": 0.004, "to": 0.002, "delta": -0.002, "change": "changed" }
@@ -95,3 +116,5 @@ Notes
 - `budget` and `policy` are optional; omit them to use defaults.
 - `deltas` reflect the net parameter changes between the first and terminal
   attempt; if no change is detected, the list can be empty.
+
+- When authenticity is required and fails, `firstFail.id` is `ADAPTER_CERTIFICATE_AUTHENTICITY_REQUIRED` (class `certificate_authenticity_required`).
