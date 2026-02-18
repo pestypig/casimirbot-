@@ -1,0 +1,31 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-052-halobank-residual-tier-promotion-pack",
+  "files_changed": [
+    "tests/halobank-time-model.spec.ts",
+    "docs/audits/research/TOE-052-tier-promotion-rationale.md",
+    "docs/audits/research/TOE-052-comparative-evidence-pack.md"
+  ],
+  "tests_run": [
+    "tests/halobank-time-model.spec.ts",
+    "tests/halobank-horizons-consistency.spec.ts",
+    "npx vitest run tests/halobank-time-model.spec.ts tests/halobank-horizons-consistency.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-backlog.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run validate:toe:research-gates",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:3b443ab0-b8c2-468c-9d39-b20947c7f9bb",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "tier-promotion-rationale",
+    "comparative-evidence-pack"
+  ],
+  "remaining_gaps": []
+}
