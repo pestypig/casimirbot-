@@ -1313,38 +1313,28 @@
       }
     },
     {
-      "id": "TOE-059-warp-viability-reduced-order-verification-pack",
-      "tree_owner": "warp-mechanics",
-      "primitive": "Warp viability reduced-order verification pack",
-      "primary_path_prefix": "tools/warpViability.ts",
+      "id": "TOE-061-strict-ready-enforcement-gate",
+      "tree_owner": "ops-deployment",
+      "primitive": "Strict-ready enforcement gate",
+      "primary_path_prefix": "scripts/toe-agent-preflight.ts",
       "allowed_paths": [
-        "tools/warpViability.ts",
-        "tools/warpViabilityCertificate.ts",
-        "tools/verifyCertificate.ts",
-        "tests/warp-viability.spec.ts",
-        "tests/warp-metric-adapter.spec.ts",
-        "tests/proof-pack-strict-parity.spec.ts",
-        "docs/audits/research/TOE-059-tier-promotion-rationale.md",
-        "docs/audits/research/TOE-059-comparative-evidence-pack.md",
-        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
+        "scripts/toe-agent-preflight.ts",
+        "scripts/compute-toe-progress.ts",
+        "tests/toe-agent-preflight.spec.ts",
+        "tests/toe-progress.spec.ts",
+        "docs/audits/toe-scaling-scorecard.md",
+        "docs/audits/toe-progress-snapshot.json"
       ],
       "required_tests": [
-        "tests/warp-viability.spec.ts",
-        "tests/warp-metric-adapter.spec.ts",
-        "tests/proof-pack-strict-parity.spec.ts"
-      ],
-      "done_criteria": [
-        "Deterministic promotion criteria are encoded with explicit reason tags for promotion or fallback",
-        "Conservative fallback prevents certification when strict metric-derived signals or contracts are missing",
-        "Research artifacts document tier-promotion rationale and comparative evidence for reduced-order verification pack"
+        "tests/toe-agent-preflight.spec.ts",
+        "tests/toe-progress.spec.ts"
       ],
       "research_gate": {
-        "risk_class": "tier_promotion",
+        "risk_class": "runtime_contract",
         "requires_audit": true,
-        "requires_research": true,
+        "requires_research": false,
         "required_artifacts": [
-          "tier-promotion-rationale",
-          "comparative-evidence-pack"
+          "runtime-contract-audit"
         ]
       }
     }

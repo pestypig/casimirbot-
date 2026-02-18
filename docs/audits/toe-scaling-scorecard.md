@@ -35,6 +35,10 @@ When `strict_ready_progress_pct` is stalled at `0` and `strict_ready_delta_targe
 preflight emits a `strict_ready_stall_warning` payload. Treat this as a hold signal for scale-up
 until at least one strict-ready delta target is advanced.
 
+Set `TOE_STRICT_READY_ENFORCE=1` to convert this hold signal into a hard preflight block. In
+that mode, preflight returns `overall_pass=false` with additive summary metadata:
+`stage_pass` and `strict_ready_enforcement.{enforced,blocked,reason}`.
+
 
 ## Scale Decision Gate
 
