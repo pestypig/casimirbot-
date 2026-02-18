@@ -146,6 +146,7 @@ describe("Helix Ask PS2 runtime report", () => {
     fs.writeFileSync(path.join(baseDir, "focused-qa.json"), JSON.stringify(focusedQa, null, 2));
 
     const reportPath = path.join("reports", `helix-ask-quake-frame-loop-${runId}.md`);
+    fs.mkdirSync("reports", { recursive: true });
     const gates: Array<[string, string, number, boolean]> = [
       ["placeholder_fallback_rate", "== 0", metrics.placeholder_fallback_rate, metrics.placeholder_fallback_rate === 0],
       ["empty_scaffold_rate", "== 0", metrics.empty_scaffold_rate, metrics.empty_scaffold_rate === 0],
@@ -168,7 +169,7 @@ describe("Helix Ask PS2 runtime report", () => {
       "| Gate | Threshold | Measured | Pass |",
       "|---|---:|---:|:--:|",
       ...gates.map(([name, threshold, measured, pass]) =>
-        `| ${name} | ${threshold} | ${typeof measured === "number" ? measured.toFixed(3) : measured} | ${pass ? "✅" : "❌"} |`,
+        `| ${name} | ${threshold} | ${typeof measured === "number" ? measured.toFixed(3) : measured} | ${pass ? "PASS" : "FAIL"} |`,
       ),
       "",
       "## Before/after snippets",
@@ -186,3 +187,4 @@ describe("Helix Ask PS2 runtime report", () => {
     expect(fs.existsSync(reportPath)).toBe(true);
   }, 180000);
 });
+
