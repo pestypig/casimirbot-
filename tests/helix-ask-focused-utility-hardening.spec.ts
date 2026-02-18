@@ -3,6 +3,9 @@ import type { Server } from "http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const PLACEHOLDER_RE = /\b(?:llm\.local\s+stub\s+result|placeholder|unable to answer|i cannot answer|answer grounded in retrieved evidence\.?\s*$)\b/i;
+const MECHANISM_RE = /\bMechanism:\s*.+->.+->.+/i;
+const MATURITY_RE = /\bMaturity\s*\((?:exploratory|reduced-order|diagnostic|certified)\)\s*:/i;
+const MISSING_EVIDENCE_RE = /\bMissing evidence:\s*[^\n]{12,}/i;
 
 const countClaims = (text: string): number => {
   const body = text.replace(/\n\nSources:[\s\S]*$/i, " ").trim();
@@ -69,7 +72,9 @@ describe("Helix Ask focused utility hardening", () => {
       expect(text.length).toBeGreaterThanOrEqual(260);
       expect(/Sources:/i.test(text)).toBe(true);
       expect(countClaims(text)).toBeGreaterThanOrEqual(2);
-      expect(/\b(because|therefore|which leads to|drives|enables|causes|through|by)\b/i.test(text)).toBe(true);
+      expect(MECHANISM_RE.test(text)).toBe(true);
+      expect(MATURITY_RE.test(text)).toBe(true);
+      expect(MISSING_EVIDENCE_RE.test(text)).toBe(true);
       expect(typeof payload.debug?.fallback_reason).toBe("string");
     }
   }, 120000);
@@ -82,8 +87,9 @@ describe("Helix Ask focused utility hardening", () => {
       expect(text.length).toBeGreaterThanOrEqual(300);
       expect(/Sources:/i.test(text)).toBe(true);
       expect(countClaims(text)).toBeGreaterThanOrEqual(2);
-      expect(/\b(because|therefore|which leads to|drives|enables|causes|through|by)\b/i.test(text)).toBe(true);
       expect(/\b(action|actions|checklist|steps|protect|mitigation|safety|defense|monitor|freeze|alert|2fa|mfa|password manager|contact your bank)\b/i.test(text)).toBe(true);
+      expect(MECHANISM_RE.test(text)).toBe(true);
+      expect(MATURITY_RE.test(text)).toBe(true);
       expect(typeof payload.debug?.fallback_reason).toBe("string");
     }
   }, 120000);
@@ -111,6 +117,10 @@ describe("Helix Ask focused utility hardening", () => {
       expect(text.length).toBeGreaterThanOrEqual(220);
       expect(/Sources:/i.test(text)).toBe(true);
       expect(countClaims(text)).toBeGreaterThanOrEqual(2);
+      if (/universe produce life|financial hack/i.test(question)) {
+        expect(MECHANISM_RE.test(text)).toBe(true);
+        expect(MATURITY_RE.test(text)).toBe(true);
+      }
       expect(typeof payload.debug?.fallback_reason).toBe("string");
       seed = seed === 7 ? 11 : seed === 11 ? 13 : 7;
     }

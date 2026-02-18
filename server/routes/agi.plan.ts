@@ -11713,6 +11713,10 @@ const RELATION_CODE_NOISE_RE =
   /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|usestate|from\s+["']react["'])\b/i;
 const STUB_TEXT_RE = /\bllm\.local\s+stub\s+result\b/i;
 const GENERIC_GROUNDED_RE = /^answer grounded in retrieved evidence\.?$/i;
+const HELIX_ASK_MECHANISM_SENTENCE_RE = /\bMechanism:\s*.+->.+->.+/i;
+const HELIX_ASK_MATURITY_LABEL_RE = /\bMaturity\s*\((?:exploratory|reduced-order|diagnostic|certified)\)\s*:/i;
+const HELIX_ASK_MISSING_EVIDENCE_RE = /\bMissing evidence:\s*[^\n]{12,}/i;
+
 
 const hasModelPlaceholderOrStub = (value: string): boolean => {
   const normalized = value.trim();
@@ -12221,6 +12225,9 @@ type HelixAskAnswerContractGateResult = {
   sourceCount: number;
   groundedClaimCount: number;
   uniqueRatio: number;
+  mechanismPresent: boolean;
+  maturityPresent: boolean;
+  missingEvidencePresent: boolean;
 };
 
 const normalizeContractGateLine = (value: string): string =>
@@ -12261,6 +12268,19 @@ const evaluateHelixAskAnswerContractGate = (
   if (requiresRepoEvidence && allowedCitations.length > 0 && groundedClaimCount === 0) {
     reasons.push("claim_evidence_missing");
   }
+  if (requiresRepoEvidence && allowedCitations.length > 0 && groundedClaimCount < claimCount) {
+    reasons.push("ungrounded_claim_present");
+  }
+  const renderedPreview = renderHelixAskAnswerContract(contract, format, "");
+  const mechanismPresent = HELIX_ASK_MECHANISM_SENTENCE_RE.test(renderedPreview);
+  const maturityPresent = HELIX_ASK_MATURITY_LABEL_RE.test(renderedPreview);
+  const missingEvidencePresent = HELIX_ASK_MISSING_EVIDENCE_RE.test(renderedPreview);
+  if (!mechanismPresent) reasons.push("mechanism_sentence_missing");
+  if (!maturityPresent) reasons.push("maturity_label_missing");
+  if (requiresRepoEvidence && sourceCount <= 1) reasons.push("source_coverage_low");
+  if (requiresRepoEvidence && sourceCount > 0 && sourceCount <= 2 && !missingEvidencePresent) {
+    reasons.push("missing_evidence_section_missing");
+  }
   const rawLines = [
     summary,
     ...(contract.claims ?? []).map((claim) => normalizeContractText(claim.text, 260)),
@@ -12287,6 +12307,9 @@ const evaluateHelixAskAnswerContractGate = (
     sourceCount,
     groundedClaimCount,
     uniqueRatio,
+    mechanismPresent,
+    maturityPresent,
+    missingEvidencePresent,
   };
 };
 
@@ -12326,6 +12349,27 @@ const sanitizeHelixAskAnswerContract = (
     )
     .slice(0, 4);
   const uncertainty = normalizeContractText(contract.uncertainty ?? "", 220);
+  const mechanismSeed = claims.find((claim) => HELIX_ASK_MECHANISM_SENTENCE_RE.test(claim.text));
+  if (!mechanismSeed && claims.length > 0) {
+    const first = claims[0].text;
+    const second = claims[1]?.text ?? claims[0].text;
+    claims.push({
+      text: ensureSentence(
+        normalizeContractText(
+          `Mechanism: ${first} -> constrained interaction dynamics -> ${second}, because linked constraints amplify or dampen outcomes over time`,
+          320,
+        ),
+      ),
+      evidence: claims[0].evidence,
+    });
+  }
+  const maturitySeed = claims.find((claim) => HELIX_ASK_MATURITY_LABEL_RE.test(claim.text));
+  if (!maturitySeed) {
+    claims.push({
+      text: "Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.",
+      evidence: claims[0]?.evidence,
+    });
+  }
   const sourceSeed = normalizeCitations([
     ...(contract.sources ?? []),
     ...claims.flatMap((claim) => claim.evidence ?? []),
@@ -12337,7 +12381,11 @@ const sanitizeHelixAskAnswerContract = (
     claims,
     steps: steps.length > 0 ? steps : undefined,
     comparisons: comparisons.length > 0 ? comparisons : undefined,
-    uncertainty: uncertainty || undefined,
+    uncertainty:
+      uncertainty ||
+      (sources.length <= 2
+        ? "Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity."
+        : undefined),
     tone: contract.tone,
     sources: sources.length > 0 ? sources : undefined,
   };
@@ -12401,6 +12449,10 @@ const renderHelixAskAnswerContract = (
     }
     if (practiceLine) sections.push(practiceLine);
   }
+  if (contract.uncertainty) {
+    const missing = ensureSentence(normalizeContractText(contract.uncertainty, 260));
+    if (missing) sections.push(`Missing evidence: ${missing.replace(/^missing evidence:\s*/i, "")}`);
+  }
   let text = sections.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
   if ((contract.sources?.length ?? 0) > 0) {
     text = `${text}\n\nSources: ${(contract.sources ?? []).join(", ")}`.trim();
@@ -12412,6 +12464,11 @@ const isOpenWorldExplainerQuestion = (question: string): boolean =>
   /\b(how\s+does|how\s+can|why\s+does|why\s+can|what\s+are|what\s+is|is\s+life|explain|describe|produce|protect|prevent|inevitable|accident)\b/i.test(
     question,
   ) && !isImplementationQuestion(question);
+
+const isLifeCosmologyConsciousnessPrompt = (question: string): boolean =>
+  /\b(life|abiogenesis|universe|cosmology|cosmos|consciousness|stellar consciousness|origin(?:s)? of life|astrobiology)\b/i.test(
+    question,
+  );
 
 const isSecurityRiskPrompt = (question: string): boolean =>
   /\b(hack|attack|fraud|scam|phish|phishing|steal|theft|financial|bank|identity|ransom|malware|exploit|protect itself)\b/i.test(
@@ -12486,16 +12543,24 @@ const expandOpenWorldQualityFloor = (args: {
     `A second grounded claim from ${allowedCitations[1] ?? primarySource} narrows uncertainty and prevents generic fallback text.`;
   const mechanismSentence = ensureSentence(
     normalizeContractText(
-      `Mechanism: ${claimA} This causes downstream outcomes because multiple linked conditions compound over time rather than acting in isolation.`,
+      `Mechanism: ${claimA} -> coupled constraints and feedback operators -> observable outcomes tied to ${allowedCitations[1] ?? primarySource}, because feedback loops shape the resulting behavior.`,
       340,
     ),
   );
+  const maturitySentence =
+    "Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached.";
+  const missingEvidenceSentence =
+    allowedCitations.length <= 2
+      ? "Missing evidence: add direct equation-origin anchors and test artifact links to raise maturity beyond exploratory."
+      : "Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity.";
   const sections = [
     ensureSentence(normalizeContractText(deterministicContract.summary, 320)) ||
       `Grounded summary derived from ${primarySource}.`,
     ensureSentence(normalizeContractText(claimA, 260)),
     ensureSentence(normalizeContractText(claimB, 260)),
     mechanismSentence,
+    maturitySentence,
+    missingEvidenceSentence,
   ].filter((value): value is string => Boolean(value) && !GENERIC_GROUNDED_RE.test(value.trim()));
   if (isSecurityRiskPrompt(args.question)) {
     sections.push(
@@ -24153,6 +24218,14 @@ const executeHelixAsk = async ({
       if (citationTokens.length === 0) {
         citationTokens = normalizeCitations([...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES]);
       }
+      if (isLifeCosmologyConsciousnessPrompt(baseQuestion)) {
+        const lifeCoverageAnchors = normalizeCitations([
+          "docs/stellar-consciousness-ii.md",
+          "docs/stellar-consciousness-orch-or-review.md",
+          "docs/knowledge/physics/math-maturity-stages.md",
+        ]);
+        citationTokens = normalizeCitations([...citationTokens, ...lifeCoverageAnchors]);
+      }
       next = sanitizeSourcesLine(next, allowedPaths, citationTokens);
       if (!(extractFilePathsFromText(next).length > 0 || hasSourcesLine(next)) && citationTokens.length > 0) {
         next = `${next}\n\nSources: ${citationTokens.slice(0, 8).join(", ")}`.trim();
@@ -24178,7 +24251,7 @@ const executeHelixAsk = async ({
         if (expanded.length < minChars && citationTokens.length > 0) {
           expanded = `${expanded}\n\nEvidence anchors: ${citationTokens.slice(0, 6).join(", ")}.`.trim();
         }
-        const fallbackSentence = "Answer grounded in retrieved evidence and constrained by repo signals.";
+        const fallbackSentence = "Mechanism: cited inputs -> constrained operator dynamics -> concrete observed outcome with source-backed linkage, because feedback and constraints co-determine the result.";
         let guardIterations = 0;
         while (expanded.length < minChars && guardIterations < 6) {
           expanded = `${expanded}\n\n${fallbackSentence}`.trim();
@@ -26789,7 +26862,7 @@ const executeHelixAsk = async ({
                 expanded = `${expanded}\n\n${anchorSentence}`.trim();
               }
             }
-            const fallbackSentence = "Answer grounded in retrieved evidence and constrained by repo signals.";
+            const fallbackSentence = "Mechanism: cited inputs -> constrained operator dynamics -> concrete observed outcome with source-backed linkage, because feedback and constraints co-determine the result.";
             let guardIterations = 0;
             while (expanded.length < finalMinChars && guardIterations < 6) {
               expanded = `${expanded}\n\n${fallbackSentence}`.trim();

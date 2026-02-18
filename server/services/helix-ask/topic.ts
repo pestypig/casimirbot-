@@ -176,6 +176,31 @@ const PHYSICS_PATHS: RegExp[] = [
   /client\/src\/lib\/atomic-orbitals\.ts/i,
 ];
 
+// PS2 stellar-framework retrieval contract anchors.
+const STELLAR_FRAMEWORK_REQUIRED_FILES: string[] = [
+  "docs/stellar-consciousness-ii.md",
+  "docs/stellar-consciousness-orch-or-review.md",
+  "docs/knowledge/dag-node-schema.md",
+  "docs/knowledge/physics/math-tree.json",
+  "docs/knowledge/physics/math-maturity-stages.md",
+  "docs/knowledge/physics/physics-foundations-tree.json",
+  "docs/knowledge/bridges/ideology-physics-bridge-tree.json",
+  "docs/ethos/ideology.json",
+  "WARP_AGENTS.md",
+];
+
+const STELLAR_FRAMEWORK_REQUIRED_PATHS: RegExp[] = [
+  /docs\/stellar-consciousness-ii\.md/i,
+  /docs\/stellar-consciousness-orch-or-review\.md/i,
+  /docs\/knowledge\/dag-node-schema\.md/i,
+  /docs\/knowledge\/physics\/math-tree\.json/i,
+  /docs\/knowledge\/physics\/math-maturity-stages\.md/i,
+  /docs\/knowledge\/physics\/physics-foundations-tree\.json/i,
+  /docs\/knowledge\/bridges\/ideology-physics-bridge-tree\.json/i,
+  /docs\/ethos\/ideology\.json/i,
+  /WARP_AGENTS\.md/i,
+];
+
 const PHYSICS_NOISE_PATHS: RegExp[] = [
   /\.test\.ts$/i,
   /\.spec\.ts$/i,
@@ -692,7 +717,9 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
     boostPaths.push(...PHYSICS_PATHS);
     deboostPaths.push(...PHYSICS_NOISE_PATHS);
     mustIncludePaths.push(...PHYSICS_PATHS);
-    minTierCandidates = Math.max(minTierCandidates, 2);
+    mustIncludePaths.push(...STELLAR_FRAMEWORK_REQUIRED_PATHS);
+    mustIncludeFiles.push(...STELLAR_FRAMEWORK_REQUIRED_FILES);
+    minTierCandidates = Math.max(minTierCandidates, 3);
   }
 
   const uiTagged = tags.some((tag) => tag === "ui" || tag === "frontend" || tag === "client");
