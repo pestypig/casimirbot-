@@ -295,6 +295,134 @@
         "Jobs route publishes queue snapshot contract at GET /api/jobs/queue without breaking existing behavior",
         "Tests validate deterministic context/run-id capture and fallback-mode contract semantics under load"
       ]
+    },
+    {
+      "id": "TOE-022-analysis-loops-provenance-gate",
+      "tree_owner": "analysis-loops",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Analysis loops provenance gate primitive",
+      "primary_path_prefix": "server/routes/analysis-loops.ts",
+      "allowed_paths": [
+        "server/routes/analysis-loops.ts",
+        "modules/analysis/constraint-loop.ts",
+        "modules/analysis/noise-field-loop.ts",
+        "tests/analysis-loops-route.spec.ts",
+        "tests/analysis-loop-contract.spec.ts"
+      ],
+      "required_tests": [
+        "tests/analysis-loops-route.spec.ts",
+        "tests/analysis-loop-contract.spec.ts"
+      ],
+      "done_criteria": [
+        "Analysis-loop API responses include deterministic provenance metadata and claim-tier-safe defaults",
+        "Constraint-loop and noise-field loop paths emit explicit non-certifying markers when upstream evidence is incomplete",
+        "Route and contract tests enforce additive response-shape parity and deterministic firstFail tagging"
+      ]
+    },
+    {
+      "id": "TOE-023-telemetry-console-provenance-contract",
+      "tree_owner": "telemetry-console",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Telemetry console provenance contract primitive",
+      "primary_path_prefix": "server/services/console-telemetry/store.ts",
+      "allowed_paths": [
+        "server/services/console-telemetry/store.ts",
+        "server/services/console-telemetry/persist.ts",
+        "server/services/console-telemetry/summarize.ts",
+        "tests/console-telemetry-contract.spec.ts"
+      ],
+      "required_tests": [
+        "tests/console-telemetry-contract.spec.ts"
+      ],
+      "done_criteria": [
+        "Console telemetry store records additive provenance fields for source class, integrity state, and maturity tier",
+        "Persist and summarize layers preserve provenance contract semantics without dropping prior telemetry dimensions",
+        "Contract tests validate deterministic handling for missing provenance inputs with conservative diagnostic outcomes"
+      ]
+    },
+    {
+      "id": "TOE-024-skills-tooling-risk-contract",
+      "tree_owner": "skills-tooling",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Skills tooling risk contract primitive",
+      "primary_path_prefix": "shared/skills.ts",
+      "allowed_paths": [
+        "shared/skills.ts",
+        "server/skills/index.ts",
+        "server/services/runtime/tool-metadata.ts",
+        "tests/skills-registry-contract.spec.ts",
+        "tests/runtime-tool-policy.spec.ts"
+      ],
+      "required_tests": [
+        "tests/skills-registry-contract.spec.ts",
+        "tests/runtime-tool-policy.spec.ts"
+      ],
+      "done_criteria": [
+        "Skills registry metadata defines explicit risk/provenance contract fields for runtime exposure",
+        "Runtime tool metadata policy rejects unknown or unsafe contract combinations with deterministic reasons",
+        "Registry and runtime policy tests prove backward-compatible additive behavior under strict contract checks"
+      ]
+    },
+    {
+      "id": "TOE-025-sdk-integration-runtime-contract",
+      "tree_owner": "sdk-integration",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "SDK integration runtime contract primitive",
+      "primary_path_prefix": "sdk/src/types.ts",
+      "allowed_paths": [
+        "sdk/src/types.ts",
+        "sdk/src/client.ts",
+        "sdk/src/runtime.ts",
+        "sdk/src/index.ts",
+        "tests/sdk-integration-contract.spec.ts"
+      ],
+      "required_tests": [
+        "tests/sdk-integration-contract.spec.ts"
+      ],
+      "done_criteria": [
+        "SDK runtime types expose deterministic provenance/claim-tier fields for integration responses",
+        "Client and runtime helpers preserve contract parity across exported entry points",
+        "Integration contract test validates serialization and default handling for absent runtime evidence"
+      ]
+    },
+    {
+      "id": "TOE-026-knowledge-ingestion-provenance-budget-contract",
+      "tree_owner": "knowledge-ingestion",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Knowledge ingestion provenance budget contract primitive",
+      "primary_path_prefix": "server/services/knowledge/validation.ts",
+      "allowed_paths": [
+        "server/services/knowledge/validation.ts",
+        "server/services/knowledge/corpus.ts",
+        "server/services/knowledge/merge.ts",
+        "server/routes/knowledge.ts",
+        "tests/knowledge-corpus.spec.ts",
+        "tests/knowledge-validation-contract.spec.ts"
+      ],
+      "required_tests": [
+        "tests/knowledge-corpus.spec.ts",
+        "tests/knowledge-validation-contract.spec.ts"
+      ],
+      "done_criteria": [
+        "Knowledge validation enforces provenance and budget contract checks before corpus merge acceptance",
+        "Corpus and merge flows annotate ingestion decisions with deterministic policy reason codes",
+        "Knowledge route and contract tests cover pass/fail paths for provenance budget enforcement"
+      ]
     }
   ]
 }
