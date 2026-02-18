@@ -1,7 +1,7 @@
 ﻿import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import {
-  ETHOS_KNOWLEDGE_STRICT_FAIL_REASON,
+  ZEN_SOCIETY_STRICT_FAIL_REASON,
   getIdeologyArtifactById,
   searchIdeologyArtifacts,
 } from "../server/services/ideology/artifacts";
@@ -74,7 +74,7 @@ describe("ideology DAG evidence", () => {
       expect(artifact.claim_tier).toBe("diagnostic");
       expect(artifact.certifying).toBe(false);
     }
-    expect(search.fail_reason).toBe(ETHOS_KNOWLEDGE_STRICT_FAIL_REASON);
+    expect(search.fail_reason).toBe(ZEN_SOCIETY_STRICT_FAIL_REASON);
 
     const byId = getIdeologyArtifactById(search.items[0]!.id);
     expect(byId?.provenance_class).toBe("inferred");

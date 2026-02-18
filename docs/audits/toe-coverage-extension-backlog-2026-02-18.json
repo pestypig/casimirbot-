@@ -862,38 +862,32 @@
       ]
     },
     {
-      "id": "TOE-045-toe-research-gate-policy-contract",
-      "tree_owner": "ops-deployment",
+      "id": "TOE-044-zen-society-governance-provenance-contract",
+      "tree_owner": "zen-society",
       "gap_refs": [
+        "F-COV-1",
         "F-COV-5"
       ],
-      "primitive": "TOE research gate policy contract primitive",
-      "primary_path_prefix": "configs/toe-research-gate-policy.v1.json",
+      "primitive": "Zen society governance provenance contract primitive",
+      "primary_path_prefix": "server/routes/ethos.ts",
       "allowed_paths": [
-        "configs/toe-research-gate-policy.v1.json",
-        "scripts/validate-toe-research-gate-policy.ts",
-        "scripts/validate-toe-ticket-backlog.ts",
-        "tests/toe-research-gate-policy.spec.ts",
-        "package.json",
+        "server/routes/ethos.ts",
+        "server/services/ideology/artifacts.ts",
+        "server/services/ideology/render.ts",
+        "tests/ideology-dag.spec.ts",
+        "tests/ideology-telemetry.spec.ts",
+        "configs/resolver-owner-coverage-manifest.v1.json",
         "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
       ],
       "required_tests": [
-        "tests/toe-research-gate-policy.spec.ts"
+        "tests/ideology-dag.spec.ts",
+        "tests/ideology-telemetry.spec.ts"
       ],
       "done_criteria": [
-        "Research gate policy manifest defines deterministic contract fields for TOE risk classes",
-        "Backlog and policy validators enforce research artifacts for physics_unknown and tier_promotion tickets",
-        "Validation script and tests cover backward compatibility when research_gate metadata is absent"
-      ],
-      "research_gate": {
-        "risk_class": "physics_unknown",
-        "requires_audit": true,
-        "requires_research": true,
-        "required_artifacts": [
-          "physics-research-brief",
-          "safety-envelope-analysis"
-        ]
-      }
+        "Zen-society responses include additive provenance_class/claim_tier/certifying metadata",
+        "Strict mode emits deterministic fail_reason ZEN_SOCIETY_PROVENANCE_MISSING when evidence provenance is absent",
+        "Resolver owner coverage marks zen-society as covered_extension and validation remains green"
+      ]
     }
   ]
 }
