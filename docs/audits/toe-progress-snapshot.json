@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T06:22:49.051Z",
+  "generated_at": "2026-02-18T06:35:24.072Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -14,18 +14,18 @@
   },
   "totals": {
     "tickets_total": 51,
-    "tickets_with_evidence": 48,
+    "tickets_with_evidence": 51,
     "claim_tier_counts": {
-      "diagnostic": 47,
-      "reduced-order": 1,
+      "diagnostic": 49,
+      "reduced-order": 2,
       "certified": 0
     },
-    "weighted_score_sum": 12.35,
-    "toe_progress_pct": 24.2,
+    "weighted_score_sum": 13.45,
+    "toe_progress_pct": 26.4,
     "forest_owner_coverage_pct": 100,
-    "strict_ready_progress_pct": 2,
-    "research_gated_tickets_total": 3,
-    "research_artifact_complete_tickets_total": 2
+    "strict_ready_progress_pct": 3.9,
+    "research_gated_tickets_total": 6,
+    "research_artifact_complete_tickets_total": 5
   },
   "segments": {
     "core": {
@@ -44,31 +44,31 @@
     },
     "extension": {
       "tickets_total": 41,
-      "tickets_with_evidence": 38,
+      "tickets_with_evidence": 41,
       "claim_tier_counts": {
-        "diagnostic": 38,
-        "reduced-order": 0,
-        "certified": 0
-      },
-      "weighted_score_sum": 9.5,
-      "toe_progress_pct": 23.2,
-      "strict_ready_progress_pct": 0,
-      "research_gated_tickets_total": 3,
-      "research_artifact_complete_tickets_total": 2
-    },
-    "combined": {
-      "tickets_total": 51,
-      "tickets_with_evidence": 48,
-      "claim_tier_counts": {
-        "diagnostic": 47,
+        "diagnostic": 40,
         "reduced-order": 1,
         "certified": 0
       },
-      "weighted_score_sum": 12.35,
-      "toe_progress_pct": 24.2,
-      "strict_ready_progress_pct": 2,
-      "research_gated_tickets_total": 3,
-      "research_artifact_complete_tickets_total": 2
+      "weighted_score_sum": 10.6,
+      "toe_progress_pct": 25.9,
+      "strict_ready_progress_pct": 2.4,
+      "research_gated_tickets_total": 6,
+      "research_artifact_complete_tickets_total": 5
+    },
+    "combined": {
+      "tickets_total": 51,
+      "tickets_with_evidence": 51,
+      "claim_tier_counts": {
+        "diagnostic": 49,
+        "reduced-order": 2,
+        "certified": 0
+      },
+      "weighted_score_sum": 13.45,
+      "toe_progress_pct": 26.4,
+      "strict_ready_progress_pct": 3.9,
+      "research_gated_tickets_total": 6,
+      "research_artifact_complete_tickets_total": 5
     }
   },
   "tickets": [
@@ -497,24 +497,30 @@
     },
     {
       "ticket_id": "TOE-048-halobank-horizons-physics-research-bridge",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-048-halobank-horizons-physics-research-bridge.20260218T062630Z.json"
     },
     {
       "ticket_id": "TOE-049-warp-viability-tier-promotion-pack",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "reduced-order",
+      "verification_ok": true,
+      "score": 0.6,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-049-warp-viability-tier-promotion-pack.20260218-062242.json"
     },
     {
       "ticket_id": "TOE-050-ideology-physics-bridge-tier-promotion-pack",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-050-ideology-physics-bridge-tier-promotion-pack.20260218T062300Z.json"
     },
     {
       "ticket_id": "TOE-051-research-artifact-progress-ledger",
