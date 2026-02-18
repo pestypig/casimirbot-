@@ -247,6 +247,9 @@ type ParsedArgs = {
   help?: boolean;
 };
 
+export const isCertifyingLane = (args: ParsedArgs): boolean =>
+  args.ci === true || process.env.CASIMIR_CERTIFY === "1";
+
 type MetricValue = number | boolean | string | null | undefined;
 
 type RepoConvergenceTelemetry = {
@@ -2156,7 +2159,10 @@ const buildConstraintPackTraceRecord = (input: {
   };
 };
 
-const buildFallbackTraceRecord = (input: {
+const NON_CERTIFYING_FALLBACK_NOTE =
+  "synthetic_fallback_non_certifying=true";
+
+export const buildFallbackTraceRecord = (input: {
   payload: AdapterRunRequest;
   response: AdapterRunResponse;
   tenantId?: string;
@@ -2167,7 +2173,11 @@ const buildFallbackTraceRecord = (input: {
     `local:${crypto.randomUUID()}`;
   const pass = input.response.pass === true || input.response.verdict === "PASS";
   const deltas = input.response.deltas ?? [];
-  const certificate = ensureTrainingTraceCertificate(input.response.certificate);
+  const certificate = {
+    ...ensureTrainingTraceCertificate(input.response.certificate),
+    status: "NOT_CERTIFIED",
+    integrityOk: false,
+  };
   const metrics = input.payload.pack?.metrics
     ? sanitizeMetrics(input.payload.pack.metrics as Record<string, MetricValue>)
     : undefined;
@@ -2184,6 +2194,7 @@ const buildFallbackTraceRecord = (input: {
     metrics,
     firstFail: input.response.firstFail ?? undefined,
     certificate,
+    notes: [NON_CERTIFYING_FALLBACK_NOTE],
   };
 };
 
@@ -2340,7 +2351,7 @@ const normalizeEndpoint = (input: string, endpointPath: string): string => {
   return `${input.replace(/\/+$/, "")}${endpointPath}`;
 };
 
-const resolveAdapterEndpoint = (explicit?: string): string | undefined => {
+export const resolveAdapterEndpoint = (explicit?: string): string | undefined => {
   if (explicit) {
     return normalizeEndpoint(explicit, "/api/agi/adapter/run");
   }
@@ -2725,6 +2736,12 @@ async function main() {
   }
 
   const adapterUrl = resolveAdapterEndpoint(args.url);
+  const certifyingLane = isCertifyingLane(args);
+  if (certifyingLane && !args.url) {
+    throw new Error(
+      "Certifying lanes require an explicit --url adapter endpoint.",
+    );
+  }
   const traceOut = args.traceOut ?? DEFAULT_TRACE_OUT;
   const traceLimit = Number.isFinite(args.traceLimit)
     ? (args.traceLimit as number)
@@ -2773,6 +2790,11 @@ async function main() {
       traceExported = true;
     } catch (error) {
       console.error("[shadow-of-intent] trace export failed:", error);
+      if (certifyingLane) {
+        throw new Error(
+          "Trace export must succeed in certifying lanes; synthetic fallback blocked.",
+        );
+      }
     }
   }
   if (!traceExported) {
@@ -2800,7 +2822,13 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const isEntrypoint =
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname);
+
+if (isEntrypoint) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

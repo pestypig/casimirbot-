@@ -1,4 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  buildFallbackTraceRecord,
+  isCertifyingLane,
+  resolveAdapterEndpoint,
+} from "../cli/casimir-verify";
 import { resolveRuntimeToolPolicy } from "../server/services/runtime/tool-policy";
 
 describe("runtime tool policy", () => {
@@ -17,5 +22,55 @@ describe("runtime tool policy", () => {
 
   it("returns null for unknown tool", () => {
     expect(resolveRuntimeToolPolicy("missing.tool")).toBeNull();
+  });
+});
+
+describe("casimir verify endpoint hardening", () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    delete process.env.CASIMIR_CERTIFY;
+    delete process.env.CASIMIR_PUBLIC_BASE_URL;
+    delete process.env.SHADOW_OF_INTENT_BASE_URL;
+    delete process.env.CASIMIR_VERIFY_URL;
+    delete process.env.AGI_ADAPTER_URL;
+  });
+
+  it("requires explicit url in certifying mode via cli lane", () => {
+    expect(isCertifyingLane({ ci: true })).toBe(true);
+  });
+
+  it("requires explicit url in certifying mode via env lane", () => {
+    process.env.CASIMIR_CERTIFY = "1";
+    expect(isCertifyingLane({})).toBe(true);
+  });
+
+  it("resolves adapter endpoint only from explicit url when certifying", () => {
+    process.env.CASIMIR_PUBLIC_BASE_URL = "http://localhost:5173";
+    expect(resolveAdapterEndpoint("http://example.com")).toBe(
+      "http://example.com/api/agi/adapter/run",
+    );
+  });
+
+  it("marks synthetic fallback traces as non-certifying", () => {
+    const trace = buildFallbackTraceRecord({
+      payload: { mode: "constraint-pack", pack: { id: "repo-convergence" } },
+      response: {
+        traceId: "trace-1",
+        runId: "run-1",
+        verdict: "PASS",
+        pass: true,
+        certificate: {
+          status: "ADMISSIBLE",
+          certificateHash: "abc",
+          integrityOk: true,
+        },
+      },
+    });
+
+    expect(trace.certificate?.status).toBe("NOT_CERTIFIED");
+    expect(trace.certificate?.integrityOk).toBe(false);
+    expect(trace.notes).toContain("synthetic_fallback_non_certifying=true");
   });
 });

@@ -1,0 +1,16 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-009-verify-endpoint-hardening",
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:eefab060-ad57-4fe6-a438-a5da4cb25b2e",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "notes": [
+    "CI/release verification requires explicit adapter URL and blocks synthetic fallback in certifying lanes.",
+    "Workflow logs now include adapter_url, verdict, cert_integrity."
+  ]
+}

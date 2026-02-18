@@ -74,6 +74,25 @@ jobs:
           chmod +x bin/shadow-of-intent.js bin/shadow-of-intent-verify.js
           echo "CLI_VERSION=$(node -p \"require('./package.json').version\")" >> "$GITHUB_ENV"
 
+      - name: Casimir verify (release gate)
+        env:
+          ADAPTER_VERIFY_URL: ${{ secrets.CASIMIR_ADAPTER_VERIFY_URL }}
+          TRACE_EXPORT_URL: ${{ secrets.CASIMIR_TRACE_EXPORT_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${ADAPTER_VERIFY_URL:-}" ]; then
+            echo "CASIMIR_ADAPTER_VERIFY_URL secret is required for release verification" >&2
+            exit 1
+          fi
+          export_url="${TRACE_EXPORT_URL:-}"
+          if [ -z "$export_url" ]; then
+            export_url="${ADAPTER_VERIFY_URL%/api/agi/adapter/run}/api/agi/training-trace/export"
+          fi
+          mkdir -p artifacts
+          npm run casimir:verify -- --ci --url "$ADAPTER_VERIFY_URL" --export-url "$export_url" --trace-out artifacts/release-training-trace.jsonl --trace-limit 200 | tee artifacts/release-casimir-verify-response.json
+          node -e 'const fs=require("fs"); const adapter=process.env.ADAPTER_VERIFY_URL; const raw=fs.readFileSync("artifacts/release-casimir-verify-response.json","utf8"); const j=JSON.parse(raw); const verdict=(j.verdict ?? (j.pass ? "PASS" : "FAIL")); const cert=j.certificate ?? {}; const integrity=(cert.integrityOk===true?"OK":"NOT_OK"); console.log(`[casimir-release-verify] adapter_url=${adapter} verdict=${verdict} cert_integrity=${integrity}`);'
+
       - name: Commit + tag
         shell: bash
         run: |
