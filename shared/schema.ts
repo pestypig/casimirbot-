@@ -2538,6 +2538,7 @@ export const trainingTraceSchema = z.object({
   certificate: trainingTraceCertificateSchema.optional(),
   predictionObservationLedger: predictionObservationLedgerSchema.optional(),
   payload: trainingTracePayloadSchema.optional(),
+  eventRefs: z.array(z.string()).optional(),
   notes: z.array(z.string()).optional(),
 });
 export type TrainingTraceRecord = z.infer<typeof trainingTraceSchema>;

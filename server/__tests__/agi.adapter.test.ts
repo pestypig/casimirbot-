@@ -119,6 +119,7 @@ describe("agi adapter API", () => {
 
 
 
+
   it("returns premeditation scoring for deterministic candidate selection", async () => {
     const response = await request(app)
       .post("/api/agi/adapter/run")
@@ -322,4 +323,5 @@ describe("agi adapter API", () => {
     expect(response.body?.certificate?.certificateHash).toBeTruthy();
     expect(response.body?.certificate?.integrityOk).toBe(true);
   });
+
 });
