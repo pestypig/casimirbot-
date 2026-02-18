@@ -240,3 +240,28 @@ Mandatory Casimir + trace export and full gate table.
   - `artifacts/experiments/helix-ask-quake-frame-loop/2026-02-18T23-21-03-498Z/semantic-gates.json`
 - Next single highest-priority task:
   - Fix ask-runtime readiness/reliability path, then rerun Stage B2 semantic gates in decision-grade mode.
+
+### Handoff Snapshot 2026-02-18T23:37:00Z
+- Branch/HEAD: cloud runs, commits `75111c6`, `9a89e0c`, `ff1c149`
+- Result type: mixed (`pass` audit bookkeeping, `blocked` rerun precheck, `needs_patch` fix verification)
+- Stage completed: Stage B2 support lane (reasoning-health audit + availability precheck hardening attempts)
+- Gates passed:
+  - Build-driving reasoning health audit generated with capability scoring and backlog order (`reports/helix-ask-reasoning-health-audit-20260218T233608Z.md`)
+  - Blocked rerun still captured explicit Casimir PASS on `repo-convergence`
+  - Availability precheck pattern established for fail-fast campaign gating
+- Gates failed:
+  - Availability precheck probes returned runtime failure then cooldown 503 (`selectedMove` initialization error then circuit cooldown)
+  - Post-fix cloud patch verification had unresolved `helix-ask-modes.spec.ts` verify-mode assertion failures
+  - One cloud verification pass failed with adapter endpoint unavailable (`ECONNREFUSED`)
+- Casimir:
+  - PASS (repo-convergence) `certificateHash=6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`, `integrityOk=true`
+  - FAIL in separate cloud patch run due endpoint unavailability (no certificate)
+- New artifacts:
+  - `reports/helix-ask-reasoning-health-audit-20260218T233608Z.md`
+  - `reports/helix-ask-versatility-post-fix-20260218T233657Z-blocked-precheck.md` (reported by cloud run)
+  - `artifacts/experiments/helix-ask-versatility/20260218T233657Z-blocked-precheck/summary.json` (reported by cloud run)
+  - `artifacts/experiments/helix-ask-versatility/20260218T233657Z-blocked-precheck/failures.json` (reported by cloud run)
+  - `artifacts/experiments/helix-ask-versatility/20260218T233657Z-blocked-precheck/recommendation.json` (reported by cloud run)
+  - `docs/audits/helix-results/HELIX-PS2-versatility-audit-and-availability-precheck.20260218T233700Z.json`
+- Next single highest-priority task:
+  - Land/validate selectedMove ordering + availability precheck hardening on the campaign branch, then rerun the exact 90 prompt x 3 seed versatility matrix only after `/api/agi/ask` precheck is 200 for all probes.

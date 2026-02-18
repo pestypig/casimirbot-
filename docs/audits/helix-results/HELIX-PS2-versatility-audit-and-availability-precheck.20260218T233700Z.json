@@ -1,0 +1,176 @@
+{
+  "schema_version": "helix_build_session_bookkeeping/1",
+  "ticket_id": "HELIX-PS2-versatility-audit-and-availability-precheck",
+  "recorded_at": "2026-02-18T23:37:00Z",
+  "executive_summary": [
+    "Recorded a build-driving Helix Ask reasoning health audit with capability scoring, blocker split, patch backlog, and Codex Cloud build order.",
+    "Recorded a post-fix rerun attempt that was intentionally blocked by availability precheck after runtime error and cooldown 503 responses.",
+    "Recorded the selectedMove ordering plus availability-precheck hardening patch attempt and its current verification gaps."
+  ],
+  "phases": [
+    {
+      "phase_id": "audit_build_driving_map",
+      "result_type": "pass",
+      "reported_commit_hash": "75111c6",
+      "artifacts": [
+        "reports/helix-ask-reasoning-health-audit-20260218T233608Z.md"
+      ],
+      "tests": [
+        {
+          "status": "PASS",
+          "item": "npx vitest run tests/casimir-verify-ps2.spec.ts"
+        },
+        {
+          "status": "PASS",
+          "item": "cat artifacts/experiments/helix-ask-ps2/casimir-verify-latest.json",
+          "detail": "verdict=PASS, certificate hash=d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d, integrity=true"
+        }
+      ],
+      "casimir": {
+        "verdict": "PASS",
+        "certificate_hash": "d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d",
+        "integrity_ok": true
+      }
+    },
+    {
+      "phase_id": "post_fix_rerun_blocked_precheck",
+      "result_type": "blocked",
+      "reported_commit_hash": "9a89e0cc3ed48dec1b03ca08e596977dd9f2af48",
+      "executive_summary": [
+        "Availability precheck blocked rerun: probe #1 hit selectedMove initialization runtime failure and probes #2/#3 hit cooldown 503.",
+        "Campaign stopped before goal-zone and 270-run versatility matrix as required by fail-fast policy.",
+        "Blocked-run report and summary artifacts were generated for build triage."
+      ],
+      "metrics_before_after": [
+        {
+          "metric": "intent",
+          "before": "N/A (baseline file missing in that cloud snapshot)",
+          "after": "N/A (blocked before matrix)"
+        },
+        {
+          "metric": "report",
+          "before": "N/A (baseline file missing in that cloud snapshot)",
+          "after": "N/A (blocked before matrix)"
+        },
+        {
+          "metric": "relation",
+          "before": "N/A (baseline file missing in that cloud snapshot)",
+          "after": "N/A (blocked before matrix)"
+        },
+        {
+          "metric": "citation",
+          "before": "N/A (baseline file missing in that cloud snapshot)",
+          "after": "N/A (blocked before matrix)"
+        },
+        {
+          "metric": "invalid",
+          "before": "N/A (baseline file missing in that cloud snapshot)",
+          "after": "N/A (blocked before matrix)"
+        },
+        {
+          "metric": "completion",
+          "before": "N/A (baseline file missing in that cloud snapshot)",
+          "after": "0/270 executed"
+        }
+      ],
+      "top_failure_signatures": [
+        {
+          "key": "llm_local_failed:selectedMove_before_initialization",
+          "count": 1
+        },
+        {
+          "key": "helix_ask_temporarily_unavailable:cooldown_after_runtime_error",
+          "count": 2
+        }
+      ],
+      "artifacts": [
+        "reports/helix-ask-versatility-post-fix-20260218T233657Z-blocked-precheck.md",
+        "artifacts/experiments/helix-ask-versatility/20260218T233657Z-blocked-precheck/summary.json",
+        "artifacts/experiments/helix-ask-versatility/20260218T233657Z-blocked-precheck/failures.json",
+        "artifacts/experiments/helix-ask-versatility/20260218T233657Z-blocked-precheck/recommendation.json"
+      ],
+      "tests": [
+        {
+          "status": "PASS",
+          "item": "npm run dev:agi:5173"
+        },
+        {
+          "status": "FAIL",
+          "item": "availability precheck probes to /api/agi/ask",
+          "detail": "500/503 responses, campaign blocked"
+        },
+        {
+          "status": "FAIL",
+          "item": "npm run casimir:verify -- --url .../api/agi/adapter/run --export-url .../api/agi/training-trace/export",
+          "detail": "default pack FAIL in that run context"
+        },
+        {
+          "status": "FAIL",
+          "item": "npm run casimir:verify -- --params '{...}' --ci --url ... --export-url ...",
+          "detail": "adapter 500 autoscale-not-settled"
+        },
+        {
+          "status": "PASS",
+          "item": "npm run casimir:verify -- --pack repo-convergence --url ... --export-url ...",
+          "detail": "PASS on explicit repo-convergence pack"
+        }
+      ],
+      "casimir": {
+        "verdict": "PASS",
+        "pack": "repo-convergence",
+        "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+        "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+        "integrity_ok": true,
+        "trace_export_path": "artifacts/training-trace-post-fix-blocked.jsonl"
+      }
+    },
+    {
+      "phase_id": "selectedmove_ordering_and_precheck_hardening_patch",
+      "result_type": "needs_patch",
+      "reported_commit_hash": "ff1c149",
+      "summary": [
+        "Moved deterministic selectedMove selection ahead of weak-evidence fallback logic so fallback paths no longer read selectedMove before initialization.",
+        "Added reusable availability precheck utility and wired it into goal-zone and versatility entrypoints for fail-fast non-200 handling.",
+        "Added tests for non-crash path and availability precheck behavior."
+      ],
+      "files_changed": [
+        "server/routes/agi.plan.ts",
+        "scripts/helix-ask-availability-precheck.ts",
+        "scripts/helix-ask-goal-zone.ts",
+        "scripts/helix-ask-versatility-record.ts",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-availability-precheck.spec.ts"
+      ],
+      "tests": [
+        {
+          "status": "FAIL",
+          "item": "npx vitest run tests/helix-ask-focused-utility-hardening.spec.ts tests/helix-ask-ps2-runtime-report.spec.ts tests/helix-ask-semantic-quality.spec.ts tests/helix-ask-modes.spec.ts",
+          "detail": "existing verify-mode adapter assertions failed in helix-ask-modes.spec.ts"
+        },
+        {
+          "status": "FAIL",
+          "item": "npx vitest run tests/helix-ask-modes.spec.ts tests/helix-ask-availability-precheck.spec.ts",
+          "detail": "precheck tests passed; existing verify-mode adapter assertions failed in helix-ask-modes.spec.ts"
+        },
+        {
+          "status": "FAIL",
+          "item": "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci",
+          "detail": "ECONNREFUSED to localhost:5173 in that cloud environment"
+        }
+      ],
+      "casimir": {
+        "verdict": "FAIL",
+        "trace_id": "N/A",
+        "run_id": "N/A",
+        "certificate_hash": "N/A",
+        "integrity_ok": false
+      }
+    }
+  ],
+  "consolidated_next_actions": [
+    "Land selectedMove ordering and availability precheck hardening on the mainline branch used for campaigns.",
+    "Require three consecutive 200 precheck probes on /api/agi/ask before goal-zone or versatility run starts.",
+    "Re-run the exact 90 prompt x 3 seed versatility matrix for before/after comparability once runtime is stable.",
+    "Close remaining verify-mode assertion failures in tests/helix-ask-modes.spec.ts before marking decision-grade pass."
+  ]
+}
