@@ -1598,6 +1598,43 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-070-halobank-horizons-long-window-calibration-pack",
+      "tree_owner": "simulation-systems",
+      "primitive": "Halobank-Horizons long-window calibration pack",
+      "primary_path_prefix": "server/services/halobank/time-model.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "server/services/halobank/time-model.ts",
+        "server/skills/halobank.time.compute.ts",
+        "server/utils/horizons-proxy.ts",
+        "tests/halobank-time-model.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts",
+        "tests/horizons-proxy.spec.ts",
+        "docs/audits/research/TOE-070-tier-promotion-rationale.md",
+        "docs/audits/research/TOE-070-comparative-evidence-pack.md",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/halobank-time-model.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts",
+        "tests/horizons-proxy.spec.ts"
+      ],
+      "done_criteria": [
+        "Long-window residual envelope criteria are explicit and testable",
+        "Promotion/downgrade outcomes are deterministic under missing/out-of-envelope evidence",
+        "Research artifacts map assumptions, falsifiability hooks, and tier recommendation"
+      ],
+      "research_gate": {
+        "risk_class": "tier_promotion",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "tier-promotion-rationale",
+          "comparative-evidence-pack"
+        ]
+      }
     }
   ]
 }
