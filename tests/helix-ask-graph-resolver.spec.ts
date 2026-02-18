@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   __testOnlyNormalizeGraphEvidenceEntry,
+  __testOnlyResolveBridgeMissingEvidencePath,
   __testOnlyResolveTreeNeighborIds,
   resolveHelixAskGraphPack,
 } from "../server/services/helix-ask/graph-resolver";
@@ -356,6 +357,66 @@ describe("helix ask graph resolver congruence overrides", () => {
     expect(entry?.provenance_class).toBe("measured");
     expect(entry?.claim_tier).toBe("diagnostic");
     expect(entry?.certifying).toBe(false);
+  });
+
+  it("registers stellar PS1 bridge tree and preserves deterministic traversal order", () => {
+    const question = "Explain consciousness and cosmology bridge constraints for open-world life prompts";
+    const first = resolveHelixAskGraphPack({
+      question,
+      topicTags: ["physics", "star"],
+      lockedTreeIds: ["stellar-ps1-bridges"],
+      pathMode: "full",
+    });
+    const second = resolveHelixAskGraphPack({
+      question,
+      topicTags: ["physics", "star"],
+      lockedTreeIds: ["stellar-ps1-bridges"],
+      pathMode: "full",
+    });
+
+    const firstFramework = first?.frameworks.find((entry) => entry.treeId === "stellar-ps1-bridges");
+    const secondFramework = second?.frameworks.find((entry) => entry.treeId === "stellar-ps1-bridges");
+    expect(firstFramework).toBeTruthy();
+    expect(secondFramework).toBeTruthy();
+
+    const firstPath = (firstFramework?.path ?? []).map((entry) => entry.id);
+    const secondPath = (secondFramework?.path ?? []).map((entry) => entry.id);
+    expect(firstPath).toEqual(secondPath);
+    expect(firstPath).toContain("bridge-orch-or-to-stellar-coherence");
+    expect(firstPath).toContain("bridge-noise-spectrum-to-collapse-proxy");
+  });
+
+  it("emits structured missing-evidence path for life/cosmology/consciousness family when bridge anchors are missing", () => {
+    const missing = __testOnlyResolveBridgeMissingEvidencePath({
+      question: "How does consciousness relate to cosmology and life emergence in open-world settings?",
+      availableNodeIds: ["uncertainty-mechanics"],
+      bridgeNodeIds: ["bridge-orch-or-to-stellar-coherence"],
+    });
+
+    expect(missing).toBeTruthy();
+    expect(missing?.family).toBe("life_cosmology_consciousness");
+    expect(missing?.missingAnchors).toEqual(
+      expect.arrayContaining([
+        "expansion_frontier",
+        "no-feasibility-claims",
+        "qi-diagnostics-schema",
+        "sampling-time-bounds",
+        "scaling-laws",
+      ]),
+    );
+  });
+
+  it("emits structured missing-evidence path for AI/financial/defense/security family", () => {
+    const missing = __testOnlyResolveBridgeMissingEvidencePath({
+      question: "What is the security posture for AI financial defense under adversarial risk?",
+      availableNodeIds: ["uncertainty-mechanics", "no-feasibility-claims"],
+      bridgeNodeIds: ["bridge-noise-spectrum-to-collapse-proxy"],
+    });
+
+    expect(missing).toBeTruthy();
+    expect(missing?.family).toBe("ai_financial_defense_security");
+    expect(missing?.missingAnchors).toEqual(expect.arrayContaining(["sampling-time-bounds", "verification_hook"]));
+    expect(missing?.bridgeNodes).toContain("bridge-noise-spectrum-to-collapse-proxy");
   });
 
 });

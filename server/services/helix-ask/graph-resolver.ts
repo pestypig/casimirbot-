@@ -60,6 +60,15 @@ export type HelixAskGraphFramework = {
   anchorScore?: number;
   pathScore?: number;
   congruenceDiagnostics?: HelixAskGraphCongruenceDiagnostics;
+  missingEvidencePath?: HelixAskGraphMissingEvidencePath;
+};
+
+export type HelixAskGraphMissingEvidencePath = {
+  treeId: string;
+  family: "life_cosmology_consciousness" | "ai_financial_defense_security";
+  requiredAnchors: string[];
+  missingAnchors: string[];
+  bridgeNodes: string[];
 };
 
 export type HelixAskGraphCongruenceDiagnostics = {
@@ -230,6 +239,11 @@ const DEFAULT_PACK_MIN_SCORE_RATIO = 0.25;
 const MAX_PACK_TREES_LIMIT = 6;
 const LOCKED_TREE_SCORE_BONUS = 4;
 const DEFAULT_GRAPH_PATH_MODE: HelixAskGraphPathMode = "full";
+
+const LIFE_COSMOLOGY_CONSCIOUSNESS_RE =
+  /\b(life|origin(?:s)? of life|abiogenesis|cosmology|consciousness|stellar consciousness|open-world)\b/i;
+const AI_FINANCIAL_DEFENSE_SECURITY_RE =
+  /\b(ai|financial|defense|security|fraud|phish(?:ing)?|cyber(?:security| attack)?)\b/i;
 
 const DEFAULT_CONGRUENCE_WALK_CONFIG_PATH = "docs/warp-tree-dag-walk-config.json";
 const DEFAULT_CONGRUENCE_WALK_CONFIG = {
@@ -997,9 +1011,10 @@ const buildScaffoldLines = (
   tree: GraphTree,
   anchors: HelixAskGraphResolvedNode[],
   path: HelixAskGraphResolvedNode[],
+  missingEvidencePath?: HelixAskGraphMissingEvidencePath,
 ): string[] => {
   const anchorIds = new Set(anchors.map((node) => node.id));
-  return path.map((node) => {
+  const lines = path.map((node) => {
     const title = node.title ?? node.id;
     const excerpt = node.excerpt ? clipText(node.excerpt, 160) : "";
     const artifact = node.artifact ? clipText(node.artifact, 120) : "";
@@ -1017,6 +1032,12 @@ const buildScaffoldLines = (
     parts.push(`(${node.sourcePath ?? tree.sourcePath})`);
     return `- ${parts.join(" ")}`;
   });
+  if (missingEvidencePath) {
+    lines.push(
+      `- MissingEvidencePath: ${JSON.stringify(missingEvidencePath)} (${tree.sourcePath})`,
+    );
+  }
+  return lines;
 };
 
 const buildContextBlock = (tree: GraphTree, lines: string[]): string => {
@@ -1035,6 +1056,115 @@ type GraphFrameworkCandidate = {
 
 const scoreGraphCandidate = (anchorScore: number, pathScore: number, hitCount: number): number =>
   anchorScore * 2 + pathScore + hitCount;
+
+const resolveBridgeMissingEvidencePath = (input: {
+  question: string;
+  tree: GraphTree;
+  resolvedPath: HelixAskGraphResolvedNode[];
+  crossTreeNodeIndex: Map<string, GraphNodeRef>;
+}): HelixAskGraphMissingEvidencePath | undefined => {
+  if (input.tree.id !== "stellar-ps1-bridges") return undefined;
+  const question = input.question;
+  const bridgeNodes = input.resolvedPath
+    .filter((node) => node.nodeType === "bridge" || node.id.includes("bridge-"))
+    .map((node) => node.id)
+    .sort((a, b) => a.localeCompare(b));
+  if (bridgeNodes.length === 0) return undefined;
+
+  const family = LIFE_COSMOLOGY_CONSCIOUSNESS_RE.test(question)
+    ? "life_cosmology_consciousness"
+    : AI_FINANCIAL_DEFENSE_SECURITY_RE.test(question)
+      ? "ai_financial_defense_security"
+      : undefined;
+  if (!family) return undefined;
+  const requiredAnchors =
+    family === "life_cosmology_consciousness"
+      ? [
+          "uncertainty-mechanics",
+          "no-feasibility-claims",
+          "sampling-time-bounds",
+          "scaling-laws",
+          "qi-diagnostics-schema",
+          "expansion_frontier",
+        ]
+      : [
+          "uncertainty-mechanics",
+          "no-feasibility-claims",
+          "verification_hook",
+          "sampling-time-bounds",
+        ];
+  const missingAnchors = requiredAnchors
+    .filter((anchor) => !input.tree.nodeById.has(anchor) && !input.crossTreeNodeIndex.has(anchor))
+    .sort((a, b) => a.localeCompare(b));
+  if (missingAnchors.length === 0) return undefined;
+  return {
+    treeId: input.tree.id,
+    family,
+    requiredAnchors,
+    missingAnchors,
+    bridgeNodes,
+  };
+};
+
+export function __testOnlyResolveBridgeMissingEvidencePath(input: {
+  question: string;
+  treeId?: string;
+  availableNodeIds?: string[];
+  bridgeNodeIds?: string[];
+}): HelixAskGraphMissingEvidencePath | undefined {
+  const treeId = input.treeId ?? "stellar-ps1-bridges";
+  const availableNodeIds = new Set(input.availableNodeIds ?? []);
+  const bridgeNodeIds = input.bridgeNodeIds ?? ["bridge-orch-or-to-stellar-coherence"];
+  return resolveBridgeMissingEvidencePath({
+    question: input.question,
+    tree: {
+      id: treeId,
+      label: treeId,
+      sourcePath: "tests/fixtures/bridge-missing-evidence-tree.json",
+      rootId: "root",
+      nodes: [],
+      nodeById: new Map(Array.from(availableNodeIds).map((id) => [id, { id } as GraphNode])),
+      neighbors: new Map(),
+      config: { id: treeId, path: "tests/fixtures/bridge-missing-evidence-tree.json" },
+      congruenceDiagnostics: {
+        inventory: { nodesCount: 0, evaluatedEdges: 0, blockedLinkCount: 0 },
+        allowedEdges: 0,
+        blockedEdges: 0,
+        resolvedInTreeEdges: 0,
+        resolvedCrossTreeEdges: 0,
+        blockedByReason: {
+          blocked_link: 0,
+          conceptual_disallowed: 0,
+          proxy_disallowed: 0,
+          cl_exceeds_allowed: 0,
+          chart_mismatch: 0,
+          condition_unsatisfied: 0,
+          unresolved_target: 0,
+        },
+        blockedByCondition: {},
+        strictSignals: {
+          B_equals_1: true,
+          qi_metric_derived_equals_true: true,
+          qi_strict_ok_equals_true: true,
+          theta_geom_equals_true: true,
+          vdb_two_wall_support_equals_true: false,
+          ts_metric_derived_equals_true: false,
+          cl3_metric_t00_available_equals_true: false,
+          cl3_rho_gate_equals_true: false,
+        },
+      },
+    },
+    resolvedPath: bridgeNodeIds.map((id) => ({
+      id,
+      title: id,
+      tags: ["bridge"],
+      score: 1,
+      depth: 0,
+      nodeType: "bridge",
+    })),
+    crossTreeNodeIndex: new Map(),
+  });
+}
 
 const buildNodeScoringMap = (
   nodeScores: Array<{ node: GraphNode; score: number }>,
@@ -1433,7 +1563,10 @@ const buildFrameworkCandidate = (
           if (a.neighbor.weight !== b.neighbor.weight) {
             return b.neighbor.weight - a.neighbor.weight;
           }
-          return b.score - a.score;
+          if (b.score !== a.score) {
+            return b.score - a.score;
+          }
+          return a.neighbor.id.localeCompare(b.neighbor.id);
         });
       for (const entry of sortedNeighbors) {
         if (ordered.length >= maxNodes) break;
@@ -1470,7 +1603,16 @@ const buildFrameworkCandidate = (
     }
     withRoles = resolveRoles(tree, ordered).slice(0, maxNodes);
   }
-  const lines = buildScaffoldLines(tree, resolvedAnchors, withRoles);
+  const missingEvidencePath = resolveBridgeMissingEvidencePath({
+    question: questionNorm,
+    tree,
+    resolvedPath: withRoles,
+    crossTreeNodeIndex,
+  });
+  if (missingEvidencePath) {
+    pathFallbackReason = pathFallbackReason ?? "missing_required_bridge_anchor";
+  }
+  const lines = buildScaffoldLines(tree, resolvedAnchors, withRoles, missingEvidencePath);
   if (lines.length === 0) return null;
   const scaffoldText = lines.join("\n");
   const contextText = buildContextBlock(tree, lines);
@@ -1497,6 +1639,7 @@ const buildFrameworkCandidate = (
     pathMode: resolvedPathMode,
     pathFallbackReason,
     congruenceDiagnostics: tree.congruenceDiagnostics,
+    missingEvidencePath,
   };
   return { framework, score: weightedScore, anchorScore, pathScore, hitCount };
 };
