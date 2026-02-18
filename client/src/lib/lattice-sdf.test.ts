@@ -60,6 +60,11 @@ describe("buildHullDistanceGrid", () => {
     expect(grid.stats.maxQuantizationError).toBeCloseTo(
       0.5 * Math.sqrt(3) * smallFrame.voxelSize_m,
     );
+    expect(grid.provenance).toEqual({
+      claimTier: "diagnostic",
+      certifying: false,
+      source: "lattice-dataflow/default",
+    });
   });
 
   it("returns a cache hit for identical mesh/basis signatures", async () => {
@@ -149,5 +154,25 @@ describe("buildHullDistanceGrid", () => {
     const hash2 = await hashLatticeSdfDeterminism(grid, { sampleCount: 64, quantScale: 1e5 });
     expect(hash1).toBe(hash2);
     expect(hash1.length).toBeGreaterThanOrEqual(8);
+  });
+
+
+  it("preserves certifying provenance when explicitly provided", async () => {
+    const certFrame = buildLatticeFrame({
+      hullDims: { Lx_m: 2, Ly_m: 2, Lz_m: 2 },
+      basis: HULL_BASIS_IDENTITY,
+      boundsProfile: "tight",
+      preset: "low",
+      overrides: { targetVoxel_m: 0.5, maxDim: 12, maxVoxels: 4000 },
+      provenance: { claimTier: "certifying", certifying: true, source: "toe-030" },
+    });
+
+    const res = await buildHullDistanceGrid({
+      payload: cubePayload,
+      frame: certFrame,
+      band: 1.0,
+      maxSamples: 120_000,
+    });
+    expect(res.grid?.provenance).toEqual({ claimTier: "certifying", certifying: true, source: "toe-030" });
   });
 });

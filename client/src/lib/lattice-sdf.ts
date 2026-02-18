@@ -1,8 +1,26 @@
 import type { HullPreviewPayload } from "@shared/schema";
 import type { HullSurfaceMesh, HullSurfaceMeshOptions, HullSurfaceMeshResult } from "./resolve-wireframe-overlay";
 import { resolveHullSurfaceMesh } from "./resolve-wireframe-overlay";
-import type { LatticeFrame } from "./lattice-frame";
+import type { LatticeClaimTier, LatticeFrame, LatticeProvenance } from "./lattice-frame";
 import { hashSignature, normalizeBasisForSignature } from "./card-signatures";
+
+
+const DEFAULT_LATTICE_PROVENANCE: LatticeProvenance = Object.freeze({
+  claimTier: "diagnostic",
+  certifying: false,
+  source: "lattice-dataflow/default",
+});
+
+const resolveLatticeProvenance = (provenance?: Partial<LatticeProvenance> | null): LatticeProvenance => {
+  if (!provenance) return DEFAULT_LATTICE_PROVENANCE;
+  const claimTier: LatticeClaimTier = provenance.claimTier === "certifying" ? "certifying" : "diagnostic";
+  const certifying = claimTier === "certifying" ? provenance.certifying !== false : false;
+  const source =
+    typeof provenance.source === "string" && provenance.source.trim()
+      ? provenance.source
+      : DEFAULT_LATTICE_PROVENANCE.source;
+  return { claimTier, certifying, source };
+};
 
 export type HullDistanceGrid = {
   key: string;
@@ -16,6 +34,7 @@ export type HullDistanceGrid = {
   indices: Uint32Array;
   distances: Float32Array;
   cacheHit: boolean;
+  provenance: LatticeProvenance;
   clampReasons: string[];
   stats: {
     sampleCount: number;
@@ -230,7 +249,7 @@ export async function buildHullDistanceGrid(
   const cached = cache.get(cacheKey);
   if (cached) {
     return {
-      grid: { ...cached, cacheHit: true, clampReasons: [...cached.clampReasons] },
+      grid: { ...cached, cacheHit: true, provenance: resolveLatticeProvenance(frame.provenance), clampReasons: [...cached.clampReasons] },
       clampReasons: [...cached.clampReasons],
       key: cacheKey,
     };
@@ -359,6 +378,7 @@ export async function buildHullDistanceGrid(
     indices: indicesOut,
     distances,
     cacheHit: false,
+    provenance: resolveLatticeProvenance(frame.provenance),
     clampReasons,
     stats: {
       sampleCount: samples,

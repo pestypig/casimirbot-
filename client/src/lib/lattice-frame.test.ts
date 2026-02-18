@@ -94,4 +94,23 @@ describe("buildLatticeFrame", () => {
       expect(frame.voxelSize_m).toBeGreaterThanOrEqual(budget.minVoxel_m);
     }
   });
+
+  it("adds deterministic diagnostic provenance defaults", () => {
+    const frame = buildLatticeFrame({
+      hullDims: { Lx_m: 4, Ly_m: 2, Lz_m: 1 },
+      basis: HULL_BASIS_IDENTITY,
+    });
+    expect(frame.provenance).toEqual({
+      claimTier: "diagnostic",
+      certifying: false,
+      source: "lattice-dataflow/default",
+    });
+
+    const downgraded = buildLatticeFrame({
+      hullDims: { Lx_m: 4, Ly_m: 2, Lz_m: 1 },
+      basis: HULL_BASIS_IDENTITY,
+      provenance: { claimTier: "diagnostic", certifying: true, source: "   " },
+    });
+    expect(downgraded.provenance).toEqual(frame.provenance);
+  });
 });

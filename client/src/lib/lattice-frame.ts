@@ -6,6 +6,28 @@ export type LatticeQualityPreset = "auto" | "low" | "medium" | "high" | "card";
 
 type Vec3 = [number, number, number];
 
+export type LatticeClaimTier = "diagnostic" | "certifying";
+
+export type LatticeProvenance = {
+  claimTier: LatticeClaimTier;
+  certifying: boolean;
+  source: string;
+};
+
+const DEFAULT_LATTICE_PROVENANCE: LatticeProvenance = Object.freeze({
+  claimTier: "diagnostic",
+  certifying: false,
+  source: "lattice-dataflow/default",
+});
+
+const resolveLatticeProvenance = (provenance?: Partial<LatticeProvenance> | null): LatticeProvenance => {
+  if (!provenance) return DEFAULT_LATTICE_PROVENANCE;
+  const claimTier: LatticeClaimTier = provenance.claimTier === "certifying" ? "certifying" : "diagnostic";
+  const certifying = claimTier === "certifying" ? provenance.certifying !== false : false;
+  const source = typeof provenance.source === "string" && provenance.source.trim() ? provenance.source : DEFAULT_LATTICE_PROVENANCE.source;
+  return { claimTier, certifying, source };
+};
+
 export type LatticeQualityBudget = {
   paddingPct: number;       // Fractional padding applied to each axis (per side) relative to the hull extent.
   paddingMin_m: number;     // Absolute minimum padding per side in meters.
@@ -132,6 +154,7 @@ export type LatticeFrameInput = {
   profileTag?: LatticeProfileTag;
   overrides?: LatticeBudgetOverrides | null;
   centerWorld?: Vec3;
+  provenance?: Partial<LatticeProvenance> | null;
 };
 
 export type LatticeFrame = {
@@ -153,6 +176,7 @@ export type LatticeFrame = {
   latticeToWorld: Float32Array;
   worldToLattice: Float32Array;
   budget: LatticeQualityBudget;
+  provenance: LatticeProvenance;
   clampReasons: string[];
 };
 
@@ -258,6 +282,7 @@ export function buildLatticeFrame(input: LatticeFrameInput): LatticeFrame {
   const latticeMax: Vec3 = [paddedHalf[0], paddedHalf[1], paddedHalf[2]];
   const centerWorld = input.centerWorld ?? vec3();
   const { latticeToWorld, worldToLattice } = buildTransforms(input.basis, centerWorld);
+  const provenance = resolveLatticeProvenance(input.provenance);
 
   return {
     preset,
@@ -278,6 +303,7 @@ export function buildLatticeFrame(input: LatticeFrameInput): LatticeFrame {
     latticeToWorld,
     worldToLattice,
     budget,
+    provenance,
     clampReasons,
   };
 }
