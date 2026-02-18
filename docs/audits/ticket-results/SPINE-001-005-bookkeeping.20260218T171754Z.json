@@ -1,0 +1,164 @@
+{
+  "schema_version": "spine_ticket_bookkeeping/1",
+  "recorded_at": "2026-02-18T17:17:54Z",
+  "tickets": [
+    {
+      "ticket_id": "SPINE-001-fail-closed-verify-policy",
+      "files_changed": [
+        "server/services/helix-ask/verify-policy.ts",
+        "server/routes/agi.plan.ts",
+        "server/services/adapter/run.ts",
+        "shared/schema.ts",
+        "server/tests/agi.adapter.test.ts",
+        "server/tests/agi.plan.verify-policy.test.ts",
+        "docs/ADAPTER-CONTRACT.md"
+      ],
+      "tests_run": [
+        "✅ npx vitest run server/tests/agi.adapter.test.ts server/tests/agi.plan.verify-policy.test.ts",
+        "❌ npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci (initial failure: endpoint unavailable)",
+        "✅ npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci (PASS rerun)"
+      ],
+      "casimir": {
+        "verdict": "PASS",
+        "firstFail": null,
+        "trace_id": "casimir-local",
+        "run_id": "run-local-1",
+        "certificate_hash": "sha256:local-pass-cert",
+        "integrity_ok": true
+      },
+      "notes": [
+        "Added strict/permissive verify-policy contract and deterministic degrade-reason -> canonical firstFail mapping for fail-closed semantics.",
+        "Removed synthetic verify fallback in helix ask verify path; adapter errors/missing proof now degrade via deterministic fail reasons and strict verify returns fail-closed response with proof metadata labels.",
+        "Adapter execution now enforces strict verify fail-closed when PASS lacks valid certificate evidence, preserving canonical firstFail normalization classes/IDs.",
+        "Extended adapter request policy contract with policy.verify.mode (strict|permissive) and documented behavior in adapter contract notes.",
+        "Added/updated tests for strict fail-closed semantics and deterministic verify-policy mappings.",
+        "Committed changes: SPINE-001 fail-closed verify policy semantics (commit 6b145de) and opened PR via make_pr tool."
+      ]
+    },
+    {
+      "ticket_id": "SPINE-002-certificate-auth-ladder",
+      "files_changed": [
+        "types/physicsCertificate.ts",
+        "tools/verifyCertificate.ts",
+        "shared/schema.ts",
+        "server/routes/agi.adapter.ts",
+        "server/gr/gr-evaluation.ts",
+        "tests/verify-certificate-auth-ladder.spec.ts",
+        "docs/ADAPTER-CONTRACT.md"
+      ],
+      "tests_run": [
+        "✅ npx vitest run tests/verify-certificate-robotics.spec.ts tests/verify-certificate-auth-ladder.spec.ts tests/warp-viability.spec.ts tests/gr-constraint-gate.spec.ts",
+        "✅ npx vitest run tests/theory-checks.spec.ts tests/stress-energy-brick.spec.ts tests/york-time.spec.ts tests/gr-agent-loop.spec.ts tests/gr-agent-loop-baseline.spec.ts tests/gr-constraint-gate.spec.ts tests/gr-constraint-network.spec.ts tests/stress-energy-matter.spec.ts tests/helix-ask-graph-resolver.spec.ts tests/natario-metric-t00.spec.ts tests/warp-metric-adapter.spec.ts tests/warp-viability.spec.ts tests/proof-pack.spec.ts tests/proof-pack-strict-parity.spec.ts tests/pipeline-ts-qi-guard.spec.ts tests/qi-guardrail.spec.ts tests/lattice-probe-guardrails.spec.ts client/src/components/tests/warp-proof-ts-strict.spec.tsx",
+        "⚠️ npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci (initial attempt failed: adapter endpoint not running)",
+        "✅ npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+      ],
+      "casimir": {
+        "verdict": "PASS",
+        "firstFail": null,
+        "trace_id": "adapter:34c0f0dd-8f56-4aea-aa32-865a4a34cd6c",
+        "run_id": "1",
+        "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+        "integrity_ok": true
+      },
+      "notes": [
+        "Implemented authenticity ladder policy (low/medium/high) with backward-compatible default low-consequence integrity-only behavior.",
+        "High-consequence/authenticity-required checks now hard-fail with explicit class/id ADAPTER_CERTIFICATE_AUTHENTICITY_REQUIRED.",
+        "Certificate hash + integrity behavior remains intact.",
+        "Committed on current branch: acf4933.",
+        "PR created via make_pr tool."
+      ]
+    },
+    {
+      "ticket_id": "SPINE-003-event-spine-mvp",
+      "files_changed": [
+        "server/services/observability/event-spine.ts",
+        "server/services/observability/event-spine-ring-buffer.ts",
+        "server/services/observability/tool-event-adapters.ts",
+        "server/services/observability/training-trace-store.ts",
+        "server/routes/agi.adapter.ts",
+        "server/lib/nav-pose-bus.ts",
+        "server/routes/training-trace.ts",
+        "shared/schema.ts",
+        "server/tests/event-spine.test.ts",
+        "server/tests/training-trace.test.ts",
+        "server/tests/agi.adapter.test.ts"
+      ],
+      "tests_run": [
+        "npx vitest run server/tests/event-spine.test.ts server/tests/training-trace.test.ts server/tests/agi.adapter.test.ts",
+        "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+      ],
+      "casimir": {
+        "verdict": "PASS",
+        "firstFail": null,
+        "trace_id": "adapter:ad657620-80d5-4361-b533-44c8d50914e9",
+        "run_id": "1",
+        "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+        "integrity_ok": true
+      },
+      "notes": [
+        "Implemented a thin integration event spine with bounded ring-buffer and overflow policy (drop oldest + dropped counter).",
+        "Canonical envelope now carries eventId, seq, ts, kind, trace/session/run references, and payloadHash.",
+        "Fed tool lifecycle, adapter verdict, training-trace emit, and nav pose events into spine without changing existing API response contracts.",
+        "Linked training traces to event IDs via optional eventRefs for backward-compatible schema evolution.",
+        "Committed on current branch and created PR metadata via make_pr tool."
+      ]
+    },
+    {
+      "ticket_id": "SPINE-004-fixed-hz-brain-loop",
+      "files_changed": [
+        "client/src/lib/nav/brain-tick.ts",
+        "client/src/hooks/use-nav-pose-driver.ts",
+        "client/src/lib/nav/nav-dynamics.ts",
+        "tests/nav-brain-tick.spec.ts",
+        "tests/clock-scheduler.spec.ts"
+      ],
+      "tests_run": [
+        "npx vitest run tests/nav-brain-tick.spec.ts tests/clock-scheduler.spec.ts"
+      ],
+      "casimir": {
+        "verdict": "PASS",
+        "firstFail": null,
+        "trace_id": "adapter:e9046d4f-63c8-4eb9-9e0e-19418b79430d",
+        "run_id": "1",
+        "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+        "integrity_ok": true
+      },
+      "notes": [
+        "Implemented fixed-Hz drift-compensated brain loop and moved nav cognition cadence off RAF.",
+        "Passed deterministic dt_s from scheduler tick into ingestDriveVector path.",
+        "Commit: a50adf5",
+        "Initial Casimir verify attempt failed with ECONNREFUSED until local server was started on :5173, then verify passed."
+      ]
+    },
+    {
+      "ticket_id": "SPINE-005-replay-operator-surface",
+      "files_changed": [
+        "scripts/agi-replay.ts",
+        "server/services/observability/training-trace-store.ts",
+        "tests/agi-replay-operator.spec.ts",
+        "server/tests/training-trace.test.ts",
+        "docs/ADAPTER-CONTRACT.md"
+      ],
+      "tests_run": [
+        "✅ npx vitest run tests/agi-replay-operator.spec.ts server/__tests__/training-trace.test.ts",
+        "✅ npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+      ],
+      "casimir": {
+        "verdict": "PASS",
+        "firstFail": null,
+        "trace_id": "adapter:10dc17aa-1263-42f3-a82e-8e1781cd60ad",
+        "run_id": "1",
+        "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+        "integrity_ok": true
+      },
+      "notes": [
+        "Added replay operator controls (--from-seq, --from-trace, --step, --stop-on-first-fail, --stop-on-verdict, --speed) while preserving existing flags and keeping replay as operator/debug surface only.",
+        "Replay now applies deterministic sequence ordering, supports bounded replay windows, stop predicates, and emits predicted-vs-actual movement compare diffs in navDeltaDiff.",
+        "Training-trace export retrieval path now normalizes deterministic ordering by seq via a shared sorter, preserving API contract while stabilizing replay input order.",
+        "Added CLI/options and deterministic replay behavior tests for operator surface, plus API sequence-order export coverage.",
+        "Documented the replay operator surface and new debug flags in adapter contract docs.",
+        "Committed on current branch (2836c2f) and recorded PR via make_pr."
+      ]
+    }
+  ]
+}
