@@ -332,6 +332,10 @@ export type GrRequestPayload = {
 };
 
 export interface EnergyPipelineState {
+  claim_tier?: "exploratory" | "reduced_order" | "diagnostic" | "certified" | string;
+  provenance_class?: string;
+  claimTier?: "exploratory" | "reduced_order" | "diagnostic" | "certified" | string;
+  provenanceClass?: string;
   // Input parameters
   tileArea_cm2: number;
   shipRadius_m: number;
@@ -1278,6 +1282,22 @@ export function useEnergyPipeline(options?: {
     (raw: EnergyPipelineSnapshot): EnergyPipelineSnapshot => {
       if (!raw) return raw;
       let snapshot: EnergyPipelineSnapshot = raw;
+
+      const claimTier =
+        (snapshot as any).claim_tier ??
+        (snapshot as any).claimTier;
+      const provenanceClass =
+        (snapshot as any).provenance_class ??
+        (snapshot as any).provenanceClass;
+      if (claimTier != null || provenanceClass != null) {
+        snapshot = {
+          ...snapshot,
+          ...(claimTier != null ? { claim_tier: claimTier, claimTier } : {}),
+          ...(provenanceClass != null
+            ? { provenance_class: provenanceClass, provenanceClass }
+            : {}),
+        };
+      }
 
       // Enforce server-provided γ_VdB green-band guard so UI solvers cannot wander outside it
       const vdbGuard =

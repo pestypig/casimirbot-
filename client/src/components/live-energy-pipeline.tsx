@@ -1,5 +1,5 @@
 // live-energy-pipeline.tsx
-import { startTransition, useMemo } from "react";
+import React, { startTransition, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -71,6 +71,11 @@ export function LiveEnergyPipeline({
       Number.isFinite((mechanical as any)?.requestedStroke_pm) &&
       Number((mechanical as any)?.requestedStroke_pm) > mechMaxStroke);
   const mechNote = mechanical?.note as string | undefined;
+  const claimTierRaw = ((P as any)?.claim_tier ?? (P as any)?.claimTier ?? "unknown") as string;
+  const claimTier = String(claimTierRaw || "unknown").toLowerCase();
+  const provenanceClass = ((P as any)?.provenance_class ?? (P as any)?.provenanceClass ?? "unknown") as string;
+  const maturityLanguage = claimTier === "diagnostic" ? "Diagnostic evidence" : claimTier === "certified" ? "Certified evidence" : `${claimTierRaw} evidence`;
+
   const live = {
     currentMode: (P.currentMode ?? selectedMode ?? "hover") as "standby"|"hover"|"nearzero"|"cruise"|"emergency",
     dutyCycle:    Number.isFinite(P.dutyCycle) ? P.dutyCycle! : duty ?? 0.14,
@@ -397,6 +402,22 @@ export function LiveEnergyPipeline({
             <span className="text-xs text-muted-foreground ml-2">
               (required γ_VdB ≈ {Number.isFinite(gammaVdB_required) ? fexp(gammaVdB_required, "—", 2) : "—"})
             </span>
+          </div>
+        </div>
+
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+          <div className="rounded border border-border/60 p-2">
+            <div className="text-muted-foreground">Claim tier</div>
+            <div className="font-mono" data-testid="live-claim-tier-value">{claimTierRaw}</div>
+          </div>
+          <div className="rounded border border-border/60 p-2">
+            <div className="text-muted-foreground">Provenance</div>
+            <div className="font-mono" data-testid="live-provenance-class-value">{provenanceClass}</div>
+          </div>
+          <div className="rounded border border-border/60 p-2">
+            <div className="text-muted-foreground">Maturity wording</div>
+            <div className="font-mono" data-testid="live-maturity-language-value">{maturityLanguage}</div>
           </div>
         </div>
 
