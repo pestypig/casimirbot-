@@ -6,6 +6,7 @@ import {
 } from "../server/services/helix-ask/query";
 import { scorePremeditation } from "../server/services/premeditation-scorer";
 import { resolveHelixAskArbiter } from "../server/services/helix-ask/arbiter";
+import { buildHelixAskStrictFailReasonLedger } from "../server/services/helix-ask/strict-fail-reason-ledger";
 
 describe("Helix Ask evidence eligibility gate", () => {
   it("fails when context misses key tokens", () => {
@@ -169,5 +170,61 @@ describe("Helix Ask strict-ready arbiter promotion", () => {
     expect(result.mode).toBe("repo_grounded");
     expect(result.reason).toBe("repo_ratio");
     expect(result.fail_reason).toBeUndefined();
+  });
+});
+
+describe("Helix Ask strict fail-reason ledger", () => {
+  it("emits deterministic ledger entries and histogram artifact for strict runs", () => {
+    const ledger = buildHelixAskStrictFailReasonLedger({
+      strictEnabled: true,
+      payload: {
+        fail_reason: "CONCEPTS_PROVENANCE_MISSING",
+        debug: {
+          arbiter_fail_reason: "CERTAINTY_EVIDENCE_MISSING",
+        },
+      },
+    });
+
+    expect(ledger).toBeTruthy();
+    expect(ledger?.entries).toEqual([
+      {
+        ordinal: 1,
+        stage: "response",
+        fail_reason: "CONCEPTS_PROVENANCE_MISSING",
+        category: "evidence_contract",
+      },
+      {
+        ordinal: 2,
+        stage: "arbiter",
+        fail_reason: "CERTAINTY_EVIDENCE_MISSING",
+        category: "evidence_contract",
+      },
+    ]);
+    expect(ledger?.histogram).toEqual([
+      {
+        fail_reason: "CERTAINTY_EVIDENCE_MISSING",
+        category: "evidence_contract",
+        count: 1,
+      },
+      {
+        fail_reason: "CONCEPTS_PROVENANCE_MISSING",
+        category: "evidence_contract",
+        count: 1,
+      },
+    ]);
+    expect(ledger?.histogram_artifact.kind).toBe("helix_ask.strict_fail_reason_histogram.v1");
+    expect(ledger?.histogram_artifact.integrity).toBe("OK");
+    expect(ledger?.histogram_artifact.sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("keeps non-strict behavior backward-compatible", () => {
+    const ledger = buildHelixAskStrictFailReasonLedger({
+      strictEnabled: false,
+      payload: {
+        fail_reason: "CONCEPTS_PROVENANCE_MISSING",
+      },
+    });
+
+    expect(ledger).toBeNull();
   });
 });

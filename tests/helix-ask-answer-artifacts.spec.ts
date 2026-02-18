@@ -35,6 +35,23 @@ describe("stripRunawayAnswerArtifacts", () => {
       "Sources: docs/knowledge/ethos/feedback-loop-hygiene.md, docs/ethos/ideology.json",
     ].join("\n"));
   });
+
+  it("preserves citation sources when trailing fallback markers are stripped", () => {
+    const input = [
+      "Deterministic fallback answer with retained retrieval evidence.",
+      "",
+      "Sources: server/services/helix-ask/repo-search.ts, server/routes/agi.plan.ts",
+      "",
+      "Ask debug",
+      "- fallback=clarify",
+    ].join("\n");
+    const cleaned = stripRunawayAnswerArtifacts(input);
+    expect(cleaned).toBe([
+      "Deterministic fallback answer with retained retrieval evidence.",
+      "",
+      "Sources: server/services/helix-ask/repo-search.ts, server/routes/agi.plan.ts",
+    ].join("\n"));
+  });
 });
 
 

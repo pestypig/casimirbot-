@@ -1,0 +1,31 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-072-ideology-physics-bridge-adversarial-pack",
+  "files_changed": [
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+    "server/services/helix-ask/relation-assembly.ts",
+    "tests/helix-ask-bridge.spec.ts",
+    "docs/audits/research/TOE-072-physics-research-brief.md",
+    "docs/audits/research/TOE-072-safety-envelope-analysis.md",
+    "docs/audits/toe-progress-snapshot.json"
+  ],
+  "tests_run": [
+    "tests/helix-ask-bridge.spec.ts",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "tests/ideology-dag.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:db1c2cac-bbfa-4e48-a008-f4602fa7eb63",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "physics-research-brief",
+    "safety-envelope-analysis"
+  ],
+  "remaining_gaps": []
+}
