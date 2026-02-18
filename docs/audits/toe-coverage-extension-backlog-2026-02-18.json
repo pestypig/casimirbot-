@@ -957,6 +957,7 @@
       "primary_path_prefix": "server/routes/agi.plan.ts",
       "allowed_paths": [
         "server/routes/agi.plan.ts",
+        "server/services/halobank/time-model.ts",
         "server/services/helix-ask/arbiter.ts",
         "server/services/helix-ask/answer-artifacts.ts",
         "tests/helix-ask-evidence-gate.spec.ts",
@@ -1176,6 +1177,7 @@
       "primary_path_prefix": "server/routes/agi.plan.ts",
       "allowed_paths": [
         "server/routes/agi.plan.ts",
+        "server/services/halobank/time-model.ts",
         "server/services/helix-ask/arbiter.ts",
         "server/services/helix-ask/answer-artifacts.ts",
         "tests/helix-ask-evidence-gate.spec.ts",
