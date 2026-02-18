@@ -10352,6 +10352,8 @@ const normalizeAtomicLaunchParams = (draft: AtomicLaunchDraft): HelixAskAtomicLa
   if (m < -l) m = -l;
   if (m > l) m = l;
   const sampleCount = clampInteger(draft.sampleCount, 96, 4000);
+  const claim_tier: HelixAskAtomicClaimTier = "diagnostic";
+  const provenance_class: HelixAskAtomicProvenanceClass = model === "quantum" ? "simulation" : "proxy";
   return {
     model,
     Z: clampInteger(draft.Z, 1, 118) ?? 1,
@@ -10359,6 +10361,9 @@ const normalizeAtomicLaunchParams = (draft: AtomicLaunchDraft): HelixAskAtomicLa
     l,
     m,
     ...(sampleCount != null ? { sampleCount } : {}),
+    claim_tier,
+    provenance_class,
+    certifying: false,
   };
 };
 
@@ -10406,6 +10411,14 @@ const resolveAtomicViewerLaunch = (
     panel_id: ATOMIC_PANEL_ID,
     tree_id: atomicFrameworks[0]?.treeId || ATOMIC_TREE_ID,
     ...(sourcePath ? { source_path: sourcePath } : {}),
+    claim_tier: params.claim_tier,
+    provenance_class: params.provenance_class,
+    policy: {
+      allowedCL: "CL4",
+      allowConceptual: false,
+      allowProxies: false,
+      chart: "comoving_cartesian",
+    },
     params,
   };
 };
@@ -12590,6 +12603,8 @@ type LocalAskResult = {
 };
 
 type HelixAskAtomicLaunchModel = "quantum" | "classical";
+type HelixAskAtomicClaimTier = "diagnostic" | "reduced-order" | "certified";
+type HelixAskAtomicProvenanceClass = "simulation" | "proxy";
 
 type HelixAskAtomicLaunchParams = {
   model: HelixAskAtomicLaunchModel;
@@ -12598,6 +12613,9 @@ type HelixAskAtomicLaunchParams = {
   l: number;
   m: number;
   sampleCount?: number;
+  claim_tier: HelixAskAtomicClaimTier;
+  provenance_class: HelixAskAtomicProvenanceClass;
+  certifying: boolean;
 };
 
 type HelixAskViewerLaunch = {
@@ -12605,6 +12623,14 @@ type HelixAskViewerLaunch = {
   panel_id: "electron-orbital";
   tree_id: string;
   source_path?: string;
+  claim_tier: HelixAskAtomicClaimTier;
+  provenance_class: HelixAskAtomicProvenanceClass;
+  policy: {
+    allowedCL: "CL4";
+    allowConceptual: false;
+    allowProxies: false;
+    chart: "comoving_cartesian";
+  };
   params: HelixAskAtomicLaunchParams;
 };
 
@@ -14142,6 +14168,19 @@ const sanitizeCitationRepairOutput = (
   cleaned = sanitizeSourcesLine(cleaned, allowedPaths, allowedTokens);
   cleaned = stripRunawayAnswerArtifacts(cleaned);
   return { text: cleaned, removedPaths: scrubbed.removed };
+};
+
+const enforceAtomicClaimTierNarration = (
+  value: string,
+  launch: HelixAskViewerLaunch | null,
+): string => {
+  if (!value || !launch) return value;
+  if (launch.claim_tier === "certified" && launch.params.certifying) return value;
+  const normalized = value.replace(/\b(certified|certify|certification)\b/gi, "diagnostic");
+  if (/\bdiagnostic\b/i.test(normalized)) return normalized;
+  return `${normalized.trim()}
+
+Atomic outputs are diagnostic/reduced-order only and non-certifying for ask-time narration.`.trim();
 };
 
 const sanitizeReportBlockAnswer = (
@@ -26404,6 +26443,7 @@ const executeHelixAsk = async ({
           }
         }
       }
+      cleaned = enforceAtomicClaimTierNarration(cleaned, viewerLaunch);
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
         logEvent("Answer cleaned preview", "final", finalCleanedPreview, answerStart);

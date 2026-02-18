@@ -6,6 +6,8 @@ const THETA_CDF_BINS = 1024;
 const MIN_FLOAT = 1e-30;
 
 export type AtomicSimulationMode = "quantum" | "classical";
+export type AtomicClaimTier = "diagnostic" | "reduced-order" | "certified";
+export type AtomicProvenanceClass = "simulation" | "proxy";
 
 export type AtomicQuantumNumbers = {
   n: number;
@@ -23,6 +25,9 @@ export type AtomicOrbitalPoint = {
 
 export type AtomicOrbitalCloud = {
   mode: AtomicSimulationMode;
+  claim_tier: AtomicClaimTier;
+  provenance_class: AtomicProvenanceClass;
+  certifying: boolean;
   n: number;
   l: number;
   m: number;
@@ -106,6 +111,9 @@ function buildQuantumCloud(
   const extent = calculateExtent(points);
   return {
     mode: "quantum",
+    claim_tier: "diagnostic",
+    provenance_class: "simulation",
+    certifying: false,
     n,
     l,
     m,
@@ -153,6 +161,9 @@ function buildClassicalCloud(
   const extent = calculateExtent(points);
   return {
     mode: "classical",
+    claim_tier: "diagnostic",
+    provenance_class: "proxy",
+    certifying: false,
     n,
     l,
     m,
