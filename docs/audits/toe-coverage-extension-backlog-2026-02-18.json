@@ -810,6 +810,32 @@
         "Strict packages mode emits deterministic fail_reason when package evidence is missing",
         "Repo-search and routing tests verify default/strict/passthrough behavior"
       ]
+    },
+    {
+      "id": "TOE-042-zen-ladder-pack-routing-provenance-contract",
+      "tree_owner": "zen-ladder-pack",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Zen ladder pack routing provenance contract primitive",
+      "primary_path_prefix": "server/services/helix-ask/topic.ts",
+      "allowed_paths": [
+        "server/services/helix-ask/topic.ts",
+        "server/services/helix-ask/paths.ts",
+        "tests/helix-ask-topic.spec.ts",
+        "tests/helix-ask-paths.spec.ts",
+        "configs/resolver-owner-coverage-manifest.v1.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-topic.spec.ts",
+        "tests/helix-ask-paths.spec.ts"
+      ],
+      "done_criteria": [
+        "Zen-ladder prompts map to deterministic routing metadata with conservative provenance defaults",
+        "Strict evidence mode emits deterministic fail_reason when zen-ladder path evidence is missing",
+        "Topic/path tests verify strict/default behavior and backward compatibility"
+      ]
     }
   ]
 }
