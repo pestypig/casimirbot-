@@ -74,6 +74,7 @@ describe("training-trace API", () => {
       .expect(200);
     expect(fetched.body?.trace?.id).toBe(id);
     expect(fetched.body?.trace?.signal?.kind).toBe("warp-viability");
+    expect(fetched.body?.trace?.eventRefs?.length).toBeGreaterThan(0);
   });
 
 

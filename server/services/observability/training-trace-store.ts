@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
+import { emitEventSpine } from "./event-spine.js";
 import {
   trainingTraceSchema,
   type TrainingTraceCertificate,
@@ -29,6 +30,7 @@ export type TrainingTraceInput = {
   notes?: string[];
   ts?: string;
   id?: string;
+  eventRefs?: string[];
 };
 
 const parseBufferSize = (): number => {
@@ -118,8 +120,24 @@ export function recordTrainingTrace(input: TrainingTraceInput): TrainingTraceRec
     certificate: input.certificate,
     predictionObservationLedger: input.predictionObservationLedger,
     payload: input.payload,
+    eventRefs: input.eventRefs,
     notes: input.notes,
   };
+  const spineEvent = emitEventSpine({
+    kind: "training-trace.emit",
+    traceId: record.traceId,
+    sessionId: undefined,
+    runId: record.id,
+    ts: record.ts,
+    payload: {
+      recordId: record.id,
+      signal: record.signal?.kind,
+      pass: record.pass,
+    },
+  });
+  if (!record.eventRefs?.includes(spineEvent.eventId)) {
+    record.eventRefs = [...(record.eventRefs ?? []), spineEvent.eventId];
+  }
   traceBuffer.push(record);
   if (traceBuffer.length > MAX_BUFFER_SIZE) {
     traceBuffer.splice(0, traceBuffer.length - MAX_BUFFER_SIZE);

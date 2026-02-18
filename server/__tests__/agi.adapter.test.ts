@@ -353,4 +353,5 @@ describe("agi adapter API", () => {
     expect(response.body?.certificate?.certificateHash).toBeTruthy();
     expect(response.body?.certificate?.integrityOk).toBe(true);
   });
+
 });

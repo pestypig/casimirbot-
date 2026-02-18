@@ -14,6 +14,7 @@ import { scorePremeditation } from "../services/premeditation-scorer.js";
 import { recordTrainingTrace } from "../services/observability/training-trace-store.js";
 import { verifyRoboticsSafetyCertificate, verifyRoboticsSafetyCertificateIntegrity } from "../../tools/verifyCertificate.js";
 import { runAdapterExecution } from "../services/adapter/run.js";
+import { emitEventSpine } from "../services/observability/event-spine.js";
 
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -343,9 +344,20 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         },
         notes: ["phase=5", "robotics-safety=veto"],
       });
+      const roboticsRunId = `robotics-veto:${crypto.randomUUID()}`;
+      emitEventSpine({
+        kind: "adapter.verdict",
+        traceId,
+        runId: roboticsRunId,
+        payload: {
+          verdict: "FAIL",
+          pass: false,
+          firstFailId: safety.firstFail?.id,
+        },
+      });
       return res.json({
         traceId,
-        runId: `robotics-veto:${crypto.randomUUID()}`,
+        runId: roboticsRunId,
         verdict: "FAIL",
         pass: false,
         firstFail: safety.firstFail ?? normalizeFailFirstFail("FAIL", null, safety.certificate),
@@ -468,6 +480,17 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         | { status?: string; certificateHash?: string | null; integrityOk?: boolean }
         | null,
     );
+
+    emitEventSpine({
+      kind: "adapter.verdict",
+      traceId: result.traceId ?? traceId,
+      runId: result.runId,
+      payload: {
+        verdict: result.verdict,
+        pass: result.pass,
+        firstFailId: normalizedFirstFail?.id,
+      },
+    });
 
     return res.json({
       traceId: result.traceId ?? traceId,
