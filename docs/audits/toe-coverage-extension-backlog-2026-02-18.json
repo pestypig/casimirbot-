@@ -1311,6 +1311,42 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-058-halobank-residual-reduced-order-promotion",
+      "tree_owner": "simulation-systems",
+      "gap_refs": [
+        "F-COV-2",
+        "F-COV-6"
+      ],
+      "primitive": "Halobank residual reduced-order promotion",
+      "primary_path_prefix": "server/services/halobank/time-model.ts",
+      "allowed_paths": [
+        "server/services/halobank/time-model.ts",
+        "server/skills/halobank.time.compute.ts",
+        "tests/halobank-time-model.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts",
+        "docs/audits/research/TOE-058-tier-promotion-rationale.md",
+        "docs/audits/research/TOE-058-comparative-evidence-pack.md"
+      ],
+      "required_tests": [
+        "tests/halobank-time-model.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts"
+      ],
+      "done_criteria": [
+        "Deterministic first-fail taxonomy differentiates incomplete residual evidence, out-of-envelope residuals, and fallback source behavior.",
+        "Reduced-order recommendation is emitted only for complete live evidence within the bounded residual envelope.",
+        "Research artifacts capture rationale and comparative evidence for promotion vs conservative downgrade behavior."
+      ],
+      "research_gate": {
+        "risk_class": "tier_promotion",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "tier-promotion-rationale",
+          "comparative-evidence-pack"
+        ]
+      }
     }
   ]
 }
