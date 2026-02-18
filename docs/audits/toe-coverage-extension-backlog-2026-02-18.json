@@ -812,26 +812,29 @@
       ]
     },
     {
-      "id": "TOE-043-full-program-toe-progress-scoring",
-      "tree_owner": "ops-deployment",
+      "id": "TOE-042-zen-ladder-pack-routing-provenance-contract",
+      "tree_owner": "zen-ladder-pack",
       "gap_refs": [
         "F-COV-1",
         "F-COV-5"
       ],
-      "primitive": "Full-program TOE progress scoring primitive",
-      "primary_path_prefix": "scripts/compute-toe-progress.ts",
+      "primitive": "Zen ladder pack routing provenance contract primitive",
+      "primary_path_prefix": "server/services/helix-ask/topic.ts",
       "allowed_paths": [
-        "scripts/compute-toe-progress.ts",
-        "tests/toe-progress.spec.ts",
-        "docs/audits/toe-progress-snapshot.json"
+        "server/services/helix-ask/topic.ts",
+        "server/services/helix-ask/paths.ts",
+        "tests/helix-ask-topic.spec.ts",
+        "tests/helix-ask-paths.spec.ts",
+        "configs/resolver-owner-coverage-manifest.v1.json"
       ],
       "required_tests": [
-        "tests/toe-progress.spec.ts"
+        "tests/helix-ask-topic.spec.ts",
+        "tests/helix-ask-paths.spec.ts"
       ],
       "done_criteria": [
-        "compute-toe-progress scores combined ticket IDs from core and extension backlogs",
-        "snapshot totals represent full-program progress while preserving backward-compatible fields",
-        "tests verify combined scoring, dedupe behavior, and fallback when extension backlog is absent"
+        "Zen-ladder prompts map to deterministic routing metadata with conservative provenance defaults",
+        "Strict evidence mode emits deterministic fail_reason when zen-ladder path evidence is missing",
+        "Topic/path tests verify strict/default behavior and backward compatibility"
       ]
     }
   ]

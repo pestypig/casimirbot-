@@ -16,7 +16,13 @@ const UI_COMPONENTS_PATH_PATTERNS: RegExp[] = [
   /ui\//i,
 ];
 
+const ZEN_LADDER_PATH_PATTERNS: RegExp[] = [
+  /docs\/zen-ladder-pack\//i,
+  /docs\/ethos\/ideology\.json/i,
+];
+
 export const UI_COMPONENTS_PATH_EVIDENCE_MISSING = "UI_COMPONENTS_PATH_EVIDENCE_MISSING" as const;
+export const ZEN_LADDER_PATH_EVIDENCE_MISSING = "ZEN_LADDER_PATH_EVIDENCE_MISSING" as const;
 
 export type UiComponentsRoutingMetadata = {
   provenance_class: "inferred";
@@ -28,6 +34,18 @@ export type UiComponentsPathEvidenceGate = {
   ok: boolean;
   fail_reason?: typeof UI_COMPONENTS_PATH_EVIDENCE_MISSING;
   routing_metadata?: UiComponentsRoutingMetadata;
+};
+
+export type ZenLadderRoutingMetadata = {
+  provenance_class: "inferred";
+  claim_tier: "diagnostic";
+  certifying: false;
+};
+
+export type ZenLadderPathEvidenceGate = {
+  ok: boolean;
+  fail_reason?: typeof ZEN_LADDER_PATH_EVIDENCE_MISSING;
+  routing_metadata?: ZenLadderRoutingMetadata;
 };
 
 function normalizePathCandidate(match: string): string {
@@ -55,6 +73,11 @@ function isUiComponentsPath(value: string): boolean {
   return UI_COMPONENTS_PATH_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
+function isZenLadderPath(value: string): boolean {
+  const normalized = value.replace(/\\/g, "/");
+  return ZEN_LADDER_PATH_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
 export function evaluateUiComponentsPathEvidence(
   paths: string[],
   options?: { strict?: boolean },
@@ -63,6 +86,28 @@ export function evaluateUiComponentsPathEvidence(
   if (!hasUiEvidence) {
     if (options?.strict === true) {
       return { ok: false, fail_reason: UI_COMPONENTS_PATH_EVIDENCE_MISSING };
+    }
+    return { ok: true };
+  }
+
+  return {
+    ok: true,
+    routing_metadata: {
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    },
+  };
+}
+
+export function evaluateZenLadderPathEvidence(
+  paths: string[],
+  options?: { strict?: boolean },
+): ZenLadderPathEvidenceGate {
+  const hasZenLadderEvidence = paths.some((entry) => isZenLadderPath(entry));
+  if (!hasZenLadderEvidence) {
+    if (options?.strict === true) {
+      return { ok: false, fail_reason: ZEN_LADDER_PATH_EVIDENCE_MISSING };
     }
     return { ok: true };
   }

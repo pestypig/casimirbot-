@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   evaluateUiComponentsPathEvidence,
+  evaluateZenLadderPathEvidence,
   extractFilePathsFromText,
 } from "../server/services/helix-ask/paths";
 
@@ -37,6 +38,31 @@ describe("Helix Ask path extraction", () => {
 
   it("keeps non-strict behavior backward compatible when UI evidence is missing", () => {
     const gate = evaluateUiComponentsPathEvidence(["server/routes/agi.plan.ts"]);
+    expect(gate).toEqual({ ok: true });
+  });
+
+  it("adds zen-ladder routing metadata when zen-ladder evidence paths exist", () => {
+    const gate = evaluateZenLadderPathEvidence(["docs/zen-ladder-pack/contract.md"]);
+    expect(gate).toEqual({
+      ok: true,
+      routing_metadata: {
+        provenance_class: "inferred",
+        claim_tier: "diagnostic",
+        certifying: false,
+      },
+    });
+  });
+
+  it("returns deterministic strict fail_reason when zen-ladder evidence paths are missing", () => {
+    const gate = evaluateZenLadderPathEvidence(["server/routes/agi.plan.ts"], {
+      strict: true,
+    });
+    expect(gate.ok).toBe(false);
+    expect(gate.fail_reason).toBe("ZEN_LADDER_PATH_EVIDENCE_MISSING");
+  });
+
+  it("keeps zen-ladder non-strict behavior backward compatible when evidence is missing", () => {
+    const gate = evaluateZenLadderPathEvidence(["server/routes/agi.plan.ts"]);
     expect(gate).toEqual({ ok: true });
   });
 });
