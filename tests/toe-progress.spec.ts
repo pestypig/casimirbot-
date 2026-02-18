@@ -195,7 +195,19 @@ describe("TOE progress tooling", () => {
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"));
     expect(snapshot.totals.strict_ready_progress_pct).toBe(33.3);
     expect(snapshot.totals.strict_ready_delta_ticket_count).toBe(2);
+    expect(snapshot.totals.strict_ready_release_gate).toEqual({
+      status: "blocked",
+      blocked_reasons: ["missing_verified_pass", "missing_research_artifacts"],
+      blocked_ticket_count: 2,
+      ready_ticket_count: 1,
+    });
     expect(snapshot.segments.combined.strict_ready_delta_ticket_count).toBe(2);
+    expect(snapshot.segments.combined.strict_ready_release_gate).toEqual({
+      status: "blocked",
+      blocked_reasons: ["missing_verified_pass", "missing_research_artifacts"],
+      blocked_ticket_count: 2,
+      ready_ticket_count: 1,
+    });
     expect(snapshot.strict_ready_delta_targets).toEqual(
       expect.arrayContaining([
         {

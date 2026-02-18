@@ -7,6 +7,9 @@ const M_SUN = 1.9885e30;
 const M_MOON = 7.342e22;
 const AU_M = 149_597_870_700;
 const MOON_DIST_M = 384_400_000;
+const RESIDUAL_ENVELOPE_PPM = 5;
+const RESIDUAL_MIN_SAMPLES = 3;
+const RESIDUAL_MAX_SAMPLES = 10_000;
 
 export type HaloBankPlace = {
   lat: number;
@@ -286,15 +289,21 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
   const explicitEvidence = input.model?.ephemerisEvidenceVerified === true;
   const evidenceRef = typeof input.model?.ephemerisEvidenceRef === "string" ? input.model.ephemerisEvidenceRef.trim() : "";
   const hasEvidenceRef = evidenceRef.length > 0;
-  const residualEnvelopePpm = 5;
+  const residualEnvelopePpm = RESIDUAL_ENVELOPE_PPM;
   const residualPpm = Number.isFinite(input.model?.residualPpm) ? Number(input.model?.residualPpm) : null;
-  const residualSampleCount =
+  const residualSampleCountRaw =
     Number.isFinite(input.model?.residualSampleCount) && Number(input.model?.residualSampleCount) >= 0
       ? Number(input.model?.residualSampleCount)
       : null;
-  const hasMinimumResidualSamples = residualSampleCount !== null && residualSampleCount >= 3;
+  const residualSampleCount =
+    residualSampleCountRaw !== null && Number.isInteger(residualSampleCountRaw) ? residualSampleCountRaw : null;
+  const hasMinimumResidualSamples =
+    residualSampleCount !== null &&
+    residualSampleCount >= RESIDUAL_MIN_SAMPLES &&
+    residualSampleCount <= RESIDUAL_MAX_SAMPLES;
   const hasResidualValue = residualPpm !== null;
-  const evidenceComplete = explicitEvidence && hasEvidenceRef && hasResidualValue && hasMinimumResidualSamples;
+  const hasCanonicalEvidenceRef = hasEvidenceRef && /^artifact:[a-z0-9][\w.-]*(?::[\w./:+-]+)+$/i.test(evidenceRef);
+  const evidenceComplete = explicitEvidence && hasCanonicalEvidenceRef && hasResidualValue && hasMinimumResidualSamples;
   const residualWithinEnvelope = residualPpm !== null && Math.abs(residualPpm) <= residualEnvelopePpm;
   const verified = source === "live" ? evidenceComplete : false;
   const residualStatus: "within_envelope" | "out_of_envelope" | "incomplete_evidence" = !evidenceComplete
@@ -305,7 +314,9 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
 
   const firstFailId = fallback
     ? "HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY"
-    : !evidenceComplete
+    : explicitEvidence && hasEvidenceRef && !hasCanonicalEvidenceRef
+      ? "HALOBANK_HORIZONS_EVIDENCE_REF_INVALID"
+      : !evidenceComplete
       ? "HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE"
       : residualWithinEnvelope
         ? null
@@ -313,7 +324,11 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
 
   const reasons = fallback
     ? ["Fallback ephemeris source detected; diagnostic-only and non-certifying."]
-    : !evidenceComplete
+    : explicitEvidence && hasEvidenceRef && !hasCanonicalEvidenceRef
+      ? [
+          "Live ephemeris evidence reference is not canonical; deterministic conservative diagnostic downgrade applied.",
+        ]
+      : !evidenceComplete
       ? [
           "Live ephemeris residual evidence is incomplete; deterministic conservative diagnostic downgrade applied.",
         ]

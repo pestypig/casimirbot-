@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T20:29:10.739Z",
+  "generated_at": "2026-02-18T20:22:04.720Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -13,20 +13,28 @@
     "certified": 1
   },
   "totals": {
-    "tickets_total": 61,
-    "tickets_with_evidence": 61,
+    "tickets_total": 62,
+    "tickets_with_evidence": 62,
     "claim_tier_counts": {
-      "diagnostic": 58,
+      "diagnostic": 59,
       "reduced-order": 3,
       "certified": 0
     },
-    "weighted_score_sum": 16.3,
+    "weighted_score_sum": 16.55,
     "toe_progress_pct": 26.7,
     "forest_owner_coverage_pct": 100,
-    "strict_ready_progress_pct": 4.9,
-    "strict_ready_delta_ticket_count": 58,
-    "research_gated_tickets_total": 16,
-    "research_artifact_complete_tickets_total": 16
+    "strict_ready_progress_pct": 4.8,
+    "strict_ready_delta_ticket_count": 59,
+    "strict_ready_release_gate": {
+      "status": "blocked",
+      "blocked_reasons": [
+        "missing_verified_pass"
+      ],
+      "blocked_ticket_count": 59,
+      "ready_ticket_count": 3
+    },
+    "research_gated_tickets_total": 17,
+    "research_artifact_complete_tickets_total": 17
   },
   "segments": {
     "core": {
@@ -44,33 +52,41 @@
       "research_artifact_complete_tickets_total": 0
     },
     "extension": {
-      "tickets_total": 51,
-      "tickets_with_evidence": 51,
+      "tickets_total": 52,
+      "tickets_with_evidence": 52,
       "claim_tier_counts": {
-        "diagnostic": 49,
+        "diagnostic": 50,
         "reduced-order": 2,
         "certified": 0
       },
-      "weighted_score_sum": 13.45,
-      "toe_progress_pct": 26.4,
-      "strict_ready_progress_pct": 3.9,
-      "research_gated_tickets_total": 16,
-      "research_artifact_complete_tickets_total": 16
+      "weighted_score_sum": 13.7,
+      "toe_progress_pct": 26.3,
+      "strict_ready_progress_pct": 3.8,
+      "research_gated_tickets_total": 17,
+      "research_artifact_complete_tickets_total": 17
     },
     "combined": {
-      "tickets_total": 61,
-      "tickets_with_evidence": 61,
+      "tickets_total": 62,
+      "tickets_with_evidence": 62,
       "claim_tier_counts": {
-        "diagnostic": 58,
+        "diagnostic": 59,
         "reduced-order": 3,
         "certified": 0
       },
-      "weighted_score_sum": 16.3,
+      "weighted_score_sum": 16.55,
       "toe_progress_pct": 26.7,
-      "strict_ready_progress_pct": 4.9,
-      "strict_ready_delta_ticket_count": 58,
-      "research_gated_tickets_total": 16,
-      "research_artifact_complete_tickets_total": 16
+      "strict_ready_progress_pct": 4.8,
+      "strict_ready_delta_ticket_count": 59,
+      "strict_ready_release_gate": {
+        "status": "blocked",
+        "blocked_reasons": [
+          "missing_verified_pass"
+        ],
+        "blocked_ticket_count": 59,
+        "ready_ticket_count": 3
+      },
+      "research_gated_tickets_total": 17,
+      "research_artifact_complete_tickets_total": 17
     }
   },
   "strict_ready_delta_targets": [
@@ -418,6 +434,12 @@
     },
     {
       "ticket_id": "TOE-061-strict-ready-enforcement-gate",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-066-strict-ready-release-gate-automation",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": false
@@ -972,6 +994,15 @@
       "research_gated": true,
       "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-061-strict-ready-enforcement-gate.20260218T193506Z.json"
+    },
+    {
+      "ticket_id": "TOE-066-strict-ready-release-gate-automation",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-066-strict-ready-release-gate-automation.20260218T201957Z.json"
     }
   ]
 }
