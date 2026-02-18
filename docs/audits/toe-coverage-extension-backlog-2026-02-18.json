@@ -1546,6 +1546,9 @@
       "primitive": "Warp viability reduced-order counterexample pack",
       "primary_path_prefix": "tools/warpViability.ts",
       "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "docs/audits/research/TOE-064-tier-promotion-rationale.md",
+        "docs/audits/research/TOE-064-comparative-evidence-pack.md",
         "tools/warpViability.ts",
         "tools/warpViabilityCertificate.ts",
         "tests/warp-viability.spec.ts",
@@ -1568,12 +1571,47 @@
       }
     },
     {
-      "id": "TOE-065-placeholder-ticket",
-      "tree_owner": "tbd",
-      "primitive": "TBD",
-      "primary_path_prefix": "tbd",
-      "allowed_paths": [],
-      "required_tests": [],
+      "id": "TOE-065-ideology-physics-contradiction-matrix-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Ideology physics contradiction matrix pack",
+      "primary_path_prefix": "docs/audits/research/TOE-065-physics-research-brief.md",
+      "allowed_paths": [
+        "docs/audits/research/TOE-065-physics-research-brief.md",
+        "docs/audits/research/TOE-065-safety-envelope-analysis.md"
+      ],
+      "required_tests": [
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "safety-envelope-analysis"
+        ]
+      }
+    },
+    {
+      "id": "TOE-066-strict-ready-release-gate-automation",
+      "tree_owner": "ops-deployment",
+      "primitive": "Strict ready release gate automation",
+      "primary_path_prefix": "scripts/compute-toe-progress.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "scripts/compute-toe-progress.ts",
+        "scripts/toe-agent-preflight.ts",
+        "tests/toe-progress.spec.ts",
+        "tests/toe-agent-preflight.spec.ts",
+        "docs/audits/toe-progress-snapshot.json",
+        "docs/audits/ticket-results/TOE-066-strict-ready-release-gate-automation.20260218T201957Z.json"
+      ],
+      "required_tests": [
+        "tests/toe-agent-preflight.spec.ts",
+        "tests/toe-progress.spec.ts"
+      ],
       "research_gate": {
         "risk_class": "runtime_contract",
         "requires_audit": true,
@@ -1584,12 +1622,29 @@
       }
     },
     {
-      "id": "TOE-066-placeholder-ticket",
-      "tree_owner": "tbd",
-      "primitive": "TBD",
-      "primary_path_prefix": "tbd",
-      "allowed_paths": [],
-      "required_tests": [],
+      "id": "TOE-067-helix-ask-quality-baseline-contract",
+      "tree_owner": "helix-ask",
+      "primitive": "Helix Ask quality baseline contract",
+      "primary_path_prefix": "scripts/helix-ask-sweep.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "scripts/helix-ask-sweep.ts",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "docs/audits/helix-ask-quality/baseline-contract.json",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts"
+      ],
+      "done_criteria": [
+        "Quality baseline contract includes deterministic threshold pass/fail outcomes",
+        "Baseline artifact is emitted to docs/audits/helix-ask-quality/baseline-contract.json",
+        "Progress snapshot is recomputed after baseline generation"
+      ],
       "research_gate": {
         "risk_class": "runtime_contract",
         "requires_audit": true,
@@ -1630,6 +1685,147 @@
         "requires_research": false,
         "required_artifacts": [
           "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-069-helix-ask-retrieval-citation-persistence-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Helix Ask retrieval and citation persistence pack",
+      "primary_path_prefix": "server/services/helix-ask/answer-artifacts.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask/answer-artifacts.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/helix-ask-repo-search.spec.ts",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/helix-ask-repo-search.spec.ts"
+      ],
+      "done_criteria": [
+        "Citation persistence remains deterministic across fallback and clarify transitions",
+        "Answer artifact cleanup does not drop Sources lines",
+        "Regression tests protect retrieval citation retention behavior"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-070-halobank-horizons-long-window-calibration-pack",
+      "tree_owner": "simulation-systems",
+      "primitive": "Halobank-Horizons long-window calibration pack",
+      "primary_path_prefix": "server/services/halobank/time-model.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "server/services/halobank/time-model.ts",
+        "server/skills/halobank.time.compute.ts",
+        "server/utils/horizons-proxy.ts",
+        "tests/halobank-time-model.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts",
+        "tests/horizons-proxy.spec.ts",
+        "docs/audits/research/TOE-070-tier-promotion-rationale.md",
+        "docs/audits/research/TOE-070-comparative-evidence-pack.md",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/halobank-time-model.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts",
+        "tests/horizons-proxy.spec.ts"
+      ],
+      "done_criteria": [
+        "Long-window residual requirements are deterministic and test-covered",
+        "Calibration promotion/downgrade outcomes are reason-coded and conservative",
+        "Tier-promotion research artifacts define assumptions and falsifiability bounds"
+      ],
+      "research_gate": {
+        "risk_class": "tier_promotion",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "tier-promotion-rationale",
+          "comparative-evidence-pack"
+        ]
+      }
+    },
+    {
+      "id": "TOE-071-warp-viability-promotion-replay-pack",
+      "tree_owner": "warp-mechanics",
+      "primitive": "Warp viability promotion replay pack",
+      "primary_path_prefix": "tools/warpViability.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "tools/warpViability.ts",
+        "tools/warpViabilityCertificate.ts",
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts",
+        "tests/proof-pack-strict-parity.spec.ts",
+        "docs/audits/research/TOE-071-tier-promotion-rationale.md",
+        "docs/audits/research/TOE-071-comparative-evidence-pack.md",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts",
+        "tests/proof-pack-strict-parity.spec.ts"
+      ],
+      "done_criteria": [
+        "Promotion replay outcomes are deterministic and reason-coded",
+        "Counterexample class routing is stable across repeat runs",
+        "Tier-promotion artifacts map evidence boundaries to gate behavior"
+      ],
+      "research_gate": {
+        "risk_class": "tier_promotion",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "tier-promotion-rationale",
+          "comparative-evidence-pack"
+        ]
+      }
+    },
+    {
+      "id": "TOE-072-ideology-physics-bridge-adversarial-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Ideology-physics bridge adversarial pack",
+      "primary_path_prefix": "server/services/helix-ask/relation-assembly.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "server/services/helix-ask/relation-assembly.ts",
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts",
+        "docs/audits/research/TOE-072-physics-research-brief.md",
+        "docs/audits/research/TOE-072-safety-envelope-analysis.md",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts"
+      ],
+      "done_criteria": [
+        "Strict contradiction-vs-missing precedence is deterministic under adversarial permutations",
+        "Bridge evidence classification remains replay-order insensitive",
+        "Physics-unknown artifacts define falsifiable safety envelope for strict gate behavior"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "safety-envelope-analysis"
         ]
       }
     }

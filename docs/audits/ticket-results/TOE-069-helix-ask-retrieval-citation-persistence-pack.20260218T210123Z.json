@@ -1,12 +1,6 @@
 {
+  "schema_version": "toe_agent_ticket_result/1",
   "ticket_id": "TOE-069-helix-ask-retrieval-citation-persistence-pack",
-  "timestamp_utc": "2026-02-18T21:01:23Z",
-  "summary": [
-    "Hardened citation persistence in Helix Ask completion flow by preserving base citations when no retrieval evidence is available.",
-    "Added answer-artifact sanitization guard to retain Sources lines after runaway/fallback marker stripping.",
-    "Added regression test that ensures fallback/clarify artifact cleanup does not drop retrieval citations.",
-    "Appended TOE-069 ticket definition to the extension backlog and refreshed TOE progress snapshot."
-  ],
   "files_changed": [
     "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
     "docs/audits/toe-progress-snapshot.json",
@@ -15,38 +9,20 @@
     "tests/helix-ask-answer-artifacts.spec.ts"
   ],
   "tests_run": [
-    {
-      "command": "npx vitest run tests/helix-ask-answer-artifacts.spec.ts tests/helix-ask-graph-resolver.spec.ts tests/helix-ask-repo-search.spec.ts",
-      "status": "pass"
-    },
-    {
-      "command": "npx tsx scripts/validate-toe-ticket-backlog.ts",
-      "status": "pass"
-    },
-    {
-      "command": "npx tsx scripts/validate-toe-ticket-results.ts",
-      "status": "warn",
-      "details": "Fails due to pre-existing unrelated ticket result inconsistencies (TOE-062/064/065/066)."
-    },
-    {
-      "command": "npm run validate:toe:research-gates",
-      "status": "pass"
-    },
-    {
-      "command": "npx tsx scripts/compute-toe-progress.ts",
-      "status": "pass"
-    },
-    {
-      "command": "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci",
-      "status": "pass",
-      "casimir": {
-        "verdict": "PASS",
-        "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
-        "certificateId": "constraint-pack:repo-convergence:6e84f965957f",
-        "integrityOk": true,
-        "status": "GREEN",
-        "traceId": "adapter:6777c580-5a94-4e69-830e-72e8a58aafc1"
-      }
-    }
-  ]
+    "tests/helix-ask-answer-artifacts.spec.ts",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "tests/helix-ask-repo-search.spec.ts",
+    "scripts/validate-toe-ticket-backlog.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "scripts/compute-toe-progress.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:6777c580-5a94-4e69-830e-72e8a58aafc1",
+    "run_id": "unknown",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
 }

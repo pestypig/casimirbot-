@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T21:02:35.065Z",
+  "generated_at": "2026-02-18T21:21:52.253Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -13,29 +13,29 @@
     "certified": 1
   },
   "totals": {
-    "tickets_total": 67,
-    "tickets_with_evidence": 64,
+    "tickets_total": 72,
+    "tickets_with_evidence": 72,
     "claim_tier_counts": {
-      "diagnostic": 60,
-      "reduced-order": 4,
+      "diagnostic": 67,
+      "reduced-order": 5,
       "certified": 0
     },
-    "weighted_score_sum": 17.4,
-    "toe_progress_pct": 26,
+    "weighted_score_sum": 19.75,
+    "toe_progress_pct": 27.4,
     "forest_owner_coverage_pct": 100,
-    "strict_ready_progress_pct": 6,
-    "strict_ready_delta_ticket_count": 63,
+    "strict_ready_progress_pct": 6.9,
+    "strict_ready_delta_ticket_count": 67,
     "strict_ready_release_gate": {
       "status": "blocked",
       "blocked_reasons": [
         "missing_verified_pass",
         "missing_research_artifacts"
       ],
-      "blocked_ticket_count": 63,
-      "ready_ticket_count": 4
+      "blocked_ticket_count": 67,
+      "ready_ticket_count": 5
     },
-    "research_gated_tickets_total": 19,
-    "research_artifact_complete_tickets_total": 18
+    "research_gated_tickets_total": 27,
+    "research_artifact_complete_tickets_total": 23
   },
   "segments": {
     "core": {
@@ -53,42 +53,42 @@
       "research_artifact_complete_tickets_total": 0
     },
     "extension": {
-      "tickets_total": 57,
-      "tickets_with_evidence": 54,
+      "tickets_total": 62,
+      "tickets_with_evidence": 62,
       "claim_tier_counts": {
-        "diagnostic": 51,
-        "reduced-order": 3,
-        "certified": 0
-      },
-      "weighted_score_sum": 14.55,
-      "toe_progress_pct": 25.5,
-      "strict_ready_progress_pct": 5.3,
-      "research_gated_tickets_total": 19,
-      "research_artifact_complete_tickets_total": 18
-    },
-    "combined": {
-      "tickets_total": 67,
-      "tickets_with_evidence": 64,
-      "claim_tier_counts": {
-        "diagnostic": 60,
+        "diagnostic": 58,
         "reduced-order": 4,
         "certified": 0
       },
-      "weighted_score_sum": 17.4,
-      "toe_progress_pct": 26,
-      "strict_ready_progress_pct": 6,
-      "strict_ready_delta_ticket_count": 63,
+      "weighted_score_sum": 16.9,
+      "toe_progress_pct": 27.3,
+      "strict_ready_progress_pct": 6.5,
+      "research_gated_tickets_total": 27,
+      "research_artifact_complete_tickets_total": 23
+    },
+    "combined": {
+      "tickets_total": 72,
+      "tickets_with_evidence": 72,
+      "claim_tier_counts": {
+        "diagnostic": 67,
+        "reduced-order": 5,
+        "certified": 0
+      },
+      "weighted_score_sum": 19.75,
+      "toe_progress_pct": 27.4,
+      "strict_ready_progress_pct": 6.9,
+      "strict_ready_delta_ticket_count": 67,
       "strict_ready_release_gate": {
         "status": "blocked",
         "blocked_reasons": [
           "missing_verified_pass",
           "missing_research_artifacts"
         ],
-        "blocked_ticket_count": 63,
-        "ready_ticket_count": 4
+        "blocked_ticket_count": 67,
+        "ready_ticket_count": 5
       },
-      "research_gated_tickets_total": 19,
-      "research_artifact_complete_tickets_total": 18
+      "research_gated_tickets_total": 27,
+      "research_artifact_complete_tickets_total": 23
     }
   },
   "strict_ready_delta_targets": [
@@ -451,6 +451,48 @@
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-065-ideology-physics-contradiction-matrix-pack",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-066-strict-ready-release-gate-automation",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-067-helix-ask-quality-baseline-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": true
+    },
+    {
+      "ticket_id": "TOE-068-helix-ask-strict-fail-reason-ledger",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": true
+    },
+    {
+      "ticket_id": "TOE-069-helix-ask-retrieval-citation-persistence-pack",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": true
+    },
+    {
+      "ticket_id": "TOE-070-halobank-horizons-long-window-calibration-pack",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-072-ideology-physics-bridge-adversarial-pack",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
     }
   ],
   "tickets": [
@@ -461,7 +503,7 @@
       "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-1538.json"
+      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-205121.json"
     },
     {
       "ticket_id": "TOE-002-semiclassical-coupling-contract",
@@ -515,7 +557,7 @@
       "score": 0.25,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-232559.json"
+      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-234300.json"
     },
     {
       "ticket_id": "TOE-008-certificate-authenticity-policy",
@@ -1031,25 +1073,76 @@
       "result_file": "docs/audits/ticket-results/TOE-064-warp-viability-reduced-order-counterexample-pack.20260218T201702Z.json"
     },
     {
-      "ticket_id": "TOE-065-placeholder-ticket",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "ticket_id": "TOE-065-ideology-physics-contradiction-matrix-pack",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-065-ideology-physics-contradiction-matrix-pack.20260218T201714Z.json"
     },
     {
-      "ticket_id": "TOE-066-placeholder-ticket",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "ticket_id": "TOE-066-strict-ready-release-gate-automation",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-066-strict-ready-release-gate-automation.20260218T201957Z.json"
+    },
+    {
+      "ticket_id": "TOE-067-helix-ask-quality-baseline-contract",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": false,
+      "result_file": "docs/audits/ticket-results/TOE-067-helix-ask-quality-baseline-contract.20260218T211900Z.json"
     },
     {
       "ticket_id": "TOE-068-helix-ask-strict-fail-reason-ledger",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": false,
+      "result_file": "docs/audits/ticket-results/TOE-068-helix-ask-strict-fail-reason-ledger.20260218T210353Z.json"
+    },
+    {
+      "ticket_id": "TOE-069-helix-ask-retrieval-citation-persistence-pack",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": false,
+      "result_file": "docs/audits/ticket-results/TOE-069-helix-ask-retrieval-citation-persistence-pack.20260218T210123Z.json"
+    },
+    {
+      "ticket_id": "TOE-070-halobank-horizons-long-window-calibration-pack",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-070-halobank-horizons-long-window-calibration-pack.20260218T210202Z.json"
+    },
+    {
+      "ticket_id": "TOE-071-warp-viability-promotion-replay-pack",
+      "claim_tier": "reduced-order",
+      "verification_ok": true,
+      "score": 0.6,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-071-warp-viability-promotion-replay-pack.20260218T210144Z.json"
+    },
+    {
+      "ticket_id": "TOE-072-ideology-physics-bridge-adversarial-pack",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-072-ideology-physics-bridge-adversarial-pack.20260218T210055Z.json"
     }
   ]
 }

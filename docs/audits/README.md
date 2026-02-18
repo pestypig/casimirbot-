@@ -16,6 +16,7 @@ This folder is the entrypoint for cloud-agent audit contracts, gap reports, and 
 - ToE next prompt batch (TOE-052..056): `docs/audits/toe-next-prompt-batch-2026-02-18-v2.md`
 - ToE lane orchestration runbook: `docs/audits/toe-lane-orchestration-2026-02-18.md`
 - ToE research artifacts index: `docs/audits/research/README.md`
+- ToE research context pack (standalone prompt anchor): `docs/audits/research/toe-research-context-pack-2026-02-18.md`
 - Ticket result contract: `docs/audits/ticket-results/README.md`
 - ToE scaling scorecard: `docs/audits/toe-scaling-scorecard.md`
 - ToE scaling scorecard CSV: `docs/audits/toe-scaling-scorecard.csv`

@@ -6,14 +6,9 @@
     "tests/helix-ask-modes.spec.ts"
   ],
   "tests_run": [
-    "npx vitest run tests/helix-ask-modes.spec.ts tests/helix-ask-evidence-gate.spec.ts tests/helix-ask-answer-artifacts.spec.ts",
-    "npx vitest run --silent tests/helix-ask-evidence-gate.spec.ts",
-    "npx vitest run --silent tests/helix-ask-answer-artifacts.spec.ts",
-    "npx tsx scripts/validate-toe-ticket-backlog.ts",
-    "npx tsx scripts/validate-toe-ticket-results.ts",
-    "npm run validate:toe:research-gates",
-    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci",
-    "npx tsx scripts/compute-toe-progress.ts"
+    "tests/helix-ask-modes.spec.ts",
+    "tests/helix-ask-evidence-gate.spec.ts",
+    "tests/helix-ask-answer-artifacts.spec.ts"
   ],
   "claim_tier": "diagnostic",
   "casimir": {

@@ -1,0 +1,28 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-067-helix-ask-quality-baseline-contract",
+  "files_changed": [
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+    "scripts/helix-ask-sweep.ts",
+    "tests/helix-ask-answer-artifacts.spec.ts",
+    "docs/audits/helix-ask-quality/baseline-contract.json",
+    "docs/audits/toe-progress-snapshot.json"
+  ],
+  "tests_run": [
+    "tests/helix-ask-modes.spec.ts",
+    "tests/helix-ask-evidence-gate.spec.ts",
+    "tests/helix-ask-answer-artifacts.spec.ts",
+    "scripts/compute-toe-progress.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:2fd10d70-6b43-499e-9e49-5312eb6517b0",
+    "run_id": "19294",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": [
+    "Combined helix-ask modes/evidence/artifacts run may be unstable in this environment; targeted suites were used for evidence collection."
+  ]
+}
