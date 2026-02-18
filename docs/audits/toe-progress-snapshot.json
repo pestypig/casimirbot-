@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T06:35:24.072Z",
+  "generated_at": "2026-02-18T06:42:22.188Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -25,7 +25,7 @@
     "forest_owner_coverage_pct": 100,
     "strict_ready_progress_pct": 3.9,
     "research_gated_tickets_total": 6,
-    "research_artifact_complete_tickets_total": 5
+    "research_artifact_complete_tickets_total": 6
   },
   "segments": {
     "core": {
@@ -54,7 +54,7 @@
       "toe_progress_pct": 25.9,
       "strict_ready_progress_pct": 2.4,
       "research_gated_tickets_total": 6,
-      "research_artifact_complete_tickets_total": 5
+      "research_artifact_complete_tickets_total": 6
     },
     "combined": {
       "tickets_total": 51,
@@ -68,7 +68,7 @@
       "toe_progress_pct": 26.4,
       "strict_ready_progress_pct": 3.9,
       "research_gated_tickets_total": 6,
-      "research_artifact_complete_tickets_total": 5
+      "research_artifact_complete_tickets_total": 6
     }
   },
   "tickets": [
@@ -79,7 +79,7 @@
       "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-205121.json"
+      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-1538.json"
     },
     {
       "ticket_id": "TOE-002-semiclassical-coupling-contract",
@@ -133,7 +133,7 @@
       "score": 0.25,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-234300.json"
+      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-232559.json"
     },
     {
       "ticket_id": "TOE-008-certificate-authenticity-policy",
@@ -483,7 +483,7 @@
       "verification_ok": true,
       "score": 0.25,
       "research_gated": true,
-      "research_artifact_complete": false,
+      "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-046-toe-agent-preflight-orchestrator.20260218T051007Z.json"
     },
     {
