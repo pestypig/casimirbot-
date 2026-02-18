@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
 
 type PromptFamily = "relation" | "repo_technical" | "ambiguous_general";
 
@@ -74,6 +74,15 @@ type FailureRecord = {
   count: number;
 };
 
+type GitProvenance = {
+  branch: string | null;
+  head: string | null;
+  originMain: string | null;
+  aheadBehind: string | null;
+  hasOriginRemote: boolean;
+  hasMainBranch: boolean;
+};
+
 const BASE_URL = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5173";
 const OUT_DIR = process.env.HELIX_ASK_VERSATILITY_OUT ?? "artifacts/experiments/helix-ask-versatility";
 const REPORT_PATH = process.env.HELIX_ASK_VERSATILITY_REPORT ?? "reports/helix-ask-versatility-report.md";
@@ -124,6 +133,44 @@ const REPORT_SECTION_RE = /(Executive summary:|Coverage map:|Point-by-point:|Rep
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const runCaseKey = (promptId: string, seed: number, temperature: number): string =>
   `${promptId}::s${seed}::t${temperature}`;
+const execGit = async (args: string[]): Promise<string | null> =>
+  new Promise((resolve) => {
+    execFile("git", args, { cwd: process.cwd(), timeout: 3000 }, (error, stdout) => {
+      if (error) {
+        resolve(null);
+        return;
+      }
+      const text = String(stdout ?? "").trim();
+      resolve(text.length ? text : null);
+    });
+  });
+
+const execGitOk = async (args: string[]): Promise<boolean> =>
+  new Promise((resolve) => {
+    execFile("git", args, { cwd: process.cwd(), timeout: 3000 }, (error) => {
+      resolve(!error);
+    });
+  });
+
+const collectGitProvenance = async (): Promise<GitProvenance> => {
+  const [branch, head, originMain, remoteText] = await Promise.all([
+    execGit(["branch", "--show-current"]),
+    execGit(["rev-parse", "--short", "HEAD"]),
+    execGit(["rev-parse", "--short", "origin/main"]),
+    execGit(["remote"]),
+  ]);
+  const hasOriginRemote = Boolean(remoteText?.split(/\r?\n/).map((v) => v.trim()).filter(Boolean).includes("origin"));
+  const hasMainBranch = await execGitOk(["show-ref", "--verify", "--quiet", "refs/heads/main"]);
+  const aheadBehind = originMain && head ? await execGit(["rev-list", "--left-right", "--count", "origin/main...HEAD"]) : null;
+  return {
+    branch,
+    head,
+    originMain,
+    aheadBehind,
+    hasOriginRemote,
+    hasMainBranch,
+  };
+};
 
 const readJsonFile = async <T>(filePath: string): Promise<T | null> => {
   try {
@@ -229,7 +276,11 @@ const isCircuitOpenPayload = (payload: AskPayload): boolean => {
   const error = String(payload.error ?? "").toLowerCase();
   const message = String(payload.message ?? "").toLowerCase();
   if (error === "helix_ask_temporarily_unavailable") return true;
-  return message.includes("circuit") || message.includes("temporarily unavailable");
+  return (
+    message.includes("circuit") ||
+    message.includes("temporarily unavailable") ||
+    message.includes("cooldown")
+  );
 };
 
 const writeCheckpoint = async (outDir: string, runId: string, rows: RawRun[]) => {
@@ -438,6 +489,7 @@ const shouldRetryResponse = (
   response: Awaited<ReturnType<typeof askOnce>>,
   entry: PromptCase,
 ): boolean => {
+  if (isCircuitOpenPayload(response.payload)) return true;
   if (RETRYABLE_STATUS.has(response.status)) return true;
   const text = String(response.payload.text ?? "");
   if (RETRY_STUB && STUB_RE.test(text) && entry.family !== "ambiguous_general") {
@@ -580,6 +632,9 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
   const debug = response.payload.debug ?? null;
   const reportMode = typeof debug?.report_mode === "boolean" ? debug.report_mode : response.payload.report_mode;
   if (response.status !== 200) failures.push(`request_failed:${response.status || "network"}`);
+  if (response.status === 200 && isCircuitOpenPayload(response.payload)) {
+    failures.push("request_failed:circuit_open_payload");
+  }
   if (entry.expected_intent_id && debug?.intent_id !== entry.expected_intent_id) {
     failures.push(`intent_mismatch:${debug?.intent_id ?? "missing"}`);
   }
@@ -612,6 +667,12 @@ const avg = (values: number[]): number => (values.length ? values.reduce((sum, v
 const main = async () => {
   const startedAt = new Date().toISOString();
   const runEpoch = Date.now();
+  const gitProvenance = await collectGitProvenance();
+  const provenanceWarnings: string[] = [];
+  if (!gitProvenance.hasOriginRemote) provenanceWarnings.push("git_origin_remote_missing");
+  if (!gitProvenance.originMain) provenanceWarnings.push("git_origin_main_ref_missing");
+  if (!gitProvenance.head) provenanceWarnings.push("git_head_missing");
+  const provenanceGatePass = provenanceWarnings.length === 0;
   let runId = `versatility-${Date.now()}`;
   const outRootDir = path.resolve(OUT_DIR);
   let runOutDir = ISOLATE_RUN_DIR ? path.join(outRootDir, runId) : outRootDir;
@@ -873,6 +934,7 @@ const main = async () => {
     }));
 
   const summary = {
+    summary_schema_version: 2,
     run_id: runId,
     started_at: startedAt,
     ended_at: new Date().toISOString(),
@@ -891,6 +953,11 @@ const main = async () => {
     total_runs: rawRuns.length,
     run_complete: runComplete,
     completion_rate: rawRuns.length / Math.max(1, expectedRuns),
+    provenance: {
+      ...gitProvenance,
+      gate_pass: provenanceGatePass,
+      warnings: provenanceWarnings,
+    },
     family_summary: familySummary,
     metrics: {
       attempts: {
@@ -937,6 +1004,7 @@ const main = async () => {
 
   const recommendationDecision =
     !runComplete ||
+    !provenanceGatePass ||
     stubRate > 0.02 ||
     relationPacketBuiltRate < 0.95 ||
     relationDualDomainRate < 0.95 ||
@@ -944,11 +1012,45 @@ const main = async () => {
     minTextPassRate < 0.9
       ? (runComplete ? "needs_patch" : "insufficient_run_quality")
       : "ship";
+  const normalizedDecision =
+    !provenanceGatePass || !runComplete ? "insufficient_run_quality" : recommendationDecision;
+  const nextPatches = [
+    ...(!provenanceGatePass
+      ? [
+          {
+            order: 0,
+            title: "Validation provenance gate",
+            why: "Require origin/main + HEAD provenance in reports before accepting decision-grade outcomes.",
+          },
+        ]
+      : []),
+    {
+      order: 1,
+      title: "Relation-mode fallback hardening",
+      why: "Increase deterministic fallback usage when relation intent is selected but generated answer omits warp/ethos linkage signals.",
+    },
+    {
+      order: 2,
+      title: "Citation persistence guard",
+      why: "Guarantee hybrid/repo responses keep at least one valid Sources line after final cleanup and repairs.",
+    },
+    {
+      order: 3,
+      title: "Stub environment policy split",
+      why: "Separate decision-grade campaigns from stub-mode smoke runs to avoid polluted quality metrics.",
+    },
+  ];
 
   const recommendation = {
+    summary_schema_version: 2,
     run_id: runId,
-    decision: recommendationDecision,
+    decision: normalizedDecision,
     rationale: [
+      `provenance_gate_pass=${String(provenanceGatePass)}`,
+      `git_branch=${gitProvenance.branch ?? "missing"}`,
+      `git_head=${gitProvenance.head ?? "missing"}`,
+      `git_origin_main=${gitProvenance.originMain ?? "missing"}`,
+      `git_ahead_behind=${gitProvenance.aheadBehind ?? "missing"}`,
       `run_complete=${String(runComplete)}`,
       `expected_runs=${expectedRuns}`,
       `total_runs=${rawRuns.length}`,
@@ -962,23 +1064,7 @@ const main = async () => {
       `report_mode_correct_rate=${reportModeCorrectRate.toFixed(3)}`,
       `min_text_length_pass_rate=${minTextPassRate.toFixed(3)}`,
     ],
-    next_patches: [
-      {
-        order: 1,
-        title: "Relation-mode fallback hardening",
-        why: "Increase deterministic fallback usage when relation intent is selected but generated answer omits warp/ethos linkage signals.",
-      },
-      {
-        order: 2,
-        title: "Citation persistence guard",
-        why: "Guarantee hybrid/repo responses keep at least one valid Sources line after final cleanup and repairs.",
-      },
-      {
-        order: 3,
-        title: "Stub environment policy split",
-        why: "Separate decision-grade campaigns from stub-mode smoke runs to avoid polluted quality metrics.",
-      },
-    ],
+    next_patches: nextPatches,
   };
 
   await fs.writeFile(path.resolve(runOutDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
@@ -1017,6 +1103,13 @@ const main = async () => {
   const md = [
     "# Helix Ask Versatility Evaluation Report",
     "",
+    `- summary_schema_version: 2`,
+    `- git_branch: ${gitProvenance.branch ?? "missing"}`,
+    `- git_head: ${gitProvenance.head ?? "missing"}`,
+    `- git_origin_main: ${gitProvenance.originMain ?? "missing"}`,
+    `- git_ahead_behind: ${gitProvenance.aheadBehind ?? "missing"}`,
+    `- provenance_gate_pass: ${String(provenanceGatePass)}`,
+    `- provenance_warnings: ${provenanceWarnings.length ? provenanceWarnings.join(", ") : "none"}`,
     `- run_id: ${runId}`,
     `- base_url: ${BASE_URL}`,
     `- prompts: ${prompts.length}`,
@@ -1070,7 +1163,7 @@ const main = async () => {
     worstSection,
     "",
     "## Recommendation",
-    `- decision: ${recommendationDecision}`,
+    `- decision: ${normalizedDecision}`,
     ...recommendation.next_patches.map((patch) => `- [${patch.order}] ${patch.title}: ${patch.why}`),
   ].join("\n");
 
@@ -1080,7 +1173,7 @@ const main = async () => {
   console.log(
     `[versatility] run=${runId} prompts=${prompts.length} expected_runs=${expectedRuns} runs=${rawRuns.length} run_complete=${String(
       runComplete,
-    )} decision=${recommendationDecision} out=${runOutDir}`,
+    )} decision=${normalizedDecision} out=${runOutDir}`,
   );
   if (FAIL_ON_INCOMPLETE && !runComplete) {
     throw new Error(

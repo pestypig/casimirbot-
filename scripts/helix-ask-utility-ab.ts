@@ -285,9 +285,11 @@ async function run() {
   const ready = await ensureReady();
   if (!ready.ok) {
     const summary = {
+      summary_schema_version: 2,
       variant: VARIANT,
       commit: COMMIT,
       run_id: runId,
+      base_url: BASE_URL,
       prompt_count: promptList.length,
       run_count: 0,
       avg_utility: 0,
@@ -416,9 +418,11 @@ async function run() {
   if (citationPresenceRate < MIN_CITATION_RATE) blockers.push(`citation_presence_rate ${citationPresenceRate.toFixed(3)} < ${MIN_CITATION_RATE.toFixed(3)}`);
 
   const summary = {
+    summary_schema_version: 2,
     variant: VARIANT,
     commit: COMMIT,
     run_id: runId,
+    base_url: BASE_URL,
     prompt_count: prompts().length,
     run_count: rows.length,
     avg_utility: avgUtility,
