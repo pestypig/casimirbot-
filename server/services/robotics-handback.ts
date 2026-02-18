@@ -6,6 +6,11 @@ export type RoboticsHandbackBundle = {
   benchmark: ReturnType<typeof runPickPlaceBenchmark>;
   benchmarkTraceCount: number;
   benchmarkTraceIds: string[];
+  replayLinkage: {
+    movementEpisodeCount: number;
+    replaySummaryCount: number;
+    certificateRefs: string[];
+  };
   openRisks: string[];
   nextRung: string[];
   runbookRef: string;
@@ -32,11 +37,27 @@ export const buildRoboticsHandbackBundle = (): RoboticsHandbackBundle => {
   const traces = getTrainingTraceExport({ limit: 200 }).filter(
     (entry) => entry.traceId === benchmark.traceId,
   );
+  const movementEpisodes = traces.filter((entry) => entry.payload?.kind === "movement_episode");
+  const replaySummaries = traces.filter(
+    (entry) => entry.payload?.kind === "trajectory_replay_summary",
+  );
+  const certificateRefs = Array.from(
+    new Set(
+      traces
+        .flatMap((entry) => [entry.certificate?.certificateHash, entry.certificate?.certificateId])
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
   return {
     generatedAt: new Date().toISOString(),
     benchmark,
     benchmarkTraceCount: traces.length,
     benchmarkTraceIds: traces.map((entry) => entry.id),
+    replayLinkage: {
+      movementEpisodeCount: movementEpisodes.length,
+      replaySummaryCount: replaySummaries.length,
+      certificateRefs,
+    },
     openRisks: OPEN_RISKS,
     nextRung: NEXT_RUNG,
     runbookRef: "docs/robotics-threshold-tuning-runbook.md",

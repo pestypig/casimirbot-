@@ -2491,6 +2491,9 @@ export const movementEpisodePayloadSchema = z.object({
   episodeId: z.string(),
   traceId: z.string().optional(),
   primitivePath: z.array(z.string()).default([]),
+  provenanceClass: z.enum(["robotics.demonstration", "robotics.hardware", "robotics.simulation"]),
+  sensorChannelCoverage: z.array(z.string()).min(1),
+  certificateRefs: z.array(z.string()).min(1),
   metrics: movementEpisodeMetricsSchema,
   events: z.array(movementEpisodeEventSchema).default([]),
   replaySeed: z.string().optional(),
@@ -2498,12 +2501,20 @@ export const movementEpisodePayloadSchema = z.object({
 });
 export type MovementEpisodePayload = z.infer<typeof movementEpisodePayloadSchema>;
 
+export const replaySummaryProvenanceSchema = z.object({
+  provenanceClass: z.enum(["robotics.demonstration", "robotics.hardware", "robotics.simulation"]),
+  sensorChannelCoverage: z.array(z.string()).min(1),
+  certificateRefs: z.array(z.string()).min(1),
+});
+export type ReplaySummaryProvenance = z.infer<typeof replaySummaryProvenanceSchema>;
+
 export const trainingTracePayloadSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("trajectory"), data: agiTrajectorySchema }),
   z.object({ kind: z.literal("trajectory_gates"), data: agiGateReportSchema }),
   z.object({
     kind: z.literal("trajectory_replay_summary"),
     data: agiRefinerySummarySchema,
+    provenance: replaySummaryProvenanceSchema,
   }),
   z.object({ kind: z.literal("dataset_export"), data: agiDatasetExportSchema }),
   z.object({ kind: z.literal("movement_episode"), data: movementEpisodePayloadSchema }),
