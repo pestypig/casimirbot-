@@ -1896,7 +1896,7 @@ const completeCitations = async (args: {
     });
   }
   if (retrievalCandidates.length === 0 && retrievalSelected.length === 0) {
-    const nextCitations = baseCitations.length > 0 ? [] : baseCitations;
+    const nextCitations = baseCitations;
     return finalize({
       citations: nextCitations,
       retrievalCandidates,
