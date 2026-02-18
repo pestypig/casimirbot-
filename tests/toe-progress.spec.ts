@@ -4,6 +4,16 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
+const TSX_CLI = path.join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+
+function runTsxScript(scriptPath: string, env: NodeJS.ProcessEnv) {
+  execFileSync(process.execPath, [TSX_CLI, scriptPath], {
+    cwd: process.cwd(),
+    env,
+    stdio: "pipe",
+  });
+}
+
 function writeJson(filePath: string, data: unknown) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
@@ -38,16 +48,12 @@ describe("TOE progress tooling", () => {
       },
     });
 
-    execFileSync("npx", ["tsx", "scripts/compute-toe-progress.ts"], {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        TOE_BACKLOG_PATH: backlogPath,
-        TOE_RESULTS_DIR: resultsDir,
-        TOE_PROGRESS_SNAPSHOT_PATH: snapshotPath,
-        RESOLVER_OWNER_COVERAGE_MANIFEST_PATH: manifestPath,
-      },
-      stdio: "pipe",
+    runTsxScript("scripts/compute-toe-progress.ts", {
+      ...process.env,
+      TOE_BACKLOG_PATH: backlogPath,
+      TOE_RESULTS_DIR: resultsDir,
+      TOE_PROGRESS_SNAPSHOT_PATH: snapshotPath,
+      RESOLVER_OWNER_COVERAGE_MANIFEST_PATH: manifestPath,
     });
 
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"));
@@ -74,14 +80,10 @@ describe("TOE progress tooling", () => {
     });
 
     expect(() => {
-      execFileSync("npx", ["tsx", "scripts/validate-resolver-owner-coverage.ts"], {
-        cwd: process.cwd(),
-        env: {
-          ...process.env,
-          RESOLVER_OWNER_COVERAGE_MANIFEST_PATH: manifestPath,
-          GRAPH_RESOLVERS_PATH: graphResolversPath,
-        },
-        stdio: "pipe",
+      runTsxScript("scripts/validate-resolver-owner-coverage.ts", {
+        ...process.env,
+        RESOLVER_OWNER_COVERAGE_MANIFEST_PATH: manifestPath,
+        GRAPH_RESOLVERS_PATH: graphResolversPath,
       });
     }).toThrow(/high-priority owners cannot be unmapped/);
   });
