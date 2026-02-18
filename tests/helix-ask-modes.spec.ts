@@ -5,9 +5,18 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 describe("Helix Ask modes", () => {
   let server: Server;
   let baseUrl = "http://127.0.0.1:0";
+  const envSnapshot = {
+    ENABLE_AGI: process.env.ENABLE_AGI,
+    HELIX_ASK_AGENT_LOOP_BUDGET_MS: process.env.HELIX_ASK_AGENT_LOOP_BUDGET_MS,
+    HELIX_ASK_AGENT_ACTION_BUDGET_MS: process.env.HELIX_ASK_AGENT_ACTION_BUDGET_MS,
+    HELIX_ASK_FAILURE_COOLDOWN_MS: process.env.HELIX_ASK_FAILURE_COOLDOWN_MS,
+  };
 
   beforeAll(async () => {
     process.env.ENABLE_AGI = "1";
+    process.env.HELIX_ASK_AGENT_LOOP_BUDGET_MS = "20000";
+    process.env.HELIX_ASK_AGENT_ACTION_BUDGET_MS = "4000";
+    process.env.HELIX_ASK_FAILURE_COOLDOWN_MS = "1";
     vi.resetModules();
     const { planRouter } = await import("../server/routes/agi.plan");
     const app = express();
@@ -27,6 +36,23 @@ describe("Helix Ask modes", () => {
       if (!server) return resolve();
       server.close(() => resolve());
     });
+    if (envSnapshot.ENABLE_AGI === undefined) delete process.env.ENABLE_AGI;
+    else process.env.ENABLE_AGI = envSnapshot.ENABLE_AGI;
+    if (envSnapshot.HELIX_ASK_AGENT_LOOP_BUDGET_MS === undefined) {
+      delete process.env.HELIX_ASK_AGENT_LOOP_BUDGET_MS;
+    } else {
+      process.env.HELIX_ASK_AGENT_LOOP_BUDGET_MS = envSnapshot.HELIX_ASK_AGENT_LOOP_BUDGET_MS;
+    }
+    if (envSnapshot.HELIX_ASK_AGENT_ACTION_BUDGET_MS === undefined) {
+      delete process.env.HELIX_ASK_AGENT_ACTION_BUDGET_MS;
+    } else {
+      process.env.HELIX_ASK_AGENT_ACTION_BUDGET_MS = envSnapshot.HELIX_ASK_AGENT_ACTION_BUDGET_MS;
+    }
+    if (envSnapshot.HELIX_ASK_FAILURE_COOLDOWN_MS === undefined) {
+      delete process.env.HELIX_ASK_FAILURE_COOLDOWN_MS;
+    } else {
+      process.env.HELIX_ASK_FAILURE_COOLDOWN_MS = envSnapshot.HELIX_ASK_FAILURE_COOLDOWN_MS;
+    }
   });
 
   it("defaults to read mode when mode is omitted", async () => {
