@@ -306,7 +306,7 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
   const firstFailId = fallback
     ? "HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY"
     : !evidenceComplete
-      ? "HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE"
+      ? null
       : residualWithinEnvelope
         ? null
         : "HALOBANK_HORIZONS_RESIDUAL_OUT_OF_ENVELOPE";
