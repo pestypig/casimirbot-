@@ -153,6 +153,48 @@ const readEnvBool = (env: NodeJS.ProcessEnv, key: string): boolean | undefined =
 const readEnvString = (env: NodeJS.ProcessEnv, key: string): string | undefined =>
   normalizePathCandidate(env[key]);
 
+
+
+type CanonicalProvenanceClass = "measured" | "proxy" | "inferred";
+type CanonicalClaimTier = "diagnostic" | "reduced-order" | "certified";
+
+const normalizeProvenanceClass = (value: unknown): CanonicalProvenanceClass | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "measured" || normalized === "proxy" || normalized === "inferred") {
+    return normalized;
+  }
+  return undefined;
+};
+
+const normalizeClaimTier = (value: unknown): CanonicalClaimTier | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === "diagnostic" ||
+    normalized === "reduced-order" ||
+    normalized === "certified"
+  ) {
+    return normalized;
+  }
+  return undefined;
+};
+
+const deriveCanonicalProvenance = (input: {
+  provenanceMissing?: number;
+  provenanceClass?: unknown;
+  claimTier?: unknown;
+}): { provenanceClass: CanonicalProvenanceClass; claimTier: CanonicalClaimTier } => {
+  const claimTier = normalizeClaimTier(input.claimTier) ?? "diagnostic";
+  const explicitClass = normalizeProvenanceClass(input.provenanceClass);
+  if (explicitClass) {
+    return { provenanceClass: explicitClass, claimTier };
+  }
+  if ((input.provenanceMissing ?? 0) > 0) {
+    return { provenanceClass: "inferred", claimTier };
+  }
+  return { provenanceClass: "proxy", claimTier };
+};
 const readEnvJson = (env: NodeJS.ProcessEnv, key: string): Record<string, unknown> | undefined => {
   const raw = env[key];
   if (!raw) return undefined;
@@ -842,6 +884,8 @@ type ToolLogSummary = {
   forbidden: number;
   approvalMissing: number;
   provenanceMissing: number;
+  provenanceClass: CanonicalProvenanceClass;
+  claimTier: CanonicalClaimTier;
 };
 
 const countPolicyFlag = (value?: boolean | number): number => {
@@ -872,6 +916,7 @@ const summarizeToolLogs = (records: ToolLogRecord[]): ToolLogSummary | null => {
     }
   }
   const stepsUsed = steps.size > 0 ? steps.size : calls;
+  const canonicalProvenance = deriveCanonicalProvenance({ provenanceMissing });
   return {
     calls,
     stepsUsed,
@@ -879,6 +924,8 @@ const summarizeToolLogs = (records: ToolLogRecord[]): ToolLogSummary | null => {
     forbidden,
     approvalMissing,
     provenanceMissing,
+    provenanceClass: canonicalProvenance.provenanceClass,
+    claimTier: canonicalProvenance.claimTier,
   };
 };
 
@@ -1003,6 +1050,12 @@ const loadToolTelemetryFromEnv = (env: NodeJS.ProcessEnv): ToolUseBudgetTelemetr
   const forbiddenOps = readEnvNumber(env, "CASIMIR_OPS_FORBIDDEN");
   const approvalMissing = readEnvNumber(env, "CASIMIR_OPS_APPROVAL_MISSING");
   const provenanceMissing = readEnvNumber(env, "CASIMIR_PROVENANCE_MISSING");
+  const explicitProvenanceClass =
+    readEnvString(env, "CASIMIR_PROVENANCE_CLASS") ??
+    readEnvString(env, "CASIMIR_PROVENANCE_CLASS_CANONICAL");
+  const explicitClaimTier =
+    readEnvString(env, "CASIMIR_CLAIM_TIER") ??
+    readEnvString(env, "CASIMIR_CLAIM_TIER_CANONICAL");
   const runtimeMs = readEnvNumber(env, "CASIMIR_RUNTIME_MS");
   const toolCalls = readEnvNumber(env, "CASIMIR_TOOL_CALLS");
   const toolTotal = readEnvNumber(env, "CASIMIR_TOOL_TOTAL");
@@ -1030,9 +1083,19 @@ const loadToolTelemetryFromEnv = (env: NodeJS.ProcessEnv): ToolUseBudgetTelemetr
   if (toolCalls !== undefined || toolTotal !== undefined) {
     telemetry.tools = { calls: toolCalls, total: toolTotal };
   }
-  if (metrics) {
-    telemetry.metrics = metrics;
-  }
+  const canonicalProvenance = deriveCanonicalProvenance({
+    provenanceMissing,
+    provenanceClass: explicitProvenanceClass,
+    claimTier: explicitClaimTier,
+  });
+  const deterministicMetrics: ConstraintPackMetricMap = {
+    "provenance.class": canonicalProvenance.provenanceClass,
+    "claim.tier": canonicalProvenance.claimTier,
+  };
+  telemetry.metrics = {
+    ...(metrics ?? {}),
+    ...deterministicMetrics,
+  };
   return telemetry;
 };
 
@@ -1277,6 +1340,10 @@ export const collectToolUseBudgetTelemetry = async (
           approvalMissing: summary.approvalMissing,
         },
         provenance: { missing: summary.provenanceMissing },
+        metrics: {
+          "provenance.class": summary.provenanceClass,
+          "claim.tier": summary.claimTier,
+        },
       };
       if (summary.stepsUsed !== undefined) {
         toolTelemetry.steps = { used: summary.stepsUsed };

@@ -1,0 +1,23 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-017-pipeline-ledger-provenance-contract",
+  "files_changed": [
+    "server/services/contributions/vcu-ledger.ts",
+    "server/services/observability/constraint-pack-telemetry.ts",
+    "tests/vcu-ledger-provenance.spec.ts"
+  ],
+  "tests_run": [
+    "npx vitest run tests/vcu-ledger-provenance.spec.ts tests/ledger-dimension.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:307c8941-8241-4b4d-8465-7cab07b88256",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}
