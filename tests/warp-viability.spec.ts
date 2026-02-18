@@ -117,6 +117,21 @@ describe("warp viability congruence wiring", () => {
     expect((result.snapshot as any).warp_mechanics_provenance_class).toBe("measured");
     expect((result.snapshot as any).warp_mechanics_claim_tier).toBe("reduced-order");
     expect((result.snapshot as any).warp_mechanics_promotion_reason).toBe("hard_constraint_failed");
+    expect((result.snapshot as any).warp_mechanics_promotion_counterexample_class).toBe(
+      "hard_constraint_regression",
+    );
+    expect((result.snapshot as any).warp_mechanics_promotion_replay).toMatchObject({
+      version: "promotion-replay-pack/v1",
+      outcome: {
+        tier: "reduced-order",
+        reason: "hard_constraint_failed",
+        counterexample_class: "hard_constraint_regression",
+        conservative_downgrade: true,
+      },
+    });
+    expect(
+      String((result.snapshot as any).warp_mechanics_promotion_replay?.deterministic_key ?? ""),
+    ).toContain("reason=hard_constraint_failed");
     expect(cl3?.details).toContain("source=warp.metric.T00.natario.shift");
     expect(cl3?.details).not.toContain("T00_ref=n/a");
   });
@@ -322,6 +337,19 @@ describe("warp viability congruence wiring", () => {
     expect((result.snapshot as any).warp_mechanics_provenance_class).toBe("proxy");
     expect((result.snapshot as any).warp_mechanics_claim_tier).toBe("diagnostic");
     expect((result.snapshot as any).warp_mechanics_promotion_reason).toBe("insufficient_provenance");
+    expect((result.snapshot as any).warp_mechanics_promotion_counterexample_class).toBe(
+      "provenance_missing",
+    );
+    expect((result.snapshot as any).warp_mechanics_promotion_replay).toMatchObject({
+      outcome: {
+        reason: "insufficient_provenance",
+        counterexample_class: "provenance_missing",
+        conservative_downgrade: true,
+      },
+      inputs: {
+        provenance_class: "proxy",
+      },
+    });
     const ts = result.constraints.find((c) => c.id === "TS_ratio_min");
     expect((ts as any)?.claim_tier).toBe("diagnostic");
   });
@@ -391,6 +419,41 @@ describe("warp viability congruence wiring", () => {
     expect(vdb?.details).toContain("derivTwoWall=true");
     expect(result.snapshot.vdb_region_ii_derivative_support).toBe(true);
     expect(result.snapshot.vdb_two_wall_derivative_support).toBe(true);
+  });
+
+
+  it("keeps promotion replay deterministic across identical evaluations", async () => {
+    runtime.pipeline = makePipeline({
+      warp: {
+        metricT00: -100,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.natario.shift",
+        metricAdapter: {
+          chart: { label: "comoving_cartesian", contractStatus: "ok" },
+          betaDiagnostics: { thetaMax: 0.5, method: "finite-diff" },
+        },
+      },
+      thetaCal: 10,
+      TS_ratio: 150,
+      tsMetricDerived: true,
+      qiGuardrail: {
+        marginRatio: 0.2,
+        lhs_Jm3: -1,
+        bound_Jm3: -5,
+        rhoSource: "warp.metric.T00.natario.shift",
+      },
+    });
+
+    const first = await evaluateWarpViability({});
+    const second = await evaluateWarpViability({});
+    const firstReplay = (first.snapshot as any).warp_mechanics_promotion_replay;
+    const secondReplay = (second.snapshot as any).warp_mechanics_promotion_replay;
+
+    expect(firstReplay).toEqual(secondReplay);
+    expect(firstReplay?.deterministic_key).toBe(secondReplay?.deterministic_key);
+    expect((first.snapshot as any).warp_mechanics_promotion_counterexample_class).toBe("hard_constraint_regression");
+    expect((first.snapshot as any).warp_mechanics_promotion_reason).toBe("hard_constraint_failed");
+    expect((first.snapshot as any).warp_mechanics_claim_tier).toBe("reduced-order");
   });
 
   // restore the caller environment for subsequent tests
