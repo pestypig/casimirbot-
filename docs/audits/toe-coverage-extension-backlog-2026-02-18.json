@@ -1863,6 +1863,44 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-076-helix-ask-system-quality-delta-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Helix Ask fixed-pack quality delta evaluation",
+      "primary_path_prefix": "tests/helix-ask-ps2-runtime-report.spec.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "tests/helix-ask-focused-utility-hardening.spec.ts",
+        "tests/helix-ask-mechanism-maturity-contract.spec.ts",
+        "tests/helix-ask-ps2-runtime-report.spec.ts",
+        "tests/casimir-verify-ps2.spec.ts",
+        "reports/helix-ask-ps2-runtime-contract-*.md",
+        "docs/audits/helix-results",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json",
+        "reports"
+      ],
+      "required_tests": [
+        "tests/helix-ask-focused-utility-hardening.spec.ts",
+        "tests/helix-ask-mechanism-maturity-contract.spec.ts",
+        "tests/helix-ask-ps2-runtime-report.spec.ts",
+        "tests/casimir-verify-ps2.spec.ts"
+      ],
+      "done_criteria": [
+        "Fixed prompt pack run uses stable seeds/questions from PS2 lane",
+        "Before/after metric deltas are emitted with deterministic thresholds and pass/fail marks",
+        "Strict fail determinism probe is measured and reported",
+        "Receipt artifact records validator/preflight runs plus Casimir PASS certificate integrity"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
     }
   ]
 }
