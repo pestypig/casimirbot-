@@ -1,0 +1,35 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-073-helix-ask-semantic-claim-citation-contract",
+  "files_changed": [
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+    "server/routes/agi.plan.ts",
+    "server/services/helix-ask/query.ts",
+    "tests/helix-ask-answer-artifacts.spec.ts",
+    "tests/helix-ask-evidence-gate.spec.ts",
+    "docs/audits/toe-progress-snapshot.json"
+  ],
+  "tests_run": [
+    "tests/helix-ask-answer-artifacts.spec.ts",
+    "tests/helix-ask-evidence-gate.spec.ts",
+    "npx vitest run tests/helix-ask-answer-artifacts.spec.ts tests/helix-ask-evidence-gate.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-backlog.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run validate:toe:research-gates",
+    "npx tsx scripts/compute-toe-progress.ts",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:5303c994-7a2f-4945-a08c-d01272d1cb02",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}
