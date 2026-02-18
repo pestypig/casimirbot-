@@ -7,6 +7,30 @@ export interface PhysicsCertificateHeader {
   issuer: string; // e.g., "server/energy-pipeline", "ci/theory-checks"
   gitCommit?: string;
   pipelineVersion?: string;
+  signer?: {
+    keyId: string;
+  };
+}
+
+export interface PhysicsCertificateVerificationProfile {
+  hardened?: boolean;
+  trustedSignerKeyIds?: string[];
+}
+
+export interface PhysicsCertificateVerificationResult {
+  integrity: {
+    ok: boolean;
+  };
+  authenticity: {
+    ok: boolean;
+    enforced: boolean;
+    signaturePresent: boolean;
+    signatureValid: boolean;
+    signerKeyId: string | null;
+    signerTrusted: boolean;
+    reasonCodes: string[];
+  };
+  overallOk: boolean;
 }
 
 export interface PhysicsCertificate<TPayload = unknown> {

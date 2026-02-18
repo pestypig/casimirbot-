@@ -31,6 +31,7 @@ function getRepoContext(): { gitCommit?: string; pipelineVersion?: string } {
 
 function makeHeader(kind: "warp-viability"): PhysicsCertificateHeader {
   const { gitCommit, pipelineVersion } = getRepoContext();
+  const signerKeyId = process.env.WARP_CERT_SIGNER_KEY_ID?.trim();
   return {
     id: crypto.randomUUID(),
     kind,
@@ -38,6 +39,7 @@ function makeHeader(kind: "warp-viability"): PhysicsCertificateHeader {
     issuer: "server/warp-viability-oracle",
     gitCommit,
     pipelineVersion,
+    ...(signerKeyId ? { signer: { keyId: signerKeyId } } : {}),
   };
 }
 

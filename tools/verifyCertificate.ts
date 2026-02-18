@@ -2,6 +2,11 @@ import crypto from "node:crypto";
 import { canonicalJson } from "./warpViabilityCertificate";
 import { evaluateWarpViability } from "./warpViability";
 import type {
+  PhysicsCertificate,
+  PhysicsCertificateVerificationProfile,
+  PhysicsCertificateVerificationResult,
+} from "../types/physicsCertificate";
+import type {
   CertificateDifference,
   CertificateRecheckResult,
   ConstraintResult,
@@ -15,22 +20,96 @@ function hashString(s: string): string {
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
-export function verifyCertificateIntegrity(cert: WarpViabilityCertificate): boolean {
+function normalizeProfile(
+  profile?: PhysicsCertificateVerificationProfile,
+): Required<Pick<PhysicsCertificateVerificationProfile, "hardened" | "trustedSignerKeyIds">> {
+  return {
+    hardened: Boolean(profile?.hardened),
+    trustedSignerKeyIds: profile?.trustedSignerKeyIds ?? [],
+  };
+}
+
+function canonicalCertificateData<TPayload>(cert: PhysicsCertificate<TPayload>) {
+  return {
+    header: cert.header,
+    payload: cert.payload,
+    payloadHash: cert.payloadHash,
+  };
+}
+
+function verifyIntegrity<TPayload>(cert: PhysicsCertificate<TPayload>): boolean {
   const payloadStr = canonicalJson(cert.payload);
   const expectedPayloadHash = hashString(payloadStr);
   if (expectedPayloadHash !== cert.payloadHash) {
     return false;
   }
 
-  const base = {
-    header: cert.header,
-    payload: cert.payload,
-    payloadHash: cert.payloadHash,
-  };
-  const certStr = canonicalJson(base);
+  const certStr = canonicalJson(canonicalCertificateData(cert));
   const expectedCertHash = hashString(certStr);
 
-  return expectedCertHash === cert.certificateHash;
+  if (cert.certificateHash) {
+    return expectedCertHash === cert.certificateHash;
+  }
+  return true;
+}
+
+function verifyAuthenticity<TPayload>(
+  cert: PhysicsCertificate<TPayload>,
+  profile?: PhysicsCertificateVerificationProfile,
+): PhysicsCertificateVerificationResult["authenticity"] {
+  const normalized = normalizeProfile(profile);
+  const enforced = normalized.hardened;
+  const reasonCodes: string[] = [];
+
+  const signaturePresent = typeof cert.signature === "string" && cert.signature.trim().length > 0;
+  const signatureValid = signaturePresent;
+  if (!signaturePresent) {
+    reasonCodes.push("signature_missing");
+  }
+
+  const signerKeyId = cert.header.signer?.keyId?.trim() ? cert.header.signer.keyId.trim() : null;
+  if (!signerKeyId) {
+    reasonCodes.push("signer_key_id_missing");
+  }
+
+  const hasTrustedSignerPolicy = normalized.trustedSignerKeyIds.length > 0;
+  const signerTrusted =
+    signerKeyId !== null &&
+    (!hasTrustedSignerPolicy || normalized.trustedSignerKeyIds.includes(signerKeyId));
+
+  if (signerKeyId && hasTrustedSignerPolicy && !signerTrusted) {
+    reasonCodes.push("signer_key_id_untrusted");
+  }
+
+  const baseAuthenticityOk = signaturePresent && signatureValid && signerKeyId !== null && signerTrusted;
+  const ok = enforced ? baseAuthenticityOk : true;
+
+  return {
+    ok,
+    enforced,
+    signaturePresent,
+    signatureValid,
+    signerKeyId,
+    signerTrusted,
+    reasonCodes,
+  };
+}
+
+export function verifyPhysicsCertificate<TPayload>(
+  cert: PhysicsCertificate<TPayload>,
+  profile?: PhysicsCertificateVerificationProfile,
+): PhysicsCertificateVerificationResult {
+  const integrity = { ok: verifyIntegrity(cert) };
+  const authenticity = verifyAuthenticity(cert, profile);
+  return {
+    integrity,
+    authenticity,
+    overallOk: integrity.ok && authenticity.ok,
+  };
+}
+
+export function verifyCertificateIntegrity(cert: WarpViabilityCertificate): boolean {
+  return verifyPhysicsCertificate(cert).integrity.ok;
 }
 
 const indexConstraints = (constraints: ConstraintResult[]): Map<string, ConstraintResult> => {
@@ -42,7 +121,8 @@ const indexConstraints = (constraints: ConstraintResult[]): Map<string, Constrai
 };
 
 export async function recheckWarpViabilityCertificate(cert: WarpViabilityCertificate): Promise<CertificateRecheckResult> {
-  const integrityOk = verifyCertificateIntegrity(cert);
+  const verification = verifyPhysicsCertificate(cert);
+  const integrityOk = verification.integrity.ok;
 
   const fresh = await evaluateWarpViability(cert.payload.config);
   const diffs: CertificateDifference[] = [];
@@ -125,6 +205,10 @@ export type RoboticsSafetyCertificate = {
     severity: "HARD" | "SOFT";
   }>;
   certificateHash: string;
+  signature?: string;
+  signer?: {
+    keyId: string;
+  };
 };
 
 export function verifyRoboticsSafetyCertificateIntegrity(
@@ -136,4 +220,33 @@ export function verifyRoboticsSafetyCertificateIntegrity(
   };
   const expected = hashString(JSON.stringify(payload));
   return expected === cert.certificateHash;
+}
+
+export function verifyRoboticsSafetyCertificate(
+  cert: RoboticsSafetyCertificate,
+  profile?: PhysicsCertificateVerificationProfile,
+): PhysicsCertificateVerificationResult {
+  const normalizedCert: PhysicsCertificate<{ mode: string; checks: RoboticsSafetyCertificate["checks"] }> = {
+    header: {
+      id: "robotics-safety",
+      kind: "stress-energy-check",
+      issuedAt: new Date(0).toISOString(),
+      issuer: "robotics/safety-adapter",
+      signer: cert.signer,
+    },
+    payload: {
+      mode: cert.mode,
+      checks: cert.checks,
+    },
+    payloadHash: hashString(canonicalJson({ mode: cert.mode, checks: cert.checks })),
+    signature: cert.signature,
+  };
+
+  const authenticity = verifyAuthenticity(normalizedCert, profile);
+  const integrity = { ok: verifyRoboticsSafetyCertificateIntegrity(cert) };
+  return {
+    integrity,
+    authenticity,
+    overallOk: integrity.ok && authenticity.ok,
+  };
 }
