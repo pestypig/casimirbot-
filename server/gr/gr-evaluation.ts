@@ -1,5 +1,5 @@
 import { issueWarpViabilityCertificate } from "../../tools/warpViabilityCertificate.js";
-import { verifyCertificateIntegrity } from "../../tools/verifyCertificate.js";
+import { verifyCertificateIntegrity, verifyPhysicsCertificate } from "../../tools/verifyCertificate.js";
 import type {
   GrConstraintPolicy,
   GrConstraintThresholds,
@@ -60,6 +60,9 @@ export async function runGrEvaluation(
         { useLiveSnapshot: input.useLiveSnapshot },
       );
       const integrityOk = verifyCertificateIntegrity(certificate);
+      const authenticity = verifyPhysicsCertificate(certificate, {
+        authenticityConsequence: "low",
+      }).authenticity;
       const certificateStatus = certificate.payload?.status ?? "NOT_CERTIFIED";
       const admissibleStatus = policyBundle.certificate.admissibleStatus;
       const allowMarginal = policyBundle.certificate.allowMarginalAsViable;
@@ -113,6 +116,8 @@ export async function runGrEvaluation(
         "gr.pass": pass,
         "warp.certificate.status": certificateStatus,
         "warp.certificate.integrity_ok": integrityOk,
+        "warp.certificate.authenticity_ok": authenticity.ok,
+        "warp.certificate.authenticity_required": authenticity.enforced,
       });
       span.status = pass
         ? { code: "OK" }
@@ -132,6 +137,10 @@ export async function runGrEvaluation(
           certificateHash: certificate.certificateHash ?? null,
           certificateId: certificate.header?.id ?? null,
           integrityOk,
+          authenticityOk: authenticity.ok,
+          authenticityRequired: authenticity.enforced,
+          authenticityConsequence: authenticity.consequence,
+          authenticityReasonCodes: authenticity.reasonCodes,
         },
         pass,
         notes: notes.length ? notes : undefined,

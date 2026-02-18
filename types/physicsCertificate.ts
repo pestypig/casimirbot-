@@ -15,6 +15,8 @@ export interface PhysicsCertificateHeader {
 export interface PhysicsCertificateVerificationProfile {
   hardened?: boolean;
   trustedSignerKeyIds?: string[];
+  authenticityConsequence?: "low" | "medium" | "high";
+  authenticityRequired?: boolean;
 }
 
 export interface PhysicsCertificateVerificationResult {
@@ -24,6 +26,7 @@ export interface PhysicsCertificateVerificationResult {
   authenticity: {
     ok: boolean;
     enforced: boolean;
+    consequence: "low" | "medium" | "high";
     signaturePresent: boolean;
     signatureValid: boolean;
     signerKeyId: string | null;

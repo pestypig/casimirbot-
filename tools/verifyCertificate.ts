@@ -22,10 +22,15 @@ const isFiniteNumber = (value: unknown): value is number =>
 
 function normalizeProfile(
   profile?: PhysicsCertificateVerificationProfile,
-): Required<Pick<PhysicsCertificateVerificationProfile, "hardened" | "trustedSignerKeyIds">> {
+): Required<Pick<PhysicsCertificateVerificationProfile, "hardened" | "trustedSignerKeyIds" | "authenticityConsequence" | "authenticityRequired">> {
+  const consequence = profile?.authenticityConsequence ?? "low";
+  const hardened = Boolean(profile?.hardened);
+  const authenticityRequired = profile?.authenticityRequired ?? (consequence === "high" ? true : hardened);
   return {
-    hardened: Boolean(profile?.hardened),
+    hardened,
     trustedSignerKeyIds: profile?.trustedSignerKeyIds ?? [],
+    authenticityConsequence: consequence,
+    authenticityRequired,
   };
 }
 
@@ -58,7 +63,7 @@ function verifyAuthenticity<TPayload>(
   profile?: PhysicsCertificateVerificationProfile,
 ): PhysicsCertificateVerificationResult["authenticity"] {
   const normalized = normalizeProfile(profile);
-  const enforced = normalized.hardened;
+  const enforced = normalized.authenticityRequired;
   const reasonCodes: string[] = [];
 
   const signaturePresent = typeof cert.signature === "string" && cert.signature.trim().length > 0;
@@ -87,6 +92,7 @@ function verifyAuthenticity<TPayload>(
   return {
     ok,
     enforced,
+    consequence: normalized.authenticityConsequence,
     signaturePresent,
     signatureValid,
     signerKeyId,
