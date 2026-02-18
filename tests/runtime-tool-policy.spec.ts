@@ -4,6 +4,7 @@ import {
   isCertifyingLane,
   resolveAdapterEndpoint,
 } from "../cli/casimir-verify";
+import { listToolMeta } from "../server/services/runtime/tool-metadata";
 import { resolveRuntimeToolPolicy } from "../server/services/runtime/tool-policy";
 
 describe("runtime tool policy", () => {
@@ -22,6 +23,19 @@ describe("runtime tool policy", () => {
 
   it("returns null for unknown tool", () => {
     expect(resolveRuntimeToolPolicy("missing.tool")).toBeNull();
+  });
+});
+
+
+describe("runtime tool metadata provenance defaults", () => {
+  it("marks tools without complete metadata as diagnostic/non-certifying", () => {
+    const repoSearch = listToolMeta().find((tool) => tool.id === "repo.search");
+    expect(repoSearch).toBeTruthy();
+    expect(repoSearch?.provenance).toEqual({
+      maturity: "diagnostic",
+      certifying: false,
+      metadataComplete: false,
+    });
   });
 });
 

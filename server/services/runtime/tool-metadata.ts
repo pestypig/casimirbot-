@@ -2,6 +2,14 @@ import type { RuntimeLane } from "./frame-contract";
 
 export type RuntimeTaskClass = "REALTIME" | "BACKGROUND" | "CRITICAL";
 
+export type RuntimeToolMaturity = "diagnostic" | "reduced-order" | "certified";
+
+export type RuntimeToolProvenance = {
+  maturity: RuntimeToolMaturity;
+  certifying: boolean;
+  metadataComplete: boolean;
+};
+
 export type ToolMeta = {
   id: string;
   lane: RuntimeLane;
@@ -9,6 +17,7 @@ export type ToolMeta = {
   hardTimeoutMs: number;
   budgetWeight: number;
   canDegradeTo?: string;
+  provenance?: RuntimeToolProvenance;
 };
 
 const TOOL_REGISTRY: Record<string, ToolMeta> = {
@@ -56,6 +65,28 @@ const TOOL_REGISTRY: Record<string, ToolMeta> = {
   },
 };
 
-export const getToolMeta = (id: string): ToolMeta | undefined => TOOL_REGISTRY[id];
 
-export const listToolMeta = (): ToolMeta[] => Object.values(TOOL_REGISTRY);
+
+const applyConservativeProvenanceDefaults = (meta: ToolMeta): ToolMeta => {
+  const provenance = meta.provenance;
+  if (!provenance || !provenance.metadataComplete) {
+    return {
+      ...meta,
+      provenance: {
+        maturity: "diagnostic",
+        certifying: false,
+        metadataComplete: false,
+      },
+    };
+  }
+
+  return meta;
+};
+
+export const getToolMeta = (id: string): ToolMeta | undefined => {
+  const meta = TOOL_REGISTRY[id];
+  return meta ? applyConservativeProvenanceDefaults(meta) : undefined;
+};
+
+export const listToolMeta = (): ToolMeta[] =>
+  Object.values(TOOL_REGISTRY).map((meta) => applyConservativeProvenanceDefaults(meta));
