@@ -12,6 +12,24 @@ type HandlerMap = {
   "essence.collapse"?: (payload: EssenceCollapsePayload) => Promise<unknown>;
 };
 
+type QueuePolicyClass = "bullmq.redis.worker" | "in-memory.fifo";
+type QueueMaturity = "certifying" | "diagnostic";
+
+type QueueProvenance = {
+  backendMode: "redis" | "local";
+  queuePolicyClass: QueuePolicyClass;
+  maturity: QueueMaturity;
+  certifying: boolean;
+  localFallback: {
+    active: boolean;
+    reason: "redis_unconfigured_or_unavailable" | null;
+  };
+  context: {
+    runIds: string[];
+    contextIds: string[];
+  };
+};
+
 const defaultEssenceCollapseHandler = async (payload: EssenceCollapsePayload) => ({ ok: true, envelopeId: payload.envelopeId });
 
 const handlers: HandlerMap = {
@@ -28,7 +46,81 @@ const adjustQueueGauge = (name: JobName, delta: number): void => {
 
 const redisUrl = process.env.REDIS_URL?.trim();
 let backend: "redis" | "local" = redisUrl ? "redis" : "local";
+let localFallbackReason: "redis_unconfigured_or_unavailable" | null = redisUrl ? null : "redis_unconfigured_or_unavailable";
 const getMediaQueueConcurrency = (): number => Math.max(1, Number(process.env.MEDIA_QUEUE_CONCURRENCY ?? 1));
+
+const activeContextTokens = new Set<string>();
+
+const normalizeContextValue = (value: unknown): string | null => {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+};
+
+const contextTokenForPayload = (payload: any): string | null => {
+  const ctx = payload && typeof payload === "object" ? (payload as { ctx?: unknown }).ctx : null;
+  if (!ctx || typeof ctx !== "object") {
+    return null;
+  }
+  const candidate = ctx as Record<string, unknown>;
+  const runId = normalizeContextValue(candidate.runId ?? candidate.run_id);
+  const contextId = normalizeContextValue(candidate.contextId ?? candidate.context_id);
+  if (!runId && !contextId) {
+    return null;
+  }
+  return JSON.stringify({ runId: runId ?? null, contextId: contextId ?? null });
+};
+
+const collectContextMetadata = (pendingPayloads: unknown[]): { runIds: string[]; contextIds: string[] } => {
+  const runIds = new Set<string>();
+  const contextIds = new Set<string>();
+  for (const token of activeContextTokens) {
+    const parsed = JSON.parse(token) as { runId: string | null; contextId: string | null };
+    if (parsed.runId) {
+      runIds.add(parsed.runId);
+    }
+    if (parsed.contextId) {
+      contextIds.add(parsed.contextId);
+    }
+  }
+  for (const payload of pendingPayloads) {
+    const token = contextTokenForPayload(payload);
+    if (!token) {
+      continue;
+    }
+    const parsed = JSON.parse(token) as { runId: string | null; contextId: string | null };
+    if (parsed.runId) {
+      runIds.add(parsed.runId);
+    }
+    if (parsed.contextId) {
+      contextIds.add(parsed.contextId);
+    }
+  }
+  return {
+    runIds: Array.from(runIds).sort(),
+    contextIds: Array.from(contextIds).sort(),
+  };
+};
+
+const markContextActive = (payload: unknown): string | null => {
+  const token = contextTokenForPayload(payload);
+  if (!token) {
+    return null;
+  }
+  activeContextTokens.add(token);
+  return token;
+};
+
+const clearContextActive = (token: string | null): void => {
+  if (!token) {
+    return;
+  }
+  activeContextTokens.delete(token);
+};
 
 let redisQueue: Queue | null = null;
 let redisEvents: QueueEvents | null = null;
@@ -63,11 +155,13 @@ class LocalQueue {
       return;
     }
     this.running += 1;
+    const contextToken = markContextActive(job.payload);
     adjustQueueGauge(job.name, 1);
     job.handler(job.payload)
       .then((result) => job.resolve(result))
       .catch((err) => job.reject(err))
       .finally(() => {
+        clearContextActive(contextToken);
         adjustQueueGauge(job.name, -1);
         this.running = Math.max(0, this.running - 1);
         this.drain();
@@ -83,6 +177,10 @@ class LocalQueue {
       counts[job.name] = (counts[job.name] ?? 0) + 1;
     }
     return counts;
+  }
+
+  getPendingPayloads(): unknown[] {
+    return this.queue.map((job) => job.payload);
   }
 }
 
@@ -141,6 +239,7 @@ if (backend === "redis" && redisUrl && redisConnection) {
   } catch (err) {
     console.warn(`[queue] Redis backend unavailable, falling back to in-memory queue: ${(err as Error).message}`);
     backend = "local";
+    localFallbackReason = "redis_unconfigured_or_unavailable";
     redisQueue = null;
     redisEvents = null;
     redisWorker = null;
@@ -157,6 +256,7 @@ const ensureHandler = (name: JobName): ((payload: any) => Promise<unknown>) => {
 
 const addJob = async (name: JobName, payload: any, opts?: JobsOptions): Promise<unknown> => {
   if (backend === "redis" && redisQueue && redisEvents) {
+    const contextToken = markContextActive(payload);
     const job = await redisQueue.add(name, payload, {
       attempts: 1,
       removeOnComplete: true,
@@ -164,7 +264,11 @@ const addJob = async (name: JobName, payload: any, opts?: JobsOptions): Promise<
       jobId: `${name}:${randomUUID()}`,
       ...(opts ?? {}),
     });
-    return job.waitUntilFinished(redisEvents);
+    try {
+      return await job.waitUntilFinished(redisEvents);
+    } finally {
+      clearContextActive(contextToken);
+    }
   }
   return localQueue.add(name, payload, ensureHandler(name));
 };
@@ -185,11 +289,13 @@ export const getQueueBackend = (): "redis" | "local" => backend;
 
 export const __resetQueueForTest = (opts?: { concurrency?: number; dropHandlers?: boolean }): void => {
   backend = "local";
+  localFallbackReason = "redis_unconfigured_or_unavailable";
   redisQueue = null;
   redisEvents = null;
   redisWorker = null;
   const concurrency = Math.max(1, opts?.concurrency ?? getMediaQueueConcurrency());
   localQueue = new LocalQueue(concurrency);
+  activeContextTokens.clear();
   activeCounts.clear();
   (["media.generate", "essence.collapse"] as const).forEach((name) => metrics.setQueueActive(name, 0));
   handlers["essence.collapse"] = defaultEssenceCollapseHandler;
@@ -204,9 +310,23 @@ export const getQueueSnapshot = () => {
     "essence.collapse": activeCounts.get("essence.collapse") ?? 0,
   };
   const pending = backend === "local" ? localQueue.getPendingCounts() : null;
+  const pendingPayloads = backend === "local" ? localQueue.getPendingPayloads() : [];
+  const context = collectContextMetadata(pendingPayloads);
+  const provenance: QueueProvenance = {
+    backendMode: backend,
+    queuePolicyClass: backend === "redis" ? "bullmq.redis.worker" : "in-memory.fifo",
+    maturity: backend === "redis" ? "certifying" : "diagnostic",
+    certifying: backend === "redis",
+    localFallback: {
+      active: backend === "local",
+      reason: backend === "local" ? localFallbackReason : null,
+    },
+    context,
+  };
   return {
     backend,
     active,
     pending,
+    provenance,
   };
 };
