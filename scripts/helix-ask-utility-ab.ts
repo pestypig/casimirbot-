@@ -355,21 +355,52 @@ function score(entry: PromptCase, payload: AskResponse | null): RawRecord['score
   const promptCopyRatio = wordTokens.length > 0 ? copiedPromptCount / wordTokens.length : 1;
   const repetitionRatio = sentenceChunks.length > 0 ? repeatedSentencePenalty / sentenceChunks.length : 1;
 
+  const familyNovelty = entry.family === 'ambiguous_general'
+    ? {
+        lexicalFloor: 0.28,
+        promptCopyCeiling: 0.72,
+        repetitionCeiling: 0.35,
+        boilerplateMaxHits: 1,
+        noveltyFloor: 0.48,
+        oneLinePenalty: 0.06,
+      }
+    : entry.family === 'repo_technical'
+      ? {
+          lexicalFloor: 0.34,
+          promptCopyCeiling: 0.62,
+          repetitionCeiling: 0.25,
+          boilerplateMaxHits: 1,
+          noveltyFloor: 0.55,
+          oneLinePenalty: 0.12,
+        }
+      : {
+          lexicalFloor: 0.34,
+          promptCopyCeiling: 0.62,
+          repetitionCeiling: 0.25,
+          boilerplateMaxHits: 1,
+          noveltyFloor: 0.55,
+          oneLinePenalty: 0.12,
+        };
+
   let noveltyScore = 1;
   noveltyScore -= Math.min(0.45, boilerplateHits * 0.15);
   noveltyScore -= Math.min(0.35, repetitionRatio * 0.7);
-  noveltyScore -= lexicalDiversity < 0.34 ? Math.min(0.3, (0.34 - lexicalDiversity) * 2.5) : 0;
-  noveltyScore -= promptCopyRatio > 0.6 ? Math.min(0.35, (promptCopyRatio - 0.6) * 0.9) : 0;
-  noveltyScore -= lines.length <= 1 ? 0.12 : 0;
+  noveltyScore -= lexicalDiversity < familyNovelty.lexicalFloor
+    ? Math.min(0.3, (familyNovelty.lexicalFloor - lexicalDiversity) * 2.5)
+    : 0;
+  noveltyScore -= promptCopyRatio > familyNovelty.promptCopyCeiling
+    ? Math.min(0.35, (promptCopyRatio - familyNovelty.promptCopyCeiling) * 0.9)
+    : 0;
+  noveltyScore -= lines.length <= 1 ? familyNovelty.oneLinePenalty : 0;
   noveltyScore = Number(Math.max(0, Math.min(1, noveltyScore)).toFixed(3));
 
   const groundingRequired = entry.family === 'relation' || entry.family === 'repo_technical';
   const noveltyHardPass =
-    boilerplateHits === 0 &&
-    repetitionRatio <= 0.2 &&
-    lexicalDiversity >= 0.34 &&
-    promptCopyRatio <= 0.6 &&
-    noveltyScore >= 0.55;
+    boilerplateHits <= familyNovelty.boilerplateMaxHits &&
+    repetitionRatio <= familyNovelty.repetitionCeiling &&
+    lexicalDiversity >= familyNovelty.lexicalFloor &&
+    promptCopyRatio <= familyNovelty.promptCopyCeiling &&
+    noveltyScore >= familyNovelty.noveltyFloor;
   const novel_response_pass: 0|1 = answer_directness_pass === 1 && noveltyHardPass && (!groundingRequired || citation_presence_pass === 1) ? 1 : 0;
 
   const utility_score = Number((0.30*answer_directness_pass + 0.20*min_length_pass + 0.20*citation_presence_pass + 0.10*clarification_quality_pass + 0.20*noveltyScore).toFixed(3));
