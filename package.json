@@ -42,6 +42,7 @@
     "casimir:verify:ci": "npm run reports:repo-telemetry && npm run casimir:verify -- --ci --trace-out artifacts/training-trace.jsonl",
     "verify:local": "tsx scripts/verify-local.ts",
     "audit:agent-context:check": "tsx scripts/validate-agent-context-checklist.ts",
+    "audit:toe:preflight": "tsx scripts/toe-agent-preflight.ts",
     "solar:pipeline": "tsx scripts/solar-pipeline.ts",
     "solar:manifest": "tsx scripts/solar-spectra-manifest.ts",
     "wallet:agent": "tsx scripts/wallet-agent.ts",

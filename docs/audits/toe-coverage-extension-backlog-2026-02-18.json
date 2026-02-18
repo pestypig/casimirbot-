@@ -888,6 +888,56 @@
         "Strict mode emits deterministic fail_reason ZEN_SOCIETY_PROVENANCE_MISSING when evidence provenance is absent",
         "Resolver owner coverage marks zen-society as covered_extension and validation remains green"
       ]
+    },
+    {
+      "id": "TOE-045-toe-research-gate-policy-contract",
+      "tree_owner": "ops-deployment",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "TOE research gate policy contract primitive",
+      "primary_path_prefix": "configs/toe-research-gate-policy.v1.json",
+      "allowed_paths": [
+        "configs/toe-research-gate-policy.v1.json",
+        "scripts/validate-toe-research-gate-policy.ts",
+        "scripts/validate-toe-ticket-backlog.ts",
+        "tests/toe-research-gate-policy.spec.ts",
+        "package.json",
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
+      ],
+      "required_tests": [
+        "tests/toe-research-gate-policy.spec.ts"
+      ],
+      "done_criteria": [
+        "Research gate policy manifest defines deterministic risk classes and required artifacts",
+        "Backlog and policy validators enforce research artifacts for physics_unknown and tier_promotion risks",
+        "Backward compatibility is preserved when research_gate metadata is absent"
+      ]
+    },
+    {
+      "id": "TOE-046-toe-agent-preflight-orchestrator",
+      "tree_owner": "ops-deployment",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "TOE agent preflight orchestrator primitive",
+      "primary_path_prefix": "scripts/toe-agent-preflight.ts",
+      "allowed_paths": [
+        "scripts/toe-agent-preflight.ts",
+        "tests/toe-agent-preflight.spec.ts",
+        "package.json",
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
+      ],
+      "required_tests": [
+        "tests/toe-agent-preflight.spec.ts"
+      ],
+      "done_criteria": [
+        "Preflight orchestrator executes TOE validation/progress stages and emits machine-readable summary",
+        "Preflight exits non-zero when any required stage fails",
+        "Npm script audit:toe:preflight runs orchestrator in one command"
+      ]
     }
   ]
 }
