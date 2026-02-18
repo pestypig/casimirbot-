@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T20:22:04.720Z",
+  "generated_at": "2026-02-18T21:01:08.110Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -13,28 +13,29 @@
     "certified": 1
   },
   "totals": {
-    "tickets_total": 62,
-    "tickets_with_evidence": 62,
+    "tickets_total": 67,
+    "tickets_with_evidence": 64,
     "claim_tier_counts": {
-      "diagnostic": 59,
-      "reduced-order": 3,
+      "diagnostic": 60,
+      "reduced-order": 4,
       "certified": 0
     },
-    "weighted_score_sum": 16.55,
-    "toe_progress_pct": 26.7,
+    "weighted_score_sum": 17.4,
+    "toe_progress_pct": 26,
     "forest_owner_coverage_pct": 100,
-    "strict_ready_progress_pct": 4.8,
-    "strict_ready_delta_ticket_count": 59,
+    "strict_ready_progress_pct": 6,
+    "strict_ready_delta_ticket_count": 63,
     "strict_ready_release_gate": {
       "status": "blocked",
       "blocked_reasons": [
-        "missing_verified_pass"
+        "missing_verified_pass",
+        "missing_research_artifacts"
       ],
-      "blocked_ticket_count": 59,
-      "ready_ticket_count": 3
+      "blocked_ticket_count": 63,
+      "ready_ticket_count": 4
     },
-    "research_gated_tickets_total": 17,
-    "research_artifact_complete_tickets_total": 17
+    "research_gated_tickets_total": 19,
+    "research_artifact_complete_tickets_total": 18
   },
   "segments": {
     "core": {
@@ -52,41 +53,42 @@
       "research_artifact_complete_tickets_total": 0
     },
     "extension": {
-      "tickets_total": 52,
-      "tickets_with_evidence": 52,
+      "tickets_total": 57,
+      "tickets_with_evidence": 54,
       "claim_tier_counts": {
-        "diagnostic": 50,
-        "reduced-order": 2,
-        "certified": 0
-      },
-      "weighted_score_sum": 13.7,
-      "toe_progress_pct": 26.3,
-      "strict_ready_progress_pct": 3.8,
-      "research_gated_tickets_total": 17,
-      "research_artifact_complete_tickets_total": 17
-    },
-    "combined": {
-      "tickets_total": 62,
-      "tickets_with_evidence": 62,
-      "claim_tier_counts": {
-        "diagnostic": 59,
+        "diagnostic": 51,
         "reduced-order": 3,
         "certified": 0
       },
-      "weighted_score_sum": 16.55,
-      "toe_progress_pct": 26.7,
-      "strict_ready_progress_pct": 4.8,
-      "strict_ready_delta_ticket_count": 59,
+      "weighted_score_sum": 14.55,
+      "toe_progress_pct": 25.5,
+      "strict_ready_progress_pct": 5.3,
+      "research_gated_tickets_total": 19,
+      "research_artifact_complete_tickets_total": 18
+    },
+    "combined": {
+      "tickets_total": 67,
+      "tickets_with_evidence": 64,
+      "claim_tier_counts": {
+        "diagnostic": 60,
+        "reduced-order": 4,
+        "certified": 0
+      },
+      "weighted_score_sum": 17.4,
+      "toe_progress_pct": 26,
+      "strict_ready_progress_pct": 6,
+      "strict_ready_delta_ticket_count": 63,
       "strict_ready_release_gate": {
         "status": "blocked",
         "blocked_reasons": [
-          "missing_verified_pass"
+          "missing_verified_pass",
+          "missing_research_artifacts"
         ],
-        "blocked_ticket_count": 59,
-        "ready_ticket_count": 3
+        "blocked_ticket_count": 63,
+        "ready_ticket_count": 4
       },
-      "research_gated_tickets_total": 17,
-      "research_artifact_complete_tickets_total": 17
+      "research_gated_tickets_total": 19,
+      "research_artifact_complete_tickets_total": 18
     }
   },
   "strict_ready_delta_targets": [
@@ -439,7 +441,13 @@
       "requires_research_artifact_completion": false
     },
     {
-      "ticket_id": "TOE-066-strict-ready-release-gate-automation",
+      "ticket_id": "TOE-062-helix-ask-modes-stability-pack",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": true
+    },
+    {
+      "ticket_id": "TOE-063-halobank-residual-reduced-order-hardening-pack",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": false
@@ -996,13 +1004,52 @@
       "result_file": "docs/audits/ticket-results/TOE-061-strict-ready-enforcement-gate.20260218T193506Z.json"
     },
     {
-      "ticket_id": "TOE-066-strict-ready-release-gate-automation",
+      "ticket_id": "TOE-062-helix-ask-modes-stability-pack",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": false,
+      "result_file": "docs/audits/ticket-results/TOE-062-helix-ask-modes-stability-pack.20260218T203251Z.json"
+    },
+    {
+      "ticket_id": "TOE-063-halobank-residual-reduced-order-hardening-pack",
       "claim_tier": "diagnostic",
       "verification_ok": true,
       "score": 0.25,
       "research_gated": true,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-066-strict-ready-release-gate-automation.20260218T201957Z.json"
+      "result_file": "docs/audits/ticket-results/TOE-063-halobank-residual-reduced-order-hardening-pack.20260218T201544Z.json"
+    },
+    {
+      "ticket_id": "TOE-064-warp-viability-reduced-order-counterexample-pack",
+      "claim_tier": "reduced-order",
+      "verification_ok": true,
+      "score": 0.6,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-064-warp-viability-reduced-order-counterexample-pack.20260218T201702Z.json"
+    },
+    {
+      "ticket_id": "TOE-065-placeholder-ticket",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-066-placeholder-ticket",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-071-warp-viability-promotion-replay-pack",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
     }
   ]
 }
