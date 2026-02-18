@@ -3,6 +3,7 @@ import path from "node:path";
 
 type BacklogTicket = {
   id?: string;
+  tree_owner?: string;
 };
 
 type Backlog = {
@@ -21,14 +22,27 @@ type TicketResult = {
 };
 
 type TierKey = "diagnostic" | "reduced-order" | "certified";
+type CoverageStatus = "covered_core" | "covered_extension" | "unmapped";
+
+type ResolverOwnerCoverageManifest = {
+  schema_version?: string;
+  owners?: Record<string, { status?: CoverageStatus }>;
+};
 
 const BACKLOG_PATH = path.resolve(
-  "docs",
-  "audits",
-  "toe-cloud-agent-ticket-backlog-2026-02-17.json",
+  process.env.TOE_BACKLOG_PATH ??
+    path.join("docs", "audits", "toe-cloud-agent-ticket-backlog-2026-02-17.json"),
 );
-const RESULTS_DIR = path.resolve("docs", "audits", "ticket-results");
-const SNAPSHOT_PATH = path.resolve("docs", "audits", "toe-progress-snapshot.json");
+const RESULTS_DIR = path.resolve(
+  process.env.TOE_RESULTS_DIR ?? path.join("docs", "audits", "ticket-results"),
+);
+const SNAPSHOT_PATH = path.resolve(
+  process.env.TOE_PROGRESS_SNAPSHOT_PATH ?? path.join("docs", "audits", "toe-progress-snapshot.json"),
+);
+const RESOLVER_OWNER_COVERAGE_MANIFEST_PATH = path.resolve(
+  process.env.RESOLVER_OWNER_COVERAGE_MANIFEST_PATH ??
+    path.join("configs", "resolver-owner-coverage-manifest.v1.json"),
+);
 
 const TIER_WEIGHTS: Record<TierKey, number> = {
   diagnostic: 0.25,
@@ -62,6 +76,36 @@ function toTier(value?: string): TierKey | null {
 
 function toProgressPercent(value: number): number {
   return Math.round(value * 1000) / 10;
+}
+
+function computeForestOwnerCoveragePct(): number {
+  if (!fs.existsSync(RESOLVER_OWNER_COVERAGE_MANIFEST_PATH)) {
+    throw new Error(
+      `Resolver owner coverage manifest missing: ${RESOLVER_OWNER_COVERAGE_MANIFEST_PATH}`,
+    );
+  }
+
+  const manifest = readJson<ResolverOwnerCoverageManifest>(
+    RESOLVER_OWNER_COVERAGE_MANIFEST_PATH,
+  );
+  if (manifest.schema_version !== "resolver_owner_coverage_manifest/1") {
+    throw new Error(
+      `Unexpected resolver owner coverage manifest schema_version: ${String(manifest.schema_version)}`,
+    );
+  }
+
+  const owners = manifest.owners ?? {};
+  const ownerNames = Object.keys(owners);
+  if (ownerNames.length === 0) {
+    throw new Error("Resolver owner coverage manifest has no owners.");
+  }
+
+  const coveredCount = ownerNames.filter((owner) => {
+    const status = owners[owner]?.status;
+    return status === "covered_core" || status === "covered_extension";
+  }).length;
+
+  return coveredCount / ownerNames.length;
 }
 
 function main() {
@@ -167,6 +211,7 @@ function main() {
   const totalTickets = ticketIds.length;
   const normalizedProgress = weightedScoreSum / totalTickets;
   const strictReadyProgress = strictReadyCount / totalTickets;
+  const forestOwnerCoverage = computeForestOwnerCoveragePct();
 
   const snapshot = {
     schema_version: "toe_progress_snapshot/1",
@@ -174,6 +219,9 @@ function main() {
     source: {
       backlog: normalizePath(path.relative(process.cwd(), BACKLOG_PATH)),
       results_dir: normalizePath(path.relative(process.cwd(), RESULTS_DIR)),
+      resolver_owner_coverage_manifest: normalizePath(
+        path.relative(process.cwd(), RESOLVER_OWNER_COVERAGE_MANIFEST_PATH),
+      ),
     },
     weights: TIER_WEIGHTS,
     totals: {
@@ -182,6 +230,7 @@ function main() {
       claim_tier_counts: claimTierCounts,
       weighted_score_sum: Math.round(weightedScoreSum * 1000) / 1000,
       toe_progress_pct: toProgressPercent(normalizedProgress),
+      forest_owner_coverage_pct: toProgressPercent(forestOwnerCoverage),
       strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
     },
     tickets,
@@ -190,7 +239,7 @@ function main() {
   fs.writeFileSync(SNAPSHOT_PATH, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
 
   console.log(
-    `toe-progress snapshot written: ${normalizePath(path.relative(process.cwd(), SNAPSHOT_PATH))} toe_progress_pct=${snapshot.totals.toe_progress_pct}`,
+    `toe-progress snapshot written: ${normalizePath(path.relative(process.cwd(), SNAPSHOT_PATH))} toe_progress_pct=${snapshot.totals.toe_progress_pct} forest_owner_coverage_pct=${snapshot.totals.forest_owner_coverage_pct}`,
   );
 }
 
