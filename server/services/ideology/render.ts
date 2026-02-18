@@ -1,3 +1,15 @@
+export type EthosRenderKnowledgeProvenance = {
+  provenance_class: "inferred";
+  claim_tier: "diagnostic";
+  certifying: false;
+};
+
+export const getEthosRenderKnowledgeProvenance = (): EthosRenderKnowledgeProvenance => ({
+  provenance_class: "inferred",
+  claim_tier: "diagnostic",
+  certifying: false,
+});
+
 type RenderFormat = "png" | "svg";
 
 type RenderOptions = {

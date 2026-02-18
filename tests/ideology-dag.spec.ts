@@ -1,5 +1,10 @@
 ﻿import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
+import {
+  ETHOS_KNOWLEDGE_STRICT_FAIL_REASON,
+  getIdeologyArtifactById,
+  searchIdeologyArtifacts,
+} from "../server/services/ideology/artifacts";
 
 const ideology = JSON.parse(readFileSync("docs/ethos/ideology.json", "utf-8"));
 const telemetryPath = "docs/ethos/ideology-telemetry-schema.json";
@@ -61,4 +66,20 @@ describe("ideology DAG evidence", () => {
       }
     }
   });
+  it("adds ethos knowledge provenance metadata and deterministic strict fail reason", () => {
+    const search = searchIdeologyArtifacts({ limit: 2, strictProvenance: true });
+    expect(search.items.length).toBeGreaterThan(0);
+    for (const artifact of search.items) {
+      expect(artifact.provenance_class).toBe("inferred");
+      expect(artifact.claim_tier).toBe("diagnostic");
+      expect(artifact.certifying).toBe(false);
+    }
+    expect(search.fail_reason).toBe(ETHOS_KNOWLEDGE_STRICT_FAIL_REASON);
+
+    const byId = getIdeologyArtifactById(search.items[0]!.id);
+    expect(byId?.provenance_class).toBe("inferred");
+    expect(byId?.claim_tier).toBe("diagnostic");
+    expect(byId?.certifying).toBe(false);
+  });
+
 });

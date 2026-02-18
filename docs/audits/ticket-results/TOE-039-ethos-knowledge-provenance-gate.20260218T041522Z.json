@@ -1,0 +1,27 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-039-ethos-knowledge-provenance-gate",
+  "files_changed": [
+    "server/routes/ethos.ts",
+    "server/services/ideology/render.ts",
+    "server/services/ideology/artifacts.ts",
+    "tests/ideology-dag.spec.ts",
+    "tests/ideology-telemetry.spec.ts"
+  ],
+  "tests_run": [
+    "tests/ideology-dag.spec.ts",
+    "tests/ideology-telemetry.spec.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "cli/casimir-verify.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:58c6dc63-84dc-49ac-a690-28545648694f",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true,
+    "status": "GREEN"
+  },
+  "remaining_gaps": []
+}

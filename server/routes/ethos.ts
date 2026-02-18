@@ -7,7 +7,7 @@ import {
   getIdeologyArtifactById,
   searchIdeologyArtifacts
 } from "../services/ideology/artifacts";
-import { renderIdeologyPill } from "../services/ideology/render";
+import { getEthosRenderKnowledgeProvenance, renderIdeologyPill } from "../services/ideology/render";
 import { getConsoleTelemetry, saveConsoleTelemetry } from "../services/console-telemetry/store";
 import { buildIdeologyPanelTelemetry } from "@shared/ideology-telemetry";
 import {
@@ -291,6 +291,15 @@ const parseNumber = (value: unknown): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+const parseBoolean = (value: unknown): boolean | undefined => {
+  const raw = readQuery(value);
+  if (!raw) return undefined;
+  const normalized = raw.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return undefined;
+};
+
 const resolveBaseUrl = (req: any): string => {
   const protoHeader = req.headers?.["x-forwarded-proto"];
   const hostHeader = req.headers?.["x-forwarded-host"];
@@ -315,6 +324,7 @@ ethosRouter.get("/artifacts", (req, res) => {
   const tags = parseTags(req.query.tags ?? req.query.tag);
   const limit = parseNumber(req.query.limit);
   const offset = parseNumber(req.query.offset);
+  const strictProvenance = parseBoolean(req.query.strictProvenance ?? req.query.strict);
 
   const result = searchIdeologyArtifacts({
     query,
@@ -322,7 +332,8 @@ ethosRouter.get("/artifacts", (req, res) => {
     nodeId,
     tags,
     limit,
-    offset
+    offset,
+    strictProvenance
   });
 
   res.json(result);
@@ -374,7 +385,11 @@ ethosRouter.get("/artifacts/:id(*)/render", async (req, res) => {
     });
     const extension = format === "svg" ? "svg" : "png";
     const safeName = (artifact.exportTargetId || artifact.id).replace(/[^a-z0-9-_]+/gi, "_");
+    const provenance = getEthosRenderKnowledgeProvenance();
     res.setHeader("Content-Type", result.contentType);
+    res.setHeader("X-Ethos-Provenance-Class", provenance.provenance_class);
+    res.setHeader("X-Ethos-Claim-Tier", provenance.claim_tier);
+    res.setHeader("X-Ethos-Certifying", String(provenance.certifying));
     res.setHeader(
       "Content-Disposition",
       `inline; filename="${safeName}.${extension}"`,
