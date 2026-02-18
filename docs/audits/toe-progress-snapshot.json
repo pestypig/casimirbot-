@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T06:54:45.986Z",
+  "generated_at": "2026-02-18T06:59:21.226Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -13,7 +13,7 @@
     "certified": 1
   },
   "totals": {
-    "tickets_total": 51,
+    "tickets_total": 56,
     "tickets_with_evidence": 51,
     "claim_tier_counts": {
       "diagnostic": 49,
@@ -21,9 +21,9 @@
       "certified": 0
     },
     "weighted_score_sum": 13.45,
-    "toe_progress_pct": 26.4,
+    "toe_progress_pct": 24,
     "forest_owner_coverage_pct": 100,
-    "strict_ready_progress_pct": 3.9,
+    "strict_ready_progress_pct": 3.6,
     "research_gated_tickets_total": 6,
     "research_artifact_complete_tickets_total": 6
   },
@@ -43,7 +43,7 @@
       "research_artifact_complete_tickets_total": 0
     },
     "extension": {
-      "tickets_total": 41,
+      "tickets_total": 46,
       "tickets_with_evidence": 41,
       "claim_tier_counts": {
         "diagnostic": 40,
@@ -51,13 +51,13 @@
         "certified": 0
       },
       "weighted_score_sum": 10.6,
-      "toe_progress_pct": 25.9,
-      "strict_ready_progress_pct": 2.4,
+      "toe_progress_pct": 23,
+      "strict_ready_progress_pct": 2.2,
       "research_gated_tickets_total": 6,
       "research_artifact_complete_tickets_total": 6
     },
     "combined": {
-      "tickets_total": 51,
+      "tickets_total": 56,
       "tickets_with_evidence": 51,
       "claim_tier_counts": {
         "diagnostic": 49,
@@ -65,8 +65,8 @@
         "certified": 0
       },
       "weighted_score_sum": 13.45,
-      "toe_progress_pct": 26.4,
-      "strict_ready_progress_pct": 3.9,
+      "toe_progress_pct": 24,
+      "strict_ready_progress_pct": 3.6,
       "research_gated_tickets_total": 6,
       "research_artifact_complete_tickets_total": 6
     }
@@ -530,6 +530,41 @@
       "research_gated": true,
       "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-051-research-artifact-progress-ledger.20260218T053415Z.json"
+    },
+    {
+      "ticket_id": "TOE-052-halobank-residual-tier-promotion-pack",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-053-helix-ask-strict-ready-contract-pack",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-054-warp-viability-cross-check-tier-pack",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-055-ideology-physics-counterexample-research-bridge",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-056-strict-ready-scorecard-automation",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
     }
   ]
 }

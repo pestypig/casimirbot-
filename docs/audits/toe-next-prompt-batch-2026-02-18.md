@@ -1,5 +1,9 @@
 # ToE Next Prompt Batch (TOE-047..051)
 
+Superseded by:
+
+- `docs/audits/toe-next-prompt-batch-2026-02-18-v2.md` for `TOE-052..056`.
+
 This batch is split by lane:
 
 - Internal lane: `TOE-047`, `TOE-051`

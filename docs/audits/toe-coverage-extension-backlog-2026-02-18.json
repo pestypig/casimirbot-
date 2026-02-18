@@ -1129,6 +1129,188 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-052-halobank-residual-tier-promotion-pack",
+      "tree_owner": "simulation-systems",
+      "gap_refs": [
+        "F-COV-2",
+        "F-COV-6"
+      ],
+      "primitive": "Halobank residual tier-promotion primitive",
+      "primary_path_prefix": "server/services/halobank/time-model.ts",
+      "allowed_paths": [
+        "server/services/halobank/time-model.ts",
+        "server/skills/halobank.time.compute.ts",
+        "tests/halobank-time-model.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts",
+        "docs/audits/research/TOE-052-tier-promotion-rationale.md",
+        "docs/audits/research/TOE-052-comparative-evidence-pack.md"
+      ],
+      "required_tests": [
+        "tests/halobank-time-model.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts"
+      ],
+      "done_criteria": [
+        "Tier-promotion rationale defines residual acceptance envelope and falsification thresholds",
+        "Comparative evidence documents diagnostic vs reduced-order behavior for complete and incomplete residual evidence",
+        "Time-model output preserves conservative downgrade behavior when residual evidence is missing or out-of-envelope"
+      ],
+      "research_gate": {
+        "risk_class": "tier_promotion",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "tier-promotion-rationale",
+          "comparative-evidence-pack"
+        ]
+      }
+    },
+    {
+      "id": "TOE-053-helix-ask-strict-ready-contract-pack",
+      "tree_owner": "helix-ask",
+      "gap_refs": [
+        "F-COV-5"
+      ],
+      "primitive": "Helix Ask strict-ready contract pack primitive",
+      "primary_path_prefix": "server/routes/agi.plan.ts",
+      "allowed_paths": [
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask/arbiter.ts",
+        "server/services/helix-ask/answer-artifacts.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-modes.spec.ts"
+      ],
+      "required_tests": [
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-modes.spec.ts"
+      ],
+      "done_criteria": [
+        "Strict mode emits deterministic fail_reason for evidence and answer-artifact contract misses",
+        "Non-strict mode remains backward-compatible with additive metadata behavior",
+        "Tests verify strict/default parity and claim-tier surfacing on verification paths"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-054-warp-viability-cross-check-tier-pack",
+      "tree_owner": "warp-mechanics",
+      "gap_refs": [
+        "F-COV-5"
+      ],
+      "primitive": "Warp viability cross-check tier-promotion primitive",
+      "primary_path_prefix": "tools/warpViability.ts",
+      "allowed_paths": [
+        "tools/warpViability.ts",
+        "tools/warpViabilityCertificate.ts",
+        "tools/verifyCertificate.ts",
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts",
+        "tests/proof-pack-strict-parity.spec.ts",
+        "docs/audits/research/TOE-054-tier-promotion-rationale.md",
+        "docs/audits/research/TOE-054-comparative-evidence-pack.md"
+      ],
+      "required_tests": [
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts",
+        "tests/proof-pack-strict-parity.spec.ts"
+      ],
+      "done_criteria": [
+        "Tier-promotion rationale maps promoted viability checks to deterministic certificate thresholds",
+        "Comparative evidence captures baseline vs promoted behavior including counterexample cases",
+        "Certificate and verify flows preserve conservative fallback when promotion evidence is insufficient"
+      ],
+      "research_gate": {
+        "risk_class": "tier_promotion",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "tier-promotion-rationale",
+          "comparative-evidence-pack"
+        ]
+      }
+    },
+    {
+      "id": "TOE-055-ideology-physics-counterexample-research-bridge",
+      "tree_owner": "ideology-physics-bridge",
+      "gap_refs": [
+        "F-COV-5",
+        "F-COV-6"
+      ],
+      "primitive": "Ideology-physics counterexample research bridge primitive",
+      "primary_path_prefix": "server/services/helix-ask/relation-assembly.ts",
+      "allowed_paths": [
+        "server/services/helix-ask/relation-assembly.ts",
+        "server/services/helix-ask/graph-resolver.ts",
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts",
+        "docs/audits/research/TOE-055-physics-research-brief.md",
+        "docs/audits/research/TOE-055-safety-envelope-analysis.md"
+      ],
+      "required_tests": [
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts"
+      ],
+      "done_criteria": [
+        "Research brief defines bridge counterexamples that force conservative claim-tier downgrades",
+        "Safety envelope maps bridge evidence bounds to deterministic strict fail reasons",
+        "Tests verify downgrade behavior for missing or contradictory bridge evidence"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "safety-envelope-analysis"
+        ]
+      }
+    },
+    {
+      "id": "TOE-056-strict-ready-scorecard-automation",
+      "tree_owner": "ops-deployment",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Strict-ready scorecard automation primitive",
+      "primary_path_prefix": "scripts/compute-toe-progress.ts",
+      "allowed_paths": [
+        "scripts/compute-toe-progress.ts",
+        "scripts/toe-agent-preflight.ts",
+        "tests/toe-progress.spec.ts",
+        "tests/toe-agent-preflight.spec.ts",
+        "docs/audits/toe-scaling-scorecard.md",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/toe-progress.spec.ts",
+        "tests/toe-agent-preflight.spec.ts"
+      ],
+      "done_criteria": [
+        "Progress snapshot reports strict-ready delta targets for the next execution batch",
+        "Preflight summary surfaces strict-ready stall warnings when maturity does not increase",
+        "Scorecard ties scale decisions to strict_ready_progress_pct and research artifact completion"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
     }
   ]
 }
