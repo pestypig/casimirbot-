@@ -1,0 +1,26 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-061-strict-ready-enforcement-gate",
+  "files_changed": [
+    "scripts/toe-agent-preflight.ts",
+    "tests/toe-agent-preflight.spec.ts",
+    "docs/audits/toe-scaling-scorecard.md",
+    "docs/audits/toe-progress-snapshot.json"
+  ],
+  "tests_run": [
+    "tests/toe-agent-preflight.spec.ts",
+    "tests/toe-progress.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:55ab2aef-0428-4dcc-99e3-55a7dffecd9a",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}

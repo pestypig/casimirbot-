@@ -40,15 +40,20 @@ function setupFakeWorkspace(failingStageId?: string) {
   return tempDir;
 }
 
-function runPreflight(workspaceRoot: string) {
+function runPreflightWithEnv(workspaceRoot: string, extraEnv: Record<string, string>) {
   return spawnSync(process.execPath, [TSX_CLI, PREFLIGHT_SCRIPT], {
     cwd: process.cwd(),
     env: {
       ...process.env,
       TOE_PREFLIGHT_ROOT: workspaceRoot,
+      ...extraEnv,
     },
     encoding: "utf8",
   });
+}
+
+function runPreflight(workspaceRoot: string) {
+  return runPreflightWithEnv(workspaceRoot, {});
 }
 
 describe("toe-agent-preflight", () => {
@@ -126,5 +131,52 @@ describe("toe-agent-preflight", () => {
 
     const summary = JSON.parse(result.stdout);
     expect(summary.strict_ready_stall_warning).toBeNull();
+  });
+
+  it("keeps stall as warning-only when strict-ready enforcement is disabled", () => {
+    const workspaceRoot = setupFakeWorkspace();
+    writeJson(path.join(workspaceRoot, "docs", "audits", "toe-progress-snapshot.json"), {
+      schema_version: "toe_progress_snapshot/1",
+      totals: {
+        strict_ready_progress_pct: 0,
+      },
+      strict_ready_delta_targets: [{ ticket_id: "TOE-TEST-001" }],
+    });
+
+    const result = runPreflightWithEnv(workspaceRoot, { TOE_STRICT_READY_ENFORCE: "0" });
+    expect(result.status).toBe(0);
+
+    const summary = JSON.parse(result.stdout);
+    expect(summary.stage_pass).toBe(true);
+    expect(summary.overall_pass).toBe(true);
+    expect(summary.strict_ready_enforcement).toEqual({
+      enforced: false,
+      blocked: false,
+      reason: null,
+    });
+  });
+
+  it("enforces strict-ready stall as a blocking gate when enabled", () => {
+    const workspaceRoot = setupFakeWorkspace();
+    writeJson(path.join(workspaceRoot, "docs", "audits", "toe-progress-snapshot.json"), {
+      schema_version: "toe_progress_snapshot/1",
+      totals: {
+        strict_ready_progress_pct: 0,
+      },
+      strict_ready_delta_targets: [{ ticket_id: "TOE-TEST-001" }],
+    });
+
+    const result = runPreflightWithEnv(workspaceRoot, { TOE_STRICT_READY_ENFORCE: "1" });
+    expect(result.status).toBe(1);
+
+    const summary = JSON.parse(result.stdout);
+    expect(summary.stage_pass).toBe(true);
+    expect(summary.overall_pass).toBe(false);
+    expect(summary.strict_ready_enforcement).toEqual({
+      enforced: true,
+      blocked: true,
+      reason: "strict_ready_stall",
+    });
+    expect(summary.strict_ready_stall_warning?.warning).toBe("strict_ready_stall");
   });
 });

@@ -40,6 +40,12 @@ type StrictReadyStallWarning = {
   guidance: string;
 };
 
+type StrictReadyEnforcement = {
+  enforced: boolean;
+  blocked: boolean;
+  reason: "strict_ready_stall" | null;
+};
+
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const workspaceRoot = path.resolve(process.env.TOE_PREFLIGHT_ROOT ?? repoRoot);
@@ -163,16 +169,27 @@ function readStrictReadyStallWarning(stages: StageSummary[]): StrictReadyStallWa
 
 function main() {
   const stages = stageConfigs.map(runStage);
-  const overallPass = stages.every((stage) => stage.pass);
+  const stagePass = stages.every((stage) => stage.pass);
 
   const strictReadyStallWarning = readStrictReadyStallWarning(stages);
+  const strictReadyEnforced = process.env.TOE_STRICT_READY_ENFORCE === "1";
+  const strictReadyBlocked = strictReadyEnforced && strictReadyStallWarning !== null;
+  const overallPass = stagePass && !strictReadyBlocked;
+
+  const strictReadyEnforcement: StrictReadyEnforcement = {
+    enforced: strictReadyEnforced,
+    blocked: strictReadyBlocked,
+    reason: strictReadyBlocked ? "strict_ready_stall" : null,
+  };
 
   const summary = {
     schema_version: "toe_agent_preflight/1",
     generated_at: new Date().toISOString(),
     workspace_root: workspaceRoot,
+    stage_pass: stagePass,
     overall_pass: overallPass,
     strict_ready_stall_warning: strictReadyStallWarning,
+    strict_ready_enforcement: strictReadyEnforcement,
     stages,
   };
 
