@@ -1,0 +1,25 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-046-toe-agent-preflight-orchestrator",
+  "files_changed": [
+    "scripts/toe-agent-preflight.ts",
+    "tests/toe-agent-preflight.spec.ts",
+    "package.json",
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
+  ],
+  "tests_run": [
+    "tests/toe-agent-preflight.spec.ts",
+    "npx vitest run tests/toe-agent-preflight.spec.ts",
+    "npm run audit:toe:preflight",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:02aa4abc-5728-43c6-a8ca-64d05881bf0e",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}
