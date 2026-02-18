@@ -1,0 +1,221 @@
+{
+  "equation_targets": [
+    {
+      "target_id": "ET-001",
+      "claim_id": "SCOR-C001",
+      "equation_family": "tau ~= hbar / E_G",
+      "required_inputs": [
+        "tau",
+        "hbar",
+        "E_G"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "tau"
+      ],
+      "testability_status": "hypothesis-only"
+    },
+    {
+      "target_id": "ET-002",
+      "claim_id": "SCOR-C002",
+      "equation_family": "f_gamma ~= 40 Hz",
+      "required_inputs": [
+        "f_gamma",
+        "Delta t"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "f_gamma"
+      ],
+      "testability_status": "hypothesis-only"
+    },
+    {
+      "target_id": "ET-003",
+      "claim_id": "SCOR-C003",
+      "equation_family": "E = hbar / t",
+      "required_inputs": [
+        "E",
+        "hbar",
+        "t"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "E"
+      ],
+      "testability_status": "testable"
+    },
+    {
+      "target_id": "ET-004",
+      "claim_id": "SCOR-C004",
+      "equation_family": "mu = log10((1/ln(eta))*(m/m_e)^2*(tau/1 s))",
+      "required_inputs": [
+        "mu",
+        "eta",
+        "m",
+        "m_e",
+        "tau"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "mu"
+      ],
+      "testability_status": "hypothesis-only"
+    },
+    {
+      "target_id": "ET-005",
+      "claim_id": "SCOR-C005",
+      "equation_family": "Delta E Delta t >= hbar/2",
+      "required_inputs": [
+        "Delta E",
+        "Delta t",
+        "hbar"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "Delta E"
+      ],
+      "testability_status": "testable"
+    },
+    {
+      "target_id": "ET-006",
+      "claim_id": "SCOR-C006",
+      "equation_family": "E_j = (pi^2*hbar^2*j^2)/(2 m a^2)",
+      "required_inputs": [
+        "E_j",
+        "j",
+        "hbar",
+        "m",
+        "a"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "E_j"
+      ],
+      "testability_status": "testable"
+    },
+    {
+      "target_id": "ET-007",
+      "claim_id": "SCOR-C007",
+      "equation_family": "V = -C/r^6 with C = (3/2) a'_1 a'_2 (I_1 I_2)/(I_1+I_2)",
+      "required_inputs": [
+        "V",
+        "C",
+        "r",
+        "a'_1",
+        "a'_2",
+        "I_1",
+        "I_2"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "V"
+      ],
+      "testability_status": "testable"
+    },
+    {
+      "target_id": "ET-008",
+      "claim_id": "SCOR-C008",
+      "equation_family": "dpsi = [-(i/hbar)H dt + sqrt(lambda)\u222b(M(x)-<M>)dW_x - lambda\u222b(M-<M>)^2 dt]psi",
+      "required_inputs": [
+        "psi",
+        "H",
+        "lambda",
+        "M(x)",
+        "dW_x"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "psi"
+      ],
+      "testability_status": "testable"
+    },
+    {
+      "target_id": "ET-009",
+      "claim_id": "SCOR-C009",
+      "equation_family": "M_g(x)=\u222b d^3y g(x-y)M(y)",
+      "required_inputs": [
+        "M_g",
+        "g",
+        "r_C"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "M_g"
+      ],
+      "testability_status": "testable"
+    },
+    {
+      "target_id": "ET-010",
+      "claim_id": "SCOR-C010",
+      "equation_family": "S(omega) ~ 1/((omega-omega0)^2+gamma^2)",
+      "required_inputs": [
+        "S(omega)",
+        "omega",
+        "omega0",
+        "gamma"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "S(omega)"
+      ],
+      "testability_status": "testable"
+    },
+    {
+      "target_id": "ET-011",
+      "claim_id": "SCOR-C011",
+      "equation_family": "M_J ~= ((5kT)/(G mu m_H))^(3/2)*(3/(4pi rho0))^(1/2)",
+      "required_inputs": [
+        "M_J",
+        "k",
+        "T",
+        "G",
+        "mu",
+        "m_H",
+        "rho0",
+        "L",
+        "M",
+        "a"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "M_J"
+      ],
+      "testability_status": "testable"
+    },
+    {
+      "target_id": "ET-012",
+      "claim_id": "SCOR-C012",
+      "equation_family": "rho u du/dr = -dp/dr - rho GM_sun/r^2",
+      "required_inputs": [
+        "rho",
+        "u",
+        "r",
+        "p",
+        "G",
+        "M_sun",
+        "T",
+        "m_p"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "rho"
+      ],
+      "testability_status": "testable"
+    },
+    {
+      "target_id": "ET-013",
+      "claim_id": "SCOR-C013",
+      "equation_family": "cross-domain mechanism statement (no single governing equation)",
+      "required_inputs": [
+        "domain",
+        "coherence_state",
+        "collapse_event"
+      ],
+      "unit_constraints": "all variables must pass dimensional consistency with declared SI units",
+      "expected_outputs": [
+        "domain"
+      ],
+      "testability_status": "hypothesis-only"
+    }
+  ]
+}

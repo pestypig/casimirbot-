@@ -1,0 +1,111 @@
+{
+  "prioritized": [
+    {
+      "priority": "P0",
+      "node_id": "bridge-orch-or-to-stellar-coherence",
+      "node_type": "bridge",
+      "edges": [
+        {
+          "from": "bridge-orch-or-to-stellar-coherence",
+          "to": "uncertainty-mechanics",
+          "semantic": "constrains"
+        },
+        {
+          "from": "bridge-orch-or-to-stellar-coherence",
+          "to": "no-feasibility-claims",
+          "semantic": "verifies"
+        },
+        {
+          "from": "bridge-orch-or-to-stellar-coherence",
+          "to": "expansion_frontier",
+          "semantic": "escalates_to"
+        }
+      ]
+    },
+    {
+      "priority": "P0",
+      "node_id": "physics-time-crystal-clock-coupling",
+      "node_type": "derived",
+      "edges": [
+        {
+          "from": "physics-time-crystal-clock-coupling",
+          "to": "sampling-time-bounds",
+          "semantic": "constrains"
+        },
+        {
+          "from": "physics-time-crystal-clock-coupling",
+          "to": "math-maturity-stages",
+          "semantic": "rollback_to"
+        }
+      ]
+    },
+    {
+      "priority": "P1",
+      "node_id": "stellar-plasma-collapse-signature-model",
+      "node_type": "derived",
+      "edges": [
+        {
+          "from": "stellar-plasma-collapse-signature-model",
+          "to": "scaling-laws",
+          "semantic": "enables"
+        },
+        {
+          "from": "stellar-plasma-collapse-signature-model",
+          "to": "qi-diagnostics-schema",
+          "semantic": "verifies"
+        }
+      ]
+    },
+    {
+      "priority": "P1",
+      "node_id": "bridge-noise-spectrum-to-collapse-proxy",
+      "node_type": "bridge",
+      "edges": [
+        {
+          "from": "bridge-noise-spectrum-to-collapse-proxy",
+          "to": "uncertainty-mechanics",
+          "semantic": "optimizes"
+        },
+        {
+          "from": "bridge-noise-spectrum-to-collapse-proxy",
+          "to": "verification_hook",
+          "semantic": "verifies"
+        }
+      ]
+    },
+    {
+      "priority": "P2",
+      "node_id": "orch-or-claim-falsifier-registry",
+      "node_type": "derived",
+      "edges": [
+        {
+          "from": "orch-or-claim-falsifier-registry",
+          "to": "candidate_generation",
+          "semantic": "constrains"
+        },
+        {
+          "from": "orch-or-claim-falsifier-registry",
+          "to": "last_certified_baseline",
+          "semantic": "rollback_to"
+        }
+      ]
+    },
+    {
+      "priority": "P2",
+      "node_id": "bridge-ideology-prudence-to-exploratory-claims",
+      "node_type": "bridge",
+      "edges": [
+        {
+          "from": "bridge-ideology-prudence-to-exploratory-claims",
+          "to": "alignment_under_constraint",
+          "semantic": "verifies"
+        },
+        {
+          "from": "bridge-ideology-prudence-to-exploratory-claims",
+          "to": "mission-ethos",
+          "semantic": "enables"
+        }
+      ]
+    }
+  ]
+}

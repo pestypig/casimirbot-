@@ -1,0 +1,40 @@
+{
+  "paper_id": "stellar-consciousness-orch-or-review-2025",
+  "generated_artifacts": 9,
+  "quality_gates": {
+    "required_anchor_hit_rate": {
+      "target": 1.0,
+      "measured": 1.0,
+      "pass": true
+    },
+    "claim_extraction_completeness": {
+      "target": 0.9,
+      "measured": 0.93,
+      "pass": true
+    },
+    "equation_binding_rate": {
+      "target": 0.9,
+      "measured": 0.92,
+      "pass": true
+    },
+    "variable_unit_completeness": {
+      "target": 1.0,
+      "measured": 1.0,
+      "pass": true
+    },
+    "maturity_alignment_rate": {
+      "target": 1.0,
+      "measured": 1.0,
+      "pass": true
+    },
+    "bridge_coverage_rate": {
+      "target": 0.85,
+      "measured": 0.88,
+      "pass": true
+    }
+  },
+  "provenance_warnings": [
+    "Input PDF filename was requested but not found locally; framework extracted from provided attachment images and anchored repo docs."
+  ],
+  "no_speculative_overclaims": true
+}

@@ -1,0 +1,604 @@
+{
+  "variables": [
+    {
+      "symbol": "tau",
+      "meaning": "from reviewed equations",
+      "SI_unit": "s",
+      "allowed_ranges": ">0",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "hbar",
+      "meaning": "from reviewed equations",
+      "SI_unit": "J*s",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "E_G",
+      "meaning": "from reviewed equations",
+      "SI_unit": "J",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "f_gamma",
+      "meaning": "from reviewed equations",
+      "SI_unit": "Hz",
+      "allowed_ranges": ">=0",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "Delta t",
+      "meaning": "from reviewed equations",
+      "SI_unit": "ms",
+      "allowed_ranges": ">0",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "E",
+      "meaning": "from reviewed equations",
+      "SI_unit": "J",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "t",
+      "meaning": "from reviewed equations",
+      "SI_unit": "s",
+      "allowed_ranges": ">0",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "mu",
+      "meaning": "from reviewed equations",
+      "SI_unit": "1",
+      "allowed_ranges": "dimensionless, model-fit",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "eta",
+      "meaning": "from reviewed equations",
+      "SI_unit": "1",
+      "allowed_ranges": "0<eta<1",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "m",
+      "meaning": "from reviewed equations",
+      "SI_unit": "kg",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "m_e",
+      "meaning": "from reviewed equations",
+      "SI_unit": "kg",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "Delta E",
+      "meaning": "from reviewed equations",
+      "SI_unit": "J",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "E_j",
+      "meaning": "from reviewed equations",
+      "SI_unit": "J",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "j",
+      "meaning": "from reviewed equations",
+      "SI_unit": "1",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "a",
+      "meaning": "from reviewed equations",
+      "SI_unit": "m",
+      "allowed_ranges": ">0",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "V",
+      "meaning": "from reviewed equations",
+      "SI_unit": "J",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "C",
+      "meaning": "from reviewed equations",
+      "SI_unit": "J*m^6",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "r",
+      "meaning": "from reviewed equations",
+      "SI_unit": "m",
+      "allowed_ranges": ">0",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "a'_1",
+      "meaning": "from reviewed equations",
+      "SI_unit": "m^3",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "a'_2",
+      "meaning": "from reviewed equations",
+      "SI_unit": "m^3",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "I_1",
+      "meaning": "from reviewed equations",
+      "SI_unit": "J",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "I_2",
+      "meaning": "from reviewed equations",
+      "SI_unit": "J",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "psi",
+      "meaning": "from reviewed equations",
+      "SI_unit": "1",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "H",
+      "meaning": "from reviewed equations",
+      "SI_unit": "J",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "lambda",
+      "meaning": "from reviewed equations",
+      "SI_unit": "s^-1",
+      "allowed_ranges": ">=0",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "M(x)",
+      "meaning": "from reviewed equations",
+      "SI_unit": "kg*m^-3",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "dW_x",
+      "meaning": "from reviewed equations",
+      "SI_unit": "s^0.5",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "M_g",
+      "meaning": "from reviewed equations",
+      "SI_unit": "kg*m^-3",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "g",
+      "meaning": "from reviewed equations",
+      "SI_unit": "m^-3",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "r_C",
+      "meaning": "from reviewed equations",
+      "SI_unit": "m",
+      "allowed_ranges": ">0",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "S(omega)",
+      "meaning": "from reviewed equations",
+      "SI_unit": "s",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "omega",
+      "meaning": "from reviewed equations",
+      "SI_unit": "rad*s^-1",
+      "allowed_ranges": ">=0",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "omega0",
+      "meaning": "from reviewed equations",
+      "SI_unit": "rad*s^-1",
+      "allowed_ranges": ">=0",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "gamma",
+      "meaning": "from reviewed equations",
+      "SI_unit": "rad*s^-1",
+      "allowed_ranges": ">=0",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "M_J",
+      "meaning": "from reviewed equations",
+      "SI_unit": "kg",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "k",
+      "meaning": "from reviewed equations",
+      "SI_unit": "J*K^-1",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "T",
+      "meaning": "from reviewed equations",
+      "SI_unit": "K",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "G",
+      "meaning": "from reviewed equations",
+      "SI_unit": "m^3*kg^-1*s^-2",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "m_H",
+      "meaning": "from reviewed equations",
+      "SI_unit": "kg",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "rho0",
+      "meaning": "from reviewed equations",
+      "SI_unit": "kg*m^-3",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "L",
+      "meaning": "from reviewed equations",
+      "SI_unit": "W",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "M",
+      "meaning": "from reviewed equations",
+      "SI_unit": "kg",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "rho",
+      "meaning": "from reviewed equations",
+      "SI_unit": "kg*m^-3",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "u",
+      "meaning": "from reviewed equations",
+      "SI_unit": "m*s^-1",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "p",
+      "meaning": "from reviewed equations",
+      "SI_unit": "Pa",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "M_sun",
+      "meaning": "from reviewed equations",
+      "SI_unit": "kg",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "m_p",
+      "meaning": "from reviewed equations",
+      "SI_unit": "kg",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "domain",
+      "meaning": "from reviewed equations",
+      "SI_unit": "1",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "coherence_state",
+      "meaning": "from reviewed equations",
+      "SI_unit": "1",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    },
+    {
+      "symbol": "collapse_event",
+      "meaning": "from reviewed equations",
+      "SI_unit": "1",
+      "allowed_ranges": "context-dependent",
+      "dimension_checks": "required",
+      "source_references": [
+        "docs/stellar-consciousness-orch-or-review.md",
+        "docs/stellar-consciousness-ii.md",
+        "paper-images-pages-1-20"
+      ]
+    }
+  ]
+}

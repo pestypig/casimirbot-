@@ -1,0 +1,69 @@
+{
+  "maturity_matrix": [
+    {
+      "claim_id": "SCOR-C001",
+      "maturity_stage": "exploratory",
+      "rationale": "Cross-domain mechanism lacks in-repo measurement pipeline and direct falsification harness."
+    },
+    {
+      "claim_id": "SCOR-C002",
+      "maturity_stage": "exploratory",
+      "rationale": "Cross-domain mechanism lacks in-repo measurement pipeline and direct falsification harness."
+    },
+    {
+      "claim_id": "SCOR-C003",
+      "maturity_stage": "reduced-order",
+      "rationale": "Mathematical form is explicit but parameterization/telemetry contract is incomplete in current repo."
+    },
+    {
+      "claim_id": "SCOR-C004",
+      "maturity_stage": "exploratory",
+      "rationale": "Cross-domain mechanism lacks in-repo measurement pipeline and direct falsification harness."
+    },
+    {
+      "claim_id": "SCOR-C005",
+      "maturity_stage": "diagnostic",
+      "rationale": "Equation family is established in physics docs and supports measurable checks, but paper-specific claim mapping is unverified."
+    },
+    {
+      "claim_id": "SCOR-C006",
+      "maturity_stage": "diagnostic",
+      "rationale": "Equation family is established in physics docs and supports measurable checks, but paper-specific claim mapping is unverified."
+    },
+    {
+      "claim_id": "SCOR-C007",
+      "maturity_stage": "diagnostic",
+      "rationale": "Equation family is established in physics docs and supports measurable checks, but paper-specific claim mapping is unverified."
+    },
+    {
+      "claim_id": "SCOR-C008",
+      "maturity_stage": "reduced-order",
+      "rationale": "Mathematical form is explicit but parameterization/telemetry contract is incomplete in current repo."
+    },
+    {
+      "claim_id": "SCOR-C009",
+      "maturity_stage": "diagnostic",
+      "rationale": "Equation family is established in physics docs and supports measurable checks, but paper-specific claim mapping is unverified."
+    },
+    {
+      "claim_id": "SCOR-C010",
+      "maturity_stage": "reduced-order",
+      "rationale": "Mathematical form is explicit but parameterization/telemetry contract is incomplete in current repo."
+    },
+    {
+      "claim_id": "SCOR-C011",
+      "maturity_stage": "diagnostic",
+      "rationale": "Equation family is established in physics docs and supports measurable checks, but paper-specific claim mapping is unverified."
+    },
+    {
+      "claim_id": "SCOR-C012",
+      "maturity_stage": "diagnostic",
+      "rationale": "Equation family is established in physics docs and supports measurable checks, but paper-specific claim mapping is unverified."
+    },
+    {
+      "claim_id": "SCOR-C013",
+      "maturity_stage": "exploratory",
+      "rationale": "Cross-domain mechanism lacks in-repo measurement pipeline and direct falsification harness."
+    }
+  ]
+}
