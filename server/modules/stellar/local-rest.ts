@@ -12,7 +12,16 @@ import type {
   LocalRestQuery,
   Vec3,
 } from "@shared/stellar";
+import { resolveStellarRestorationProvenance, type StellarRestorationProvenance } from "./evolution";
 
+
+
+export type LocalRestSnapshotWithProvenance = LocalRestSnapshot & StellarRestorationProvenance & {
+  gate?: {
+    status: "pass" | "fail";
+    fail_reason?: string;
+  };
+};
 // ---------- constants & utilities ----------
 const DEG = Math.PI / 180;
 const KM_S_TO_M_S = 1000;
@@ -222,12 +231,26 @@ export function resolveCategory(input?: string): HRCategoryLiteral {
 
 // ---------- public API ----------
 
-export async function buildLocalRestSnapshot(q: LocalRestQuery): Promise<LocalRestSnapshot> {
+export async function buildLocalRestSnapshot(
+  q: LocalRestQuery,
+  options?: {
+    strictProvenance?: boolean;
+    provenance?: Partial<StellarRestorationProvenance> | null;
+    hasExplicitProvenance?: boolean;
+    failReason?: string;
+  },
+): Promise<LocalRestSnapshotWithProvenance> {
   const epochMs = q.epoch ? new Date(q.epoch).getTime() : Date.now();
   const radiusPc = Math.max(0.1, q.radius_pc ?? 50);
   const withOort = !!q.with_oort;
   const page = Math.max(1, q.page ?? 1);
   const perPage = Math.min(5000, Math.max(100, q.per_page ?? 5000));
+  const strictProvenance = options?.strictProvenance === true;
+  const provenance = resolveStellarRestorationProvenance(options?.provenance);
+  const provenanceMissing = options?.hasExplicitProvenance === false;
+  const gate = strictProvenance && provenanceMissing
+    ? { status: "fail" as const, fail_reason: options?.failReason }
+    : { status: "pass" as const };
 
   const catalogPath = process.env.LSR_CATALOG_PATH || DEFAULT_CATALOG;
   const cacheKey = hashKey(
@@ -244,7 +267,7 @@ export async function buildLocalRestSnapshot(q: LocalRestQuery): Promise<LocalRe
       const txt = await fs.readFile(cacheFile, "utf8");
       const snap = JSON.parse(txt) as LocalRestSnapshot;
       const start = (page - 1) * perPage;
-      return { ...snap, stars: snap.stars.slice(start, start + perPage), page, perPage };
+      return { ...snap, stars: snap.stars.slice(start, start + perPage), page, perPage, ...provenance, gate };
     }
   } catch {
     /* cache miss */
@@ -361,7 +384,7 @@ export async function buildLocalRestSnapshot(q: LocalRestQuery): Promise<LocalRe
   await fs.writeFile(cacheFile, JSON.stringify(snap), "utf8");
 
   const start = (page - 1) * perPage;
-  return { ...snap, stars: stars.slice(start, start + perPage), page, perPage };
+  return { ...snap, stars: stars.slice(start, start + perPage), page, perPage, ...provenance, gate };
 }
 
 export function propagateStarPosition(star: LocalRestStar, epochMs: number): LocalRestStar {

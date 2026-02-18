@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
 import { buildLocalRestSnapshot } from "../modules/stellar/local-rest";
-import { computeProofs } from "../modules/stellar/evolution";
+import {
+  computeProofs,
+  resolveStellarRestorationProvenance,
+  STELLAR_RESTORATION_PROVENANCE_MISSING,
+} from "../modules/stellar/evolution";
 import { navPoseBus } from "../lib/nav-pose-bus";
 import type { LocalRestQuery } from "@shared/stellar";
 
@@ -14,13 +18,28 @@ const LsrQuery = z.object({
   page: z.coerce.number().int().min(1).optional(),
   per_page: z.coerce.number().int().min(10).max(5000).optional(),
   with_oort: z.coerce.boolean().optional(),
+  strict_provenance: z.coerce.boolean().optional(),
+  provenance_class: z.enum(["inferred", "measured", "simulated"]).optional(),
+  claim_tier: z.enum(["diagnostic", "reduced-order", "certified"]).optional(),
+  certifying: z.coerce.boolean().optional(),
 });
 
 // GET /api/stellar/local-rest?epoch=ISO&radius_pc=..&category=..&page=..&per_page=..
 stellarRouter.get("/local-rest", async (req, res, next) => {
   try {
     const q = LsrQuery.parse(req.query);
-    const snap = await buildLocalRestSnapshot(q as LocalRestQuery);
+    const hasExplicitProvenance =
+      q.provenance_class !== undefined || q.claim_tier !== undefined || q.certifying !== undefined;
+    const snap = await buildLocalRestSnapshot(q as LocalRestQuery, {
+      strictProvenance: q.strict_provenance === true,
+      provenance: {
+        provenance_class: q.provenance_class,
+        claim_tier: q.claim_tier,
+        certifying: q.certifying,
+      },
+      hasExplicitProvenance,
+      failReason: STELLAR_RESTORATION_PROVENANCE_MISSING,
+    });
     res.json(snap);
   } catch (err) {
     next(err);
@@ -41,7 +60,19 @@ stellarRouter.get("/local-rest/stream", async (req, res) => {
   };
 
   const q = LsrQuery.parse(req.query);
-  buildLocalRestSnapshot(q as LocalRestQuery)
+  const hasExplicitProvenance =
+    q.provenance_class !== undefined || q.claim_tier !== undefined || q.certifying !== undefined;
+  const snapshotOptions = {
+    strictProvenance: q.strict_provenance === true,
+    provenance: {
+      provenance_class: q.provenance_class,
+      claim_tier: q.claim_tier,
+      certifying: q.certifying,
+    },
+    hasExplicitProvenance,
+    failReason: STELLAR_RESTORATION_PROVENANCE_MISSING,
+  };
+  buildLocalRestSnapshot(q as LocalRestQuery, snapshotOptions)
     .then((snap) => send("snapshot", snap))
     .catch((err) => send("error", { message: String(err) }));
 
@@ -51,7 +82,7 @@ stellarRouter.get("/local-rest/stream", async (req, res) => {
   const timer = setInterval(async () => {
     if (!q.epoch) {
       try {
-        const snap = await buildLocalRestSnapshot({ ...q, epoch: new Date().toISOString() } as LocalRestQuery);
+        const snap = await buildLocalRestSnapshot({ ...q, epoch: new Date().toISOString() } as LocalRestQuery, snapshotOptions);
         send("snapshot", snap);
       } catch (err) {
         send("error", { message: String(err) });
@@ -88,7 +119,8 @@ stellarRouter.get("/evolution/proofs", (req, res) => {
   }
   try {
     const proofs = computeProofs(parsed.data);
-    return res.json(proofs);
+    const provenance = resolveStellarRestorationProvenance();
+    return res.json({ ...proofs, ...provenance });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return res.status(500).json({ error: "compute_failed", message });
@@ -107,9 +139,11 @@ stellarRouter.get("/evolution/track", (req, res) => {
     mass_Msun: parsed.data.mass_Msun,
     metallicity_Z: parsed.data.metallicity_Z,
   });
+  const provenance = resolveStellarRestorationProvenance();
   return res.json({
     input: { mass_Msun: proofs.input.mass_Msun, metallicity_Z: proofs.input.metallicity_Z },
     track: proofs.track,
     meta: proofs.meta,
+    ...provenance,
   });
 });

@@ -552,6 +552,33 @@
         "Warp viability certificate generation includes deterministic integrity metadata and explicit firstFail propagation on FAIL",
         "Warp viability and metric adapter tests assert hard-constraint policy handling with conservative non-viable defaults"
       ]
+    },
+    {
+      "id": "TOE-036-stellar-restoration-runtime-provenance-contract",
+      "tree_owner": "stellar-restoration",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Stellar restoration runtime provenance contract primitive",
+      "primary_path_prefix": "server/modules/stellar/evolution.ts",
+      "allowed_paths": [
+        "server/modules/stellar/evolution.ts",
+        "server/modules/stellar/local-rest.ts",
+        "server/routes/stellar.ts",
+        "tests/stellar-runtime-contract.spec.ts",
+        "server/__tests__/star-equilibrium.spec.ts",
+        "docs/audits/ticket-results"
+      ],
+      "required_tests": [
+        "tests/stellar-runtime-contract.spec.ts",
+        "server/__tests__/star-equilibrium.spec.ts"
+      ],
+      "done_criteria": [
+        "Stellar restoration modules emit additive runtime provenance metadata with conservative defaults for missing provenance",
+        "Stellar route responses preserve backward-compatible shape while surfacing deterministic strict fail_reason when provenance is required",
+        "Runtime contract tests cover default provenance, strict failure determinism, and caller-provided provenance pass-through"
+      ]
     }
   ]
 }

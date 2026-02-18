@@ -3,6 +3,7 @@ import {
   handleInformationEvent,
   getTelemetrySnapshot,
 } from "../services/star/service";
+import { resolveStellarRestorationProvenance } from "../modules/stellar/evolution";
 import {
   EQUILIBRIUM_DISPERSION_MAX,
   EQUILIBRIUM_HOLD_MS,
@@ -80,5 +81,25 @@ describe("star equilibrium gate", () => {
     expect(final.equilibrium_hold_ms ?? 0).toBeGreaterThanOrEqual(
       EQUILIBRIUM_HOLD_MS,
     );
+  });
+
+  it("keeps stellar restoration provenance defaults conservative", () => {
+    const resolved = resolveStellarRestorationProvenance({
+      provenance_class: "measured",
+      claim_tier: "certified",
+      certifying: true,
+    });
+    expect(resolved).toEqual({
+      provenance_class: "measured",
+      claim_tier: "certified",
+      certifying: true,
+    });
+
+    const fallback = resolveStellarRestorationProvenance({});
+    expect(fallback).toEqual({
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    });
   });
 });
