@@ -3415,6 +3415,10 @@ const HELIX_ASK_VIABILITY_PATHS =
   /(server\/gr\/gr-evaluation\.ts|server\/gr\/gr-constraint-policy\.ts|server\/routes\/warp-viability\.ts|server\/skills\/physics\.warp\.viability|server\/skills\/physics\.gr\.grounding|types\/warpViability|server\/helix-core\.ts)/i;
 const HELIX_ASK_VERIFICATION_FOCUS =
   /\b(scientific method|verification|verify|falsifiable|falsifiability|hypothesis|experiment)\b/i;
+const HELIX_ASK_OPEN_WORLD_EXPLAIN_RE =
+  /\b(how (?:does|do|can)|why|explain|what(?:'s| is)|describe)\b/i;
+const HELIX_ASK_OPEN_WORLD_DOMAIN_RE =
+  /\b(universe|cosmos|cosmology|life|abiogenesis|evolution|astrobiology|stellar consciousness|financial hack|phish(?:ing)?|fraud|scam|cybersecurity|account takeover)\b/i;
 const HELIX_ASK_VERIFICATION_ANCHOR_PATHS: RegExp[] = [
   /server\/routes\/agi\.plan\.ts/i,
   /server\/services\/helix-ask\/platonic-gates\.ts/i,
@@ -5291,6 +5295,20 @@ function buildHelixAskSearchQueries(
     push("warp pipeline");
     push("energy-pipeline warp");
   }
+  if (
+    hasTopic("physics") ||
+    /universe|cosmos|cosmology|astrobiology|abiogenesis|origin(?:s)? of life|life emergence|stellar consciousness/i.test(
+      normalized,
+    )
+  ) {
+    push("docs/stellar-consciousness-orch-or-review.md");
+    push("docs/stellar-consciousness-ii.md");
+    push("docs/stellar-fact-check.md");
+    push("docs/papers.md");
+    push("docs/papers");
+    push("docs/knowledge/stellar-restoration-tree.json");
+    push("docs/knowledge/trees/stellar-restoration-tree.md");
+  }
   if (hasTopic("ideology") || /ideology|ethos|mission ethos|ledger/i.test(normalized)) {
     push("docs/ethos/ideology.json");
     push("docs/ethos/why.md");
@@ -5387,6 +5405,19 @@ function buildHelixAskSearchQueries(
     push("docs/knowledge/hardware-telemetry-tree.json");
     push("server/services/observability");
     push("server/skills/telemetry.panels.ts");
+  }
+  if (
+    hasTopic("security") ||
+    /financial hack|hack(?:ed|ing)?|phish(?:ing)?|fraud|scam|account takeover|credential (?:theft|stuffing)|cyber(?:security| attack)?/i.test(
+      normalized,
+    )
+  ) {
+    push("server/security");
+    push("server/auth");
+    push("server/middleware/concurrency-guard.ts");
+    push("docs/knowledge/ethos/no-bypass-guardrail.md");
+    push("docs/knowledge/ethos/metric-integrity-guardrail.md");
+    push("shared/hull-basis.ts");
   }
   if (hasTopic("queue") || hasTopic("jobs") || /queue|scheduler|orchestration/i.test(normalized)) {
     push("docs/knowledge/queue-orchestration-tree.json");
@@ -18564,8 +18595,13 @@ const executeHelixAsk = async ({
           }
         }
       }
+      const openWorldClarifyBypass =
+        !explicitRepoExpectation &&
+        repoExpectationLevel === "low" &&
+        HELIX_ASK_OPEN_WORLD_EXPLAIN_RE.test(baseQuestion) &&
+        HELIX_ASK_OPEN_WORLD_DOMAIN_RE.test(baseQuestion);
       const shouldApplyPreIntentClarify =
-        ambiguityResolution.shouldClarify && !warpEthosRelationQuery;
+        ambiguityResolution.shouldClarify && !warpEthosRelationQuery && !openWorldClarifyBypass;
       if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
         debugPayload.ambiguity_resolver_applied = shouldApplyPreIntentClarify;
         debugPayload.ambiguity_resolver_reason = ambiguityResolution.reason;
@@ -18594,6 +18630,11 @@ const executeHelixAsk = async ({
           "clarify",
           ambiguityResolution.reason ?? "short_prompt",
         );
+      } else if (ambiguityResolution.shouldClarify && openWorldClarifyBypass) {
+        logEvent("Ambiguity resolver", "bypass_open_world", "low_repo_explainer");
+        if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
+          debugPayload.ambiguity_resolver_bypassed = "open_world_query";
+        }
       } else if (ambiguityResolution.shouldClarify && warpEthosRelationQuery) {
         logEvent("Ambiguity resolver", "bypass_relation_query", "warp_ethos_relation");
         if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
