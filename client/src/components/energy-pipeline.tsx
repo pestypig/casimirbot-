@@ -98,6 +98,11 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const live = pipelineState ?? results ?? {};
   const mode = (live?.currentMode ?? "hover") as "standby" | "hover" | "taxi" | "nearzero" | "cruise" | "emergency";
 
+  const claimTierRaw = ((live as any)?.claim_tier ?? (live as any)?.claimTier ?? "unknown") as string;
+  const claimTier = String(claimTierRaw || "unknown").toLowerCase();
+  const provenanceClass = ((live as any)?.provenance_class ?? (live as any)?.provenanceClass ?? "unknown") as string;
+  const maturityLabel = claimTier === "diagnostic" ? "Diagnostic evidence" : claimTier === "certified" ? "Certified evidence" : `${claimTierRaw} evidence`;
+
   // Try to use canonical FR duty from pipeline; otherwise reconstruct a reasonable fallback
   const dutyEffectiveFR: number = useMemo(() => {
     // 0) explicit from pipeline
@@ -695,6 +700,29 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
               </div>
             </div>
 
+          </div>
+        </CardContent>
+      </Card>
+
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Claim Provenance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="bg-muted rounded-lg p-4">
+              <div className="text-muted-foreground">Claim tier</div>
+              <div className="font-mono" data-testid="claim-tier-value">{claimTierRaw}</div>
+            </div>
+            <div className="bg-muted rounded-lg p-4">
+              <div className="text-muted-foreground">Provenance class</div>
+              <div className="font-mono" data-testid="provenance-class-value">{provenanceClass}</div>
+            </div>
+            <div className="bg-muted rounded-lg p-4">
+              <div className="text-muted-foreground">Maturity language</div>
+              <div className="font-mono" data-testid="maturity-language-value">{maturityLabel}</div>
+            </div>
           </div>
         </CardContent>
       </Card>

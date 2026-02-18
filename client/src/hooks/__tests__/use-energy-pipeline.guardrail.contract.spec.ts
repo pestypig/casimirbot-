@@ -126,13 +126,21 @@ describe("useEnergyPipeline qi guard contract", () => {
   it.each(guardCases)(
     "returns guard fields bit-identical for $name",
     async ({ guard }) => {
-      const payload: PipelineSnapshot = { qiGuardrail: guard };
+      const payload: PipelineSnapshot = {
+        qiGuardrail: guard,
+        claim_tier: "diagnostic",
+        provenance_class: "simulation",
+      } as PipelineSnapshot;
       const { snapshot, apiRequestMock, pipelinePayload } = await renderWithPayload(payload);
 
       expect(snapshot.qiGuardrail).toBe(guard);
       expect(snapshot.qiGuardrail).toStrictEqual(guard);
       expect(snapshot.zeta).toBe(pipelinePayload.zeta);
       expect(snapshot.zetaRaw).toBe(pipelinePayload.zetaRaw);
+      expect((snapshot as any).claim_tier).toBe("diagnostic");
+      expect((snapshot as any).claimTier).toBe("diagnostic");
+      expect((snapshot as any).provenance_class).toBe("simulation");
+      expect((snapshot as any).provenanceClass).toBe("simulation");
       expect(apiRequestMock).toHaveBeenCalledWith("GET", "/api/helix/pipeline");
     },
   );
