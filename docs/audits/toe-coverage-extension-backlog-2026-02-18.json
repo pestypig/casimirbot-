@@ -1486,6 +1486,41 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-065-ideology-physics-contradiction-matrix-pack",
+      "tree_owner": "ideology-physics-bridge",
+      "gap_refs": [
+        "F-COV-5",
+        "F-COV-6"
+      ],
+      "primitive": "Ideology-physics contradiction matrix pack primitive",
+      "primary_path_prefix": "server/services/helix-ask/relation-assembly.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "docs/audits/research/TOE-065-physics-research-brief.md",
+        "docs/audits/research/TOE-065-safety-envelope-analysis.md",
+        "docs/audits/ticket-results/TOE-065-ideology-physics-contradiction-matrix-pack.20260218T201714Z.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts"
+      ],
+      "done_criteria": [
+        "Contradiction matrix enumerates intrinsic, collision, and mixed contradiction envelopes with deterministic fail mapping",
+        "Strict contradiction precedence is documented for mixed missing+contradiction packets",
+        "Research artifacts capture falsifiability hooks and safety-envelope constraints for ideology-physics bridge evidence"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "safety-envelope-analysis"
+        ]
+      }
     }
   ]
 }
