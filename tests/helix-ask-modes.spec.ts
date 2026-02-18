@@ -86,7 +86,12 @@ describe("Helix Ask modes", () => {
         allowTools: ["halobank.time.compute"],
         timestamp: "2025-03-01T12:00:00Z",
         place: { lat: 40.7128, lon: -74.006 },
-        model: { orbitalAlignment: true, ephemerisSource: "live" },
+        model: {
+          orbitalAlignment: true,
+          ephemerisSource: "live",
+          ephemerisEvidenceVerified: true,
+          ephemerisEvidenceRef: "artifact:jpl-horizons:modes-verify-halobank",
+        },
         sessionId: "modes-verify-halobank",
       }),
     });
@@ -124,6 +129,7 @@ describe("Helix Ask modes", () => {
         timestamp: "2025-03-01T12:00:00Z",
         place: { lat: 40.7128, lon: -74.006 },
         model: { orbitalAlignment: true, ephemerisSource: "fallback" },
+        verify: { mode: "constraint-pack", packId: "repo-convergence" },
         sessionId: "modes-verify-halobank-fallback",
       }),
     });
@@ -132,12 +138,16 @@ describe("Helix Ask modes", () => {
       ok?: boolean;
       mode?: string;
       action?: { output?: { ephemeris?: { consistency?: { verdict?: string; firstFailId?: string | null } } } };
-      proof?: { consistencyGate?: { verdict?: string; firstFailId?: string | null; deterministic?: boolean } };
+      proof?: {
+        firstFail?: { id?: string } | null;
+        consistencyGate?: { verdict?: string; firstFailId?: string | null; deterministic?: boolean };
+      };
     };
-    expect(payload.ok).toBe(true);
+    expect(payload.ok).toBe(false);
     expect(payload.mode).toBe("verify");
     expect(payload.action?.output?.ephemeris?.consistency?.verdict).toBe("FAIL");
     expect(payload.proof?.consistencyGate?.verdict).toBe("FAIL");
+    expect(payload.proof?.firstFail?.id).toBe("HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY");
     expect(payload.proof?.consistencyGate?.firstFailId).toBe("HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY");
     expect(payload.proof?.consistencyGate?.deterministic).toBe(true);
   }, 90000);

@@ -26,6 +26,8 @@ const Input = z.object({
       includeCausal: z.boolean().optional(),
       orbitalAlignment: z.boolean().optional(),
       ephemerisSource: z.enum(["live", "fallback"]).optional(),
+      ephemerisEvidenceVerified: z.boolean().optional(),
+      ephemerisEvidenceRef: z.string().optional(),
     })
     .optional(),
   question: z.string().optional(),
