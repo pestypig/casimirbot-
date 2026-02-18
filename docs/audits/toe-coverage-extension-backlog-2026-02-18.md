@@ -153,16 +153,18 @@ Return strict JSON only:
 
 ## Tickets
 
-- `TOE-011-orbital-ephemeris-provenance-bridge`
-- `TOE-012-halobank-horizons-consistency-gate`
-- `TOE-013-atomic-systems-claim-tier-contract`
-- `TOE-014-robotics-recollection-provenance-contract`
-- `TOE-015-external-integration-evidence-manifest`
-- `TOE-016-resolver-forest-owner-coverage-manifest`
+Ticket list is maintained in:
+
+- `docs/audits/toe-coverage-extension-backlog-2026-02-18.json`
+
+Current extension range:
+
+- `TOE-011` through `TOE-051`
 
 For full ticket detail use:
 
 - `docs/audits/toe-coverage-extension-backlog-2026-02-18.json`
+- `docs/audits/toe-lane-orchestration-2026-02-18.md`
 
 ## Batch Coordinator Prompt
 
@@ -179,10 +181,10 @@ Rules:
 5) Keep unresolved tickets in queue with explicit blocker notes.
 
 Order:
-1. TOE-011
-2. TOE-012
-3. TOE-013
-4. TOE-014
-5. TOE-015
-6. TOE-016
+1. internal lane first (`contract_only|runtime_contract`)
+2. research lane second (`physics_unknown|tier_promotion`)
+3. keep one agent per ticket, parallel within each lane
+4. use prompt packs:
+   - docs/audits/toe-extension-prompt-batch-2026-02-18.md
+   - docs/audits/toe-next-prompt-batch-2026-02-18.md
 ```

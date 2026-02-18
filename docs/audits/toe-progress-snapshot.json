@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T05:16:43.788Z",
+  "generated_at": "2026-02-18T05:26:14.113Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -13,7 +13,7 @@
     "certified": 1
   },
   "totals": {
-    "tickets_total": 46,
+    "tickets_total": 51,
     "tickets_with_evidence": 46,
     "claim_tier_counts": {
       "diagnostic": 45,
@@ -21,9 +21,9 @@
       "certified": 0
     },
     "weighted_score_sum": 11.85,
-    "toe_progress_pct": 25.8,
+    "toe_progress_pct": 23.2,
     "forest_owner_coverage_pct": 100,
-    "strict_ready_progress_pct": 2.2
+    "strict_ready_progress_pct": 2
   },
   "segments": {
     "core": {
@@ -39,7 +39,7 @@
       "strict_ready_progress_pct": 10
     },
     "extension": {
-      "tickets_total": 36,
+      "tickets_total": 41,
       "tickets_with_evidence": 36,
       "claim_tier_counts": {
         "diagnostic": 36,
@@ -47,11 +47,11 @@
         "certified": 0
       },
       "weighted_score_sum": 9,
-      "toe_progress_pct": 25,
+      "toe_progress_pct": 22,
       "strict_ready_progress_pct": 0
     },
     "combined": {
-      "tickets_total": 46,
+      "tickets_total": 51,
       "tickets_with_evidence": 46,
       "claim_tier_counts": {
         "diagnostic": 45,
@@ -59,8 +59,8 @@
         "certified": 0
       },
       "weighted_score_sum": 11.85,
-      "toe_progress_pct": 25.8,
-      "strict_ready_progress_pct": 2.2
+      "toe_progress_pct": 23.2,
+      "strict_ready_progress_pct": 2
     }
   },
   "tickets": [
@@ -385,6 +385,41 @@
       "verification_ok": true,
       "score": 0.25,
       "result_file": "docs/audits/ticket-results/TOE-046-toe-agent-preflight-orchestrator.20260218T051007Z.json"
+    },
+    {
+      "ticket_id": "TOE-047-helix-ask-strict-e2e-contract",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-048-halobank-horizons-physics-research-bridge",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-049-warp-viability-tier-promotion-pack",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-050-ideology-physics-bridge-tier-promotion-pack",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
+    },
+    {
+      "ticket_id": "TOE-051-research-artifact-progress-ledger",
+      "claim_tier": null,
+      "verification_ok": false,
+      "score": 0,
+      "result_file": null
     }
   ]
 }

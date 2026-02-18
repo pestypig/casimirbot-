@@ -2,6 +2,10 @@
 
 This file provides copy/paste prompts for `TOE-013` to `TOE-016` and enforces a persistent context loop so future agents keep long-horizon continuity.
 
+Next batch (`TOE-047..051`) is documented at:
+
+- `docs/audits/toe-next-prompt-batch-2026-02-18.md`
+
 ## Shared Context Loop
 
 Read before each ticket:

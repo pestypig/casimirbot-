@@ -937,7 +937,198 @@
         "Preflight orchestrator executes TOE validation/progress stages and emits machine-readable summary",
         "Preflight exits non-zero when any required stage fails",
         "Npm script audit:toe:preflight runs orchestrator in one command"
-      ]
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-047-helix-ask-strict-e2e-contract",
+      "tree_owner": "helix-ask",
+      "gap_refs": [
+        "F-COV-5"
+      ],
+      "primitive": "Helix Ask strict end-to-end contract primitive",
+      "primary_path_prefix": "server/routes/agi.plan.ts",
+      "allowed_paths": [
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask/arbiter.ts",
+        "server/services/helix-ask/answer-artifacts.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-modes.spec.ts"
+      ],
+      "required_tests": [
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "tests/helix-ask-modes.spec.ts"
+      ],
+      "done_criteria": [
+        "Strict Helix Ask flow emits deterministic fail_reason on missing evidence contract fields",
+        "Answer artifact payload carries additive claim_tier/provenance fields in strict and default modes",
+        "E2E tests verify strict-vs-default behavior without regression to existing routing behavior"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-048-halobank-horizons-physics-research-bridge",
+      "tree_owner": "simulation-systems",
+      "gap_refs": [
+        "F-COV-2",
+        "F-COV-6"
+      ],
+      "primitive": "Halobank and Horizons physics research bridge primitive",
+      "primary_path_prefix": "server/services/halobank/time-model.ts",
+      "allowed_paths": [
+        "server/services/halobank/time-model.ts",
+        "server/skills/halobank.time.compute.ts",
+        "server/utils/horizons-proxy.ts",
+        "tests/halobank-time-model.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts",
+        "tests/horizons-proxy.spec.ts",
+        "docs/audits/research/TOE-048-physics-research-brief.md",
+        "docs/audits/research/TOE-048-safety-envelope-analysis.md"
+      ],
+      "required_tests": [
+        "tests/halobank-time-model.spec.ts",
+        "tests/halobank-horizons-consistency.spec.ts",
+        "tests/horizons-proxy.spec.ts"
+      ],
+      "done_criteria": [
+        "Research artifacts define bounded assumptions for ephemeris-vs-model residual interpretation",
+        "Runtime output maps residuals to deterministic claim_tier/provenance behavior",
+        "Tests verify conservative downgrade behavior when residual evidence is incomplete"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "safety-envelope-analysis"
+        ]
+      }
+    },
+    {
+      "id": "TOE-049-warp-viability-tier-promotion-pack",
+      "tree_owner": "warp-mechanics",
+      "gap_refs": [
+        "F-COV-5"
+      ],
+      "primitive": "Warp viability tier-promotion primitive",
+      "primary_path_prefix": "tools/warpViability.ts",
+      "allowed_paths": [
+        "tools/warpViability.ts",
+        "tools/warpViabilityCertificate.ts",
+        "tools/verifyCertificate.ts",
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts",
+        "tests/proof-pack-strict-parity.spec.ts",
+        "docs/audits/research/TOE-049-tier-promotion-rationale.md",
+        "docs/audits/research/TOE-049-comparative-evidence-pack.md"
+      ],
+      "required_tests": [
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts",
+        "tests/proof-pack-strict-parity.spec.ts"
+      ],
+      "done_criteria": [
+        "Tier-promotion rationale maps each promoted claim to explicit falsification checks",
+        "Comparative evidence pack documents baseline vs promoted behavior with deterministic acceptance thresholds",
+        "Certificate output preserves conservative fallback when promotion evidence is insufficient"
+      ],
+      "research_gate": {
+        "risk_class": "tier_promotion",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "tier-promotion-rationale",
+          "comparative-evidence-pack"
+        ]
+      }
+    },
+    {
+      "id": "TOE-050-ideology-physics-bridge-tier-promotion-pack",
+      "tree_owner": "ideology-physics-bridge",
+      "gap_refs": [
+        "F-COV-5"
+      ],
+      "primitive": "Ideology and physics bridge tier-promotion primitive",
+      "primary_path_prefix": "server/services/helix-ask/relation-assembly.ts",
+      "allowed_paths": [
+        "server/services/helix-ask/relation-assembly.ts",
+        "server/services/helix-ask/graph-resolver.ts",
+        "server/routes/ethos.ts",
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts",
+        "docs/audits/research/TOE-050-tier-promotion-rationale.md",
+        "docs/audits/research/TOE-050-comparative-evidence-pack.md"
+      ],
+      "required_tests": [
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/ideology-dag.spec.ts"
+      ],
+      "done_criteria": [
+        "Bridge promotion rationale maps ideology constraints to measurable physics-side evidence requirements",
+        "Comparative evidence pack demonstrates strict-mode behavior under present vs missing bridge evidence",
+        "Resolver and bridge tests preserve deterministic fail reasons and backward-compatible defaults"
+      ],
+      "research_gate": {
+        "risk_class": "tier_promotion",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "tier-promotion-rationale",
+          "comparative-evidence-pack"
+        ]
+      }
+    },
+    {
+      "id": "TOE-051-research-artifact-progress-ledger",
+      "tree_owner": "ops-deployment",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Research artifact progress ledger primitive",
+      "primary_path_prefix": "scripts/compute-toe-progress.ts",
+      "allowed_paths": [
+        "scripts/compute-toe-progress.ts",
+        "scripts/validate-toe-ticket-results.ts",
+        "tests/toe-progress.spec.ts",
+        "docs/audits/toe-progress-snapshot.json",
+        "docs/audits/ticket-results/README.md"
+      ],
+      "required_tests": [
+        "tests/toe-progress.spec.ts"
+      ],
+      "done_criteria": [
+        "Progress snapshot exposes research-gated ticket counts and artifact-complete counts",
+        "Ticket result validation can detect missing research artifact references for research-gated tickets",
+        "Progress output remains backward-compatible for existing dashboards"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
     }
   ]
 }
