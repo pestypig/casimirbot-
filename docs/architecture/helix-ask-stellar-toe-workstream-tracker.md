@@ -219,3 +219,24 @@ Mandatory Casimir + trace export and full gate table.
   - artifacts/experiments/helix-ask-stellar-ps1/20260218T230617Z/training-trace-export.jsonl
 - Next single highest-priority task:
   - Stage B2 (PS2.5 Quake-frame runtime hardening and semantic gate tightening)
+
+### Handoff Snapshot 2026-02-18T23:21:03Z
+- Branch/HEAD: cloud run, commit `0455aa8`
+- Result type: infra-blocked
+- Stage completed: Stage B2 (PS2.5 Quake-frame runtime hardening benchmark)
+- Gates passed:
+  - Reliability preflight `/api/ready` true
+  - Semantic gates: `repetition_penalty_fail_rate` and `contradiction_flag_rate`
+  - Required artifacts emitted: `summary.json`, `recommendation.json`, `focused-qa.json`, `semantic-gates.json`
+- Gates failed:
+  - Reliability preflight `/api/agi/ask` smoke 200-rate (`0.000`, threshold `>=0.90`)
+  - Semantic gates: `claim_citation_link_rate` (`0.000`) and `unsupported_claim_rate` (`1.000`)
+- Casimir: PASS, `certificateHash=765346b07be3b1d97dbf4fb7c0091cee28903983e571973afa2ca631ad4fcd08`, `integrityOk=true`
+- New artifacts:
+  - `reports/helix-ask-quake-frame-loop-2026-02-18T23-21-03-498Z.md`
+  - `artifacts/experiments/helix-ask-quake-frame-loop/2026-02-18T23-21-03-498Z/summary.json`
+  - `artifacts/experiments/helix-ask-quake-frame-loop/2026-02-18T23-21-03-498Z/recommendation.json`
+  - `artifacts/experiments/helix-ask-quake-frame-loop/2026-02-18T23-21-03-498Z/focused-qa.json`
+  - `artifacts/experiments/helix-ask-quake-frame-loop/2026-02-18T23-21-03-498Z/semantic-gates.json`
+- Next single highest-priority task:
+  - Fix ask-runtime readiness/reliability path, then rerun Stage B2 semantic gates in decision-grade mode.
