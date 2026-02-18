@@ -20,6 +20,7 @@ import {
 } from "@shared/jobs";
 import type { EssenceProposal } from "@shared/proposals";
 import { recordTask } from "../metrics";
+import { getQueueSnapshot } from "../queue";
 
 export const jobsRouter = Router();
 
@@ -107,6 +108,11 @@ jobsRouter.get("/budget", (req, res) => {
   const userId = (req as any)?.auth?.sub || "anon";
   const balance = getTokenBalance(String(userId), true);
   res.json(balance);
+});
+
+jobsRouter.get("/queue", (_req, res) => {
+  const snapshot = getQueueSnapshot();
+  res.json(snapshot);
 });
 
 jobsRouter.get("/payouts", (req, res) => {

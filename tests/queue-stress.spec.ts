@@ -4,6 +4,7 @@ import {
   registerMediaWorker,
   __resetQueueForTest,
   getQueueBackend,
+  getQueueSnapshot,
 } from "../server/queue";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -54,5 +55,15 @@ describe("queue stress harness", () => {
     expect(results).toHaveLength(totalJobs);
     expect(new Set(results).size).toBe(totalJobs);
     expect(peakInflight).toBeLessThanOrEqual(concurrency);
+    expect(getQueueSnapshot().provenance).toMatchObject({
+      backendMode: "local",
+      queuePolicyClass: "in-memory.fifo",
+      maturity: "diagnostic",
+      certifying: false,
+      localFallback: {
+        active: true,
+        reason: "redis_unconfigured_or_unavailable",
+      },
+    });
   });
 });
