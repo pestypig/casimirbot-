@@ -860,6 +860,30 @@
         "snapshot totals represent full-program progress while preserving backward-compatible fields",
         "tests verify combined scoring, dedupe behavior, and fallback when extension backlog is absent"
       ]
+    },
+    {
+      "id": "TOE-046-toe-agent-preflight-orchestrator",
+      "tree_owner": "ops-deployment",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "TOE agent preflight orchestrator primitive",
+      "primary_path_prefix": "scripts/toe-agent-preflight.ts",
+      "allowed_paths": [
+        "scripts/toe-agent-preflight.ts",
+        "tests/toe-agent-preflight.spec.ts",
+        "package.json",
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
+      ],
+      "required_tests": [
+        "tests/toe-agent-preflight.spec.ts"
+      ],
+      "done_criteria": [
+        "Single command orchestrates TOE backlog/results/owner-coverage validation plus progress compute",
+        "Preflight JSON output includes stage-level pass/fail status and non-zero exit on failure",
+        "Tests cover all-pass and required-stage failure behavior including optional research-gate skip"
+      ]
     }
   ]
 }
