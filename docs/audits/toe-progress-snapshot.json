@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T04:06:28.396Z",
+  "generated_at": "2026-02-18T04:34:54.926Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "results_dir": "docs/audits/ticket-results",
@@ -21,7 +21,7 @@
     },
     "weighted_score_sum": 2.85,
     "toe_progress_pct": 28.5,
-    "forest_owner_coverage_pct": 70.7,
+    "forest_owner_coverage_pct": 95.1,
     "strict_ready_progress_pct": 10
   },
   "tickets": [

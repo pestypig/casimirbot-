@@ -34,13 +34,13 @@
       "status": "covered_extension"
     },
     "certainty-framework": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "concepts": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "debate-specialists": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "dp-collapse": {
       "status": "covered_extension"
@@ -49,7 +49,7 @@
       "status": "covered_extension"
     },
     "ethos-knowledge": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "external-integrations": {
       "status": "covered_extension"
@@ -67,7 +67,7 @@
       "status": "covered_core"
     },
     "ideology-physics-bridge": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "knowledge-ingestion": {
       "status": "covered_extension"
@@ -82,7 +82,7 @@
       "status": "covered_core"
     },
     "packages": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "physics-foundations": {
       "status": "covered_core"
@@ -94,7 +94,7 @@
       "status": "covered_extension"
     },
     "resonance": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "robotics-recollection": {
       "status": "covered_extension"
@@ -112,10 +112,10 @@
       "status": "covered_extension"
     },
     "star-materials-environment": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "stellar-restoration": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "telemetry-console": {
       "status": "covered_extension"
@@ -127,7 +127,7 @@
       "status": "covered_extension"
     },
     "ui-components": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "uncertainty-mechanics": {
       "status": "covered_core"
