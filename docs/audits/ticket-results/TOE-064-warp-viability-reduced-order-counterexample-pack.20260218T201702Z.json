@@ -1,0 +1,33 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-064-warp-viability-reduced-order-counterexample-pack",
+  "files_changed": [
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+    "docs/audits/research/TOE-064-tier-promotion-rationale.md",
+    "docs/audits/research/TOE-064-comparative-evidence-pack.md"
+  ],
+  "tests_run": [
+    "tests/warp-viability.spec.ts",
+    "tests/warp-metric-adapter.spec.ts",
+    "tests/proof-pack-strict-parity.spec.ts",
+    "npx vitest run tests/warp-viability.spec.ts tests/warp-metric-adapter.spec.ts tests/proof-pack-strict-parity.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-backlog.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run validate:toe:research-gates",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci",
+    "npx tsx scripts/compute-toe-progress.ts"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:a9829903-b925-400c-bd94-c09ec1dcf035",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "tier-promotion-rationale",
+    "comparative-evidence-pack"
+  ],
+  "remaining_gaps": []
+}

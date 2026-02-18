@@ -182,6 +182,13 @@ type StrictReadyDeltaTarget = {
   requires_research_artifact_completion: boolean;
 };
 
+type StrictReadyReleaseGate = {
+  status: "ready" | "blocked";
+  blocked_reasons: Array<"missing_verified_pass" | "missing_research_artifacts">;
+  blocked_ticket_count: number;
+  ready_ticket_count: number;
+};
+
 function emptySegmentSummary(): SegmentSummary {
   return {
     tickets_total: 0,
@@ -383,6 +390,17 @@ function main() {
   const strictReadyProgress = totalTickets > 0 ? strictReadyCount / totalTickets : 0;
   const forestOwnerCoverage = computeForestOwnerCoveragePct();
   const strictReadyDeltaTicketCount = Math.max(totalTickets - strictReadyCount, 0);
+  const strictReadyReleaseGate: StrictReadyReleaseGate = {
+    status: strictReadyDeltaTicketCount === 0 ? "ready" : "blocked",
+    blocked_reasons: [
+      ...(strictReadyDeltaTicketCount > 0 ? (["missing_verified_pass"] as const) : []),
+      ...(strictReadyDeltaTargets.some((target) => target.requires_research_artifact_completion)
+        ? (["missing_research_artifacts"] as const)
+        : []),
+    ],
+    blocked_ticket_count: strictReadyDeltaTicketCount,
+    ready_ticket_count: strictReadyCount,
+  };
 
   coreSummary.tickets_total = coreTicketIdSet.size;
   extensionSummary.tickets_total = extensionTicketIdSet.size;
@@ -430,6 +448,7 @@ function main() {
       forest_owner_coverage_pct: toProgressPercent(forestOwnerCoverage),
       strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
       strict_ready_delta_ticket_count: strictReadyDeltaTicketCount,
+      strict_ready_release_gate: strictReadyReleaseGate,
       research_gated_tickets_total: researchGatedTickets,
       research_artifact_complete_tickets_total: researchArtifactCompleteTickets,
     },
@@ -452,6 +471,7 @@ function main() {
         toe_progress_pct: toProgressPercent(normalizedProgress),
         strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
         strict_ready_delta_ticket_count: strictReadyDeltaTicketCount,
+        strict_ready_release_gate: strictReadyReleaseGate,
         research_gated_tickets_total: researchGatedTickets,
         research_artifact_complete_tickets_total: researchArtifactCompleteTickets,
       },
