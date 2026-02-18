@@ -39,6 +39,8 @@ export type VcuMintResult = {
   policy: VcuMintPolicy;
   window?: VcuMintWindow;
   reviewSummary?: ContributionReviewSummary;
+  provenance_class: LedgerProvenanceClass;
+  claim_tier: LedgerClaimTier;
 };
 
 export type VcuRevokeResult = {
@@ -48,6 +50,57 @@ export type VcuRevokeResult = {
   reason?: string;
   receipt?: ContributionReceiptRecord;
   balance?: TokenBalance;
+  provenance_class: LedgerProvenanceClass;
+  claim_tier: LedgerClaimTier;
+};
+
+export type LedgerProvenanceClass = "measured" | "proxy" | "inferred";
+export type LedgerClaimTier = "diagnostic" | "reduced-order" | "certified";
+
+const LEDGER_PROVENANCE_DEFAULT: {
+  provenance_class: LedgerProvenanceClass;
+  claim_tier: LedgerClaimTier;
+} = {
+  provenance_class: "inferred",
+  claim_tier: "diagnostic",
+};
+
+const toLedgerClaimTier = (
+  tier?: ContributionReceiptRecord["receipt"]["verification"]["tier"],
+): LedgerClaimTier => {
+  if (tier === "L3") return "certified";
+  if (tier === "L2") return "reduced-order";
+  return "diagnostic";
+};
+
+export const resolveLedgerProvenanceContract = (
+  receipt?: ContributionReceiptRecord,
+): {
+  provenance_class: LedgerProvenanceClass;
+  claim_tier: LedgerClaimTier;
+} => {
+  if (!receipt) {
+    return { ...LEDGER_PROVENANCE_DEFAULT };
+  }
+  const verification = receipt.receipt?.verification;
+  const claim_tier = toLedgerClaimTier(verification?.tier);
+  if (
+    verification?.verdict === "pass" &&
+    verification.integrityOk === true &&
+    !!verification.certificateHash
+  ) {
+    return {
+      provenance_class: "measured",
+      claim_tier,
+    };
+  }
+  if (verification?.verdict === "pass") {
+    return {
+      provenance_class: "proxy",
+      claim_tier,
+    };
+  }
+  return { ...LEDGER_PROVENANCE_DEFAULT };
 };
 
 const parseEnvNumber = (
@@ -151,6 +204,7 @@ export const mintContributionReceiptToLedger = (
   receiptId: string,
 ): VcuMintResult => {
   const receipt = getContributionReceipt(receiptId);
+  const provenance = resolveLedgerProvenanceContract(receipt ?? undefined);
   if (!receipt) {
     return {
       ok: false,
@@ -160,6 +214,7 @@ export const mintContributionReceiptToLedger = (
       capped: false,
       reason: "not_found",
       policy,
+      ...provenance,
     };
   }
   if (receipt.status === "revoked" || receipt.status === "rejected") {
@@ -172,6 +227,7 @@ export const mintContributionReceiptToLedger = (
       reason: `not_mintable:${receipt.status}`,
       receipt,
       policy,
+      ...provenance,
     };
   }
   if (receipt.status !== "minted") {
@@ -184,6 +240,7 @@ export const mintContributionReceiptToLedger = (
       reason: "cooldown",
       receipt,
       policy,
+      ...provenance,
     };
   }
   if (receipt.receipt.verification.verdict !== "pass") {
@@ -196,6 +253,7 @@ export const mintContributionReceiptToLedger = (
       reason: "verification_fail",
       receipt,
       policy,
+      ...provenance,
     };
   }
   const reviewSummary = getContributionReviewSummary(receipt);
@@ -210,6 +268,7 @@ export const mintContributionReceiptToLedger = (
       receipt,
       policy,
       reviewSummary,
+      ...provenance,
     };
   }
   if (receipt.ledgerMintedAt) {
@@ -223,6 +282,7 @@ export const mintContributionReceiptToLedger = (
       receipt,
       policy,
       reviewSummary,
+      ...provenance,
     };
   }
   const planned = Math.max(0, Math.floor(receipt.plannedVcu));
@@ -237,6 +297,7 @@ export const mintContributionReceiptToLedger = (
       receipt,
       policy,
       reviewSummary,
+      ...provenance,
     };
   }
   const window = buildWindow(receipt.contributorId, Date.now());
@@ -253,6 +314,7 @@ export const mintContributionReceiptToLedger = (
       policy,
       window,
       reviewSummary,
+      ...provenance,
     };
   }
   const concentration = checkContributionConcentrationPolicy({
@@ -271,6 +333,7 @@ export const mintContributionReceiptToLedger = (
       policy,
       window,
       reviewSummary,
+      ...provenance,
     };
   }
   const balance = awardEarnings(
@@ -293,6 +356,7 @@ export const mintContributionReceiptToLedger = (
     policy,
     window,
     reviewSummary,
+    ...resolveLedgerProvenanceContract(updated),
   };
 };
 
@@ -301,12 +365,14 @@ export const revokeReceiptFromLedger = (
   input?: { reason?: string; actorId?: string },
 ): VcuRevokeResult => {
   const receipt = getContributionReceipt(receiptId);
+  const provenance = resolveLedgerProvenanceContract(receipt ?? undefined);
   if (!receipt) {
     return {
       ok: false,
       reversed: false,
       reversal: 0,
       reason: "not_found",
+      ...provenance,
     };
   }
   const reversal = Math.max(0, Math.floor(receipt.ledgerAwardedVcu ?? 0));      
@@ -334,5 +400,6 @@ export const revokeReceiptFromLedger = (
     reversal,
     receipt: updated,
     balance,
+    ...resolveLedgerProvenanceContract(updated),
   };
 };
