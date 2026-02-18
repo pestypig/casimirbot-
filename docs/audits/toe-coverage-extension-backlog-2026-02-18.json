@@ -860,6 +860,34 @@
         "snapshot totals represent full-program progress while preserving backward-compatible fields",
         "tests verify combined scoring, dedupe behavior, and fallback when extension backlog is absent"
       ]
+    },
+    {
+      "id": "TOE-044-zen-society-governance-provenance-contract",
+      "tree_owner": "zen-society",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Zen society governance provenance contract primitive",
+      "primary_path_prefix": "server/routes/ethos.ts",
+      "allowed_paths": [
+        "server/routes/ethos.ts",
+        "server/services/ideology/artifacts.ts",
+        "server/services/ideology/render.ts",
+        "tests/ideology-dag.spec.ts",
+        "tests/ideology-telemetry.spec.ts",
+        "configs/resolver-owner-coverage-manifest.v1.json",
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
+      ],
+      "required_tests": [
+        "tests/ideology-dag.spec.ts",
+        "tests/ideology-telemetry.spec.ts"
+      ],
+      "done_criteria": [
+        "Zen-society responses include additive provenance_class/claim_tier/certifying metadata",
+        "Strict mode emits deterministic fail_reason ZEN_SOCIETY_PROVENANCE_MISSING when evidence provenance is absent",
+        "Resolver owner coverage marks zen-society as covered_extension and validation remains green"
+      ]
     }
   ]
 }
