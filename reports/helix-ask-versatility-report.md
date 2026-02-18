@@ -2,12 +2,14 @@
 
 - summary_schema_version: 2
 - git_branch: work
-- git_head: 0d4bf81
+- git_head: d9f1ad3
 - git_origin_main: missing
 - git_ahead_behind: missing
 - provenance_gate_pass: false
 - provenance_warnings: git_origin_remote_missing, git_origin_main_ref_missing
-- run_id: versatility-1771389322450
+- decision_grade_ready: false
+- provenance_blocked: true
+- run_id: versatility-1771397003143
 - base_url: http://127.0.0.1:5173
 - prompts: 90
 - seeds: 7,11,13
@@ -16,19 +18,19 @@
 - total_runs: 270
 - run_complete: true
 - completion_rate: 100.00%
-- run_duration_ms: 246447
+- run_duration_ms: 158971
 - terminated_early_reason: none
 - global_cooldown_applied_ms: 0
 - resumed_from_latest: false
 - resumed_runs: 0
-- output_run_dir: /workspace/casimirbot-/artifacts/experiments/helix-ask-versatility/versatility-1771389322450
+- output_run_dir: /workspace/casimirbot-/artifacts/experiments/helix-ask-versatility/versatility-1771397003143
 
 ## Aggregate by Prompt Family
 | family | runs | pass_rate | intent_correct_rate | report_mode_correct_rate | stub_rate | latency_p50_ms | latency_p95_ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| relation | 90 | 90.0% | 93.3% | 100.0% | 0.0% | 507 | 633 |
-| repo_technical | 90 | 83.3% | 0.0% | 83.3% | 0.0% | 941 | 2384 |
-| ambiguous_general | 90 | 90.0% | 0.0% | 93.3% | 0.0% | 970 | 1929 |
+| relation | 90 | 90.0% | 93.3% | 100.0% | 0.0% | 347 | 450 |
+| repo_technical | 90 | 83.3% | 0.0% | 83.3% | 0.0% | 547 | 1524 |
+| ambiguous_general | 90 | 90.0% | 0.0% | 93.3% | 0.0% | 631 | 1182 |
 
 ## Core Metrics
 - intent_id_correct_rate: 93.33%
@@ -43,12 +45,12 @@
 - citation_repair_rate: 0.00%
 - citation_presence_rate: 97.78%
 - min_text_length_pass_rate: 100.00%
-- latency_total_p50_ms: 735
-- latency_total_p95_ms: 2238
-- latency_retrieval_p50_ms: 256 (samples=260)
-- latency_retrieval_p95_ms: 499 (samples=260)
+- latency_total_p50_ms: 473
+- latency_total_p95_ms: 1348
+- latency_retrieval_p50_ms: 170 (samples=258)
+- latency_retrieval_p95_ms: 303 (samples=258)
 - latency_synthesis_p50_ms: 1 (samples=270)
-- latency_synthesis_p95_ms: 1 (samples=270)
+- latency_synthesis_p95_ms: 6 (samples=270)
 
 ## Top Failure Signatures
 - report_mode_mismatch: 21
@@ -65,28 +67,20 @@
 - Decision should prefer real-model reruns for release-grade quality gates whenever stub-text rate is non-zero.
 
 ## 15 Worst Examples
-### Worst #1: relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer
+### Worst #1: relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented
 - family: relation
-- question: Explain warp bubble + mission ethos for a skeptical engineer.
-- failures: intent_mismatch:hybrid.concept_plus_system_mapping, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
+- question: Could warp bubble progress violate mission ethos? How is that prevented?
+- failures: intent_mismatch:repo.ideology_reference, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
 - likely_root_cause: relation_topology_or_context_gap
 - patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- debug: intent_id=repo.ideology_reference intent_strategy=repo_rag report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-Unverified:
-- No repo-evidenced claims were confirmed yet.
+In plain language, Mission Ethos means the warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
 
-Reasoned connections (bounded):
-- Need at least two grounded points before drawing a connection.
+This is in the ideology scope.
 
-Next evidence:
-- Searched terms: warp bubble, calculateNatarioWarpBubble, warp pipeline
-- Checked files: docs/ethos/ideology.json, docs/ethos/why.md, client/src/pages/why.tsx, modules/warp/warp-module.ts
-- Check files under docs or modules.
-- Search docs headings for "Mission Ethos".
-- Search docs headings for "Mission Ethos Seeds".
-- Search docs headings for "Mission Ethos Tree".
+Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md
 ```
 
 ### Worst #2: relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics
@@ -127,35 +121,7 @@ Next evidence:
 - Search docs headings for "Mission Ethos Tree".
 ```
 
-### Worst #4: relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics
-- family: relation
-- question: How do we connect Natario warp bubble constraints to mission ethics?
-- failures: relation_packet_built:false, relation_dual_domain:false, bridge_count_low:0, evidence_count_low:0, citation_missing
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. Key questions include: Which bubble model is used and where are its constraints checked? See modules/warp/warp-module.ts and modules/warp/natario-warp.ts for the implementation.
-
-In practice, those standards guide how evidence and justification are weighed in specific contexts.
-```
-
-### Worst #5: relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics
-- family: relation
-- question: How do we connect Natario warp bubble constraints to mission ethics?
-- failures: relation_packet_built:false, relation_dual_domain:false, bridge_count_low:0, evidence_count_low:0, citation_missing
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. Key questions include: Which bubble model is used and where are its constraints checked? See modules/warp/warp-module.ts and modules/warp/natario-warp.ts for the implementation.
-
-In practice, those standards guide how evidence and justification are weighed in specific contexts.
-```
-
-### Worst #6: relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented
+### Worst #4: relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented
 - family: relation
 - question: Could warp bubble progress violate mission ethos? How is that prevented?
 - failures: intent_mismatch:repo.ideology_reference, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
@@ -171,7 +137,23 @@ This is in the ideology scope.
 Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md
 ```
 
-### Worst #7: relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer
+### Worst #5: relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented
+- family: relation
+- question: Could warp bubble progress violate mission ethos? How is that prevented?
+- failures: intent_mismatch:repo.ideology_reference, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
+- likely_root_cause: relation_topology_or_context_gap
+- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
+- debug: intent_id=repo.ideology_reference intent_strategy=repo_rag report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+In plain language, Mission Ethos means the warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
+
+This is in the ideology scope.
+
+Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md
+```
+
+### Worst #6: relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer
 - family: relation
 - question: Explain warp bubble + mission ethos for a skeptical engineer.
 - failures: intent_mismatch:hybrid.concept_plus_system_mapping, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
@@ -195,45 +177,27 @@ Next evidence:
 - Search docs headings for "Mission Ethos Tree".
 ```
 
-### Worst #8: relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented
+### Worst #7: relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics
 - family: relation
-- question: Could warp bubble progress violate mission ethos? How is that prevented?
-- failures: intent_mismatch:repo.ideology_reference, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
+- question: How do we connect Natario warp bubble constraints to mission ethics?
+- failures: relation_packet_built:false, relation_dual_domain:false, bridge_count_low:0, evidence_count_low:0, citation_missing
 - likely_root_cause: relation_topology_or_context_gap
 - patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=repo.ideology_reference intent_strategy=repo_rag report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-In plain language, Mission Ethos means the warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
+In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. Key questions include: Which bubble model is used and where are its constraints checked? See modules/warp/warp-module.ts and modules/warp/natario-warp.ts for the implementation.
 
-This is in the ideology scope.
-
-Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md
+In practice, those standards guide how evidence and justification are weighed in specific contexts.
 ```
 
-### Worst #9: relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented
+### Worst #8: relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer
 - family: relation
-- question: Could warp bubble progress violate mission ethos? How is that prevented?
-- failures: intent_mismatch:repo.ideology_reference, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
+- question: Explain warp bubble + mission ethos for a skeptical engineer.
+- failures: intent_mismatch:hybrid.concept_plus_system_mapping, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
 - likely_root_cause: relation_topology_or_context_gap
 - patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=repo.ideology_reference intent_strategy=repo_rag report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-In plain language, Mission Ethos means the warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
-
-This is in the ideology scope.
-
-Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md
-```
-
-### Worst #10: repo_tech_15_how-does-the-system-prevent-report-scaffold-responses-for-relation-promp
-- family: repo_technical
-- question: How does the system prevent report-scaffold responses for relation prompts?
-- failures: report_mode_mismatch:true
-- likely_root_cause: routing_or_report_mode_policy
-- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=true relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
 Unverified:
@@ -243,36 +207,66 @@ Reasoned connections (bounded):
 - Need at least two grounded points before drawing a connection.
 
 Next evidence:
-- Searched terms: relationship mapping, repo mapping, system linkage, how does it relate
-- Checked files: docs/knowledge/trace-system-tree.json, client/src/lib/agi/api.ts, client/src/components/agi/essence.tsx, client/src/components/agi/JobsBudgetModal.tsx
-- Check files under docs or client.
-- Search docs headings for "Helix Ask System Tree".
-- Search docs headings for "Definition: Helix Ask System Tree".
-- Search docs headings for "Node: Helix Ask System Tree".
+- Searched terms: warp bubble, calculateNatarioWarpBubble, warp pipeline
+- Checked files: docs/ethos/ideology.json, docs/ethos/why.md, client/src/pages/why.tsx, modules/warp/warp-module.ts
+- Check files under docs or modules.
+- Search docs headings for "Mission Ethos".
+- Search docs headings for "Mission Ethos Seeds".
+- Search docs headings for "Mission Ethos Tree".
 ```
 
-### Worst #11: repo_tech_15_how-does-the-system-prevent-report-scaffold-responses-for-relation-promp
-- family: repo_technical
-- question: How does the system prevent report-scaffold responses for relation prompts?
+### Worst #9: relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics
+- family: relation
+- question: How do we connect Natario warp bubble constraints to mission ethics?
+- failures: relation_packet_built:false, relation_dual_domain:false, bridge_count_low:0, evidence_count_low:0, citation_missing
+- likely_root_cause: relation_topology_or_context_gap
+- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
+- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. Key questions include: Which bubble model is used and where are its constraints checked? See modules/warp/warp-module.ts and modules/warp/natario-warp.ts for the implementation.
+
+In practice, those standards guide how evidence and justification are weighed in specific contexts.
+```
+
+### Worst #10: ambiguous_01_define-lattice
+- family: ambiguous_general
+- question: Define lattice.
 - failures: report_mode_mismatch:true
 - likely_root_cause: routing_or_report_mode_policy
 - patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=true relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=true relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
 Unverified:
-- No repo-evidenced claims were confirmed yet.
+
+No confirmed evidence was found yet.
 
 Reasoned connections (bounded):
-- Need at least two grounded points before drawing a connection.
 
-Next evidence:
-- Searched terms: relationship mapping, repo mapping, system linkage, how does it relate
-- Checked files: docs/knowledge/trace-system-tree.json, client/src/lib/agi/api.ts, client/src/components/agi/essence.tsx, client/src/components/agi/JobsBudgetModal.tsx
-- Check files under docs or client.
-- Search docs headings for "Helix Ask System Tree".
-- Search docs headings for "Definition: Helix Ask System Tree".
-- Search docs headings for "Node: Helix Ask System Tree".
+Need at least two grounded points before drawing a connection.
+
+Sources: docs/knowledge/warp/casimir-lattice.md, server/energy-pipeline.ts, docs/knowledge/warp/warp-bubble.md, docs/knowledge/warp/natario-zero-expansion.md, docs/knowledge/warp/shift-vector-expansion-scalar.md, docs/knowledge/resonance-tree.json, docs/knowledge/physics/brick-lattice-dataflow-tree.json, docs/knowledge/warp/warp-mechanics-tree.json
+```
+
+### Worst #11: ambiguous_01_define-lattice
+- family: ambiguous_general
+- question: Define lattice.
+- failures: report_mode_mismatch:true
+- likely_root_cause: routing_or_report_mode_policy
+- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=true relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+Unverified:
+
+No confirmed evidence was found yet.
+
+Reasoned connections (bounded):
+
+Need at least two grounded points before drawing a connection.
+
+Sources: docs/knowledge/warp/casimir-lattice.md, server/energy-pipeline.ts, docs/knowledge/warp/warp-bubble.md, docs/knowledge/warp/natario-zero-expansion.md, docs/knowledge/warp/shift-vector-expansion-scalar.md, docs/knowledge/resonance-tree.json, docs/knowledge/physics/brick-lattice-dataflow-tree.json, docs/knowledge/warp/warp-mechanics-tree.json
 ```
 
 ### Worst #12: ambiguous_01_define-lattice
@@ -319,48 +313,56 @@ Next evidence:
 - Search docs headings for "Node: Helix Ask System Tree".
 ```
 
-### Worst #14: ambiguous_01_define-lattice
-- family: ambiguous_general
-- question: Define lattice.
+### Worst #14: repo_tech_15_how-does-the-system-prevent-report-scaffold-responses-for-relation-promp
+- family: repo_technical
+- question: How does the system prevent report-scaffold responses for relation prompts?
 - failures: report_mode_mismatch:true
 - likely_root_cause: routing_or_report_mode_policy
 - patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=true relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=true relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
 Unverified:
-
-No confirmed evidence was found yet.
+- No repo-evidenced claims were confirmed yet.
 
 Reasoned connections (bounded):
+- Need at least two grounded points before drawing a connection.
 
-Need at least two grounded points before drawing a connection.
-
-Sources: docs/knowledge/warp/casimir-lattice.md, server/energy-pipeline.ts, docs/knowledge/warp/warp-bubble.md, docs/knowledge/warp/natario-zero-expansion.md, docs/knowledge/warp/shift-vector-expansion-scalar.md, docs/knowledge/resonance-tree.json, docs/knowledge/physics/brick-lattice-dataflow-tree.json, docs/knowledge/warp/warp-mechanics-tree.json
+Next evidence:
+- Searched terms: relationship mapping, repo mapping, system linkage, how does it relate
+- Checked files: docs/knowledge/trace-system-tree.json, client/src/lib/agi/api.ts, client/src/components/agi/essence.tsx, client/src/components/agi/JobsBudgetModal.tsx
+- Check files under docs or client.
+- Search docs headings for "Helix Ask System Tree".
+- Search docs headings for "Definition: Helix Ask System Tree".
+- Search docs headings for "Node: Helix Ask System Tree".
 ```
 
-### Worst #15: ambiguous_01_define-lattice
-- family: ambiguous_general
-- question: Define lattice.
+### Worst #15: repo_tech_15_how-does-the-system-prevent-report-scaffold-responses-for-relation-promp
+- family: repo_technical
+- question: How does the system prevent report-scaffold responses for relation prompts?
 - failures: report_mode_mismatch:true
 - likely_root_cause: routing_or_report_mode_policy
 - patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=true relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=true relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
 Unverified:
-
-No confirmed evidence was found yet.
+- No repo-evidenced claims were confirmed yet.
 
 Reasoned connections (bounded):
+- Need at least two grounded points before drawing a connection.
 
-Need at least two grounded points before drawing a connection.
-
-Sources: docs/knowledge/warp/casimir-lattice.md, server/energy-pipeline.ts, docs/knowledge/warp/warp-bubble.md, docs/knowledge/warp/natario-zero-expansion.md, docs/knowledge/warp/shift-vector-expansion-scalar.md, docs/knowledge/resonance-tree.json, docs/knowledge/physics/brick-lattice-dataflow-tree.json, docs/knowledge/warp/warp-mechanics-tree.json
+Next evidence:
+- Searched terms: relationship mapping, repo mapping, system linkage, how does it relate
+- Checked files: docs/knowledge/trace-system-tree.json, client/src/lib/agi/api.ts, client/src/components/agi/essence.tsx, client/src/components/agi/JobsBudgetModal.tsx
+- Check files under docs or client.
+- Search docs headings for "Helix Ask System Tree".
+- Search docs headings for "Definition: Helix Ask System Tree".
+- Search docs headings for "Node: Helix Ask System Tree".
 ```
 
 ## Recommendation
-- decision: insufficient_run_quality
+- decision: needs_patch
 - [0] Validation provenance gate: Require origin/main + HEAD provenance in reports before accepting decision-grade outcomes.
 - [1] Relation-mode fallback hardening: Increase deterministic fallback usage when relation intent is selected but generated answer omits warp/ethos linkage signals.
 - [2] Citation persistence guard: Guarantee hybrid/repo responses keep at least one valid Sources line after final cleanup and repairs.
