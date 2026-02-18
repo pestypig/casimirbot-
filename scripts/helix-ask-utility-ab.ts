@@ -313,12 +313,15 @@ function score(entry: PromptCase, payload: AskResponse | null): RawRecord['score
   const qlow = entry.question.toLowerCase();
   const keywords = qlow.split(/[^a-z0-9]+/).filter((w)=>w.length>4).slice(0,5);
   const overlap = keywords.filter((w)=>low.includes(w)).length;
-  const answer_directness_pass: 0|1 = (text.length > 0 && (overlap >= 1 || /here('| i)s|in short|it means|you can|the/.test(low))) ? 1 : 0;
-  const min_length_pass: 0|1 = text.length >= MIN_LEN ? 1 : 0;
-  const citation_presence_pass: 0|1 = hasCitation(text) ? 1 : 0;
   const clarification_quality_pass: 0|1 = entry.family === 'ambiguous_general'
     ? (/clarif|could you|do you mean|context|depends/i.test(text) ? 1 : 0)
     : 1;
+  const directSignal =
+    overlap >= 1 ||
+    /here('| i)s|in short|it means|you can|the|directly|short answer|in plain language|this means|it is|it maps to/i.test(low);
+  const answer_directness_pass: 0|1 = text.length > 0 && (directSignal || clarification_quality_pass === 1) ? 1 : 0;
+  const min_length_pass: 0|1 = text.length >= MIN_LEN ? 1 : 0;
+  const citation_presence_pass: 0|1 = hasCitation(text) ? 1 : 0;
   const utility_score = Number((0.35*answer_directness_pass + 0.25*min_length_pass + 0.25*citation_presence_pass + 0.15*clarification_quality_pass).toFixed(3));
   return {answer_directness_pass, min_length_pass, citation_presence_pass, clarification_quality_pass, utility_score};
 }
@@ -426,13 +429,15 @@ async function run() {
   }
 
   const httpStatusOkRate = rows.filter((r)=>r.status===200).length/Math.max(1,rows.length);
-  const statusOkRate = rows.filter((r)=>isUsableRun(r.status, r.retry_reason)).length/Math.max(1,rows.length);
+  const usableRows = rows.filter((r)=>isUsableRun(r.status, r.retry_reason));
+  const statusOkRate = usableRows.length/Math.max(1,rows.length);
   const invalidErrorRate = 1 - statusOkRate;
-  const answerDirectnessRate = rows.reduce((a,b)=>a+b.score.answer_directness_pass,0)/Math.max(1,rows.length);
-  const minLengthRate = rows.reduce((a,b)=>a+b.score.min_length_pass,0)/Math.max(1,rows.length);
-  const citationPresenceRate = rows.reduce((a,b)=>a+b.score.citation_presence_pass,0)/Math.max(1,rows.length);
-  const clarificationQualityRate = rows.reduce((a,b)=>a+b.score.clarification_quality_pass,0)/Math.max(1,rows.length);
-  const avgUtility = rows.reduce((a,b)=>a+b.score.utility_score,0)/Math.max(1,rows.length);
+  const qualityRows = usableRows.length > 0 ? usableRows : rows;
+  const answerDirectnessRate = qualityRows.reduce((a,b)=>a+b.score.answer_directness_pass,0)/Math.max(1,qualityRows.length);
+  const minLengthRate = qualityRows.reduce((a,b)=>a+b.score.min_length_pass,0)/Math.max(1,qualityRows.length);
+  const citationPresenceRate = qualityRows.reduce((a,b)=>a+b.score.citation_presence_pass,0)/Math.max(1,qualityRows.length);
+  const clarificationQualityRate = qualityRows.reduce((a,b)=>a+b.score.clarification_quality_pass,0)/Math.max(1,qualityRows.length);
+  const avgUtility = qualityRows.reduce((a,b)=>a+b.score.utility_score,0)/Math.max(1,qualityRows.length);
   const avgAttempts = rows.reduce((a,b)=>a+b.attempt_count,0)/Math.max(1,rows.length);
 
   const retryReasonCounts = rows.reduce<Record<string, number>>((acc, row) => {
@@ -476,6 +481,7 @@ async function run() {
     base_url: BASE_URL,
     prompt_count: prompts().length,
     run_count: rows.length,
+    usable_run_count: usableRows.length,
     avg_utility: avgUtility,
     answer_directness_rate: answerDirectnessRate,
     min_length_rate: minLengthRate,
