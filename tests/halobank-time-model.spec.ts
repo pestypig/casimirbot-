@@ -119,6 +119,47 @@ describe("halobank time model", () => {
     expect(result.ephemeris?.provenance.claim_tier_recommendation).toBe("diagnostic");
   });
 
+
+  it("fails deterministically when evidence reference is non-canonical", () => {
+    const result = computeHaloBankTimeModel({
+      timestamp: "2025-03-01T12:00:00.000Z",
+      place: { lat: 40.7128, lon: -74.006 },
+      model: {
+        orbitalAlignment: true,
+        ephemerisSource: "live",
+        ephemerisEvidenceVerified: true,
+        ephemerisEvidenceRef: "jpl-horizons-run-123",
+        residualPpm: 0.8,
+        residualSampleCount: 7,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_EVIDENCE_REF_INVALID");
+    expect(result.ephemeris?.provenance.claim_tier_recommendation).toBe("diagnostic");
+  });
+
+  it("fails deterministically when residual sample count is non-integer", () => {
+    const result = computeHaloBankTimeModel({
+      timestamp: "2025-03-01T12:00:00.000Z",
+      place: { lat: 40.7128, lon: -74.006 },
+      model: {
+        orbitalAlignment: true,
+        ephemerisSource: "live",
+        ephemerisEvidenceVerified: true,
+        ephemerisEvidenceRef: "artifact:jpl-horizons:run-123",
+        residualPpm: 0.8,
+        residualSampleCount: 7.5,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE");
+    expect(result.ephemeris?.provenance.evidence.residualStatus).toBe("incomplete_evidence");
+  });
+
   it("marks fallback ephemeris as diagnostic non-certifying with deterministic fail id", () => {
     const result = computeHaloBankTimeModel({
       timestamp: "2025-03-01T12:00:00.000Z",
