@@ -305,11 +305,28 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type ProvenanceClass = "measured" | "proxy" | "inferred";
 type ConfidenceBand = { low: number; high: number };
+type ClaimTier = "diagnostic" | "reduced-order" | "certified";
 
 const CONFIDENCE_BY_PROVENANCE: Record<ProvenanceClass, ConfidenceBand> = {
   measured: { low: 0.8, high: 0.99 },
   inferred: { low: 0.5, high: 0.79 },
   proxy: { low: 0.2, high: 0.49 },
+};
+
+const CLAIM_TIER_BY_PROVENANCE: Record<ProvenanceClass, ClaimTier> = {
+  measured: "reduced-order",
+  inferred: "diagnostic",
+  proxy: "diagnostic",
+};
+
+const determineClaimTier = (
+  provenanceClass: ProvenanceClass | undefined,
+  strictMode: boolean,
+  passed: boolean,
+): ClaimTier => {
+  if (!provenanceClass) return "diagnostic";
+  if (provenanceClass === "measured" && strictMode && passed) return "certified";
+  return CLAIM_TIER_BY_PROVENANCE[provenanceClass];
 };
 
 const resolveProvenanceClass = (value: unknown): ProvenanceClass => {
@@ -337,12 +354,21 @@ const constraint = (
   confidenceBand?: ConfidenceBand,
   enforceProvenanceInStrict = false,
   strictMode = false,
+  claimTier?: ClaimTier,
 ): ConstraintResult => {
   const provenanceMissing = enforceProvenanceInStrict && strictMode && provenanceClass == null;
+  const strictProvenanceReason = provenanceMissing
+    ? "strict_provenance_missing"
+    : enforceProvenanceInStrict && strictMode && provenanceClass !== "measured"
+      ? "strict_provenance_non_measured"
+      : undefined;
   const effectivePassed = provenanceMissing ? false : passed;
   const effectiveNote = provenanceMissing
-    ? [note, "provenance_missing"].filter(Boolean).join(";")
-    : note;
+    ? strictProvenanceReason
+    : !effectivePassed && strictProvenanceReason && !note
+      ? strictProvenanceReason
+      : note;
+  const effectiveClaimTier = claimTier ?? determineClaimTier(provenanceClass, strictMode, effectivePassed);
   const margin = lhs !== undefined && rhs !== undefined ? lhs - rhs : undefined;
   return {
     id,
@@ -355,7 +381,9 @@ const constraint = (
     details,
     note: effectiveNote,
     provenance_class: provenanceClass,
+    claim_tier: effectiveClaimTier,
     confidence_band: confidenceBand,
+    strict_provenance_reason: strictProvenanceReason,
   } as ConstraintResult;
 };
 
@@ -756,6 +784,22 @@ export async function evaluateWarpViability(
         ? "constraint_rho_missing"
         : undefined;
 
+  const warpMechanicsProvenanceClass: ProvenanceClass =
+    thetaProvenanceClass === "measured" &&
+    qiProvenanceClass === "measured" &&
+    tsProvenanceClass === "measured"
+      ? "measured"
+      : thetaProvenanceClass === "inferred" ||
+          qiProvenanceClass === "inferred" ||
+          tsProvenanceClass === "inferred"
+        ? "inferred"
+        : "proxy";
+  const warpMechanicsClaimTier = determineClaimTier(
+    warpMechanicsProvenanceClass,
+    strictCongruence,
+    warpMechanicsProvenanceClass === "measured",
+  );
+
   const snapshot: WarpViabilitySnapshot = {
     bubbleRadius_m: config.bubbleRadius_m ?? pipeline.shipRadius_m,
     wallThickness_m: config.wallThickness_m ?? pipeline.hull?.wallThickness_m,
@@ -795,6 +839,8 @@ export async function evaluateWarpViability(
     qiGuardrail: qiGuard?.marginRatio,
     qi_provenance_class: qiProvenanceClass,
     qi_confidence_band: qiConfidenceBand,
+    warp_mechanics_provenance_class: warpMechanicsProvenanceClass,
+    warp_mechanics_claim_tier: warpMechanicsClaimTier,
     T00_min: (pipeline as any).T00_min ?? T00Value,
     T00_avg: T00Value,
     sectorPeriod_ms: pipeline.sectorPeriod_ms,
