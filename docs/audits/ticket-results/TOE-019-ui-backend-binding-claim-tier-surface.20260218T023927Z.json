@@ -6,13 +6,11 @@
     "client/src/components/energy-pipeline.tsx",
     "client/src/components/live-energy-pipeline.tsx",
     "client/src/hooks/__tests__/use-energy-pipeline.guardrail.contract.spec.ts",
-    "client/src/components/__tests__/energy-pipeline-claim-tier.spec.tsx",
-    "docs/audits/ticket-results/TOE-019-ui-backend-binding-claim-tier-surface.20260218T023927Z.json"
+    "client/src/components/__tests__/energy-pipeline-claim-tier.spec.tsx"
   ],
   "tests_run": [
-    "npx vitest run client/src/hooks/__tests__/use-energy-pipeline.guardrail.contract.spec.ts client/src/components/__tests__/energy-pipeline-claim-tier.spec.tsx",
-    "npx tsx scripts/validate-toe-ticket-results.ts",
-    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+    "client/src/hooks/__tests__/use-energy-pipeline.guardrail.contract.spec.ts",
+    "client/src/components/__tests__/energy-pipeline-claim-tier.spec.tsx"
   ],
   "claim_tier": "diagnostic",
   "casimir": {

@@ -7,13 +7,11 @@
     "server/skills/telemetry.panels.ts",
     "server/skills/telemetry.badges.ts",
     "tests/hardware-telemetry-provenance.spec.ts",
-    "tests/ideology-telemetry.spec.ts",
-    "docs/audits/ticket-results/TOE-018-hardware-telemetry-provenance-gate.20260218T023924Z.json"
+    "tests/ideology-telemetry.spec.ts"
   ],
   "tests_run": [
-    "npx vitest run tests/hardware-telemetry-provenance.spec.ts tests/ideology-telemetry.spec.ts",
-    "npx tsx scripts/validate-toe-ticket-results.ts",
-    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+    "tests/hardware-telemetry-provenance.spec.ts",
+    "tests/ideology-telemetry.spec.ts"
   ],
   "claim_tier": "diagnostic",
   "casimir": {

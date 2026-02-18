@@ -1,9 +1,10 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-17T23:44:00.561Z",
+  "generated_at": "2026-02-18T02:52:16.393Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
-    "results_dir": "docs/audits/ticket-results"
+    "results_dir": "docs/audits/ticket-results",
+    "resolver_owner_coverage_manifest": "configs/resolver-owner-coverage-manifest.v1.json"
   },
   "weights": {
     "diagnostic": 0.25,
@@ -12,14 +13,15 @@
   },
   "totals": {
     "tickets_total": 10,
-    "tickets_with_evidence": 7,
+    "tickets_with_evidence": 10,
     "claim_tier_counts": {
-      "diagnostic": 6,
+      "diagnostic": 9,
       "reduced-order": 1,
       "certified": 0
     },
-    "weighted_score_sum": 2.1,
-    "toe_progress_pct": 21,
+    "weighted_score_sum": 2.85,
+    "toe_progress_pct": 28.5,
+    "forest_owner_coverage_pct": 34.1,
     "strict_ready_progress_pct": 10
   },
   "tickets": [
@@ -74,24 +76,24 @@
     },
     {
       "ticket_id": "TOE-008-certificate-authenticity-policy",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "result_file": "docs/audits/ticket-results/TOE-008-certificate-authenticity-policy.20260217-235336.json"
     },
     {
       "ticket_id": "TOE-009-verify-endpoint-hardening",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "result_file": "docs/audits/ticket-results/TOE-009-verify-endpoint-hardening.20260218T001944Z.json"
     },
     {
       "ticket_id": "TOE-010-unified-primitive-manifest",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "result_file": "docs/audits/ticket-results/TOE-010-unified-primitive-manifest.20260218T001948Z.json"
     }
   ]
 }

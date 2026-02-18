@@ -9,9 +9,7 @@
   ],
   "tests_run": [
     "tests/queue-stress.spec.ts",
-    "tests/queue-orchestration-contract.spec.ts",
-    "scripts/validate-toe-ticket-results.ts",
-    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+    "tests/queue-orchestration-contract.spec.ts"
   ],
   "claim_tier": "diagnostic",
   "casimir": {

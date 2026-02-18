@@ -7,9 +7,8 @@
     "tests/vcu-ledger-provenance.spec.ts"
   ],
   "tests_run": [
-    "npx vitest run tests/vcu-ledger-provenance.spec.ts tests/ledger-dimension.spec.ts",
-    "npx tsx scripts/validate-toe-ticket-results.ts",
-    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+    "tests/vcu-ledger-provenance.spec.ts",
+    "tests/ledger-dimension.spec.ts"
   ],
   "claim_tier": "diagnostic",
   "casimir": {
