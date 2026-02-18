@@ -129,6 +129,92 @@ describe("TOE progress tooling", () => {
 
 
 
+  it("reports strict-ready delta targets for the next execution batch", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "toe-progress-strict-ready-"));
+    const backlogPath = path.join(tempDir, "core.json");
+    const extensionBacklogPath = path.join(tempDir, "extension.json");
+    const resultsDir = path.join(tempDir, "results");
+    const snapshotPath = path.join(tempDir, "snapshot.json");
+    const manifestPath = path.join(tempDir, "manifest.json");
+
+    writeJson(backlogPath, {
+      schema_version: "toe_cloud_ticket_backlog/1",
+      tickets: [
+        { id: "TOE-TEST-001" },
+        {
+          id: "TOE-TEST-002",
+          research_gate: { required_artifacts: ["runtime-contract-audit"] },
+        },
+      ],
+    });
+
+    writeJson(extensionBacklogPath, {
+      schema_version: "toe_coverage_extension_backlog/1",
+      tickets: [{ id: "TOE-TEST-003" }],
+    });
+
+    writeJson(path.join(resultsDir, "TOE-TEST-001.20260218-000000.json"), {
+      schema_version: "toe_agent_ticket_result/1",
+      ticket_id: "TOE-TEST-001",
+      claim_tier: "reduced-order",
+      casimir: { verdict: "PASS", integrity_ok: true },
+    });
+
+    writeJson(path.join(resultsDir, "TOE-TEST-002.20260218-000000.json"), {
+      schema_version: "toe_agent_ticket_result/1",
+      ticket_id: "TOE-TEST-002",
+      claim_tier: "diagnostic",
+      casimir: { verdict: "PASS", integrity_ok: true },
+      research_artifacts: [],
+    });
+
+    writeJson(path.join(resultsDir, "TOE-TEST-003.20260218-000000.json"), {
+      schema_version: "toe_agent_ticket_result/1",
+      ticket_id: "TOE-TEST-003",
+      claim_tier: "certified",
+      casimir: { verdict: "FAIL", integrity_ok: true },
+    });
+
+    writeJson(manifestPath, {
+      schema_version: "resolver_owner_coverage_manifest/1",
+      high_priority_owners: ["owner-a"],
+      owners: {
+        "owner-a": { status: "covered_core" },
+      },
+    });
+
+    runTsxScript("scripts/compute-toe-progress.ts", {
+      ...process.env,
+      TOE_BACKLOG_PATH: backlogPath,
+      TOE_EXTENSION_BACKLOG_PATH: extensionBacklogPath,
+      TOE_RESULTS_DIR: resultsDir,
+      TOE_PROGRESS_SNAPSHOT_PATH: snapshotPath,
+      RESOLVER_OWNER_COVERAGE_MANIFEST_PATH: manifestPath,
+    });
+
+    const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"));
+    expect(snapshot.totals.strict_ready_progress_pct).toBe(33.3);
+    expect(snapshot.totals.strict_ready_delta_ticket_count).toBe(2);
+    expect(snapshot.segments.combined.strict_ready_delta_ticket_count).toBe(2);
+    expect(snapshot.strict_ready_delta_targets).toEqual(
+      expect.arrayContaining([
+        {
+          ticket_id: "TOE-TEST-002",
+          next_strict_ready_claim_tier: "reduced-order",
+          requires_verified_pass: true,
+          requires_research_artifact_completion: true,
+        },
+        {
+          ticket_id: "TOE-TEST-003",
+          next_strict_ready_claim_tier: "certified",
+          requires_verified_pass: true,
+          requires_research_artifact_completion: false,
+        },
+      ]),
+    );
+  });
+
+
   it("tracks research-gated and artifact-complete ticket counts", () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "toe-progress-research-"));
     const backlogPath = path.join(tempDir, "core.json");

@@ -1,0 +1,28 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-056-strict-ready-scorecard-automation",
+  "files_changed": [
+    "scripts/compute-toe-progress.ts",
+    "scripts/toe-agent-preflight.ts",
+    "tests/toe-progress.spec.ts",
+    "tests/toe-agent-preflight.spec.ts",
+    "docs/audits/toe-scaling-scorecard.md",
+    "docs/audits/toe-progress-snapshot.json"
+  ],
+  "tests_run": [
+    "tests/toe-progress.spec.ts",
+    "tests/toe-agent-preflight.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:99d3c1ae-384f-41d7-a3b5-596e19a2fd31",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}

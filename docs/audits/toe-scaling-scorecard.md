@@ -21,6 +21,21 @@ Compute snapshot:
 - `npx tsx scripts/compute-toe-progress.ts`
 - Snapshot output: `docs/audits/toe-progress-snapshot.json`
 
+- Snapshot strict-ready planning fields:
+  - `totals.strict_ready_delta_ticket_count`
+  - `strict_ready_delta_targets[]` with `next_strict_ready_claim_tier`, verification requirement, and research artifact completion requirement for next-batch planning.
+
+## Strict-Ready Stall Warning
+
+Run preflight summary:
+
+- `npx tsx scripts/toe-agent-preflight.ts`
+
+When `strict_ready_progress_pct` is stalled at `0` and `strict_ready_delta_targets` is non-empty,
+preflight emits a `strict_ready_stall_warning` payload. Treat this as a hold signal for scale-up
+until at least one strict-ready delta target is advanced.
+
+
 ## Scale Decision Gate
 
 A run is eligible for scaling only when all are true:

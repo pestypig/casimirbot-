@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T06:59:21.226Z",
+  "generated_at": "2026-02-18T17:53:13.892Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -14,18 +14,19 @@
   },
   "totals": {
     "tickets_total": 56,
-    "tickets_with_evidence": 51,
+    "tickets_with_evidence": 52,
     "claim_tier_counts": {
-      "diagnostic": 49,
+      "diagnostic": 50,
       "reduced-order": 2,
       "certified": 0
     },
-    "weighted_score_sum": 13.45,
-    "toe_progress_pct": 24,
+    "weighted_score_sum": 13.7,
+    "toe_progress_pct": 24.5,
     "forest_owner_coverage_pct": 100,
     "strict_ready_progress_pct": 3.6,
-    "research_gated_tickets_total": 6,
-    "research_artifact_complete_tickets_total": 6
+    "strict_ready_delta_ticket_count": 54,
+    "research_gated_tickets_total": 7,
+    "research_artifact_complete_tickets_total": 7
   },
   "segments": {
     "core": {
@@ -44,33 +45,336 @@
     },
     "extension": {
       "tickets_total": 46,
-      "tickets_with_evidence": 41,
+      "tickets_with_evidence": 42,
       "claim_tier_counts": {
-        "diagnostic": 40,
+        "diagnostic": 41,
         "reduced-order": 1,
         "certified": 0
       },
-      "weighted_score_sum": 10.6,
-      "toe_progress_pct": 23,
+      "weighted_score_sum": 10.85,
+      "toe_progress_pct": 23.6,
       "strict_ready_progress_pct": 2.2,
-      "research_gated_tickets_total": 6,
-      "research_artifact_complete_tickets_total": 6
+      "research_gated_tickets_total": 7,
+      "research_artifact_complete_tickets_total": 7
     },
     "combined": {
       "tickets_total": 56,
-      "tickets_with_evidence": 51,
+      "tickets_with_evidence": 52,
       "claim_tier_counts": {
-        "diagnostic": 49,
+        "diagnostic": 50,
         "reduced-order": 2,
         "certified": 0
       },
-      "weighted_score_sum": 13.45,
-      "toe_progress_pct": 24,
+      "weighted_score_sum": 13.7,
+      "toe_progress_pct": 24.5,
       "strict_ready_progress_pct": 3.6,
-      "research_gated_tickets_total": 6,
-      "research_artifact_complete_tickets_total": 6
+      "strict_ready_delta_ticket_count": 54,
+      "research_gated_tickets_total": 7,
+      "research_artifact_complete_tickets_total": 7
     }
   },
+  "strict_ready_delta_targets": [
+    {
+      "ticket_id": "TOE-002-semiclassical-coupling-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-003-quantum-provenance-class",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-004-uncertainty-propagation-gates",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-005-prediction-observation-ledger",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-006-firstfail-taxonomy-normalization",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-007-ideology-hard-action-gates",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-008-certificate-authenticity-policy",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-009-verify-endpoint-hardening",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-010-unified-primitive-manifest",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-011-orbital-ephemeris-provenance-bridge",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-012-halobank-horizons-consistency-gate",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-013-atomic-systems-claim-tier-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-014-robotics-recollection-provenance-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-015-external-integration-evidence-manifest",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-016-resolver-forest-owner-coverage-manifest",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-017-pipeline-ledger-provenance-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-018-hardware-telemetry-provenance-gate",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-019-ui-backend-binding-claim-tier-surface",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-020-llm-runtime-artifact-provenance-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-021-queue-orchestration-runtime-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-022-analysis-loops-provenance-gate",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-023-telemetry-console-provenance-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-024-skills-tooling-risk-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-025-sdk-integration-runtime-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-026-knowledge-ingestion-provenance-budget-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-027-casimir-tiles-resonance-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-028-dp-collapse-runtime-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-029-essence-luma-noise-provenance-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-030-brick-lattice-dataflow-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-031-warp-mechanics-provenance-claim-gate",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-032-resonance-source-provenance-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-033-debate-specialists-evidence-provenance-gate",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-034-concepts-ontology-claim-tier-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-035-star-materials-environment-provenance-gate",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-036-stellar-restoration-runtime-provenance-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-037-certainty-framework-claim-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-038-ideology-physics-bridge-evidence-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-039-ethos-knowledge-provenance-gate",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-040-ui-components-topic-path-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-041-packages-retrieval-provenance-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-042-zen-ladder-pack-routing-provenance-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-043-full-program-toe-progress-scoring",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-044-zen-society-governance-provenance-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-045-toe-research-gate-policy-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-046-toe-agent-preflight-orchestrator",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-047-helix-ask-strict-e2e-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-048-halobank-horizons-physics-research-bridge",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-050-ideology-physics-bridge-tier-promotion-pack",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-051-research-artifact-progress-ledger",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
+      "ticket_id": "TOE-056-strict-ready-scorecard-automation",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    }
+  ],
   "tickets": [
     {
       "ticket_id": "TOE-001-curvature-stress-bridge",
@@ -79,7 +383,7 @@
       "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-205121.json"
+      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-1538.json"
     },
     {
       "ticket_id": "TOE-002-semiclassical-coupling-contract",
@@ -133,7 +437,7 @@
       "score": 0.25,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-234300.json"
+      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-232559.json"
     },
     {
       "ticket_id": "TOE-008-certificate-authenticity-policy",
@@ -561,10 +865,12 @@
     },
     {
       "ticket_id": "TOE-056-strict-ready-scorecard-automation",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-056-strict-ready-scorecard-automation.20260218T175215Z.json"
     }
   ]
 }

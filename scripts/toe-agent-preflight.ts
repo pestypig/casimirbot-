@@ -24,6 +24,22 @@ type StageConfig = {
   required: boolean;
 };
 
+
+type StrictReadySnapshot = {
+  schema_version?: string;
+  totals?: {
+    strict_ready_progress_pct?: number;
+  };
+  strict_ready_delta_targets?: unknown[];
+};
+
+type StrictReadyStallWarning = {
+  warning: "strict_ready_stall";
+  strict_ready_progress_pct: number | null;
+  strict_ready_delta_ticket_count: number;
+  guidance: string;
+};
+
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const workspaceRoot = path.resolve(process.env.TOE_PREFLIGHT_ROOT ?? repoRoot);
@@ -36,6 +52,12 @@ const stageConfigs: StageConfig[] = [
   { id: "validate-toe-research-gate-policy", script: path.join("scripts", "validate-toe-research-gate-policy.ts"), required: false },
   { id: "compute-toe-progress", script: path.join("scripts", "compute-toe-progress.ts"), required: true },
 ];
+
+
+const TOE_PROGRESS_SNAPSHOT_PATH = path.resolve(
+  workspaceRoot,
+  process.env.TOE_PROGRESS_SNAPSHOT_PATH ?? path.join("docs", "audits", "toe-progress-snapshot.json"),
+);
 
 function runStage(stage: StageConfig): StageSummary {
   const scriptPath = path.resolve(workspaceRoot, stage.script);
@@ -95,15 +117,62 @@ function runStage(stage: StageConfig): StageSummary {
   };
 }
 
+
+function readStrictReadyStallWarning(stages: StageSummary[]): StrictReadyStallWarning | null {
+  const computeStage = stages.find((stage) => stage.id === "compute-toe-progress");
+  if (!computeStage || !computeStage.pass) {
+    return null;
+  }
+
+  if (!fs.existsSync(TOE_PROGRESS_SNAPSHOT_PATH)) {
+    return null;
+  }
+
+  const parsed = JSON.parse(
+    fs.readFileSync(TOE_PROGRESS_SNAPSHOT_PATH, "utf8"),
+  ) as StrictReadySnapshot;
+
+  if (parsed.schema_version !== "toe_progress_snapshot/1") {
+    return null;
+  }
+
+  const strictReadyProgressRaw = parsed.totals?.strict_ready_progress_pct;
+  const strictReadyProgress =
+    typeof strictReadyProgressRaw === "number" ? strictReadyProgressRaw : null;
+  const deltaTargets = Array.isArray(parsed.strict_ready_delta_targets)
+    ? parsed.strict_ready_delta_targets
+    : [];
+  const deltaTicketCount = deltaTargets.length;
+
+  if (strictReadyProgress !== null && strictReadyProgress > 0) {
+    return null;
+  }
+
+  if (deltaTicketCount === 0) {
+    return null;
+  }
+
+  return {
+    warning: "strict_ready_stall",
+    strict_ready_progress_pct: strictReadyProgress,
+    strict_ready_delta_ticket_count: deltaTicketCount,
+    guidance:
+      "strict_ready_progress_pct is stalled; resolve strict_ready_delta_targets in toe-progress snapshot before scaling.",
+  };
+}
+
 function main() {
   const stages = stageConfigs.map(runStage);
   const overallPass = stages.every((stage) => stage.pass);
+
+  const strictReadyStallWarning = readStrictReadyStallWarning(stages);
 
   const summary = {
     schema_version: "toe_agent_preflight/1",
     generated_at: new Date().toISOString(),
     workspace_root: workspaceRoot,
     overall_pass: overallPass,
+    strict_ready_stall_warning: strictReadyStallWarning,
     stages,
   };
 
