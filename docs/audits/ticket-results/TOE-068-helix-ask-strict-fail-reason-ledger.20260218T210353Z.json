@@ -1,0 +1,74 @@
+{
+  "ticket_id": "TOE-068-helix-ask-strict-fail-reason-ledger",
+  "completed_at": "2026-02-18T21:03:53Z",
+  "summary": [
+    "Added deterministic strict fail-reason ledger generation with stable category taxonomy and replay-friendly ordering.",
+    "Attached strict fail-reason ledger + histogram + histogram artifact metadata to Helix Ask responses only when strictProvenance is enabled.",
+    "Added targeted tests for strict ledger determinism and non-strict backward compatibility, and expanded mode tests to assert strict ledger surfaces."
+  ],
+  "files_changed": [
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+    "docs/audits/toe-progress-snapshot.json",
+    "server/routes/agi.plan.ts",
+    "server/services/helix-ask/strict-fail-reason-ledger.ts",
+    "tests/helix-ask-evidence-gate.spec.ts",
+    "tests/helix-ask-modes.spec.ts"
+  ],
+  "tests_run": [
+    {
+      "command": "npx vitest run tests/helix-ask-evidence-gate.spec.ts tests/helix-ask-modes.spec.ts tests/helix-ask-bridge.spec.ts",
+      "status": "warning",
+      "notes": "Vitest process produced expected test execution logs but did not terminate cleanly in this environment (hanging process)."
+    },
+    {
+      "command": "npx tsx scripts/validate-toe-ticket-backlog.ts",
+      "status": "pass"
+    },
+    {
+      "command": "npx tsx scripts/validate-toe-ticket-results.ts",
+      "status": "fail",
+      "notes": "Fails due to pre-existing unrelated ticket-result files in repo not matching current backlog constraints."
+    },
+    {
+      "command": "npm run validate:toe:research-gates",
+      "status": "pass"
+    },
+    {
+      "command": "npx tsx scripts/compute-toe-progress.ts",
+      "status": "pass"
+    },
+    {
+      "command": "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci",
+      "status": "pass",
+      "casimir": {
+        "verdict": "PASS",
+        "traceId": "adapter:503a0736-11ee-4d2a-bb66-3c3757f93ac9",
+        "runId": "8",
+        "firstFail": null,
+        "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+        "certificateId": "constraint-pack:repo-convergence:6e84f965957f",
+        "integrityOk": true
+      }
+    }
+  ],
+  "casimir_pass": {
+    "verdict": "PASS",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_integrity_ok": true
+  },
+  "research_gate": {
+    "risk_class": "runtime_contract",
+    "requires_audit": true,
+    "requires_research": false,
+    "required_artifacts": [
+      "runtime-contract-audit"
+    ],
+    "artifacts_status": {
+      "runtime-contract-audit": "covered-by-tests-and-strict-ledger-receipt"
+    }
+  },
+  "remaining_gaps": [
+    "Global toe ticket results validation currently fails from unrelated pre-existing ticket receipts outside this ticket scope.",
+    "Vitest command can hang after test execution in this environment; no assertion failures were observed in emitted logs."
+  ]
+}
