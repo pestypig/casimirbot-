@@ -82,6 +82,68 @@ branch-execution counterfactual tools and calibrated uncertainty models.
 - `server/routes/agi.plan.ts`
 - `server/services/helix-ask/platonic-gates.ts`
 
+## Quake frame loop spec (architectural rationale)
+
+Use this model for small-LLM reliability in open-world prompts.
+
+### 1) Unified event pump + journal
+
+- Treat each ask run as an event stream (prompt, retrieval decisions, gates,
+  fallback decisions, final contract render).
+- Persist deterministic trace records so failures are replayable byte-for-byte
+  under fixed seed/config.
+- Never treat generation output as the primary truth source; treat it as a
+  narrated view of engine state.
+
+### 2) VM/syscall boundary for fallback
+
+- Keep LLM behavior and deterministic runtime behavior separate.
+- Expose deterministic fallback as an engine-level call:
+  - `RenderPlatonicFallback(prompt, anchors, constraints, budget)`
+- The engine may force this path when evidence is weak, even if model output is
+  present.
+
+### 3) Fixed-tick runtime split (Clock A / Clock B)
+
+- `Clock A` (interactive): always returns a complete answer contract on budget,
+  including uncertainty and missing-evidence sections when needed.
+- `Clock B` (deep): expands retrieval, bridge traversal, and optional refiners
+  without blocking user-facing completion.
+- This prevents placeholder outputs caused by long-running model/tool paths.
+
+### 4) AAS-style precomputed bridge reachability
+
+- Precompute reasoning reachability across trees/DAGs so runtime inference does
+  graph traversal, not ontology invention.
+- Use existing bridge edge semantics:
+  - `enables`, `constrains`, `verifies`, `rollback_to`, `escalates_to`,
+    `optimizes`
+- Enforce stable traversal ordering and bounded depth/node budget.
+
+### 5) Fuzzy move selector (small-compute decision policy)
+
+- Select answer mode by scored policy rather than open-ended generation:
+  - direct answer
+  - bounded hypothesis
+  - targeted clarification
+  - missing-evidence report
+- Score against groundedness, uncertainty, safety, and coverage.
+
+### 6) Offline evolutionary tuning from traces
+
+- Optimize policy thresholds and traversal budgets from replay traces.
+- Tune retrieval/fallback parameters, not model weights, for most runtime
+  quality gains.
+- Fitness objective: lower placeholder/scaffold rate, higher falsifier/citation
+  presence, lower contradiction rate, bounded latency.
+
+### Runtime invariants
+
+- Never emit generic placeholder final text.
+- Final answer must include mechanism + maturity posture + citation or explicit
+  missing-evidence disclosure.
+- All fallback decisions must carry deterministic `fallback_reason` taxonomy.
+
 ## Cloud chat fixed packet (Feedback Loop Hygiene)
 
 Use this packet for recurring cloud-chat checks so we can detect regressions away
