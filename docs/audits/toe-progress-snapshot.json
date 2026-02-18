@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T04:45:25.082Z",
+  "generated_at": "2026-02-18T04:55:31.898Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -13,17 +13,17 @@
     "certified": 1
   },
   "totals": {
-    "tickets_total": 42,
-    "tickets_with_evidence": 41,
+    "tickets_total": 43,
+    "tickets_with_evidence": 43,
     "claim_tier_counts": {
-      "diagnostic": 40,
+      "diagnostic": 42,
       "reduced-order": 1,
       "certified": 0
     },
-    "weighted_score_sum": 10.6,
-    "toe_progress_pct": 25.2,
-    "forest_owner_coverage_pct": 95.1,
-    "strict_ready_progress_pct": 2.4
+    "weighted_score_sum": 11.1,
+    "toe_progress_pct": 25.8,
+    "forest_owner_coverage_pct": 97.6,
+    "strict_ready_progress_pct": 2.3
   },
   "segments": {
     "core": {
@@ -39,28 +39,28 @@
       "strict_ready_progress_pct": 10
     },
     "extension": {
-      "tickets_total": 32,
-      "tickets_with_evidence": 31,
+      "tickets_total": 33,
+      "tickets_with_evidence": 33,
       "claim_tier_counts": {
-        "diagnostic": 31,
+        "diagnostic": 33,
         "reduced-order": 0,
         "certified": 0
       },
-      "weighted_score_sum": 7.75,
-      "toe_progress_pct": 24.2,
+      "weighted_score_sum": 8.25,
+      "toe_progress_pct": 25,
       "strict_ready_progress_pct": 0
     },
     "combined": {
-      "tickets_total": 42,
-      "tickets_with_evidence": 41,
+      "tickets_total": 43,
+      "tickets_with_evidence": 43,
       "claim_tier_counts": {
-        "diagnostic": 40,
+        "diagnostic": 42,
         "reduced-order": 1,
         "certified": 0
       },
-      "weighted_score_sum": 10.6,
-      "toe_progress_pct": 25.2,
-      "strict_ready_progress_pct": 2.4
+      "weighted_score_sum": 11.1,
+      "toe_progress_pct": 25.8,
+      "strict_ready_progress_pct": 2.3
     }
   },
   "tickets": [
@@ -69,7 +69,7 @@
       "claim_tier": "reduced-order",
       "verification_ok": true,
       "score": 0.6,
-      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-1538.json"
+      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-205121.json"
     },
     {
       "ticket_id": "TOE-002-semiclassical-coupling-contract",
@@ -111,7 +111,7 @@
       "claim_tier": "diagnostic",
       "verification_ok": true,
       "score": 0.25,
-      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-232559.json"
+      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-234300.json"
     },
     {
       "ticket_id": "TOE-008-certificate-authenticity-policy",
@@ -352,11 +352,18 @@
       "result_file": "docs/audits/ticket-results/TOE-041-packages-retrieval-provenance-contract.20260218T041604Z.json"
     },
     {
+      "ticket_id": "TOE-042-zen-ladder-pack-routing-provenance-contract",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "result_file": "docs/audits/ticket-results/TOE-042-zen-ladder-pack-routing-provenance-contract.2026-02-18T04-44-33Z.json"
+    },
+    {
       "ticket_id": "TOE-043-full-program-toe-progress-scoring",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "result_file": "docs/audits/ticket-results/TOE-043-full-program-toe-progress-scoring.20260218T044850Z.json"
     }
   ]
 }
