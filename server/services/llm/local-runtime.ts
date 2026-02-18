@@ -5,6 +5,7 @@ type LocalRuntimeCaps = {
   maxKnowledgeFiles: number;
   maxAppendixChars: number;
   maxAppendixSnippets: number;
+  claimTier: "diagnostic" | "reduced-order" | "certified";
 };
 
 const LOCAL_CONTEXT_MIN = 2048;
@@ -15,6 +16,12 @@ const DEFAULT_KNOWLEDGE_BYTES = 80_000;
 const DEFAULT_KNOWLEDGE_FILES = 4;
 const DEFAULT_APPENDIX_CHARS = 1000;
 const DEFAULT_APPENDIX_SNIPPETS = 3;
+const DEFAULT_CLAIM_TIER: LocalRuntimeCaps["claimTier"] = "diagnostic";
+const CLAIM_TIER_VALUES = new Set<LocalRuntimeCaps["claimTier"]>([
+  "diagnostic",
+  "reduced-order",
+  "certified",
+]);
 
 const clampInt = (value: number, min: number, max: number): number =>
   Math.min(Math.max(Math.floor(value), min), max);
@@ -71,6 +78,10 @@ export const resolveLocalRuntimeCaps = (): LocalRuntimeCaps | null => {
     1,
     6,
   );
+  const claimTierRaw = (process.env.LLM_LOCAL_CLAIM_TIER ?? process.env.CLAIM_TIER ?? "").trim();
+  const claimTier = CLAIM_TIER_VALUES.has(claimTierRaw as LocalRuntimeCaps["claimTier"])
+    ? (claimTierRaw as LocalRuntimeCaps["claimTier"])
+    : DEFAULT_CLAIM_TIER;
   return {
     contextTokens,
     maxTopK,
@@ -78,5 +89,6 @@ export const resolveLocalRuntimeCaps = (): LocalRuntimeCaps | null => {
     maxKnowledgeFiles,
     maxAppendixChars,
     maxAppendixSnippets,
+    claimTier,
   };
 };
