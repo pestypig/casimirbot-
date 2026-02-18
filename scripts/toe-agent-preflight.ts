@@ -29,6 +29,12 @@ type StrictReadySnapshot = {
   schema_version?: string;
   totals?: {
     strict_ready_progress_pct?: number;
+    strict_ready_release_gate?: {
+      status?: "ready" | "blocked";
+      blocked_reasons?: Array<"missing_verified_pass" | "missing_research_artifacts">;
+      blocked_ticket_count?: number;
+      ready_ticket_count?: number;
+    };
   };
   strict_ready_delta_targets?: unknown[];
 };
@@ -43,7 +49,7 @@ type StrictReadyStallWarning = {
 type StrictReadyEnforcement = {
   enforced: boolean;
   blocked: boolean;
-  reason: "strict_ready_stall" | null;
+  reason: "strict_ready_stall" | "strict_ready_release_gate" | null;
 };
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -59,6 +65,14 @@ const stageConfigs: StageConfig[] = [
   { id: "compute-toe-progress", script: path.join("scripts", "compute-toe-progress.ts"), required: true },
 ];
 
+
+
+type StrictReadyReleaseGateSummary = {
+  status: "ready" | "blocked";
+  blocked_reasons: Array<"missing_verified_pass" | "missing_research_artifacts">;
+  blocked_ticket_count: number;
+  ready_ticket_count: number;
+};
 
 const TOE_PROGRESS_SNAPSHOT_PATH = path.resolve(
   workspaceRoot,
@@ -167,19 +181,66 @@ function readStrictReadyStallWarning(stages: StageSummary[]): StrictReadyStallWa
   };
 }
 
+
+function readStrictReadyReleaseGate(stages: StageSummary[]): StrictReadyReleaseGateSummary | null {
+  const computeStage = stages.find((stage) => stage.id === "compute-toe-progress");
+  if (!computeStage || !computeStage.pass) {
+    return null;
+  }
+
+  if (!fs.existsSync(TOE_PROGRESS_SNAPSHOT_PATH)) {
+    return null;
+  }
+
+  const parsed = JSON.parse(
+    fs.readFileSync(TOE_PROGRESS_SNAPSHOT_PATH, "utf8"),
+  ) as StrictReadySnapshot;
+
+  if (parsed.schema_version !== "toe_progress_snapshot/1") {
+    return null;
+  }
+
+  const gate = parsed.totals?.strict_ready_release_gate;
+  if (!gate || (gate.status !== "ready" && gate.status !== "blocked")) {
+    return null;
+  }
+
+  return {
+    status: gate.status,
+    blocked_reasons: Array.isArray(gate.blocked_reasons)
+      ? gate.blocked_reasons.filter(
+          (reason): reason is "missing_verified_pass" | "missing_research_artifacts" =>
+            reason === "missing_verified_pass" || reason === "missing_research_artifacts",
+        )
+      : [],
+    blocked_ticket_count:
+      typeof gate.blocked_ticket_count === "number" ? gate.blocked_ticket_count : 0,
+    ready_ticket_count: typeof gate.ready_ticket_count === "number" ? gate.ready_ticket_count : 0,
+  };
+}
+
 function main() {
   const stages = stageConfigs.map(runStage);
   const stagePass = stages.every((stage) => stage.pass);
 
   const strictReadyStallWarning = readStrictReadyStallWarning(stages);
+  const strictReadyReleaseGate = readStrictReadyReleaseGate(stages);
   const strictReadyEnforced = process.env.TOE_STRICT_READY_ENFORCE === "1";
-  const strictReadyBlocked = strictReadyEnforced && strictReadyStallWarning !== null;
+  const strictReadyReleaseGateEnforced = process.env.TOE_STRICT_READY_RELEASE_GATE_ENFORCE === "1";
+  const strictReadyStallBlocked = strictReadyEnforced && strictReadyStallWarning !== null;
+  const strictReadyReleaseGateBlocked =
+    strictReadyReleaseGateEnforced && strictReadyReleaseGate?.status === "blocked";
+  const strictReadyBlocked = strictReadyStallBlocked || strictReadyReleaseGateBlocked;
   const overallPass = stagePass && !strictReadyBlocked;
 
   const strictReadyEnforcement: StrictReadyEnforcement = {
-    enforced: strictReadyEnforced,
+    enforced: strictReadyEnforced || strictReadyReleaseGateEnforced,
     blocked: strictReadyBlocked,
-    reason: strictReadyBlocked ? "strict_ready_stall" : null,
+    reason: strictReadyStallBlocked
+      ? "strict_ready_stall"
+      : strictReadyReleaseGateBlocked
+        ? "strict_ready_release_gate"
+        : null,
   };
 
   const summary = {
@@ -189,6 +250,7 @@ function main() {
     stage_pass: stagePass,
     overall_pass: overallPass,
     strict_ready_stall_warning: strictReadyStallWarning,
+    strict_ready_release_gate: strictReadyReleaseGate,
     strict_ready_enforcement: strictReadyEnforcement,
     stages,
   };
