@@ -1,0 +1,40 @@
+{
+  "missing_nodes_or_edges": [
+    {
+      "priority": "P0",
+      "from": "entropy-gradient dynamics",
+      "to": "prebiotic chemistry",
+      "gap": "no explicit DAG bridge for thermodynamic disequilibrium -> autocatalytic networks"
+    },
+    {
+      "priority": "P0",
+      "from": "prebiotic chemistry",
+      "to": "protocell selection",
+      "gap": "missing node for membrane compartmentalization + heredity threshold"
+    },
+    {
+      "priority": "P1",
+      "from": "protocell selection",
+      "to": "neural complexity",
+      "gap": "missing bridge from metabolic networks to multicellularity/cognition"
+    },
+    {
+      "priority": "P1",
+      "from": "stellar nucleosynthesis",
+      "to": "planetary habitability constraints",
+      "gap": "needs explicit edge linking element abundance to solvent/atmosphere windows"
+    },
+    {
+      "priority": "P0",
+      "from": "security ethos guardrails",
+      "to": "consumer incident response tree",
+      "gap": "missing edge no-bypass guardrail -> concrete account lockdown playbook"
+    },
+    {
+      "priority": "P1",
+      "from": "metric integrity guardrail",
+      "to": "fraud signal verification",
+      "gap": "missing bridge for telemetry integrity checks in user-facing anti-fraud steps"
+    }
+  ]
+}

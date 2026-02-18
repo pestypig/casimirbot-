@@ -1,0 +1,1028 @@
+{
+  "topic": "life",
+  "prompt_index": 5,
+  "is_primary": false,
+  "prompt": "What are the key stages from Big Bang conditions to the first cells?",
+  "seed": 11,
+  "temperature": 0.2,
+  "request_ts": "2026-02-18T19:57:44.866215+00:00",
+  "latency_ms": 262.1,
+  "status": 200,
+  "payload": {
+    "prompt": "What are the key stages from Big Bang conditions to the first cells?",
+    "debug": true,
+    "seed": 11,
+    "temperature": 0.2
+  },
+  "response_json": {
+    "text": "Repo evidence did not cover key terms from the question (energy-conditions, boundary-conditions-modes, math-maturity-stages). Please point to the relevant files or narrow the request.\n\nSources: docs/knowledge/ethos/two-key-approval.md, docs/ethos/ideology.json",
+    "envelope": {
+      "mode": "extended",
+      "tier": "F1",
+      "secondaryTier": "F0",
+      "answer": "Repo evidence did not cover key terms from the question (energy-conditions, boundary-conditions-modes, math-maturity-stages). Please point to the relevant files or narrow the request.",
+      "sections": [
+        {
+          "title": "Details",
+          "body": "Sources: docs/knowledge/ethos/two-key-approval.md, docs/ethos/ideology.json",
+          "citations": [
+            "docs/knowledge/ethos/two-key-approval.md",
+            "docs/ethos/ideology.json"
+          ],
+          "layer": "details",
+          "defaultOpen": true
+        },
+        {
+          "title": "Key files",
+          "body": "- docs/knowledge/ethos/two-key-approval.md",
+          "citations": [
+            "docs/knowledge/ethos/two-key-approval.md"
+          ],
+          "layer": "proof"
+        }
+      ]
+    },
+    "prompt_ingested": false,
+    "concept": {
+      "id": "two-key-approval",
+      "label": "Two-Key Approval",
+      "source_path": "docs/knowledge/ethos/two-key-approval.md",
+      "provenance_class": "inferred",
+      "claim_tier": "diagnostic",
+      "certifying": false
+    },
+    "claim_tier": "diagnostic",
+    "provenance_class": "inferred",
+    "certifying": false,
+    "debug": {
+      "two_pass": false,
+      "micro_pass": true,
+      "trace_id": "ask:8d21cdec-fdaf-4123-a847-8a79870b0026",
+      "tuning_enabled": false,
+      "fast_quality_mode": false,
+      "arbiter_repo_ratio": 0.45,
+      "arbiter_hybrid_ratio": 0.25,
+      "retry_topk_bonus": 4,
+      "format_enforcement": "strict",
+      "soft_expansion": 0,
+      "scaffold_tokens": 1024,
+      "evidence_tokens": 512,
+      "repair_tokens": 192,
+      "hypothesis_enabled": false,
+      "agent_loop_enabled": true,
+      "agent_loop_max_steps": 3,
+      "agent_loop_budget_ms": 120000,
+      "agent_action_budget_ms": 20000,
+      "clocka_tool_cap": 2,
+      "agent_loop_steps": 2,
+      "agent_loop_actions": [
+        {
+          "action": "expand_heading_aliases",
+          "reason": "doc_heading_seed_slots",
+          "expectedGain": "seed_slot_aliases",
+          "overBudget": false,
+          "ok": true,
+          "ts": "2026-02-18T19:57:44.618Z"
+        },
+        {
+          "action": "retrieve_docs_first",
+          "reason": "docs_first_scope",
+          "expectedGain": "prioritize_docs",
+          "overBudget": false,
+          "ok": true,
+          "ts": "2026-02-18T19:57:44.630Z"
+        },
+        {
+          "action": "slot_local_retry",
+          "reason": "slot_missing",
+          "expectedGain": "recover_missing_slots",
+          "observedDelta": "slots:0->0; evidence:fail->fail",
+          "durationMs": 15,
+          "overBudget": false,
+          "ok": true,
+          "ts": "2026-02-18T19:57:44.682Z"
+        }
+      ],
+      "agent_stop_reason": "clocka_tool_cap",
+      "agent_action_counts": {
+        "expand_heading_aliases": 1,
+        "retrieve_docs_first": 1,
+        "slot_local_retry": 1
+      },
+      "agent_attempts": [
+        "expand_heading_aliases",
+        "retrieve_docs_first",
+        "slot_local_retry"
+      ],
+      "single_llm": true,
+      "definition_focus": false,
+      "block_scoped": false,
+      "report_mode": false,
+      "report_mode_reason": "ideology_chat_mode",
+      "report_blocks_count": 0,
+      "slot_plan_pass_used": false,
+      "session_memory_used": false,
+      "concept_id": "two-key-approval",
+      "concept_label": "Two-Key Approval",
+      "concept_source": "docs/knowledge/ethos/two-key-approval.md",
+      "explicit_repo_expectation": false,
+      "repo_expectation_score": 2,
+      "repo_expectation_level": "medium",
+      "repo_expectation_signals": [
+        "concept_match"
+      ],
+      "ambiguity_resolver_applied": false,
+      "ambiguity_resolver_token_count": 0,
+      "ambiguity_resolver_short_prompt": false,
+      "ambiguity_resolver_top_score": 24,
+      "ambiguity_resolver_margin": 6,
+      "slot_dominance_margin": 0,
+      "ambiguity_resolver_candidates": [
+        "energy-conditions",
+        "energy condition",
+        "energy conditions"
+      ],
+      "format": "brief",
+      "stage_tags": false,
+      "verbosity": "extended",
+      "intent_id": "hybrid.concept_plus_system_mapping",
+      "intent_domain": "hybrid",
+      "intent_tier": "F1",
+      "intent_secondary_tier": "F0",
+      "intent_strategy": "hybrid_explain",
+      "intent_reason": "empty|obligation:repo_required|arbiter:clarify|evidence_gate:no_repo_evidence",
+      "is_repo_question": true,
+      "topic_tags": [
+        "ideology"
+      ],
+      "topic_allowlist_tiers": 3,
+      "topic_must_include_files": [
+        "docs/ethos/ideology.json",
+        "docs/ethos/why.md"
+      ],
+      "graph_pack_skip_reason": "concept_fast_path",
+      "concept_fast_path": true,
+      "concept_fast_path_reason": "hybrid.concept_plus_system_mapping",
+      "concept_fast_path_source": "docs/knowledge/ethos/two-key-approval.md",
+      "verification_anchor_required": false,
+      "preflight_queries": [
+        "docs/knowledge/ethos/two-key-approval.md"
+      ],
+      "preflight_files": [
+        "docs/ethos/ideology.json",
+        "docs/ethos/why.md",
+        "server/routes/ethos.ts"
+      ],
+      "preflight_file_count": 3,
+      "preflight_doc_share": 0.6666666666666666,
+      "preflight_evidence_ok": true,
+      "preflight_evidence_ratio": 0.4,
+      "preflight_repo_search_hits": 0,
+      "preflight_retrieval_upgrade": false,
+      "preflight_reuse": true,
+      "context_deferred": true,
+      "micro_pass_enabled": true,
+      "fast_quality_plan_pass_suppressed": false,
+      "plan_pass_used": true,
+      "plan_pass_forced": true,
+      "micro_pass_reason": "concept_fast_path",
+      "query_hints": [
+        "docs/ethos/ideology.json",
+        "docs/ethos/why.md",
+        "server/routes/ethos.ts"
+      ],
+      "slot_tiers": [
+        {
+          "id": "energy-conditions",
+          "label": "energy-conditions",
+          "source": "concept",
+          "required": true,
+          "tier": "A"
+        },
+        {
+          "id": "two-key-approval",
+          "label": "Two-Key Approval",
+          "source": "concept",
+          "required": true,
+          "tier": "A"
+        },
+        {
+          "id": "boundary-conditions-modes",
+          "label": "boundary-conditions-modes",
+          "source": "concept",
+          "required": true,
+          "tier": "A"
+        },
+        {
+          "id": "math-maturity-stages",
+          "label": "math-maturity-stages",
+          "source": "concept",
+          "required": true,
+          "tier": "A"
+        }
+      ],
+      "slot_tier_counts": {
+        "A": 4,
+        "B": 0,
+        "C": 0
+      },
+      "slot_plan": [
+        {
+          "id": "energy-conditions",
+          "label": "energy-conditions",
+          "required": true,
+          "source": "concept",
+          "weak": false,
+          "surfaces": [
+            "knowledge",
+            "docs",
+            "code"
+          ],
+          "aliases": [
+            "NEC",
+            "WEC",
+            "SEC",
+            "DEC",
+            "energy condition",
+            "energy conditions"
+          ],
+          "evidence_criteria": []
+        },
+        {
+          "id": "two-key-approval",
+          "label": "Two-Key Approval",
+          "required": true,
+          "source": "concept",
+          "weak": false,
+          "surfaces": [
+            "knowledge",
+            "docs",
+            "ethos"
+          ],
+          "aliases": [
+            "Two-Key Approval",
+            "two-key-approval",
+            "two key approval",
+            "Definition: Plans are approved only when both legal and ethos gates pass",
+            "ideology",
+            "Overview"
+          ],
+          "evidence_criteria": []
+        },
+        {
+          "id": "boundary-conditions-modes",
+          "label": "boundary-conditions-modes",
+          "required": true,
+          "source": "concept",
+          "weak": false,
+          "surfaces": [
+            "knowledge",
+            "docs",
+            "code"
+          ],
+          "aliases": [
+            "boundary conditions",
+            "mode quantization",
+            "mode spectrum",
+            "boundary conditions modes",
+            "Overview",
+            "Definition: Boundary conditions restrict the allowed field modes, which changes the energy spectrum and drives Casimir forces"
+          ],
+          "evidence_criteria": []
+        },
+        {
+          "id": "math-maturity-stages",
+          "label": "math-maturity-stages",
+          "required": true,
+          "source": "concept",
+          "weak": false,
+          "surfaces": [
+            "knowledge",
+            "docs"
+          ],
+          "aliases": [
+            "math maturity",
+            "exploratory vs certified",
+            "maturity stages",
+            "math maturity stages",
+            "Overview",
+            "Definition: Math maturity stages describe how confident the repo is in a result (exploratory, diagnostic, or certified)"
+          ],
+          "evidence_criteria": []
+        }
+      ],
+      "slot_count": 4,
+      "slot_required_count": 4,
+      "hard_required_slots": [
+        "energy-conditions",
+        "two-key-approval",
+        "boundary-conditions-modes",
+        "math-maturity-stages"
+      ],
+      "hard_required_slot_count": 4,
+      "coverage_slots_source": "concept",
+      "queries": [
+        "docs/knowledge/ethos/two-key-approval.md",
+        "docs/ethos/ideology.json",
+        "docs/ethos/why.md",
+        "energy-conditions",
+        "boundary-conditions-modes",
+        "math-maturity-stages",
+        "energy conditions",
+        "NEC",
+        "WEC",
+        "SEC",
+        "DEC",
+        "energy condition"
+      ],
+      "docs_first_enabled": true,
+      "plan_scope_allowlist_tiers": 1,
+      "plan_scope_avoidlist": 0,
+      "plan_scope_must_include": 0,
+      "compaction_applied": false,
+      "compaction_dropped": 0,
+      "compaction_kept": 3,
+      "compaction_policy": "definition->policy->entrypoint->tests",
+      "compaction_budget": {
+        "maxBlocks": 12,
+        "maxBytes": 18000,
+        "maxPerFile": 2
+      },
+      "proof_span_rate": 1,
+      "slot_doc_coverage_rate": 1,
+      "repo_search_terms": [
+        "two-key-approval"
+      ],
+      "repo_search_paths": [
+        "docs/ethos",
+        "docs/knowledge/ethos",
+        "server/services/ideology",
+        "shared/ideology",
+        "docs/ethos/ideology.json",
+        "docs/ethos/why.md"
+      ],
+      "repo_search_reason": "evidence_gate_fail",
+      "repo_search_explicit": false,
+      "repo_search_hits": 20,
+      "repo_search_truncated": false,
+      "topic_must_include_ok": true,
+      "viability_must_include_ok": true,
+      "verification_anchor_ok": true,
+      "plan_must_include_ok": true,
+      "evidence_gate_ok": false,
+      "evidence_match_ratio": 1,
+      "evidence_match_count": 5,
+      "evidence_token_count": 5,
+      "evidence_core_required": true,
+      "evidence_core_ok": false,
+      "evidence_core_match_ratio": 0,
+      "evidence_core_match_count": 0,
+      "evidence_core_token_count": 0,
+      "evidence_use_question_tokens": true,
+      "evidence_signal_tokens": [
+        "ideology",
+        "two-key-approval",
+        "Two-Key Approval",
+        "two key approval"
+      ],
+      "evidence_tokens_preview": [
+        "ideology",
+        "two-key-approval",
+        "two-key",
+        "approval",
+        "key"
+      ],
+      "evidence_match_preview": [
+        "ideology",
+        "two-key-approval",
+        "two-key",
+        "approval",
+        "key"
+      ],
+      "retrieval_confidence": 0,
+      "retrieval_doc_share": 0.75,
+      "retrieval_doc_hits": 3,
+      "retrieval_context_file_count": 4,
+      "retrieval_query_hit_count": 3,
+      "retrieval_top_score": 0.02459016393442623,
+      "retrieval_score_gap": 0,
+      "retrieval_channel_hits": {
+        "lexical": 0,
+        "symbol": 0,
+        "fuzzy": 0,
+        "path": 3
+      },
+      "retrieval_channel_top_scores": {
+        "lexical": 0,
+        "symbol": 0,
+        "fuzzy": 0,
+        "path": 46
+      },
+      "retrieval_channel_weights": {
+        "lexical": 0.5,
+        "symbol": 0.4,
+        "fuzzy": 0.3,
+        "path": 1.5
+      },
+      "doc_header_injected": 3,
+      "slot_coverage_required": [],
+      "slot_coverage_missing": [],
+      "slot_coverage_ratio": 1,
+      "slot_coverage_ok": true,
+      "coverage_slots_required": [
+        "energy-conditions",
+        "two-key-approval",
+        "boundary-conditions-modes",
+        "math-maturity-stages"
+      ],
+      "coverage_slots_covered": [
+        "two-key-approval"
+      ],
+      "coverage_slots_missing": [
+        "energy-conditions",
+        "boundary-conditions-modes",
+        "math-maturity-stages"
+      ],
+      "coverage_slots_ratio": 0.25,
+      "docs_first_slot_covered": [
+        "energy-conditions",
+        "two-key-approval",
+        "boundary-conditions-modes",
+        "math-maturity-stages"
+      ],
+      "docs_first_slot_missing": [],
+      "docs_first_slot_ratio": 1,
+      "slot_evidence": [
+        {
+          "id": "energy-conditions",
+          "label": "energy-conditions",
+          "doc_card_count": 1,
+          "alias_card_count": 1,
+          "evidence_gate_ok": false,
+          "coverage_ratio": 1,
+          "missing_slots": []
+        },
+        {
+          "id": "two-key-approval",
+          "label": "Two-Key Approval",
+          "doc_card_count": 1,
+          "alias_card_count": 1,
+          "evidence_gate_ok": false,
+          "coverage_ratio": 1,
+          "missing_slots": []
+        },
+        {
+          "id": "boundary-conditions-modes",
+          "label": "boundary-conditions-modes",
+          "doc_card_count": 1,
+          "alias_card_count": 1,
+          "evidence_gate_ok": false,
+          "coverage_ratio": 1,
+          "missing_slots": []
+        },
+        {
+          "id": "math-maturity-stages",
+          "label": "math-maturity-stages",
+          "doc_card_count": 1,
+          "alias_card_count": 1,
+          "evidence_gate_ok": false,
+          "coverage_ratio": 1,
+          "missing_slots": []
+        }
+      ],
+      "slot_doc_hit_rate": 1,
+      "slot_alias_coverage_rate": 1,
+      "controller_steps": [
+        {
+          "step": "initial",
+          "evidenceOk": false,
+          "slotCoverageOk": true,
+          "docCoverageOk": true,
+          "missingSlots": [
+            "energy-conditions",
+            "boundary-conditions-modes",
+            "math-maturity-stages"
+          ],
+          "retrievalConfidence": 0
+        },
+        {
+          "step": "retry",
+          "action": "applied",
+          "reason": "slot_missing",
+          "evidenceOk": false,
+          "slotCoverageOk": true,
+          "docCoverageOk": true,
+          "missingSlots": [
+            "energy-conditions",
+            "boundary-conditions-modes",
+            "math-maturity-stages"
+          ],
+          "retrievalConfidence": 0
+        }
+      ],
+      "controller_attempts": 2,
+      "context_files": [
+        "docs/knowledge/ethos/two-key-approval.md"
+      ],
+      "controller_stop_reason": "clocka_tool_cap",
+      "definition_doc_required": false,
+      "definition_doc_ok": true,
+      "definition_doc_blocks": 3,
+      "arbiter_mode": "clarify",
+      "arbiter_reason": "expect_repo_weak_evidence",
+      "arbiter_strictness": "med",
+      "arbiter_user_expects_repo": true,
+      "requires_repo_evidence": true,
+      "arbiter_repo_ok": false,
+      "arbiter_hybrid_ok": false,
+      "arbiter_ratio": 0,
+      "arbiter_topic_ok": true,
+      "arbiter_concept_match": true,
+      "runtime_budget_level": "OVER",
+      "runtime_budget_recommend": "reduce_output_tokens",
+      "runtime_budget_signals": {
+        "clockA_p95_ms": 76,
+        "tool_calls_last_tick": 2,
+        "kv_tokens": 0,
+        "queue_depth": 0,
+        "lane_pressure": {
+          "llm": 0.19,
+          "io": 0,
+          "media": 0.7317073170731707,
+          "physics": 0,
+          "perception": 0
+        }
+      },
+      "clarify_triggered": true,
+      "graph_node_acceptance_rate": 0,
+      "graph_node_acceptance_total": 0,
+      "graph_node_acceptance_rejected": 0,
+      "graph_node_acceptance_missing": [],
+      "code_alignment_applied": true,
+      "code_alignment_symbols": [
+        "Approval",
+        "Two",
+        "Heading",
+        "Mission",
+        "Ethos",
+        "Seeds"
+      ],
+      "code_alignment_resolved": [
+        "shared/essence-persona.ts",
+        "tests/agi-plan.spec.ts",
+        "client/src/models/star.ts",
+        "tests/essence-dal.spec.ts",
+        "client/src/components/MissionEthosSourcePanel.tsx",
+        "tests/essence-mix.spec.ts"
+      ],
+      "code_spans_added": 6,
+      "prompt_items": [
+        {
+          "type": "intent",
+          "hash": "c9b5dfaa6a88",
+          "size": 63
+        },
+        {
+          "type": "retrieval_summary",
+          "hash": "ba3a10f09f04",
+          "size": 183
+        },
+        {
+          "type": "doc_spans",
+          "hash": "dc1fd16d1aea",
+          "size": 142
+        },
+        {
+          "type": "code_spans",
+          "hash": "3f7635f5a8a5",
+          "size": 326
+        },
+        {
+          "type": "slot_coverage",
+          "hash": "d0111d35e896",
+          "size": 124
+        }
+      ],
+      "prompt_item_count": 5,
+      "tool_results_block": "TOOL_RESULTS\n[retrieval_summary]\nqueries: docs/knowledge/ethos/two-key-approval.md; docs/ethos/ideology.json; docs/ethos/why.md; server/routes/ethos.ts; energy-conditions; energy conditions; NEC; WEC\nconfidence: 0.00\n\n[doc_spans]\n- Doc: ideology (docs/ethos/ideology.json)\n- Title: Two-Key Approval (docs/knowledge/ethos/two-key-approval.md)\n- Doc: why (docs/ethos/why.md)\n\n[code_spans]\n- Approval Span: L53-L57 (shared/essence-persona.ts)\n- Approval Span: L113-L117 (tests/agi-plan.spec.ts)\n- Two Span: L22-L26 (client/src/models/star.ts)\n- Two Span: L55-L59 (tests/essence-dal.spec.ts)\n- Mission Span: L1-L5 (client/src/components/MissionEthosSourcePanel.tsx)\n- Mission Span: L73-L77 (tests/essence-mix.spec.ts)\n\nEND_TOOL_RESULTS",
+      "tool_results_present": true,
+      "tool_results_items": [
+        "retrieval_summary",
+        "doc_spans",
+        "code_spans"
+      ],
+      "tool_results_hash": "4f1d860d72ba",
+      "synthesis_mode": "concept_scaffold",
+      "synthesis_mode_reasons": [
+        "single_llm",
+        "hybrid_route",
+        "fail_closed_repo_evidence"
+      ],
+      "synthesis_reason": "mode=concept_scaffold | repo=concept | prompt=none | general=none | repo_scaffold=yes | prompt_scaffold=no | general_scaffold=yes",
+      "synthesis_repo_path": "concept",
+      "synthesis_prompt_path": "none",
+      "synthesis_general_path": "none",
+      "evidence_cards": "General reasoning:\n- Definition: Plans are approved only when both legal and ethos gates pass.\n- Notes: Tags: approval, gating, law, ethos, verification.\n- Scope: \"ideology\"\n\nRepo evidence:\n- Definition: Plans are approved only when both legal and ethos gates pass.\n- Notes: Tags: approval, gating, law, ethos, verification.\n- Scope: \"ideology\"\n\nSources: docs/knowledge/ethos/two-key-approval.md",
+      "answer_short_sentences": 4,
+      "answer_short_tokens": 78,
+      "answer_raw_text": "Plans are approved only when both legal and ethos gates pass. Tags: approval, gating, law, ethos, verification.\n\nNo repo evidence was found for this system mapping; please point to the relevant files or modules.\n\nIn practice, those standards guide how evidence and justification are weighed in specific contexts.",
+      "answer_contract_applied": false,
+      "answer_after_format": "Plans are approved only when both legal and ethos gates pass. Tags: approval, gating, law, ethos, verification.\n\nNo repo evidence was found for this system mapping; please point to the relevant files or modules.\n\nIn practice, those standards guide how evidence and justification are weighed in specific contexts.",
+      "scientific_response_applied": true,
+      "next_evidence_count": 6,
+      "next_evidence_coverage": 2,
+      "hypothesis_count": 0,
+      "hypothesis_rate": 0,
+      "claim_ref_rate": 0,
+      "answer_after_fallback": "Repo evidence did not cover key terms from the question (energy-conditions, boundary-conditions-modes, math-maturity-stages). Please point to the relevant files or narrow the request.",
+      "junk_clean_applied": false,
+      "junk_clean_reasons": [],
+      "concept_lint_applied": false,
+      "concept_lint_reasons": [],
+      "physics_lint_applied": false,
+      "physics_lint_reasons": [],
+      "drift_repair_applied": false,
+      "drift_repair_attempts": 0,
+      "drift_repair_improved": false,
+      "coverage_token_count": 0,
+      "coverage_key_count": 4,
+      "coverage_missing_key_count": 3,
+      "coverage_ratio": 0.25,
+      "coverage_missing_keys": [
+        "energy-conditions",
+        "boundary-conditions-modes",
+        "math-maturity-stages"
+      ],
+      "coverage_gate_applied": true,
+      "coverage_gate_reason": "missing_slots",
+      "claim_ledger": [
+        {
+          "id": "claim:1",
+          "type": "fact",
+          "supported": false,
+          "evidence_refs": [],
+          "proof": "source:missing -> verify -> claim:1"
+        },
+        {
+          "id": "claim:2",
+          "type": "inference",
+          "supported": false,
+          "evidence_refs": [],
+          "proof": "source:missing -> verify -> claim:2"
+        }
+      ],
+      "uncertainty_register": [
+        {
+          "id": "claim:1",
+          "type": "fact",
+          "reason": "missing_evidence"
+        },
+        {
+          "id": "claim:2",
+          "type": "inference",
+          "reason": "missing_evidence"
+        }
+      ],
+      "constraint_matrix": {
+        "section_count": 1,
+        "constraints": [
+          {
+            "id": "citations_required",
+            "satisfied": false,
+            "detail": "citations=0"
+          }
+        ]
+      },
+      "belief_claim_count": 2,
+      "belief_supported_count": 0,
+      "belief_unsupported_count": 2,
+      "belief_unsupported_rate": 1,
+      "belief_contradictions": 0,
+      "belief_gate_applied": false,
+      "belief_graph_node_count": 3,
+      "belief_graph_edge_count": 0,
+      "belief_graph_claim_count": 2,
+      "belief_graph_definition_count": 0,
+      "belief_graph_conclusion_count": 1,
+      "belief_graph_evidence_ref_count": 1,
+      "belief_graph_constraint_count": 0,
+      "belief_graph_supports": 0,
+      "belief_graph_contradicts": 0,
+      "belief_graph_depends_on": 0,
+      "belief_graph_maps_to": 0,
+      "belief_graph_claim_ids": [
+        "claim:1",
+        "claim:2"
+      ],
+      "belief_graph_unsupported_claim_ids": [
+        "claim:1",
+        "claim:2"
+      ],
+      "belief_graph_contradiction_ids": [],
+      "rattling_score": 0.9795918367346939,
+      "rattling_gate_applied": false,
+      "grounded_sentence_rate": 0,
+      "tree_citation_share": 0,
+      "tree_citation_total": 0,
+      "tree_citation_tree": 0,
+      "tree_citation_non_tree": 0,
+      "clarify_precision": 1,
+      "rattling_base_distance": 0.9795918367346939,
+      "rattling_perturbation_distance": 0,
+      "rattling_claim_set_count": 3,
+      "gates": {
+        "evidence": {
+          "ok": false,
+          "matchCount": 5,
+          "tokenCount": 5,
+          "matchRatio": 1
+        },
+        "coverage": {
+          "applied": true,
+          "reason": "missing_slots",
+          "ratio": 0.25,
+          "tokenCount": 0,
+          "keyCount": 4,
+          "missingKeyCount": 3,
+          "missingKeys": [
+            "energy-conditions",
+            "boundary-conditions-modes",
+            "math-maturity-stages"
+          ]
+        },
+        "belief": {
+          "applied": false,
+          "unsupportedRate": 1,
+          "unsupportedCount": 2,
+          "supportedCount": 0,
+          "claimCount": 2,
+          "contradictions": 0
+        },
+        "beliefGraph": {
+          "nodeCount": 3,
+          "edgeCount": 0,
+          "claimCount": 2,
+          "definitionCount": 0,
+          "conclusionCount": 1,
+          "evidenceRefCount": 1,
+          "constraintCount": 0,
+          "supports": 0,
+          "contradicts": 0,
+          "dependsOn": 0,
+          "mapsTo": 0
+        },
+        "rattling": {
+          "applied": false,
+          "score": 0.9795918367346939,
+          "baseDistance": 0.9795918367346939,
+          "perturbationDistance": 0,
+          "claimSetCount": 3
+        },
+        "lint": {
+          "conceptApplied": false,
+          "conceptReasons": [],
+          "physicsApplied": false,
+          "physicsReasons": []
+        },
+        "variant": {},
+        "ambiguity": {
+          "resolverApplied": false,
+          "resolverTokenCount": 0,
+          "resolverShortPrompt": false,
+          "resolverTopScore": 24,
+          "resolverMargin": 6,
+          "resolverCandidates": [
+            "energy-conditions",
+            "energy condition",
+            "energy conditions"
+          ]
+        }
+      },
+      "answer_path": [
+        "concept_fast_path:preintent",
+        "intent:hybrid.concept_plus_system_mapping",
+        "domain:hybrid",
+        "strategy:hybrid_explain",
+        "concept_fast_path",
+        "forcedAnswer:concept",
+        "arbiter:clarify",
+        "answer:forced",
+        "citationRepair:skipped(intent)",
+        "citationFallback:sources",
+        "platonic:gates",
+        "citationPersistence:append_sources"
+      ],
+      "citation_persistence_guard_applied": true,
+      "citation_persistence_sources": [
+        "docs/knowledge/ethos/two-key-approval.md",
+        "docs/ethos/ideology.json"
+      ],
+      "citation_persistence_appended": true,
+      "answer_final_text": "Repo evidence did not cover key terms from the question (energy-conditions, boundary-conditions-modes, math-maturity-stages). Please point to the relevant files or narrow the request.\n\nSources: docs/knowledge/ethos/two-key-approval.md, docs/ethos/ideology.json",
+      "answer_extension_available": false,
+      "answer_extension_items": 0,
+      "answer_extension_doc_items": 0,
+      "answer_extension_code_items": 0,
+      "answer_extension_appended": false,
+      "live_events": [
+        {
+          "ts": "2026-02-18T19:57:44.625Z",
+          "tool": "helix.ask.progress",
+          "stage": "Preflight retrieval",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: Preflight retrieval - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.629Z",
+          "tool": "helix.ask.progress",
+          "stage": "Concept card ready",
+          "detail": "two-key-approval",
+          "durationMs": 0,
+          "text": "Helix Ask: Concept card ready - two-key-approval",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.629Z",
+          "tool": "helix.ask.progress",
+          "stage": "Query hints ready",
+          "detail": "3 hints",
+          "durationMs": 0,
+          "text": "Helix Ask: Query hints ready - 3 hints",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.667Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval retry",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: Retrieval retry - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.682Z",
+          "tool": "helix.ask.progress",
+          "stage": "Context retry ready",
+          "detail": "3 files",
+          "durationMs": 15,
+          "text": "Helix Ask: Context retry ready - 3 files",
+          "meta": {
+            "elapsedMs": 15
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.682Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval retry",
+          "detail": "done",
+          "ok": true,
+          "durationMs": 15,
+          "text": "Helix Ask: Retrieval retry - done",
+          "meta": {
+            "elapsedMs": 15
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.860Z",
+          "tool": "helix.ask.progress",
+          "stage": "Evidence cards ready",
+          "detail": "concept",
+          "durationMs": 0,
+          "text": "Helix Ask: Evidence cards ready - concept",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.860Z",
+          "tool": "helix.ask.progress",
+          "stage": "Generating answer",
+          "durationMs": 0,
+          "text": "Helix Ask: Generating answer"
+        },
+        {
+          "ts": "2026-02-18T19:57:44.860Z",
+          "tool": "helix.ask.progress",
+          "stage": "Answer ready",
+          "detail": "concept",
+          "durationMs": 0,
+          "text": "Helix Ask: Answer ready - concept",
+          "meta": {
+            "elapsedMs": 0
+          }
+        }
+      ],
+      "trace_events": [
+        {
+          "ts": "2026-02-18T19:57:44.625Z",
+          "tool": "helix.ask.progress",
+          "stage": "Preflight retrieval",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: Preflight retrieval - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.629Z",
+          "tool": "helix.ask.progress",
+          "stage": "Concept card ready",
+          "detail": "two-key-approval",
+          "durationMs": 0,
+          "text": "Helix Ask: Concept card ready - two-key-approval",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.629Z",
+          "tool": "helix.ask.progress",
+          "stage": "Query hints ready",
+          "detail": "3 hints",
+          "durationMs": 0,
+          "text": "Helix Ask: Query hints ready - 3 hints",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.667Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval retry",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: Retrieval retry - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.682Z",
+          "tool": "helix.ask.progress",
+          "stage": "Context retry ready",
+          "detail": "3 files",
+          "durationMs": 15,
+          "text": "Helix Ask: Context retry ready - 3 files",
+          "meta": {
+            "elapsedMs": 15
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.682Z",
+          "tool": "helix.ask.progress",
+          "stage": "Retrieval retry",
+          "detail": "done",
+          "ok": true,
+          "durationMs": 15,
+          "text": "Helix Ask: Retrieval retry - done",
+          "meta": {
+            "elapsedMs": 15
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.860Z",
+          "tool": "helix.ask.progress",
+          "stage": "Evidence cards ready",
+          "detail": "concept",
+          "durationMs": 0,
+          "text": "Helix Ask: Evidence cards ready - concept",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:44.860Z",
+          "tool": "helix.ask.progress",
+          "stage": "Generating answer",
+          "durationMs": 0,
+          "text": "Helix Ask: Generating answer"
+        },
+        {
+          "ts": "2026-02-18T19:57:44.860Z",
+          "tool": "helix.ask.progress",
+          "stage": "Answer ready",
+          "detail": "concept",
+          "durationMs": 0,
+          "text": "Helix Ask: Answer ready - concept",
+          "meta": {
+            "elapsedMs": 0
+          }
+        }
+      ],
+      "trace_summary": [],
+      "helix_ask_fail_reason": null,
+      "helix_ask_fail_class": null
+    }
+  }
+}

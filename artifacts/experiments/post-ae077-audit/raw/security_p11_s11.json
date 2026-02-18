@@ -1,0 +1,438 @@
+{
+  "topic": "security",
+  "prompt_index": 11,
+  "is_primary": false,
+  "prompt": "What operational security habits best defend personal money from AI exploits?",
+  "seed": 11,
+  "temperature": 0.2,
+  "request_ts": "2026-02-18T19:57:47.247403+00:00",
+  "latency_ms": 13.02,
+  "status": 200,
+  "payload": {
+    "prompt": "What operational security habits best defend personal money from AI exploits?",
+    "debug": true,
+    "seed": 11,
+    "temperature": 0.2
+  },
+  "response_json": {
+    "text": "Answer grounded in retrieved evidence.\n\nAnswer grounded in retrieved evidence and constrained by repo signals.\n\nAnswer grounded in retrieved evidence and constrained by repo signals.\n\nAnswer grounded in retrieved evidence and constrained by repo signals.\n\nSources: server/routes/agi.plan.ts, docs/helix-ask-flow.md",
+    "usage": {
+      "tokens": 64
+    },
+    "envelope": {
+      "mode": "extended",
+      "tier": "F0",
+      "answer": "Answer grounded in retrieved evidence.",
+      "sections": [
+        {
+          "title": "Details",
+          "body": "Answer grounded in retrieved evidence and constrained by repo signals.",
+          "layer": "details",
+          "defaultOpen": true
+        },
+        {
+          "title": "Details",
+          "body": "Answer grounded in retrieved evidence and constrained by repo signals.",
+          "layer": "details",
+          "defaultOpen": true
+        },
+        {
+          "title": "Details",
+          "body": "Answer grounded in retrieved evidence and constrained by repo signals.",
+          "layer": "details",
+          "defaultOpen": true
+        },
+        {
+          "title": "Details",
+          "body": "Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md",
+          "citations": [
+            "server/routes/agi.plan.ts",
+            "docs/helix-ask-flow.md"
+          ],
+          "layer": "details",
+          "defaultOpen": true
+        }
+      ]
+    },
+    "prompt_ingested": false,
+    "claim_tier": "diagnostic",
+    "provenance_class": "inferred",
+    "certifying": false,
+    "debug": {
+      "two_pass": false,
+      "micro_pass": false,
+      "trace_id": "ask:bcfa0d87-4898-4282-8e86-e5b799c3b5e5",
+      "tuning_enabled": false,
+      "fast_quality_mode": false,
+      "arbiter_repo_ratio": 0.45,
+      "arbiter_hybrid_ratio": 0.25,
+      "retry_topk_bonus": 4,
+      "format_enforcement": "strict",
+      "soft_expansion": 0,
+      "scaffold_tokens": 1024,
+      "evidence_tokens": 512,
+      "repair_tokens": 192,
+      "hypothesis_enabled": false,
+      "agent_loop_enabled": true,
+      "agent_loop_max_steps": 3,
+      "agent_loop_budget_ms": 120000,
+      "agent_action_budget_ms": 20000,
+      "clocka_tool_cap": 2,
+      "agent_loop_steps": 0,
+      "agent_loop_actions": [
+        {
+          "action": "expand_heading_aliases",
+          "reason": "doc_heading_seed_slots",
+          "expectedGain": "seed_slot_aliases",
+          "overBudget": false,
+          "ok": true,
+          "ts": "2026-02-18T19:57:47.243Z"
+        }
+      ],
+      "agent_action_counts": {
+        "expand_heading_aliases": 1
+      },
+      "agent_attempts": [
+        "expand_heading_aliases"
+      ],
+      "single_llm": true,
+      "definition_focus": false,
+      "block_scoped": false,
+      "report_mode": false,
+      "report_blocks_count": 0,
+      "slot_plan_pass_used": false,
+      "session_memory_used": false,
+      "explicit_repo_expectation": false,
+      "repo_expectation_score": 0,
+      "repo_expectation_level": "low",
+      "repo_expectation_signals": [],
+      "ambiguity_resolver_applied": false,
+      "ambiguity_resolver_token_count": 0,
+      "ambiguity_resolver_short_prompt": false,
+      "ambiguity_resolver_top_score": 18,
+      "ambiguity_resolver_margin": 18,
+      "slot_dominance_margin": 0,
+      "ambiguity_resolver_candidates": [
+        "Security and Hull Guard Tree",
+        "security-hull-guard-tree",
+        "security hull guard tree"
+      ],
+      "format": "brief",
+      "stage_tags": false,
+      "verbosity": "extended",
+      "intent_id": "general.fallback",
+      "intent_domain": "general",
+      "intent_tier": "F0",
+      "intent_strategy": "general_explain",
+      "intent_reason": "empty",
+      "is_repo_question": false,
+      "graph_pack_lock": {
+        "requested": [],
+        "applied": []
+      },
+      "graph_congruence_region": {
+        "B_equals_1": true,
+        "qi_metric_derived_equals_true": true,
+        "qi_strict_ok_equals_true": true,
+        "theta_geom_equals_true": true,
+        "vdb_two_wall_support_equals_true": true,
+        "ts_metric_derived_equals_true": true,
+        "cl3_metric_t00_available_equals_true": true,
+        "cl3_rho_gate_equals_true": false
+      },
+      "graph_congruence_chart": "comoving_cartesian",
+      "verification_anchor_required": false,
+      "context_deferred": false,
+      "micro_pass_enabled": false,
+      "fast_quality_plan_pass_suppressed": false,
+      "plan_pass_used": false,
+      "plan_pass_forced": false,
+      "answer_token_budget": 3000,
+      "answer_token_cap": 3072,
+      "answer_token_base": 3000,
+      "answer_token_boosts": [
+        "force_full_floor"
+      ],
+      "answer_token_reason": "auto:force_full_floor",
+      "answer_retry_applied": false,
+      "answer_short_sentences": 1,
+      "answer_short_tokens": 6,
+      "answer_contract_primary_applied": false,
+      "answer_raw_text": "llm.local stub result",
+      "answer_contract_applied": false,
+      "answer_after_format": "llm.local stub result",
+      "claim_ref_rate": 0,
+      "answer_after_fallback": "llm.local stub result",
+      "junk_clean_applied": false,
+      "junk_clean_reasons": [],
+      "concept_lint_applied": false,
+      "concept_lint_reasons": [],
+      "physics_lint_applied": false,
+      "physics_lint_reasons": [],
+      "drift_repair_applied": false,
+      "drift_repair_attempts": 0,
+      "drift_repair_improved": false,
+      "coverage_token_count": 0,
+      "coverage_key_count": 0,
+      "coverage_missing_key_count": 0,
+      "coverage_ratio": 1,
+      "coverage_missing_keys": [],
+      "coverage_gate_applied": false,
+      "claim_ledger": [
+        {
+          "id": "claim:1",
+          "type": "fact",
+          "supported": false,
+          "evidence_refs": [],
+          "proof": "source:missing -> verify -> claim:1"
+        }
+      ],
+      "uncertainty_register": [
+        {
+          "id": "claim:1",
+          "type": "fact",
+          "reason": "missing_evidence"
+        }
+      ],
+      "constraint_matrix": {
+        "section_count": 1,
+        "constraints": []
+      },
+      "belief_claim_count": 1,
+      "belief_supported_count": 0,
+      "belief_unsupported_count": 1,
+      "belief_unsupported_rate": 1,
+      "belief_contradictions": 0,
+      "belief_gate_applied": false,
+      "belief_graph_node_count": 1,
+      "belief_graph_edge_count": 0,
+      "belief_graph_claim_count": 1,
+      "belief_graph_definition_count": 0,
+      "belief_graph_conclusion_count": 0,
+      "belief_graph_evidence_ref_count": 0,
+      "belief_graph_constraint_count": 0,
+      "belief_graph_supports": 0,
+      "belief_graph_contradicts": 0,
+      "belief_graph_depends_on": 0,
+      "belief_graph_maps_to": 0,
+      "belief_graph_claim_ids": [
+        "claim:1"
+      ],
+      "belief_graph_unsupported_claim_ids": [
+        "claim:1"
+      ],
+      "belief_graph_contradiction_ids": [],
+      "rattling_score": 0,
+      "rattling_gate_applied": false,
+      "grounded_sentence_rate": 0,
+      "tree_citation_share": 0,
+      "tree_citation_total": 0,
+      "tree_citation_tree": 0,
+      "tree_citation_non_tree": 0,
+      "rattling_base_distance": 0,
+      "rattling_perturbation_distance": 0,
+      "rattling_claim_set_count": 0,
+      "gates": {
+        "evidence": {},
+        "coverage": {
+          "applied": false,
+          "ratio": 1,
+          "tokenCount": 0,
+          "keyCount": 0,
+          "missingKeyCount": 0,
+          "missingKeys": []
+        },
+        "belief": {
+          "applied": false,
+          "unsupportedRate": 1,
+          "unsupportedCount": 1,
+          "supportedCount": 0,
+          "claimCount": 1,
+          "contradictions": 0
+        },
+        "beliefGraph": {
+          "nodeCount": 1,
+          "edgeCount": 0,
+          "claimCount": 1,
+          "definitionCount": 0,
+          "conclusionCount": 0,
+          "evidenceRefCount": 0,
+          "constraintCount": 0,
+          "supports": 0,
+          "contradicts": 0,
+          "dependsOn": 0,
+          "mapsTo": 0
+        },
+        "rattling": {
+          "applied": false,
+          "score": 0,
+          "baseDistance": 0,
+          "perturbationDistance": 0,
+          "claimSetCount": 0
+        },
+        "lint": {
+          "conceptApplied": false,
+          "conceptReasons": [],
+          "physicsApplied": false,
+          "physicsReasons": []
+        },
+        "variant": {},
+        "ambiguity": {
+          "resolverApplied": false,
+          "resolverTokenCount": 0,
+          "resolverShortPrompt": false,
+          "resolverTopScore": 18,
+          "resolverMargin": 18,
+          "resolverCandidates": [
+            "Security and Hull Guard Tree",
+            "security-hull-guard-tree",
+            "security hull guard tree"
+          ]
+        }
+      },
+      "answer_path": [
+        "intent:general.fallback",
+        "domain:general",
+        "strategy:general_explain",
+        "answer:llm",
+        "citationRepair:skipped(intent)",
+        "platonic:gates",
+        "citationPersistence:append_sources",
+        "placeholderFallback:deterministic_contract",
+        "qualityFloor:deterministic_contract",
+        "qualityFloor:expand_min_length",
+        "qualityFloor:append_sources"
+      ],
+      "citation_persistence_guard_applied": true,
+      "citation_persistence_sources": [
+        "server/routes/agi.plan.ts",
+        "docs/helix-ask-flow.md"
+      ],
+      "citation_persistence_appended": true,
+      "placeholder_fallback_applied": true,
+      "placeholder_fallback_reason": "model_placeholder_answer",
+      "answer_quality_floor_applied": true,
+      "answer_quality_floor_reasons": [
+        "citation_missing",
+        "text_too_short",
+        "text_too_short_expanded",
+        "citation_missing_appended"
+      ],
+      "answer_final_text": "Answer grounded in retrieved evidence.\n\nAnswer grounded in retrieved evidence and constrained by repo signals.\n\nAnswer grounded in retrieved evidence and constrained by repo signals.\n\nAnswer grounded in retrieved evidence and constrained by repo signals.\n\nSources: server/routes/agi.plan.ts, docs/helix-ask-flow.md",
+      "answer_extension_available": false,
+      "answer_extension_items": 0,
+      "answer_extension_doc_items": 0,
+      "answer_extension_code_items": 0,
+      "answer_extension_appended": false,
+      "live_events": [
+        {
+          "ts": "2026-02-18T19:57:47.245Z",
+          "tool": "helix.ask.progress",
+          "stage": "Preflight retrieval",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: Preflight retrieval - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:47.245Z",
+          "tool": "helix.ask.progress",
+          "stage": "Generating answer",
+          "durationMs": 0,
+          "text": "Helix Ask: Generating answer"
+        },
+        {
+          "ts": "2026-02-18T19:57:47.245Z",
+          "tool": "helix.ask.progress",
+          "stage": "LLM answer",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: LLM answer - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:47.245Z",
+          "tool": "helix.ask.progress",
+          "stage": "LLM answer",
+          "detail": "done",
+          "ok": true,
+          "durationMs": 0,
+          "text": "Helix Ask: LLM answer - done",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:47.245Z",
+          "tool": "helix.ask.progress",
+          "stage": "Answer ready",
+          "durationMs": 0,
+          "text": "Helix Ask: Answer ready",
+          "meta": {
+            "elapsedMs": 0
+          }
+        }
+      ],
+      "trace_events": [
+        {
+          "ts": "2026-02-18T19:57:47.245Z",
+          "tool": "helix.ask.progress",
+          "stage": "Preflight retrieval",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: Preflight retrieval - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:47.245Z",
+          "tool": "helix.ask.progress",
+          "stage": "Generating answer",
+          "durationMs": 0,
+          "text": "Helix Ask: Generating answer"
+        },
+        {
+          "ts": "2026-02-18T19:57:47.245Z",
+          "tool": "helix.ask.progress",
+          "stage": "LLM answer",
+          "detail": "start",
+          "durationMs": 0,
+          "text": "Helix Ask: LLM answer - start",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:47.245Z",
+          "tool": "helix.ask.progress",
+          "stage": "LLM answer",
+          "detail": "done",
+          "ok": true,
+          "durationMs": 0,
+          "text": "Helix Ask: LLM answer - done",
+          "meta": {
+            "elapsedMs": 0
+          }
+        },
+        {
+          "ts": "2026-02-18T19:57:47.245Z",
+          "tool": "helix.ask.progress",
+          "stage": "Answer ready",
+          "durationMs": 0,
+          "text": "Helix Ask: Answer ready",
+          "meta": {
+            "elapsedMs": 0
+          }
+        }
+      ],
+      "trace_summary": [],
+      "helix_ask_fail_reason": null,
+      "helix_ask_fail_class": null
+    }
+  }
+}
