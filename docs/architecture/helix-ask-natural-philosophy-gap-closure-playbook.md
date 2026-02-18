@@ -150,3 +150,86 @@ Return:
 - If the user asks for ideology references, anchor to `docs/ethos/ideology.json` first, then bridge to domain trees.
 - If answers look generic but retrieval appears fast, inspect routing/fallback before tuning generation.
 - Prefer scan-first then build. Do not skip scan for broad-domain failures.
+
+## Standalone GPT Pro research prompt standard
+Use this when you need independent research runs that can be repeated and compared across agents.
+
+### Required structure (always include)
+1. Objective (single measurable goal).
+2. Repo definitions (project-specific meanings for terms like life, equilibrium, entropy, consciousness).
+3. Required anchors (exact files that must be read).
+4. Research tasks (numbered, concrete outputs).
+5. Output artifacts (exact paths and formats).
+6. Metrics and gates (thresholds with pass/fail).
+7. Allowed decision types (`pass`, `needs_quality_patch`, `needs_reliability_patch`, `insufficient_run_quality`).
+8. Constraints (no invented citations, no maturity over-claiming).
+9. Provenance policy (what to do when `main/origin` is missing).
+10. Verification block (Casimir + trace export when files change).
+11. Final response format (fixed section order).
+
+### Reusable standalone prompt template
+```
+You are running a standalone research pass (no implementation unless explicitly requested).
+
+## Objective
+<single measurable goal>
+
+## Repo Definitions (must use exactly)
+- <term>: <repo-specific meaning>
+- <term>: <repo-specific meaning>
+
+## Required Anchors (must read)
+- <path1>
+- <path2>
+- <path3>
+
+## Research Tasks
+1. <task>
+2. <task>
+3. <task>
+
+## Required Artifacts
+- reports/<name>.md
+- artifacts/<name>/summary.json
+- artifacts/<name>/missing-topics.json
+- artifacts/<name>/missing-tree-dag-bridges.json
+
+## Metrics + Gates
+- <metric_a> target <...>
+- <metric_b> target <...>
+- <metric_c> target <...>
+
+## Allowed Decision Types
+- pass
+- needs_quality_patch
+- needs_reliability_patch
+- insufficient_run_quality
+
+## Constraints
+- No invented citations.
+- Respect math maturity stages.
+- Mark speculative vs certified claims explicitly.
+
+## Provenance Policy
+If `main/origin` unavailable, continue on current HEAD and emit provenance warning.
+
+## Verification (if any files changed)
+- POST /api/agi/adapter/run (constraint-pack repo-convergence)
+- GET /api/agi/training-trace/export
+- Report: verdict, certificateHash, integrityOk, trace export status.
+
+## Final Response Format
+1) Executive summary
+2) Metrics table (threshold / measured / pass-fail)
+3) Findings
+4) Top blockers
+5) Next patches
+6) Exact commands run
+7) ✅/⚠️/❌ tests
+8) Casimir block
+9) Commit hash (if any)
+```
+
+### Recommended workflow variants
+- Scan -> Synthesis -> Build for new domains.
+- Scan -> Build for known, narrow regressions.
