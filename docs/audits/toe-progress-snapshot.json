@@ -1,6 +1,7 @@
 {
   "schema_version": "toe_progress_snapshot/1",
   "generated_at": "2026-02-18T22:54:04.745Z",
+  "generated_at": "2026-02-18T22:55:04.400Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -1156,6 +1157,7 @@
       "research_gated": true,
       "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T225336Z.json"
+      "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T224927Z.json"
     }
   ]
 }

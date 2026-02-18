@@ -68,7 +68,9 @@ describe("Casimir verify for PS2 patch", () => {
       traceStatus: traceRes.status,
       traceBytes: Buffer.byteLength(traceText, "utf8"),
     };
-    fs.writeFileSync(path.join("artifacts", "experiments", "helix-ask-ps2", "casimir-verify-latest.json"), JSON.stringify(out, null, 2));
+    const outDir = path.join("artifacts", "experiments", "helix-ask-ps2");
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(path.join(outDir, "casimir-verify-latest.json"), JSON.stringify(out, null, 2));
 
     expect(verifyRes.status).toBe(200);
     expect(traceRes.status).toBe(200);

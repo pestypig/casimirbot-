@@ -4,6 +4,7 @@ import {
   evaluateEvidenceEligibility,
   extractClaimCandidates,
   evaluateClaimCoverage,
+  evaluateClaimCitationLinkage,
 } from "../server/services/helix-ask/query";
 import { scorePremeditation } from "../server/services/premeditation-scorer";
 import { resolveHelixAskArbiter } from "../server/services/helix-ask/arbiter";
@@ -266,5 +267,40 @@ describe("Helix Ask semantic claim-citation linkage scorer", () => {
     expect(score.linkedClaimCount).toBe(2);
     expect(score.linkRate).toBe(1);
     expect(score.failReasons).toEqual([]);
+describe("Helix Ask semantic claim citation linkage", () => {
+  it("fails with CLAIM_CITATION_LINK_MISSING when claims have no citation links", () => {
+    const answer = [
+      "The system enforces deterministic evidence gates for Helix Ask.",
+      "It persists training traces for replay and audits.",
+    ].join(" ");
+    const result = evaluateClaimCitationLinkage(answer, []);
+    expect(result.ok).toBe(false);
+    expect(result.failReason).toBe("CLAIM_CITATION_LINK_MISSING");
+    expect(result.unlinkedClaims.length).toBeGreaterThan(0);
+  });
+
+  it("fails with CLAIM_CITATION_LINK_WEAK when citations cannot cover all claims", () => {
+    const answer = [
+      "The system enforces deterministic evidence gates for Helix Ask.",
+      "It persists training traces for replay and audits.",
+      "It records strict fail reasons for contract regressions.",
+      "",
+      "Sources: server/routes/agi.plan.ts",
+    ].join("\n");
+    const result = evaluateClaimCitationLinkage(answer, []);
+    expect(result.ok).toBe(false);
+    expect(result.failReason).toBe("CLAIM_CITATION_LINK_WEAK");
+  });
+
+  it("passes when citations can be deterministically linked to all claims", () => {
+    const answer = [
+      "The system enforces deterministic evidence gates for Helix Ask.",
+      "It persists training traces for replay and audits.",
+      "",
+      "Sources: server/routes/agi.plan.ts, tests/helix-ask-evidence-gate.spec.ts",
+    ].join("\n");
+    const result = evaluateClaimCitationLinkage(answer, []);
+    expect(result.ok).toBe(true);
+    expect(result.failReason).toBeUndefined();
   });
 });
