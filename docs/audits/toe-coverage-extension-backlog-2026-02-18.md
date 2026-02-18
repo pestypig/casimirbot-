@@ -69,6 +69,49 @@ Batch prompts:
 
 - `docs/audits/toe-extension-prompt-batch-2026-02-18.md`
 
+## ToE Percent Semantics (Reviewer Policy)
+
+Use these definitions when reporting progress:
+
+- `toe_progress_pct` is an engineering maturity score from `scripts/compute-toe-progress.ts`.
+- Current default scoring uses the core backlog at:
+  - `docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json`
+- Ticket score weights:
+  - `diagnostic = 0.25`
+  - `reduced-order = 0.6`
+  - `certified = 1.0`
+- A ticket scores only when receipt evidence has:
+  - `casimir.verdict=PASS`
+  - `casimir.integrity_ok=true`
+- `forest_owner_coverage_pct` is separate and comes from:
+  - `configs/resolver-owner-coverage-manifest.v1.json`
+
+Interpretation rule:
+
+- Do not present `toe_progress_pct` as full-forest completion unless progress tooling is explicitly configured to include extension backlog coverage.
+- Use both metrics together in reviews:
+  - `toe_progress_pct` = maturity depth on scored tickets.
+  - `forest_owner_coverage_pct` = breadth across tree-owner lanes.
+
+## Research Escalation Policy (ChatGPT Pro / External Research)
+
+Use research-first prompts before implementation when work crosses from contract wiring into truth-bearing claims.
+
+Escalate to research prompts when any of the following is true:
+
+- A patch introduces or changes physics derivations, constants, or model assumptions not already bounded by in-repo tests.
+- A lane is being promoted from `diagnostic` to `reduced-order` or `certified`.
+- Multiple candidate methods exist and source-backed method selection is required.
+- Existing outputs conflict with guardrails or known physical constraints and adjudication is needed.
+- External claims are needed for operator-facing justification, release notes, or policy assertions.
+
+Research output minimum contract:
+
+- Primary-source citations list.
+- Falsifiable hypotheses and counter-hypotheses.
+- Explicit uncertainty bounds and claim-tier recommendation.
+- Clear mapping from source claim -> repo artifact/test/guardrail.
+
 ## Reusable Worker Prompt
 
 ```md
