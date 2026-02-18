@@ -71,4 +71,30 @@ describe("casimir resonance seeding", () => {
       ) ?? false;
     expect(containsCasimirNode).toBe(true);
   });
+
+  it("adds default provenance metadata when telemetry provenance is missing", async () => {
+    const bundle = await buildResonanceBundle({
+      goal: "check casimir telemetry",
+      query: "casimir tiles",
+      telemetry: null,
+      limit: 5,
+    });
+    expect(bundle?.claim_tier).toBe("diagnostic");
+    expect(bundle?.certifying).toBe(false);
+    expect(bundle?.provenance_class).toBe("inferred");
+  });
+
+  it("returns deterministic fail reason in strict mode when provenance is missing", async () => {
+    const bundle = await buildResonanceBundle({
+      goal: "check casimir telemetry",
+      query: "casimir tiles",
+      telemetry: null,
+      strictProvenance: true,
+      limit: 5,
+    });
+    expect(bundle?.candidates).toEqual([]);
+    expect(bundle?.fail_reason).toBe("RESONANCE_PROVENANCE_MISSING");
+    expect(bundle?.claim_tier).toBe("diagnostic");
+    expect(bundle?.certifying).toBe(false);
+  });
 });

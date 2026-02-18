@@ -16,8 +16,10 @@ import {
   CASIMIR_BAND_BIAS,
   CASIMIR_BLUEPRINT_BY_BAND,
   CASIMIR_LOW_SIGNAL,
+  RESONANCE_DEFAULT_PROVENANCE,
   RESONANCE_EVENT_RATE_CAP,
   RESONANCE_RECENCY_TAU_MS,
+  RESONANCE_STRICT_PROVENANCE_FAIL_REASON,
   RESONANCE_WEIGHTS,
 } from "./resonance.constants";
 import { loadCodeLattice } from "./loader";
@@ -33,6 +35,12 @@ type LatticeIndex = {
 type PanelHitMap = Map<string, Set<string>>;
 type NodeBandMap = Map<string, Set<string>>;
 type NodeSourceMap = Map<string, Set<string>>;
+
+type ResonanceProvenance = {
+  provenance_class: string;
+  claim_tier: string;
+  certifying: boolean;
+};
 
 type ResonancePatchConfig = {
   id: string;
@@ -335,6 +343,40 @@ function mergeSeedArtifacts(target: TelemetrySeedResult, incoming: TelemetrySeed
   return target;
 }
 
+const resolveResonanceProvenance = (
+  telemetry: ConsoleTelemetryBundle | null,
+): { provenance: ResonanceProvenance; hasProvidedProvenance: boolean } => {
+  if (!telemetry || typeof telemetry !== "object") {
+    return { provenance: { ...RESONANCE_DEFAULT_PROVENANCE }, hasProvidedProvenance: false };
+  }
+  const candidate = telemetry as unknown as {
+    provenance_class?: unknown;
+    claim_tier?: unknown;
+    certifying?: unknown;
+  };
+  const hasProvidedProvenance =
+    typeof candidate.provenance_class === "string" ||
+    typeof candidate.claim_tier === "string" ||
+    typeof candidate.certifying === "boolean";
+  return {
+    provenance: {
+      provenance_class:
+        typeof candidate.provenance_class === "string" && candidate.provenance_class.trim().length > 0
+          ? candidate.provenance_class
+          : RESONANCE_DEFAULT_PROVENANCE.provenance_class,
+      claim_tier:
+        typeof candidate.claim_tier === "string" && candidate.claim_tier.trim().length > 0
+          ? candidate.claim_tier
+          : RESONANCE_DEFAULT_PROVENANCE.claim_tier,
+      certifying:
+        typeof candidate.certifying === "boolean"
+          ? candidate.certifying
+          : RESONANCE_DEFAULT_PROVENANCE.certifying,
+    },
+    hasProvidedProvenance,
+  };
+};
+
 function collectTelemetrySeeds(
   telemetry: ConsoleTelemetryBundle | null,
   nodesById: Map<string, TCodeFeature>,
@@ -476,6 +518,7 @@ type BuildResonanceArgs = {
   query?: string;
   limit?: number;
   telemetry?: ConsoleTelemetryBundle | null;
+  strictProvenance?: boolean;
 };
 
 type PatchBuilderArgs = {
@@ -627,6 +670,21 @@ export async function buildResonanceBundle(args: BuildResonanceArgs): Promise<Re
   if (!trimmed) {
     return null;
   }
+  const { provenance, hasProvidedProvenance } = resolveResonanceProvenance(args.telemetry ?? null);
+  if (args.strictProvenance === true && !hasProvidedProvenance) {
+    return {
+      goal: args.goal,
+      query: trimmed,
+      capturedAt: new Date().toISOString(),
+      baseLimit: limit,
+      seedCount: 0,
+      candidates: [],
+      provenance_class: provenance.provenance_class,
+      claim_tier: provenance.claim_tier,
+      certifying: provenance.certifying,
+      fail_reason: RESONANCE_STRICT_PROVENANCE_FAIL_REASON,
+    } as ResonanceBundle;
+  }
   const tokenSet = new Set(tokenize(trimmed));
   const seeds = new Map<string, number>();
   const telemetrySeedResult = collectTelemetrySeeds(
@@ -690,7 +748,10 @@ export async function buildResonanceBundle(args: BuildResonanceArgs): Promise<Re
     seedCount: seeds.size,
     candidates,
     telemetry: telemetrySummary,
-  };
+    provenance_class: provenance.provenance_class,
+    claim_tier: provenance.claim_tier,
+    certifying: provenance.certifying,
+  } as ResonanceBundle;
 }
 
 export async function buildResonantCodeKnowledge(args: BuildResonanceArgs): Promise<KnowledgeProjectExport | null> {
