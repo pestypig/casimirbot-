@@ -177,6 +177,49 @@ describe("Helix Ask modes", () => {
     expect(payload.proof?.verdict).toBe("FAIL");
     expect(payload.proof?.firstFail?.id).toBe("EVIDENCE_CONTRACT_FIELD_MISSING");
   }, 90000);
+
+  it("keeps verify mode backward-compatible by omitting strict fail_reason when strictProvenance is disabled", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "time/place tide gravity check",
+        mode: "verify",
+        strictProvenance: false,
+        allowTools: ["halobank.time.compute"],
+        timestamp: "2025-03-01T12:00:00Z",
+        place: { lat: 40.7128, lon: -74.006 },
+        model: {
+          orbitalAlignment: true,
+          ephemerisSource: "live",
+        },
+        sessionId: "modes-verify-halobank-default-missing-evidence",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      mode?: string;
+      fail_reason?: string;
+      fail_class?: string;
+      claim_tier?: string;
+      provenance_class?: string;
+      certifying?: boolean;
+      proof?: {
+        verdict?: string;
+        firstFail?: { id?: string } | null;
+      };
+    };
+
+    expect(payload.mode).toBe("verify");
+    expect(payload.fail_reason).toBeUndefined();
+    expect(payload.fail_class).toBeUndefined();
+    expect(payload.claim_tier).toBe("diagnostic");
+    expect(payload.provenance_class).toBe("inferred");
+    expect(payload.certifying).toBe(false);
+    expect(payload.proof?.verdict).toBe("PASS");
+    expect(payload.proof?.firstFail).toBeNull();
+  }, 90000);
+
   it("returns proof packet + action output for verify mode with halobank tool", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",
