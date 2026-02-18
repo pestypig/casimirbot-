@@ -24,11 +24,68 @@ type EnergyBuildOptions = {
   persistEnvelope?: boolean;
   leakageSentinel?: boolean;
   skipLeakageTest?: boolean;
+  provenanceClass?: unknown;
+  claimTier?: unknown;
+  strictMeasuredProvenance?: boolean;
 };
 
 const calibrationCache = new Map<string, TSolarEnergyCalibration>();
 const DEFAULT_CAL_VERSION = process.env.SOLAR_ENERGY_CALIB_VERSION ?? "aia-193-v1";
 const R_SUN_M = 696_340_000; // SI radius for unit-disk scaling (meters)
+
+
+const STAR_MATERIALS_PROVENANCE_NON_MEASURED =
+  "STAR_MATERIALS_PROVENANCE_NON_MEASURED" as const;
+
+type StarMaterialsProvenanceClass = "measured" | "proxy" | "inferred";
+type StarMaterialsClaimTier = "diagnostic" | "reduced-order" | "certified";
+
+type StarMaterialsProvenanceMeta = {
+  provenance_class: StarMaterialsProvenanceClass;
+  claim_tier: StarMaterialsClaimTier;
+  certifying: boolean;
+  fail_reason?: typeof STAR_MATERIALS_PROVENANCE_NON_MEASURED;
+};
+
+const normalizeProvenanceClass = (value: unknown): StarMaterialsProvenanceClass => {
+  if (value === "measured" || value === "proxy" || value === "inferred") {
+    return value;
+  }
+  return "inferred";
+};
+
+const normalizeClaimTier = (value: unknown): StarMaterialsClaimTier => {
+  if (value === "diagnostic" || value === "reduced-order" || value === "certified") {
+    return value;
+  }
+  return "diagnostic";
+};
+
+const resolveStarMaterialsProvenance = (opts?: {
+  provenanceClass?: unknown;
+  claimTier?: unknown;
+  strictMeasuredProvenance?: boolean;
+}): StarMaterialsProvenanceMeta => {
+  const provenanceClass = normalizeProvenanceClass(opts?.provenanceClass);
+  const requestedClaimTier = normalizeClaimTier(opts?.claimTier);
+  const certifying = provenanceClass === "measured" && requestedClaimTier === "certified";
+  const claimTier = certifying ? requestedClaimTier : "diagnostic";
+
+  if (opts?.strictMeasuredProvenance && provenanceClass !== "measured") {
+    return {
+      provenance_class: provenanceClass,
+      claim_tier: "diagnostic",
+      certifying: false,
+      fail_reason: STAR_MATERIALS_PROVENANCE_NON_MEASURED,
+    };
+  }
+
+  return {
+    provenance_class: provenanceClass,
+    claim_tier: claimTier,
+    certifying,
+  };
+};
 
 type EnergyFieldMeta = {
   calibration: TSolarEnergyCalibration;
@@ -38,6 +95,10 @@ type EnergyFieldMeta = {
   wavelength_A?: number | null;
   window_start?: string | null;
   window_end?: string | null;
+  provenance_class: StarMaterialsProvenanceClass;
+  claim_tier: StarMaterialsClaimTier;
+  certifying: boolean;
+  fail_reason?: typeof STAR_MATERIALS_PROVENANCE_NON_MEASURED;
 };
 
 const clamp = (v: number, min: number, max: number) => {
@@ -291,6 +352,7 @@ export function buildEnergyFieldFromSunpy(
   }
 
   const energy = applyEnergyCalibration(map, calibration);
+  const provenance = resolveStarMaterialsProvenance(opts);
   const meta = {
     calibration_version: calibration.version,
     calibration,
@@ -299,6 +361,10 @@ export function buildEnergyFieldFromSunpy(
     wavelength_A: payload.wavelength_A ?? payload.meta?.wavelength ?? null,
     window_start: payload.meta?.start ?? payload.meta?.requested_start ?? null,
     window_end: payload.meta?.end ?? payload.meta?.requested_end ?? null,
+    provenance_class: provenance.provenance_class,
+    claim_tier: provenance.claim_tier,
+    certifying: provenance.certifying,
+    ...(provenance.fail_reason ? { fail_reason: provenance.fail_reason } : {}),
   };
   const { inputs_hash, features_hash } = computeHashes(energy, meta, "sunpy-export", mapHash);
   const information_boundary = buildInformationBoundaryFromHashes({
@@ -351,6 +417,7 @@ export function buildEnergyFieldFromSolarCoherence(
       ? coherence.map.energy
       : decodeFloat32((coherence.map as any).energy_b64, gridSize);
   const energyProxy = applyCoherenceEnergyCalibration(energyArr, calibration);
+  const provenance = resolveStarMaterialsProvenance(opts);
   const mapHash = sha256Prefixed(Buffer.from(energyArr.buffer, energyArr.byteOffset, energyArr.byteLength));
   const data_cutoff_iso = pickDataCutoff([opts?.asOf, coherence.frames?.[coherence.frames.length - 1]?.t ? new Date(coherence.frames[coherence.frames.length - 1].t).toISOString() : null], new Date().toISOString());
 
@@ -364,6 +431,10 @@ export function buildEnergyFieldFromSolarCoherence(
     window_end: coherence.frames?.[coherence.frames.length - 1]?.t
       ? new Date(coherence.frames[coherence.frames.length - 1].t).toISOString()
       : null,
+    provenance_class: provenance.provenance_class,
+    claim_tier: provenance.claim_tier,
+    certifying: provenance.certifying,
+    ...(provenance.fail_reason ? { fail_reason: provenance.fail_reason } : {}),
   };
   const { inputs_hash, features_hash } = computeHashes(energyProxy, meta, "solar-coherence", mapHash);
   const information_boundary = buildInformationBoundaryFromHashes({
@@ -392,6 +463,8 @@ export function buildEnergyFieldFromSolarCoherence(
 
   return field;
 }
+
+export { STAR_MATERIALS_PROVENANCE_NON_MEASURED };
 
 export async function runSolarCurvatureFromSunpy(
   payload: SunpyExportPayload,

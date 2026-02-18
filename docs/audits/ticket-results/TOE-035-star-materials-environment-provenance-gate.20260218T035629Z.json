@@ -1,0 +1,30 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-035-star-materials-environment-provenance-gate",
+  "files_changed": [
+    "server/services/essence/solar-guardrails.ts",
+    "server/services/essence/solar-energy-adapter.ts",
+    "server/routes/star.ts",
+    "tests/solar-guardrails.spec.ts",
+    "tests/solar-energy-adapter.spec.ts",
+    "server/__tests__/star-equilibrium.spec.ts",
+    "docs/audits/ticket-results/TOE-035-star-materials-environment-provenance-gate.20260218T035629Z.json"
+  ],
+  "tests_run": [
+    "tests/solar-guardrails.spec.ts",
+    "tests/solar-energy-adapter.spec.ts",
+    "server/__tests__/star-equilibrium.spec.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "cli/casimir-verify.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:73fe26f6-ffff-4a74-a231-a4062840b8ee",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true,
+    "status": "GREEN"
+  },
+  "remaining_gaps": []
+}
