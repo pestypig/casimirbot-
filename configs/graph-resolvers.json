@@ -31,6 +31,47 @@
       "weight": 1.2
     },
     {
+      "id": "stellar-ps1-bridges",
+      "label": "Stellar PS1 Bridge Walk",
+      "path": "docs/knowledge/bridges/stellar-ps1-bridge-tree.json",
+      "topicTags": [
+        "physics",
+        "star",
+        "security",
+        "uncertainty"
+      ],
+      "matchers": [
+        "life emergence",
+        "origin of life",
+        "consciousness",
+        "cosmology",
+        "stellar consciousness",
+        "open-world",
+        "ai financial defense",
+        "financial defense",
+        "security",
+        "fraud",
+        "cybersecurity"
+      ],
+      "maxAnchors": 4,
+      "maxDepth": 3,
+      "maxNodes": 10,
+      "minAnchorScore": 2,
+      "preferGraph": true,
+      "edgePriority": {
+        "enables": 3,
+        "constrains": 3,
+        "verifies": 3,
+        "rollback_to": 2,
+        "escalates_to": 2,
+        "optimizes": 2,
+        "child": 1,
+        "parent": 1,
+        "see-also": 1
+      },
+      "weight": 1.2
+    },
+    {
       "id": "ideology-physics-bridge",
       "label": "Ideology \u2194 Physics Bridge Walk",
       "path": "docs/knowledge/bridges/ideology-physics-bridge-tree.json",

@@ -1,0 +1,187 @@
+{
+  "version": 1,
+  "rootId": "stellar-ps1-bridge-root",
+  "nodes": [
+    {
+      "id": "stellar-ps1-bridge-root",
+      "title": "Stellar PS1 Bridge Root",
+      "summary": "P0/P1 bridge inventory normalized from missing-tree-dag-bridges.json for deterministic resolver traversal.",
+      "tags": [
+        "bridge",
+        "stellar",
+        "open-world",
+        "deterministic"
+      ],
+      "children": [
+        "bridge-orch-or-to-stellar-coherence",
+        "physics-time-crystal-clock-coupling",
+        "stellar-plasma-collapse-signature-model",
+        "bridge-noise-spectrum-to-collapse-proxy"
+      ],
+      "links": []
+    },
+    {
+      "id": "bridge-orch-or-to-stellar-coherence",
+      "nodeType": "bridge",
+      "title": "Bridge Orch-OR to Stellar Coherence",
+      "summary": "Bridge from Orch-OR hypotheses into stellar coherence constraints with explicit no-feasibility and escalation gates.",
+      "tags": [
+        "bridge",
+        "consciousness",
+        "cosmology",
+        "life",
+        "open-world"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "uncertainty-mechanics"
+        },
+        {
+          "rel": "see-also",
+          "to": "no-feasibility-claims"
+        },
+        {
+          "rel": "constrains",
+          "to": "uncertainty-mechanics"
+        },
+        {
+          "rel": "verifies",
+          "to": "no-feasibility-claims"
+        },
+        {
+          "rel": "escalates_to",
+          "to": "expansion_frontier"
+        }
+      ],
+      "bridge": {
+        "left": "uncertainty-mechanics",
+        "right": "no-feasibility-claims",
+        "relation": "constrains"
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/stellar-consciousness-orch-or-review.md",
+          "scope": "left",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/no-feasibility-claims.md",
+          "scope": "right",
+          "provenance_class": "measured",
+          "claim_tier": "certified",
+          "certifying": true
+        }
+      ]
+    },
+    {
+      "id": "physics-time-crystal-clock-coupling",
+      "nodeType": "derived",
+      "title": "Physics Time Crystal Clock Coupling",
+      "summary": "Derived coupling path constraining sampling bounds and forcing rollback to math maturity stage when evidence weakens.",
+      "tags": [
+        "derived",
+        "physics",
+        "clock",
+        "collapse"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "constrains",
+          "to": "sampling-time-bounds"
+        },
+        {
+          "rel": "rollback_to",
+          "to": "math-maturity-stages"
+        }
+      ]
+    },
+    {
+      "id": "stellar-plasma-collapse-signature-model",
+      "nodeType": "derived",
+      "title": "Stellar Plasma Collapse Signature Model",
+      "summary": "Derived model path that enables scaling-law reasoning and verifies QI diagnostics schema.",
+      "tags": [
+        "derived",
+        "stellar",
+        "plasma",
+        "collapse",
+        "cosmology"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "enables",
+          "to": "scaling-laws"
+        },
+        {
+          "rel": "verifies",
+          "to": "qi-diagnostics-schema"
+        }
+      ]
+    },
+    {
+      "id": "bridge-noise-spectrum-to-collapse-proxy",
+      "nodeType": "bridge",
+      "title": "Bridge Noise Spectrum to Collapse Proxy",
+      "summary": "Bridge from noise-spectrum signals into uncertainty mechanics and verification hooks for AI/financial/defense/security prompts.",
+      "tags": [
+        "bridge",
+        "security",
+        "ai",
+        "financial",
+        "defense",
+        "collapse",
+        "risk"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "uncertainty-mechanics"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification_hook"
+        },
+        {
+          "rel": "optimizes",
+          "to": "uncertainty-mechanics"
+        },
+        {
+          "rel": "verifies",
+          "to": "verification_hook"
+        }
+      ],
+      "bridge": {
+        "left": "uncertainty-mechanics",
+        "right": "verification_hook",
+        "relation": "optimizes"
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/uncertainty-mechanics.md",
+          "scope": "left",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/bridges/ideology-physics-bridge-tree.json",
+          "scope": "right",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ]
+    }
+  ]
+}
