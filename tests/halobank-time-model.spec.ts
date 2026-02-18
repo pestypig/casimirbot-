@@ -98,6 +98,27 @@ describe("halobank time model", () => {
     expect(result.ephemeris?.provenance.claim_tier_recommendation).toBe("diagnostic");
   });
 
+  it("keeps conservative diagnostic downgrade when residual evidence is incomplete", () => {
+    const result = computeHaloBankTimeModel({
+      timestamp: "2025-03-01T12:00:00.000Z",
+      place: { lat: 40.7128, lon: -74.006 },
+      model: {
+        orbitalAlignment: true,
+        ephemerisSource: "live",
+        ephemerisEvidenceVerified: true,
+        ephemerisEvidenceRef: "artifact:jpl-horizons:2025-03-01T12:00:00Z",
+        residualPpm: 2.2,
+        residualSampleCount: 2,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE");
+    expect(result.ephemeris?.provenance.evidence.residualStatus).toBe("incomplete_evidence");
+    expect(result.ephemeris?.provenance.claim_tier_recommendation).toBe("diagnostic");
+  });
+
   it("marks fallback ephemeris as diagnostic non-certifying with deterministic fail id", () => {
     const result = computeHaloBankTimeModel({
       timestamp: "2025-03-01T12:00:00.000Z",
