@@ -3,7 +3,7 @@
 - pass: yes
 - pass_rate: 100.0%
 - failed_cases: 0/5
-- duration_ms: 10358
+- duration_ms: 7676
 
 ## Case Summary
 - relation_canonical: PASS (100%)
