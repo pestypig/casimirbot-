@@ -11,6 +11,27 @@ import { estimateAttachmentBytes } from "./validation";
 const NON_WORD = /[^\p{Letter}\p{Number}]+/gu;
 const KEYWORD_WEIGHT = 0.55;
 const EMBEDDING_DIM = 128;
+const KNOWLEDGE_CLAIM_TIER = "diagnostic" as const;
+
+type KnowledgeCorpusAudit = {
+  claim_tier: typeof KNOWLEDGE_CLAIM_TIER;
+  provenance: {
+    class: "derived";
+    stage: "ingestion" | "retrieval";
+    source: "knowledge.corpus";
+    deterministic: true;
+  };
+  status: "persisted" | "selected";
+  context?: Record<string, unknown>;
+};
+
+type KnowledgeAuditedProject = KnowledgeProjectExport & {
+  audit?: {
+    ingestion?: KnowledgeCorpusAudit;
+    retrieval?: KnowledgeCorpusAudit;
+    [key: string]: unknown;
+  };
+};
 
 const tokenize = (value: string): string[] => {
   const trimmed = value.trim();
@@ -169,7 +190,30 @@ export async function persistKnowledgeBundles(projects: KnowledgeProjectExport[]
   if (!projects || projects.length === 0) {
     return { synced: 0, projectIds: [] };
   }
-  const payload = projects.map(toSyncPayload);
+  const auditedProjects = projects.map((project) => {
+    const existingAudit = (project as KnowledgeAuditedProject).audit ?? {};
+    return {
+      ...project,
+      audit: {
+        ...existingAudit,
+        ingestion: {
+          claim_tier: KNOWLEDGE_CLAIM_TIER,
+          provenance: {
+            class: "derived",
+            stage: "ingestion",
+            source: "knowledge.corpus",
+            deterministic: true,
+          },
+          status: "persisted",
+          context: {
+            file_count: project.files.length,
+            approx_bytes: project.approxBytes,
+          },
+        },
+      },
+    } as KnowledgeProjectExport;
+  });
+  const payload = auditedProjects.map(toSyncPayload);
   await persistKnowledgeProjects(payload);
   return { synced: payload.length, projectIds: payload.map((project) => project.id) };
 }
@@ -285,7 +329,24 @@ export async function fetchKnowledgeForProjects(
       files,
       approxBytes: projectBytes,
       omittedFiles: omitted.length > 0 ? omitted : undefined,
-    });
+      audit: {
+        retrieval: {
+          claim_tier: KNOWLEDGE_CLAIM_TIER,
+          provenance: {
+            class: "derived",
+            stage: "retrieval",
+            source: "knowledge.corpus",
+            deterministic: true,
+          },
+          status: "selected",
+          context: {
+            selected_files: files.length,
+            omitted_files: omitted.length,
+            approx_bytes: projectBytes,
+          },
+        },
+      },
+    } as KnowledgeProjectExport);
 
     if (Number.isFinite(remaining) && remaining <= 0) {
       break;

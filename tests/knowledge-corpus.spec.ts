@@ -86,6 +86,10 @@ describe("knowledge corpus", () => {
     const first = payload.knowledge_context[0] as KnowledgeProjectExport | undefined;
     expect(first?.project.id).toBe("project:test");
     expect(first?.files?.length).toBeGreaterThan(0);
+    const retrievalAudit = (first as { audit?: { retrieval?: { claim_tier?: string; provenance?: { stage?: string } } } })?.audit
+      ?.retrieval;
+    expect(retrievalAudit?.claim_tier).toBe("diagnostic");
+    expect(retrievalAudit?.provenance?.stage).toBe("retrieval");
   });
 });
 
