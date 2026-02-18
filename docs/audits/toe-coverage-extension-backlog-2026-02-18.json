@@ -1832,6 +1832,7 @@
     {
       "id": "TOE-073-helix-ask-semantic-claim-citation-contract",
       "tree_owner": "helix-ask",
+      "primitive": "Helix Ask semantic claim-citation contract primitive",
       "primitive": "Helix Ask semantic claim citation linkage contract",
       "primary_path_prefix": "server/routes/agi.plan.ts",
       "allowed_paths": [
@@ -1848,6 +1849,9 @@
         "tests/helix-ask-evidence-gate.spec.ts"
       ],
       "done_criteria": [
+        "Final claim sentences require deterministic citation-linkage checks",
+        "Semantic gate emits deterministic fail reasons for missing vs weak claim-citation linkage",
+        "Regression tests pin deterministic linkage scoring behavior"
         "Final claim sentences require deterministic linkage to at least one citation token or path",
         "Fail reasons are deterministic and emitted as CLAIM_CITATION_LINK_MISSING or CLAIM_CITATION_LINK_WEAK",
         "Helix Ask artifact and evidence gate tests cover linkage pass/fail behavior"

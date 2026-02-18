@@ -1,5 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
+  "generated_at": "2026-02-18T22:54:04.745Z",
   "generated_at": "2026-02-18T22:55:04.400Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
@@ -33,8 +34,8 @@
       "blocked_ticket_count": 68,
       "ready_ticket_count": 5
     },
-    "research_gated_tickets_total": 27,
-    "research_artifact_complete_tickets_total": 27
+    "research_gated_tickets_total": 28,
+    "research_artifact_complete_tickets_total": 28
   },
   "segments": {
     "core": {
@@ -59,11 +60,11 @@
         "reduced-order": 4,
         "certified": 0
       },
-      "weighted_score_sum": 16.9,
-      "toe_progress_pct": 27.3,
-      "strict_ready_progress_pct": 6.5,
-      "research_gated_tickets_total": 27,
-      "research_artifact_complete_tickets_total": 27
+      "weighted_score_sum": 17.15,
+      "toe_progress_pct": 27.2,
+      "strict_ready_progress_pct": 6.3,
+      "research_gated_tickets_total": 28,
+      "research_artifact_complete_tickets_total": 28
     },
     "combined": {
       "tickets_total": 73,
@@ -85,8 +86,8 @@
         "blocked_ticket_count": 68,
         "ready_ticket_count": 5
       },
-      "research_gated_tickets_total": 27,
-      "research_artifact_complete_tickets_total": 27
+      "research_gated_tickets_total": 28,
+      "research_artifact_complete_tickets_total": 28
     }
   },
   "strict_ready_delta_targets": [
@@ -1155,6 +1156,7 @@
       "score": 0.25,
       "research_gated": true,
       "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T225336Z.json"
       "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T224927Z.json"
     }
   ]

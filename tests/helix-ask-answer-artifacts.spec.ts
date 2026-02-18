@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { stripRunawayAnswerArtifacts } from "../server/services/helix-ask/answer-artifacts";
+import { __testScoreDeterministicClaimCitationLinkage } from "../server/routes/agi.plan";
 import { buildQualityBaselineContract } from "../scripts/helix-ask-sweep";
 import { evaluateClaimCitationLinkage } from "../server/services/helix-ask/query";
 
@@ -109,6 +110,21 @@ describe("buildQualityBaselineContract", () => {
 });
 
 
+describe("Helix Ask semantic claim-citation linkage contract (artifacts)", () => {
+  it("treats Sources-line references as deterministic claim linkage anchors", () => {
+    const cleaned = stripRunawayAnswerArtifacts([
+      "Deterministic linkage is enforced in server/routes/agi.plan.ts.",
+      "Coverage checks are validated in tests/helix-ask-answer-artifacts.spec.ts.",
+      "",
+      "Sources: server/routes/agi.plan.ts, tests/helix-ask-answer-artifacts.spec.ts",
+      "",
+      "Ask debug",
+      "- stage=final",
+    ].join("\n"));
+
+    const score = __testScoreDeterministicClaimCitationLinkage(cleaned);
+    expect(score.failReasons).toEqual([]);
+    expect(score.linkRate).toBe(1);
 describe("Helix Ask semantic linkage contract artifacts", () => {
   it("retained Sources lines satisfy deterministic claim linkage after cleanup", () => {
     const input = [
