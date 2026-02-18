@@ -49,6 +49,8 @@ const MIN_LEN = Number(process.env.HELIX_ASK_AB_MIN_LEN ?? '220');
 const REQUEST_TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_AB_TIMEOUT_MS ?? '20000'));
 const MAX_ATTEMPTS = Math.max(1, Number(process.env.HELIX_ASK_AB_MAX_ATTEMPTS ?? '3'));
 const RETRY_BASE_MS = Math.max(50, Number(process.env.HELIX_ASK_AB_RETRY_BASE_MS ?? '450'));
+const CASE_PACE_MS = Math.max(0, Number(process.env.HELIX_ASK_AB_CASE_PACE_MS ?? '250'));
+const GLOBAL_COOLDOWN_CAP_MS = Math.max(500, Number(process.env.HELIX_ASK_AB_GLOBAL_COOLDOWN_CAP_MS ?? '30000'));
 const MIN_STATUS_OK_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_STATUS_OK_RATE ?? '0.90')));
 const MAX_INVALID_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MAX_INVALID_RATE ?? '0.10')));
 const MIN_DIRECTNESS_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_ASK_AB_MIN_DIRECTNESS_RATE ?? '0.85')));
@@ -61,6 +63,7 @@ type AskAttemptResult = {
   latencyMs: number;
   attemptCount: number;
   retryReason: string | null;
+  retryAfterMs: number;
 };
 
 type ReadyProbeResult = {
@@ -169,20 +172,19 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve)=>setTimeout(resolve, ms));
 }
 
-function payloadText(payload: AskResponse | null): string {
-  return `${String(payload?.text ?? '')}\n${JSON.stringify(payload ?? {})}`.toLowerCase();
-}
-
 function inferRetryReason(status: number, payload: AskResponse | null): string | null {
+  const error = String(payload?.error ?? '').toLowerCase();
+  const message = String(payload?.message ?? '').toLowerCase();
   if (status === 429) return 'rate_limited';
   if (status === 503) return 'service_unavailable';
   if (status === 408 || status === 504) return 'timeout';
   if (status === 0) return 'network_or_timeout';
   if (status >= 500) return 'server_error';
-  const text = payloadText(payload);
-  if (/circuit[_\s-]?open|short[_\s-]?circuit/.test(text)) return 'circuit_open_short_circuit';
-  if (/cooldown|temporarily unavailable|retry later/.test(text)) return 'cooldown_or_unavailable';
-  if (/autoscale|not settled/.test(text)) return 'autoscale_not_settled';
+  if (error === 'helix_ask_temporarily_unavailable' || /circuit[_\s-]?open|short[_\s-]?circuit/.test(message)) {
+    return 'circuit_open_short_circuit';
+  }
+  if (/cooldown|temporarily unavailable|retry later/.test(message)) return 'cooldown_or_unavailable';
+  if (error.includes('autoscale') || /autoscale|not settled/.test(message)) return 'autoscale_not_settled';
   return null;
 }
 
@@ -194,15 +196,42 @@ function isUsableRun(status: number, retryReason: string | null): boolean {
   return status === 200 && retryReason === null;
 }
 
+function parseRetryAfterMs(raw: string | null | undefined): number {
+  if (!raw) return 0;
+  const trimmed = raw.trim();
+  if (!trimmed) return 0;
+  const asNumber = Number(trimmed);
+  if (Number.isFinite(asNumber) && asNumber > 0) {
+    return Math.round(asNumber * 1000);
+  }
+  const at = Date.parse(trimmed);
+  if (Number.isFinite(at)) {
+    return Math.max(0, at - Date.now());
+  }
+  return 0;
+}
+
+let globalCooldownUntilMs = 0;
+
+async function waitForGlobalCooldown(): Promise<void> {
+  const remaining = globalCooldownUntilMs - Date.now();
+  if (remaining > 0) {
+    await sleep(remaining);
+  }
+}
+
 async function askWithRetry(entry: PromptCase, seed: number): Promise<AskAttemptResult> {
+  await waitForGlobalCooldown();
   const started = Date.now();
   let lastStatus = 0;
   let lastPayload: AskResponse | null = null;
   let lastRetryReason: string | null = null;
+  let lastRetryAfterMs = 0;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let status = 0;
     let payload: AskResponse | null = null;
+    let retryAfterMs = 0;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
@@ -225,6 +254,7 @@ async function askWithRetry(entry: PromptCase, seed: number): Promise<AskAttempt
       } else {
         payload = { text: await resp.text() } as AskResponse;
       }
+      retryAfterMs = parseRetryAfterMs(resp.headers.get('retry-after'));
     } catch (error) {
       const message = error instanceof Error ? error.message : typeof error === 'string' ? error : 'request_failed';
       payload = { text: message } as AskResponse;
@@ -236,6 +266,11 @@ async function askWithRetry(entry: PromptCase, seed: number): Promise<AskAttempt
     lastStatus = status;
     lastPayload = payload;
     lastRetryReason = inferRetryReason(status, payload);
+    const payloadRetryAfterMs = Number(payload?.retryAfterMs ?? 0);
+    lastRetryAfterMs = Math.max(
+      retryAfterMs,
+      Number.isFinite(payloadRetryAfterMs) && payloadRetryAfterMs > 0 ? payloadRetryAfterMs : 0,
+    );
 
     if (!shouldRetry(status, payload) || attempt === MAX_ATTEMPTS) {
       return {
@@ -244,10 +279,22 @@ async function askWithRetry(entry: PromptCase, seed: number): Promise<AskAttempt
         latencyMs: Date.now() - started,
         attemptCount: attempt,
         retryReason: lastRetryReason,
+        retryAfterMs: lastRetryAfterMs,
       };
     }
 
-    await sleep(retryDelayMs(attempt));
+    const computedBackoffMs = retryDelayMs(attempt);
+    const boundedRetryAfterMs = Math.min(GLOBAL_COOLDOWN_CAP_MS, Math.max(0, lastRetryAfterMs));
+    const waitMs = Math.max(computedBackoffMs, boundedRetryAfterMs);
+    if (
+      lastRetryReason === 'circuit_open_short_circuit' ||
+      lastRetryReason === 'cooldown_or_unavailable' ||
+      lastRetryReason === 'service_unavailable'
+    ) {
+      const cooldownMs = Math.min(GLOBAL_COOLDOWN_CAP_MS, Math.max(waitMs, computedBackoffMs));
+      globalCooldownUntilMs = Math.max(globalCooldownUntilMs, Date.now() + cooldownMs);
+    }
+    await sleep(waitMs);
   }
 
   return {
@@ -256,6 +303,7 @@ async function askWithRetry(entry: PromptCase, seed: number): Promise<AskAttempt
     latencyMs: Date.now() - started,
     attemptCount: MAX_ATTEMPTS,
     retryReason: lastRetryReason,
+    retryAfterMs: lastRetryAfterMs,
   };
 }
 
@@ -371,6 +419,9 @@ async function run() {
       const f = path.resolve(rawDir, `${entry.id}__s${seed}.json`);
       await fs.writeFile(f, `${JSON.stringify(rec, null, 2)}\n`, 'utf8');
       console.log(`[${VARIANT}] ${entry.id} seed=${seed} status=${status} attempt=${asked.attemptCount} utility=${rec.score.utility_score}`);
+      if (CASE_PACE_MS > 0) {
+        await sleep(CASE_PACE_MS);
+      }
     }
   }
 
