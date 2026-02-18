@@ -267,6 +267,9 @@ describe("Helix Ask semantic claim-citation linkage scorer", () => {
     expect(score.linkedClaimCount).toBe(2);
     expect(score.linkRate).toBe(1);
     expect(score.failReasons).toEqual([]);
+  });
+});
+
 describe("Helix Ask semantic claim citation linkage", () => {
   it("fails with CLAIM_CITATION_LINK_MISSING when claims have no citation links", () => {
     const answer = [
