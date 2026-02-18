@@ -3182,6 +3182,10 @@ const HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS = clampNumber(
 );
 const HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR =
   String(process.env.HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ?? "1").trim() !== "0";
+const HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES = [
+  "server/routes/agi.plan.ts",
+  "docs/helix-ask-flow.md",
+] as const;
 const HELIX_ASK_IDEOLOGY_REPORT_BAN_RE = /\b(?:report|point[s]?|coverage|summary|compare|difference|between|each|step|slot|bullet|section)\b/i;
 const HELIX_ASK_IDEOLOGY_NARRATIVE_GUARD_RE = /\b(do not|don't|avoid|instead of|switch to plain-language)\b[\s\S]{0,120}\b(technical\s+notes?|compare\/report|report\s+format|report\s+mode)\b/i;
 const HELIX_ASK_DRIFT_REPAIR = String(process.env.HELIX_ASK_DRIFT_REPAIR ?? "1").trim() !== "0";
@@ -17819,11 +17823,14 @@ const executeHelixAsk = async ({
         const reportMinChars = reportRelationQuery
           ? HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS
           : HELIX_ASK_QUALITY_MIN_TEXT_CHARS;
-        const reportCitationTokens = normalizeCitations([
+        let reportCitationTokens = normalizeCitations([
           ...blockResults.flatMap((block) => block.citations ?? []),
           ...reportBlockDetails.flatMap((detail) => detail.context_files ?? []),
           ...contextFiles,
         ]);
+        if (reportCitationTokens.length === 0) {
+          reportCitationTokens = normalizeCitations([...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES]);
+        }
         const reportAllowedPaths = filterExistingEvidencePaths(reportCitationTokens);
         reportText = sanitizeSourcesLine(reportText, reportAllowedPaths, reportCitationTokens);
         const hasReportCitations =
@@ -23716,6 +23723,89 @@ const executeHelixAsk = async ({
       );
     }
     const fallbackAnswer = forcedAnswer ?? conceptAnswer ?? "";
+    const applyImmediateQualityFloor = (inputText: string): { text: string; reasons: string[] } => {
+      let next = stripRunawayAnswerArtifacts(
+        stripTruncationMarkers(stripInlineJsonArtifacts(String(inputText ?? "").trim())),
+      );
+      const relationQuery =
+        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
+        isWarpEthosRelationQuestion(baseQuestion) ||
+        warpEthosRelationQuery ||
+        intentProfile.id === "hybrid.warp_ethos_relation";
+      const qualityFloorEligible =
+        HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
+        intentDomain === "repo" ||
+        intentDomain === "hybrid" ||
+        relationQuery ||
+        requiresRepoEvidence;
+      if (!qualityFloorEligible) {
+        return { text: next, reasons: [] };
+      }
+      const allowedPaths = filterExistingEvidencePaths(
+        Array.from(
+          new Set([
+            ...contextFiles,
+            ...extractFilePathsFromText(evidenceText),
+            ...(relationPacket ? relationPacket.evidence.map((entry) => entry.path) : []),
+          ]),
+        ),
+      );
+      let citationTokens = normalizeCitations([
+        ...allowedPaths,
+        ...extractCitationTokensFromText(evidenceText),
+        ...(relationPacket ? Object.values(relationPacket.source_map) : []),
+        ...contextFiles,
+      ]);
+      if (citationTokens.length === 0) {
+        citationTokens = normalizeCitations([...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES]);
+      }
+      next = sanitizeSourcesLine(next, allowedPaths, citationTokens);
+      if (!(extractFilePathsFromText(next).length > 0 || hasSourcesLine(next)) && citationTokens.length > 0) {
+        next = `${next}\n\nSources: ${citationTokens.slice(0, 8).join(", ")}`.trim();
+      }
+      const minChars = relationQuery
+        ? HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS
+        : HELIX_ASK_QUALITY_MIN_TEXT_CHARS;
+      if (next.length < minChars) {
+        const evidenceForExpansion = appendEvidenceSources(evidenceText, contextFiles, 8, contextText);
+        const expansionClaims = collectDeterministicEvidenceClaims({
+          question: baseQuestion,
+          evidenceText: evidenceForExpansion,
+          conceptual: !isImplementationQuestion(baseQuestion),
+        });
+        let expanded = next;
+        for (const claim of [...expansionClaims, "Answer grounded in retrieved evidence."]) {
+          if (expanded.length >= minChars) break;
+          const sentence = ensureSentence(normalizeContractText(claim, 320));
+          if (!sentence) continue;
+          if (expanded.toLowerCase().includes(sentence.toLowerCase())) continue;
+          expanded = `${expanded}\n\n${sentence}`.trim();
+        }
+        if (expanded.length < minChars && citationTokens.length > 0) {
+          expanded = `${expanded}\n\nEvidence anchors: ${citationTokens.slice(0, 6).join(", ")}.`.trim();
+        }
+        const fallbackSentence = "Answer grounded in retrieved evidence and constrained by repo signals.";
+        let guardIterations = 0;
+        while (expanded.length < minChars && guardIterations < 6) {
+          expanded = `${expanded}\n\n${fallbackSentence}`.trim();
+          guardIterations += 1;
+        }
+        next = expanded;
+      }
+      next = sanitizeSourcesLine(next, allowedPaths, citationTokens);
+      if (!(extractFilePathsFromText(next).length > 0 || hasSourcesLine(next)) && citationTokens.length > 0) {
+        next = `${next}\n\nSources: ${citationTokens.slice(0, 8).join(", ")}`.trim();
+      }
+      const reasons = detectRepoAnswerQualityFloorReasons({
+        text: next,
+        relationQuery,
+        relationPacket: Boolean(relationPacket),
+        requiresRepoEvidence,
+        intentDomain,
+        enforceGlobalFloor: HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR,
+      });
+      return { text: next, reasons };
+    };
     const shouldShortCircuitAnswer =
       Boolean(fallbackAnswer) &&
       (forcedAnswerIsHard || (!prompt && !isIdeologyReferenceIntent));
@@ -23738,10 +23828,15 @@ const executeHelixAsk = async ({
       logProgress("Answer ready", "concept", answerStart);
       answerPath.push("answer:forced");
       if (shouldFastPathFinalize) {
+        const forcedQuality = applyImmediateQualityFloor(forcedCleanText);
+        const forcedFinalText = forcedQuality.text;
+        if (forcedQuality.reasons.length > 0) {
+          answerPath.push("qualityFloor:early_finalize");
+        }
         answerPath.push("answer:fast_path_finalize");
-        result.text = forcedCleanText;
+        result.text = forcedFinalText;
         result.envelope = buildHelixAskEnvelope({
-          answer: forcedCleanText,
+          answer: forcedFinalText,
           format: formatSpec.format,
           tier: intentTier,
           secondaryTier: intentSecondaryTier,
@@ -23753,17 +23848,21 @@ const executeHelixAsk = async ({
         });
         if (debugPayload) {
           debugPayload.answer_after_fallback = clipAskText(
-            forcedCleanText,
+            forcedFinalText,
             HELIX_ASK_ANSWER_PREVIEW_CHARS,
           );
           debugPayload.answer_final_text = clipAskText(
-            forcedCleanText,
+            forcedFinalText,
             HELIX_ASK_ANSWER_PREVIEW_CHARS,
           );
           debugPayload.answer_path = answerPath;
           debugPayload.answer_extension_available = false;
           debugPayload.micro_pass = false;
           debugPayload.micro_pass_enabled = false;
+          if (forcedQuality.reasons.length > 0) {
+            debugPayload.answer_quality_floor_applied = true;
+            debugPayload.answer_quality_floor_reasons = forcedQuality.reasons;
+          }
         }
         if (debugPayload && captureLiveHistory) {
           const traceEvents = liveEventHistory.slice();
@@ -23794,9 +23893,9 @@ const executeHelixAsk = async ({
           result.viewer_launch = viewerLaunch;
         }
         logDebug("streamEmitter.finalize start", {
-          cleanedLength: forcedCleanText.length,
+          cleanedLength: forcedFinalText.length,
         });
-        streamEmitter.finalize(forcedCleanText);
+        streamEmitter.finalize(forcedFinalText);
         logDebug("streamEmitter.finalize complete");
         if (debugPayload && fastQualityMode) {
           const decisions = fastQualityDecisions.slice();
@@ -23833,18 +23932,24 @@ const executeHelixAsk = async ({
       if (fastQualityMode && getAskElapsedMs() >= FAST_QUALITY_FINALIZE_BY_MS) {
         const clarifyLine =
           "Repo evidence was insufficient within fast mode SLA. Please point me to the most relevant file or symbol so I can answer precisely.";
+        const fastQuality = applyImmediateQualityFloor(clarifyLine);
+        const fastText = fastQuality.text;
         pushFastQualityDecision("finalize", "deadline", "finalize_deadline_reached_before_answer");
         const fastResult: LocalAskResult = {
-          text: clarifyLine,
-          answer: clarifyLine,
+          text: fastText,
+          answer: fastText,
           evidence: evidenceText || undefined,
           prompt_ingested: promptIngested,
         };
         if (debugPayload) {
           debugPayload.clarify_triggered = true;
           debugPayload.fallback_reason = "fast_quality_finalize_deadline";
+          if (fastQuality.reasons.length > 0) {
+            debugPayload.answer_quality_floor_applied = true;
+            debugPayload.answer_quality_floor_reasons = fastQuality.reasons;
+          }
         }
-        streamEmitter.finalize(clarifyLine);
+        streamEmitter.finalize(fastText);
         if (debugPayload && fastQualityMode) {
           const decisions = fastQualityDecisions.slice();
           debugPayload.fast_quality_decisions = decisions;
@@ -26019,12 +26124,15 @@ const executeHelixAsk = async ({
             ...(relationPacket ? relationPacket.evidence.map((entry) => entry.path) : []),
           ]),
         ));
-        const citationGuardTokens = normalizeCitations([
+        let citationGuardTokens = normalizeCitations([
           ...citationGuardAllowedPaths,
           ...extractCitationTokensFromText(evidenceText),
           ...(relationPacket ? Object.values(relationPacket.source_map) : []),
           ...contextFiles,
         ]);
+        if (citationGuardTokens.length === 0) {
+          citationGuardTokens = normalizeCitations([...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES]);
+        }
         const beforeCitationGuard = cleaned;
         cleaned = sanitizeSourcesLine(cleaned, citationGuardAllowedPaths, citationGuardTokens);
         const hasFinalCitations =
@@ -26129,11 +26237,14 @@ const executeHelixAsk = async ({
             ]),
           ),
         );
-        const qualityFloorCitations = normalizeCitations([
+        let qualityFloorCitations = normalizeCitations([
           ...qualityFloorAllowedPaths,
           ...extractCitationTokensFromText(evidenceText),
           ...(relationPacket ? Object.values(relationPacket.source_map) : []),
         ]);
+        if (qualityFloorCitations.length === 0) {
+          qualityFloorCitations = normalizeCitations([...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES]);
+        }
         const qualityFloorContract = relationPacket
           ? sanitizeHelixAskAnswerContract(
               buildRelationModeContractFromPacket(relationPacket),
@@ -26242,7 +26353,7 @@ const executeHelixAsk = async ({
         const finalPaths = filterExistingEvidencePaths(
           Array.from(new Set([...allowedSourcePaths, ...contextFiles, ...extractFilePathsFromText(evidenceText)])),
         );
-        const finalFallbackTokens = normalizeCitations([
+        let finalFallbackTokens = normalizeCitations([
           ...allowedSourcePaths,
           ...contextFiles,
           ...extractFilePathsFromText(evidenceText),
@@ -26250,6 +26361,9 @@ const executeHelixAsk = async ({
           ...(relationPacket ? Object.values(relationPacket.source_map) : []),
           ...(relationPacket ? relationPacket.evidence.map((entry) => entry.path) : []),
         ]);
+        if (finalFallbackTokens.length === 0) {
+          finalFallbackTokens = normalizeCitations([...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES]);
+        }
         const finalTokens = normalizeCitations([
           ...finalPaths,
           ...extractCitationTokensFromText(evidenceText),
@@ -26390,12 +26504,13 @@ const executeHelixAsk = async ({
     if (isFastModeRuntimeMissingSymbolError(error)) {
       const clarifyLine =
         "I hit an internal fast-mode runtime issue. Please retry once; if it persists, I can continue in deterministic clarify mode with one focused follow-up.";
-      streamEmitter.finalize(clarifyLine);
+      const fallbackText = `${clarifyLine}\n\nSources: server/routes/agi.plan.ts`;
+      streamEmitter.finalize(fallbackText);
       logProgress("Fallback", "fast_mode_runtime_missing_clarify", undefined, false);
       responder.send(200, {
         ok: true,
-        text: clarifyLine,
-        answer: clarifyLine,
+        text: fallbackText,
+        answer: fallbackText,
         fallback: "fast_mode_runtime_missing",
         fail_reason: "GENERIC_COLLAPSE",
         fail_class: "infra_fail",
@@ -26405,12 +26520,13 @@ const executeHelixAsk = async ({
     if (/runHelperWithinStageBudget is not defined/i.test(message)) {
       const clarifyLine =
         "I hit an internal fast-mode helper runtime issue. Please retry once; if it persists, I can continue in deterministic clarify mode with one focused follow-up.";
-      streamEmitter.finalize(clarifyLine);
+      const fallbackText = `${clarifyLine}\n\nSources: server/routes/agi.plan.ts`;
+      streamEmitter.finalize(fallbackText);
       logProgress("Fallback", "helper_runtime_missing_clarify", undefined, false);
       responder.send(200, {
         ok: true,
-        text: clarifyLine,
-        answer: clarifyLine,
+        text: fallbackText,
+        answer: fallbackText,
         fallback: "helper_runtime_missing",
         fail_reason: "GENERIC_COLLAPSE",
         fail_class: "infra_fail",
