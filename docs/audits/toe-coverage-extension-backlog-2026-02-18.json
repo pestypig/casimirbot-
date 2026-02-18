@@ -9,7 +9,10 @@
     {
       "id": "TOE-011-orbital-ephemeris-provenance-bridge",
       "tree_owner": "simulation-systems",
-      "gap_refs": ["F-COV-2", "F-COV-6"],
+      "gap_refs": [
+        "F-COV-2",
+        "F-COV-6"
+      ],
       "primitive": "Orbital ephemeris provenance bridge primitive",
       "primary_path_prefix": "server/utils/horizons-proxy.ts",
       "allowed_paths": [
@@ -32,7 +35,9 @@
     {
       "id": "TOE-012-halobank-horizons-consistency-gate",
       "tree_owner": "helix-ask",
-      "gap_refs": ["F-COV-2"],
+      "gap_refs": [
+        "F-COV-2"
+      ],
       "primitive": "Halobank-orbital consistency gate primitive",
       "primary_path_prefix": "server/services/halobank/time-model.ts",
       "allowed_paths": [
@@ -57,7 +62,10 @@
     {
       "id": "TOE-013-atomic-systems-claim-tier-contract",
       "tree_owner": "atomic-systems",
-      "gap_refs": ["F-COV-3", "F-COV-5"],
+      "gap_refs": [
+        "F-COV-3",
+        "F-COV-5"
+      ],
       "primitive": "Atomic systems claim-tier and provenance contract primitive",
       "primary_path_prefix": "server/routes/agi.plan.ts",
       "allowed_paths": [
@@ -81,7 +89,9 @@
     {
       "id": "TOE-014-robotics-recollection-provenance-contract",
       "tree_owner": "robotics-recollection",
-      "gap_refs": ["F-COV-4"],
+      "gap_refs": [
+        "F-COV-4"
+      ],
       "primitive": "Robotics recollection provenance and replay contract primitive",
       "primary_path_prefix": "shared/schema.ts",
       "allowed_paths": [
@@ -107,7 +117,9 @@
     {
       "id": "TOE-015-external-integration-evidence-manifest",
       "tree_owner": "external-integrations",
-      "gap_refs": ["F-COV-5"],
+      "gap_refs": [
+        "F-COV-5"
+      ],
       "primitive": "External integration evidence manifest primitive",
       "primary_path_prefix": "configs/external-integration-evidence-manifest.v1.json",
       "allowed_paths": [
@@ -129,7 +141,10 @@
     {
       "id": "TOE-016-resolver-forest-owner-coverage-manifest",
       "tree_owner": "helix-ask",
-      "gap_refs": ["F-COV-1", "F-COV-5"],
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
       "primitive": "Resolver forest owner coverage manifest primitive",
       "primary_path_prefix": "configs/resolver-owner-coverage-manifest.v1.json",
       "allowed_paths": [
@@ -148,6 +163,151 @@
         "Manifest maps resolver tree owner -> ticket coverage status in {covered_core,covered_extension,unmapped}",
         "Progress tooling reports forest_owner_coverage_pct separately from toe_progress_pct",
         "Validation fails when high-priority owners remain unmapped"
+      ]
+    },
+    {
+      "id": "TOE-017-pipeline-ledger-provenance-contract",
+      "tree_owner": "pipeline-ledger",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Pipeline ledger provenance contract primitive",
+      "primary_path_prefix": "server/routes/training-trace.ts",
+      "allowed_paths": [
+        "server/routes/training-trace.ts",
+        "server/services/observability/training-trace-store.ts",
+        "server/routes/agi.adapter.ts",
+        "shared/schema.ts",
+        "server/__tests__/training-trace.test.ts",
+        "tests/trace-api.spec.ts",
+        "tests/trace-export.spec.ts"
+      ],
+      "required_tests": [
+        "server/__tests__/training-trace.test.ts",
+        "tests/trace-api.spec.ts",
+        "tests/trace-export.spec.ts"
+      ],
+      "done_criteria": [
+        "Ledger-bearing training trace artifacts include explicit provenance lineage fields and certificate references",
+        "Adapter and trace-export responses preserve deterministic provenance contract fields across list/detail/export flows",
+        "Tests validate pass/fail provenance serialization and stable schema parity for prediction_vs_observation ledger traces"
+      ]
+    },
+    {
+      "id": "TOE-018-hardware-telemetry-provenance-gate",
+      "tree_owner": "hardware-telemetry",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Hardware telemetry provenance gate primitive",
+      "primary_path_prefix": "server/helix-core.ts",
+      "allowed_paths": [
+        "server/helix-core.ts",
+        "server/routes/agi.adapter.ts",
+        "server/services/observability/training-trace-store.ts",
+        "shared/schema.ts",
+        "server/__tests__/agi.adapter.test.ts",
+        "tests/ideology-telemetry.spec.ts",
+        "tests/trace-api.spec.ts"
+      ],
+      "required_tests": [
+        "server/__tests__/agi.adapter.test.ts",
+        "tests/ideology-telemetry.spec.ts",
+        "tests/trace-api.spec.ts"
+      ],
+      "done_criteria": [
+        "Hardware ingest telemetry is tagged with source class, channel coverage, and capture integrity status",
+        "Verification paths apply deterministic firstFail taxonomy when required hardware provenance signals are missing",
+        "Tests cover ingest acceptance, provenance-gate rejection, and training-trace persistence parity"
+      ]
+    },
+    {
+      "id": "TOE-019-ui-backend-binding-claim-tier-surface",
+      "tree_owner": "ui-backend-binding",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "UI/backend binding claim-tier surface primitive",
+      "primary_path_prefix": "server/routes/agi.plan.ts",
+      "allowed_paths": [
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask/topic.ts",
+        "client/src/lib/helixPlan.ts",
+        "client/src/components/helix/HelixPlanPanel.tsx",
+        "shared/schema.ts",
+        "tests/agi-plan.spec.ts",
+        "tests/persona-ui.spec.ts"
+      ],
+      "required_tests": [
+        "tests/agi-plan.spec.ts",
+        "tests/persona-ui.spec.ts"
+      ],
+      "done_criteria": [
+        "UI-facing plan payloads expose backend claim_tier/provenance fields without ambiguity across diagnostic and certified branches",
+        "Backend bindings prevent certified narration when upstream payloads are proxy/sim-only or missing certification references",
+        "Tests assert response-shape parity between backend contracts and rendered UI claim-tier indicators"
+      ]
+    },
+    {
+      "id": "TOE-020-llm-runtime-artifact-provenance-contract",
+      "tree_owner": "llm-runtime",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "LLM runtime artifact provenance contract primitive",
+      "primary_path_prefix": "server/routes/small-llm.ts",
+      "allowed_paths": [
+        "server/routes/small-llm.ts",
+        "server/services/small-llm.ts",
+        "server/skills/llm.http.ts",
+        "server/skills/llm.local.ts",
+        "server/skills/llm.local.spawn.ts",
+        "tests/runtime-tool-policy.spec.ts",
+        "tests/runtime-frame-contract.spec.ts",
+        "tests/helix-ask-runtime-errors.spec.ts"
+      ],
+      "required_tests": [
+        "tests/runtime-tool-policy.spec.ts",
+        "tests/runtime-frame-contract.spec.ts",
+        "tests/helix-ask-runtime-errors.spec.ts"
+      ],
+      "done_criteria": [
+        "LLM runtime/tool artifacts include backend identity, model/runtime provenance class, and certificate/hash references when available",
+        "Runtime policy demotes unverifiable or local-only backends to non-certifying claim tiers with deterministic reason codes",
+        "Tests cover HTTP/local backend branches, artifact shape stability, and provenance-aware error handling"
+      ]
+    },
+    {
+      "id": "TOE-021-queue-orchestration-runtime-contract",
+      "tree_owner": "queue-orchestration",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Queue orchestration runtime contract primitive",
+      "primary_path_prefix": "server/queue/index.ts",
+      "allowed_paths": [
+        "server/queue/index.ts",
+        "server/routes/jobs.ts",
+        "server/services/jobs/processor.ts",
+        "server/services/jobs/media-jobs.ts",
+        "tests/queue-stress.spec.ts",
+        "tests/hull-status.spec.ts",
+        "tests/helix-ask-job-store-runtime.spec.ts"
+      ],
+      "required_tests": [
+        "tests/queue-stress.spec.ts",
+        "tests/hull-status.spec.ts",
+        "tests/helix-ask-job-store-runtime.spec.ts"
+      ],
+      "done_criteria": [
+        "Queue/job runtime artifacts emit deterministic enqueue/dispatch/completion provenance fields",
+        "Orchestration contract propagates queue depth/backpressure state to policy surfaces without claim-tier overstatement",
+        "Tests validate concurrency behavior, runtime status contract stability, and provenance continuity across job lifecycle"
       ]
     }
   ]
