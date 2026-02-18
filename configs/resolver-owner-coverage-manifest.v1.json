@@ -118,7 +118,7 @@
       "status": "covered_extension"
     },
     "stellar-ps1-bridges": {
-      "status": "unmapped"
+      "status": "covered_extension"
     },
     "telemetry-console": {
       "status": "covered_extension"
