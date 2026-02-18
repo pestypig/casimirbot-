@@ -29,6 +29,8 @@ export type HaloBankTimeComputeInput = {
     includeCausal?: boolean;
     orbitalAlignment?: boolean;
     ephemerisSource?: "live" | "fallback";
+    ephemerisEvidenceVerified?: boolean;
+    ephemerisEvidenceRef?: string;
   };
   question?: string;
   prompt?: string;
@@ -54,6 +56,13 @@ export type HaloBankTimeComputeResult = {
       claim_tier: "diagnostic";
       certifying: false;
       note: string;
+      evidence: {
+        declaredSourceClass: "live" | "fallback";
+        verifiedSourceClass: "live" | "fallback" | null;
+        explicitEvidence: boolean;
+        verified: boolean;
+        reference: string | null;
+      };
     };
     consistency: {
       gate: "halobank.horizons.consistency.v1";
@@ -267,9 +276,20 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
   if (!requested) return undefined;
   const source: "live" | "fallback" = input.model?.ephemerisSource === "fallback" ? "fallback" : "live";
   const fallback = source === "fallback";
+  const explicitEvidence = input.model?.ephemerisEvidenceVerified === true;
+  const evidenceRef = typeof input.model?.ephemerisEvidenceRef === "string" ? input.model.ephemerisEvidenceRef.trim() : "";
+  const hasEvidenceRef = evidenceRef.length > 0;
+  const verified = source === "live" ? explicitEvidence : false;
   const reasons = fallback
     ? ["Fallback ephemeris source detected; diagnostic-only and non-certifying."]
-    : ["Ephemeris alignment source is live proxy; reduced-order consistency checks passed."];
+    : verified
+      ? ["Live ephemeris source declared with explicit verification evidence."]
+      : ["Live ephemeris source declared without explicit verification evidence; consistency gate is non-pass."];
+  const firstFailId = fallback
+    ? "HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY"
+    : verified
+      ? null
+      : "HALOBANK_HORIZONS_LIVE_UNVERIFIED_EVIDENCE";
   return {
     requested,
     source,
@@ -280,12 +300,21 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
       certifying: false,
       note: fallback
         ? "Fallback ephemeris remains diagnostic and non-certifying for orbital alignment claims."
-        : "Live ephemeris provenance captured for diagnostic consistency gating.",
+        : verified
+          ? "Live ephemeris provenance includes explicit evidence marker for diagnostic consistency gating."
+          : "Live ephemeris source is declared but unverified; diagnostic non-pass consistency gate applied.",
+      evidence: {
+        declaredSourceClass: source,
+        verifiedSourceClass: verified ? source : null,
+        explicitEvidence,
+        verified,
+        reference: hasEvidenceRef ? evidenceRef : null,
+      },
     },
     consistency: {
       gate: "halobank.horizons.consistency.v1",
-      verdict: fallback ? "FAIL" : "PASS",
-      firstFailId: fallback ? "HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY" : null,
+      verdict: firstFailId ? "FAIL" : "PASS",
+      firstFailId,
       deterministic: true,
       reasons,
     },

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeHaloBankTimeModel } from "../server/services/halobank/time-model";
 
 describe("halobank horizons consistency gate", () => {
-  it("returns PASS gate with live ephemeris provenance", () => {
+  it("returns deterministic FAIL gate for declared live ephemeris without explicit evidence", () => {
     const result = computeHaloBankTimeModel({
       question: "orbital alignment with horizons",
       timestamp: "2025-03-01T12:00:00Z",
@@ -12,11 +12,33 @@ describe("halobank horizons consistency gate", () => {
 
     expect(result.ok).toBe(true);
     expect(result.ephemeris?.consistency.gate).toBe("halobank.horizons.consistency.v1");
-    expect(result.ephemeris?.consistency.verdict).toBe("PASS");
-    expect(result.ephemeris?.consistency.firstFailId).toBeNull();
+    expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_LIVE_UNVERIFIED_EVIDENCE");
     expect(result.ephemeris?.consistency.deterministic).toBe(true);
     expect(result.ephemeris?.provenance.class).toBe("live");
     expect(result.ephemeris?.provenance.claim_tier).toBe("diagnostic");
+    expect(result.ephemeris?.provenance.evidence.verified).toBe(false);
+  });
+
+
+  it("returns PASS gate for live ephemeris with explicit evidence marker", () => {
+    const result = computeHaloBankTimeModel({
+      question: "orbital alignment with horizons",
+      timestamp: "2025-03-01T12:00:00Z",
+      place: { lat: 10, lon: 20 },
+      model: {
+        orbitalAlignment: true,
+        ephemerisSource: "live",
+        ephemerisEvidenceVerified: true,
+        ephemerisEvidenceRef: "artifact:jpl-horizons:run-123",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.consistency.verdict).toBe("PASS");
+    expect(result.ephemeris?.consistency.firstFailId).toBeNull();
+    expect(result.ephemeris?.provenance.evidence.verified).toBe(true);
+    expect(result.ephemeris?.provenance.evidence.reference).toBe("artifact:jpl-horizons:run-123");
   });
 
   it("returns FAIL gate with deterministic firstFail on fallback ephemeris", () => {

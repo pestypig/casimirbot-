@@ -12428,6 +12428,8 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
         includeCausal: z.boolean().optional(),
         orbitalAlignment: z.boolean().optional(),
         ephemerisSource: z.enum(["live", "fallback"]).optional(),
+        ephemerisEvidenceVerified: z.boolean().optional(),
+        ephemerisEvidenceRef: z.string().min(1).optional(),
       })
       .optional(),
     debug: z.boolean().optional(),
@@ -15835,7 +15837,16 @@ const executeHelixAsk = async ({
           : null;
       const proof = {
         verdict: adapter?.verdict ?? "FAIL",
-        firstFail: adapter?.firstFail ?? null,
+        firstFail:
+          adapter?.firstFail ??
+          (halobankConsistency?.verdict === "FAIL" && halobankConsistency.firstFailId
+            ? {
+                id: halobankConsistency.firstFailId,
+                severity: "HARD",
+                status: "fail",
+                note: "halobank_consistency_gate_failed",
+              }
+            : null),
         certificate: adapter?.certificate ?? null,
         artifacts: adapter?.artifacts?.length ? adapter.artifacts : defaultProofArtifacts,
         consistencyGate:
@@ -15855,7 +15866,8 @@ const executeHelixAsk = async ({
       };
       if (askMode === "verify") {
         const integrityOk = Boolean((proof.certificate as any)?.integrityOk);
-        if (proof.verdict !== "PASS" || !integrityOk) {
+        const consistencyGateFailed = proof.consistencyGate?.verdict === "FAIL";
+        if (proof.verdict !== "PASS" || !integrityOk || consistencyGateFailed) {
           responder.send(200, { ok: false, mode: askMode, text: "Verification failed.", proof, action: { tool: toolName, output: actionOutput } });
           return;
         }
