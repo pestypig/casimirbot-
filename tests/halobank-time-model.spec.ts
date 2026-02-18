@@ -66,6 +66,7 @@ describe("halobank time model", () => {
         ephemerisEvidenceRef: "artifact:jpl-horizons:2025-03-01T12:00:00Z",
         residualPpm: 1.75,
         residualSampleCount: 9,
+        residualWindowHours: 72,
       },
     });
     expect(result.ok).toBe(true);
@@ -89,6 +90,7 @@ describe("halobank time model", () => {
         ephemerisEvidenceRef: "artifact:jpl-horizons:2025-03-01T12:00:00Z",
         residualPpm: 9.25,
         residualSampleCount: 12,
+        residualWindowHours: 72,
       },
     });
     expect(result.ok).toBe(true);
@@ -109,6 +111,7 @@ describe("halobank time model", () => {
         ephemerisEvidenceRef: "artifact:jpl-horizons:2025-03-01T12:00:00Z",
         residualPpm: 2.2,
         residualSampleCount: 2,
+        residualWindowHours: 72,
       },
     });
 
@@ -131,6 +134,7 @@ describe("halobank time model", () => {
         ephemerisEvidenceRef: "jpl-horizons-run-123",
         residualPpm: 0.8,
         residualSampleCount: 7,
+        residualWindowHours: 72,
       },
     });
 
@@ -151,6 +155,7 @@ describe("halobank time model", () => {
         ephemerisEvidenceRef: "artifact:jpl-horizons:run-123",
         residualPpm: 0.8,
         residualSampleCount: 7.5,
+        residualWindowHours: 72,
       },
     });
 
@@ -158,6 +163,52 @@ describe("halobank time model", () => {
     expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
     expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE");
     expect(result.ephemeris?.provenance.evidence.residualStatus).toBe("incomplete_evidence");
+  });
+
+
+
+  it("fails deterministically when residual calibration window is shorter than long-window minimum", () => {
+    const result = computeHaloBankTimeModel({
+      timestamp: "2025-03-01T12:00:00.000Z",
+      place: { lat: 40.7128, lon: -74.006 },
+      model: {
+        orbitalAlignment: true,
+        ephemerisSource: "live",
+        ephemerisEvidenceVerified: true,
+        ephemerisEvidenceRef: "artifact:jpl-horizons:2025-03-01T12:00:00Z",
+        residualPpm: 0.8,
+        residualSampleCount: 9,
+        residualWindowHours: 12,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_LONG_WINDOW_REQUIRED");
+    expect(result.ephemeris?.provenance.evidence.residualWindowStatus).toBe("short_window");
+    expect(result.ephemeris?.provenance.claim_tier_recommendation).toBe("diagnostic");
+  });
+
+  it("passes when long-window residual calibration evidence is complete and bounded", () => {
+    const result = computeHaloBankTimeModel({
+      timestamp: "2025-03-01T12:00:00.000Z",
+      place: { lat: 40.7128, lon: -74.006 },
+      model: {
+        orbitalAlignment: true,
+        ephemerisSource: "live",
+        ephemerisEvidenceVerified: true,
+        ephemerisEvidenceRef: "artifact:jpl-horizons:2025-03-01T12:00:00Z",
+        residualPpm: 0.8,
+        residualSampleCount: 9,
+        residualWindowHours: 72,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.consistency.verdict).toBe("PASS");
+    expect(result.ephemeris?.consistency.firstFailId).toBeNull();
+    expect(result.ephemeris?.provenance.evidence.residualWindowStatus).toBe("long_window");
+    expect(result.ephemeris?.provenance.evidence.residualLongWindowMinHours).toBe(24);
   });
 
   it("marks fallback ephemeris as diagnostic non-certifying with deterministic fail id", () => {
