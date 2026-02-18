@@ -6,6 +6,23 @@ import { pipeline } from "node:stream/promises";
 import type { Client as ReplitStorageClient } from "@replit/object-storage";
 import { createCircuitBreaker } from "../resilience/circuit-breaker";
 
+export type RuntimeArtifactIntegrityState = "verified" | "mismatch" | "missing" | "unverifiable";
+export type RuntimeArtifactHydrationMode = "rehydrated" | "already_present" | "local_only" | "disabled";
+
+export type RuntimeArtifactProvenance = {
+  sourceClass: "object-storage" | "local-env";
+  integrityState: RuntimeArtifactIntegrityState;
+  hydrationMode: RuntimeArtifactHydrationMode;
+  expectedSha256: string | null;
+  observedSha256: string | null;
+  targetPath: string;
+};
+
+export type RuntimeArtifactStatus = {
+  label: string;
+  provenance: RuntimeArtifactProvenance;
+};
+
 type ArtifactSpec = {
   label: string;
   objectKey: string;
@@ -16,6 +33,7 @@ type ArtifactSpec = {
 
 let replitClient: ReplitStorageClient | null = null;
 let hydrationPromise: Promise<void> | null = null;
+let artifactStatuses: RuntimeArtifactStatus[] = [];
 
 const toPositiveInt = (value: string | undefined, fallback: number): number => {
   const parsed = Number(value);
@@ -101,6 +119,57 @@ const logArtifactState = async (label: string, targetPath: string): Promise<void
   }
 };
 
+const setArtifactStatus = (status: RuntimeArtifactStatus): void => {
+  const index = artifactStatuses.findIndex((entry) => entry.label === status.label);
+  if (index >= 0) {
+    artifactStatuses[index] = status;
+    return;
+  }
+  artifactStatuses.push(status);
+};
+
+const setLocalArtifactStatus = (
+  label: string,
+  targetPath: string,
+  integrityState: RuntimeArtifactIntegrityState,
+  hydrationMode: RuntimeArtifactHydrationMode,
+  expectedSha: string | null,
+  observedSha: string | null,
+): void => {
+  setArtifactStatus({
+    label,
+    provenance: {
+      sourceClass: "local-env",
+      integrityState,
+      hydrationMode,
+      expectedSha256: expectedSha,
+      observedSha256: observedSha,
+      targetPath: resolveTargetPath(targetPath),
+    },
+  });
+};
+
+const setHydratedArtifactStatus = (
+  label: string,
+  targetPath: string,
+  integrityState: RuntimeArtifactIntegrityState,
+  hydrationMode: RuntimeArtifactHydrationMode,
+  expectedSha: string | null,
+  observedSha: string | null,
+): void => {
+  setArtifactStatus({
+    label,
+    provenance: {
+      sourceClass: "object-storage",
+      integrityState,
+      hydrationMode,
+      expectedSha256: expectedSha,
+      observedSha256: observedSha,
+      targetPath: resolveTargetPath(targetPath),
+    },
+  });
+};
+
 const validateLocalArtifact = async (
   label: string,
   targetPath: string,
@@ -109,22 +178,26 @@ const validateLocalArtifact = async (
   const resolved = resolveTargetPath(targetPath);
   if (!(await fileExists(resolved))) {
     console.warn(`[runtime] ${label} not found at ${resolved}`);
+    setLocalArtifactStatus(label, targetPath, "missing", "local_only", normalizeSha256(expectedSha), null);
     return;
   }
   const expected = normalizeSha256(expectedSha);
   if (!expected) {
     console.log(`[runtime] ${label} present (${resolved})`);
     await logArtifactState(label, resolved);
+    setLocalArtifactStatus(label, targetPath, "unverifiable", "local_only", null, null);
     return;
   }
   const existingHash = await hashFile(resolved);
   if (existingHash !== expected) {
+    setLocalArtifactStatus(label, targetPath, "mismatch", "local_only", expected, existingHash);
     throw new Error(
       `[runtime] ${label} sha256 mismatch (expected ${expected}, got ${existingHash})`,
     );
   }
   console.log(`[runtime] ${label} verified (${resolved})`);
   await logArtifactState(label, resolved);
+  setLocalArtifactStatus(label, targetPath, "verified", "local_only", expected, existingHash);
 };
 
 const downloadObject = async (key: string, targetPath: string): Promise<string> => {
@@ -140,6 +213,7 @@ const downloadObject = async (key: string, targetPath: string): Promise<string> 
 const hydrateArtifact = async (spec: ArtifactSpec): Promise<void> => {
   const expected = normalizeSha256(spec.sha256);
   if (!expected) {
+    setHydratedArtifactStatus(spec.label, spec.targetPath, "unverifiable", "disabled", null, null);
     throw new Error(`[runtime] ${spec.label} sha256 is required for hydration`);
   }
   const target = resolveTargetPath(spec.targetPath);
@@ -148,6 +222,7 @@ const hydrateArtifact = async (spec: ArtifactSpec): Promise<void> => {
     if (existingHash === expected) {
       console.log(`[runtime] ${spec.label} already hydrated (${target})`);
       await logArtifactState(spec.label, target);
+      setHydratedArtifactStatus(spec.label, spec.targetPath, "verified", "already_present", expected, existingHash);
       return;
     }
     console.warn(`[runtime] ${spec.label} hash mismatch; rehydrating (${target})`);
@@ -158,6 +233,7 @@ const hydrateArtifact = async (spec: ArtifactSpec): Promise<void> => {
   try {
     const downloadedHash = await hashFile(tmpPath);
     if (downloadedHash !== expected) {
+      setHydratedArtifactStatus(spec.label, spec.targetPath, "mismatch", "rehydrated", expected, downloadedHash);
       throw new Error(
         `[runtime] ${spec.label} sha256 mismatch (expected ${expected}, got ${downloadedHash})`,
       );
@@ -177,6 +253,7 @@ const hydrateArtifact = async (spec: ArtifactSpec): Promise<void> => {
     }
     console.log(`[runtime] ${spec.label} hydrated (${target})`);
     await logArtifactState(spec.label, target);
+    setHydratedArtifactStatus(spec.label, spec.targetPath, "verified", "rehydrated", expected, downloadedHash);
   } catch (error) {
     await fs.unlink(tmpPath).catch(() => undefined);
     throw error;
@@ -192,7 +269,11 @@ const describeEnv = (value?: string | null, max = 12): string => {
   return `${safe} (len ${trimmed.length})`;
 };
 
+export const getRuntimeArtifactStatuses = (): RuntimeArtifactStatus[] =>
+  artifactStatuses.map((entry) => ({ ...entry, provenance: { ...entry.provenance } }));
+
 export const hydrateRuntimeArtifacts = async (): Promise<void> => {
+  artifactStatuses = [];
   const artifacts: ArtifactSpec[] = [];
   console.log(
     `[runtime] env LLM_LOCAL_CMD_OBJECT_KEY=${describeEnv(process.env.LLM_LOCAL_CMD_OBJECT_KEY)} ` +
