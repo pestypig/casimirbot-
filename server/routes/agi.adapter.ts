@@ -12,7 +12,7 @@ import {
 } from "../../shared/schema.js";
 import { scorePremeditation } from "../services/premeditation-scorer.js";
 import { recordTrainingTrace } from "../services/observability/training-trace-store.js";
-import { verifyRoboticsSafetyCertificateIntegrity } from "../../tools/verifyCertificate.js";
+import { verifyRoboticsSafetyCertificate, verifyRoboticsSafetyCertificateIntegrity } from "../../tools/verifyCertificate.js";
 import { runAdapterExecution } from "../services/adapter/run.js";
 import { emitEventSpine } from "../services/observability/event-spine.js";
 
@@ -27,12 +27,12 @@ const setCors = (res: Response) => {
 };
 
 
-type CanonicalFirstFailClass = "constraint" | "certificate_integrity" | "certificate_status" | "certificate_missing" | "robotics_safety";
+type CanonicalFirstFailClass = "constraint" | "certificate_integrity" | "certificate_status" | "certificate_missing" | "certificate_authenticity_required" | "robotics_safety";
 
 const normalizeFailFirstFail = (
   verdict: "PASS" | "FAIL",
   firstFail: TrainingTraceConstraint | null | undefined,
-  certificate?: { status?: string; certificateHash?: string | null; integrityOk?: boolean } | null,
+  certificate?: { status?: string; certificateHash?: string | null; integrityOk?: boolean; authenticityOk?: boolean; authenticityRequired?: boolean } | null,
 ): TrainingTraceConstraint | null => {
   if (verdict === "PASS") return firstFail ?? null;
   if (firstFail) return firstFail;
@@ -40,20 +40,24 @@ const normalizeFailFirstFail = (
   const certificateStatus = typeof certificate?.status === "string" ? certificate.status.trim() : "";
   const canonicalClass: CanonicalFirstFailClass = certificate?.integrityOk === false
     ? "certificate_integrity"
-    : !certificateHash
-      ? "certificate_missing"
-      : certificateStatus && certificateStatus !== "FAIL"
-        ? "certificate_status"
-        : "constraint";
+    : certificate?.authenticityRequired === true && certificate?.authenticityOk === false
+      ? "certificate_authenticity_required"
+      : !certificateHash
+        ? "certificate_missing"
+        : certificateStatus && certificateStatus !== "FAIL"
+          ? "certificate_status"
+          : "constraint";
   const id = canonicalClass === "certificate_integrity"
     ? "ADAPTER_CERTIFICATE_INTEGRITY"
     : canonicalClass === "certificate_missing"
       ? "ADAPTER_CERTIFICATE_MISSING"
       : canonicalClass === "certificate_status"
         ? `ADAPTER_CERTIFICATE_STATUS_${certificateStatus.toUpperCase()}`
-        : canonicalClass === "robotics_safety"
-          ? "ROBOTICS_SAFETY_ENVELOPE_FAIL"
-          : "ADAPTER_CONSTRAINT_FAIL";
+        : canonicalClass === "certificate_authenticity_required"
+          ? "ADAPTER_CERTIFICATE_AUTHENTICITY_REQUIRED"
+          : canonicalClass === "robotics_safety"
+            ? "ROBOTICS_SAFETY_ENVELOPE_FAIL"
+            : "ADAPTER_CONSTRAINT_FAIL";
   return {
     id,
     severity: "HARD",
@@ -64,6 +68,8 @@ const normalizeFailFirstFail = (
   };
 };
 
+type AuthenticityLadderConsequence = "low" | "medium" | "high";
+
 type RoboticsSafetyGateResult = {
   pass: boolean;
   firstFail?: TrainingTraceConstraint;
@@ -73,11 +79,16 @@ type RoboticsSafetyGateResult = {
     certificateHash: string | null;
     certificateId: string | null;
     integrityOk: boolean;
+    authenticityOk: boolean;
+    authenticityRequired: boolean;
+    authenticityConsequence: AuthenticityLadderConsequence;
+    authenticityReasonCodes: string[];
   };
 };
 
 const buildRoboticsSafetyGate = (
   roboticsSafety: AdapterRoboticsSafety,
+  ladder: { consequence: AuthenticityLadderConsequence; required?: boolean; trustedSignerKeyIds?: string[] } = { consequence: "low" },
 ): RoboticsSafetyGateResult => {
   const checks = [
     {
@@ -124,6 +135,18 @@ const buildRoboticsSafetyGate = (
     certificateHash,
   });
   const integrityOk = (roboticsSafety.integrityOk ?? true) && integrityByHash;
+  const authenticity = verifyRoboticsSafetyCertificate({
+    mode: "robotics-safety-v1",
+    checks,
+    certificateHash,
+    signature: roboticsSafety.signature,
+    signer: roboticsSafety.signer,
+  }, {
+    authenticityConsequence: ladder.consequence,
+    authenticityRequired: ladder.required,
+    trustedSignerKeyIds: ladder.trustedSignerKeyIds,
+  }).authenticity;
+
   const certificateFail = !integrityOk
     ? {
         id: "ROBOTICS_CERTIFICATE_INTEGRITY",
@@ -133,7 +156,16 @@ const buildRoboticsSafetyGate = (
         severity: "HARD",
       }
     : null;
-  const firstFailCheck = checks.find((entry) => !entry.pass) ?? certificateFail;
+  const authenticityFail = authenticity.enforced && !authenticity.ok
+    ? {
+        id: "ROBOTICS_CERTIFICATE_AUTHENTICITY_REQUIRED",
+        pass: false,
+        value: 0,
+        limit: "authenticityOk=true",
+        severity: "HARD",
+      }
+    : null;
+  const firstFailCheck = checks.find((entry) => !entry.pass) ?? certificateFail ?? authenticityFail;
   const pass = !firstFailCheck;
   const deltas: TrainingTraceDelta[] = [
     {
@@ -174,7 +206,9 @@ const buildRoboticsSafetyGate = (
           status: "fail",
           value: firstFailCheck.value,
           limit: firstFailCheck.limit,
-          note: "class=robotics_safety,robotics-safety-veto",
+          note: firstFailCheck.id === "ROBOTICS_CERTIFICATE_AUTHENTICITY_REQUIRED"
+            ? `class=certificate_authenticity_required,consequence=${authenticity.consequence},reasons=${authenticity.reasonCodes.join("|") || "unknown"}`
+            : "class=robotics_safety,robotics-safety-veto",
         }
       : undefined,
     deltas,
@@ -183,6 +217,10 @@ const buildRoboticsSafetyGate = (
       certificateHash,
       certificateId: `robotics-safety:${certificateHash.slice(0, 12)}`,
       integrityOk,
+      authenticityOk: authenticity.ok,
+      authenticityRequired: authenticity.enforced,
+      authenticityConsequence: authenticity.consequence,
+      authenticityReasonCodes: authenticity.reasonCodes,
     },
   };
 };
@@ -263,7 +301,11 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
     premeditation ? scorePremeditation(premeditation) : undefined;
 
   if (roboticsSafety) {
-    const safety = buildRoboticsSafetyGate(roboticsSafety);
+    const safety = buildRoboticsSafetyGate(roboticsSafety, {
+      consequence: parsed.data.policy?.authenticity?.consequence ?? "low",
+      required: parsed.data.policy?.authenticity?.required,
+      trustedSignerKeyIds: parsed.data.policy?.authenticity?.trustedSignerKeyIds,
+    });
     if (!safety.pass) {
       const roboticsProvenance = deriveRoboticsEpisodeProvenance(roboticsSafety, safety.certificate);
       recordTrainingTrace({

@@ -1558,6 +1558,10 @@ export const grEvaluationSchema = z.object({
     certificateHash: z.string().nullable(),
     certificateId: z.string().nullable(),
     integrityOk: z.boolean(),
+    authenticityOk: z.boolean().optional(),
+    authenticityRequired: z.boolean().optional(),
+    authenticityConsequence: z.enum(["low", "medium", "high"]).optional(),
+    authenticityReasonCodes: z.array(z.string()).optional(),
   }),
   pass: z.boolean(),
   notes: z.array(z.string()).optional(),
@@ -1571,6 +1575,10 @@ export const grGroundingCertificateSchema = z.object({
   certificateHash: z.string().nullable(),
   certificateId: z.string().nullable(),
   integrityOk: z.boolean().optional(),
+  authenticityOk: z.boolean().optional(),
+  authenticityRequired: z.boolean().optional(),
+  authenticityConsequence: z.enum(["low", "medium", "high"]).optional(),
+  authenticityReasonCodes: z.array(z.string()).optional(),
 });
 export type GrGroundingCertificate = z.infer<typeof grGroundingCertificateSchema>;
 
@@ -2398,6 +2406,10 @@ export const trainingTraceCertificateSchema = z.object({
   certificateHash: z.string().nullable(),
   certificateId: z.string().nullable().optional(),
   integrityOk: z.boolean().optional(),
+  authenticityOk: z.boolean().optional(),
+  authenticityRequired: z.boolean().optional(),
+  authenticityConsequence: z.enum(["low", "medium", "high"]).optional(),
+  authenticityReasonCodes: z.array(z.string()).optional(),
 });
 export type TrainingTraceCertificate = z.infer<typeof trainingTraceCertificateSchema>;
 
@@ -2561,9 +2573,24 @@ export const adapterBudgetSchema = z.object({
 });
 export type AdapterBudget = z.infer<typeof adapterBudgetSchema>;
 
+export const adapterCertificateAuthenticityConsequenceSchema = z.enum(["low", "medium", "high"]);
+export type AdapterCertificateAuthenticityConsequence = z.infer<typeof adapterCertificateAuthenticityConsequenceSchema>;
+
+export const adapterCertificateAuthenticityPolicySchema = z.object({
+  consequence: z.enum(["low", "medium", "high"]).optional(),
+  required: z.boolean().optional(),
+  trustedSignerKeyIds: z.array(z.string()).optional(),
+});
+export type AdapterCertificateAuthenticityPolicy = z.infer<typeof adapterCertificateAuthenticityPolicySchema>;
+
 export const adapterPolicySchema = z.object({
   thresholds: grConstraintThresholdSchema.partial().optional(),
   gate: grConstraintPolicySchema.partial().optional(),
+  verify: z
+    .object({
+      mode: z.enum(["strict", "permissive"]).optional(),
+    })
+    .optional(),
 });
 export type AdapterPolicy = z.infer<typeof adapterPolicySchema>;
 
@@ -2657,6 +2684,10 @@ export const adapterRoboticsSafetySchema = z.object({
   stabilityMarginMin: z.number(),
   certificateHash: z.string().nullable().optional(),
   integrityOk: z.boolean().optional(),
+  signature: z.string().optional(),
+  signer: z.object({
+    keyId: z.string(),
+  }).optional(),
 });
 export type AdapterRoboticsSafety = z.infer<typeof adapterRoboticsSafetySchema>;
 
@@ -2837,6 +2868,10 @@ export const constraintPackCertificateResultSchema = z.object({
   certificateHash: z.string().nullable().optional(),
   certificateId: z.string().nullable().optional(),
   integrityOk: z.boolean().optional(),
+  authenticityOk: z.boolean().optional(),
+  authenticityRequired: z.boolean().optional(),
+  authenticityConsequence: z.enum(["low", "medium", "high"]).optional(),
+  authenticityReasonCodes: z.array(z.string()).optional(),
 });
 export type ConstraintPackCertificateResult = z.infer<
   typeof constraintPackCertificateResultSchema
