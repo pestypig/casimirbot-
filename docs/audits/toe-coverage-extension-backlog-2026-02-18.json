@@ -567,17 +567,16 @@
         "server/modules/stellar/local-rest.ts",
         "server/routes/stellar.ts",
         "tests/stellar-runtime-contract.spec.ts",
-        "server/__tests__/star-equilibrium.spec.ts",
-        "docs/audits/ticket-results"
+        "server/__tests__/star-equilibrium.spec.ts"
       ],
       "required_tests": [
         "tests/stellar-runtime-contract.spec.ts",
         "server/__tests__/star-equilibrium.spec.ts"
       ],
       "done_criteria": [
-        "Stellar restoration modules emit additive runtime provenance metadata with conservative defaults for missing provenance",
-        "Stellar route responses preserve backward-compatible shape while surfacing deterministic strict fail_reason when provenance is required",
-        "Runtime contract tests cover default provenance, strict failure determinism, and caller-provided provenance pass-through"
+        "Stellar evolution/local-rest outputs include additive provenance_class, claim_tier, certifying metadata",
+        "Route-level stellar responses preserve backward compatibility and include deterministic fallback fail_reason metadata",
+        "Stellar runtime contract tests verify default, strict/fallback, and pass-through behaviors"
       ]
     }
   ]

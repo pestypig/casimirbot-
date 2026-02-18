@@ -73,4 +73,47 @@ describe("debate orchestrator", () => {
     expect(combined.debateId).toBeDefined();
     expect(combined.outcome?.debate_id).toBe(combined.debateId);
   });
+
+  it("adds additive provenance fields and enforces strict missing-provenance fail reason", async () => {
+    const strictEnv = process.env.DEBATE_STRICT_PROVENANCE;
+    process.env.DEBATE_STRICT_PROVENANCE = "1";
+    try {
+      const { debateId } = await startDebate({
+        goal: "strict provenance gate",
+        persona_id: "persona:test",
+        max_rounds: 1,
+        max_wall_ms: 3000,
+        verifiers: [],
+      });
+      const outcome = await waitForDebateOutcome(debateId, 4000);
+      expect(outcome?.fail_reason).toBe("DEBATE_EVIDENCE_PROVENANCE_MISSING");
+      expect(outcome?.provenance_class).toBe("proxy");
+      expect(outcome?.claim_tier).toBe("diagnostic");
+      expect(outcome?.certifying).toBe(false);
+    } finally {
+      process.env.DEBATE_STRICT_PROVENANCE = strictEnv;
+    }
+
+    const { debateId: groundedDebateId } = await startDebate({
+      goal: "grounded metadata",
+      persona_id: "persona:test",
+      max_rounds: 1,
+      max_wall_ms: 3000,
+      verifiers: [],
+      context: {
+        warp_grounding: {
+          status: "ADMISSIBLE",
+          summary: "ok",
+          certificateHash: "cert:abc",
+          constraints: [],
+        },
+      },
+    });
+
+    const grounded = await waitForDebateOutcome(groundedDebateId, 4000);
+    expect(grounded?.provenance_class).toBe("measured");
+    expect(grounded?.claim_tier).toBe("certified");
+    expect(grounded?.certifying).toBe(true);
+  });
+
 });

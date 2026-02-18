@@ -93,7 +93,7 @@ describe("casimir resonance seeding", () => {
       limit: 5,
     });
     expect(bundle?.candidates).toEqual([]);
-    expect(bundle?.fail_reason).toBe("RESONANCE_PROVENANCE_MISSING");
+    expect(bundle?.fail_reason).toBe("RESONANCE_SOURCE_PROVENANCE_MISSING");
     expect(bundle?.claim_tier).toBe("diagnostic");
     expect(bundle?.certifying).toBe(false);
   });

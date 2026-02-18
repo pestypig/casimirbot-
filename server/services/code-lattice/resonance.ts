@@ -345,18 +345,18 @@ function mergeSeedArtifacts(target: TelemetrySeedResult, incoming: TelemetrySeed
 
 const resolveResonanceProvenance = (
   telemetry: ConsoleTelemetryBundle | null,
-): { provenance: ResonanceProvenance; hasProvidedProvenance: boolean } => {
+): { provenance: ResonanceProvenance; hasCompleteProvenance: boolean } => {
   if (!telemetry || typeof telemetry !== "object") {
-    return { provenance: { ...RESONANCE_DEFAULT_PROVENANCE }, hasProvidedProvenance: false };
+    return { provenance: { ...RESONANCE_DEFAULT_PROVENANCE }, hasCompleteProvenance: false };
   }
   const candidate = telemetry as unknown as {
     provenance_class?: unknown;
     claim_tier?: unknown;
     certifying?: unknown;
   };
-  const hasProvidedProvenance =
-    typeof candidate.provenance_class === "string" ||
-    typeof candidate.claim_tier === "string" ||
+  const hasCompleteProvenance =
+    typeof candidate.provenance_class === "string" && candidate.provenance_class.trim().length > 0 &&
+    typeof candidate.claim_tier === "string" && candidate.claim_tier.trim().length > 0 &&
     typeof candidate.certifying === "boolean";
   return {
     provenance: {
@@ -373,7 +373,7 @@ const resolveResonanceProvenance = (
           ? candidate.certifying
           : RESONANCE_DEFAULT_PROVENANCE.certifying,
     },
-    hasProvidedProvenance,
+    hasCompleteProvenance,
   };
 };
 
@@ -670,8 +670,8 @@ export async function buildResonanceBundle(args: BuildResonanceArgs): Promise<Re
   if (!trimmed) {
     return null;
   }
-  const { provenance, hasProvidedProvenance } = resolveResonanceProvenance(args.telemetry ?? null);
-  if (args.strictProvenance === true && !hasProvidedProvenance) {
+  const { provenance, hasCompleteProvenance } = resolveResonanceProvenance(args.telemetry ?? null);
+  if (args.strictProvenance === true && !hasCompleteProvenance) {
     return {
       goal: args.goal,
       query: trimmed,

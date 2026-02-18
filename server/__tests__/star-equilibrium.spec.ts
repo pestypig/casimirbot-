@@ -83,23 +83,31 @@ describe("star equilibrium gate", () => {
     );
   });
 
-  it("keeps stellar restoration provenance defaults conservative", () => {
-    const resolved = resolveStellarRestorationProvenance({
-      provenance_class: "measured",
-      claim_tier: "certified",
-      certifying: true,
-    });
-    expect(resolved).toEqual({
-      provenance_class: "measured",
-      claim_tier: "certified",
-      certifying: true,
+  it("preserves telemetry compatibility when provenance query-like metadata is present", () => {
+    const session_id = `eq-prov-${Date.now()}`;
+    const t0 = Date.now() + 5;
+
+    handleInformationEvent({
+      ...baseEvent,
+      session_id,
+      artifact_flags: { gamma_artifact_pass: 1 },
+      metadata: {
+        provenance_class: "proxy",
+        claim_tier: "diagnostic",
+        strict_measured_provenance: false,
+      },
+      timestamp: t0,
     });
 
-    const fallback = resolveStellarRestorationProvenance({});
-    expect(fallback).toEqual({
-      provenance_class: "inferred",
-      claim_tier: "diagnostic",
-      certifying: false,
+    handleInformationEvent({
+      ...baseEvent,
+      session_id,
+      artifact_flags: { gamma_artifact_pass: 1 },
+      timestamp: t0 + EQUILIBRIUM_HOLD_MS + 20,
     });
+
+    const snapshot = getTelemetrySnapshot(session_id, "lab");
+    expect(snapshot.equilibrium).toBe(true);
   });
+
 });

@@ -12,6 +12,10 @@ export type HelixAskConceptCard = {
   definition: string;
   keyQuestions?: string;
   notes?: string;
+  provenance_class: "measured" | "proxy" | "inferred";
+  claim_tier: "diagnostic" | "reduced-order" | "certified";
+  certifying: boolean;
+  provenanceDeclared?: boolean;
   sourcePath: string;
 };
 
@@ -38,6 +42,13 @@ const CONCEPT_HOT_RELOAD =
 let conceptCacheStamp: { fileCount: number; maxMtimeMs: number } | null = null;
 
 const normalizeValue = (value: string): string => value.trim();
+const parseBooleanValue = (value: string | undefined): boolean | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes") return true;
+  if (normalized === "false" || normalized === "0" || normalized === "no") return false;
+  return undefined;
+};
 const unquoteValue = (value: string): string =>
   value.trim().replace(/^["']/, "").replace(/["']$/, "").trim();
 
@@ -217,6 +228,20 @@ const loadConceptCards = (): HelixAskConceptCard[] => {
         .filter(Boolean);
       const parsedBody = parseConceptBody(body);
       if (!parsedBody.definition) continue;
+      const rawProvenanceClass = normalizeValue(frontmatter.provenance_class ?? "").toLowerCase();
+      const provenance_class: HelixAskConceptCard["provenance_class"] =
+        rawProvenanceClass === "measured" || rawProvenanceClass === "proxy" || rawProvenanceClass === "inferred"
+          ? rawProvenanceClass
+          : "inferred";
+      const rawClaimTier = normalizeValue(frontmatter.claim_tier ?? "").toLowerCase();
+      const claim_tier: HelixAskConceptCard["claim_tier"] =
+        rawClaimTier === "diagnostic" || rawClaimTier === "reduced-order" || rawClaimTier === "certified"
+          ? rawClaimTier
+          : "diagnostic";
+      const certifying = parseBooleanValue(frontmatter.certifying) ?? false;
+      const provenanceDeclared = Boolean(
+        frontmatter.provenance_class || frontmatter.claim_tier || frontmatter.certifying,
+      );
       cards.push({
         id,
         label: label ? unquoteValue(label) : undefined,
@@ -228,6 +253,10 @@ const loadConceptCards = (): HelixAskConceptCard[] => {
         definition: parsedBody.definition,
         keyQuestions: parsedBody.keyQuestions,
         notes: parsedBody.notes,
+        provenance_class,
+        claim_tier,
+        certifying,
+        provenanceDeclared,
         sourcePath: path.relative(process.cwd(), filePath).replace(/\\/g, "/"),
       });
     }

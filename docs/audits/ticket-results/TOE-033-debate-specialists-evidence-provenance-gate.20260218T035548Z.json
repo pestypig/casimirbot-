@@ -1,0 +1,26 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-033-debate-specialists-evidence-provenance-gate",
+  "files_changed": [
+    "server/services/debate/orchestrator.ts",
+    "server/services/debate/types.ts",
+    "server/routes/agi.debate.ts",
+    "tests/debate-orchestrator.spec.ts",
+    "tests/debate-sse.spec.ts"
+  ],
+  "tests_run": [
+    "tests/debate-orchestrator.spec.ts",
+    "tests/debate-sse.spec.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "cli/casimir-verify.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:ad389fad-ba79-4150-896e-00824fb93dc7",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}
