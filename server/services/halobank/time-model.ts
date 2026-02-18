@@ -31,6 +31,8 @@ export type HaloBankTimeComputeInput = {
     ephemerisSource?: "live" | "fallback";
     ephemerisEvidenceVerified?: boolean;
     ephemerisEvidenceRef?: string;
+    residualPpm?: number;
+    residualSampleCount?: number;
   };
   question?: string;
   prompt?: string;
@@ -62,7 +64,12 @@ export type HaloBankTimeComputeResult = {
         explicitEvidence: boolean;
         verified: boolean;
         reference: string | null;
+        residualPpm: number | null;
+        residualSampleCount: number | null;
+        residualEnvelopePpm: number;
+        residualStatus: "within_envelope" | "out_of_envelope" | "incomplete_evidence";
       };
+      claim_tier_recommendation: "diagnostic" | "reduced-order";
     };
     consistency: {
       gate: "halobank.horizons.consistency.v1";
@@ -279,17 +286,41 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
   const explicitEvidence = input.model?.ephemerisEvidenceVerified === true;
   const evidenceRef = typeof input.model?.ephemerisEvidenceRef === "string" ? input.model.ephemerisEvidenceRef.trim() : "";
   const hasEvidenceRef = evidenceRef.length > 0;
-  const verified = source === "live" ? explicitEvidence : false;
-  const reasons = fallback
-    ? ["Fallback ephemeris source detected; diagnostic-only and non-certifying."]
-    : verified
-      ? ["Live ephemeris source declared with explicit verification evidence."]
-      : ["Live ephemeris source declared without explicit verification evidence; consistency gate is non-pass."];
+  const residualEnvelopePpm = 5;
+  const residualPpm = Number.isFinite(input.model?.residualPpm) ? Number(input.model?.residualPpm) : null;
+  const residualSampleCount =
+    Number.isFinite(input.model?.residualSampleCount) && Number(input.model?.residualSampleCount) >= 0
+      ? Number(input.model?.residualSampleCount)
+      : null;
+  const hasMinimumResidualSamples = residualSampleCount !== null && residualSampleCount >= 3;
+  const hasResidualValue = residualPpm !== null;
+  const evidenceComplete = explicitEvidence && hasEvidenceRef && hasResidualValue && hasMinimumResidualSamples;
+  const residualWithinEnvelope = residualPpm !== null && Math.abs(residualPpm) <= residualEnvelopePpm;
+  const verified = source === "live" ? evidenceComplete : false;
+  const residualStatus: "within_envelope" | "out_of_envelope" | "incomplete_evidence" = !evidenceComplete
+    ? "incomplete_evidence"
+    : residualWithinEnvelope
+      ? "within_envelope"
+      : "out_of_envelope";
+
   const firstFailId = fallback
     ? "HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY"
-    : verified
-      ? null
-      : "HALOBANK_HORIZONS_LIVE_UNVERIFIED_EVIDENCE";
+    : !evidenceComplete
+      ? "HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE"
+      : residualWithinEnvelope
+        ? null
+        : "HALOBANK_HORIZONS_RESIDUAL_OUT_OF_ENVELOPE";
+
+  const reasons = fallback
+    ? ["Fallback ephemeris source detected; diagnostic-only and non-certifying."]
+    : !evidenceComplete
+      ? ["Live ephemeris residual evidence is incomplete; conservative diagnostic downgrade applied."]
+      : residualWithinEnvelope
+        ? ["Live ephemeris residual is within bounded envelope with complete evidence."]
+        : ["Live ephemeris residual exceeds bounded envelope; consistency gate is non-pass."];
+
+  const claimTierRecommendation: "diagnostic" | "reduced-order" =
+    !firstFailId && source === "live" && residualStatus === "within_envelope" ? "reduced-order" : "diagnostic";
   return {
     requested,
     source,
@@ -301,15 +332,20 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
       note: fallback
         ? "Fallback ephemeris remains diagnostic and non-certifying for orbital alignment claims."
         : verified
-          ? "Live ephemeris provenance includes explicit evidence marker for diagnostic consistency gating."
-          : "Live ephemeris source is declared but unverified; diagnostic non-pass consistency gate applied.",
+          ? "Live ephemeris provenance includes complete residual evidence within bounded envelope for bridge consistency gating."
+          : "Live ephemeris residual evidence is incomplete or out-of-envelope; diagnostic non-pass consistency gate applied.",
       evidence: {
         declaredSourceClass: source,
         verifiedSourceClass: verified ? source : null,
         explicitEvidence,
         verified,
         reference: hasEvidenceRef ? evidenceRef : null,
+        residualPpm,
+        residualSampleCount,
+        residualEnvelopePpm,
+        residualStatus,
       },
+      claim_tier_recommendation: claimTierRecommendation,
     },
     consistency: {
       gate: "halobank.horizons.consistency.v1",

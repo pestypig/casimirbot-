@@ -50,7 +50,7 @@ describe("halobank time model", () => {
     expect(result.ephemeris?.provenance.evidence.declaredSourceClass).toBe("live");
     expect(result.ephemeris?.provenance.evidence.verified).toBe(false);
     expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
-    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_LIVE_UNVERIFIED_EVIDENCE");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE");
     expect(result.ephemeris?.consistency.deterministic).toBe(true);
   });
 
@@ -64,6 +64,8 @@ describe("halobank time model", () => {
         ephemerisSource: "live",
         ephemerisEvidenceVerified: true,
         ephemerisEvidenceRef: "artifact:jpl-horizons:2025-03-01T12:00:00Z",
+        residualPpm: 1.75,
+        residualSampleCount: 9,
       },
     });
     expect(result.ok).toBe(true);
@@ -71,6 +73,29 @@ describe("halobank time model", () => {
     expect(result.ephemeris?.consistency.firstFailId).toBeNull();
     expect(result.ephemeris?.provenance.evidence.verified).toBe(true);
     expect(result.ephemeris?.provenance.evidence.reference).toContain("artifact:jpl-horizons");
+    expect(result.ephemeris?.provenance.evidence.residualStatus).toBe("within_envelope");
+    expect(result.ephemeris?.provenance.claim_tier_recommendation).toBe("reduced-order");
+  });
+
+
+  it("returns FAIL when residual evidence is out of bounded envelope", () => {
+    const result = computeHaloBankTimeModel({
+      timestamp: "2025-03-01T12:00:00.000Z",
+      place: { lat: 40.7128, lon: -74.006 },
+      model: {
+        orbitalAlignment: true,
+        ephemerisSource: "live",
+        ephemerisEvidenceVerified: true,
+        ephemerisEvidenceRef: "artifact:jpl-horizons:2025-03-01T12:00:00Z",
+        residualPpm: 9.25,
+        residualSampleCount: 12,
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_OUT_OF_ENVELOPE");
+    expect(result.ephemeris?.provenance.evidence.residualStatus).toBe("out_of_envelope");
+    expect(result.ephemeris?.provenance.claim_tier_recommendation).toBe("diagnostic");
   });
 
   it("marks fallback ephemeris as diagnostic non-certifying with deterministic fail id", () => {
