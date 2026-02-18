@@ -1863,6 +1863,42 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-075-helix-ask-strict-ready-verified-pass-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Helix Ask strict-ready verified PASS pack",
+      "primary_path_prefix": "server/routes/agi.plan.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts",
+        "scripts/compute-toe-progress.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts"
+      ],
+      "done_criteria": [
+        "Top strict-ready blockers are identified from current progress snapshot",
+        "Highest-impact Helix Ask blockers are promoted to verified PASS-ready state with deterministic gates",
+        "Strict fail reasons remain deterministic and replay-safe across fallback paths",
+        "Progress snapshot and ticket receipt capture before/after strict-ready counters"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
     }
   ]
 }
