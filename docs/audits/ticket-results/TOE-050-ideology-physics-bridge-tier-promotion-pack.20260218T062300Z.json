@@ -1,0 +1,31 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-050-ideology-physics-bridge-tier-promotion-pack",
+  "files_changed": [
+    "docs/audits/research/TOE-050-tier-promotion-rationale.md",
+    "docs/audits/research/TOE-050-comparative-evidence-pack.md"
+  ],
+  "tests_run": [
+    "tests/helix-ask-bridge.spec.ts",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "tests/ideology-dag.spec.ts",
+    "npx vitest run tests/helix-ask-bridge.spec.ts tests/helix-ask-graph-resolver.spec.ts tests/ideology-dag.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-backlog.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run validate:toe:research-gates",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:3e699995-333a-4af7-b509-729a4ad99124",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "tier-promotion-rationale",
+    "comparative-evidence-pack"
+  ],
+  "remaining_gaps": []
+}
