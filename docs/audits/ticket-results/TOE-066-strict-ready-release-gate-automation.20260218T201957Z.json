@@ -1,0 +1,34 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-066-strict-ready-release-gate-automation",
+  "files_changed": [
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+    "scripts/compute-toe-progress.ts",
+    "scripts/toe-agent-preflight.ts",
+    "tests/toe-progress.spec.ts",
+    "tests/toe-agent-preflight.spec.ts",
+    "docs/audits/toe-progress-snapshot.json",
+    "docs/audits/ticket-results/TOE-066-strict-ready-release-gate-automation.20260218T201957Z.json"
+  ],
+  "tests_run": [
+    "tests/toe-agent-preflight.spec.ts",
+    "tests/toe-progress.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-backlog.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run validate:toe:research-gates",
+    "npx tsx scripts/compute-toe-progress.ts",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:b95fe882-f2eb-4c71-b7a3-289e024b6d8d",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}

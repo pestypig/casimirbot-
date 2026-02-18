@@ -1488,30 +1488,47 @@
       }
     },
     {
+      "id": "TOE-062-helix-ask-modes-stability-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Helix Ask modes stability pack",
+      "primary_path_prefix": "server/services/helix-ask/arbiter.ts",
+      "allowed_paths": [
+        "server/services/helix-ask/arbiter.ts",
+        "server/routes/agi.plan.ts",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts"
+      ],
+      "required_tests": [
+        "tests/helix-ask-modes.spec.ts",
+        "tests/helix-ask-evidence-gate.spec.ts",
+        "tests/helix-ask-answer-artifacts.spec.ts"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
       "id": "TOE-063-halobank-residual-reduced-order-hardening-pack",
       "tree_owner": "simulation-systems",
-      "gap_refs": [
-        "F-COV-2",
-        "F-COV-6"
-      ],
-      "primitive": "Halobank residual reduced-order hardening pack primitive",
+      "primitive": "Halobank residual reduced-order hardening pack",
       "primary_path_prefix": "server/services/halobank/time-model.ts",
       "allowed_paths": [
         "server/services/halobank/time-model.ts",
+        "server/skills/halobank.time.compute.ts",
         "tests/halobank-time-model.spec.ts",
         "tests/halobank-horizons-consistency.spec.ts",
         "docs/audits/research/TOE-063-tier-promotion-rationale.md",
-        "docs/audits/research/TOE-063-comparative-evidence-pack.md",
-        "docs/audits/ticket-results/TOE-063-halobank-residual-reduced-order-hardening-pack.20260218T201544Z.json"
+        "docs/audits/research/TOE-063-comparative-evidence-pack.md"
       ],
       "required_tests": [
         "tests/halobank-time-model.spec.ts",
         "tests/halobank-horizons-consistency.spec.ts"
-      ],
-      "done_criteria": [
-        "Reduced-order recommendation requires canonical artifact evidence references and bounded integer sample counts for live residual evidence",
-        "Invalid artifact references deterministically fail with HALOBANK_HORIZONS_EVIDENCE_REF_INVALID before promotion",
-        "Research artifacts define hardening assumptions, falsifiability hooks, and comparative outcomes"
       ],
       "research_gate": {
         "risk_class": "tier_promotion",
@@ -1520,6 +1537,65 @@
         "required_artifacts": [
           "tier-promotion-rationale",
           "comparative-evidence-pack"
+        ]
+      }
+    },
+    {
+      "id": "TOE-064-warp-viability-reduced-order-counterexample-pack",
+      "tree_owner": "warp-mechanics",
+      "primitive": "Warp viability reduced-order counterexample pack",
+      "primary_path_prefix": "tools/warpViability.ts",
+      "allowed_paths": [
+        "tools/warpViability.ts",
+        "tools/warpViabilityCertificate.ts",
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts",
+        "tests/proof-pack-strict-parity.spec.ts"
+      ],
+      "required_tests": [
+        "tests/warp-viability.spec.ts",
+        "tests/warp-metric-adapter.spec.ts",
+        "tests/proof-pack-strict-parity.spec.ts"
+      ],
+      "research_gate": {
+        "risk_class": "tier_promotion",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "tier-promotion-rationale",
+          "comparative-evidence-pack"
+        ]
+      }
+    },
+    {
+      "id": "TOE-065-placeholder-ticket",
+      "tree_owner": "tbd",
+      "primitive": "TBD",
+      "primary_path_prefix": "tbd",
+      "allowed_paths": [],
+      "required_tests": [],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-066-placeholder-ticket",
+      "tree_owner": "tbd",
+      "primitive": "TBD",
+      "primary_path_prefix": "tbd",
+      "allowed_paths": [],
+      "required_tests": [],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
         ]
       }
     }
