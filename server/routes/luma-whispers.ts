@@ -10,6 +10,7 @@ import {
   type TLumaWhisper,
   type WhisperContext,
 } from "@shared/whispers";
+import { resolveLumaGenerationProvenance } from "../services/luma";
 
 let BANK: TLumaWhisper[] | null = null;
 
@@ -170,7 +171,10 @@ export function registerLumaWhisperRoute(app: Express) {
         .slice(0, 3)
         .map(({ w }) => w);
 
-      res.json({ items: ranked, context: whisperCtx });
+      const metadata = resolveLumaGenerationProvenance(
+        whisperCtx.telemetry as { provenance_class?: string; maturity?: string; certifying?: boolean } | undefined,
+      );
+      res.json({ items: ranked, context: whisperCtx, provenance: metadata });
     } catch (err: any) {
       res.status(500).json({ error: err?.message ?? "failed" });
     }

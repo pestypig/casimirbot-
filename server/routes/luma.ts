@@ -4,6 +4,7 @@ import {
   planSteps,
   proposePatch,
   summarizeUrl,
+  withLumaGenerationProvenance,
   type ChatMsg,
 } from "../services/luma";
 import { answerWithSelfConsistency } from "../services/decoding/selfConsistency";
@@ -69,6 +70,23 @@ lumaRouter.post("/summarize", async (req, res) => {
     res.status(400).json({ error: err?.message || "Unable to summarize" });
   }
 });
+
+lumaRouter.post("/generate/provenance", async (req, res) => {
+  const { output, provenance } = req.body || {};
+  if (!output || typeof output !== "object" || Array.isArray(output)) {
+    return res.status(400).json({ error: "output object required" });
+  }
+
+  const enriched = withLumaGenerationProvenance(
+    output as Record<string, unknown>,
+    provenance && typeof provenance === "object" && !Array.isArray(provenance)
+      ? (provenance as { provenance_class?: string; maturity?: string; certifying?: boolean })
+      : undefined,
+  );
+
+  return res.json(enriched);
+});
+
 
 lumaRouter.post("/chat/stream", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
