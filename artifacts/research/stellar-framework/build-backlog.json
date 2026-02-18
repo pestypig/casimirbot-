@@ -1,0 +1,41 @@
+{
+  "next_round_patch_sets": [
+    {
+      "id": "PS1",
+      "description": "Add stellar Orch-OR claim DAG nodes",
+      "file_targets": [
+        "docs/knowledge/physics/math-tree.json",
+        "docs/knowledge/physics/physics-foundations-tree.json",
+        "docs/knowledge/bridges/ideology-physics-bridge-tree.json"
+      ],
+      "test_targets": [
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/theory-checks.spec.ts"
+      ]
+    },
+    {
+      "id": "PS2",
+      "description": "Introduce retrieval contract enforcement for mechanism sentence + maturity label",
+      "file_targets": [
+        "server/routes/helix.ts",
+        "server/services/helix/retrieval.ts",
+        "docs/knowledge/physics/math-maturity-stages.md"
+      ],
+      "test_targets": [
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/helix-ask-reasoning.spec.ts"
+      ]
+    },
+    {
+      "id": "PS3",
+      "description": "Add falsifier schema validation for exploratory claims",
+      "file_targets": [
+        "docs/knowledge/dag-node-schema.md",
+        "server/services/knowledge/validator.ts"
+      ],
+      "test_targets": [
+        "tests/knowledge-schema-validator.spec.ts"
+      ]
+    }
+  ]
+}

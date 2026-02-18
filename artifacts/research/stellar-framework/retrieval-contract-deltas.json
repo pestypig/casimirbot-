@@ -1,0 +1,47 @@
+{
+  "mustIncludeFiles": [
+    "docs/stellar-consciousness-ii.md",
+    "docs/stellar-consciousness-orch-or-review.md",
+    "docs/knowledge/dag-node-schema.md",
+    "docs/knowledge/physics/math-tree.json",
+    "docs/knowledge/physics/math-maturity-stages.md",
+    "docs/knowledge/physics/physics-foundations-tree.json",
+    "docs/knowledge/bridges/ideology-physics-bridge-tree.json",
+    "docs/ethos/ideology.json",
+    "WARP_AGENTS.md"
+  ],
+  "intent_family_boosts": [
+    {
+      "intent_family": "equation-grounding",
+      "boost_nodes": [
+        "math-maturity-stages",
+        "dimensional-analysis",
+        "fundamental-constants"
+      ]
+    },
+    {
+      "intent_family": "collapse-mechanism",
+      "boost_nodes": [
+        "uncertainty-mechanics",
+        "sampling-time-bounds",
+        "no-feasibility-claims"
+      ]
+    },
+    {
+      "intent_family": "ideology-physics-governance",
+      "boost_nodes": [
+        "ideology-physics-bridge",
+        "alignment_under_constraint",
+        "verification_hook"
+      ]
+    }
+  ],
+  "citation_persistence_requirements": [
+    "Persist at least one repo citation per claim and one equation-origin citation (paper page or anchor doc).",
+    "Do not upgrade maturity stage without explicit evidence path + test artifact link."
+  ],
+  "mechanism_sentence_requirements": [
+    "Every answer must include one sentence in the form: 'Mechanism: <inputs> -> <operator/dynamics> -> <observable output>'.",
+    "For exploratory claims, mechanism sentence must include uncertainty qualifier ('hypothesized', 'unverified', or equivalent)."
+  ]
+}

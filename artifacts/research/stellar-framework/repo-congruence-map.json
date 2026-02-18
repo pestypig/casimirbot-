@@ -1,0 +1,107 @@
+{
+  "repo_congruence_map": [
+    {
+      "claim_id": "SCOR-C001",
+      "repo_links": [
+        "physics-foundations-tree:uncertainty-mechanics",
+        "math-tree:math-maturity-stages"
+      ],
+      "status": "existing",
+      "gap": null
+    },
+    {
+      "claim_id": "SCOR-C002",
+      "repo_links": [
+        "MISSING:physics-time-crystal-clock-coupling",
+        "MISSING:bridge-orch-or-to-stellar-coherence"
+      ],
+      "status": "partial",
+      "gap": "requires new DAG/tree bridge nodes for Orch-OR-specific semantics"
+    },
+    {
+      "claim_id": "SCOR-C003",
+      "repo_links": [
+        "physics-foundations-tree:uncertainty-mechanics",
+        "math-tree:math-maturity-stages"
+      ],
+      "status": "existing",
+      "gap": null
+    },
+    {
+      "claim_id": "SCOR-C004",
+      "repo_links": [],
+      "status": "partial",
+      "gap": "requires new DAG/tree bridge nodes for Orch-OR-specific semantics"
+    },
+    {
+      "claim_id": "SCOR-C005",
+      "repo_links": [
+        "physics-foundations-tree:sampling-time-bounds"
+      ],
+      "status": "existing",
+      "gap": null
+    },
+    {
+      "claim_id": "SCOR-C006",
+      "repo_links": [],
+      "status": "partial",
+      "gap": "requires new DAG/tree bridge nodes for Orch-OR-specific semantics"
+    },
+    {
+      "claim_id": "SCOR-C007",
+      "repo_links": [],
+      "status": "partial",
+      "gap": "requires new DAG/tree bridge nodes for Orch-OR-specific semantics"
+    },
+    {
+      "claim_id": "SCOR-C008",
+      "repo_links": [],
+      "status": "partial",
+      "gap": "requires new DAG/tree bridge nodes for Orch-OR-specific semantics"
+    },
+    {
+      "claim_id": "SCOR-C009",
+      "repo_links": [
+        "physics-foundations-tree:uncertainty-mechanics",
+        "math-tree:math-maturity-stages"
+      ],
+      "status": "existing",
+      "gap": null
+    },
+    {
+      "claim_id": "SCOR-C010",
+      "repo_links": [
+        "physics-foundations-tree:uncertainty-mechanics",
+        "math-tree:math-maturity-stages"
+      ],
+      "status": "existing",
+      "gap": null
+    },
+    {
+      "claim_id": "SCOR-C011",
+      "repo_links": [
+        "physics-foundations-tree:energy-mass-equivalence",
+        "physics-foundations-tree:fundamental-constants"
+      ],
+      "status": "existing",
+      "gap": null
+    },
+    {
+      "claim_id": "SCOR-C012",
+      "repo_links": [
+        "physics-foundations-tree:scaling-laws"
+      ],
+      "status": "existing",
+      "gap": null
+    },
+    {
+      "claim_id": "SCOR-C013",
+      "repo_links": [
+        "MISSING:physics-time-crystal-clock-coupling",
+        "MISSING:bridge-orch-or-to-stellar-coherence"
+      ],
+      "status": "partial",
+      "gap": "requires new DAG/tree bridge nodes for Orch-OR-specific semantics"
+    }
+  ]
+}

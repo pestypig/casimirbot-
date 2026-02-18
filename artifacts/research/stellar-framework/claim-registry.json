@@ -1,0 +1,387 @@
+{
+  "paper_id": "stellar-consciousness-orch-or-review-2025",
+  "source_status": {
+    "pdf_available_in_repo": false,
+    "note": "Attachment not present as a local file during build pass; framework derived from provided page images + anchored repo docs."
+  },
+  "claims": [
+    {
+      "claim_id": "SCOR-C001",
+      "claim_text": "Objective reduction timescale is inversely proportional to gravitational self-energy for mass superpositions.",
+      "equation_text": "tau ~= hbar / E_G",
+      "variables": [
+        "tau",
+        "hbar",
+        "E_G"
+      ],
+      "units": {
+        "tau": "s",
+        "hbar": "J*s",
+        "E_G": "J"
+      },
+      "assumptions": [
+        "Penrose OR framing applies",
+        "E_G can be estimated for the considered structure"
+      ],
+      "observables": [
+        "collapse cadence",
+        "coherence lifetime"
+      ],
+      "falsifiers": [
+        "No observed tau scaling with inferred E_G across regimes"
+      ],
+      "maturity_stage": "exploratory"
+    },
+    {
+      "claim_id": "SCOR-C002",
+      "claim_text": "Microtubule orchestration links coherent windows to ~40 Hz conscious-moment timing in the reviewed narrative.",
+      "equation_text": "f_gamma ~= 40 Hz; Delta t ~= 25 ms",
+      "variables": [
+        "f_gamma",
+        "Delta t"
+      ],
+      "units": {
+        "f_gamma": "Hz",
+        "Delta t": "ms"
+      },
+      "assumptions": [
+        "Neural/tubulin resonance mechanism is valid"
+      ],
+      "observables": [
+        "EEG gamma timing",
+        "phase-locked burst intervals"
+      ],
+      "falsifiers": [
+        "Lack of repeatable 25 ms periodicity tied to proposed mechanism"
+      ],
+      "maturity_stage": "exploratory"
+    },
+    {
+      "claim_id": "SCOR-C003",
+      "claim_text": "Mass-superposition energy is represented as E = hbar / t in a collapse-time interpretation.",
+      "equation_text": "E = hbar / t",
+      "variables": [
+        "E",
+        "hbar",
+        "t"
+      ],
+      "units": {
+        "E": "J",
+        "hbar": "J*s",
+        "t": "s"
+      },
+      "assumptions": [
+        "Collapse time maps directly to effective superposition energy"
+      ],
+      "observables": [
+        "estimated collapse threshold versus dwell time"
+      ],
+      "falsifiers": [
+        "Energy estimates inconsistent with dimensional checks or measured thresholds"
+      ],
+      "maturity_stage": "reduced-order"
+    },
+    {
+      "claim_id": "SCOR-C004",
+      "claim_text": "KDTLI-like interferometric coherence scales with a log mass-ratio expression used as an argument for macro-molecule coherence.",
+      "equation_text": "mu = log10((1/ln(eta))*(m/m_e)^2*(tau/1 s))",
+      "variables": [
+        "mu",
+        "eta",
+        "m",
+        "m_e",
+        "tau"
+      ],
+      "units": {
+        "mu": "1",
+        "eta": "1",
+        "m": "kg",
+        "m_e": "kg",
+        "tau": "s"
+      },
+      "assumptions": [
+        "Interferometer expression transfers to biological/stellar analogy"
+      ],
+      "observables": [
+        "fringe visibility",
+        "coherence contrast"
+      ],
+      "falsifiers": [
+        "No coherence contrast trend with the proposed scaling"
+      ],
+      "maturity_stage": "exploratory"
+    },
+    {
+      "claim_id": "SCOR-C005",
+      "claim_text": "Uncertainty relation is used to motivate tunneling-assisted transitions under short time windows.",
+      "equation_text": "Delta E Delta t >= hbar/2",
+      "variables": [
+        "Delta E",
+        "Delta t",
+        "hbar"
+      ],
+      "units": {
+        "Delta E": "J",
+        "Delta t": "s",
+        "hbar": "J*s"
+      },
+      "assumptions": [
+        "Barrier-crossing regime approximated by uncertainty-limited borrowing"
+      ],
+      "observables": [
+        "transition rates versus barrier/time"
+      ],
+      "falsifiers": [
+        "Rates fail to respond to Delta t or barrier parameters as predicted"
+      ],
+      "maturity_stage": "diagnostic"
+    },
+    {
+      "claim_id": "SCOR-C006",
+      "claim_text": "One-dimensional box quantization is used to frame electron localization and resonance states.",
+      "equation_text": "E_j = (pi^2*hbar^2*j^2)/(2 m a^2)",
+      "variables": [
+        "E_j",
+        "j",
+        "hbar",
+        "m",
+        "a"
+      ],
+      "units": {
+        "E_j": "J",
+        "j": "1",
+        "hbar": "J*s",
+        "m": "kg",
+        "a": "m"
+      },
+      "assumptions": [
+        "1D box approximation is informative for discussed pockets"
+      ],
+      "observables": [
+        "spectral line spacing"
+      ],
+      "falsifiers": [
+        "Measured spectra diverge from n^2/a^2 spacing"
+      ],
+      "maturity_stage": "diagnostic"
+    },
+    {
+      "claim_id": "SCOR-C007",
+      "claim_text": "London-type interaction energy is presented as a coherence-supporting microphysical mechanism.",
+      "equation_text": "V = -C/r^6 with C = (3/2) a'_1 a'_2 (I_1 I_2)/(I_1+I_2)",
+      "variables": [
+        "V",
+        "C",
+        "r",
+        "a'_1",
+        "a'_2",
+        "I_1",
+        "I_2"
+      ],
+      "units": {
+        "V": "J",
+        "C": "J*m^6",
+        "r": "m",
+        "a'_1": "m^3",
+        "a'_2": "m^3",
+        "I_1": "J",
+        "I_2": "J"
+      },
+      "assumptions": [
+        "Pairwise London force dominates local interaction"
+      ],
+      "observables": [
+        "binding energy trends versus spacing"
+      ],
+      "falsifiers": [
+        "Interaction data incompatible with r^-6 dependence"
+      ],
+      "maturity_stage": "diagnostic"
+    },
+    {
+      "claim_id": "SCOR-C008",
+      "claim_text": "Stochastic Schr\u00f6dinger evolution is used to model collapse with additive/multiplicative noise and mass-density coupling.",
+      "equation_text": "dpsi = [-(i/hbar)H dt + sqrt(lambda)\u222b(M(x)-<M>)dW_x - lambda\u222b(M-<M>)^2 dt]psi",
+      "variables": [
+        "psi",
+        "H",
+        "lambda",
+        "M(x)",
+        "dW_x"
+      ],
+      "units": {
+        "psi": "1",
+        "H": "J",
+        "lambda": "s^-1",
+        "M(x)": "kg*m^-3",
+        "dW_x": "s^0.5"
+      },
+      "assumptions": [
+        "CSL-like collapse law applicable in discussed regimes"
+      ],
+      "observables": [
+        "decoherence rates",
+        "noise-spectrum signatures"
+      ],
+      "falsifiers": [
+        "No differential decoherence under predicted noise coupling"
+      ],
+      "maturity_stage": "reduced-order"
+    },
+    {
+      "claim_id": "SCOR-C009",
+      "claim_text": "Smeared mass density via Gaussian kernel sets spatial correlation length for collapse dynamics.",
+      "equation_text": "M_g(x)=\u222b d^3y g(x-y)M(y); g(x-y)=(1/(2pi r_C^2))^(3/2) exp(-|x-y|^2/(2r_C^2))",
+      "variables": [
+        "M_g",
+        "g",
+        "r_C"
+      ],
+      "units": {
+        "M_g": "kg*m^-3",
+        "g": "m^-3",
+        "r_C": "m"
+      },
+      "assumptions": [
+        "Gaussian smearing is valid effective kernel"
+      ],
+      "observables": [
+        "spatial decoherence profile"
+      ],
+      "falsifiers": [
+        "Best-fit kernels consistently non-Gaussian"
+      ],
+      "maturity_stage": "diagnostic"
+    },
+    {
+      "claim_id": "SCOR-C010",
+      "claim_text": "Lorentzian noise spectrum is proposed to encode quasi-particle memory and resonant poles.",
+      "equation_text": "S(omega) ~ 1/((omega-omega0)^2+gamma^2)",
+      "variables": [
+        "S(omega)",
+        "omega",
+        "omega0",
+        "gamma"
+      ],
+      "units": {
+        "S(omega)": "s",
+        "omega": "rad*s^-1",
+        "omega0": "rad*s^-1",
+        "gamma": "rad*s^-1"
+      },
+      "assumptions": [
+        "Colored noise with resonant structure governs dynamics"
+      ],
+      "observables": [
+        "power spectral peaks",
+        "linewidth broadening"
+      ],
+      "falsifiers": [
+        "No Lorentzian-like peak structure in measured spectra"
+      ],
+      "maturity_stage": "reduced-order"
+    },
+    {
+      "claim_id": "SCOR-C011",
+      "claim_text": "Solar scaling claims use Jeans mass/critical temperature and mass-luminosity relations to connect collapse and stellar structure.",
+      "equation_text": "M_J ~= ((5kT)/(G mu m_H))^(3/2)*(3/(4pi rho0))^(1/2); L/Lsun=(M/Msun)^a",
+      "variables": [
+        "M_J",
+        "k",
+        "T",
+        "G",
+        "mu",
+        "m_H",
+        "rho0",
+        "L",
+        "M",
+        "a"
+      ],
+      "units": {
+        "M_J": "kg",
+        "k": "J*K^-1",
+        "T": "K",
+        "G": "m^3*kg^-1*s^-2",
+        "mu": "1",
+        "m_H": "kg",
+        "rho0": "kg*m^-3",
+        "L": "W",
+        "M": "kg",
+        "a": "1"
+      },
+      "assumptions": [
+        "Quasi-equilibrium stellar approximations hold"
+      ],
+      "observables": [
+        "luminosity-mass fits",
+        "collapse onset statistics"
+      ],
+      "falsifiers": [
+        "Observed stellar populations violate expected scaling bands"
+      ],
+      "maturity_stage": "diagnostic"
+    },
+    {
+      "claim_id": "SCOR-C012",
+      "claim_text": "Parker wind equations are used as analogical support for steady oscillatory plasma outflow behavior.",
+      "equation_text": "rho u du/dr = -dp/dr - rho GM_sun/r^2; p=2 rho T / m_p",
+      "variables": [
+        "rho",
+        "u",
+        "r",
+        "p",
+        "G",
+        "M_sun",
+        "T",
+        "m_p"
+      ],
+      "units": {
+        "rho": "kg*m^-3",
+        "u": "m*s^-1",
+        "r": "m",
+        "p": "Pa",
+        "G": "m^3*kg^-1*s^-2",
+        "M_sun": "kg",
+        "T": "K",
+        "m_p": "kg"
+      },
+      "assumptions": [
+        "1D steady hydrodynamic model informative for discussed regime"
+      ],
+      "observables": [
+        "wind speed profile",
+        "density gradient"
+      ],
+      "falsifiers": [
+        "Profiles incompatible with any admissible Parker branch"
+      ],
+      "maturity_stage": "diagnostic"
+    },
+    {
+      "claim_id": "SCOR-C013",
+      "claim_text": "The review's cross-domain thesis claims mass superposition can sustain coherence in both neural and solar systems, with collapse triggering discrete events.",
+      "equation_text": "cross-domain mechanism statement (no single governing equation)",
+      "variables": [
+        "domain",
+        "coherence_state",
+        "collapse_event"
+      ],
+      "units": {
+        "domain": "1",
+        "coherence_state": "1",
+        "collapse_event": "1"
+      },
+      "assumptions": [
+        "Shared mechanism across scales despite differing substrates"
+      ],
+      "observables": [
+        "event timing distributions",
+        "spectral coherence before events"
+      ],
+      "falsifiers": [
+        "No shared statistical signature across domains"
+      ],
+      "maturity_stage": "exploratory"
+    }
+  ]
+}
