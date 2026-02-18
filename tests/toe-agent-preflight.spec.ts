@@ -99,6 +99,12 @@ describe("toe-agent-preflight", () => {
       schema_version: "toe_progress_snapshot/1",
       totals: {
         strict_ready_progress_pct: 0,
+        strict_ready_release_gate: {
+          status: "blocked",
+          blocked_reasons: ["missing_verified_pass"],
+          blocked_ticket_count: 1,
+          ready_ticket_count: 0,
+        },
       },
       strict_ready_delta_targets: [{ ticket_id: "TOE-TEST-001" }],
     });
@@ -113,6 +119,12 @@ describe("toe-agent-preflight", () => {
       strict_ready_delta_ticket_count: 1,
       guidance:
         "strict_ready_progress_pct is stalled; resolve strict_ready_delta_targets in toe-progress snapshot before scaling.",
+    });
+    expect(summary.strict_ready_release_gate).toEqual({
+      status: "blocked",
+      blocked_reasons: ["missing_verified_pass"],
+      blocked_ticket_count: 1,
+      ready_ticket_count: 0,
     });
   });
 
@@ -178,5 +190,41 @@ describe("toe-agent-preflight", () => {
       reason: "strict_ready_stall",
     });
     expect(summary.strict_ready_stall_warning?.warning).toBe("strict_ready_stall");
+  });
+
+  it("enforces strict-ready release gate when automation flag is enabled", () => {
+    const workspaceRoot = setupFakeWorkspace();
+    writeJson(path.join(workspaceRoot, "docs", "audits", "toe-progress-snapshot.json"), {
+      schema_version: "toe_progress_snapshot/1",
+      totals: {
+        strict_ready_progress_pct: 50,
+        strict_ready_release_gate: {
+          status: "blocked",
+          blocked_reasons: ["missing_verified_pass", "missing_research_artifacts"],
+          blocked_ticket_count: 2,
+          ready_ticket_count: 1,
+        },
+      },
+      strict_ready_delta_targets: [{ ticket_id: "TOE-TEST-001" }, { ticket_id: "TOE-TEST-002" }],
+    });
+
+    const result = runPreflightWithEnv(workspaceRoot, {
+      TOE_STRICT_READY_RELEASE_GATE_ENFORCE: "1",
+    });
+    expect(result.status).toBe(1);
+
+    const summary = JSON.parse(result.stdout);
+    expect(summary.overall_pass).toBe(false);
+    expect(summary.strict_ready_release_gate).toEqual({
+      status: "blocked",
+      blocked_reasons: ["missing_verified_pass", "missing_research_artifacts"],
+      blocked_ticket_count: 2,
+      ready_ticket_count: 1,
+    });
+    expect(summary.strict_ready_enforcement).toEqual({
+      enforced: true,
+      blocked: true,
+      reason: "strict_ready_release_gate",
+    });
   });
 });
