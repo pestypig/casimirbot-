@@ -552,6 +552,32 @@
         "Warp viability certificate generation includes deterministic integrity metadata and explicit firstFail propagation on FAIL",
         "Warp viability and metric adapter tests assert hard-constraint policy handling with conservative non-viable defaults"
       ]
+    },
+    {
+      "id": "TOE-034-concepts-ontology-claim-tier-contract",
+      "tree_owner": "helix-ask",
+      "gap_refs": [
+        "F-COV-1",
+        "F-COV-5"
+      ],
+      "primitive": "Helix Ask concepts ontology claim-tier contract primitive",
+      "primary_path_prefix": "server/services/helix-ask/concepts.ts",
+      "allowed_paths": [
+        "server/services/helix-ask/concepts.ts",
+        "server/routes/agi.plan.ts",
+        "tests/helix-ask-concepts.spec.ts",
+        "tests/helix-ask-modes.spec.ts",
+        "docs/audits/ticket-results"
+      ],
+      "required_tests": [
+        "tests/helix-ask-concepts.spec.ts",
+        "tests/helix-ask-modes.spec.ts"
+      ],
+      "done_criteria": [
+        "Concept cards expose additive provenance metadata fields provenance_class, claim_tier, and certifying with conservative defaults",
+        "Strict provenance mode emits deterministic fail_reason CONCEPTS_PROVENANCE_MISSING when matched concepts have no explicit provenance declaration",
+        "Concept lookup behavior remains backward-compatible for non-strict mode while surfacing provenance metadata in ask responses"
+      ]
     }
   ]
 }

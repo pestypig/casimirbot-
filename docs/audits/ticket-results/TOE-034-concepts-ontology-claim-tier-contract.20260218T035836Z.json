@@ -1,0 +1,24 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-034-concepts-ontology-claim-tier-contract",
+  "files_changed": [
+    "server/services/helix-ask/concepts.ts",
+    "server/routes/agi.plan.ts",
+    "tests/helix-ask-concepts.spec.ts",
+    "tests/helix-ask-modes.spec.ts",
+    "docs/audits/ticket-results/TOE-034-concepts-ontology-claim-tier-contract.20260218T035836Z.json"
+  ],
+  "tests_run": [
+    "tests/helix-ask-concepts.spec.ts",
+    "tests/helix-ask-modes.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:6c605b2e-7884-465b-bc2a-5f8965e279eb",
+    "run_id": "8",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}
