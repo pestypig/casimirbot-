@@ -154,6 +154,23 @@ describe("Helix Ask topic routing", () => {
     const profile = buildHelixAskTopicProfile(["warp"]);
     expect(profile?.routingMetadata).toBeUndefined();
   });
+  it("tags zen-ladder prompts as zen_ladder_pack", () => {
+    const tags = inferHelixAskTopicTags(
+      "Show me the zen-ladder-pack routing and provenance expectations.",
+    );
+    expect(tags).toContain("zen_ladder_pack");
+  });
+
+  it("adds zen-ladder routing metadata with conservative defaults", () => {
+    const profile = buildHelixAskTopicProfile(["zen_ladder_pack"]);
+    expect(profile?.routingMetadata).toEqual({
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    });
+    expect(topicMustIncludeSatisfied(["docs/zen-ladder-pack/overview.md"], profile)).toBe(true);
+  });
+
 
   it("tags simulation prompts as simulation", () => {
     const tags = inferHelixAskTopicTags("How do the simulation systems stream results into the app?");

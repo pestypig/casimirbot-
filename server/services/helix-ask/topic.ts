@@ -38,7 +38,8 @@ export type HelixAskTopicTag =
   | "queue"
   | "jobs"
   | "ops"
-  | "ci";
+  | "ci"
+  | "zen_ladder_pack";
 
 export type HelixAskTopicProfile = {
   tags: HelixAskTopicTag[];
@@ -66,7 +67,7 @@ const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
   trace: /\b(trace|task trace|tasktrace|trajectory|essence|casimir)\b/i,
   resonance: /\b(resonance|code lattice|lattice)\b/i,
   ideology:
-    /\b(ideology|ethos|mission[-\s]?ethos|ideology tree|ethos tree|two-key approval|stewardship ledger|sun ledger|stellar ledger|tend the sun ledger|tend the stellar ledger|zen society)\b/i,
+    /\b(ideology|ethos|mission[-\s]?ethos|ideology tree|ethos tree|two-key approval|stewardship ledger|sun ledger|stellar ledger|tend the sun ledger|tend the stellar ledger|zen society|zen ladder|zen-ladder|zen ladder pack|zen-ladder-pack)\b/i,
   concepts:
     /\b(platonic reasoning|platonic method|concept registry|definition lint|belief gate|rattling gate|analysis loop|analysis loops|belief graph loop|morphospace attractors?|morphospace|wavefunction|uncertainty|probability field|boltzmann|langevin|scientific method|verification|falsifiability|falsifiable)\b/i,
   ledger:
@@ -110,6 +111,7 @@ const TOPIC_PATTERNS: Record<HelixAskTopicTag, RegExp> = {
   jobs: /\b(job|jobs|scheduler|orchestration|worker pool)\b/i,
   ops: /\b(ops|operations|deployment|release|runbook|observability|infra|sre)\b/i,
   ci: /\b(ci|cd|github actions|build pipeline|release pipeline)\b/i,
+  zen_ladder_pack: /\b(zen ladder|zen-ladder|zen ladder pack|zen-ladder-pack)\b/i,
 };
 
 const HELIX_ASK_CORE_PATHS: RegExp[] = [
@@ -238,6 +240,10 @@ const IDEOLOGY_EXPANDED_PATHS: RegExp[] = [
 const IDEOLOGY_KNOWLEDGE_PATHS: RegExp[] = [
   /docs\/knowledge\/ethos\//i,
 ];
+
+const ZEN_LADDER_PACK_PATHS: RegExp[] = [/docs\/zen-ladder-pack\//i, /docs\/ethos\/ideology\.json/i];
+
+const ZEN_LADDER_PACK_FILES: string[] = ["docs/ethos/ideology.json"];
 
 const LEDGER_CORE_PATHS: RegExp[] = [
   /docs\/ethos\/ideology\.json/i,
@@ -619,6 +625,21 @@ export function buildHelixAskTopicProfile(tags: HelixAskTopicTag[]): HelixAskTop
     // Avoid warp/energy drift when the user is asking for ideology guidance.
     deboostPaths.push(...WARP_PATHS, ...ENERGY_PATHS);
     minTierCandidates = Math.max(minTierCandidates, 2);
+  }
+
+  if (tags.includes("zen_ladder_pack")) {
+    allowlistTiers.push(ZEN_LADDER_PACK_PATHS);
+    allowlistTiers.push([]);
+    boostPaths.push(...ZEN_LADDER_PACK_PATHS);
+    mustIncludePaths.push(...ZEN_LADDER_PACK_PATHS);
+    mustIncludeFiles.push(...ZEN_LADDER_PACK_FILES);
+    deboostPaths.push(...WARP_PATHS, ...ENERGY_PATHS);
+    minTierCandidates = Math.max(minTierCandidates, 2);
+    routingMetadata = {
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    };
   }
 
   if (tags.includes("ledger")) {
