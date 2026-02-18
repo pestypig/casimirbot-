@@ -82,6 +82,34 @@ const resolveAutoTelemetry = (input: { autoTelemetry?: boolean; telemetryPath?: 
 const resolveTerminalAttempt = (attempts: GrAgentLoopAttempt[], acceptedIteration?: number): GrAgentLoopAttempt | undefined => acceptedIteration !== undefined ? attempts.find((attempt) => attempt.iteration === acceptedIteration) ?? attempts[attempts.length - 1] : attempts[attempts.length - 1];
 const buildActionProposals = (actions?: AdapterAction[]) => actions?.map((action, index) => ({ label: action.label ?? action.id ?? action.kind ?? `action-${index + 1}`, params: action.params ?? {} }));
 const buildArtifactRefs = (input: { runId: string; certificateHash?: string | null; certificateId?: string | null; }): AdapterArtifactRef[] => [{ kind: "gr-agent-loop-run", ref: input.runId }, { kind: "gr-agent-loop-run-url", ref: `/api/helix/gr-agent-loop/${input.runId}` }, { kind: "training-trace-export", ref: "/api/agi/training-trace/export" }, ...(input.certificateHash ? [{ kind: "warp-certificate-hash", ref: input.certificateHash }] : []), ...(input.certificateId ? [{ kind: "warp-certificate-id", ref: input.certificateId }] : [])];
+
+const applyVerifyPolicyToOutcome = (input: {
+  policyMode?: "strict" | "permissive";
+  verdict: "PASS" | "FAIL";
+  pass: boolean;
+  firstFail?: TrainingTraceConstraint | null;
+  certificate?: Record<string, unknown> | null;
+}): {
+  verdict: "PASS" | "FAIL";
+  pass: boolean;
+  firstFail?: TrainingTraceConstraint | null;
+} => {
+  if (input.policyMode !== "strict") return { verdict: input.verdict, pass: input.pass, firstFail: input.firstFail ?? null };
+  const certificate = input.certificate ?? null;
+  const certificateHash = typeof certificate?.certificateHash === "string" ? certificate.certificateHash.trim() : "";
+  if (input.verdict === "PASS" && (!certificateHash || certificate?.integrityOk !== true)) {
+    const firstFail = normalizeFirstFail({
+      verdict: "FAIL",
+      firstFail: input.firstFail ?? null,
+      certificate,
+      fallbackId: "ADAPTER_CONSTRAINT_FAIL",
+      fallbackNote: "verify_policy_strict_fail_closed",
+    });
+    return { verdict: "FAIL", pass: false, firstFail };
+  }
+  return { verdict: input.verdict, pass: input.pass, firstFail: input.firstFail ?? null };
+};
+
 const buildConstraintPackArtifacts = (input: { packId: string; traceId: string; certificateHash?: string | null; certificateId?: string | null; }): AdapterArtifactRef[] => [{ kind: "constraint-pack", ref: input.packId }, { kind: "training-trace-id", ref: input.traceId }, { kind: "training-trace-url", ref: `/api/agi/training-trace/${input.traceId}` }, { kind: "training-trace-export", ref: "/api/agi/training-trace/export" }, ...(input.certificateHash ? [{ kind: "constraint-pack-certificate-hash", ref: input.certificateHash }] : []), ...(input.certificateId ? [{ kind: "constraint-pack-certificate-id", ref: input.certificateId }] : [])];
 
 export async function runAdapterExecution(parsed: AdapterRunRequest, opts?: { tenantId?: string }): Promise<AdapterRunResult> {
@@ -129,7 +157,14 @@ export async function runAdapterExecution(parsed: AdapterRunRequest, opts?: { te
     const trace = recordConstraintPackTrace({ traceId, tenantId: effectiveTenantId, pack: effectivePack, evaluation, metrics, source: { system: "constraint-pack", component: "adapter", tool: effectivePack.id, version: String(effectivePack.version) } });
     const verdict = trace.pass ? "PASS" : "FAIL";
     const certificate = evaluation.certificate ?? null;
-    return { traceId, runId: trace.id, verdict, pass: trace.pass, firstFail: normalizeFirstFail({ verdict, firstFail: trace.firstFail ?? null, certificate, fallbackId: "ADAPTER_CONSTRAINT_FAIL", fallbackNote: "constraint_pack_failed" }), deltas: trace.deltas, certificate, artifacts: buildConstraintPackArtifacts({ packId: effectivePack.id, traceId: trace.id, certificateHash: evaluation.certificate?.certificateHash ?? null, certificateId: evaluation.certificate?.certificateId ?? null }) };
+    const verifyOutcome = applyVerifyPolicyToOutcome({
+      policyMode: policy?.verify?.mode,
+      verdict,
+      pass: trace.pass,
+      firstFail: trace.firstFail ?? null,
+      certificate,
+    });
+    return { traceId, runId: trace.id, verdict: verifyOutcome.verdict, pass: verifyOutcome.pass, firstFail: normalizeFirstFail({ verdict: verifyOutcome.verdict, firstFail: verifyOutcome.firstFail ?? null, certificate, fallbackId: "ADAPTER_CONSTRAINT_FAIL", fallbackNote: "constraint_pack_failed" }), deltas: trace.deltas, certificate, artifacts: buildConstraintPackArtifacts({ packId: effectivePack.id, traceId: trace.id, certificateHash: evaluation.certificate?.certificateHash ?? null, certificateId: evaluation.certificate?.certificateId ?? null }) };
   }
   const proposals = buildActionProposals(actions);
   const proposalCount = proposals?.length ?? 0;
@@ -142,5 +177,12 @@ export async function runAdapterExecution(parsed: AdapterRunRequest, opts?: { te
   const terminalParams = terminalAttempt?.proposal.params;
   const verdict = result.accepted ? "PASS" : "FAIL";
   const certificate = terminalAttempt?.evaluation.certificate ?? null;
-  return { traceId, runId: run.id, verdict, pass: result.accepted, firstFail: normalizeFirstFail({ verdict, firstFail: firstFail ?? null, certificate, fallbackId: "ADAPTER_CONSTRAINT_FAIL", fallbackNote: "hard_constraint_failed_or_unavailable" }), deltas: toTrainingTraceDeltas(diffParams(baselineParams as Record<string, unknown> | undefined, terminalParams as Record<string, unknown> | undefined)), certificate, artifacts: buildArtifactRefs({ runId: run.id, certificateHash: terminalAttempt?.evaluation.certificate.certificateHash, certificateId: terminalAttempt?.evaluation.certificate.certificateId }) };
+  const verifyOutcome = applyVerifyPolicyToOutcome({
+    policyMode: policy?.verify?.mode,
+    verdict,
+    pass: result.accepted,
+    firstFail: firstFail ?? null,
+    certificate,
+  });
+  return { traceId, runId: run.id, verdict: verifyOutcome.verdict, pass: verifyOutcome.pass, firstFail: normalizeFirstFail({ verdict: verifyOutcome.verdict, firstFail: verifyOutcome.firstFail ?? null, certificate, fallbackId: "ADAPTER_CONSTRAINT_FAIL", fallbackNote: "hard_constraint_failed_or_unavailable" }), deltas: toTrainingTraceDeltas(diffParams(baselineParams as Record<string, unknown> | undefined, terminalParams as Record<string, unknown> | undefined)), certificate, artifacts: buildArtifactRefs({ runId: run.id, certificateHash: terminalAttempt?.evaluation.certificate?.certificateHash, certificateId: terminalAttempt?.evaluation.certificate?.certificateId }) };
 }

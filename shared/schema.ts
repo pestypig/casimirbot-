@@ -2585,7 +2585,11 @@ export type AdapterCertificateAuthenticityPolicy = z.infer<typeof adapterCertifi
 export const adapterPolicySchema = z.object({
   thresholds: grConstraintThresholdSchema.partial().optional(),
   gate: grConstraintPolicySchema.partial().optional(),
-  authenticity: adapterCertificateAuthenticityPolicySchema.optional(),
+  verify: z
+    .object({
+      mode: z.enum(["strict", "permissive"]).optional(),
+    })
+    .optional(),
 });
 export type AdapterPolicy = z.infer<typeof adapterPolicySchema>;
 

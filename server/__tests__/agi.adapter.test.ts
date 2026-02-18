@@ -119,6 +119,37 @@ describe("agi adapter API", () => {
 
 
 
+
+  it("fails closed in strict verify mode when certificate evidence is missing", async () => {
+    runMock.mockResolvedValue({
+      accepted: true,
+      acceptedIteration: 0,
+      attempts: [
+        {
+          iteration: 0,
+          proposal: { label: "baseline", params: { dutyCycle: 0.004 } },
+          evaluation: {
+            constraints: [],
+            certificate: null,
+          },
+        },
+      ],
+    } as any);
+
+    const response = await request(app)
+      .post("/api/agi/adapter/run")
+      .send({
+        traceId: "trace-strict-fail-closed-1",
+        actions: [{ id: "a1", params: { dutyCycle: 0.004 } }],
+        policy: { verify: { mode: "strict" } },
+      })
+      .expect(200);
+
+    expect(response.body?.verdict).toBe("FAIL");
+    expect(response.body?.pass).toBe(false);
+    expect(response.body?.firstFail?.id).toBe("ADAPTER_CERTIFICATE_MISSING");
+  });
+
   it("returns premeditation scoring for deterministic candidate selection", async () => {
     const response = await request(app)
       .post("/api/agi/adapter/run")

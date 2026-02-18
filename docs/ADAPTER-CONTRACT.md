@@ -100,6 +100,14 @@ Response (example)
 
 Notes
 - `actions[].params` map directly to the GR pipeline parameter overrides.
+- `policy.verify.mode` supports `strict` and `permissive`:
+  - `strict` is fail-closed for verification flows: missing certificate evidence,
+    certificate integrity failure, or adapter failure must degrade to FAIL.
+  - `permissive` keeps execution available but must be labeled
+    `non_verified_degraded` by callers when verification evidence is incomplete.
+- Canonical fail IDs for verification degradation include
+  `ADAPTER_CERTIFICATE_MISSING`, `ADAPTER_CERTIFICATE_INTEGRITY`, and
+  `ADAPTER_CONSTRAINT_FAIL` (plus adapter-error-specific deterministic IDs).
 - For `mode: "constraint-pack"`, provide `pack.id` and telemetry/metrics; the
   adapter evaluates the pack and emits a training trace.
 - When available, the adapter response includes a `certificate` object with     
