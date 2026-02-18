@@ -1,0 +1,145 @@
+{
+  "schema_version": "resolver_owner_coverage_manifest/1",
+  "generated_at": "2026-02-18T02:01:54.905Z",
+  "sources": {
+    "graph_resolvers": "configs/graph-resolvers.json",
+    "core_backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
+    "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
+  },
+  "high_priority_owners": [
+    "helix-ask",
+    "simulation-systems",
+    "atomic-systems",
+    "external-integrations",
+    "robotics-recollection",
+    "physics-foundations",
+    "gr-solver",
+    "math",
+    "ideology"
+  ],
+  "owners": {
+    "agi-runtime": {
+      "status": "covered_core"
+    },
+    "analysis-loops": {
+      "status": "unmapped"
+    },
+    "atomic-systems": {
+      "status": "covered_extension"
+    },
+    "brick-lattice-dataflow": {
+      "status": "unmapped"
+    },
+    "casimir-tiles": {
+      "status": "unmapped"
+    },
+    "certainty-framework": {
+      "status": "unmapped"
+    },
+    "concepts": {
+      "status": "unmapped"
+    },
+    "debate-specialists": {
+      "status": "unmapped"
+    },
+    "dp-collapse": {
+      "status": "unmapped"
+    },
+    "essence-luma-noise": {
+      "status": "unmapped"
+    },
+    "ethos-knowledge": {
+      "status": "unmapped"
+    },
+    "external-integrations": {
+      "status": "covered_extension"
+    },
+    "gr-solver": {
+      "status": "covered_core"
+    },
+    "hardware-telemetry": {
+      "status": "unmapped"
+    },
+    "helix-ask": {
+      "status": "covered_extension"
+    },
+    "ideology": {
+      "status": "covered_core"
+    },
+    "ideology-physics-bridge": {
+      "status": "unmapped"
+    },
+    "knowledge-ingestion": {
+      "status": "unmapped"
+    },
+    "llm-runtime": {
+      "status": "unmapped"
+    },
+    "math": {
+      "status": "covered_core"
+    },
+    "ops-deployment": {
+      "status": "covered_core"
+    },
+    "packages": {
+      "status": "unmapped"
+    },
+    "physics-foundations": {
+      "status": "covered_core"
+    },
+    "pipeline-ledger": {
+      "status": "unmapped"
+    },
+    "queue-orchestration": {
+      "status": "unmapped"
+    },
+    "resonance": {
+      "status": "unmapped"
+    },
+    "robotics-recollection": {
+      "status": "covered_extension"
+    },
+    "sdk-integration": {
+      "status": "unmapped"
+    },
+    "security-hull-guard": {
+      "status": "covered_core"
+    },
+    "simulation-systems": {
+      "status": "covered_extension"
+    },
+    "skills-tooling": {
+      "status": "unmapped"
+    },
+    "star-materials-environment": {
+      "status": "unmapped"
+    },
+    "stellar-restoration": {
+      "status": "unmapped"
+    },
+    "telemetry-console": {
+      "status": "unmapped"
+    },
+    "trace-system": {
+      "status": "covered_core"
+    },
+    "ui-backend-binding": {
+      "status": "unmapped"
+    },
+    "ui-components": {
+      "status": "unmapped"
+    },
+    "uncertainty-mechanics": {
+      "status": "covered_core"
+    },
+    "warp-mechanics": {
+      "status": "unmapped"
+    },
+    "zen-ladder-pack": {
+      "status": "unmapped"
+    },
+    "zen-society": {
+      "status": "unmapped"
+    }
+  }
+}
