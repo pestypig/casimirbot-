@@ -63,11 +63,17 @@ describe("Helix Ask modes", () => {
         certifying?: boolean;
       };
       fail_reason?: string | null;
+      claim_tier?: string;
+      provenance_class?: string;
+      certifying?: boolean;
     };
     expect(payload.concept?.id).toBe("epistemology");
     expect(payload.concept?.provenance_class).toBe("inferred");
     expect(payload.concept?.claim_tier).toBe("diagnostic");
     expect(payload.concept?.certifying).toBe(false);
+    expect(payload.claim_tier).toBe("diagnostic");
+    expect(payload.provenance_class).toBe("inferred");
+    expect(payload.certifying).toBe(false);
     expect(payload.fail_reason ?? null).toBeNull();
   }, 90000);
 
@@ -128,6 +134,49 @@ describe("Helix Ask modes", () => {
     expect(payload.action?.output?.comparison?.deltas?.dGravExposure_ns).toBeDefined();
   }, 180000);
 
+
+  it("returns strict evidence contract fail_reason when verify live ephemeris metadata is incomplete", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "time/place tide gravity check",
+        mode: "verify",
+        strictProvenance: true,
+        allowTools: ["halobank.time.compute"],
+        timestamp: "2025-03-01T12:00:00Z",
+        place: { lat: 40.7128, lon: -74.006 },
+        model: {
+          orbitalAlignment: true,
+          ephemerisSource: "live",
+        },
+        sessionId: "modes-verify-halobank-strict-missing-evidence",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      mode?: string;
+      fail_reason?: string;
+      fail_class?: string;
+      claim_tier?: string;
+      provenance_class?: string;
+      certifying?: boolean;
+      proof?: {
+        verdict?: string;
+        firstFail?: { id?: string } | null;
+      };
+    };
+    expect(payload.ok).toBe(false);
+    expect(payload.mode).toBe("verify");
+    expect(payload.fail_reason).toBe("EVIDENCE_CONTRACT_FIELD_MISSING");
+    expect(payload.fail_class).toBe("input_contract");
+    expect(payload.claim_tier).toBe("diagnostic");
+    expect(payload.provenance_class).toBe("inferred");
+    expect(payload.certifying).toBe(false);
+    expect(payload.proof?.verdict).toBe("FAIL");
+    expect(payload.proof?.firstFail?.id).toBe("EVIDENCE_CONTRACT_FIELD_MISSING");
+  }, 90000);
   it("returns proof packet + action output for verify mode with halobank tool", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",
