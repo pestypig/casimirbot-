@@ -28,9 +28,14 @@ Store one JSON result file per ticket execution in this folder.
     "certificate_hash": "d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d",
     "integrity_ok": true
   },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
   "remaining_gaps": []
 }
 ```
+
+`research_artifacts` is optional for non-research-gated tickets. For tickets where `research_gate.required_artifacts` is non-empty in either ToE backlog, every listed required artifact must be present in `research_artifacts`.
 
 ## Enforcement
 

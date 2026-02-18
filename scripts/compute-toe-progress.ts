@@ -4,6 +4,9 @@ import path from "node:path";
 type BacklogTicket = {
   id?: string;
   tree_owner?: string;
+  research_gate?: {
+    required_artifacts?: string[];
+  };
 };
 
 type Backlog = {
@@ -21,6 +24,7 @@ type TicketResult = {
     verdict?: string;
     integrity_ok?: boolean;
   };
+  research_artifacts?: string[];
 };
 
 type TierKey = "diagnostic" | "reduced-order" | "certified";
@@ -130,6 +134,38 @@ function readBacklogTicketIds(filePath: string, segment: BacklogSegment): string
     .filter((id): id is string => typeof id === "string" && id.length > 0);
 }
 
+function readBacklogTicketResearchRequirements(filePath: string): Map<string, Set<string>> {
+  const backlog = readJson<Backlog>(filePath);
+  const requirements = new Map<string, Set<string>>();
+
+  for (const ticket of backlog.tickets ?? []) {
+    const ticketId = typeof ticket.id === "string" ? ticket.id.trim() : "";
+    if (!ticketId) continue;
+
+    const requiredArtifacts = Array.isArray(ticket.research_gate?.required_artifacts)
+      ? ticket.research_gate?.required_artifacts
+          .map((value) => String(value).trim())
+          .filter((value): value is string => value.length > 0)
+      : [];
+    requirements.set(ticketId, new Set(requiredArtifacts));
+  }
+
+  return requirements;
+}
+
+function mergeArtifactRequirementMaps(
+  existing: Map<string, Set<string>>,
+  incoming: Map<string, Set<string>>,
+) {
+  for (const [ticketId, requiredArtifacts] of incoming.entries()) {
+    const current = existing.get(ticketId) ?? new Set<string>();
+    for (const artifact of requiredArtifacts) {
+      current.add(artifact);
+    }
+    existing.set(ticketId, current);
+  }
+}
+
 type SegmentSummary = {
   tickets_total: number;
   tickets_with_evidence: number;
@@ -160,10 +196,17 @@ function main() {
   }
 
   const coreTicketIds = readBacklogTicketIds(BACKLOG_PATH, "core");
+  const artifactRequirementsByTicket = readBacklogTicketResearchRequirements(BACKLOG_PATH);
   const extensionBacklogPresent = fs.existsSync(EXTENSION_BACKLOG_PATH);
   const extensionTicketIds = extensionBacklogPresent
     ? readBacklogTicketIds(EXTENSION_BACKLOG_PATH, "extension")
     : [];
+  if (extensionBacklogPresent) {
+    mergeArtifactRequirementMaps(
+      artifactRequirementsByTicket,
+      readBacklogTicketResearchRequirements(EXTENSION_BACKLOG_PATH),
+    );
+  }
 
   const ticketIds = [...new Set([...coreTicketIds, ...extensionTicketIds])];
 
@@ -214,6 +257,12 @@ function main() {
   let weightedScoreSum = 0;
   let ticketsWithEvidence = 0;
   let strictReadyCount = 0;
+  let researchGatedTickets = 0;
+  let researchArtifactCompleteTickets = 0;
+  let coreResearchGatedTickets = 0;
+  let coreResearchArtifactCompleteTickets = 0;
+  let extensionResearchGatedTickets = 0;
+  let extensionResearchArtifactCompleteTickets = 0;
 
   const tickets = ticketIds.map((ticketId) => {
     const latest = latestByTicket.get(ticketId);
@@ -232,6 +281,37 @@ function main() {
       latest.result.casimir?.verdict === "PASS" &&
       latest.result.casimir?.integrity_ok === true;
     const score = claimTier && verificationOk ? TIER_WEIGHTS[claimTier] : 0;
+    const requiredArtifacts = artifactRequirementsByTicket.get(ticketId) ?? new Set<string>();
+    const isResearchGated = requiredArtifacts.size > 0;
+    const reportedResearchArtifacts = new Set(
+      Array.isArray(latest.result.research_artifacts)
+        ? latest.result.research_artifacts
+            .map((value) => String(value).trim())
+            .filter((value) => value.length > 0)
+        : [],
+    );
+    const researchArtifactComplete =
+      requiredArtifacts.size === 0 ||
+      [...requiredArtifacts].every((requiredArtifact) => reportedResearchArtifacts.has(requiredArtifact));
+
+    if (isResearchGated) {
+      researchGatedTickets += 1;
+      if (researchArtifactComplete) {
+        researchArtifactCompleteTickets += 1;
+      }
+      if (coreTicketIdSet.has(ticketId)) {
+        coreResearchGatedTickets += 1;
+        if (researchArtifactComplete) {
+          coreResearchArtifactCompleteTickets += 1;
+        }
+      }
+      if (extensionTicketIdSet.has(ticketId)) {
+        extensionResearchGatedTickets += 1;
+        if (researchArtifactComplete) {
+          extensionResearchArtifactCompleteTickets += 1;
+        }
+      }
+    }
 
     if (claimTier) {
       claimTierCounts[claimTier] += 1;
@@ -276,6 +356,8 @@ function main() {
       claim_tier: claimTier,
       verification_ok: verificationOk,
       score,
+      research_gated: isResearchGated,
+      research_artifact_complete: researchArtifactComplete,
       result_file: normalizePath(path.relative(process.cwd(), latest.filePath)),
     };
   });
@@ -330,10 +412,20 @@ function main() {
       toe_progress_pct: toProgressPercent(normalizedProgress),
       forest_owner_coverage_pct: toProgressPercent(forestOwnerCoverage),
       strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
+      research_gated_tickets_total: researchGatedTickets,
+      research_artifact_complete_tickets_total: researchArtifactCompleteTickets,
     },
     segments: {
-      core: coreSummary,
-      extension: extensionSummary,
+      core: {
+        ...coreSummary,
+        research_gated_tickets_total: coreResearchGatedTickets,
+        research_artifact_complete_tickets_total: coreResearchArtifactCompleteTickets,
+      },
+      extension: {
+        ...extensionSummary,
+        research_gated_tickets_total: extensionResearchGatedTickets,
+        research_artifact_complete_tickets_total: extensionResearchArtifactCompleteTickets,
+      },
       combined: {
         tickets_total: totalTickets,
         tickets_with_evidence: ticketsWithEvidence,
@@ -341,6 +433,8 @@ function main() {
         weighted_score_sum: Math.round(weightedScoreSum * 1000) / 1000,
         toe_progress_pct: toProgressPercent(normalizedProgress),
         strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
+        research_gated_tickets_total: researchGatedTickets,
+        research_artifact_complete_tickets_total: researchArtifactCompleteTickets,
       },
     },
     tickets,
