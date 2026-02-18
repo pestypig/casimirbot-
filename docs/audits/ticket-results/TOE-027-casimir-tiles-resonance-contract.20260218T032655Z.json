@@ -1,0 +1,25 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-027-casimir-tiles-resonance-contract",
+  "files_changed": [
+    "server/services/code-lattice/resonance.constants.ts",
+    "server/services/code-lattice/resonance.ts",
+    "server/services/code-lattice/__tests__/casimir-resonance.spec.ts",
+    "server/services/code-lattice/__tests__/resonance.casimir.spec.ts"
+  ],
+  "tests_run": [
+    "server/services/code-lattice/__tests__/casimir-resonance.spec.ts",
+    "server/services/code-lattice/__tests__/resonance.casimir.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:b47e939e-9bef-4e81-8a34-063c4e54b384",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": [
+    "Ticket id not yet present in checked-in backlog catalogs; validator flags unknown ticket_id."
+  ]
+}

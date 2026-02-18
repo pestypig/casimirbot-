@@ -30,3 +30,11 @@ export const CASIMIR_PROMOTION_THRESHOLDS = {
 };
 
 export const RESONANCE_RECENCY_TAU_MS = RESONANCE_WEIGHTS.tauMs ?? RESONANCE_WEIGHT_DEFAULTS.tauMs;
+
+export const RESONANCE_DEFAULT_PROVENANCE = {
+  provenance_class: "inferred",
+  claim_tier: "diagnostic",
+  certifying: false,
+} as const;
+
+export const RESONANCE_STRICT_PROVENANCE_FAIL_REASON = "RESONANCE_PROVENANCE_MISSING" as const;

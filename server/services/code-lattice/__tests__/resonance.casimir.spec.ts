@@ -136,4 +136,36 @@ describe("casimir resonance seeding", () => {
     expect(result?.primaryPatchId).toBe("patch_architecture");
     expect(result?.backupPatchId).toBe("patch_plumbing");
   });
+
+
+  it("preserves provided provenance metadata on resonance outputs", async () => {
+    const telemetry: ConsoleTelemetryBundle = {
+      desktopId: "dev",
+      capturedAt: nowIso(),
+      panels: [
+        {
+          panelId: "casimir-tiles",
+          instanceId: "casimir-tiles.server",
+          title: "Casimir Tiles",
+          kind: "casimir",
+          sourceIds: ["server/services/casimir/telemetry.ts"],
+          lastUpdated: nowIso(),
+        },
+      ],
+      provenance_class: "measured",
+      claim_tier: "reduced-order",
+      certifying: false,
+    } as ConsoleTelemetryBundle;
+
+    const bundle = await buildResonanceBundle({
+      goal: "casimir provenance",
+      query: "casimir tiles",
+      telemetry,
+      limit: 5,
+    });
+
+    expect(bundle?.provenance_class).toBe("measured");
+    expect(bundle?.claim_tier).toBe("reduced-order");
+    expect(bundle?.certifying).toBe(false);
+  });
 });
