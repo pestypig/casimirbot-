@@ -1,6 +1,7 @@
 import type {
   AdapterRunRequest,
   AdapterRunResponse,
+  NormalizedAdapterRuntimeEnvelopeMetadata,
   ConstraintPack,
   ConstraintPackEvaluateRequest,
   ConstraintPackEvaluateResponse,
@@ -33,6 +34,31 @@ export type CasimirClientOptions = {
 };
 
 const DEFAULT_BASE_URL = "http://localhost:5173";
+
+
+const normalizeClaimTier = (
+  value: unknown,
+): NormalizedAdapterRuntimeEnvelopeMetadata["claim_tier"] => {
+  if (value === "reduced-order" || value === "certified") {
+    return value;
+  }
+  return "diagnostic";
+};
+
+const normalizeAdapterRuntimeEnvelopeMetadata = (
+  value: unknown,
+): NormalizedAdapterRuntimeEnvelopeMetadata => {
+  const metadata =
+    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    claim_tier: normalizeClaimTier(metadata.claim_tier),
+    provenance:
+      typeof metadata.provenance === "string" && metadata.provenance.trim().length > 0
+        ? metadata.provenance.trim()
+        : "diagnostic",
+    certifying: metadata.certifying === true,
+  };
+};
 
 const isHttpUrl = (value?: string): boolean =>
   typeof value === "string" && /^https?:\/\//i.test(value);
@@ -165,11 +191,27 @@ export class CasimirClient {
     return parseJson<T>(response, url);
   }
 
+
+  normalizeRunAdapterResponse(
+    response: AdapterRunResponse,
+  ): AdapterRunResponse & { metadata: NormalizedAdapterRuntimeEnvelopeMetadata } {
+    return {
+      ...response,
+      metadata: normalizeAdapterRuntimeEnvelopeMetadata(response.metadata),
+    };
+  }
+
   async runAdapter(
     payload: AdapterRunRequest,
     options?: CasimirRequestOptions,
-  ): Promise<AdapterRunResponse> {
-    return this.request<AdapterRunResponse>("POST", this.adapterUrl, payload, options);
+  ): Promise<AdapterRunResponse & { metadata: NormalizedAdapterRuntimeEnvelopeMetadata }> {
+    const response = await this.request<AdapterRunResponse>(
+      "POST",
+      this.adapterUrl,
+      payload,
+      options,
+    );
+    return this.normalizeRunAdapterResponse(response);
   }
 
   async exportTrainingTraceJsonl(

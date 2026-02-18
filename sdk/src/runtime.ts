@@ -93,6 +93,15 @@ export type RuntimeLlmEvent = {
 
 export type RuntimeEvent = RuntimeToolEvent | RuntimeLlmEvent;
 
+
+export type RuntimeClaimTier = "diagnostic" | "reduced-order" | "certified";
+
+export type RuntimeResponseEnvelopeMetadata = {
+  claim_tier: RuntimeClaimTier;
+  provenance: string;
+  certifying: boolean;
+};
+
 export type RuntimeTelemetryOptions = {
   clock?: () => number;
   hashPayload?: (value: unknown) => string;
@@ -224,6 +233,33 @@ const extractUsageFromResult = (result: unknown): RuntimeTokenUsage | undefined 
   const data = obj.data as Record<string, unknown> | undefined;
   const response = obj.response as Record<string, unknown> | undefined;
   return normalizeUsage(obj.usage) ?? normalizeUsage(data?.usage) ?? normalizeUsage(response?.usage);
+};
+
+
+const normalizeRuntimeClaimTier = (value: unknown): RuntimeClaimTier => {
+  if (value === "reduced-order" || value === "certified") {
+    return value;
+  }
+  return "diagnostic";
+};
+
+const normalizeRuntimeEnvelopeMetadata = (
+  metadata: unknown,
+): RuntimeResponseEnvelopeMetadata => {
+  const source = metadata && typeof metadata === "object"
+    ? (metadata as Record<string, unknown>)
+    : {};
+  const claimTier = normalizeRuntimeClaimTier(source.claim_tier);
+  const provenance =
+    typeof source.provenance === "string" && source.provenance.trim().length > 0
+      ? source.provenance.trim()
+      : "diagnostic";
+  const certifying = source.certifying === true;
+  return {
+    claim_tier: claimTier,
+    provenance,
+    certifying,
+  };
 };
 
 const toCount = (value?: boolean | number): number => {
@@ -565,6 +601,11 @@ export class RuntimeTelemetry {
     const { dirname } = await import("node:path");
     await fs.mkdir(dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, `${this.toToolTelemetryJson(options)}\n`, "utf8");
+  }
+
+
+  normalizeResponseEnvelopeMetadata(metadata?: unknown): RuntimeResponseEnvelopeMetadata {
+    return normalizeRuntimeEnvelopeMetadata(metadata);
   }
 
   finalize(): void {
