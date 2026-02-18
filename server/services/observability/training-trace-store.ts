@@ -91,6 +91,9 @@ const filterByTenant = (
   return records.filter((record) => matchesTenant(record, tenantId));
 };
 
+const sortBySequence = (records: TrainingTraceRecord[]): TrainingTraceRecord[] =>
+  records.slice().sort((a, b) => a.seq - b.seq);
+
 const persistedTraces = loadPersistedTraces();
 if (persistedTraces.length > 0) {
   traceBuffer.push(...persistedTraces);
@@ -165,7 +168,7 @@ export function getTrainingTraces(
   if (traceBuffer.length === 0) {
     return [];
   }
-  const filtered = filterByTenant(traceBuffer, tenantId);
+  const filtered = sortBySequence(filterByTenant(traceBuffer, tenantId));
   const start = Math.max(0, filtered.length - limit);
   return filtered.slice(start).reverse();
 }
@@ -209,7 +212,7 @@ export function getTrainingTraceExport(
       return persisted;
     }
   }
-  const filtered = filterByTenant(traceBuffer, normalizedTenant);
+  const filtered = sortBySequence(filterByTenant(traceBuffer, normalizedTenant));
   if (!limit) {
     return filtered.slice();
   }
@@ -265,7 +268,7 @@ function readPersistedTraces(
       return [];
     }
     const capped = Math.max(1, Math.floor(limit));
-    return parsed.slice(-capped);
+    return sortBySequence(parsed).slice(-capped);
   } catch (error) {
     console.warn("[training-trace] failed to read audit log", error);
     return [];

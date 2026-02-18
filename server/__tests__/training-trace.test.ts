@@ -125,6 +125,26 @@ describe("training-trace API", () => {
     expect(movement?.payload?.data?.certificateRefs).toEqual(["cert-hash-1", "cert-id-1"]);
   });
 
+
+  it("exports traces in deterministic sequence order", async () => {
+    await request(app).post("/api/agi/training-trace").send({ pass: true, deltas: [], traceId: "trace-b" }).expect(200);
+    await request(app).post("/api/agi/training-trace").send({ pass: true, deltas: [], traceId: "trace-c" }).expect(200);
+    await request(app).post("/api/agi/training-trace").send({ pass: true, deltas: [], traceId: "trace-d" }).expect(200);
+
+    const res = await request(app)
+      .get("/api/agi/training-trace/export")
+      .expect(200);
+    const rows = (res.text ?? "")
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+
+    const seq = rows.map((entry) => Number(entry.seq));
+    const sorted = seq.slice().sort((a, b) => a - b);
+    expect(seq).toEqual(sorted);
+  });
+
   it("exports JSONL", async () => {
     await request(app)
       .post("/api/agi/training-trace")
