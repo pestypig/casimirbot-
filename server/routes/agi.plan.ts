@@ -27202,9 +27202,9 @@ const executeHelixAsk = async ({
         supportedClaimCount: (platonicResult.claimLedger ?? []).filter((entry) => entry.supported).length,
         contradictionCount: platonicResult.beliefSummary?.contradictionCount ?? 0,
       });
-      const claimCitationLinkage = scoreDeterministicClaimCitationLinkage(cleaned);
+      const deterministicClaimCitationLinkage = scoreDeterministicClaimCitationLinkage(cleaned);
       const semanticGateFailReasons: string[] = [];
-      semanticGateFailReasons.push(...claimCitationLinkage.failReasons);
+      semanticGateFailReasons.push(...deterministicClaimCitationLinkage.failReasons);
       if (
         semanticQuality.claimCitationLinkRate < 0.9 &&
         !semanticGateFailReasons.includes("CLAIM_CITATION_LINK_WEAK") &&
@@ -27223,9 +27223,9 @@ const executeHelixAsk = async ({
       if (debugPayload) {
         (debugPayload as Record<string, unknown>).semantic_quality = {
           claim_citation_link_rate: semanticQuality.claimCitationLinkRate,
-          deterministic_claim_citation_link_rate: claimCitationLinkage.linkRate,
-          deterministic_claim_count: claimCitationLinkage.claimCount,
-          deterministic_linked_claim_count: claimCitationLinkage.linkedClaimCount,
+          deterministic_claim_citation_link_rate: deterministicClaimCitationLinkage.linkRate,
+          deterministic_claim_count: deterministicClaimCitationLinkage.claimCount,
+          deterministic_linked_claim_count: deterministicClaimCitationLinkage.linkedClaimCount,
           unsupported_claim_rate: semanticQuality.unsupportedClaimRate,
           repetition_penalty_fail: semanticQuality.repetitionPenaltyFail,
           contradiction_flag: semanticQuality.contradictionFlag,
