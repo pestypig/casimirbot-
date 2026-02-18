@@ -6,6 +6,7 @@ import {
 } from "../shared/ideology-telemetry";
 import { saveConsoleTelemetry } from "../server/services/console-telemetry/store";
 import { collectPanelSnapshots } from "../server/services/telemetry/panels";
+import { ETHOS_KNOWLEDGE_STRICT_FAIL_REASON, searchIdeologyArtifacts } from "../server/services/ideology/artifacts";
 
 describe("ideology telemetry", () => {
   it("schema has core metrics and flags", () => {
@@ -47,4 +48,13 @@ describe("ideology telemetry", () => {
     expect(snapshot.panels[0]?.claim_tier).toBe("certified");
     expect(snapshot.panels[0]?.certifying).toBe(true);
   });
+  it("keeps artifact search backward compatible while allowing strict provenance gate", () => {
+    const base = searchIdeologyArtifacts({ limit: 1 });
+    expect(base.fail_reason).toBeUndefined();
+    expect(base.items[0]?.provenance_class).toBe("inferred");
+
+    const strict = searchIdeologyArtifacts({ limit: 1, strictProvenance: true });
+    expect(strict.fail_reason).toBe(ETHOS_KNOWLEDGE_STRICT_FAIL_REASON);
+  });
+
 });
