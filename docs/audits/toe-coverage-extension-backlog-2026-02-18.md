@@ -14,6 +14,10 @@ Parent backlog:
 
 - `docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json`
 
+Goal context anchor:
+
+- `docs/experiments/helix-ask-goal-zone.md`
+
 ## Global Execution Contract
 
 - Read:
@@ -38,6 +42,32 @@ Parent backlog:
   - `casimir.certificate_hash`
   - `casimir.integrity_ok`
   - `remaining_gaps`
+
+## Persistent Context Loop (Required)
+
+To keep long-horizon context alive for future agents, every extension ticket run must keep this file loop updated.
+
+Read before each run:
+
+- `docs/experiments/helix-ask-goal-zone.md`
+- `docs/audits/repo-forest-coverage-audit-2026-02-18.md`
+- `docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json`
+- `docs/audits/toe-coverage-extension-backlog-2026-02-18.json`
+- `docs/audits/ticket-results/README.md`
+
+Write/update after each successful run:
+
+- `docs/audits/ticket-results/<ticket-id>.<timestamp>.json`
+- `docs/audits/toe-progress-snapshot.json` (run `npx tsx scripts/compute-toe-progress.ts`)
+
+Optional but recommended when planning context changes:
+
+- `docs/audits/repo-forest-coverage-audit-2026-02-18.md`
+- `docs/audits/toe-coverage-extension-backlog-2026-02-18.md`
+
+Batch prompts:
+
+- `docs/audits/toe-extension-prompt-batch-2026-02-18.md`
 
 ## Reusable Worker Prompt
 

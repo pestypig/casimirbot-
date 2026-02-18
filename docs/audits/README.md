@@ -11,6 +11,7 @@ This folder is the entrypoint for cloud-agent audit contracts, gap reports, and 
 - ToE ticket backlog (machine-readable): `docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json`
 - ToE coverage-extension backlog (human-readable): `docs/audits/toe-coverage-extension-backlog-2026-02-18.md`
 - ToE coverage-extension backlog (machine-readable): `docs/audits/toe-coverage-extension-backlog-2026-02-18.json`
+- ToE extension prompt batch (TOE-013..016): `docs/audits/toe-extension-prompt-batch-2026-02-18.md`
 - Ticket result contract: `docs/audits/ticket-results/README.md`
 - ToE scaling scorecard: `docs/audits/toe-scaling-scorecard.md`
 - ToE scaling scorecard CSV: `docs/audits/toe-scaling-scorecard.csv`
