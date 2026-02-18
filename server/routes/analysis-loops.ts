@@ -29,6 +29,48 @@ const summarizeValues = (values: Float32Array) => {
   return { min, max, mean };
 };
 
+
+const provenanceClassSchema = z.enum(["measured", "proxy", "inferred"]);
+const claimTierSchema = z.enum(["diagnostic", "reduced-order", "certified"]);
+const provenanceSchema = z
+  .object({
+    provenance_class: provenanceClassSchema,
+    claim_tier: claimTierSchema,
+    certifying: z.boolean(),
+  })
+  .strict();
+
+const DEFAULT_PROVENANCE = {
+  provenance_class: "inferred" as const,
+  claim_tier: "diagnostic" as const,
+  certifying: false,
+};
+
+const STRICT_PROVENANCE_FAIL_REASON = "ANALYSIS_LOOP_PROVENANCE_MISSING" as const;
+
+const applyStrictProvenanceGate = (
+  gate: unknown,
+  strictProvenance: boolean,
+  hasProvenance: boolean,
+) => {
+  if (!strictProvenance || hasProvenance || !gate || typeof gate !== "object") {
+    return gate;
+  }
+  const typedGate = gate as Record<string, unknown>;
+  const noteParts: string[] = [];
+  if (typeof typedGate.note === "string" && typedGate.note.trim()) {
+    noteParts.push(typedGate.note);
+  }
+  noteParts.push(STRICT_PROVENANCE_FAIL_REASON);
+
+  return {
+    ...typedGate,
+    status: "fail",
+    fail_reason: STRICT_PROVENANCE_FAIL_REASON,
+    note: noteParts.join(";"),
+  };
+};
+
 const clampSchema = z
   .object({
     min: z.number(),
@@ -55,6 +97,8 @@ const noiseFieldRequestSchema = z
     clamp: clampSchema.optional(),
     includeValues: z.boolean().optional(),
     includeAttempts: z.boolean().optional(),
+    strictProvenance: z.boolean().optional(),
+    provenance: provenanceSchema.optional(),
   })
   .strict();
 
@@ -80,6 +124,8 @@ const diffusionRequestSchema = z
     targetValues: z.array(z.number()).optional(),
     includeValues: z.boolean().optional(),
     includeAttempts: z.boolean().optional(),
+    strictProvenance: z.boolean().optional(),
+    provenance: provenanceSchema.optional(),
   })
   .strict();
 
@@ -116,6 +162,8 @@ const beliefGraphRequestSchema = z
     scoreClamp: clampSchema.optional(),
     includeGraph: z.boolean().optional(),
     includeAttempts: z.boolean().optional(),
+    strictProvenance: z.boolean().optional(),
+    provenance: provenanceSchema.optional(),
   })
   .strict();
 
@@ -158,6 +206,8 @@ router.post("/loops/noise-field", (req: Request, res: Response) => {
   };
   const includeValues = request.includeValues === true;
   const includeAttempts = request.includeAttempts === true;
+  const strictProvenance = request.strictProvenance === true;
+  const provenance = request.provenance ?? DEFAULT_PROVENANCE;
 
   const result = runNoiseFieldLoop({
     width,
@@ -167,6 +217,8 @@ router.post("/loops/noise-field", (req: Request, res: Response) => {
     stepSize,
     thresholds,
     clamp: request.clamp,
+    provenance: request.provenance,
+    strictProvenance,
   });
 
   const attempts = result.attempts.map((attempt) => ({
@@ -176,6 +228,8 @@ router.post("/loops/noise-field", (req: Request, res: Response) => {
     constraints: attempt.constraints,
   }));
   const finalAttempt = attempts[attempts.length - 1] ?? null;
+  const hasProvenance = Boolean(request.provenance);
+  const finalGate = applyStrictProvenanceGate(finalAttempt?.gate ?? null, strictProvenance, hasProvenance);
   const stats = summarizeValues(result.finalState.values);
   const values = includeValues
     ? Array.from(result.finalState.values)
@@ -197,7 +251,7 @@ router.post("/loops/noise-field", (req: Request, res: Response) => {
     accepted: result.accepted,
     acceptedIteration: result.acceptedIteration ?? null,
     iterations: attempts.length,
-    gate: finalAttempt?.gate ?? null,
+    gate: finalGate,
     constraints: finalAttempt?.constraints ?? null,
     attempts: includeAttempts ? attempts : undefined,
     state: {
@@ -207,6 +261,9 @@ router.post("/loops/noise-field", (req: Request, res: Response) => {
       ...(includeValues ? { values } : {}),
     },
     stats,
+    provenance_class: provenance.provenance_class,
+    claim_tier: provenance.claim_tier,
+    certifying: provenance.certifying,
   });
 });
 
@@ -244,6 +301,8 @@ router.post("/loops/diffusion", (req: Request, res: Response) => {
   };
   const includeValues = request.includeValues === true;
   const includeAttempts = request.includeAttempts === true;
+  const strictProvenance = request.strictProvenance === true;
+  const provenance = request.provenance ?? DEFAULT_PROVENANCE;
 
   const result = runImageDiffusionLoop({
     width,
@@ -267,6 +326,8 @@ router.post("/loops/diffusion", (req: Request, res: Response) => {
     constraints: attempt.constraints,
   }));
   const finalAttempt = attempts[attempts.length - 1] ?? null;
+  const hasProvenance = Boolean(request.provenance);
+  const finalGate = applyStrictProvenanceGate(finalAttempt?.gate ?? null, strictProvenance, hasProvenance);
   const stats = summarizeValues(result.finalState.values);
   const values = includeValues
     ? Array.from(result.finalState.values)
@@ -293,7 +354,7 @@ router.post("/loops/diffusion", (req: Request, res: Response) => {
     accepted: result.accepted,
     acceptedIteration: result.acceptedIteration ?? null,
     iterations: attempts.length,
-    gate: finalAttempt?.gate ?? null,
+    gate: finalGate,
     constraints: finalAttempt?.constraints ?? null,
     attempts: includeAttempts ? attempts : undefined,
     state: {
@@ -304,6 +365,9 @@ router.post("/loops/diffusion", (req: Request, res: Response) => {
       ...(includeValues ? { values } : {}),
     },
     stats,
+    provenance_class: provenance.provenance_class,
+    claim_tier: provenance.claim_tier,
+    certifying: provenance.certifying,
   });
 });
 
@@ -326,6 +390,8 @@ router.post("/loops/belief-graph", (req: Request, res: Response) => {
   };
   const includeGraph = request.includeGraph !== false;
   const includeAttempts = request.includeAttempts === true;
+  const strictProvenance = request.strictProvenance === true;
+  const provenance = request.provenance ?? DEFAULT_PROVENANCE;
 
   const result = runBeliefGraphLoop({
     graph: request.graph
@@ -356,6 +422,8 @@ router.post("/loops/belief-graph", (req: Request, res: Response) => {
     constraints: attempt.constraints,
   }));
   const finalAttempt = attempts[attempts.length - 1] ?? null;
+  const hasProvenance = Boolean(request.provenance);
+  const finalGate = applyStrictProvenanceGate(finalAttempt?.gate ?? null, strictProvenance, hasProvenance);
   const nodeCount = result.finalState.nodes.length;
   const edgeCount = result.finalState.edges.length;
 
@@ -376,7 +444,7 @@ router.post("/loops/belief-graph", (req: Request, res: Response) => {
     accepted: result.accepted,
     acceptedIteration: result.acceptedIteration ?? null,
     iterations: attempts.length,
-    gate: finalAttempt?.gate ?? null,
+    gate: finalGate,
     constraints: finalAttempt?.constraints ?? null,
     attempts: includeAttempts ? attempts : undefined,
     graph: includeGraph
@@ -389,6 +457,9 @@ router.post("/loops/belief-graph", (req: Request, res: Response) => {
           edges: result.finalState.edges.map((edge) => ({ ...edge })),
         }
       : undefined,
+    provenance_class: provenance.provenance_class,
+    claim_tier: provenance.claim_tier,
+    certifying: provenance.certifying,
   });
 });
 
