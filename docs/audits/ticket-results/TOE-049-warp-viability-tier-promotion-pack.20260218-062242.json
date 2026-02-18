@@ -1,0 +1,28 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-049-warp-viability-tier-promotion-pack",
+  "files_changed": [
+    "docs/audits/research/TOE-049-tier-promotion-rationale.md",
+    "docs/audits/research/TOE-049-comparative-evidence-pack.md"
+  ],
+  "tests_run": [
+    "tests/warp-viability.spec.ts",
+    "tests/warp-metric-adapter.spec.ts",
+    "tests/proof-pack-strict-parity.spec.ts",
+    "npm run -s audit:toe:preflight",
+    "npm run -s casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:491eacea-aab3-4be1-aef9-b31832eaa1b0",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "tier-promotion-rationale",
+    "comparative-evidence-pack"
+  ],
+  "remaining_gaps": []
+}
