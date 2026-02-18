@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T21:00:29.500Z",
+  "generated_at": "2026-02-18T21:02:35.065Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -1045,7 +1045,7 @@
       "result_file": null
     },
     {
-      "ticket_id": "TOE-069-helix-ask-retrieval-citation-persistence-pack",
+      "ticket_id": "TOE-068-helix-ask-strict-fail-reason-ledger",
       "claim_tier": null,
       "verification_ok": false,
       "score": 0,

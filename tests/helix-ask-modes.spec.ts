@@ -118,6 +118,8 @@ describe("Helix Ask modes", () => {
     const payload = (await response.json()) as {
       fail_reason?: string;
       fail_class?: string;
+      strict_fail_reason_ledger?: Array<{ fail_reason?: string; category?: string; stage?: string }>;
+      strict_fail_reason_histogram_artifact?: { kind?: string; integrity?: string; sha256?: string };
       concept?: {
         id?: string;
       };
@@ -125,6 +127,16 @@ describe("Helix Ask modes", () => {
     expect(payload.concept?.id).toBe("epistemology");
     expect(payload.fail_reason).toBe("CONCEPTS_PROVENANCE_MISSING");
     expect(payload.fail_class).toBe("input_contract");
+    expect(payload.strict_fail_reason_ledger?.[0]).toMatchObject({
+      fail_reason: "CONCEPTS_PROVENANCE_MISSING",
+      category: "evidence_contract",
+      stage: "response",
+    });
+    expect(payload.strict_fail_reason_histogram_artifact?.kind).toBe(
+      "helix_ask.strict_fail_reason_histogram.v1",
+    );
+    expect(payload.strict_fail_reason_histogram_artifact?.integrity).toBe("OK");
+    expect(payload.strict_fail_reason_histogram_artifact?.sha256).toMatch(/^[a-f0-9]{64}$/);
   }, 90000);
 
   it("routes act mode date/time/place gravity query to halobank.time.compute", async () => {
@@ -227,6 +239,9 @@ describe("Helix Ask modes", () => {
       mode?: string;
       fail_reason?: string;
       fail_class?: string;
+      strict_fail_reason_ledger?: unknown;
+      strict_fail_reason_histogram?: unknown;
+      strict_fail_reason_histogram_artifact?: unknown;
       claim_tier?: string;
       provenance_class?: string;
       certifying?: boolean;
@@ -239,6 +254,9 @@ describe("Helix Ask modes", () => {
     expect(payload.mode).toBe("verify");
     expect(payload.fail_reason).toBeUndefined();
     expect(payload.fail_class).toBeUndefined();
+    expect(payload.strict_fail_reason_ledger).toBeUndefined();
+    expect(payload.strict_fail_reason_histogram).toBeUndefined();
+    expect(payload.strict_fail_reason_histogram_artifact).toBeUndefined();
     expect(payload.claim_tier).toBe("diagnostic");
     expect(payload.provenance_class).toBe("inferred");
     expect(payload.certifying).toBe(false);
