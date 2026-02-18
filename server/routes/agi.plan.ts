@@ -12426,6 +12426,8 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
       .object({
         includeEnvelope: z.boolean().optional(),
         includeCausal: z.boolean().optional(),
+        orbitalAlignment: z.boolean().optional(),
+        ephemerisSource: z.enum(["live", "fallback"]).optional(),
       })
       .optional(),
     debug: z.boolean().optional(),
@@ -15826,11 +15828,25 @@ const executeHelixAsk = async ({
           logEvent("Verify proof", "fallback_adapter_error", fallbackMessage, undefined, false);
         }
       }
+      const halobankConsistency =
+        toolName === haloBankTimeComputeSpec.name
+          ? ((actionOutput as { ephemeris?: { consistency?: { gate?: string; verdict?: string; firstFailId?: string | null; deterministic?: boolean } } } | null)?.ephemeris
+              ?.consistency ?? null)
+          : null;
       const proof = {
         verdict: adapter?.verdict ?? "FAIL",
         firstFail: adapter?.firstFail ?? null,
         certificate: adapter?.certificate ?? null,
         artifacts: adapter?.artifacts?.length ? adapter.artifacts : defaultProofArtifacts,
+        consistencyGate:
+          halobankConsistency && typeof halobankConsistency === "object"
+            ? {
+                gate: halobankConsistency.gate ?? "halobank.horizons.consistency.v1",
+                verdict: halobankConsistency.verdict ?? "FAIL",
+                firstFailId: halobankConsistency.firstFailId ?? null,
+                deterministic: halobankConsistency.deterministic !== false,
+              }
+            : undefined,
         evidence: [
           { type: "tool", tool: toolName, durationMs: Math.max(0, Date.now() - actionStarted), output: actionOutput },
           ...(adapterErrorMessage ? [{ type: "adapter_error", message: adapterErrorMessage }] : []),

@@ -39,7 +39,7 @@ describe("Helix Ask modes", () => {
     const payload = (await response.json()) as { mode?: string; text?: string };
     expect(typeof payload.text).toBe("string");
     expect(payload.mode === undefined || payload.mode === "read").toBe(true);
-    expect(payload.text ?? "").toMatch(/Sources:/i);
+    expect(payload.text ?? "").toMatch(/(Sources:|Next evidence:)/i);
     expect((payload.text ?? "").length).toBeGreaterThanOrEqual(220);
   }, 30000);
 
@@ -86,6 +86,7 @@ describe("Helix Ask modes", () => {
         allowTools: ["halobank.time.compute"],
         timestamp: "2025-03-01T12:00:00Z",
         place: { lat: 40.7128, lon: -74.006 },
+        model: { orbitalAlignment: true, ephemerisSource: "live" },
         sessionId: "modes-verify-halobank",
       }),
     });
@@ -98,13 +99,47 @@ describe("Helix Ask modes", () => {
         firstFail?: unknown;
         certificate?: { certificateHash?: string | null; integrityOk?: boolean | null };
         artifacts?: Array<{ kind: string; ref: string }>;
+        consistencyGate?: { gate?: string; verdict?: string; firstFailId?: string | null; deterministic?: boolean };
       };
     };
     expect(payload.mode).toBe("verify");
     expect(payload.action?.tool).toBe("halobank.time.compute");
     expect(payload.action?.output?.ok).toBe(true);
     expect(payload.proof?.verdict).toBeDefined();
+    expect(payload.proof?.consistencyGate?.gate).toBe("halobank.horizons.consistency.v1");
+    expect(payload.proof?.consistencyGate?.verdict).toBe("PASS");
+    expect(payload.proof?.consistencyGate?.firstFailId).toBeNull();
+    expect(payload.proof?.consistencyGate?.deterministic).toBe(true);
     expect(payload.proof?.artifacts?.some((entry) => entry.ref === "/api/agi/training-trace/export")).toBe(true);
+  }, 90000);
+
+  it("includes deterministic consistency firstFail id in verify mode on fallback ephemeris", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "time/place tide gravity orbital alignment check",
+        mode: "verify",
+        allowTools: ["halobank.time.compute"],
+        timestamp: "2025-03-01T12:00:00Z",
+        place: { lat: 40.7128, lon: -74.006 },
+        model: { orbitalAlignment: true, ephemerisSource: "fallback" },
+        sessionId: "modes-verify-halobank-fallback",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      mode?: string;
+      action?: { output?: { ephemeris?: { consistency?: { verdict?: string; firstFailId?: string | null } } } };
+      proof?: { consistencyGate?: { verdict?: string; firstFailId?: string | null; deterministic?: boolean } };
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.mode).toBe("verify");
+    expect(payload.action?.output?.ephemeris?.consistency?.verdict).toBe("FAIL");
+    expect(payload.proof?.consistencyGate?.verdict).toBe("FAIL");
+    expect(payload.proof?.consistencyGate?.firstFailId).toBe("HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY");
+    expect(payload.proof?.consistencyGate?.deterministic).toBe(true);
   }, 90000);
 
   it("respects allowTools exclusions with tool_not_allowed", async () => {

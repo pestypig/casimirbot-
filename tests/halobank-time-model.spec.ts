@@ -36,6 +36,38 @@ describe("halobank time model", () => {
     expect(deltas?.dCombExposure_ns).toBeCloseTo((result.primary?.voxel.combined_ns_per_1s ?? 0) * 60, 6);
   });
 
+  it("includes ephemeris consistency/provenance on requested orbital alignment", () => {
+    const result = computeHaloBankTimeModel({
+      timestamp: "2025-03-01T12:00:00.000Z",
+      place: { lat: 40.7128, lon: -74.006 },
+      model: { orbitalAlignment: true, ephemerisSource: "live" },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.requested).toBe(true);
+    expect(result.ephemeris?.source).toBe("live");
+    expect(result.ephemeris?.provenance.claim_tier).toBe("diagnostic");
+    expect(result.ephemeris?.provenance.certifying).toBe(false);
+    expect(result.ephemeris?.consistency.verdict).toBe("PASS");
+    expect(result.ephemeris?.consistency.firstFailId).toBeNull();
+    expect(result.ephemeris?.consistency.deterministic).toBe(true);
+  });
+
+  it("marks fallback ephemeris as diagnostic non-certifying with deterministic fail id", () => {
+    const result = computeHaloBankTimeModel({
+      timestamp: "2025-03-01T12:00:00.000Z",
+      place: { lat: 40.7128, lon: -74.006 },
+      model: { orbitalAlignment: true, ephemerisSource: "fallback" },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.source).toBe("fallback");
+    expect(result.ephemeris?.provenance.claim_tier).toBe("diagnostic");
+    expect(result.ephemeris?.provenance.certifying).toBe(false);
+    expect(result.ephemeris?.provenance.note.toLowerCase()).toContain("non-certifying");
+    expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY");
+    expect(result.ephemeris?.consistency.deterministic).toBe(true);
+  });
+
   it("returns actionable validation when parsing is insufficient", () => {
     const result = computeHaloBankTimeModel({ question: "what are the tides" });
     expect(result.ok).toBe(false);

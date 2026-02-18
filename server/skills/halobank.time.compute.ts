@@ -24,6 +24,8 @@ const Input = z.object({
     .object({
       includeEnvelope: z.boolean().optional(),
       includeCausal: z.boolean().optional(),
+      orbitalAlignment: z.boolean().optional(),
+      ephemerisSource: z.enum(["live", "fallback"]).optional(),
     })
     .optional(),
   question: z.string().optional(),
@@ -41,6 +43,7 @@ const Output = z.object({
   }),
   primary: z.any().optional(),
   comparison: z.any().optional(),
+  ephemeris: z.any().optional(),
 });
 
 export const haloBankTimeComputeSpec: ToolSpecShape = {
