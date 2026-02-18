@@ -4,13 +4,32 @@ import { ensureCasimirTelemetry } from "../casimir/telemetry";
 import { getConsoleTelemetry } from "../console-telemetry/store";
 
 const DEFAULT_DESKTOP_ID = "helix.desktop.main";
+const PROVENANCE_MISSING_FAIL_TAG = "telemetry_provenance_missing";
+const PROVENANCE_MISSING_FAIL_REASON = "strict provenance mode requires sourceIds for telemetry badges";
+
+type ProvenanceClass = "measured" | "synthesized";
+type ClaimTier = "certified" | "diagnostic";
 
 type CollectArgs = {
   desktopId?: string;
   panelIds?: string[];
+  strictProvenance?: boolean;
 };
 
-type CollectResult = { snapshot: BadgeTelemetrySnapshot; rawPanels: PanelTelemetry[] };
+type BadgeEntryWithProvenance = BadgeTelemetryEntry & {
+  provenance_class: ProvenanceClass;
+  claim_tier: ClaimTier;
+  certifying: boolean;
+  provenance_tag?: string;
+};
+
+type BadgeSnapshotWithProvenance = BadgeTelemetrySnapshot & {
+  entries: BadgeEntryWithProvenance[];
+  fail_reason?: string;
+  fail_tag?: string;
+};
+
+type CollectResult = { snapshot: BadgeSnapshotWithProvenance; rawPanels: PanelTelemetry[] };
 
 const toFiniteNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -23,7 +42,10 @@ const raiseStatus = (current: BadgeTelemetryEntry["status"], next: BadgeTelemetr
 const fmtPercent = (value: number | null): string | null =>
   value === null ? null : `${Math.round(value * 1000) / 10}%`;
 
-const normalizeBadgePanel = (panel: PanelTelemetry): BadgeTelemetryEntry => {
+const hasSourceProvenance = (panel: PanelTelemetry): boolean =>
+  Array.isArray(panel.sourceIds) && panel.sourceIds.some((id) => Boolean(id?.trim()));
+
+const normalizeBadgePanel = (panel: PanelTelemetry): BadgeEntryWithProvenance => {
   const metrics = panel.metrics ?? {};
   const flags = panel.flags ?? {};
   const proofs: BadgeProof[] = [];
@@ -34,6 +56,8 @@ const normalizeBadgePanel = (panel: PanelTelemetry): BadgeTelemetryEntry => {
   const activeTiles = toFiniteNumber(metrics.tilesActive ?? metrics.active);
   const totalTiles = toFiniteNumber(metrics.totalTiles ?? metrics.total);
   const primaryBand = Array.isArray(panel.bands) ? panel.bands[0] : null;
+  const hasProvenance = hasSourceProvenance(panel);
+  const synthesized = !hasProvenance;
   let status: BadgeTelemetryEntry["status"] = "unknown";
   if (occupancy !== null) {
     proofs.push({ label: "occupancy", value: fmtPercent(occupancy) ?? `${occupancy}` });
@@ -72,7 +96,7 @@ const normalizeBadgePanel = (panel: PanelTelemetry): BadgeTelemetryEntry => {
     }
   }
   if (qFactor !== null) {
-    proofs.push({ label: "Q\u2097", value: qFactor.toFixed(3) });
+    proofs.push({ label: "Qₗ", value: qFactor.toFixed(3) });
     if (qFactor < 0.55 || flags.lowQFactor) {
       status = raiseStatus(status, "warn");
       solutions.push({
@@ -114,6 +138,10 @@ const normalizeBadgePanel = (panel: PanelTelemetry): BadgeTelemetryEntry => {
     bands: panel.bands,
     lastUpdated: panel.lastUpdated,
     sourceIds: panel.sourceIds,
+    provenance_class: synthesized ? "synthesized" : "measured",
+    claim_tier: synthesized ? "diagnostic" : "certified",
+    certifying: !synthesized,
+    ...(synthesized ? { provenance_tag: "fallback" } : {}),
   };
 };
 
@@ -131,6 +159,8 @@ export function collectBadgeTelemetry(args: CollectArgs = {}): CollectResult {
   const rawPanels =
     bundle?.panels?.filter((panel) => !panelFilter || panelFilter.has(panel.panelId.toLowerCase())) ?? [];
   const entries = rawPanels.map((panel) => normalizeBadgePanel(panel));
+  const strictMissingProvenance =
+    args.strictProvenance === true && entries.some((entry) => entry.provenance_class === "synthesized");
   const totals = entries.reduce(
     (acc, entry) => {
       acc.total += 1;
@@ -154,6 +184,12 @@ export function collectBadgeTelemetry(args: CollectArgs = {}): CollectResult {
       total: entries.length,
       relatedPanels,
       relationNotes,
+      ...(strictMissingProvenance
+        ? {
+            fail_reason: PROVENANCE_MISSING_FAIL_REASON,
+            fail_tag: PROVENANCE_MISSING_FAIL_TAG,
+          }
+        : {}),
     },
     rawPanels,
   };
