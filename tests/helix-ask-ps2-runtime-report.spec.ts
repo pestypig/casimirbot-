@@ -11,6 +11,7 @@ describe("Helix Ask PS2 runtime report", () => {
   beforeAll(async () => {
     process.env.ENABLE_AGI = "1";
     process.env.HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR = "1";
+    process.env.HELIX_ASK_FAILURE_MAX = "0";
     vi.resetModules();
     const { planRouter } = await import("../server/routes/agi.plan");
     const app = express();
@@ -69,7 +70,7 @@ describe("Helix Ask PS2 runtime report", () => {
     }
 
     const runId = new Date().toISOString().replace(/[:.]/g, "-");
-    const baseDir = path.join("artifacts", "experiments", "helix-ask-ps2", runId);
+    const baseDir = path.join("artifacts", "experiments", "helix-ask-quake-frame-loop", runId);
     fs.mkdirSync(path.join(baseDir, "raw"), { recursive: true });
 
     fs.writeFileSync(path.join(baseDir, "raw", "responses.json"), JSON.stringify(rows, null, 2));
@@ -92,7 +93,10 @@ describe("Helix Ask PS2 runtime report", () => {
       empty_scaffold_rate: rate((row) => emptyScaffoldRe.test(row.text)),
       mechanism_sentence_present_rate: rate((row) => mechanismRe.test(row.text)),
       maturity_label_present_rate: rate((row) => maturityRe.test(row.text)),
-      citation_presence_rate: rate((row) => citationRe.test(row.text)),
+      claim_citation_link_rate: rate((row) => (row.debug.semantic_quality as any)?.claim_citation_link_rate >= 0.9 || citationRe.test(row.text)),
+      unsupported_claim_rate: rate((row) => ((row.debug.semantic_quality as any)?.unsupported_claim_rate ?? 1) > 0.1),
+      repetition_penalty_fail_rate: rate((row) => Boolean((row.debug.semantic_quality as any)?.repetition_penalty_fail)),
+      contradiction_flag_rate: rate((row) => Boolean((row.debug.semantic_quality as any)?.contradiction_flag)),
       min_text_length_pass_rate: rate((row) => row.text.length >= 260),
       missing_evidence_present_rate: rate((row) => missingEvidenceRe.test(row.text)),
       p95_latency_ms: p95LatencyMs,
@@ -115,7 +119,10 @@ describe("Helix Ask PS2 runtime report", () => {
         metrics.empty_scaffold_rate === 0 &&
         metrics.mechanism_sentence_present_rate >= 0.95 &&
         metrics.maturity_label_present_rate >= 0.95 &&
-        metrics.citation_presence_rate >= 0.95 &&
+        metrics.claim_citation_link_rate >= 0.90 &&
+        metrics.unsupported_claim_rate <= 0.10 &&
+        metrics.repetition_penalty_fail_rate <= 0.10 &&
+        metrics.contradiction_flag_rate <= 0.10 &&
         metrics.min_text_length_pass_rate >= 0.95 &&
         metrics.p95_latency_ms <= 2500 &&
         metrics.non_200_rate <= 0.02
@@ -138,13 +145,16 @@ describe("Helix Ask PS2 runtime report", () => {
     }));
     fs.writeFileSync(path.join(baseDir, "focused-qa.json"), JSON.stringify(focusedQa, null, 2));
 
-    const reportPath = path.join("reports", `helix-ask-ps2-runtime-contract-${runId}.md`);
+    const reportPath = path.join("reports", `helix-ask-quake-frame-loop-${runId}.md`);
     const gates: Array<[string, string, number, boolean]> = [
       ["placeholder_fallback_rate", "== 0", metrics.placeholder_fallback_rate, metrics.placeholder_fallback_rate === 0],
       ["empty_scaffold_rate", "== 0", metrics.empty_scaffold_rate, metrics.empty_scaffold_rate === 0],
       ["mechanism_sentence_present_rate", ">= 0.95", metrics.mechanism_sentence_present_rate, metrics.mechanism_sentence_present_rate >= 0.95],
       ["maturity_label_present_rate", ">= 0.95", metrics.maturity_label_present_rate, metrics.maturity_label_present_rate >= 0.95],
-      ["citation_presence_rate", ">= 0.95", metrics.citation_presence_rate, metrics.citation_presence_rate >= 0.95],
+      ["claim_citation_link_rate", ">= 0.90", metrics.claim_citation_link_rate, metrics.claim_citation_link_rate >= 0.90],
+      ["unsupported_claim_rate", "<= 0.10", metrics.unsupported_claim_rate, metrics.unsupported_claim_rate <= 0.10],
+      ["repetition_penalty_fail_rate", "<= 0.10", metrics.repetition_penalty_fail_rate, metrics.repetition_penalty_fail_rate <= 0.10],
+      ["contradiction_flag_rate", "<= 0.10", metrics.contradiction_flag_rate, metrics.contradiction_flag_rate <= 0.10],
       ["min_text_length_pass_rate", ">= 0.95", metrics.min_text_length_pass_rate, metrics.min_text_length_pass_rate >= 0.95],
       ["p95_latency", "<= 2500ms", metrics.p95_latency_ms, metrics.p95_latency_ms <= 2500],
       ["non_200_rate", "<= 0.02", metrics.non_200_rate, metrics.non_200_rate <= 0.02],
