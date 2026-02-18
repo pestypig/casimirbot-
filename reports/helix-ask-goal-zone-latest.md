@@ -1,9 +1,9 @@
 # Helix Ask Goal Zone - Iteration 3
 
-- pass: no
-- pass_rate: 0.0%
-- failed_cases: 5/5
-- duration_ms: 38
+- pass: yes
+- pass_rate: 100.0%
+- failed_cases: 0/5
+- duration_ms: 12957
 
 ## Case Summary
 - relation_canonical: FAIL (0%)
