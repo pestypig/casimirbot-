@@ -201,6 +201,11 @@ describe("voxelizeHullSurfaceStrobe", () => {
     expect(scaled.volume?.metadata.driveLadder.scalars?.ampChain).toBeCloseTo(2);
     expect(scaled.volume?.metadata.driveLadder.signature).toBe("6.000000|0.200000|1.000|g500000|d2000000");
     expect(scaled.volume?.metadata.driveLadder.hash).not.toBe(base.volume?.metadata.driveLadder.hash);
+    expect(base.volume?.metadata.provenance).toEqual({
+      claimTier: "diagnostic",
+      certifying: false,
+      source: "lattice-dataflow/default",
+    });
     expect(scaled.volume?.hash).not.toBe(base.volume?.hash);
   });
 
@@ -237,6 +242,7 @@ describe("voxelizeHullSurfaceStrobe", () => {
         0, 0, 0, 1,
       ]),
       budget: LATTICE_QUALITY_BUDGETS.high,
+      provenance: { claimTier: "diagnostic", certifying: false, source: "lattice-dataflow/default" },
       clampReasons: [],
     } satisfies LatticeFrame;
 

@@ -1,12 +1,30 @@
 import type { HullBasisResolved } from "@shared/hull-basis";
 import type { HullPreviewPayload } from "@shared/schema";
-import type { LatticeFrame } from "./lattice-frame";
+import type { LatticeClaimTier, LatticeFrame, LatticeProvenance } from "./lattice-frame";
 import {
   resolveHullSurfaceMesh,
   type HullSurfaceMeshOptions,
   type HullSurfaceMeshResult,
   type WireframeOverlayLod,
 } from "./resolve-wireframe-overlay";
+
+
+const DEFAULT_LATTICE_PROVENANCE: LatticeProvenance = Object.freeze({
+  claimTier: "diagnostic",
+  certifying: false,
+  source: "lattice-dataflow/default",
+});
+
+const resolveLatticeProvenance = (provenance?: Partial<LatticeProvenance> | null): LatticeProvenance => {
+  if (!provenance) return DEFAULT_LATTICE_PROVENANCE;
+  const claimTier: LatticeClaimTier = provenance.claimTier === "certifying" ? "certifying" : "diagnostic";
+  const certifying = claimTier === "certifying" ? provenance.certifying !== false : false;
+  const source =
+    typeof provenance.source === "string" && provenance.source.trim()
+      ? provenance.source
+      : DEFAULT_LATTICE_PROVENANCE.source;
+  return { claimTier, certifying, source };
+};
 
 export type HullSurfaceStrobeHist = {
   vertices: Float32Array;
@@ -398,6 +416,7 @@ export type HullSurfaceVoxelDriveLadderMetadata = {
 
 export type HullSurfaceVoxelVolumeMetadata = {
   driveLadder: HullSurfaceVoxelDriveLadderMetadata;
+  provenance: LatticeProvenance;
 };
 
 export type HullSurfaceVoxelVolume = {
@@ -622,7 +641,12 @@ export const voxelizeHullSurfaceStrobe = (
     voxelCache.delete(cacheKey);
     voxelCache.set(cacheKey, cached);
     return {
-      volume: { ...cached, cacheHit: true, clampReasons: [...cached.clampReasons] },
+      volume: {
+        ...cached,
+        cacheHit: true,
+        metadata: { ...cached.metadata, provenance: resolveLatticeProvenance(frame.provenance) },
+        clampReasons: [...cached.clampReasons],
+      },
       clampReasons: [...cached.clampReasons],
       hash: cacheKey,
     };
@@ -752,6 +776,7 @@ export const voxelizeHullSurfaceStrobe = (
     ],
     metadata: {
       driveLadder: driveLadderMeta,
+      provenance: resolveLatticeProvenance(frame.provenance),
     },
     gate3D,
     dfdr3D,
