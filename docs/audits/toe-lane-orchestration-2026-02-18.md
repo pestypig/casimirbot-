@@ -66,3 +66,7 @@ first-class lane closure:
 
 This track defines the `TOE-082..TOE-089` execution order, lane objectives,
 required tests, and research-gate metadata.
+
+Owner-parity and stabilization follow-on prompts are in:
+
+- `docs/audits/toe-sequence-owner-parity-stabilization-2026-02-19.md`

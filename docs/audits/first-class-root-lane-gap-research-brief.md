@@ -639,3 +639,5 @@ codebase-aware Deep Research and running a full forest-level lane census.
   - `docs/audits/forest-wide-first-class-lane-audit-2026-02-19.md`
 - Ticket-ready roadmap and sequencing are recorded in:
   - `docs/audits/toe-sequence-forest-lane-closure-2026-02-19.md`
+- Owner-parity + stabilization follow-on prompts:
+  - `docs/audits/toe-sequence-owner-parity-stabilization-2026-02-19.md`

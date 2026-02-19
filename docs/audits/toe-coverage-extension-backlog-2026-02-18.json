@@ -2117,6 +2117,358 @@
           "falsifier-matrix"
         ]
       }
+    },
+    {
+      "id": "TOE-082-evidence-falsifier-ledger-lane",
+      "tree_owner": "evidence-falsifier-ledger",
+      "primitive": "Evidence-falsifier ledger first-class lane contract",
+      "primary_path_prefix": "docs/knowledge/evidence-falsifier-ledger-tree.json",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "configs/graph-resolvers.json",
+        "configs/resolver-owner-coverage-manifest.v1.json",
+        "server/services/helix-ask/graph-resolver.ts",
+        "server/services/helix-ask/relation-assembly.ts",
+        "scripts/toe-agent-preflight.ts",
+        "docs/knowledge/evidence-falsifier-ledger-tree.json",
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-bridge.spec.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "scripts/toe-agent-preflight.ts"
+      ],
+      "done_criteria": [
+        "Evidence-falsifier ledger lane exists and is selectable by resolver tree ID",
+        "Deterministic missing-vs-contradictory evidence fail behavior is test-pinned",
+        "Preflight includes an evidence-ledger validation stage or equivalent contract check"
+      ],
+      "research_gate": {
+        "risk_class": "contract_only",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-083-tool-plan-tool-execution-contracts-lane",
+      "tree_owner": "tool-plan-contracts",
+      "primitive": "Tool-plan and tool-execution deterministic contracts lane",
+      "primary_path_prefix": "docs/knowledge/tool-plan-contracts-tree.json",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "configs/graph-resolvers.json",
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask/graph-resolver.ts",
+        "scripts/toe-agent-preflight.ts",
+        "docs/knowledge/tool-plan-contracts-tree.json",
+        "tests/helix-ask-modes.spec.ts",
+        "tests/tool-contracts-replay.spec.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/tool-contracts-replay.spec.ts",
+        "tests/helix-ask-modes.spec.ts"
+      ],
+      "done_criteria": [
+        "Tool-plan receipts are emitted with deterministic schema and fail taxonomy",
+        "Replay of identical plan input yields stable receipt and fail classification",
+        "Missing or invalid receipt states are emitted as deterministic contract failures"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-084-orbital-ephemeris-provenance-lane",
+      "tree_owner": "orbital-ephemeris-provenance",
+      "primitive": "Orbital and ephemeris provenance deterministic lane contract",
+      "primary_path_prefix": "docs/knowledge/orbital-ephemeris-provenance-tree.json",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "configs/graph-resolvers.json",
+        "server/routes/agi.plan.ts",
+        "server/routes.ts",
+        "server/services/halobank/time-model.ts",
+        "docs/knowledge/orbital-ephemeris-provenance-tree.json",
+        "tests/halobank-time-model.spec.ts",
+        "tests/horizons-proxy.spec.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/halobank-time-model.spec.ts",
+        "tests/horizons-proxy.spec.ts"
+      ],
+      "done_criteria": [
+        "Orbital/ephemeris outputs carry deterministic provenance and maturity-safe markers",
+        "Drift and nondeterminism routes produce deterministic fail reasons",
+        "Tool outputs remain compatible with tool-plan contract receipts"
+      ],
+      "research_gate": {
+        "risk_class": "contract_only",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-085-physics-root-lanes-spacetime-semiclassical",
+      "tree_owner": "physics_spacetime_gr",
+      "primitive": "Dedicated physics root lanes for spacetime GR and semiclassical coupling",
+      "primary_path_prefix": "docs/knowledge/physics/physics-spacetime-gr-tree.json",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "configs/graph-resolvers.json",
+        "configs/physics-root-leaf-manifest.v1.json",
+        "configs/physics-equation-backbone.v1.json",
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "scripts/validate-physics-equation-backbone.ts",
+        "docs/knowledge/physics/physics-spacetime-gr-tree.json",
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "tests/physics-root-leaf-first-class-coverage.spec.ts",
+        "tests/physics-root-lane-tree-parity.spec.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "scripts/validate-physics-equation-backbone.ts",
+        "tests/physics-root-leaf-first-class-coverage.spec.ts",
+        "tests/physics-root-lane-tree-parity.spec.ts"
+      ],
+      "done_criteria": [
+        "Spacetime and semiclassical roots are tree-addressable and parity-tested",
+        "Root-leaf and equation validators remain green with explicit root lane mapping",
+        "Deterministic root lane assembly is stable under locked lane execution"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "falsifier-matrix"
+        ]
+      }
+    },
+    {
+      "id": "TOE-086-physics-root-lanes-entropy-information",
+      "tree_owner": "physics_thermodynamics_entropy",
+      "primitive": "Dedicated entropy and information dynamics root lane closure",
+      "primary_path_prefix": "docs/knowledge/physics/physics-thermodynamics-entropy-tree.json",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "configs/graph-resolvers.json",
+        "configs/physics-root-leaf-manifest.v1.json",
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "docs/knowledge/physics/physics-thermodynamics-entropy-tree.json",
+        "docs/knowledge/physics/physics-information-dynamics-tree.json",
+        "tests/physics-root-leaf-manifest.spec.ts",
+        "tests/physics-root-lane-tree-parity.spec.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "tests/physics-root-leaf-manifest.spec.ts",
+        "tests/physics-root-lane-tree-parity.spec.ts"
+      ],
+      "done_criteria": [
+        "Entropy-first and information-lane mappings are explicit and deterministic",
+        "Canonical entropy-first path behavior remains validator compliant",
+        "Parity tests enforce root lane linkage to manifest paths and falsifiers"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "falsifier-matrix"
+        ]
+      }
+    },
+    {
+      "id": "TOE-087-physics-root-lanes-prebiotic-biology-runtime-safety",
+      "tree_owner": "physics_runtime_safety_control",
+      "primitive": "Dedicated prebiotic, biology life, and runtime safety root lane closure",
+      "primary_path_prefix": "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "configs/graph-resolvers.json",
+        "configs/physics-root-leaf-manifest.v1.json",
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json",
+        "docs/knowledge/physics/physics-biology-life-tree.json",
+        "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
+        "tests/physics-root-leaf-first-class-coverage.spec.ts",
+        "tests/physics-root-lane-tree-parity.spec.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "tests/physics-root-leaf-first-class-coverage.spec.ts",
+        "tests/physics-root-lane-tree-parity.spec.ts"
+      ],
+      "done_criteria": [
+        "All seven physics roots are represented as resolver lanes",
+        "Runtime safety root paths preserve deterministic fail semantics",
+        "Parity and coverage tests remain green for root lane completeness"
+      ],
+      "research_gate": {
+        "risk_class": "contract_only",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-088-robotics-recollection-lane-promotion",
+      "tree_owner": "robotics-recollection",
+      "primitive": "Promote robotics recollection lane to first-class falsifier closure",
+      "primary_path_prefix": "docs/knowledge/robotics-recollection-tree.json",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "docs/knowledge/robotics-recollection-tree.json",
+        "server/routes/agi.adapter.ts",
+        "server/__tests__/agi.adapter.test.ts",
+        "tests/robotics-recollection.spec.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/robotics-recollection.spec.ts",
+        "server/__tests__/agi.adapter.test.ts"
+      ],
+      "done_criteria": [
+        "Robotics lane has explicit falsifier/reject-rule metadata in tree artifacts",
+        "Replay and veto outputs remain deterministic and test-verified",
+        "Adapter lane surfaces deterministic fail reasons for invalid replay conditions"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-089-external-integrations-lane-promotion",
+      "tree_owner": "external-integrations",
+      "primitive": "Promote external integrations lane with provenance and drift contracts",
+      "primary_path_prefix": "docs/knowledge/external-integrations-tree.json",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "docs/knowledge/external-integrations-tree.json",
+        "configs/warp-primitive-manifest.v1.json",
+        "server/services/helix-ask/graph-resolver.ts",
+        "tests/startup-config.spec.ts",
+        "tests/external-integrations-contract.spec.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/startup-config.spec.ts",
+        "tests/external-integrations-contract.spec.ts",
+        "scripts/validate-resolver-owner-coverage.ts"
+      ],
+      "done_criteria": [
+        "Integration entries carry deterministic provenance and claim-tier semantics",
+        "Missing or contradictory integration contracts produce deterministic fail taxonomy",
+        "Owner coverage and integration contract tests remain validator-clean"
+      ],
+      "research_gate": {
+        "risk_class": "contract_only",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-090-resolver-owner-manifest-parity-for-082-089",
+      "tree_owner": "helix-ask",
+      "primitive": "Resolver owner coverage parity fix for newly added TOE-082..TOE-089 lanes",
+      "primary_path_prefix": "configs/resolver-owner-coverage-manifest.v1.json",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "configs/resolver-owner-coverage-manifest.v1.json",
+        "configs/graph-resolvers.json",
+        "scripts/validate-resolver-owner-coverage.ts",
+        "scripts/toe-agent-preflight.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "scripts/validate-resolver-owner-coverage.ts",
+        "scripts/toe-agent-preflight.ts"
+      ],
+      "done_criteria": [
+        "All new resolver tree IDs added by TOE-082..TOE-089 have owner entries",
+        "validate-resolver-owner-coverage passes without missing owner errors",
+        "Preflight no longer fails on resolver owner parity stage"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-091-forest-lane-stabilization-pass-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Forest lane stabilization verification pack after owner parity closure",
+      "primary_path_prefix": "scripts/toe-agent-preflight.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "scripts/toe-agent-preflight.ts",
+        "scripts/compute-toe-progress.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json",
+        "docs/audits/helix-results",
+        "reports"
+      ],
+      "required_tests": [
+        "scripts/toe-agent-preflight.ts",
+        "scripts/compute-toe-progress.ts",
+        "scripts/validate-toe-ticket-results.ts"
+      ],
+      "done_criteria": [
+        "Stabilization pass records preflight stage outcomes and strict-ready deltas",
+        "Ticket receipts and progress snapshot are regenerated with current lane state",
+        "Casimir PASS and certificate integrity are included in stabilization receipt"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
     }
   ]
 }

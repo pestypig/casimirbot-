@@ -14,6 +14,14 @@ This sequence is additive and replay-safe by default:
 - `docs/audits/first-class-root-lane-gap-research-brief.md`
 - `docs/audits/toe-lane-orchestration-2026-02-18.md`
 
+## Bookkeeping Snapshot (Post-merge)
+- `TOE-082..TOE-089` implementation surfaces are present in `main`
+  (lane trees, tests, and runtime contract changes).
+- Remaining blocker before calling stabilization complete:
+  - resolver-owner coverage parity for newly added lane IDs.
+- Follow-on prompt pack for closure:
+  - `docs/audits/toe-sequence-owner-parity-stabilization-2026-02-19.md`
+
 ## Ticket Sequence (`TOE-082..TOE-089`)
 
 ### TOE-082-evidence-falsifier-ledger-lane
