@@ -37,7 +37,7 @@ Out of scope (this phase):
 ## Work Plan
 
 ### Phase 0: Targeted Research Lock (short)
-Status: `pending`
+Status: `completed`
 
 Deliverables:
 - final metric definitions (units + thresholds),
@@ -48,6 +48,57 @@ Deliverables:
 Exit criteria:
 - all thresholds are numeric and replayable,
 - no unresolved ambiguity in tool endpoint usage.
+
+Phase 0 locked artifacts:
+
+#### A) Final Metric Definitions (units + thresholds)
+
+| Metric | Definition | Unit | Threshold | Replay Computation Notes |
+|---|---|---|---|---|
+| `pass_rate_delta_abs` | `pass_rate(B) - pass_rate(A)` where `pass_rate = passed_episodes / total_episodes` | absolute fraction in `[0,1]` | `>= +0.10` | Compute over identical fixed seed set and episode budget for A/B; no reweighting. |
+| `contradiction_rate_delta_rel` | `(contradiction_rate(B) - contradiction_rate(A)) / max(contradiction_rate(A), 1e-6)` | relative ratio | `<= -0.50` | Contradiction event defined as verify/tool mismatch recorded in trace for same claim ID. |
+| `replay_parity` | `matching_outcomes / total_replayed_outcomes` on deterministic rerun | fraction in `[0,1]` | `>= 0.98` | Matching outcome requires same verdict + same firstFail class (or none) per episode. |
+| `claim_to_hook_linkage` | `claims_with_traceable_hook / total_claims` | fraction in `[0,1]` | `>= 0.90` | Hook must include tool call ID or verifier artifact reference present in trace export. |
+| `unsupported_claim_rate` | `unsupported_claims / total_claims` | fraction in `[0,1]` | `<= 0.10` | Unsupported claim means no linked telemetry, no verifier artifact, or falsifier unresolved. |
+| `certificate.integrityOk` | Verification certificate integrity flag from Casimir verifier output | boolean | `== true` | Must be true for every gating verify run attached to a phase closeout. |
+
+#### B) Fixed Seed Set + Episode Budget
+
+- Seed set (frozen for Phases 1-6 unless explicit change control):
+  - `1103`, `2081`, `3191`, `4273`, `5399`, `6421`, `7507`, `8629`, `9733`, `10859`,
+  - `11939`, `13007`, `14143`, `15269`, `16381`, `17489`, `18617`, `19739`, `20849`, `21961`.
+- Episode count per controller arm (A or B): `20 seeds x 5 episodes/seed = 100 episodes`.
+- Replay check budget: deterministic replay of all 100 episodes per arm.
+
+#### C) Falsifier Table (`H1..H5`)
+
+| Hypothesis | Claim | Primary Falsifier | Falsify Condition |
+|---|---|---|---|
+| `H1` | Telemetry state vector `x(t)` improves next-step failure prediction signal quality. | Hold-out prediction audit vs random/permuted features. | Falsified if AUROC improvement over permuted baseline `< +0.03` across fixed seeds. |
+| `H2` | `linear` baseline provides non-trivial predictive value for clamp decisions. | Calibration + lift audit on held-out episodes. | Falsified if top-risk quintile failure lift `< 1.20x` over global failure rate. |
+| `H3` | `PCA` embedding preserves enough signal to match/exceed linear baseline reliability impact. | Side-by-side A/B with identical splits and seeds. | Falsified if `pass_rate_delta_abs(PCA vs linear) < 0` and contradiction reduction is worse. |
+| `H4` | Optional `6D helical` layer adds value beyond `linear`/`PCA`. | Baseline comparison gate from Phase 3. | Falsified if it fails any success metric delta threshold relative to best baseline. |
+| `H5` | `rho` clamp + Natario-first ordering reduce unsupported/contradictory claims without harming replay parity. | Policy-on vs policy-off fixed-seed A/B. | Falsified if unsupported claim rate does not improve by `>= 0.05` absolute or replay parity drops below `0.98`. |
+
+#### D) Promotion Rule Table (maturity alignment)
+
+| Promotion | Required Evidence | Blocking Conditions |
+|---|---|---|
+| `exploratory -> reduced-order` | Reproducible metric pipeline, frozen seeds, deterministic run IDs, falsifier table complete. | Any metric undefined/non-numeric; no replay recipe. |
+| `reduced-order -> diagnostic` | Fixed-seed A/B results attached to trace IDs, Casimir verify `PASS`, certificate integrity true, falsifier outcomes explicitly recorded. | Any `HARD` verifier fail, missing certificate integrity, unresolved falsifier for retained layer. |
+| `diagnostic -> certified` | **Out of scope for this plan phase set.** | Any attempt to claim certified physical viability from these artifacts alone. |
+
+#### E) Tool Endpoint Usage Lock
+
+- Verification endpoint: `POST /api/agi/adapter/run` (invoked via verifier CLI command below).
+- Trace export endpoint: `GET /api/agi/training-trace/export`.
+- Mandatory phase verify command:
+
+```bash
+npm run casimir:verify -- --pack repo-convergence --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci
+```
+
+- Closeout requirement for every patch/phase: `verdict=PASS`, `firstFail=none`, certificate hash present, `integrityOk=true`, and run reference logged.
 
 ### Phase 1: Telemetry State Vector `x(t)`
 Status: `pending`
@@ -185,9 +236,10 @@ Run verification gate to PASS and report certificate hash/integrity + trace refe
 
 ## Progress Log
 - 2026-02-19: Plan initialized.
+- 2026-02-19: Phase 0 completed; metric definitions, fixed seed/episode budget, falsifier table (H1-H5), promotion rules, and endpoint usage lock finalized.
 
 ## Current Status Snapshot
-- Phase 0: `pending`
+- Phase 0: `completed`
 - Phase 1: `pending`
 - Phase 2: `pending`
 - Phase 3: `pending`
