@@ -15901,6 +15901,109 @@ type HelixAskResponder = {
   send: (status: number, payload: unknown) => void;
 };
 
+const HELIX_ASK_OUTPUT_CONTRACT_VERSION = "phase6.ask.v1";
+
+type HelixAskRequestMetadata = {
+  seed: number | null;
+  episode: string | null;
+  replay: {
+    index: number | null;
+    isReplay: boolean;
+  };
+  trace_id: string | null;
+  session_id: string | null;
+};
+
+const deriveHelixAskReplayIndex = (traceId: string | null): number | null => {
+  if (!traceId) return null;
+  const match = traceId.match(/(?:^|[-_:])r(\d+)(?:$|[-_:])/i);
+  if (!match) return null;
+  const value = Number.parseInt(match[1], 10);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+};
+
+const buildHelixAskRequestMetadata = (request: z.infer<typeof LocalAskRequest>): HelixAskRequestMetadata => {
+  const traceId = typeof request.traceId === "string" && request.traceId.trim() ? request.traceId.trim() : null;
+  const replayIndex = deriveHelixAskReplayIndex(traceId);
+  return {
+    seed: Number.isInteger(request.seed) ? request.seed : null,
+    episode: traceId,
+    replay: {
+      index: replayIndex,
+      isReplay: Boolean(replayIndex && replayIndex > 1),
+    },
+    trace_id: traceId,
+    session_id: typeof request.sessionId === "string" && request.sessionId.trim() ? request.sessionId.trim() : null,
+  };
+};
+
+const classifyHelixAskTimeoutFailClass = (message: string): "timeout_soft" | "timeout_hard" | null => {
+  const normalized = message.trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized.includes("aborted") || normalized.includes("aborterror")) {
+    return "timeout_soft";
+  }
+  if (normalized.includes("timeout") || /\b(etimedout|esockettimedout)\b/.test(normalized)) {
+    return "timeout_hard";
+  }
+  return null;
+};
+
+const normalizeHelixAskErrorEnvelope = (
+  status: number,
+  payload: unknown,
+  requestMetadata: HelixAskRequestMetadata,
+  startedAtMs: number,
+): Record<string, unknown> => {
+  const source = payload && typeof payload === "object" ? ({ ...(payload as Record<string, unknown>) } as Record<string, unknown>) : {};
+  const sourceStatus = typeof source.status === "number" ? source.status : undefined;
+  const httpStatus = Number.isFinite(sourceStatus) ? Number(sourceStatus) : status;
+  const message = typeof source.message === "string" ? source.message : typeof source.error === "string" ? source.error : "request_failed";
+  const timeoutClass = classifyHelixAskTimeoutFailClass(message);
+  const failClass = typeof source.fail_class === "string" && source.fail_class.trim()
+    ? source.fail_class
+    : timeoutClass ?? (httpStatus >= 500 ? "infra_fail" : "http_error");
+  const failReason = typeof source.fail_reason === "string" && source.fail_reason.trim()
+    ? source.fail_reason
+    : message;
+  const debugPayload = source.debug && typeof source.debug === "object"
+    ? ({ ...(source.debug as Record<string, unknown>) } as Record<string, unknown>)
+    : {};
+  const traceId = requestMetadata.trace_id ?? (typeof debugPayload.trace_id === "string" ? debugPayload.trace_id : null);
+  const runId =
+    (typeof source.runId === "string" && source.runId.trim())
+    || (typeof source.run_id === "string" && source.run_id.trim())
+    || (typeof debugPayload.runId === "string" && debugPayload.runId.trim())
+    || (typeof debugPayload.run_id === "string" && debugPayload.run_id.trim())
+    || null;
+  return {
+    ...source,
+    contract_version: HELIX_ASK_OUTPUT_CONTRACT_VERSION,
+    request_metadata: requestMetadata,
+    status: {
+      ok: false,
+      http_status: httpStatus,
+      fail_class: String(failClass),
+      fail_reason: String(failReason),
+    },
+    timing: {
+      elapsed_ms: Math.max(0, Date.now() - startedAtMs),
+    },
+    debug: {
+      ...debugPayload,
+      trace_id: traceId,
+      run_id: runId,
+    },
+  };
+};
+
+export const __testHelixAskOutputContract = {
+  classifyHelixAskTimeoutFailClass,
+  normalizeHelixAskErrorEnvelope,
+  buildHelixAskRequestMetadata,
+  contractVersion: HELIX_ASK_OUTPUT_CONTRACT_VERSION,
+};
+
 type HelixAskExecutionArgs = {
   request: z.infer<typeof LocalAskRequest>;
   personaId: string;
@@ -27629,8 +27732,21 @@ const executeHelixAsk = async ({
 planRouter.post("/ask", async (req, res) => {
   const parsed = LocalAskRequest.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+    const invalidRequestMetadata = buildHelixAskRequestMetadata({
+      ...(typeof req.body === "object" && req.body ? (req.body as Record<string, unknown>) : {}),
+      question: "_invalid_",
+    } as z.infer<typeof LocalAskRequest>);
+    return res.status(400).json(
+      normalizeHelixAskErrorEnvelope(
+        400,
+        { error: "bad_request", details: parsed.error.issues, fail_class: "input_contract", fail_reason: "bad_request" },
+        invalidRequestMetadata,
+        Date.now(),
+      ),
+    );
   }
+  const askStartedAtMs = Date.now();
+  const requestMetadata = buildHelixAskRequestMetadata(parsed.data);
   let personaId = parsed.data.personaId ?? "default";
   if (personaPolicy.shouldRestrictRequest(req.auth) && (!personaId || personaId === "default") && req.auth?.sub) {
     personaId = req.auth.sub;
@@ -27670,12 +27786,15 @@ planRouter.post("/ask", async (req, res) => {
         typedDebug.strict_fail_reason_histogram_artifact = strictFailLedger.histogram_artifact;
       }
     }
+    const normalizedPayload = status >= 400
+      ? normalizeHelixAskErrorEnvelope(status, payload, requestMetadata, askStartedAtMs)
+      : payload;
     if (status >= 500) {
       recordHelixAskFailure(payload);
     } else if (status < 400) {
       recordHelixAskSuccess();
     }
-    keepAlive.send(status, payload);
+    keepAlive.send(status, normalizedPayload);
   };
   try {
     await executeHelixAsk({
@@ -27686,7 +27805,14 @@ planRouter.post("/ask", async (req, res) => {
   } catch (error) {
     recordHelixAskFailure(error);
     const message = error instanceof Error ? error.message : String(error);
-    safeSend(500, { ok: false, error: "helix_ask_unhandled", message, status: 500 });
+    safeSend(500, {
+      ok: false,
+      error: "helix_ask_unhandled",
+      message,
+      status: 500,
+      fail_reason: message,
+      fail_class: classifyHelixAskTimeoutFailClass(message) ?? "infra_fail",
+    });
   }
 });
 
