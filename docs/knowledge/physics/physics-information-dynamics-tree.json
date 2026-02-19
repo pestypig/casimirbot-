@@ -8,15 +8,29 @@
       "title": "Physics Information Dynamics Tree",
       "excerpt": "Dedicated lane for information-flow, coherence, and falsifier-linked dynamics.",
       "bodyMD": "This lane provides explicit information-dynamics roots for falsifiable theory paths.",
-      "tags": ["physics", "information", "dynamics"],
-      "children": ["coherence-bounds", "signal-fidelity"],
+      "tags": [
+        "physics",
+        "information",
+        "dynamics"
+      ],
+      "children": [
+        "coherence-bounds",
+        "signal-fidelity",
+        "physics-information-dynamics-equation-residual"
+      ],
       "links": [],
       "summary": "Dedicated lane for information-flow, coherence, and falsifier-linked dynamics.",
       "nodeType": "concept",
       "dependencies": [],
       "evidence": [
-        { "type": "doc", "path": "docs/knowledge/physics/coherence-bounds.md" },
-        { "type": "doc", "path": "docs/knowledge/physics/signal-fidelity.md" }
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/coherence-bounds.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/signal-fidelity.md"
+        }
       ]
     },
     {
@@ -25,13 +39,31 @@
       "title": "Coherence Bounds",
       "excerpt": "Bounded coherence assumptions used by information-dynamics falsifiers.",
       "bodyMD": "Defines bounded coherence thresholds for path-level reject rules.",
-      "tags": ["physics", "information", "coherence"],
+      "tags": [
+        "physics",
+        "information",
+        "coherence"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "physics-information-dynamics-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-information-dynamics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
       "summary": "Bounded coherence assumptions used by information-dynamics falsifiers.",
       "nodeType": "concept",
-      "dependencies": ["physics-information-dynamics-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/coherence-bounds.md" }]
+      "dependencies": [
+        "physics-information-dynamics-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/coherence-bounds.md"
+        }
+      ]
     },
     {
       "id": "signal-fidelity",
@@ -39,13 +71,73 @@
       "title": "Signal Fidelity",
       "excerpt": "Signal transfer reliability anchor for information-flow diagnostics.",
       "bodyMD": "Ties information propagation assumptions to measurable fidelity observables.",
-      "tags": ["physics", "information", "signal"],
+      "tags": [
+        "physics",
+        "information",
+        "signal"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "physics-information-dynamics-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-information-dynamics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
       "summary": "Signal transfer reliability anchor for information-flow diagnostics.",
       "nodeType": "concept",
-      "dependencies": ["physics-information-dynamics-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/signal-fidelity.md" }]
+      "dependencies": [
+        "physics-information-dynamics-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/signal-fidelity.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-information-dynamics-equation-residual",
+      "slug": "physics-information-dynamics-equation-residual",
+      "title": "Physics Information Dynamics Equation Residual",
+      "excerpt": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "bodyMD": "Defines the derived residual schema used to evaluate lane-level equation mismatch under declared uncertainty assumptions.",
+      "tags": [
+        "physics",
+        "residual",
+        "derived"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-information-dynamics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-information-dynamics-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "physics-information-dynamics-tree",
+        "residual_symbol": "R_lane",
+        "tolerance": {
+          "metric": "rms",
+          "max": 0.01,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "bounded_gaussian",
+          "sigma": 0.002,
+          "coverage": 0.95
+        }
+      },
+      "evidence": []
     }
   ],
   "schema": {

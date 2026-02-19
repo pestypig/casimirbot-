@@ -8,15 +8,29 @@
       "title": "Physics Biology Life Tree",
       "excerpt": "Dedicated lane for biology and life-emergence constraints grounded in physics contracts.",
       "bodyMD": "This lane anchors life-emergence claims to explicit transition criteria and falsifiable pathway structure.",
-      "tags": ["physics", "biology", "life"],
-      "children": ["biogenesis-transition", "adaptive-system-bounds"],
+      "tags": [
+        "physics",
+        "biology",
+        "life"
+      ],
+      "children": [
+        "biogenesis-transition",
+        "adaptive-system-bounds",
+        "physics-biology-life-equation-residual"
+      ],
       "links": [],
       "summary": "Dedicated lane for biology and life-emergence constraints grounded in physics contracts.",
       "nodeType": "concept",
       "dependencies": [],
       "evidence": [
-        { "type": "doc", "path": "docs/knowledge/physics/biogenesis-transition.md" },
-        { "type": "doc", "path": "docs/knowledge/physics/adaptive-system-bounds.md" }
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/biogenesis-transition.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/adaptive-system-bounds.md"
+        }
       ]
     },
     {
@@ -25,15 +39,31 @@
       "title": "Biogenesis Transition",
       "excerpt": "Transition constraints from prebiotic chemistry to stable life-like dynamics.",
       "bodyMD": "Defines transition-coverage checks and pathway ordering for life-emergence narratives.",
-      "tags": ["physics", "biology", "biogenesis"],
+      "tags": [
+        "physics",
+        "biology",
+        "biogenesis"
+      ],
       "children": [],
       "links": [
-        { "rel": "parent", "to": "physics-biology-life-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+        {
+          "rel": "parent",
+          "to": "physics-biology-life-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
       ],
       "summary": "Transition constraints from prebiotic chemistry to stable life-like dynamics.",
       "nodeType": "concept",
-      "dependencies": ["physics-biology-life-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/biogenesis-transition.md" }]
+      "dependencies": [
+        "physics-biology-life-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/biogenesis-transition.md"
+        }
+      ]
     },
     {
       "id": "adaptive-system-bounds",
@@ -41,15 +71,73 @@
       "title": "Adaptive System Bounds",
       "excerpt": "Bounds for persistence and adaptation used by life-lane falsifiers.",
       "bodyMD": "Links life-emergence assertions to bounded adaptive dynamics and measurable proxies.",
-      "tags": ["physics", "biology", "adaptation"],
+      "tags": [
+        "physics",
+        "biology",
+        "adaptation"
+      ],
       "children": [],
       "links": [
-        { "rel": "parent", "to": "physics-biology-life-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+        {
+          "rel": "parent",
+          "to": "physics-biology-life-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
       ],
       "summary": "Bounds for persistence and adaptation used by life-lane falsifiers.",
       "nodeType": "concept",
-      "dependencies": ["physics-biology-life-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/adaptive-system-bounds.md" }]
+      "dependencies": [
+        "physics-biology-life-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/adaptive-system-bounds.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-biology-life-equation-residual",
+      "slug": "physics-biology-life-equation-residual",
+      "title": "Physics Biology Life Equation Residual",
+      "excerpt": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "bodyMD": "Defines the derived residual schema used to evaluate lane-level equation mismatch under declared uncertainty assumptions.",
+      "tags": [
+        "physics",
+        "residual",
+        "derived"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-biology-life-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-biology-life-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "physics-biology-life-tree",
+        "residual_symbol": "R_lane",
+        "tolerance": {
+          "metric": "rms",
+          "max": 0.01,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "bounded_gaussian",
+          "sigma": 0.002,
+          "coverage": 0.95
+        }
+      },
+      "evidence": []
     }
   ],
   "schema": {

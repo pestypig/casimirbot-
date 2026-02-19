@@ -8,15 +8,30 @@
       "title": "Physics Runtime Safety Control Tree",
       "excerpt": "Dedicated lane for runtime safety controls and deterministic guardrail enforcement.",
       "bodyMD": "This lane captures control-gate determinism, fail-reason contracts, and runtime auditability requirements.",
-      "tags": ["physics", "runtime", "safety", "control"],
-      "children": ["guardrail-determinism", "control-loop-audit"],
+      "tags": [
+        "physics",
+        "runtime",
+        "safety",
+        "control"
+      ],
+      "children": [
+        "guardrail-determinism",
+        "control-loop-audit",
+        "physics-runtime-safety-control-equation-residual"
+      ],
       "links": [],
       "summary": "Dedicated lane for runtime safety controls and deterministic guardrail enforcement.",
       "nodeType": "concept",
       "dependencies": [],
       "evidence": [
-        { "type": "doc", "path": "docs/knowledge/physics/guardrail-determinism.md" },
-        { "type": "doc", "path": "docs/knowledge/physics/control-loop-audit.md" }
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/guardrail-determinism.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/control-loop-audit.md"
+        }
       ]
     },
     {
@@ -25,15 +40,31 @@
       "title": "Guardrail Determinism",
       "excerpt": "Deterministic fail-reason and decision contracts for runtime safety paths.",
       "bodyMD": "Defines strict decision reproducibility and stable fail-reason semantics across runtime checks.",
-      "tags": ["physics", "runtime", "guardrails"],
+      "tags": [
+        "physics",
+        "runtime",
+        "guardrails"
+      ],
       "children": [],
       "links": [
-        { "rel": "parent", "to": "physics-runtime-safety-control-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+        {
+          "rel": "parent",
+          "to": "physics-runtime-safety-control-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
       ],
       "summary": "Deterministic fail-reason and decision contracts for runtime safety paths.",
       "nodeType": "concept",
-      "dependencies": ["physics-runtime-safety-control-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/guardrail-determinism.md" }]
+      "dependencies": [
+        "physics-runtime-safety-control-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/guardrail-determinism.md"
+        }
+      ]
     },
     {
       "id": "control-loop-audit",
@@ -41,15 +72,73 @@
       "title": "Control Loop Audit",
       "excerpt": "Audit traceability for runtime control loops and safety contracts.",
       "bodyMD": "Connects runtime decisions to auditable artifacts for contract-only risk classification.",
-      "tags": ["physics", "runtime", "audit"],
+      "tags": [
+        "physics",
+        "runtime",
+        "audit"
+      ],
       "children": [],
       "links": [
-        { "rel": "parent", "to": "physics-runtime-safety-control-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+        {
+          "rel": "parent",
+          "to": "physics-runtime-safety-control-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
       ],
       "summary": "Audit traceability for runtime control loops and safety contracts.",
       "nodeType": "concept",
-      "dependencies": ["physics-runtime-safety-control-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/control-loop-audit.md" }]
+      "dependencies": [
+        "physics-runtime-safety-control-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/control-loop-audit.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-runtime-safety-control-equation-residual",
+      "slug": "physics-runtime-safety-control-equation-residual",
+      "title": "Physics Runtime Safety Control Equation Residual",
+      "excerpt": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "bodyMD": "Defines the derived residual schema used to evaluate lane-level equation mismatch under declared uncertainty assumptions.",
+      "tags": [
+        "physics",
+        "residual",
+        "derived"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-runtime-safety-control-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-runtime-safety-control-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "physics-runtime-safety-control-tree",
+        "residual_symbol": "R_lane",
+        "tolerance": {
+          "metric": "rms",
+          "max": 0.01,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "bounded_gaussian",
+          "sigma": 0.002,
+          "coverage": 0.95
+        }
+      },
+      "evidence": []
     }
   ],
   "schema": {

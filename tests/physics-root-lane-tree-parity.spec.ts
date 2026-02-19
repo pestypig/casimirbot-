@@ -26,6 +26,15 @@ type PathEntry = {
 type Manifest = { roots: RootEntry[]; paths: PathEntry[] };
 type ResolverTree = { id: string; path: string };
 type Resolvers = { trees: ResolverTree[] };
+type TreeNode = {
+  id: string;
+  derived_residual?: {
+    schema?: string;
+    tolerance?: { max?: number };
+    uncertainty?: { model?: string };
+  };
+};
+type LaneTree = { rootId: string; nodes: TreeNode[] };
 
 const REQUIRED_ROOT_TREE_MAP: Record<string, string> = {
   physics_spacetime_gr: "docs/knowledge/physics/physics-spacetime-gr-tree.json",
@@ -85,8 +94,31 @@ describe("physics root-lane tree parity", () => {
 
     for (const entry of runtimePaths) {
       expect(entry.falsifier).toBeTruthy();
-      expect(entry.falsifier?.uncertainty_model).toBe("runtime_gate_thresholds");
+      expect(entry.falsifier?.uncertainty_model?.startsWith("runtime_gate_thresholds")).toBe(true);
       expect(entry.maturity_gate?.strict_fail_reason).toBe("ROOT_LEAF_RUNTIME_CONTROL_PATH_MISSING");
+    }
+  });
+
+  it("requires derived residual schema plus tolerance and uncertainty declaration for each physics root lane tree", () => {
+    const repoRoot = process.cwd();
+
+    for (const treePath of Object.values(REQUIRED_ROOT_TREE_MAP)) {
+      const fullTreePath = path.join(repoRoot, treePath);
+      const tree = JSON.parse(fs.readFileSync(fullTreePath, "utf8")) as LaneTree;
+
+      const residualNodes = tree.nodes.filter((node) => Boolean(node.derived_residual));
+      expect(residualNodes.length).toBeGreaterThan(0);
+
+      const hasDeclaredContract = residualNodes.some((node) => {
+        const residual = node.derived_residual;
+        return Boolean(
+          residual?.schema &&
+            typeof residual.tolerance?.max === "number" &&
+            residual.uncertainty?.model,
+        );
+      });
+
+      expect(hasDeclaredContract).toBe(true);
     }
   });
 

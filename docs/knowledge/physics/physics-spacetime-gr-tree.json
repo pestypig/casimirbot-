@@ -8,15 +8,29 @@
       "title": "Physics Spacetime GR Tree",
       "excerpt": "Dedicated lane for spacetime geometry and general-relativity constraints.",
       "bodyMD": "This lane isolates core GR scaffolding used by root-to-leaf theory paths.",
-      "tags": ["physics", "spacetime", "gr"],
-      "children": ["spacetime-metric-basics", "einstein-field-equations"],
+      "tags": [
+        "physics",
+        "spacetime",
+        "gr"
+      ],
+      "children": [
+        "spacetime-metric-basics",
+        "einstein-field-equations",
+        "physics-spacetime-gr-equation-residual"
+      ],
       "links": [],
       "summary": "Dedicated lane for spacetime geometry and general-relativity constraints.",
       "nodeType": "concept",
       "dependencies": [],
       "evidence": [
-        { "type": "doc", "path": "docs/knowledge/physics/spacetime-metric-basics.md" },
-        { "type": "doc", "path": "docs/knowledge/physics/einstein-field-equations.md" }
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/spacetime-metric-basics.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/einstein-field-equations.md"
+        }
       ]
     },
     {
@@ -25,13 +39,31 @@
       "title": "Spacetime Metric Basics",
       "excerpt": "Metric tensor and interval conventions.",
       "bodyMD": "Foundational metric conventions for GR lane routing.",
-      "tags": ["physics", "spacetime", "metric"],
+      "tags": [
+        "physics",
+        "spacetime",
+        "metric"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "physics-spacetime-gr-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-spacetime-gr-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
       "summary": "Metric tensor and interval conventions.",
       "nodeType": "concept",
-      "dependencies": ["physics-spacetime-gr-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/spacetime-metric-basics.md" }]
+      "dependencies": [
+        "physics-spacetime-gr-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/spacetime-metric-basics.md"
+        }
+      ]
     },
     {
       "id": "einstein-field-equations",
@@ -39,13 +71,73 @@
       "title": "Einstein Field Equations",
       "excerpt": "Baseline GR field equation lane anchor.",
       "bodyMD": "Equation-level anchor for curvature-to-stress-energy coupling.",
-      "tags": ["physics", "gr", "equations"],
+      "tags": [
+        "physics",
+        "gr",
+        "equations"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "physics-spacetime-gr-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-spacetime-gr-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
       "summary": "Baseline GR field equation lane anchor.",
       "nodeType": "concept",
-      "dependencies": ["physics-spacetime-gr-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/einstein-field-equations.md" }]
+      "dependencies": [
+        "physics-spacetime-gr-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/einstein-field-equations.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-spacetime-gr-equation-residual",
+      "slug": "physics-spacetime-gr-equation-residual",
+      "title": "Physics Spacetime GR Equation Residual",
+      "excerpt": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "bodyMD": "Defines the derived residual schema used to evaluate lane-level equation mismatch under declared uncertainty assumptions.",
+      "tags": [
+        "physics",
+        "residual",
+        "derived"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-spacetime-gr-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-spacetime-gr-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "physics-spacetime-gr-tree",
+        "residual_symbol": "R_lane",
+        "tolerance": {
+          "metric": "rms",
+          "max": 0.01,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "bounded_gaussian",
+          "sigma": 0.002,
+          "coverage": 0.95
+        }
+      },
+      "evidence": []
     }
   ],
   "schema": {

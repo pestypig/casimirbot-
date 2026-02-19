@@ -8,15 +8,29 @@
       "title": "Physics Prebiotic Chemistry Tree",
       "excerpt": "Dedicated lane for prebiotic chemistry constraints that bridge physics roots to biogenesis claims.",
       "bodyMD": "This lane captures molecular selection, reaction network constraints, and deterministic linkage toward life-emergence pathways.",
-      "tags": ["physics", "prebiotic", "chemistry"],
-      "children": ["chemical-selection", "reaction-network-constraints"],
+      "tags": [
+        "physics",
+        "prebiotic",
+        "chemistry"
+      ],
+      "children": [
+        "chemical-selection",
+        "reaction-network-constraints",
+        "physics-prebiotic-chemistry-equation-residual"
+      ],
       "links": [],
       "summary": "Dedicated lane for prebiotic chemistry constraints that bridge physics roots to biogenesis claims.",
       "nodeType": "concept",
       "dependencies": [],
       "evidence": [
-        { "type": "doc", "path": "docs/knowledge/physics/chemical-selection.md" },
-        { "type": "doc", "path": "docs/knowledge/physics/reaction-network-constraints.md" }
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/chemical-selection.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/reaction-network-constraints.md"
+        }
       ]
     },
     {
@@ -25,15 +39,31 @@
       "title": "Chemical Selection",
       "excerpt": "Molecular selection assumptions used by prebiotic-path falsifiers.",
       "bodyMD": "Defines deterministic criteria for molecular pathway selection under constrained environments.",
-      "tags": ["physics", "prebiotic", "selection"],
+      "tags": [
+        "physics",
+        "prebiotic",
+        "selection"
+      ],
       "children": [],
       "links": [
-        { "rel": "parent", "to": "physics-prebiotic-chemistry-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+        {
+          "rel": "parent",
+          "to": "physics-prebiotic-chemistry-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
       ],
       "summary": "Molecular selection assumptions used by prebiotic-path falsifiers.",
       "nodeType": "concept",
-      "dependencies": ["physics-prebiotic-chemistry-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/chemical-selection.md" }]
+      "dependencies": [
+        "physics-prebiotic-chemistry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/chemical-selection.md"
+        }
+      ]
     },
     {
       "id": "reaction-network-constraints",
@@ -41,15 +71,73 @@
       "title": "Reaction Network Constraints",
       "excerpt": "Constraint contracts for prebiotic reaction networks and transition coverage.",
       "bodyMD": "Links reaction-path completeness to observable transition-coverage thresholds.",
-      "tags": ["physics", "prebiotic", "reaction-network"],
+      "tags": [
+        "physics",
+        "prebiotic",
+        "reaction-network"
+      ],
       "children": [],
       "links": [
-        { "rel": "parent", "to": "physics-prebiotic-chemistry-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+        {
+          "rel": "parent",
+          "to": "physics-prebiotic-chemistry-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
       ],
       "summary": "Constraint contracts for prebiotic reaction networks and transition coverage.",
       "nodeType": "concept",
-      "dependencies": ["physics-prebiotic-chemistry-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/reaction-network-constraints.md" }]
+      "dependencies": [
+        "physics-prebiotic-chemistry-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/reaction-network-constraints.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-prebiotic-chemistry-equation-residual",
+      "slug": "physics-prebiotic-chemistry-equation-residual",
+      "title": "Physics Prebiotic Chemistry Equation Residual",
+      "excerpt": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "bodyMD": "Defines the derived residual schema used to evaluate lane-level equation mismatch under declared uncertainty assumptions.",
+      "tags": [
+        "physics",
+        "residual",
+        "derived"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-prebiotic-chemistry-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-prebiotic-chemistry-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "physics-prebiotic-chemistry-tree",
+        "residual_symbol": "R_lane",
+        "tolerance": {
+          "metric": "rms",
+          "max": 0.01,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "bounded_gaussian",
+          "sigma": 0.002,
+          "coverage": 0.95
+        }
+      },
+      "evidence": []
     }
   ],
   "schema": {

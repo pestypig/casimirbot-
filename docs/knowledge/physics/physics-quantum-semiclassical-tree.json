@@ -8,15 +8,29 @@
       "title": "Physics Quantum Semiclassical Tree",
       "excerpt": "Dedicated lane for semiclassical quantum stress-energy coupling.",
       "bodyMD": "This lane isolates curved-spacetime quantum expectations used in root-to-leaf paths.",
-      "tags": ["physics", "quantum", "semiclassical"],
-      "children": ["vacuum-fluctuations", "stress-energy-tensor"],
+      "tags": [
+        "physics",
+        "quantum",
+        "semiclassical"
+      ],
+      "children": [
+        "vacuum-fluctuations",
+        "stress-energy-tensor",
+        "physics-quantum-semiclassical-equation-residual"
+      ],
       "links": [],
       "summary": "Dedicated lane for semiclassical quantum stress-energy coupling.",
       "nodeType": "concept",
       "dependencies": [],
       "evidence": [
-        { "type": "doc", "path": "docs/knowledge/physics/vacuum-fluctuations.md" },
-        { "type": "doc", "path": "docs/knowledge/physics/stress-energy-tensor.md" }
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/vacuum-fluctuations.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stress-energy-tensor.md"
+        }
       ]
     },
     {
@@ -25,13 +39,31 @@
       "title": "Vacuum Fluctuations",
       "excerpt": "Quantum vacuum expectations in curved backgrounds.",
       "bodyMD": "Semiclassical lane anchor for expectation-value stress-energy behavior.",
-      "tags": ["physics", "quantum", "vacuum"],
+      "tags": [
+        "physics",
+        "quantum",
+        "vacuum"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "physics-quantum-semiclassical-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
       "summary": "Quantum vacuum expectations in curved backgrounds.",
       "nodeType": "concept",
-      "dependencies": ["physics-quantum-semiclassical-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/vacuum-fluctuations.md" }]
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/vacuum-fluctuations.md"
+        }
+      ]
     },
     {
       "id": "stress-energy-tensor",
@@ -39,13 +71,73 @@
       "title": "Stress-Energy Tensor",
       "excerpt": "Expectation-value stress-energy coupling anchor.",
       "bodyMD": "Bridge node connecting QFT expectation values to semiclassical Einstein coupling.",
-      "tags": ["physics", "semiclassical", "stress-energy"],
+      "tags": [
+        "physics",
+        "semiclassical",
+        "stress-energy"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "physics-quantum-semiclassical-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
       "summary": "Expectation-value stress-energy coupling anchor.",
       "nodeType": "concept",
-      "dependencies": ["physics-quantum-semiclassical-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/stress-energy-tensor.md" }]
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stress-energy-tensor.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-equation-residual",
+      "slug": "physics-quantum-semiclassical-equation-residual",
+      "title": "Physics Quantum Semiclassical Equation Residual",
+      "excerpt": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "bodyMD": "Defines the derived residual schema used to evaluate lane-level equation mismatch under declared uncertainty assumptions.",
+      "tags": [
+        "physics",
+        "residual",
+        "derived"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "physics-quantum-semiclassical-tree",
+        "residual_symbol": "R_lane",
+        "tolerance": {
+          "metric": "rms",
+          "max": 0.01,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "bounded_gaussian",
+          "sigma": 0.002,
+          "coverage": 0.95
+        }
+      },
+      "evidence": []
     }
   ],
   "schema": {
