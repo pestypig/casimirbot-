@@ -92,6 +92,10 @@ export type TimeDilationDiagnostics = {
     mathStageOK: boolean;
     grCertified: boolean;
     banner: string | null;
+    certifiedLabelsAllowed?: boolean;
+    strongClaimsAllowed?: boolean;
+    failId?: string | null;
+    failClosedReasons?: string[];
   };
   canonical: {
     family: string;
@@ -159,6 +163,14 @@ type Definitions = {
 };
 
 type CongruenceKind = "eulerian_adm" | "grid_static" | "ship_comoving" | "geodesic_bundle";
+
+type DiagnosticsVerification = {
+  certified: boolean;
+  strongClaimsAllowed: boolean;
+  certifiedLabelsAllowed: boolean;
+  failId: string | null;
+  reasons: string[];
+};
 
 const canonicalizeCanonicalField = (canonical: CanonicalField): CanonicalField => ({
   family: canonical.family,
@@ -274,6 +286,87 @@ const resolveGrGuardrails = (pipeline: any) => {
     raw?.certificate?.snapshot ??
     raw?.payload?.snapshot;
   return snapshot?.grGuardrails ?? null;
+};
+
+const resolveStrictVerificationGate = (pipeline: any): DiagnosticsVerification => {
+  const raw = pipeline?.physics?.warp?.viability ?? pipeline?.warp?.viability ?? pipeline?.viability ?? null;
+  const certificate = raw?.certificate ?? null;
+  const certificateHashRaw =
+    typeof raw?.certificateHash === "string"
+      ? raw.certificateHash
+      : typeof certificate?.certificateHash === "string"
+        ? certificate.certificateHash
+        : "";
+  const certificateHash = certificateHashRaw.trim();
+  const integrityOk =
+    typeof raw?.integrityOk === "boolean"
+      ? raw.integrityOk
+      : typeof certificate?.integrityOk === "boolean"
+        ? certificate.integrityOk
+        : null;
+  const constraints = Array.isArray(raw?.constraints)
+    ? raw.constraints
+    : Array.isArray(certificate?.payload?.constraints)
+      ? certificate.payload.constraints
+      : [];
+  const hardConstraints = constraints.filter((entry: any) => String(entry?.severity ?? "SOFT") === "HARD");
+  const hardFail = hardConstraints.find((entry: any) => entry?.passed === false || String(entry?.status ?? "").toLowerCase() === "fail");
+  const hardUnknown = hardConstraints.find((entry: any) => {
+    if (entry?.passed === true || entry?.passed === false) return false;
+    const status = String(entry?.status ?? "").toLowerCase();
+    return !status || status === "unknown";
+  });
+
+  if (!certificateHash) {
+    return {
+      certified: false,
+      strongClaimsAllowed: false,
+      certifiedLabelsAllowed: false,
+      failId: "ADAPTER_CERTIFICATE_MISSING",
+      reasons: ["certificate_missing"],
+    };
+  }
+
+  if (integrityOk !== true) {
+    return {
+      certified: false,
+      strongClaimsAllowed: false,
+      certifiedLabelsAllowed: false,
+      failId: "ADAPTER_CERTIFICATE_INTEGRITY",
+      reasons: ["certificate_integrity_failed"],
+    };
+  }
+
+  if (!hardConstraints.length || hardUnknown) {
+    return {
+      certified: false,
+      strongClaimsAllowed: false,
+      certifiedLabelsAllowed: false,
+      failId: "ADAPTER_CONSTRAINTS_UNKNOWN",
+      reasons: ["hard_constraints_unknown"],
+    };
+  }
+
+  if (hardFail) {
+    const failId = typeof hardFail.id === "string" && hardFail.id.trim().length > 0
+      ? hardFail.id.trim()
+      : "ADAPTER_CONSTRAINT_FAIL";
+    return {
+      certified: false,
+      strongClaimsAllowed: false,
+      certifiedLabelsAllowed: false,
+      failId,
+      reasons: ["hard_constraints_failed"],
+    };
+  }
+
+  return {
+    certified: true,
+    strongClaimsAllowed: true,
+    certifiedLabelsAllowed: true,
+    failId: null,
+    reasons: [],
+  };
 };
 
 const getProofValue = (proofPack: ProofPack | null, key: string): ProofValue | null =>
@@ -402,6 +495,7 @@ export async function buildTimeDilationDiagnostics(
     : false;
 
   const grGuardrails = resolveGrGuardrails(pipeline);
+  const verificationGate = resolveStrictVerificationGate(pipeline);
   const grProxy = Boolean(grGuardrails?.proxy);
   const proofPackProxy = hasAnyProxy(proofPack);
   const anyProxy = latticeMetricOnly
@@ -418,7 +512,8 @@ export async function buildTimeDilationDiagnostics(
     grBrick?.meta?.status === "CERTIFIED" &&
       (grBrick?.stats?.solverHealth?.status ?? "NOT_CERTIFIED") === "CERTIFIED" &&
       (!grGuardrails ||
-        (grGuardrails.proxy === false && grGuardrails.source === "pipeline-gr")),
+        (grGuardrails.proxy === false && grGuardrails.source === "pipeline-gr")) &&
+      verificationGate.certified,
   );
 
   const cellSize = (gridScale * 2) / DEFAULT_GRID_DIV;
@@ -612,14 +707,46 @@ export async function buildTimeDilationDiagnostics(
     ]),
   );
 
+  const divBetaRms = toNumber((pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaRms);
+  const divBetaMaxAbs = toNumber((pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaMaxAbs);
+  const natarioExpansionTolerance = toNumber(readProofString(proofPack, "natario_expansion_tolerance")) ?? 1e-3;
+  const divBetaStatus: "pass" | "fail" | "unknown" = divBetaRms == null
+    ? "unknown"
+    : divBetaRms <= natarioExpansionTolerance
+      ? "pass"
+      : "fail";
+  const thetaGeom = toNumber(readProofString(proofPack, "theta_geom"));
+  const kTrace = toNumber(readProofString(proofPack, "metric_k_trace_mean"));
+  const thetaKTolerance = toNumber(readProofString(proofPack, "theta_k_tolerance")) ?? 1e-3;
+  const thetaKResidualAbs = thetaGeom != null && kTrace != null ? Math.abs(thetaGeom + kTrace) : null;
+  const thetaKStatus: "pass" | "fail" | "unknown" = thetaKResidualAbs == null
+    ? "unknown"
+    : thetaKResidualAbs <= thetaKTolerance
+      ? "pass"
+      : "fail";
+  const natarioRequiredFieldsOk = thetaGeom != null && kTrace != null && divBetaRms != null;
+  const natarioCanonicalSatisfied = natarioRequiredFieldsOk && divBetaStatus === "pass" && thetaKStatus === "pass";
+  const natarioReason = natarioCanonicalSatisfied
+    ? null
+    : !natarioRequiredFieldsOk
+      ? "natario_required_fields_missing"
+      : divBetaStatus === "fail"
+        ? "natario_divergence_constraint_failed"
+        : thetaKStatus === "fail"
+          ? "natario_theta_k_consistency_failed"
+          : "natario_constraints_unknown";
+
   const diagnostics: TimeDilationDiagnostics = {
     kind: "time_dilation_diagnostics",
     captured_at: new Date().toISOString(),
     gate: {
       banner: renderPlan.banner,
-      reasons: Array.isArray((renderPlan as { reasons?: string[] }).reasons)
-        ? renderPlan.reasons
-        : [],
+      reasons: [
+        ...(Array.isArray((renderPlan as { reasons?: string[] }).reasons)
+          ? renderPlan.reasons
+          : []),
+        ...verificationGate.reasons.map((reason) => `verification:${reason}`),
+      ],
     },
     definitions: {
       theta_definition: definitions.theta_definition,
@@ -650,6 +777,10 @@ export async function buildTimeDilationDiagnostics(
       mathStageOK,
       grCertified,
       banner: renderPlan.banner,
+      certifiedLabelsAllowed: verificationGate.certifiedLabelsAllowed,
+      strongClaimsAllowed: verificationGate.strongClaimsAllowed,
+      failId: verificationGate.failId,
+      failClosedReasons: verificationGate.reasons,
     },
     canonical: {
       family: canonicalFamily,
