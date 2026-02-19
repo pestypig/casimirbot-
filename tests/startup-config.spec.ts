@@ -42,16 +42,51 @@ describe("warp primitive manifest validation", () => {
       "utf8",
     ),
   );
+  const backlogWithToe089 = {
+    ...backlog,
+    tickets: [
+      ...(Array.isArray(backlog?.tickets) ? backlog.tickets : []),
+      {
+        id: "TOE-089-external-integrations-lane-promotion",
+        tree_owner: "external-integrations",
+        required_tests: [
+          "tests/startup-config.spec.ts",
+          "tests/external-integrations-contract.spec.ts",
+        ],
+      },
+    ],
+  };
 
   it("passes for current manifest", () => {
-    const checklistTests = ["tests/startup-config.spec.ts", "tests/theory-checks.spec.ts"];
-    const errors = validateManifest(manifest, backlog, checklistTests, repoRoot);
+    const checklistTests = [
+      "tests/startup-config.spec.ts",
+      "tests/theory-checks.spec.ts",
+      "tests/external-integrations-contract.spec.ts",
+    ];
+    const errors = validateManifest(manifest, backlogWithToe089, checklistTests, repoRoot);
 
     expect(errors).toEqual([]);
   });
 
+
+
+  it("registers TOE-089 external integrations lane contract in primitive manifest", () => {
+    const primitive = manifest.primitives.find(
+      (entry: { primitive_id?: string }) =>
+        entry.primitive_id === "TOE-089-external-integrations-lane-promotion",
+    );
+
+    expect(primitive).toBeTruthy();
+    expect(primitive?.tree_owner).toBe("external-integrations");
+    expect(primitive?.tests).toContain("tests/external-integrations-contract.spec.ts");
+  });
+
   it("fails for missing links and dangling test references", () => {
-    const checklistTests = ["tests/startup-config.spec.ts", "tests/theory-checks.spec.ts"];
+    const checklistTests = [
+      "tests/startup-config.spec.ts",
+      "tests/theory-checks.spec.ts",
+      "tests/external-integrations-contract.spec.ts",
+    ];
     const badManifest = {
       schema_version: "warp_primitive_manifest/1",
       primitives: [
