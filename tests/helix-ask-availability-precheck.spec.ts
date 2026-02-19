@@ -27,6 +27,37 @@ describe("helix ask availability precheck", () => {
     ).resolves.toBeUndefined();
   });
 
+
+
+  it("treats deterministic runtime fallback as serviceable when status is 200", async () => {
+    const fetchFallback: typeof fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          text: "Mechanism: evidence A -> constrained dynamics -> outcome B.\n\nMaturity (exploratory): bounded fallback.\n\nSources: server/routes/agi.plan.ts",
+          fail_reason: "GENERIC_COLLAPSE",
+          debug: { fallback_reason: "runtime_unavailable_deterministic_fallback" },
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      )) as typeof fetch;
+
+    const probe = await probeHelixAskAvailability({
+      baseUrl: "http://127.0.0.1:5173",
+      fetchImpl: fetchFallback,
+    });
+    expect(probe.ok).toBe(true);
+    expect(probe.status).toBe(200);
+
+    await expect(
+      precheckHelixAskAvailability({
+        baseUrl: "http://127.0.0.1:5173",
+        fetchImpl: fetchFallback,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it("fails fast with clear reason when /api/agi/ask is unavailable", async () => {
     const fetchUnavailable: typeof fetch = (async () =>
       new Response(

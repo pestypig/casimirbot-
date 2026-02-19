@@ -27459,15 +27459,40 @@ const executeHelixAsk = async ({
       });
       return;
     }
-    streamEmitter.finalize();
-    logProgress("Failed", "llm_local_failed", undefined, false);
-    responder.send(500, {
-      ok: false,
-      error: "llm_local_failed",
-      message,
-      status: 500,
+    const runtimeFallbackReason = /timeout|timed out|econnrefused|unavailable|llm|model/i.test(message)
+      ? "runtime_unavailable_deterministic_fallback"
+      : "runtime_error_deterministic_fallback";
+    const fallbackCitations = normalizeCitations([...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES]);
+    const runtimeFallback = RenderPlatonicFallback({
+      prompt: parsed.data.question,
+      anchors: fallbackCitations,
+      constraints: [runtimeFallbackReason, "final_output_guard", "citation_contract"],
+      budget: { maxChars: 1200, maxClaims: 4 },
+      format: parsed.data.format ?? "default",
+      definitionFocus: false,
+      docBlocks: [],
+      evidenceText: `Runtime fallback: ${message}`,
+      allowedCitations: fallbackCitations,
+    });
+    const fallbackText = runtimeFallback.rendered.trim();
+    streamEmitter.finalize(fallbackText);
+    logProgress("Fallback", runtimeFallbackReason, undefined, false);
+    responder.send(200, {
+      ok: true,
+      text: fallbackText,
+      answer: fallbackText,
+      fallback: "runtime_deterministic",
       fail_reason: "GENERIC_COLLAPSE",
       fail_class: "infra_fail",
+      debug: {
+        fallback_reason: runtimeFallbackReason,
+        helix_ask_fail_reason: "GENERIC_COLLAPSE",
+        helix_ask_fail_class: "infra_fail",
+        answer_final_text: clipAskText(fallbackText, HELIX_ASK_ANSWER_PREVIEW_CHARS),
+        answer_after_fallback: clipAskText(fallbackText, HELIX_ASK_ANSWER_PREVIEW_CHARS),
+        placeholder_fallback_applied: false,
+        runtime_error: message,
+      },
     });
     return;
   } finally {
