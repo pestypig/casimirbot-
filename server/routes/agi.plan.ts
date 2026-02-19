@@ -10474,6 +10474,45 @@ const parseAtomicQuestionOverrides = (question: string): AtomicLaunchDraft => {
   return draft;
 };
 
+const buildAtomicStressEnergyProxy = (params: {
+  model: HelixAskAtomicLaunchModel;
+  Z: number;
+  n: number;
+  l: number;
+  m: number;
+}): HelixAskAtomicStressEnergyProxy => {
+  const baseScale = 9.0e10;
+  const orbitalWeight = (params.n + params.l + Math.abs(params.m) + 1) / params.n;
+  const modelWeight = params.model === "quantum" ? 1 : 0.82;
+  const value_J_m3 = Number((baseScale * params.Z * orbitalWeight * modelWeight).toPrecision(12));
+  const relative_1sigma = 0.12;
+  const absolute_1sigma_J_m3 = Number((value_J_m3 * relative_1sigma).toPrecision(12));
+  return {
+    schema_version: "atomic_stress_energy_proxy/1",
+    value_J_m3,
+    units: {
+      value: "J/m^3",
+      uncertainty: "relative_1sigma",
+    },
+    uncertainty: {
+      relative_1sigma,
+      absolute_1sigma_J_m3,
+      confidence: 0.95,
+    },
+    equation: {
+      id: "atomic_stress_energy_proxy_eq.v1",
+      expression: "u_proxy = 9.0e10 * Z * ((n + l + |m| + 1) / n) * model_weight",
+    },
+    citations: [
+      "docs/knowledge/physics/atomic-systems-tree.json#atomic-stress-energy-bridge-placeholder",
+      "tests/fixtures/graph-congruence-conditions-tree.json#atomic-stress-energy-bridge-placeholder",
+    ],
+    claim_tier: "diagnostic",
+    provenance_class: "proxy",
+    certifying: false,
+  };
+};
+
 const normalizeAtomicLaunchParams = (draft: AtomicLaunchDraft): HelixAskAtomicLaunchParams => {
   const model = parseAtomicModel(draft.model) ?? "quantum";
   let n = clampInteger(draft.n, 1, 7) ?? 1;
@@ -10488,13 +10527,17 @@ const normalizeAtomicLaunchParams = (draft: AtomicLaunchDraft): HelixAskAtomicLa
   const sampleCount = clampInteger(draft.sampleCount, 96, 4000);
   const claim_tier: HelixAskAtomicClaimTier = "diagnostic";
   const provenance_class: HelixAskAtomicProvenanceClass = model === "quantum" ? "simulation" : "proxy";
-  return {
+  const normalizedCore = {
     model,
     Z: clampInteger(draft.Z, 1, 118) ?? 1,
     n,
     l,
     m,
+  };
+  return {
+    ...normalizedCore,
     ...(sampleCount != null ? { sampleCount } : {}),
+    stress_energy_proxy: buildAtomicStressEnergyProxy(normalizedCore),
     claim_tier,
     provenance_class,
     certifying: false,
@@ -13086,6 +13129,28 @@ type HelixAskAtomicLaunchModel = "quantum" | "classical";
 type HelixAskAtomicClaimTier = "diagnostic" | "reduced-order" | "certified";
 type HelixAskAtomicProvenanceClass = "simulation" | "proxy";
 
+type HelixAskAtomicStressEnergyProxy = {
+  schema_version: "atomic_stress_energy_proxy/1";
+  value_J_m3: number;
+  units: {
+    value: "J/m^3";
+    uncertainty: "relative_1sigma";
+  };
+  uncertainty: {
+    relative_1sigma: number;
+    absolute_1sigma_J_m3: number;
+    confidence: number;
+  };
+  equation: {
+    id: "atomic_stress_energy_proxy_eq.v1";
+    expression: string;
+  };
+  citations: string[];
+  claim_tier: "diagnostic";
+  provenance_class: "proxy";
+  certifying: false;
+};
+
 type HelixAskAtomicLaunchParams = {
   model: HelixAskAtomicLaunchModel;
   Z: number;
@@ -13093,6 +13158,7 @@ type HelixAskAtomicLaunchParams = {
   l: number;
   m: number;
   sampleCount?: number;
+  stress_energy_proxy: HelixAskAtomicStressEnergyProxy;
   claim_tier: HelixAskAtomicClaimTier;
   provenance_class: HelixAskAtomicProvenanceClass;
   certifying: boolean;
