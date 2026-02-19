@@ -513,7 +513,13 @@
         },
         {
           "rel": "see-also",
-          "to": "physics_quantum_semiclassical",
+          "to": "atomic-quantum-route",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "stress-energy-tensor",
           "edgeType": "association",
           "requiresCL": "none"
         }
@@ -530,6 +536,10 @@
         {
           "name": "stress_energy_mapping_status",
           "value": "blocked"
+        },
+        {
+          "name": "display_mode",
+          "value": "proxy_only"
         }
       ],
       "assumptions": [
@@ -544,6 +554,15 @@
           "equation_ref": "semiclassical_coupling",
           "uncertainty_model_id": "required",
           "stress_energy_mapping": "required"
+        },
+        "proxy_semantics": {
+          "mode": "display_only_proxy",
+          "enforcement": "strict_fail",
+          "notes": "Any atomic->stress-energy lift is proxy visualization only until equation binding is declared."
+        },
+        "display_semantics": {
+          "status": "placeholder_visible",
+          "label": "Atomic -> Stress-Energy (Blocked: mapping required)"
         }
       },
       "deterministic": true,
@@ -563,13 +582,24 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/atomic-systems-tree.json"
+          "path": "docs/knowledge/physics/atomic-systems-tree.json",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/atomic-systems-tree.json",
+          "scope": "right"
         }
       ],
       "congruence": {
         "class": "bridge",
         "chart": null,
         "congruenceLevel": null
+      },
+      "bridge": {
+        "left": "atomic-quantum-route",
+        "right": "stress-energy-tensor",
+        "relation": "atomic_to_stress_energy_lift"
       }
     }
   ],

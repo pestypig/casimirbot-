@@ -5,7 +5,9 @@
       "id": "condition-root",
       "title": "Condition Root",
       "tags": [],
-      "children": [],
+      "children": [
+        "atomic-stress-energy-bridge-placeholder"
+      ],
       "links": [
         {
           "rel": "see-also",
@@ -34,6 +36,13 @@
           "edgeType": "guardrail_congruent",
           "requiresCL": "CL4",
           "condition": "cl3_metric_t00_available=true"
+        },
+        {
+          "rel": "see-also",
+          "to": "atomic-stress-energy-bridge-placeholder",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "atomic_to_t_mu_nu_mapping_declared=true"
         }
       ]
     },
@@ -64,6 +73,50 @@
       "tags": [],
       "children": [],
       "links": []
+    },
+    {
+      "id": "atomic-stress-energy-bridge-placeholder",
+      "title": "Atomic -> Stress-Energy Bridge Placeholder",
+      "nodeType": "bridge",
+      "tags": [
+        "atomic",
+        "bridge",
+        "stress-energy",
+        "guardrail"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "condition-root"
+        },
+        {
+          "rel": "see-also",
+          "to": "theta-target"
+        }
+      ],
+      "bridge": {
+        "left": "condition-root",
+        "right": "theta-target",
+        "relation": "atomic_to_stress_energy_lift"
+      },
+      "validity": {
+        "maturity_ceiling": "diagnostic",
+        "strict_fail_reason": "FAIL_NO_ATOMIC_TO_TMU_NU_MAPPING",
+        "proxy_semantics": "display_only_proxy"
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/atomic-systems-tree.json",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/atomic-systems-tree.json",
+          "scope": "right"
+        }
+      ]
     }
   ]
 }
