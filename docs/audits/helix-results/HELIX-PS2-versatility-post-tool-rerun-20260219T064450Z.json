@@ -1,0 +1,106 @@
+{
+  "id": "HELIX-PS2-versatility-post-tool-rerun-20260219T064450Z",
+  "timestamp": "20260219T064450Z",
+  "baseline_run_id": "versatility-1771461446899",
+  "post_tool_run_id": "versatility-1771483259807",
+  "delta_vs_baseline": {
+    "intent_id_correct_rate": {
+      "before": 0.9333,
+      "after": 0.9333333333333333,
+      "delta": 3.333333333332966e-05
+    },
+    "report_mode_correct_rate": {
+      "before": 0.9222,
+      "after": 0.9222222222222223,
+      "delta": 2.2222222222256782e-05
+    },
+    "relation_packet_built_rate": {
+      "before": 0.8667,
+      "after": 0.8666666666666667,
+      "delta": -3.333333333332966e-05
+    },
+    "relation_dual_domain_ok_rate": {
+      "before": 0.8667,
+      "after": 0.8666666666666667,
+      "delta": -3.333333333332966e-05
+    },
+    "citation_presence_rate": {
+      "before": 0.9667,
+      "after": 0.9666666666666667,
+      "delta": -3.333333333332966e-05
+    },
+    "min_text_length_pass_rate": {
+      "before": 1.0,
+      "after": 1,
+      "delta": 0.0
+    },
+    "invalid_error_rate": {
+      "before": 0.0,
+      "after": 0.0,
+      "delta": 0.0
+    },
+    "latency_total_p95_ms": {
+      "before": 1931,
+      "after": 1422,
+      "delta": -509
+    }
+  },
+  "top_failure_signatures": [
+    {
+      "key": "report_mode_mismatch",
+      "count": 21
+    },
+    {
+      "key": "relation_packet_built",
+      "count": 12
+    },
+    {
+      "key": "relation_dual_domain",
+      "count": 12
+    },
+    {
+      "key": "bridge_count_low",
+      "count": 12
+    },
+    {
+      "key": "evidence_count_low",
+      "count": 12
+    },
+    {
+      "key": "citation_missing",
+      "count": 9
+    },
+    {
+      "key": "intent_mismatch",
+      "count": 6
+    }
+  ],
+  "layer_attribution": {
+    "response_format_layer": 21,
+    "relation_router_layer": 24,
+    "relation_bridge_layer": 12,
+    "evidence_retrieval_layer": 12,
+    "citation_layer": 9,
+    "intent_router_layer": 6
+  },
+  "tool_friction_metrics": {
+    "clarify_trigger_rate": 0.2889,
+    "tool_not_allowed_rate": 0.0,
+    "clocka_tool_cap_stop_rate": 1.0,
+    "adapter_degrade_histogram": {
+      "quality_floor:placeholder_rewrite": 23,
+      "none": 18,
+      "clarify:ambiguity_gate": 115,
+      "ambiguity_clarify": 99,
+      "evidence_gate_failed": 6,
+      "fail_closed:evidence_gate_failed": 9
+    }
+  },
+  "casimir_verify": {
+    "verdict": "PASS",
+    "traceId": "adapter:b5de5228-9bac-45e9-b42b-58bf1cd1c821",
+    "runId": "291",
+    "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrityOk": true
+  }
+}
