@@ -855,6 +855,16 @@ const normalizeDeterministicToolOutput = (value: unknown): unknown => {
   return out;
 };
 
+const isValidToolReceiptShape = (value: unknown): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as { ok?: unknown; receipt?: unknown };
+  if (typeof record.ok !== "boolean") return false;
+  if (record.receipt !== undefined && (typeof record.receipt !== "object" || record.receipt === null)) {
+    return false;
+  }
+  return true;
+};
+
 export const buildDeterministicToolExecutionReceipt = (input: {
   tool: string;
   mode: "act" | "observe" | "verify";
@@ -867,7 +877,7 @@ export const buildDeterministicToolExecutionReceipt = (input: {
   if (input.actionOutput === null || input.actionOutput === undefined) {
     failReason = "TOOL_RECEIPT_MISSING";
     status = "failed";
-  } else if (typeof input.actionOutput !== "object") {
+  } else if (!isValidToolReceiptShape(input.actionOutput)) {
     failReason = "TOOL_RECEIPT_INVALID";
     status = "failed";
   } else if ((input.actionOutput as { ok?: unknown }).ok === false) {
