@@ -1,0 +1,30 @@
+{
+  "schema_version": "helix_ask_versatility_recommendation/1",
+  "run_id": "20260219T023617Z",
+  "decision": "needs_patch",
+  "priority_actions": [
+    {
+      "priority": 1,
+      "action": "Harden relation fallback path and dual-domain bridge assembly for relation intents.",
+      "why": "Largest clustered failures are relation packet and bridge/evidence deficits."
+    },
+    {
+      "priority": 2,
+      "action": "Add citation persistence guard in final answer cleanup.",
+      "why": "Citation misses are still present despite high overall citation rate."
+    },
+    {
+      "priority": 3,
+      "action": "Tune report mode routing for repo_technical and ambiguous families.",
+      "why": "report_mode_mismatch remains top single failure signature."
+    }
+  ],
+  "release_readiness": {
+    "status": "not_ready",
+    "blocking_factors": [
+      "report_mode_mismatch frequency",
+      "relation bridge/evidence assembly gaps",
+      "missing baseline artifacts for strict delta reproducibility"
+    ]
+  }
+}

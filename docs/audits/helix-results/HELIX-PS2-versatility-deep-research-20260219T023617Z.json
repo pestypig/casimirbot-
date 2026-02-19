@@ -1,0 +1,46 @@
+{
+  "schema_version": "helix_build_session_bookkeeping/1",
+  "ticket_id": "HELIX-PS2-versatility-deep-research",
+  "recorded_at": "2026-02-19T02:36:17Z",
+  "reported_commit_hash": "pending_local_commit",
+  "source": "local deep research fixup",
+  "executive_summary": [
+    "Created all required deep-research deliverable files in-repo for the 20260219T023617Z audit run.",
+    "Verified required source reports exist before writing conclusions.",
+    "Confirmed baseline JSON artifacts for 20260218T232914Z / versatility-1771457356197 are absent in the current snapshot and treated as missing.",
+    "Aligned summary metrics with the latest matrix in reports/helix-ask-versatility-report.md.",
+    "Normalized citation formatting to repository-native path references only."
+  ],
+  "source_artifact_checks": {
+    "existing": [
+      "reports/helix-ask-versatility-report.md",
+      "reports/helix-ask-versatility-20260218T232914Z.md",
+      "reports/helix-ask-post-e1ccd1e6-validation.md",
+      "reports/helix-ask-versatility-post-fix-20260218T233657Z-blocked-precheck.md"
+    ],
+    "missing": [
+      "artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/summary.json",
+      "artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/failures.json",
+      "artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/recommendation.json"
+    ]
+  },
+  "output_artifacts": [
+    "reports/helix-ask-versatility-deep-research-20260219T023617Z.md",
+    "artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/summary.json",
+    "artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/failure-taxonomy.json",
+    "artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/tool-friction.json",
+    "artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/counterfactuals.json",
+    "artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/recommendation.json",
+    "docs/audits/helix-results/HELIX-PS2-versatility-deep-research-20260219T023617Z.json"
+  ],
+  "consistency_checks": {
+    "summary_matches_latest_matrix": true
+  },
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:90e4a0f2-eeed-4645-9b48-c1d678770455",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  }
+}

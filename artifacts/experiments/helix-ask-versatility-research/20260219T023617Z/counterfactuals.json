@@ -1,0 +1,31 @@
+{
+  "schema_version": "helix_ask_versatility_counterfactuals/1",
+  "run_id": "20260219T023617Z",
+  "counterfactuals": [
+    {
+      "name": "relation_fallback_enforced",
+      "change": "Force deterministic relation fallback when relation intent confidence drops below threshold.",
+      "expected_effect": {
+        "relation_packet_built_rate": ">=0.93",
+        "relation_dual_domain_ok_rate": ">=0.93",
+        "bridge_count_low_failures": "decrease"
+      }
+    },
+    {
+      "name": "citation_retention_guard",
+      "change": "Apply final-stage guard that ensures at least one valid source citation line persists.",
+      "expected_effect": {
+        "citation_presence_rate": ">=0.99",
+        "citation_missing_failures": "decrease"
+      }
+    },
+    {
+      "name": "mode_router_hardening",
+      "change": "Strengthen report-mode router for repo_technical and ambiguous_general families.",
+      "expected_effect": {
+        "report_mode_correct_rate": ">=0.96",
+        "report_mode_mismatch_failures": "decrease"
+      }
+    }
+  ]
+}

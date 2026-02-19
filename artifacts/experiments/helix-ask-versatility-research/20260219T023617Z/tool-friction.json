@@ -1,0 +1,23 @@
+{
+  "schema_version": "helix_ask_versatility_tool_friction/1",
+  "run_id": "20260219T023617Z",
+  "frictions": [
+    {
+      "id": "missing_baseline_artifacts",
+      "severity": "high",
+      "description": "Baseline JSON files for 20260218T232914Z / versatility-1771457356197 are absent, preventing strict before-vs-after deltas.",
+      "observed_paths": [
+        "artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/summary.json",
+        "artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/failures.json",
+        "artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/recommendation.json"
+      ],
+      "impact": "Delta analysis must be expressed as absolute latest-matrix values only."
+    },
+    {
+      "id": "origin_main_unavailable",
+      "severity": "medium",
+      "description": "Repository state shows no origin/main reference in local snapshot metadata used by versatility reports.",
+      "impact": "Provenance-grade branch divergence checks are unavailable in this environment."
+    }
+  ]
+}
