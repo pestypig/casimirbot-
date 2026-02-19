@@ -17,7 +17,9 @@ export type RelationAssemblyPacket = {
   domains: string[];
   fail_reason?:
     | "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING"
-    | "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY";
+    | "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY"
+    | "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_MISSING"
+    | "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_CONTRADICTORY";
   definitions: {
     warp_definition: string;
     ethos_definition: string;
@@ -84,6 +86,8 @@ type BridgeEvidenceContract = {
 type BridgeEvidenceStrictFailReason =
   | "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING"
   | "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY"
+  | "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_MISSING"
+  | "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_CONTRADICTORY"
   | undefined;
 
 const isBridgeEvidenceContractComplete = (entry: BridgeEvidenceContract): boolean =>
@@ -101,7 +105,7 @@ const bridgeEvidenceContractFingerprint = (entry: BridgeEvidenceContract): strin
 
 const classifyStrictBridgeEvidenceFailure = (
   contracts: BridgeEvidenceContract[],
-  options?: { requireStrongEvidence?: boolean },
+  options?: { requireStrongEvidence?: boolean; evidenceFalsifierLane?: boolean },
 ): BridgeEvidenceStrictFailReason => {
   const canonical = [...contracts].sort(
     (a, b) =>
@@ -129,14 +133,20 @@ const classifyStrictBridgeEvidenceFailure = (
   const hasStrongEvidence = canonical.some(
     (contract) => contract.certifying === true && contract.provenance_class === "measured" && contract.claim_tier === "certified",
   );
+  const missingReason = options?.evidenceFalsifierLane
+    ? "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_MISSING"
+    : "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING";
+  const contradictoryReason = options?.evidenceFalsifierLane
+    ? "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_CONTRADICTORY"
+    : "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY";
   if (hasIntrinsicContradiction || hasPathCollision) {
-    return "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY";
+    return contradictoryReason;
   }
   if (hasGap) {
-    return "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING";
+    return missingReason;
   }
   if (options?.requireStrongEvidence && !hasStrongEvidence) {
-    return "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING";
+    return missingReason;
   }
   return undefined;
 };
@@ -287,11 +297,13 @@ export function buildRelationAssemblyPacket(args: {
   if (ethosEvidence.length > 0) domainSet.add("ethos");
 
   const strictBridgeEvidence = args.strictBridgeEvidence === true;
+  const evidenceFalsifierLane = (args.graphPack?.treeIds ?? []).includes("evidence-falsifier-ledger");
   const requireStrongBridgeEvidence = /\b(life|origin(?:s)? of life|abiogenesis|cosmology|consciousness|open-world|universe produce life)\b/i.test(
     args.question,
   );
   const strictFailReason = classifyStrictBridgeEvidenceFailure(graphEvidenceContracts, {
     requireStrongEvidence: requireStrongBridgeEvidence,
+    evidenceFalsifierLane,
   });
 
   return {

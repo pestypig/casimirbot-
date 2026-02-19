@@ -294,6 +294,37 @@ describe("Helix Ask bridge nodes", () => {
     expect(Array.from(verdicts)).toEqual(["IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY"]);
   });
 
+  it("maps strict bridge contradiction into evidence falsifier ledger taxonomy when lane is active", () => {
+    const verdict = __testOnlyClassifyStrictBridgeEvidenceFailure(
+      [
+        {
+          path: "docs/knowledge/physics/einstein-field-equations.md",
+          provenance_class: "proxy",
+          claim_tier: "diagnostic",
+          certifying: true,
+        },
+      ],
+      { evidenceFalsifierLane: true },
+    );
+
+    expect(verdict).toBe("EVIDENCE_FALSIFIER_LEDGER_CONTRACT_CONTRADICTORY");
+  });
+
+  it("maps strict bridge missing metadata into evidence falsifier ledger taxonomy when lane is active", () => {
+    const verdict = __testOnlyClassifyStrictBridgeEvidenceFailure(
+      [
+        {
+          path: "docs/knowledge/physics/einstein-field-equations.md",
+          provenance_class: "inferred",
+          claim_tier: "diagnostic",
+        },
+      ],
+      { evidenceFalsifierLane: true, requireStrongEvidence: true },
+    );
+
+    expect(verdict).toBe("EVIDENCE_FALSIFIER_LEDGER_CONTRACT_MISSING");
+  });
+
   it("preserves non-strict bridge behavior when metadata is incomplete", () => {
     const packet = buildRelationAssemblyPacket({
       question: "How does ideology bridge physics?",
@@ -386,6 +417,55 @@ describe("Helix Ask bridge nodes", () => {
     });
 
     expect(packet.fail_reason).toBe("IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING");
+  });
+
+  it("uses evidence falsifier ledger fail taxonomy through packet assembly when ledger lane is selected", () => {
+    const packet = buildRelationAssemblyPacket({
+      question: "How does ideology bridge physics?",
+      contextFiles: ["docs/ethos/ideology.json", "docs/knowledge/physics/einstein-field-equations.md"],
+      contextText: "ideology and physics relation",
+      docBlocks: [],
+      strictBridgeEvidence: true,
+      graphPack: {
+        frameworks: [
+          {
+            treeId: "evidence-falsifier-ledger",
+            sourcePath: "docs/knowledge/evidence-falsifier-ledger-tree.json",
+            anchors: [],
+            path: [
+              {
+                id: "bridge-node",
+                title: "Bridge",
+                tags: [],
+                score: 1,
+                depth: 0,
+                nodeType: "bridge",
+                evidence: [
+                  {
+                    type: "doc",
+                    path: "docs/knowledge/physics/einstein-field-equations.md",
+                    scope: "left",
+                    provenance_class: "proxy",
+                    claim_tier: "diagnostic",
+                    certifying: true,
+                  },
+                ],
+              },
+            ],
+            scaffoldText: "",
+            contextText: "",
+            preferGraph: true,
+          },
+        ],
+        scaffoldText: "",
+        contextText: "",
+        preferGraph: true,
+        sourcePaths: ["docs/knowledge/evidence-falsifier-ledger-tree.json"],
+        treeIds: ["evidence-falsifier-ledger"],
+      },
+    });
+
+    expect(packet.fail_reason).toBe("EVIDENCE_FALSIFIER_LEDGER_CONTRACT_CONTRADICTORY");
   });
 
 

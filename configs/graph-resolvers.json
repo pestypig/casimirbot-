@@ -318,6 +318,35 @@
       "weight": 1.05
     },
     {
+      "id": "evidence-falsifier-ledger",
+      "label": "Evidence Falsifier Ledger Lane",
+      "path": "docs/knowledge/evidence-falsifier-ledger-tree.json",
+      "topicTags": [
+        "ledger",
+        "knowledge"
+      ],
+      "matchers": [
+        "evidence falsifier ledger",
+        "evidence schema",
+        "claim tier consistency",
+        "provenance consistency",
+        "contract contradiction",
+        "missing evidence contract",
+        "runtime contract audit"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 3,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.1
+    },
+    {
       "id": "stellar-restoration",
       "label": "Stellar Restoration Walk",
       "path": "docs/knowledge/stellar-restoration-tree.json",
