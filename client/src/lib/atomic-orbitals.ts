@@ -1,9 +1,14 @@
+import { kappa_u } from "@shared/curvature-proxy";
+
 const PI = Math.PI;
 const TWO_PI = PI * 2;
 const DEFAULT_BOHR_RADIUS = 5.29177210903e-11;
 const RADIAL_CDF_BINS = 1024;
 const THETA_CDF_BINS = 1024;
 const MIN_FLOAT = 1e-30;
+const EV_TO_J = 1.602176634e-19;
+const ATOMIC_PROXY_RELATIVE_1SIGMA = 0.35;
+const ATOMIC_PROXY_UNCERTAINTY_MODEL_ID = "atomic_proxy_volume_scale_v1";
 
 export type AtomicSimulationMode = "quantum" | "classical";
 export type AtomicClaimTier = "diagnostic" | "reduced-order" | "certified";
@@ -43,6 +48,89 @@ export type AtomicCloudBuildOptions = {
   nuclearCharge?: number;
   seed?: number;
 };
+
+export type AtomicStressEnergyProxyInput = {
+  energy_scalar_eV: number;
+  effective_volume_m3: number;
+};
+
+export type AtomicStressEnergyProxyOutput = {
+  energy_scalar_eV: number;
+  energy_scalar_J: number;
+  effective_volume_m3: number;
+  energy_density_J_m3: number;
+  kappa_proxy_m2: number;
+  units: {
+    energy_scalar_eV: "eV";
+    energy_scalar_J: "J";
+    effective_volume_m3: "m^3";
+    energy_density_J_m3: "J/m^3";
+    kappa_proxy_m2: "m^-2";
+  };
+  governance: {
+    equation_ref: "atomic_energy_to_energy_density_proxy";
+    uncertainty_model_id: string;
+    citation_claim_ids: ["atomic_energy_to_energy_density_proxy.v1", ...string[]];
+    claim_tier: "diagnostic";
+    provenance_class: "proxy";
+    certifying: false;
+  };
+  uncertainty: {
+    relative_1sigma: number;
+    absolute_1sigma_J_m3: number;
+    assumptions: string;
+    labels: ["volume_scale_ambiguity", ...string[]];
+  };
+  semantics: {
+    interpretation: "diagnostic proxy";
+    not_stress_energy_tensor_inference: true;
+  };
+};
+
+export function computeAtomicStressEnergyProxy(
+  input: AtomicStressEnergyProxyInput
+): AtomicStressEnergyProxyOutput {
+  const energy_scalar_eV = Number.isFinite(input.energy_scalar_eV) ? input.energy_scalar_eV : 0;
+  const effective_volume_m3 = Math.max(MIN_FLOAT, Number.isFinite(input.effective_volume_m3) ? input.effective_volume_m3 : MIN_FLOAT);
+  const energy_scalar_J = energy_scalar_eV * EV_TO_J;
+  const energy_density_J_m3 = energy_scalar_J / effective_volume_m3;
+  const kappa_proxy_m2 = kappa_u(energy_density_J_m3);
+  const absolute_1sigma_J_m3 = Math.abs(energy_density_J_m3) * ATOMIC_PROXY_RELATIVE_1SIGMA;
+
+  return {
+    energy_scalar_eV,
+    energy_scalar_J,
+    effective_volume_m3,
+    energy_density_J_m3,
+    kappa_proxy_m2,
+    units: {
+      energy_scalar_eV: "eV",
+      energy_scalar_J: "J",
+      effective_volume_m3: "m^3",
+      energy_density_J_m3: "J/m^3",
+      kappa_proxy_m2: "m^-2"
+    },
+    governance: {
+      equation_ref: "atomic_energy_to_energy_density_proxy",
+      uncertainty_model_id: ATOMIC_PROXY_UNCERTAINTY_MODEL_ID,
+      citation_claim_ids: ["atomic_energy_to_energy_density_proxy.v1"],
+      claim_tier: "diagnostic",
+      provenance_class: "proxy",
+      certifying: false
+    },
+    uncertainty: {
+      relative_1sigma: ATOMIC_PROXY_RELATIVE_1SIGMA,
+      absolute_1sigma_J_m3,
+      assumptions:
+        "Volume-scale ambiguity dominates this diagnostic mapping; effective_volume_m3 is a coarse orbital localization proxy, not a measured confinement volume.",
+      labels: ["volume_scale_ambiguity"]
+    },
+    semantics: {
+      interpretation: "diagnostic proxy",
+      not_stress_energy_tensor_inference: true
+    }
+  };
+}
 
 type RadialCdf = {
   cdf: Float64Array;
