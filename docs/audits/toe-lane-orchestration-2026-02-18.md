@@ -56,3 +56,13 @@ Do not mark ticket complete unless all are true:
 - `toe_progress_pct` tracks maturity-weighted engineering progress.
 - `forest_owner_coverage_pct` tracks tree-owner breadth coverage.
 - Treat these as separate dimensions in reviews.
+
+## Forest-Wide Lane Closure Track
+
+Use this sequence when transitioning from owner-coverage parity to full
+first-class lane closure:
+
+- `docs/audits/toe-sequence-forest-lane-closure-2026-02-19.md`
+
+This track defines the `TOE-082..TOE-089` execution order, lane objectives,
+required tests, and research-gate metadata.
