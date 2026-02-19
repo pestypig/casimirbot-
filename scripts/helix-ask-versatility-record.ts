@@ -87,6 +87,8 @@ type GitProvenance = {
 const BASE_URL = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5173";
 const OUT_DIR = process.env.HELIX_ASK_VERSATILITY_OUT ?? "artifacts/experiments/helix-ask-versatility";
 const REPORT_PATH = process.env.HELIX_ASK_VERSATILITY_REPORT ?? "reports/helix-ask-versatility-report.md";
+const PROMPT_ORDER_MODE = process.env.HELIX_ASK_VERSATILITY_PROMPT_ORDER_MODE ?? "sequential";
+const PROMPT_SAMPLE_PER_FAMILY = Math.max(0, Number(process.env.HELIX_ASK_VERSATILITY_PROMPT_SAMPLE_PER_FAMILY ?? 0));
 const ISOLATE_RUN_DIR = (process.env.HELIX_ASK_VERSATILITY_ISOLATE_RUN_DIR ?? "1") !== "0";
 const RESUME_FROM_LATEST = (process.env.HELIX_ASK_VERSATILITY_RESUME_FROM_LATEST ?? "1") !== "0";
 const FAIL_ON_INCOMPLETE = (process.env.HELIX_ASK_VERSATILITY_FAIL_ON_INCOMPLETE ?? "1") !== "0";
@@ -220,6 +222,85 @@ const loadExistingRawRunMap = async (runOutDir: string): Promise<Map<string, Raw
     }
   }
   return map;
+};
+
+const mulberry32 = (seed: number): (() => number) => {
+  let state = (seed >>> 0) + 0x6d2b79f5;
+  return () => {
+    state += 0x6d2b79f5;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+const stableSeedFrom = (value: string): number => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const shuffleDeterministic = <T>(items: T[], seed: number): T[] => {
+  const rng = mulberry32(seed);
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j] as T, out[i] as T];
+  }
+  return out;
+};
+
+const maybeApplyPromptSamplingAndOrder = (prompts: PromptCase[]): PromptCase[] => {
+  if (PROMPT_ORDER_MODE === "sequential" && PROMPT_SAMPLE_PER_FAMILY <= 0) {
+    return prompts;
+  }
+  const families: PromptFamily[] = ["relation", "repo_technical", "ambiguous_general"];
+  const byFamily = new Map<PromptFamily, PromptCase[]>(
+    families.map((family) => [family, prompts.filter((prompt) => prompt.family === family)]),
+  );
+  const sampledByFamily = new Map<PromptFamily, PromptCase[]>();
+  for (const family of families) {
+    const familyPrompts = byFamily.get(family) ?? [];
+    if (PROMPT_SAMPLE_PER_FAMILY > 0) {
+      const sampleSeed = stableSeedFrom(`${family}:${SEEDS.join(",")}:${TEMPS.join(",")}`);
+      sampledByFamily.set(family, shuffleDeterministic(familyPrompts, sampleSeed).slice(0, PROMPT_SAMPLE_PER_FAMILY));
+      continue;
+    }
+    sampledByFamily.set(family, [...familyPrompts]);
+  }
+
+  if (PROMPT_ORDER_MODE === "stratified_seeded") {
+    const stratSeed = stableSeedFrom(`stratified:${SEEDS.join(",")}:${TEMPS.join(",")}`);
+    const familiesOrder = shuffleDeterministic(families, stratSeed);
+    for (const family of familiesOrder) {
+      const familySeed = stableSeedFrom(`${family}:${stratSeed}`);
+      sampledByFamily.set(
+        family,
+        shuffleDeterministic(sampledByFamily.get(family) ?? [], familySeed),
+      );
+    }
+    const output: PromptCase[] = [];
+    let index = 0;
+    while (true) {
+      let added = false;
+      for (const family of familiesOrder) {
+        const pool = sampledByFamily.get(family) ?? [];
+        const next = pool[index];
+        if (next) {
+          output.push(next);
+          added = true;
+        }
+      }
+      if (!added) break;
+      index += 1;
+    }
+    return output;
+  }
+
+  return families.flatMap((family) => sampledByFamily.get(family) ?? []);
 };
 
 const ensureServerReady = async (timeoutMs = 120000) => {
@@ -681,8 +762,10 @@ const main = async () => {
   let runId = `versatility-${Date.now()}`;
   const outRootDir = path.resolve(OUT_DIR);
   let runOutDir = ISOLATE_RUN_DIR ? path.join(outRootDir, runId) : outRootDir;
-  const prompts = allPrompts();
-  if (prompts.length < 90) throw new Error(`expected >=90 prompts, got ${prompts.length}`);
+  const prompts = maybeApplyPromptSamplingAndOrder(allPrompts());
+  if (PROMPT_SAMPLE_PER_FAMILY <= 0 && prompts.length < 90) {
+    throw new Error(`expected >=90 prompts, got ${prompts.length}`);
+  }
   const expectedRuns = prompts.length * SEEDS.length * TEMPS.length;
 
   let resumedFromLatest = false;
