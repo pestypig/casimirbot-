@@ -1,22 +1,17 @@
 {
   "schema_version": "toe_agent_ticket_result/1",
-  "ticket_id": "TOE-094-uncertainty-model-registry-and-enforcement",
+  "ticket_id": "TOE-093-root-leaf-equation-to-falsifier-binding",
   "files_changed": [
     "configs/physics-root-leaf-manifest.v1.json",
-    "configs/uncertainty-model-registry.v1.json",
-    "scripts/validate-physics-root-leaf-manifest.ts",
-    "scripts/validate-uncertainty-model-registry.ts",
-    "tests/uncertainty-model-registry.spec.ts",
-    "docs/audits/ticket-results/TOE-094-uncertainty-model-registry-and-enforcement.20260219T073900Z.json"
-  ],
-  "tests_run": [
-    "scripts/validate-uncertainty-model-registry.ts",
     "scripts/validate-physics-root-leaf-manifest.ts",
     "tests/physics-root-leaf-manifest.spec.ts",
-    "tests/uncertainty-model-registry.spec.ts",
-    "npx tsx scripts/validate-uncertainty-model-registry.ts",
+    "docs/audits/ticket-results/TOE-093-root-leaf-equation-to-falsifier-binding.20260219T170500Z.json"
+  ],
+  "tests_run": [
+    "scripts/validate-physics-root-leaf-manifest.ts",
+    "tests/physics-root-leaf-manifest.spec.ts",
     "npx tsx scripts/validate-physics-root-leaf-manifest.ts",
-    "npx vitest run tests/physics-root-leaf-manifest.spec.ts tests/uncertainty-model-registry.spec.ts"
+    "npx vitest run tests/physics-root-leaf-manifest.spec.ts"
   ],
   "claim_tier": "diagnostic",
   "research_artifacts": [
@@ -24,7 +19,7 @@
   ],
   "casimir": {
     "verdict": "PASS",
-    "trace_id": "toe-094-casimir-verify",
+    "trace_id": "toe-093-casimir-verify",
     "run_id": "1",
     "certificate_hash": "d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d",
     "integrity_ok": true

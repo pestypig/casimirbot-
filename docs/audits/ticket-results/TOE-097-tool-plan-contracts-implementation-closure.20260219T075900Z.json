@@ -1,22 +1,28 @@
 {
-  "ticket_id": "TOE-097",
-  "risk_class": "runtime_contract",
-  "requires_audit": true,
-  "requires_research": false,
-  "artifacts": [
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-097-tool-plan-contracts-implementation-closure",
+  "files_changed": [
+    "server/routes/agi.plan.ts",
+    "tests/tool-contracts-replay.spec.ts",
+    "tests/casimir-verify-ps2.spec.ts",
+    "docs/knowledge/tool-plan-contracts-tree.json",
+    "docs/audits/ticket-results/TOE-097-tool-plan-contracts-implementation-closure.20260219T075900Z.json"
+  ],
+  "tests_run": [
+    "tests/tool-contracts-replay.spec.ts",
+    "tests/casimir-verify-ps2.spec.ts",
+    "npx vitest run tests/tool-contracts-replay.spec.ts tests/casimir-verify-ps2.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "research_artifacts": [
     "runtime-contract-audit"
   ],
-  "summary": {
-    "deterministic_receipts": true,
-    "replay_stability_enforced": true,
-    "missing_receipt_fail_reason": "TOOL_RECEIPT_MISSING",
-    "invalid_receipt_fail_reason": "TOOL_RECEIPT_INVALID",
-    "receipt_shape_requires_ok_boolean": true
-  },
   "casimir": {
     "verdict": "PASS",
+    "trace_id": "toe-097-casimir-verify",
+    "run_id": "1",
     "certificate_hash": "d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d",
-    "integrity_ok": true,
-    "source": "artifacts/experiments/helix-ask-ps2/casimir-verify-latest.json"
-  }
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
 }

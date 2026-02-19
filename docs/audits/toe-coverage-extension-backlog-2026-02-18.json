@@ -1865,44 +1865,6 @@
       }
     },
     {
-      "id": "TOE-076-helix-ask-system-quality-delta-pack",
-      "tree_owner": "helix-ask",
-      "primitive": "Helix Ask fixed-pack quality delta evaluation",
-      "primary_path_prefix": "tests/helix-ask-ps2-runtime-report.spec.ts",
-      "allowed_paths": [
-        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
-        "tests/helix-ask-focused-utility-hardening.spec.ts",
-        "tests/helix-ask-mechanism-maturity-contract.spec.ts",
-        "tests/helix-ask-ps2-runtime-report.spec.ts",
-        "tests/casimir-verify-ps2.spec.ts",
-        "reports/helix-ask-ps2-runtime-contract-*.md",
-        "docs/audits/helix-results",
-        "docs/audits/ticket-results",
-        "docs/audits/toe-progress-snapshot.json",
-        "reports"
-      ],
-      "required_tests": [
-        "tests/helix-ask-focused-utility-hardening.spec.ts",
-        "tests/helix-ask-mechanism-maturity-contract.spec.ts",
-        "tests/helix-ask-ps2-runtime-report.spec.ts",
-        "tests/casimir-verify-ps2.spec.ts"
-      ],
-      "done_criteria": [
-        "Fixed prompt pack run uses stable seeds/questions from PS2 lane",
-        "Before/after metric deltas are emitted with deterministic thresholds and pass/fail marks",
-        "Strict fail determinism probe is measured and reported",
-        "Receipt artifact records validator/preflight runs plus Casimir PASS certificate integrity"
-      ],
-      "research_gate": {
-        "risk_class": "runtime_contract",
-        "requires_audit": true,
-        "requires_research": false,
-        "required_artifacts": [
-          "runtime-contract-audit"
-        ]
-      }
-    },
-    {
       "id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
       "tree_owner": "stellar-ps1-bridges",
       "primitive": "Stellar PS1 bridges resolver owner coverage contract",
@@ -1960,6 +1922,44 @@
         "Highest-impact Helix Ask blockers are promoted to verified PASS-ready state with deterministic gates",
         "Strict fail reasons remain deterministic and replay-safe across fallback paths",
         "Progress snapshot and ticket receipt capture before/after strict-ready counters"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-076-helix-ask-system-quality-delta-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Helix Ask fixed-pack quality delta evaluation",
+      "primary_path_prefix": "tests/helix-ask-ps2-runtime-report.spec.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "tests/helix-ask-focused-utility-hardening.spec.ts",
+        "tests/helix-ask-mechanism-maturity-contract.spec.ts",
+        "tests/helix-ask-ps2-runtime-report.spec.ts",
+        "tests/casimir-verify-ps2.spec.ts",
+        "reports/helix-ask-ps2-runtime-contract-*.md",
+        "docs/audits/helix-results",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json",
+        "reports"
+      ],
+      "required_tests": [
+        "tests/helix-ask-focused-utility-hardening.spec.ts",
+        "tests/helix-ask-mechanism-maturity-contract.spec.ts",
+        "tests/helix-ask-ps2-runtime-report.spec.ts",
+        "tests/casimir-verify-ps2.spec.ts"
+      ],
+      "done_criteria": [
+        "Fixed prompt pack run uses stable seeds/questions from PS2 lane",
+        "Before/after metric deltas are emitted with deterministic thresholds and pass/fail marks",
+        "Strict fail determinism probe is measured and reported",
+        "Receipt artifact records validator/preflight runs plus Casimir PASS certificate integrity"
       ],
       "research_gate": {
         "risk_class": "runtime_contract",
@@ -2463,6 +2463,253 @@
       ],
       "research_gate": {
         "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-092-canonical-equation-residual-contracts",
+      "tree_owner": "math",
+      "primitive": "Canonical equation residual contracts for root-referenced equations",
+      "primary_path_prefix": "configs/physics-equation-backbone.v1.json",
+      "allowed_paths": [
+        "configs/physics-equation-backbone.v1.json",
+        "scripts/validate-physics-equation-backbone.ts",
+        "tests/physics-equation-backbone.spec.ts",
+        "docs/audits/ticket-results"
+      ],
+      "required_tests": [
+        "scripts/validate-physics-equation-backbone.ts",
+        "tests/physics-equation-backbone.spec.ts"
+      ],
+      "done_criteria": [
+        "Root-referenced equations expose explicit residual and uncertainty contract fields",
+        "Equation backbone validator fails deterministically when contract fields are missing",
+        "Equation backbone tests cover pass/fail residual contract scenarios"
+      ],
+      "research_gate": {
+        "risk_class": "contract_only",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-093-root-leaf-equation-to-falsifier-binding",
+      "tree_owner": "math",
+      "primitive": "Bind each equation_ref in root-leaf paths to falsifier clauses",
+      "primary_path_prefix": "configs/physics-root-leaf-manifest.v1.json",
+      "allowed_paths": [
+        "configs/physics-root-leaf-manifest.v1.json",
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "tests/physics-root-leaf-manifest.spec.ts",
+        "docs/audits/ticket-results"
+      ],
+      "required_tests": [
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "tests/physics-root-leaf-manifest.spec.ts"
+      ],
+      "done_criteria": [
+        "Root-leaf validator rejects equation_ref entries with no falsifier binding",
+        "Manifest paths remain deterministic and coverage-complete after binding enforcement",
+        "Root-leaf manifest tests include explicit unbound-equation failure coverage"
+      ],
+      "research_gate": {
+        "risk_class": "contract_only",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-094-uncertainty-model-registry-and-enforcement",
+      "tree_owner": "math",
+      "primitive": "Parameterize and enforce uncertainty model registry references",
+      "primary_path_prefix": "configs/uncertainty-model-registry.v1.json",
+      "allowed_paths": [
+        "configs/physics-root-leaf-manifest.v1.json",
+        "configs/uncertainty-model-registry.v1.json",
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "scripts/validate-uncertainty-model-registry.ts",
+        "tests/physics-root-leaf-manifest.spec.ts",
+        "tests/uncertainty-model-registry.spec.ts",
+        "docs/audits/ticket-results"
+      ],
+      "required_tests": [
+        "scripts/validate-uncertainty-model-registry.ts",
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "tests/physics-root-leaf-manifest.spec.ts",
+        "tests/uncertainty-model-registry.spec.ts"
+      ],
+      "done_criteria": [
+        "Undefined uncertainty models are rejected deterministically",
+        "Unparameterized/invalid model references are rejected deterministically",
+        "Registry and manifest validators stay green with compliant model references"
+      ],
+      "research_gate": {
+        "risk_class": "contract_only",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-095-physics-lane-derived-nodes-for-equation-residuals",
+      "tree_owner": "physics-foundations",
+      "primitive": "Add derived residual nodes across all physics root lane trees",
+      "primary_path_prefix": "docs/knowledge/physics/physics-spacetime-gr-tree.json",
+      "allowed_paths": [
+        "docs/knowledge/physics/physics-spacetime-gr-tree.json",
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/physics-thermodynamics-entropy-tree.json",
+        "docs/knowledge/physics/physics-information-dynamics-tree.json",
+        "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json",
+        "docs/knowledge/physics/physics-biology-life-tree.json",
+        "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
+        "tests/physics-root-lane-tree-parity.spec.ts",
+        "docs/audits/ticket-results"
+      ],
+      "required_tests": [
+        "tests/physics-root-lane-tree-parity.spec.ts"
+      ],
+      "done_criteria": [
+        "Every physics root lane tree includes at least one derived residual contract node",
+        "Derived nodes declare deterministic schema/tolerance/uncertainty metadata",
+        "Parity tests enforce residual-node presence across required root lanes"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "falsifier-matrix"
+        ]
+      }
+    },
+    {
+      "id": "TOE-096-runtime-safety-gate-enforcement-hook",
+      "tree_owner": "agi-runtime",
+      "primitive": "Enforce runtime_safety_gate hook with deterministic residual fail semantics",
+      "primary_path_prefix": "server/services/helix-ask/relation-assembly.ts",
+      "allowed_paths": [
+        "server/services/helix-ask/graph-resolver.ts",
+        "server/services/helix-ask/relation-assembly.ts",
+        "configs/physics-root-leaf-manifest.v1.json",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/helix-ask-focused-utility-hardening.spec.ts",
+        "docs/audits/ticket-results"
+      ],
+      "required_tests": [
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/helix-ask-focused-utility-hardening.spec.ts"
+      ],
+      "done_criteria": [
+        "Runtime emits deterministic residual summary when runtime_safety_gate is referenced",
+        "Missing or out-of-bounds gate data maps to deterministic fail reasons",
+        "Graph-resolver and focused utility tests confirm deterministic gate behavior"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-097-tool-plan-contracts-implementation-closure",
+      "tree_owner": "agi-runtime",
+      "primitive": "Complete deterministic tool plan receipt contract closure",
+      "primary_path_prefix": "server/routes/agi.plan.ts",
+      "allowed_paths": [
+        "server/routes/agi.plan.ts",
+        "tests/tool-contracts-replay.spec.ts",
+        "tests/casimir-verify-ps2.spec.ts",
+        "docs/knowledge/tool-plan-contracts-tree.json",
+        "docs/audits/ticket-results"
+      ],
+      "required_tests": [
+        "tests/tool-contracts-replay.spec.ts",
+        "tests/casimir-verify-ps2.spec.ts"
+      ],
+      "done_criteria": [
+        "Deterministic tool receipts are emitted in stable shape across replay",
+        "Missing/invalid receipts produce deterministic fail reason taxonomy",
+        "Tool replay and PS2 Casimir tests remain green"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-098-math-congruence-matrix-builder-and-snapshot",
+      "tree_owner": "math",
+      "primitive": "Deterministic math congruence matrix builder and validator snapshot contract",
+      "primary_path_prefix": "scripts/build-math-congruence-matrix.ts",
+      "allowed_paths": [
+        "configs/math-congruence-matrix.v1.json",
+        "scripts/build-math-congruence-matrix.ts",
+        "scripts/validate-math-congruence-matrix.ts",
+        "tests/math-congruence-matrix.spec.ts",
+        "docs/audits/ticket-results"
+      ],
+      "required_tests": [
+        "scripts/validate-math-congruence-matrix.ts",
+        "tests/math-congruence-matrix.spec.ts"
+      ],
+      "done_criteria": [
+        "Builder emits deterministic sorted matrix rows across runs",
+        "Validator rejects matrix drift against deterministic builder output",
+        "Matrix spec tests enforce required binding/residual/falsifier fields"
+      ],
+      "research_gate": {
+        "risk_class": "contract_only",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-099-anti-pseudo-rigor-validation-gates",
+      "tree_owner": "math",
+      "primitive": "Detect and block pseudo-rigor patterns in root-leaf physics contracts",
+      "primary_path_prefix": "scripts/validate-physics-root-leaf-manifest.ts",
+      "allowed_paths": [
+        "scripts/toe-agent-preflight.ts",
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "tests/physics-root-leaf-manifest.spec.ts",
+        "tests/casimir-verify-ps2.spec.ts",
+        "docs/audits/ticket-results"
+      ],
+      "required_tests": [
+        "scripts/toe-agent-preflight.ts",
+        "tests/physics-root-leaf-manifest.spec.ts"
+      ],
+      "done_criteria": [
+        "Validator fails deterministically on equation-grounded claims without residual evidence",
+        "Validator fails deterministically on unknown or malformed uncertainty model references",
+        "Preflight and manifest tests preserve deterministic fail-closed behavior"
+      ],
+      "research_gate": {
+        "risk_class": "contract_only",
         "requires_audit": true,
         "requires_research": false,
         "required_artifacts": [

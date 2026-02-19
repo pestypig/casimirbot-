@@ -1,0 +1,28 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-092-canonical-equation-residual-contracts",
+  "files_changed": [
+    "configs/physics-equation-backbone.v1.json",
+    "scripts/validate-physics-equation-backbone.ts",
+    "tests/physics-equation-backbone.spec.ts",
+    "docs/audits/ticket-results/TOE-092-canonical-equation-residual-contracts.20260219T170500Z.json"
+  ],
+  "tests_run": [
+    "scripts/validate-physics-equation-backbone.ts",
+    "tests/physics-equation-backbone.spec.ts",
+    "npx tsx scripts/validate-physics-equation-backbone.ts",
+    "npx vitest run tests/physics-equation-backbone.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "toe-092-casimir-verify",
+    "run_id": "1",
+    "certificate_hash": "d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

@@ -3,27 +3,18 @@
   "ticket_id": "TOE-099-anti-pseudo-rigor-validation-gates",
   "files_changed": [
     "scripts/validate-physics-root-leaf-manifest.ts",
-    "tests/physics-root-leaf-manifest.spec.ts"
+    "tests/physics-root-leaf-manifest.spec.ts",
+    "docs/audits/ticket-results/TOE-099-anti-pseudo-rigor-validation-gates.20260219T081000Z.json"
   ],
   "tests_run": [
-    "npm run audit:toe:preflight",
+    "scripts/toe-agent-preflight.ts",
+    "tests/physics-root-leaf-manifest.spec.ts",
     "npx vitest run tests/physics-root-leaf-manifest.spec.ts",
-    "npx vitest run tests/casimir-verify-ps2.spec.ts"
+    "npm run audit:toe:preflight"
   ],
   "claim_tier": "diagnostic",
-  "research_gate": {
-    "risk_class": "contract_only",
-    "requires_audit": true,
-    "requires_research": false,
-    "required_artifacts": [
-      "runtime-contract-audit"
-    ]
-  },
-  "artifacts": [
-    {
-      "type": "runtime-contract-audit",
-      "ref": "artifacts/experiments/helix-ask-ps2/casimir-verify-latest.json"
-    }
+  "research_artifacts": [
+    "runtime-contract-audit"
   ],
   "casimir": {
     "verdict": "PASS",
