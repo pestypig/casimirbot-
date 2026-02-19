@@ -509,13 +509,29 @@ Derived reliability delta:
   - `A`: baseline controller with manifold/helical layer off.
   - `B`: baseline + retained control layers; `helical_6d` remains dropped (unchanged).
 
-Validity-gate definition (diagnostic hardening; configurable env thresholds with defaults):
-- `usable_response_rate >= 0.90` for each arm (`status=200` and parseable payload with required semantic fields).
-- `http_status_ok_rate >= 0.95` for each arm.
-- Non-degenerate semantic metric checks per arm:
-  - `claim_to_hook_linkage` must not be a constant floor artifact (`max-min > epsilon` OR `avg > floor_max`).
-  - `unsupported_claim_rate` must not be a constant `1.0` artifact (`max-min > epsilon` OR `avg < 1.0`).
-- If any gate fails, mark run `valid=false`, retain prior layer decisions, and annotate `evaluation_blocked_due_to_run_invalidity`.
+Validity-gate definition (finalized for `contract_version="phase6.ask.v1"`; configurable env thresholds with defaults):
+- Runtime envelope defaults:
+  - `timeout_ms=30000`
+  - `hard_timeout_ms=max(timeout_ms+250, configured hard timeout)`
+  - `concurrency=8`
+  - retry/backoff: `max_attempts=2`, `backoff_base_ms=250`, `backoff_multiplier=2`, `backoff_jitter_ms=125`
+  - cooldown/circuit breaker: open for `cooldown_ms=3000` after `failure_threshold=8` consecutive failed episodes.
+- Per-arm validity gates:
+  - `usable_response_rate >= 0.90` (`status=200` and scoreable response with required semantic fields).
+  - `http_status_ok_rate >= 0.95`.
+  - `json_ok_rate >= 0.95` (episodes not classified `invalid_json`).
+  - `schema_ok_rate >= 0.95` (episodes not classified `schema_mismatch`/`metric_input_missing`).
+  - `seed_coverage_rate >= 1.0`.
+  - `episode_coverage_rate >= 1.0`.
+  - Non-degenerate semantic metric checks:
+    - `claim_to_hook_linkage` must not be a constant floor artifact (`max-min > epsilon` OR `avg > floor_max`, with `epsilon=1e-6`, `floor_max=0.25`).
+    - `unsupported_claim_rate` must not be a constant `1.0` artifact (`max-min > epsilon` OR `avg < 1.0`).
+- Parse/schema/contract accounting is mandatory in diagnostics:
+  - `json_ok_rate`
+  - `schema_ok_rate`
+  - `fail_class_histogram`
+  - `fail_reason_histogram`
+- Blocked-run rule (strict): if any validity gate fails, set `evaluation.blocked=true` with reason `evaluation_blocked_due_to_run_invalidity`, and retain locked layer decisions unchanged.
 
 Latest live run validity status:
 - `valid=false`.

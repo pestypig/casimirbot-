@@ -7,6 +7,21 @@ import { helixUtilityPrompts } from "./helix-ask-utility-ab";
 type LayerId = "telemetry_x_t" | "linear_baseline" | "pca_baseline" | "helical_6d" | "rho_clamp" | "natario_first";
 type ArmName = "A" | "B";
 type FailureClass = "invalid_json" | "schema_mismatch" | "metric_input_missing" | "timeout_soft" | "timeout_hard" | "http_error";
+type RuntimeEnvelope = {
+  timeout_ms: number;
+  hard_timeout_ms: number;
+  concurrency: number;
+  retry: {
+    max_attempts: number;
+    backoff_base_ms: number;
+    backoff_multiplier: number;
+    backoff_jitter_ms: number;
+  };
+  circuit_breaker: {
+    failure_threshold: number;
+    cooldown_ms: number;
+  };
+};
 
 const FAILURE_CLASSES: ReadonlySet<FailureClass> = new Set([
   "invalid_json",
@@ -39,13 +54,34 @@ type AskResponse = {
 type PromptCase = ReturnType<typeof helixUtilityPrompts>[number];
 
 const BASE_URL = process.env.HELIX_PHASE6_BASE_URL ?? "http://127.0.0.1:5173";
-const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_PHASE6_TIMEOUT_MS ?? "30000");
-const REQUEST_HARD_TIMEOUT_MS = Math.max(REQUEST_TIMEOUT_MS + 250, Number(process.env.HELIX_PHASE6_HARD_TIMEOUT_MS ?? String(REQUEST_TIMEOUT_MS + 250)));
-const CONCURRENCY = Math.max(1, Number(process.env.HELIX_PHASE6_CONCURRENCY ?? "8"));
+const RUNTIME_ENVELOPE: RuntimeEnvelope = {
+  timeout_ms: Math.max(1000, Number(process.env.HELIX_PHASE6_TIMEOUT_MS ?? "30000")),
+  hard_timeout_ms: 0,
+  concurrency: Math.max(1, Number(process.env.HELIX_PHASE6_CONCURRENCY ?? "8")),
+  retry: {
+    max_attempts: Math.max(1, Number(process.env.HELIX_PHASE6_RETRY_MAX_ATTEMPTS ?? "2")),
+    backoff_base_ms: Math.max(0, Number(process.env.HELIX_PHASE6_BACKOFF_BASE_MS ?? "250")),
+    backoff_multiplier: Math.max(1, Number(process.env.HELIX_PHASE6_BACKOFF_MULTIPLIER ?? "2")),
+    backoff_jitter_ms: Math.max(0, Number(process.env.HELIX_PHASE6_BACKOFF_JITTER_MS ?? "125")),
+  },
+  circuit_breaker: {
+    failure_threshold: Math.max(1, Number(process.env.HELIX_PHASE6_CIRCUIT_FAILURE_THRESHOLD ?? "8")),
+    cooldown_ms: Math.max(250, Number(process.env.HELIX_PHASE6_COOLDOWN_MS ?? "3000")),
+  },
+};
+RUNTIME_ENVELOPE.hard_timeout_ms = Math.max(
+  RUNTIME_ENVELOPE.timeout_ms + 250,
+  Number(process.env.HELIX_PHASE6_HARD_TIMEOUT_MS ?? String(RUNTIME_ENVELOPE.timeout_ms + 250)),
+);
+
 const MIN_USABLE_RESPONSE_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_PHASE6_MIN_USABLE_RESPONSE_RATE ?? "0.90")));
 const MIN_HTTP_STATUS_OK_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_PHASE6_MIN_HTTP_STATUS_OK_RATE ?? "0.95")));
+const MIN_JSON_OK_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_PHASE6_MIN_JSON_OK_RATE ?? "0.95")));
+const MIN_SCHEMA_OK_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_PHASE6_MIN_SCHEMA_OK_RATE ?? "0.95")));
 const CLAIM_LINKAGE_FLOOR_MAX = Math.max(0, Math.min(1, Number(process.env.HELIX_PHASE6_CLAIM_LINKAGE_FLOOR_MAX ?? "0.25")));
 const METRIC_CONST_EPSILON = Math.max(0, Number(process.env.HELIX_PHASE6_METRIC_CONST_EPSILON ?? "0.000001"));
+const MIN_SEED_COVERAGE_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_PHASE6_MIN_SEED_COVERAGE_RATE ?? "1.0")));
+const MIN_EPISODE_COVERAGE_RATE = Math.max(0, Math.min(1, Number(process.env.HELIX_PHASE6_MIN_EPISODE_COVERAGE_RATE ?? "1.0")));
 const SEEDS = [
   1103, 2081, 3191, 4273, 5399, 6421, 7507, 8629, 9733, 10859,
   11939, 13007, 14143, 15269, 16381, 17489, 18617, 19739, 20849, 21961,
@@ -69,6 +105,10 @@ const ARM_TUNING: Record<ArmName, Record<string, unknown>> = {
 };
 
 const avg = (values: number[]): number => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
+const sleep = async (ms: number) => {
+  if (ms <= 0) return;
+  await new Promise((resolve) => setTimeout(resolve, ms));
+};
 
 const pickPromptSuite = (): PromptCase[] => {
   const all = helixUtilityPrompts();
@@ -157,10 +197,13 @@ const metricFromPayload = (status: number, payload: AskResponse | null) => {
   };
 };
 
-const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayIndex: number) => {
+const isRetryableFailure = (failClass: FailureClass | null | undefined): boolean =>
+  failClass === "timeout_soft" || failClass === "timeout_hard" || failClass === "http_error" || failClass === "invalid_json";
+
+const runAskAttempt = async (arm: ArmName, prompt: PromptCase, seed: number, replayIndex: number, attempt: number) => {
   const traceId = `phase6-live-${arm}-${prompt.id}-s${seed}-r${replayIndex}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), RUNTIME_ENVELOPE.timeout_ms);
   let hardTimeout: ReturnType<typeof setTimeout> | undefined;
   const started = Date.now();
   try {
@@ -173,6 +216,7 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
           debug: true,
           seed,
           temperature: 0,
+          contract_version: "phase6.ask.v1",
           sessionId: `phase6-live:${arm}:${prompt.id}:s${seed}`.slice(0, 120),
           traceId,
           strictProvenance: arm === "B",
@@ -184,7 +228,7 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
         hardTimeout = setTimeout(() => {
           controller.abort();
           reject(new Error("hard_timeout"));
-        }, REQUEST_HARD_TIMEOUT_MS);
+        }, RUNTIME_ENVELOPE.hard_timeout_ms);
       }),
     ]);
     if (hardTimeout) clearTimeout(hardTimeout);
@@ -197,6 +241,7 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
       promptId: prompt.id,
       seed,
       replayIndex,
+      attempt,
       traceId,
       status: resp.status,
       latencyMs: Date.now() - started,
@@ -214,6 +259,7 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
         promptId: prompt.id,
         seed,
         replayIndex,
+        attempt,
         traceId,
         status: 200,
         latencyMs: Date.now() - started,
@@ -233,6 +279,7 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
       promptId: prompt.id,
       seed,
       replayIndex,
+      attempt,
       traceId,
       status: 0,
       latencyMs: Date.now() - started,
@@ -245,7 +292,56 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
   }
 };
 
-const summarizeArm = (rows: Array<Awaited<ReturnType<typeof runAsk>>>) => {
+const runAsk = async (
+  arm: ArmName,
+  prompt: PromptCase,
+  seed: number,
+  replayIndex: number,
+  circuitState: { consecutiveFailures: number; openUntilMs: number },
+) => {
+  if (Date.now() < circuitState.openUntilMs) {
+    const payload: AskResponse = { fail_class: "http_error", fail_reason: "circuit_breaker_open_cooldown" };
+    return {
+      arm,
+      promptId: prompt.id,
+      seed,
+      replayIndex,
+      attempt: 0,
+      traceId: `phase6-live-${arm}-${prompt.id}-s${seed}-r${replayIndex}`,
+      status: 0,
+      latencyMs: 0,
+      payload,
+      metrics: metricFromPayload(0, payload),
+    };
+  }
+
+  let lastResult: Awaited<ReturnType<typeof runAskAttempt>> | null = null;
+  for (let attempt = 1; attempt <= RUNTIME_ENVELOPE.retry.max_attempts; attempt += 1) {
+    const result = await runAskAttempt(arm, prompt, seed, replayIndex, attempt);
+    lastResult = result;
+    if (result.status === 200 && result.metrics.scoreable && !result.metrics.fail_reason) {
+      circuitState.consecutiveFailures = 0;
+      return result;
+    }
+    circuitState.consecutiveFailures += 1;
+    if (circuitState.consecutiveFailures >= RUNTIME_ENVELOPE.circuit_breaker.failure_threshold) {
+      circuitState.openUntilMs = Date.now() + RUNTIME_ENVELOPE.circuit_breaker.cooldown_ms;
+      circuitState.consecutiveFailures = 0;
+    }
+    if (attempt < RUNTIME_ENVELOPE.retry.max_attempts && isRetryableFailure(result.metrics.fail_class)) {
+      const jitter = Math.floor(Math.random() * (RUNTIME_ENVELOPE.retry.backoff_jitter_ms + 1));
+      const backoff =
+        RUNTIME_ENVELOPE.retry.backoff_base_ms * Math.pow(RUNTIME_ENVELOPE.retry.backoff_multiplier, attempt - 1) + jitter;
+      await sleep(backoff);
+      continue;
+    }
+    return result;
+  }
+
+  return lastResult as Awaited<ReturnType<typeof runAskAttempt>>;
+};
+
+const summarizeArm = (rows: Array<Awaited<ReturnType<typeof runAsk>>>, expectedSeeds: readonly number[], expectedEpisodeCount: number) => {
   const primaryRows = rows.filter((entry) => entry.replayIndex === 1);
   const replayRows = rows.filter((entry) => entry.replayIndex === 2);
   const replayMap = new Map(replayRows.map((entry) => [`${entry.promptId}:${entry.seed}`, entry]));
@@ -273,8 +369,15 @@ const summarizeArm = (rows: Array<Awaited<ReturnType<typeof runAsk>>>) => {
   const claimValues = primaryRows.map((entry) => entry.metrics.claim_to_hook_linkage);
   const unsupportedValues = primaryRows.map((entry) => entry.metrics.unsupported_claim_rate);
 
+  const uniqueSeeds = new Set(primaryRows.map((entry) => entry.seed));
+  const coveredEpisodes = new Set(primaryRows.map((entry) => `${entry.promptId}:${entry.seed}`));
+  const jsonOkRate = avg(primaryRows.map((entry) => (entry.metrics.fail_class === "invalid_json" ? 0 : 1)));
+  const schemaOkRate = avg(primaryRows.map((entry) => (entry.metrics.fail_class === "schema_mismatch" || entry.metrics.fail_class === "metric_input_missing" ? 0 : 1)));
+
   return {
     episodeCount: primaryRows.length,
+    seed_coverage_rate: expectedSeeds.length ? uniqueSeeds.size / expectedSeeds.length : 0,
+    episode_coverage_rate: expectedEpisodeCount ? coveredEpisodes.size / expectedEpisodeCount : 0,
     pass_rate: avg(primaryRows.map((entry) => (entry.metrics.pass ? 1 : 0))),
     contradiction_rate: avg(primaryRows.map((entry) => (entry.metrics.contradiction ? 1 : 0))),
     replay_parity: avg(parity),
@@ -282,6 +385,8 @@ const summarizeArm = (rows: Array<Awaited<ReturnType<typeof runAsk>>>) => {
     unsupported_claim_rate: avg(primaryRows.map((entry) => entry.metrics.unsupported_claim_rate)),
     http_status_ok_rate: avg(primaryRows.map((entry) => (entry.status === 200 ? 1 : 0))),
     usable_response_rate: avg(primaryRows.map((entry) => (entry.status === 200 && entry.metrics.scoreable ? 1 : 0))),
+    json_ok_rate: jsonOkRate,
+    schema_ok_rate: schemaOkRate,
     diagnostics: {
       claim_to_hook_linkage_min: claimValues.length ? Math.min(...claimValues) : 0,
       claim_to_hook_linkage_max: claimValues.length ? Math.max(...claimValues) : 0,
@@ -323,6 +428,62 @@ const computeValidity = (A: ReturnType<typeof summarizeArm>, B: ReturnType<typeo
       value: B.http_status_ok_rate,
       pass: B.http_status_ok_rate >= MIN_HTTP_STATUS_OK_RATE,
       reason: B.http_status_ok_rate >= MIN_HTTP_STATUS_OK_RATE ? "ok" : "below_min_http_status_ok_rate",
+    },
+    {
+      gate: "A.json_ok_rate",
+      threshold: `>= ${MIN_JSON_OK_RATE}`,
+      value: A.json_ok_rate,
+      pass: A.json_ok_rate >= MIN_JSON_OK_RATE,
+      reason: A.json_ok_rate >= MIN_JSON_OK_RATE ? "ok" : "below_min_json_ok_rate",
+    },
+    {
+      gate: "B.json_ok_rate",
+      threshold: `>= ${MIN_JSON_OK_RATE}`,
+      value: B.json_ok_rate,
+      pass: B.json_ok_rate >= MIN_JSON_OK_RATE,
+      reason: B.json_ok_rate >= MIN_JSON_OK_RATE ? "ok" : "below_min_json_ok_rate",
+    },
+    {
+      gate: "A.schema_ok_rate",
+      threshold: `>= ${MIN_SCHEMA_OK_RATE}`,
+      value: A.schema_ok_rate,
+      pass: A.schema_ok_rate >= MIN_SCHEMA_OK_RATE,
+      reason: A.schema_ok_rate >= MIN_SCHEMA_OK_RATE ? "ok" : "below_min_schema_ok_rate",
+    },
+    {
+      gate: "B.schema_ok_rate",
+      threshold: `>= ${MIN_SCHEMA_OK_RATE}`,
+      value: B.schema_ok_rate,
+      pass: B.schema_ok_rate >= MIN_SCHEMA_OK_RATE,
+      reason: B.schema_ok_rate >= MIN_SCHEMA_OK_RATE ? "ok" : "below_min_schema_ok_rate",
+    },
+    {
+      gate: "A.seed_coverage_rate",
+      threshold: `>= ${MIN_SEED_COVERAGE_RATE}`,
+      value: A.seed_coverage_rate,
+      pass: A.seed_coverage_rate >= MIN_SEED_COVERAGE_RATE,
+      reason: A.seed_coverage_rate >= MIN_SEED_COVERAGE_RATE ? "ok" : "below_min_seed_coverage_rate",
+    },
+    {
+      gate: "B.seed_coverage_rate",
+      threshold: `>= ${MIN_SEED_COVERAGE_RATE}`,
+      value: B.seed_coverage_rate,
+      pass: B.seed_coverage_rate >= MIN_SEED_COVERAGE_RATE,
+      reason: B.seed_coverage_rate >= MIN_SEED_COVERAGE_RATE ? "ok" : "below_min_seed_coverage_rate",
+    },
+    {
+      gate: "A.episode_coverage_rate",
+      threshold: `>= ${MIN_EPISODE_COVERAGE_RATE}`,
+      value: A.episode_coverage_rate,
+      pass: A.episode_coverage_rate >= MIN_EPISODE_COVERAGE_RATE,
+      reason: A.episode_coverage_rate >= MIN_EPISODE_COVERAGE_RATE ? "ok" : "below_min_episode_coverage_rate",
+    },
+    {
+      gate: "B.episode_coverage_rate",
+      threshold: `>= ${MIN_EPISODE_COVERAGE_RATE}`,
+      value: B.episode_coverage_rate,
+      pass: B.episode_coverage_rate >= MIN_EPISODE_COVERAGE_RATE,
+      reason: B.episode_coverage_rate >= MIN_EPISODE_COVERAGE_RATE ? "ok" : "below_min_episode_coverage_rate",
     },
     {
       gate: "A.claim_to_hook_linkage_not_constant_floor_artifact",
@@ -368,6 +529,10 @@ const computeValidity = (A: ReturnType<typeof summarizeArm>, B: ReturnType<typeo
     thresholds: {
       usable_response_rate_min: MIN_USABLE_RESPONSE_RATE,
       http_status_ok_rate_min: MIN_HTTP_STATUS_OK_RATE,
+      json_ok_rate_min: MIN_JSON_OK_RATE,
+      schema_ok_rate_min: MIN_SCHEMA_OK_RATE,
+      seed_coverage_rate_min: MIN_SEED_COVERAGE_RATE,
+      episode_coverage_rate_min: MIN_EPISODE_COVERAGE_RATE,
       claim_to_hook_linkage_floor_max: CLAIM_LINKAGE_FLOOR_MAX,
       metric_const_epsilon: METRIC_CONST_EPSILON,
     },
@@ -376,22 +541,36 @@ const computeValidity = (A: ReturnType<typeof summarizeArm>, B: ReturnType<typeo
   };
 };
 
+const resolveLayerDecisions = (valid: boolean, recommendedLayerDecisions: Array<{ layer: LayerId; decision: "keep" | "drop"; basis: string }>, unchangedLayerDecisions: Array<{ layer: LayerId; decision: "keep" | "drop"; basis: string }>) => ({
+  evaluation: {
+    blocked: !valid,
+    reason: valid ? null : "evaluation_blocked_due_to_run_invalidity",
+  },
+  layerDecisions: valid
+    ? recommendedLayerDecisions
+    : unchangedLayerDecisions.map((entry) => ({ ...entry, basis: `${entry.basis}; evaluation_blocked_due_to_run_invalidity` })),
+});
+
 const main = async () => {
   const promptSuite = pickPromptSuite();
   const jobs: Array<() => Promise<Awaited<ReturnType<typeof runAsk>>>> = [];
+  const circuitStateByArm: Record<ArmName, { consecutiveFailures: number; openUntilMs: number }> = {
+    A: { consecutiveFailures: 0, openUntilMs: 0 },
+    B: { consecutiveFailures: 0, openUntilMs: 0 },
+  };
 
   for (const arm of ["A", "B"] as const) {
     for (const seed of SEEDS) {
       for (const prompt of promptSuite) {
-        jobs.push(() => runAsk(arm, prompt, seed, 1));
-        jobs.push(() => runAsk(arm, prompt, seed, 2));
+        jobs.push(() => runAsk(arm, prompt, seed, 1, circuitStateByArm[arm]));
+        jobs.push(() => runAsk(arm, prompt, seed, 2, circuitStateByArm[arm]));
       }
     }
   }
 
   const rows: Array<Awaited<ReturnType<typeof runAsk>>> = [];
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(CONCURRENCY, jobs.length) }, async () => {
+  const workers = Array.from({ length: Math.min(RUNTIME_ENVELOPE.concurrency, jobs.length) }, async () => {
     while (cursor < jobs.length) {
       const index = cursor;
       cursor += 1;
@@ -402,8 +581,9 @@ const main = async () => {
 
   const armRowsA = rows.filter((entry) => entry.arm === "A");
   const armRowsB = rows.filter((entry) => entry.arm === "B");
-  const A = summarizeArm(armRowsA);
-  const B = summarizeArm(armRowsB);
+  const expectedEpisodesPerArm = SEEDS.length * promptSuite.length;
+  const A = summarizeArm(armRowsA, SEEDS, expectedEpisodesPerArm);
+  const B = summarizeArm(armRowsB, SEEDS, expectedEpisodesPerArm);
 
   const deltas = {
     pass_rate: B.pass_rate - A.pass_rate,
@@ -433,9 +613,7 @@ const main = async () => {
   ];
 
   const validity = computeValidity(A, B);
-  const layerDecisions = validity.valid
-    ? recommendedLayerDecisions
-    : unchangedLayerDecisions.map((entry) => ({ ...entry, basis: `${entry.basis}; evaluation_blocked_due_to_run_invalidity` }));
+  const decisionResolution = resolveLayerDecisions(validity.valid, recommendedLayerDecisions, unchangedLayerDecisions);
 
   const runAt = new Date().toISOString();
   const runId = `phase6-live-ab-${runAt.replace(/[:.]/g, "-")}`;
@@ -459,6 +637,7 @@ const main = async () => {
         tuning: ARM_TUNING.B,
       },
     },
+    runtimeEnvelope: RUNTIME_ENVELOPE,
     traceRefs: rows.map((entry) => ({
       arm: entry.arm,
       promptId: entry.promptId,
@@ -469,16 +648,14 @@ const main = async () => {
       latencyMs: entry.latencyMs,
       failReason: entry.metrics.fail_reason ?? null,
       failClass: entry.metrics.fail_class ?? null,
+      attempt: entry.attempt,
     })),
     arms: { A, B },
     deltas,
     validity,
-    evaluation: {
-      blocked: !validity.valid,
-      reason: validity.valid ? null : "evaluation_blocked_due_to_run_invalidity",
-    },
+    evaluation: decisionResolution.evaluation,
     recommendedLayerDecisions,
-    layerDecisions,
+    layerDecisions: decisionResolution.layerDecisions,
   };
 
   const outPath = path.join("artifacts", "experiments", "helical-phase6", "phase6-live-ab-results.json");
@@ -488,9 +665,13 @@ const main = async () => {
 };
 
 export const __test = {
+  RUNTIME_ENVELOPE,
   hasRequiredFields,
   classifyScoreability,
   metricFromPayload,
+  summarizeArm,
+  computeValidity,
+  resolveLayerDecisions,
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
