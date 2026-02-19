@@ -1,0 +1,44 @@
+{
+  "schema_version": "helix_build_session_bookkeeping/1",
+  "ticket_id": "HELIX-PS2-tool-space-audit",
+  "recorded_at": "2026-02-19T06:25:26Z",
+  "reported_commit_hash": "e97eafa",
+  "source": "post-mvp tool-space audit campaign",
+  "output_artifacts": [
+    "reports/helix-ask-tool-space-audit-20260219T062056Z.md",
+    "artifacts/experiments/helix-ask-tool-space-audit/20260219T062056Z/summary.json",
+    "artifacts/experiments/helix-ask-tool-space-audit/20260219T062056Z/failures.json",
+    "artifacts/experiments/helix-ask-tool-space-audit/20260219T062056Z/recommendation.json"
+  ],
+  "metrics": {
+    "report_mode_mismatch_rate": 0.07777777777777778,
+    "citation_missing_rate": 0.03333333333333333,
+    "relation_packet_built_rate": 0.8666666666666667,
+    "clarify_trigger_rate": 0.28888888888888886,
+    "tool_not_allowed_rate": 0.0,
+    "clocka_tool_cap_stop_rate": 0.46296296296296297,
+    "adapter_degrade_reason_distribution": {}
+  },
+  "before_after": {
+    "baseline": "reports/helix-ask-versatility-report.md",
+    "report_mode_mismatch_rate": {
+      "before": 0.07777777777777778,
+      "after": 0.07777777777777778
+    },
+    "citation_missing_rate": {
+      "before": 0.03333333333333333,
+      "after": 0.03333333333333333
+    },
+    "relation_packet_built_rate": {
+      "before": 0.8667,
+      "after": 0.8666666666666667
+    }
+  },
+  "casimir": {
+    "traceId": "adapter:c993d730-8653-43cc-992e-d75816c0fe13",
+    "runId": "272",
+    "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrityOk": true,
+    "verdict": "PASS"
+  }
+}
