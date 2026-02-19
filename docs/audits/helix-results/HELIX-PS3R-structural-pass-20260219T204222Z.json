@@ -1,0 +1,31 @@
+{
+  "runLabel": "HELIX-PS3R-structural-pass",
+  "timestamp": "20260219T204222Z",
+  "baseline": {
+    "quakeWeight": "reports/helix-ask-quake-weight-ps3-3-20260219T180123Z.md",
+    "versatility": "reports/helix-ask-versatility-post-tool-rerun-20260219T064450Z.md"
+  },
+  "changes": {
+    "reportModeRoutingContract": "implemented",
+    "relationPacketFloors": "implemented_with_bounded_retry",
+    "citationPersistenceGuard": "implemented_with_explicit_fail_signal"
+  },
+  "validation": {
+    "availabilityPrecheck": "blocked",
+    "goalZone": "blocked",
+    "versatility270": "blocked",
+    "casimirVerify": {
+      "status": "blocked",
+      "verdict": null,
+      "traceId": null,
+      "runId": null,
+      "certificateHash": null,
+      "integrityOk": null
+    }
+  },
+  "environmentBlockers": [
+    "vitest not found in runtime",
+    "npx registry access denied (403)",
+    "local service could not be started on :5173 due missing toolchain"
+  ]
+}

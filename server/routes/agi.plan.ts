@@ -237,6 +237,7 @@ import {
 } from "../services/helix-ask/proof-packet";
 import {
   buildRelationAssemblyPacket,
+  evaluateRelationPacketFloors,
   renderRelationAssemblyFallback,
   resolveRelationTopologySignal,
   type RelationAssemblyPacket,
@@ -3272,6 +3273,10 @@ const HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS = clampNumber(
   140,
   1400,
 );
+const HELIX_ASK_RELATION_PACKET_MIN_BRIDGES = Math.max(1, Math.floor(readNumber(process.env.HELIX_ASK_RELATION_PACKET_MIN_BRIDGES, 2)));
+const HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE = Math.max(2, Math.floor(readNumber(process.env.HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE, 4)));
+const HELIX_ASK_RELATION_PACKET_MAX_RETRIES = Math.max(0, Math.floor(readNumber(process.env.HELIX_ASK_RELATION_PACKET_MAX_RETRIES, 1)));
+
 const HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR =
   String(process.env.HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ?? "1").trim() !== "0";
 const HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES = [
@@ -14879,12 +14884,9 @@ const resolveReportModeDecision = (question: string): HelixAskReportModeDecision
   if (isExplicitReportRequest(question)) {
     return { enabled: true, reason: "explicit_report_request", tokenCount, charCount, blockCount };
   }
-  if (blockCount >= HELIX_ASK_REPORT_TRIGGER_BLOCKS) {
-    return { enabled: true, reason: "block_count", tokenCount, charCount, blockCount };
-  }
-  if (tokenCount >= HELIX_ASK_REPORT_TRIGGER_TOKENS || charCount >= HELIX_ASK_REPORT_TRIGGER_CHARS) {
-    return { enabled: true, reason: "long_prompt", tokenCount, charCount, blockCount };
-  }
+  // Structural contract: non-explicit report prompts must be routed by downstream
+  // slot coverage logic so evaluation families do not drift into report mode based
+  // only on prompt length.
   return { enabled: false, tokenCount, charCount, blockCount };
 };
 
@@ -24140,22 +24142,59 @@ const executeHelixAsk = async ({
       const relationPacketActivationOk =
         relationQuery && (relationTopology.crossDomainBridge || relationDualDomainOk);
       if (relationPacketActivationOk) {
-        relationPacket = buildRelationAssemblyPacket({
-          question: baseQuestion,
-          contextFiles,
-          contextText,
-          docBlocks,
-          graphPack,
-        });
-        const relationPacketDualDomain =
-          relationPacket.domains.includes("warp") && relationPacket.domains.includes("ethos");
-        relationDualDomainOk = relationDualDomainOk || relationPacketDualDomain;
-        if (debugPayload) {
-          debugPayload.relation_packet_built = true;
-          debugPayload.relation_packet_evidence_count = relationPacket.evidence.length;
-          debugPayload.relation_packet_bridge_count = relationPacket.bridge_claims.length;
+        const relationSeedFiles = Array.from(
+          new Set([
+            ...contextFiles,
+            "docs/knowledge/warp/warp-bubble.md",
+            "docs/ethos/ideology.json",
+          ]),
+        );
+        const relationRetryFailures: string[] = [];
+        for (let attempt = 0; attempt <= HELIX_ASK_RELATION_PACKET_MAX_RETRIES; attempt += 1) {
+          const attemptPacket = buildRelationAssemblyPacket({
+            question: baseQuestion,
+            contextFiles: relationSeedFiles,
+            contextText,
+            docBlocks,
+            graphPack,
+          });
+          const floorCheck = evaluateRelationPacketFloors(attemptPacket, {
+            minBridges: HELIX_ASK_RELATION_PACKET_MIN_BRIDGES,
+            minEvidence: HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE,
+          });
+          if (floorCheck.ok) {
+            relationPacket = attemptPacket;
+            break;
+          }
+          relationRetryFailures.push(`${floorCheck.failReason ?? "relation_packet_built"}:${floorCheck.failReason === "bridge_count_low" ? floorCheck.bridgeCount : floorCheck.evidenceCount}`);
+          if (attempt >= HELIX_ASK_RELATION_PACKET_MAX_RETRIES) {
+            if (debugPayload) {
+              debugPayload.helix_ask_fail_reason = relationRetryFailures[0] ?? "relation_packet_built";
+            }
+            relationPacket = null;
+            break;
+          }
+          relationSeedFiles.push(...attemptPacket.evidence.map((entry) => entry.path));
+        }
+        if (relationPacket) {
+          const relationPacketDualDomain =
+            relationPacket.domains.includes("warp") && relationPacket.domains.includes("ethos");
+          relationDualDomainOk = relationDualDomainOk || relationPacketDualDomain;
+          if (debugPayload) {
+            debugPayload.relation_packet_built = true;
+            debugPayload.relation_packet_evidence_count = relationPacket.evidence.length;
+            debugPayload.relation_packet_bridge_count = relationPacket.bridge_claims.length;
+            debugPayload.relation_dual_domain_ok = relationDualDomainOk;
+            debugPayload.relation_missing_anchor_files = [];
+            debugPayload.relation_packet_retry_failures = relationRetryFailures;
+          }
+        } else if (debugPayload) {
+          debugPayload.relation_packet_built = false;
           debugPayload.relation_dual_domain_ok = relationDualDomainOk;
-          debugPayload.relation_missing_anchor_files = [];
+          debugPayload.relation_missing_anchor_files = relationTopology.missingAnchors;
+          debugPayload.relation_packet_bridge_count = 0;
+          debugPayload.relation_packet_evidence_count = 0;
+          debugPayload.relation_packet_retry_failures = relationRetryFailures;
         }
       } else if (debugPayload && relationQuery) {
         debugPayload.relation_packet_built = false;
@@ -27089,11 +27128,20 @@ const executeHelixAsk = async ({
         } else if (hasFinalCitations) {
           answerPath.push("citationPersistence:preserved");
         }
+        const citationPersistenceOk =
+          extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
+        if (!citationPersistenceOk) {
+          answerPath.push("citationPersistence:citation_missing");
+          if (debugPayload) {
+            debugPayload.helix_ask_fail_reason = "citation_missing";
+          }
+        }
         if (debugPayload) {
           debugPayload.citation_persistence_guard_applied = true;
           debugPayload.citation_persistence_sources = citationGuardTokens.slice(0, 8);
           debugPayload.citation_persistence_appended =
             beforeCitationGuard.trim() !== cleaned.trim();
+          debugPayload.citation_persistence_ok = citationPersistenceOk;
         }
       }
       let selectedMove: "direct_answer" | "retrieve_more" | "relation_build" | "clarify" | "fail_closed" =

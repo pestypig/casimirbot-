@@ -329,6 +329,28 @@ export function resolveRelationTopologySignal(args: {
   };
 }
 
+
+export type RelationPacketFloorCheck = {
+  ok: boolean;
+  bridgeCount: number;
+  evidenceCount: number;
+  failReason?: "bridge_count_low" | "evidence_count_low";
+};
+
+export function evaluateRelationPacketFloors(
+  packet: RelationAssemblyPacket | null,
+  floors: { minBridges: number; minEvidence: number },
+): RelationPacketFloorCheck {
+  const bridgeCount = packet?.bridge_claims?.length ?? 0;
+  const evidenceCount = packet?.evidence?.length ?? 0;
+  if (bridgeCount < floors.minBridges) {
+    return { ok: false, bridgeCount, evidenceCount, failReason: "bridge_count_low" };
+  }
+  if (evidenceCount < floors.minEvidence) {
+    return { ok: false, bridgeCount, evidenceCount, failReason: "evidence_count_low" };
+  }
+  return { ok: true, bridgeCount, evidenceCount };
+}
 export function buildRelationAssemblyPacket(args: {
   question: string;
   contextFiles: string[];

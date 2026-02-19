@@ -221,6 +221,36 @@ describe("Helix Ask live events", () => {
     expect(payload.text).toMatch(/Sources:/i);
   }, 45000);
 
+  it("keeps long relation prompts out of report mode unless explicitly requested", async () => {
+    const question = [
+      "Explain how warp bubble viability relates to mission ethos stewardship and governance.",
+      "Also map falsifiability hooks to policy checkpoints and safety constraints.",
+      "Keep this as one direct relation answer with sources, not a multi-block report.",
+    ].join(" ");
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question,
+        debug: true,
+        sessionId: "test-relation-long-no-report",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      debug?: {
+        report_mode?: boolean;
+        report_mode_reason?: string;
+        intent_id?: string;
+      };
+      text?: string;
+    };
+    expect(payload.debug?.report_mode).toBe(false);
+    expect(payload.debug?.report_mode_reason).not.toBe("long_prompt");
+    expect(payload.debug?.intent_id).toBe("hybrid.warp_ethos_relation");
+    expect(payload.text ?? "").toMatch(/Sources:/i);
+  }, 45000);
+
   it("does not auto-fanout relation prompts into report mode", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",
