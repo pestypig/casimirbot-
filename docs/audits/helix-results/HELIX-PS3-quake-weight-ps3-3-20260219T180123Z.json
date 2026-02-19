@@ -1,0 +1,115 @@
+{
+  "task": "HELIX-PS3.3",
+  "timestamp": "20260219T180123Z",
+  "baseline_run_id": "versatility-1771461446899",
+  "sweep_dir": "artifacts/experiments/helix-ask-quake-weight-tuning/20260219T171102Z",
+  "promoted": false,
+  "winner": {
+    "id": "quake-core-10",
+    "metrics": {
+      "report_mode_mismatch": 21,
+      "relation_failures": 12,
+      "citation_missing": 9,
+      "clocka_tool_cap_stop_rate": 0.3111111111111111,
+      "latency_total_p95_ms": 1888,
+      "invalid_error_rate": 0
+    },
+    "passes": false,
+    "score": 17.33888888888889,
+    "summaryPath": "/workspace/casimirbot-/artifacts/experiments/helix-ask-quake-weight-tuning/20260219T171102Z/quake-core-10-1771523330760/versatility-1771523332004/summary.json"
+  },
+  "delta_vs_baseline": {
+    "report_mode_mismatch": 0,
+    "relation_failures": 0,
+    "citation_missing": 0,
+    "clocka_tool_cap_stop_rate": -0.1519,
+    "latency_total_p95_ms": -43,
+    "invalid_error_rate": 0
+  },
+  "gate_status": [
+    {
+      "gate": "report_mode_mismatch",
+      "threshold": 10,
+      "actual": 21,
+      "pass": false
+    },
+    {
+      "gate": "relation_failures",
+      "threshold": 6,
+      "actual": 12,
+      "pass": false
+    },
+    {
+      "gate": "citation_missing",
+      "threshold": 4,
+      "actual": 9,
+      "pass": false
+    },
+    {
+      "gate": "clocka_tool_cap_stop_rate",
+      "threshold": 0.35,
+      "actual": 0.3111111111111111,
+      "pass": true
+    },
+    {
+      "gate": "latency_total_p95_ms",
+      "threshold": 1600,
+      "actual": 1888,
+      "pass": false
+    },
+    {
+      "gate": "invalid_error_rate",
+      "threshold": 0,
+      "actual": 0,
+      "pass": true
+    }
+  ],
+  "tool_friction": {
+    "clarify_trigger_rate": 0.28888888888888886,
+    "tool_not_allowed_rate": 0,
+    "clocka_tool_cap_stop_rate": 0.3111111111111111,
+    "adapter_degrade_histogram": {
+      "none": 270
+    }
+  },
+  "top_failures": [
+    {
+      "signature": "report_mode_mismatch",
+      "count": 21,
+      "layer": "report-policy-layer"
+    },
+    {
+      "signature": "relation_packet_built",
+      "count": 12,
+      "layer": "relation-routing-layer"
+    },
+    {
+      "signature": "relation_dual_domain",
+      "count": 12,
+      "layer": "relation-routing-layer"
+    },
+    {
+      "signature": "bridge_count_low",
+      "count": 12,
+      "layer": "relation-routing-layer"
+    },
+    {
+      "signature": "evidence_count_low",
+      "count": 12,
+      "layer": "relation-routing-layer"
+    }
+  ],
+  "strict_validation": {
+    "goal_zone_pass": false,
+    "versatility_run_id": "versatility-1771523827677"
+  },
+  "casimir": {
+    "verdict": "PASS",
+    "traceId": "adapter:0b4e5a0c-64ab-439f-87f8-12765fd1c6ef",
+    "runId": "3573",
+    "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrityOk": true
+  },
+  "commit": "9497befc98a641bd1858f46b41f31551e59977a2",
+  "pr_url": "unavailable"
+}
