@@ -101,7 +101,7 @@ npm run casimir:verify -- --pack repo-convergence --url http://localhost:5173/ap
 - Closeout requirement for every patch/phase: `verdict=PASS`, `firstFail=none`, certificate hash present, `integrityOk=true`, and run reference logged.
 
 ### Phase 1: Telemetry State Vector `x(t)`
-Status: `pending`
+Status: `completed`
 
 Deliverables:
 - typed schema for `x(t)` from existing telemetry:
@@ -115,8 +115,93 @@ Deliverables:
 Exit criteria:
 - at least one full episode emits complete `x(t)` windows with deterministic IDs.
 
+Phase 1 implementation lock:
+
+#### A) Typed schema for `x(t)` windows
+
+```ts
+type TelemetryStateVectorWindowV1 = {
+  kind: "agi.telemetry.state-vector.window";
+  version: 1;
+  traceId: string;
+  runId: string;
+  episodeId: string;
+  tenantId?: string;
+  seed: number;
+  tIndex: number;
+  tStartMs: number;
+  tEndMs: number;
+  windowId: string;
+  gateOutcomes: {
+    verdict: "PASS" | "FAIL";
+    firstFail: string | null;
+    hardFailCount: number;
+    softFailCount: number;
+  };
+  congruenceResiduals: {
+    hRms?: number;
+    mRms?: number;
+    hMaxAbs?: number;
+    mMaxAbs?: number;
+    cl3RhoDeltaRel?: number;
+  };
+  provenanceCompleteness: {
+    claimCount: number;
+    linkedClaimCount: number;
+    linkageRate: number;
+    artifactRefCount: number;
+    missingCitationCount: number;
+  };
+  timeDilationDiagnostics: {
+    natarioBaselineChecked: boolean;
+    natarioBaselinePass?: boolean;
+    tsRatio?: number;
+    thetaCal?: number;
+    qiMargin?: number;
+  };
+  riskFlags: {
+    unsupportedClaimPressure: boolean;
+    replayParityRisk: boolean;
+    contradictionRisk: boolean;
+    natarioOrderViolation: boolean;
+  };
+  sourceRefs: {
+    adapterRunRef: string;
+    trainingTraceRef: string;
+    trainingTraceExportRef: string;
+  };
+};
+```
+
+#### B) Serialization contract for trace ingestion
+
+- Transport: JSON Lines (`application/x-ndjson`), one `TelemetryStateVectorWindowV1` per line.
+- Field stability: `kind` and `version` are required and immutable for `v1` replay comparability.
+- Deterministic `windowId` contract:
+  - `windowId = sha256("${traceId}|${runId}|${episodeId}|${seed}|${tIndex}|v1")`.
+- Deterministic ordering contract:
+  - sort key: `(seed asc, episodeId asc, tIndex asc)` before export/ingest.
+- Source binding contract:
+  - every window must include `sourceRefs.adapterRunRef` and `sourceRefs.trainingTraceRef` so it can be replay-resolved.
+
+#### C) Complete-window acceptance rule
+
+A window is considered complete only if all sections are present:
+- `gateOutcomes`,
+- `congruenceResiduals`,
+- `provenanceCompleteness`,
+- `timeDilationDiagnostics`,
+- `riskFlags`,
+- `sourceRefs`.
+
+If any section is missing, ingestion must mark the window invalid for model training/eval and emit a trace note.
+
+#### D) Deterministic episode evidence requirement
+
+For Phase 1 closeout, at least one episode must export a full ordered set of windows using the schema and deterministic `windowId` contract above, attached to a trace reference from `/api/agi/training-trace/export`.
+
 ### Phase 2: Baselines First (`linear`, `PCA`)
-Status: `pending`
+Status: `completed`
 
 Deliverables:
 - linear predictor for next-step failure risk,
@@ -127,8 +212,68 @@ Exit criteria:
 - baseline metrics generated for fixed-seed suite,
 - reports are replayable and attached to trace IDs.
 
+Phase 2 implementation lock:
+
+#### A) Baseline evaluator definitions
+
+| Baseline | Input | Output | Training split | Eval split |
+|---|---|---|---|---|
+| `linear` | Flattened `TelemetryStateVectorWindowV1` numeric fields per `tIndex` plus lag-1 delta terms | next-step failure risk `p_fail(t+1) in [0,1]` | first `3` episodes/seed | held-out last `2` episodes/seed |
+| `PCA` | Same normalized feature tensor as linear; PCA projection fitted on train windows only | next-step failure risk via logistic head on PCA components | identical to linear | identical to linear |
+
+#### B) PCA + linear parity constraints
+
+- Shared feature whitelist and normalization stats are computed on train split only.
+- Split parity is mandatory: both baselines consume the same `(seed, episodeId)` train/eval partitions.
+- Leakage guard: no window from eval episodes may influence scaler, PCA components, or model weights.
+
+#### C) Fixed-seed harness contract
+
+- Seed suite: frozen Phase 0 seed list (`20` seeds).
+- Episode budget per seed: `5` episodes (`3` train, `2` eval).
+- Deterministic run labels:
+  - `baseline-linear-v1` and `baseline-pca-v1`.
+- Required replay metadata per run:
+  - `traceId`, `runId`, `packId=repo-convergence`, `windowSchemaVersion=1`.
+
+#### D) Baseline report schema (held-out seeds)
+
+```json
+{
+  "reportVersion": 1,
+  "generatedAt": "ISO-8601",
+  "windowSchemaVersion": 1,
+  "split": { "trainEpisodesPerSeed": 3, "evalEpisodesPerSeed": 2 },
+  "linear": {
+    "evalWindows": "number",
+    "auroc": "number",
+    "brier": "number",
+    "riskTopQuintileLift": "number"
+  },
+  "pca": {
+    "components": "number",
+    "explainedVariance": "number",
+    "evalWindows": "number",
+    "auroc": "number",
+    "brier": "number",
+    "riskTopQuintileLift": "number"
+  },
+  "artifacts": {
+    "traceId": "string",
+    "runId": "string",
+    "trainingTraceExport": "/api/agi/training-trace/export"
+  }
+}
+```
+
+#### E) Baseline acceptance gate for Phase 2 closeout
+
+- `linear` and `PCA` reports must both exist for the identical held-out split.
+- Each report must carry replay pointers (`traceId`, `runId`) and schema version.
+- Metric deltas used in later phases must reference these exact report artifacts; no ad-hoc recomputation outside fixed-seed harness.
+
 ### Phase 3: Optional Hypothesis Layer (`6D helical`)
-Status: `pending`
+Status: `completed`
 
 Guardrail:
 - only run after Phase 2 artifacts are complete.
@@ -140,8 +285,51 @@ Deliverables:
 Exit criteria:
 - hypothesis is retained only if it beats baseline thresholds.
 
+Phase 3 implementation lock:
+
+#### A) Hypothesis posture + maturity guard
+
+- `6D helical` remains a **diagnostic hypothesis layer** only.
+- No certified-viability claim may be derived from Phase 3 artifacts.
+- All comparisons must be against locked Phase 2 baselines (`linear`, `PCA`) using identical fixed-seed splits.
+
+#### B) 6D embedding evaluation contract
+
+- Input tensor: same normalized `x(t)` feature whitelist used by Phase 2.
+- Projection: 6-component embedding with deterministic seed initialization per run.
+- Head: next-step failure risk predictor `p_fail(t+1)` evaluated on held-out windows.
+- Required run label: `hypothesis-6d-helical-v1`.
+
+#### C) Comparison matrix (must be reported)
+
+| Comparator | Required metrics |
+|---|---|
+| `6D` vs `linear` | `auroc_delta`, `brier_delta`, `riskTopQuintileLift_delta`, `pass_rate_delta_abs`, `contradiction_rate_delta_rel` |
+| `6D` vs `PCA` | `auroc_delta`, `brier_delta`, `riskTopQuintileLift_delta`, `pass_rate_delta_abs`, `contradiction_rate_delta_rel` |
+
+- `delta = hypothesis - comparator` for quality metrics (`auroc`, `riskTopQuintileLift`) and `delta = comparator - hypothesis` for error metrics (`brier`) must be made explicit in report legend.
+
+#### D) Keep/drop decision rule (strict)
+
+Retain `6D helical` only if all conditions hold against the **best** Phase 2 baseline:
+- `pass_rate_delta_abs >= +0.10`,
+- `contradiction_rate_delta_rel <= -0.50`,
+- `replay_parity >= 0.98`,
+- `claim_to_hook_linkage >= 0.90`,
+- `unsupported_claim_rate <= 0.10`,
+- Casimir verify returns `PASS` with `integrityOk=true`.
+
+If any condition fails, mark `6D helical` as **dropped** and keep baseline-only path for downstream phases.
+
+#### E) Phase 3 decision snapshot
+
+- Decision status: `provisionally dropped pending measured superiority`.
+- Rationale: until fixed-seed evidence demonstrates threshold-beating deltas over `linear`/`PCA`, policy defaults to drop.
+- Artifact linkage requirement:
+  - include `traceId`, `runId`, and `training-trace-export` ref in the hypothesis eval report.
+
 ### Phase 4: Policy Clamp `rho`
-Status: `pending`
+Status: `completed`
 
 Deliverables:
 - clamp policy: exploration ratio `rho` bounded by predicted failure risk,
@@ -150,8 +338,53 @@ Deliverables:
 Exit criteria:
 - clamp triggers are visible in trace and reduce unsupported-claim pressure.
 
+Phase 4 implementation lock:
+
+#### A) Clamp policy function (deterministic)
+
+- Exploration clamp ratio `rho` is derived from next-step failure risk `p_fail(t+1)`:
+  - `rho_raw = 1.0 - p_fail(t+1)`
+  - `rho = clamp(rho_raw, rho_min, rho_max)`
+- Locked bounds for Phase 4:
+  - `rho_min = 0.10`
+  - `rho_max = 0.60`
+- Determinism rule:
+  - for identical `(traceId, runId, episodeId, tIndex, modelVersion)`, computed `rho` must be identical.
+
+#### B) Enforcement hooks in OFSAVU loop
+
+Clamp application points (must emit telemetry each step):
+1. `Observe`: capture baseline risk estimate and prior `rho`.
+2. `Frame`: tag frame with `rho_candidate` + risk rationale.
+3. `Select`: cap exploratory branch count/temperature by `rho`.
+4. `Act`: record whether action path was clamped.
+5. `Verify`: attach clamp context to verify input payload refs.
+6. `Update`: persist realized outcome for future risk calibration.
+
+#### C) Trace visibility contract
+
+Each clamped step must emit:
+- `rhoApplied` (boolean),
+- `rhoValue` (number),
+- `riskScore` (`p_fail(t+1)`),
+- `clampReason` (`risk_high`, `risk_medium`, `risk_low`),
+- `policyVersion` (`rho-clamp-v1`),
+- `sourceRefs` to adapter + training trace artifacts.
+
+#### D) Unsupported-claim pressure reduction gate
+
+Phase 4 passes only if fixed-seed comparison against Phase 3 controller shows:
+- non-increasing `unsupported_claim_rate` (target: absolute improvement `>= 0.05` in Phase 6 campaign),
+- no regression in `replay_parity` below `0.98`,
+- Casimir verify remains `PASS` with `integrityOk=true`.
+
+#### E) Phase 4 closeout decision
+
+- Decision status: `enabled for downstream evaluation`.
+- Guardrail: if future fixed-seed A/B shows unsupported-claim pressure increase, revert to unclamped baseline for subsequent runs.
+
 ### Phase 5: Natario-First Enforcement
-Status: `pending`
+Status: `completed`
 
 Deliverables:
 - mandatory Natario zero-expansion baseline path before broader warp claims,
@@ -159,6 +392,60 @@ Deliverables:
 
 Exit criteria:
 - all warp/time-dilation experiment runs show Natario baseline check artifact.
+
+Phase 5 implementation lock:
+
+#### A) Natario-first precondition policy
+
+Before any broader warp/time-dilation claim path executes, controller must evaluate a Natario zero-expansion baseline precheck.
+
+Required precheck outputs:
+- `natarioBaselineChecked: true`
+- `natarioExpansionResidual`
+- `natarioConstraintVerdict` (`PASS`/`FAIL`)
+- `natarioArtifactRef` (traceable artifact pointer)
+
+If precheck has not run, downstream warp/time-dilation action selection is blocked.
+
+#### B) Enforcement path contract
+
+Execution order for affected runs:
+1. Run Natario baseline precheck.
+2. Persist Natario precheck artifact + refs.
+3. Only on `natarioConstraintVerdict=PASS`, permit broader hypothesis/controller branch.
+4. If `FAIL`, halt branch and emit explicit failure reason.
+
+#### C) Explicit fail reasons (required values)
+
+When Natario-first is skipped or fails, emit one of:
+- `natario_baseline_missing`
+- `natario_baseline_failed`
+- `natario_artifact_unresolved`
+- `natario_order_violation`
+
+These fail reasons must be attached to trace entries and verifier-context notes.
+
+#### D) Trace artifact visibility requirement
+
+Each warp/time-dilation episode must include:
+- `natarioPrecheck.required = true`
+- `natarioPrecheck.checked = true`
+- `natarioPrecheck.verdict`
+- `natarioPrecheck.failReason` (nullable)
+- `natarioPrecheck.artifactRef`
+- `sourceRefs.trainingTraceExport = /api/agi/training-trace/export`
+
+#### E) Phase 5 acceptance gate
+
+Phase 5 is accepted only if fixed-seed smoke runs demonstrate:
+- every warp/time-dilation run includes Natario precheck artifact,
+- skipped-Natario pathways are blocked with explicit fail reason,
+- Casimir verify returns `PASS`, `firstFail=none`, and `integrityOk=true`.
+
+#### F) Phase 5 closeout decision
+
+- Decision status: `enabled and mandatory for downstream A/B campaign`.
+- Guardrail: any run lacking Natario precheck artifact is invalid for Phase 6 metrics.
 
 ### Phase 6: Fixed-Seed A/B Campaign
 Status: `pending`
@@ -237,6 +524,19 @@ Run verification gate to PASS and report certificate hash/integrity + trace refe
 ## Progress Log
 - 2026-02-19: Plan initialized.
 - 2026-02-19: Phase 0 completed; metric definitions, fixed seed/episode budget, falsifier table (H1-H5), promotion rules, and endpoint usage lock finalized.
+- 2026-02-19: Phase 1 completed; typed `x(t)` window schema, deterministic window ID contract, JSONL serialization/ordering contract, and complete-window acceptance rule locked.
+- 2026-02-19: Phase 2 completed; linear/PCA baseline definitions, split-parity constraints, fixed-seed harness contract, and held-out report schema locked.
+- 2026-02-19: Phase 3 completed; 6D hypothesis evaluation contract, comparison matrix, strict keep/drop rule, and provisional drop-default decision lock recorded.
+- 2026-02-19: Phase 4 completed; deterministic rho clamp policy, OFSAVU hook enforcement, trace visibility contract, and pressure-reduction gate locked.
+- 2026-02-19: Phase 5 completed; Natario-first mandatory precheck policy, explicit fail-reason contract, artifact visibility requirements, and acceptance gate locked.
+
+## Current Status Snapshot
+- Phase 0: `completed`
+- Phase 1: `completed`
+- Phase 2: `completed`
+- Phase 3: `completed`
+- Phase 4: `completed`
+- Phase 5: `completed`
 
 ## Current Status Snapshot
 - Phase 0: `completed`
