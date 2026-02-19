@@ -222,6 +222,14 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
         },
       },
     ],
+    maturity_propagation_policy: {
+      enabled: true,
+      no_over_promotion: true,
+      strict_fail_reason: "FAIL_MATURITY_CEILING_VIOLATION",
+      default_max_claim_tier: "diagnostic",
+      upstream_claim_tier_blocklist_for_certified: ["diagnostic", "reduced-order"],
+      upstream_provenance_blocklist_for_certified: ["proxy", "inferred"],
+    },
   };
 
   mutator?.(manifest);
@@ -429,6 +437,21 @@ describe("validatePhysicsRootLeafManifest", () => {
     expect(result.errors.join("\n")).toContain(
       "paths[0] contains tier over-claim language inconsistent with max_claim_tier=diagnostic",
     );
+  });
+
+  it("declares deterministic maturity propagation metadata in repo manifest", () => {
+    const manifestPath = path.join(process.cwd(), "configs", "physics-root-leaf-manifest.v1.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+      maturity_propagation_policy?: Record<string, unknown>;
+    };
+    const policy = manifest.maturity_propagation_policy ?? {};
+
+    expect(policy.enabled).toBe(true);
+    expect(policy.no_over_promotion).toBe(true);
+    expect(policy.strict_fail_reason).toBe("FAIL_MATURITY_CEILING_VIOLATION");
+    expect(policy.default_max_claim_tier).toBe("diagnostic");
+    expect(policy.upstream_claim_tier_blocklist_for_certified).toEqual(["diagnostic", "reduced-order"]);
+    expect(policy.upstream_provenance_blocklist_for_certified).toEqual(["proxy", "inferred"]);
   });
 
 });
