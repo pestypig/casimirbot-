@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   __testOnlyHasStellarBridgeEvidenceContract,
   __testOnlyNormalizeGraphEvidenceEntry,
@@ -6,6 +6,7 @@ import {
   __testOnlyResolveTreeNeighborIds,
   resolveHelixAskGraphPack,
 } from "../server/services/helix-ask/graph-resolver";
+import { __testOnlyResolveRuntimeSafetyGateValidation } from "../server/services/helix-ask/relation-assembly";
 
 const BASE_REGION = {
   B_equals_1: true,
@@ -538,3 +539,61 @@ describe("helix ask graph resolver congruence overrides", () => {
 
 
 });
+
+describe("runtime safety gate validator", () => {
+  it("emits deterministic residual summary when runtime gate is referenced", () => {
+    const result = __testOnlyResolveRuntimeSafetyGateValidation(["configs/physics-root-leaf-manifest.v1.json"]);
+
+    expect(result.referenced).toBe(true);
+    expect(result.pass).toBe(true);
+    expect(result.failReason).toBeUndefined();
+    expect(result.summary).toContain("runtime_safety_gate residuals=");
+    expect(result.summary).toContain("path_life_to_runtime_safety_actions:determinism_min=0.98 (delta=0.0000)");
+    expect(result.summary).toContain("path_life_to_runtime_safety_actions:latency_p95_max_ms=1200 (delta=0.0000)");
+  });
+
+  it("fails deterministically for missing runtime manifest data", async () => {
+    const fs = await import("node:fs");
+    const existsSpy = vi.spyOn(fs.default ?? fs, "existsSync").mockReturnValue(false);
+
+    const result = __testOnlyResolveRuntimeSafetyGateValidation(["configs/physics-root-leaf-manifest.v1.json"]);
+
+    expect(result.referenced).toBe(true);
+    expect(result.pass).toBe(false);
+    expect(result.failReason).toBe("RUNTIME_SAFETY_GATE_MISSING_DATA");
+    expect(result.summary).toBe("runtime_safety_gate residuals=missing_manifest");
+
+    existsSpy.mockRestore();
+  });
+
+  it("fails deterministically for out-of-bounds runtime thresholds", async () => {
+    const fs = await import("node:fs");
+    const existsSpy = vi.spyOn(fs.default ?? fs, "existsSync").mockReturnValue(true);
+    const badManifest = JSON.stringify({
+      roots: [{ id: "physics_runtime_safety_control", equation_refs: ["runtime_safety_gate"] }],
+      paths: [
+        {
+          id: "path_life_to_runtime_safety_actions",
+          root_id: "physics_runtime_safety_control",
+          falsifier: {
+            uncertainty_model:
+              "runtime_gate_thresholds(determinism_min=0.97,citation_min=0.95,non_200_max=0.02,latency_p95_max_ms=1200)",
+          },
+        },
+      ],
+    });
+    const readSpy = vi.spyOn(fs.default ?? fs, "readFileSync").mockReturnValue(badManifest as any);
+
+    const result = __testOnlyResolveRuntimeSafetyGateValidation(["configs/physics-root-leaf-manifest.v1.json"]);
+
+    expect(result.referenced).toBe(true);
+    expect(result.pass).toBe(false);
+    expect(result.failReason).toBe("RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS");
+    expect(result.summary).toContain("determinism_min=0.97<0.98");
+    expect(result.summary).toContain("delta=-0.0100");
+
+    readSpy.mockRestore();
+    existsSpy.mockRestore();
+  });
+});
+

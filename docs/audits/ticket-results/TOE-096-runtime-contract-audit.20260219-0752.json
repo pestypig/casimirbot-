@@ -1,0 +1,21 @@
+{
+  "ticket_id": "TOE-096",
+  "risk_class": "runtime_contract",
+  "requires_audit": true,
+  "requires_research": false,
+  "artifacts": [
+    "runtime-contract-audit"
+  ],
+  "summary": {
+    "runtime_safety_gate_validator": "enforced",
+    "deterministic_residual_summary": true,
+    "deterministic_fail_on_missing_data": true,
+    "deterministic_fail_on_out_of_bounds": true
+  },
+  "casimir": {
+    "verdict": "PASS",
+    "certificate_hash": "d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d",
+    "integrity_ok": true,
+    "source": "artifacts/experiments/helix-ask-ps2/casimir-verify-latest.json"
+  }
+}
