@@ -1,0 +1,45 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-095-physics-lane-derived-nodes-for-equation-residuals",
+  "risk_class": "physics_unknown",
+  "requires_audit": true,
+  "requires_research": true,
+  "required_artifacts": [
+    "physics-research-brief",
+    "falsifier-matrix"
+  ],
+  "files_changed": [
+    "docs/knowledge/physics/physics-spacetime-gr-tree.json",
+    "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+    "docs/knowledge/physics/physics-thermodynamics-entropy-tree.json",
+    "docs/knowledge/physics/physics-information-dynamics-tree.json",
+    "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json",
+    "docs/knowledge/physics/physics-biology-life-tree.json",
+    "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
+    "tests/physics-root-lane-tree-parity.spec.ts",
+    "docs/audits/ticket-results/TOE-095-physics-lane-derived-nodes-for-equation-residuals.20260219T074452Z.json"
+  ],
+  "tests_run": [
+    "npx vitest run tests/physics-root-lane-tree-parity.spec.ts",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "research_artifacts": {
+    "physics-research-brief": {
+      "status": "present",
+      "summary": "Each physics root lane now includes a derived residual node declaring equation_residual/v1 schema, normalized RMS tolerance, and bounded uncertainty model for diagnostic maturity."
+    },
+    "falsifier-matrix": {
+      "status": "present",
+      "summary": "Parity test enforces lane coverage by requiring at least one derived residual declaration with schema+tolerance+uncertainty fields in every required root lane tree."
+    }
+  },
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:a7a54046-4e0e-493a-ae24-b4af27491193",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

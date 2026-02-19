@@ -8,15 +8,29 @@
       "title": "Physics Thermodynamics Entropy Tree",
       "excerpt": "Dedicated lane for thermodynamic irreversibility and entropy-gradient constraints.",
       "bodyMD": "This lane anchors entropy-first route determinism for life-emergence manifest paths.",
-      "tags": ["physics", "thermodynamics", "entropy"],
-      "children": ["entropy-gradient", "arrow-of-time"],
+      "tags": [
+        "physics",
+        "thermodynamics",
+        "entropy"
+      ],
+      "children": [
+        "entropy-gradient",
+        "arrow-of-time",
+        "physics-thermodynamics-entropy-equation-residual"
+      ],
       "links": [],
       "summary": "Dedicated lane for thermodynamic irreversibility and entropy-gradient constraints.",
       "nodeType": "concept",
       "dependencies": [],
       "evidence": [
-        { "type": "doc", "path": "docs/knowledge/physics/entropy-gradient.md" },
-        { "type": "doc", "path": "docs/knowledge/physics/arrow-of-time.md" }
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/entropy-gradient.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/arrow-of-time.md"
+        }
       ]
     },
     {
@@ -25,13 +39,31 @@
       "title": "Entropy Gradient",
       "excerpt": "Gradient structure used for deterministic entropy-first lane traversal.",
       "bodyMD": "Constrained relation between entropy flux and ordered pathway candidate selection.",
-      "tags": ["physics", "entropy", "gradient"],
+      "tags": [
+        "physics",
+        "entropy",
+        "gradient"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "physics-thermodynamics-entropy-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-thermodynamics-entropy-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
       "summary": "Gradient structure used for deterministic entropy-first lane traversal.",
       "nodeType": "concept",
-      "dependencies": ["physics-thermodynamics-entropy-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/entropy-gradient.md" }]
+      "dependencies": [
+        "physics-thermodynamics-entropy-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/entropy-gradient.md"
+        }
+      ]
     },
     {
       "id": "arrow-of-time",
@@ -39,13 +71,73 @@
       "title": "Arrow of Time",
       "excerpt": "Irreversibility anchor for entropy-constrained narrative ordering.",
       "bodyMD": "Used as a lane-level root constraint for deterministic root-to-leaf topology.",
-      "tags": ["physics", "thermodynamics", "irreversibility"],
+      "tags": [
+        "physics",
+        "thermodynamics",
+        "irreversibility"
+      ],
       "children": [],
-      "links": [{ "rel": "parent", "to": "physics-thermodynamics-entropy-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-thermodynamics-entropy-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
       "summary": "Irreversibility anchor for entropy-constrained narrative ordering.",
       "nodeType": "concept",
-      "dependencies": ["physics-thermodynamics-entropy-tree"],
-      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/arrow-of-time.md" }]
+      "dependencies": [
+        "physics-thermodynamics-entropy-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/arrow-of-time.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-thermodynamics-entropy-equation-residual",
+      "slug": "physics-thermodynamics-entropy-equation-residual",
+      "title": "Physics Thermodynamics Entropy Equation Residual",
+      "excerpt": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "bodyMD": "Defines the derived residual schema used to evaluate lane-level equation mismatch under declared uncertainty assumptions.",
+      "tags": [
+        "physics",
+        "residual",
+        "derived"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-thermodynamics-entropy-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived residual contract for lane equations with explicit tolerance and uncertainty declarations.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-thermodynamics-entropy-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "physics-thermodynamics-entropy-tree",
+        "residual_symbol": "R_lane",
+        "tolerance": {
+          "metric": "rms",
+          "max": 0.01,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "bounded_gaussian",
+          "sigma": 0.002,
+          "coverage": 0.95
+        }
+      },
+      "evidence": []
     }
   ],
   "schema": {
