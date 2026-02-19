@@ -111,6 +111,119 @@ describe("HELIX_ASK_MOVE_PROFILE_WEIGHTS hardening", () => {
 });
 
 
+
+describe("HELIX dynamic relation deficit weighting", () => {
+  afterEach(() => {
+    delete process.env.HELIX_ASK_QUAKE_BRIDGE_GAP_WEIGHT;
+    delete process.env.HELIX_ASK_QUAKE_EVIDENCE_GAP_WEIGHT;
+    delete process.env.HELIX_ASK_QUAKE_DUAL_DOMAIN_GAP_WEIGHT;
+    delete process.env.HELIX_ASK_QUAKE_RELATION_DYNAMIC_BIAS_MAX;
+    delete process.env.HELIX_ASK_QUAKE_RETRIEVE_DYNAMIC_BIAS_MAX;
+    vi.resetModules();
+  });
+
+  it("boosts relation/retrieve scores when deficits rise", () => {
+    const base = selectDeterministicMoveWithDebug({
+      groundedness: 0.5,
+      uncertainty: 0.5,
+      safety: 0.2,
+      coverage: 0.5,
+      evidenceGain: 0.5,
+      latencyCost: 0.3,
+      risk: 0.2,
+      budgetPressure: 0.2,
+      relationIntentActive: true,
+      bridgeGap: 0,
+      evidenceGap: 0,
+      dualDomainGap: 0,
+      profile: "evidence_first",
+    });
+    const boosted = selectDeterministicMoveWithDebug({
+      groundedness: 0.5,
+      uncertainty: 0.5,
+      safety: 0.2,
+      coverage: 0.5,
+      evidenceGain: 0.5,
+      latencyCost: 0.3,
+      risk: 0.2,
+      budgetPressure: 0.2,
+      relationIntentActive: true,
+      bridgeGap: 1,
+      evidenceGap: 1,
+      dualDomainGap: 1,
+      profile: "evidence_first",
+    });
+
+    expect(boosted.moveScores.retrieve_more).toBeGreaterThan(base.moveScores.retrieve_more);
+    expect(boosted.moveScores.relation_build).toBeGreaterThan(base.moveScores.relation_build);
+    expect(boosted.dynamicBiases.relationBuildBias).toBeGreaterThan(0);
+    expect(boosted.dynamicBiases.retrieveMoreBias).toBeGreaterThan(0);
+  });
+
+  it("clamps env-tuned dynamic bias knobs and gaps", async () => {
+    process.env.HELIX_ASK_QUAKE_BRIDGE_GAP_WEIGHT = "9";
+    process.env.HELIX_ASK_QUAKE_EVIDENCE_GAP_WEIGHT = "9";
+    process.env.HELIX_ASK_QUAKE_DUAL_DOMAIN_GAP_WEIGHT = "9";
+    process.env.HELIX_ASK_QUAKE_RELATION_DYNAMIC_BIAS_MAX = "5";
+    process.env.HELIX_ASK_QUAKE_RETRIEVE_DYNAMIC_BIAS_MAX = "5";
+    vi.resetModules();
+    const mod = await import("../server/services/helix-ask/quake-frame-loop");
+    const out = mod.selectDeterministicMoveWithDebug({
+      groundedness: 0.5,
+      uncertainty: 0.5,
+      safety: 0.2,
+      coverage: 0.5,
+      evidenceGain: 0.5,
+      latencyCost: 0.3,
+      risk: 0.2,
+      budgetPressure: 0.2,
+      relationIntentActive: true,
+      bridgeGap: 2,
+      evidenceGap: -1,
+      dualDomainGap: 7,
+      profile: "evidence_first",
+    });
+
+    expect(out.dynamicBiases.bridgeGap).toBe(1);
+    expect(out.dynamicBiases.evidenceGap).toBe(0);
+    expect(out.dynamicBiases.dualDomainGap).toBe(1);
+    expect(out.dynamicBiases.relationBuildBias).toBeLessThanOrEqual(0.8);
+    expect(out.dynamicBiases.retrieveMoreBias).toBeLessThanOrEqual(0.8);
+  });
+
+  it("keeps baseline behavior when gaps are absent", () => {
+    const noGaps = selectDeterministicMoveWithDebug({
+      groundedness: 0.45,
+      uncertainty: 0.55,
+      safety: 0.3,
+      coverage: 0.4,
+      evidenceGain: 0.6,
+      latencyCost: 0.4,
+      risk: 0.25,
+      budgetPressure: 0.3,
+      relationIntentActive: true,
+      profile: "evidence_first",
+    });
+    const explicitZeroGaps = selectDeterministicMoveWithDebug({
+      groundedness: 0.45,
+      uncertainty: 0.55,
+      safety: 0.3,
+      coverage: 0.4,
+      evidenceGain: 0.6,
+      latencyCost: 0.4,
+      risk: 0.25,
+      budgetPressure: 0.3,
+      relationIntentActive: true,
+      bridgeGap: 0,
+      evidenceGap: 0,
+      dualDomainGap: 0,
+      profile: "evidence_first",
+    });
+
+    expect(explicitZeroGaps).toEqual(noGaps);
+  });
+});
+
 describe("HELIX relation second-pass deterministic policy", () => {
   it("triggers second pass for retrieve_more/relation_build when deficits exist", () => {
     const retrieveMore = decideRelationSecondPassAttempt({

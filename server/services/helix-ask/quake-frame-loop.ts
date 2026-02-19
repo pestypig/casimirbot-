@@ -27,8 +27,19 @@ export type HelixAskMoveScoreInput = {
   risk: number;
   budgetPressure: number;
   relationIntentActive?: boolean;
+  bridgeGap?: number;
+  evidenceGap?: number;
+  dualDomainGap?: number;
   profile?: HelixAskMovePolicyProfile;
   clarifyFailClosedThreshold?: number;
+};
+
+export type HelixAskDynamicBiases = {
+  relationBuildBias: number;
+  retrieveMoreBias: number;
+  bridgeGap: number;
+  evidenceGap: number;
+  dualDomainGap: number;
 };
 
 export type HelixAskMoveSelection = {
@@ -38,6 +49,7 @@ export type HelixAskMoveSelection = {
   rejectReasons: Record<HelixAskMove, string[]>;
   budgetPressure: number;
   stopReason: string;
+  dynamicBiases: HelixAskDynamicBiases;
 };
 
 export type HelixAskSemanticQuality = {
@@ -138,6 +150,53 @@ const clamp01 = (value: number): number => {
 
 const finiteNumber = (value: number): number => (Number.isFinite(value) ? value : 0);
 
+const envNumber = (name: string, fallback: number): number => {
+  const raw = Number(process.env[name]);
+  return Number.isFinite(raw) ? raw : fallback;
+};
+
+const computeDynamicRelationBiases = (input: {
+  relationIntentActive: boolean;
+  bridgeGap: number;
+  evidenceGap: number;
+  dualDomainGap: number;
+}): HelixAskDynamicBiases => {
+  if (!input.relationIntentActive) {
+    return {
+      relationBuildBias: 0,
+      retrieveMoreBias: 0,
+      bridgeGap: clamp01(input.bridgeGap),
+      evidenceGap: clamp01(input.evidenceGap),
+      dualDomainGap: clamp01(input.dualDomainGap),
+    };
+  }
+
+  const bridgeGap = clamp01(input.bridgeGap);
+  const evidenceGap = clamp01(input.evidenceGap);
+  const dualDomainGap = clamp01(input.dualDomainGap);
+  const bridgeWeight = Math.max(0, Math.min(2, envNumber("HELIX_ASK_QUAKE_BRIDGE_GAP_WEIGHT", 0.2)));
+  const evidenceWeight = Math.max(0, Math.min(2, envNumber("HELIX_ASK_QUAKE_EVIDENCE_GAP_WEIGHT", 0.16)));
+  const dualDomainWeight = Math.max(0, Math.min(2, envNumber("HELIX_ASK_QUAKE_DUAL_DOMAIN_GAP_WEIGHT", 0.12)));
+  const relationBiasMax = Math.max(0, Math.min(0.8, envNumber("HELIX_ASK_QUAKE_RELATION_DYNAMIC_BIAS_MAX", 0.45)));
+  const retrieveBiasMax = Math.max(0, Math.min(0.8, envNumber("HELIX_ASK_QUAKE_RETRIEVE_DYNAMIC_BIAS_MAX", 0.35)));
+
+  const relationBuildBias = Math.max(
+    0,
+    Math.min(relationBiasMax, bridgeGap * bridgeWeight + evidenceGap * evidenceWeight + dualDomainGap * dualDomainWeight),
+  );
+  const retrieveMoreBias = Math.max(
+    0,
+    Math.min(retrieveBiasMax, evidenceGap * evidenceWeight + bridgeGap * bridgeWeight * 0.2),
+  );
+  return {
+    relationBuildBias,
+    retrieveMoreBias,
+    bridgeGap,
+    evidenceGap,
+    dualDomainGap,
+  };
+};
+
 export const rankMovesDeterministically = (
   moveScores: Record<HelixAskMove, number>,
 ): Array<{ move: HelixAskMove; score: number }> =>
@@ -179,6 +238,12 @@ export const selectDeterministicMoveWithDebug = (
   const risk = clamp01(input.risk);
   const budgetPressure = clamp01(input.budgetPressure);
   const relationIntentActive = input.relationIntentActive === true;
+  const dynamicBiases = computeDynamicRelationBiases({
+    relationIntentActive,
+    bridgeGap: input.bridgeGap ?? 0,
+    evidenceGap: input.evidenceGap ?? 0,
+    dualDomainGap: input.dualDomainGap ?? 0,
+  });
   const profile = input.profile ?? "balanced";
   const clarifyFailClosedThreshold = clamp01(input.clarifyFailClosedThreshold ?? 0.72);
 
@@ -186,20 +251,22 @@ export const selectDeterministicMoveWithDebug = (
   const bridgeEvidenceBoost = relationIntentActive ? 0.1 : 0;
   const goalTerms: Record<HelixAskMove, number> = {
     direct_answer: groundedness * 0.5 + coverage * 0.35 + (1 - uncertainty) * 0.15,
-    retrieve_more: (1 - coverage) * 0.5 + uncertainty * 0.3 + evidenceGain * 0.2,
+    retrieve_more: (1 - coverage) * 0.5 + uncertainty * 0.3 + evidenceGain * 0.2 + dynamicBiases.retrieveMoreBias,
     relation_build:
       relationBoost +
       uncertainty * 0.35 +
       (1 - groundedness) * 0.2 +
       evidenceGain * 0.3 +
-      bridgeEvidenceBoost,
+      bridgeEvidenceBoost +
+      dynamicBiases.relationBuildBias,
     clarify: (1 - groundedness) * 0.4 + uncertainty * 0.35 + (1 - coverage) * 0.25,
     fail_closed: safety * 0.55 + risk * 0.35 + budgetPressure * 0.1,
   };
   const evidenceTerms: Record<HelixAskMove, number> = {
     direct_answer: coverage * 0.6 + groundedness * 0.4,
-    retrieve_more: evidenceGain * 0.65 + (1 - coverage) * 0.35,
-    relation_build: evidenceGain * (0.5 + bridgeEvidenceBoost) + relationBoost,
+    retrieve_more: evidenceGain * 0.65 + (1 - coverage) * 0.35 + dynamicBiases.retrieveMoreBias,
+    relation_build:
+      evidenceGain * (0.5 + bridgeEvidenceBoost) + relationBoost + dynamicBiases.relationBuildBias,
     clarify: uncertainty * 0.45 + (1 - groundedness) * 0.25,
     fail_closed: risk * 0.3,
   };
@@ -277,6 +344,7 @@ export const selectDeterministicMoveWithDebug = (
     rejectReasons,
     budgetPressure,
     stopReason,
+    dynamicBiases,
   };
 };
 
