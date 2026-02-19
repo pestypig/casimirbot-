@@ -1,0 +1,24 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-024-skills-tooling-risk-contract",
+  "files_changed": [
+    "shared/skills.ts",
+    "server/skills/index.ts",
+    "server/services/runtime/tool-metadata.ts",
+    "tests/skills-registry-contract.spec.ts",
+    "tests/runtime-tool-policy.spec.ts"
+  ],
+  "tests_run": [
+    "tests/skills-registry-contract.spec.ts",
+    "tests/runtime-tool-policy.spec.ts"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:101d1cd5-ac57-42ea-8433-2602e0e2c19c",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

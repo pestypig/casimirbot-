@@ -1,0 +1,23 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-021-queue-orchestration-runtime-contract",
+  "files_changed": [
+    "server/queue/index.ts",
+    "server/routes/jobs.ts",
+    "tests/queue-stress.spec.ts",
+    "tests/queue-orchestration-contract.spec.ts"
+  ],
+  "tests_run": [
+    "tests/queue-stress.spec.ts",
+    "tests/queue-orchestration-contract.spec.ts"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:93fcb0a5-b128-47e2-9777-020f76ff8835",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

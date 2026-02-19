@@ -1,0 +1,25 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-026-knowledge-ingestion-provenance-budget-contract",
+  "files_changed": [
+    "server/services/knowledge/validation.ts",
+    "server/services/knowledge/corpus.ts",
+    "server/services/knowledge/merge.ts",
+    "server/routes/knowledge.ts",
+    "tests/knowledge-corpus.spec.ts",
+    "tests/knowledge-validation-contract.spec.ts"
+  ],
+  "tests_run": [
+    "tests/knowledge-corpus.spec.ts",
+    "tests/knowledge-validation-contract.spec.ts"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:34e2a6c7-b185-4b18-aac4-9d09608198a6",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}
