@@ -3,11 +3,12 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const BASE_URL = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5173";
-const BASELINE_RUN_ID = "versatility-1771461446899";
-const BASELINE = {
-  relation_packet_built_rate: 0.923,
-  relation_dual_domain_ok_rate: 0.884,
-  report_mode_correct_rate: 0.962,
+const BASELINE_RUN_ID = process.env.HELIX_ASK_BASELINE_RUN_ID ?? "versatility-1771461446899";
+const BASELINE_SUMMARY_PATH = process.env.HELIX_ASK_BASELINE_SUMMARY_PATH ?? "";
+const BASELINE_DEFAULT = {
+  relation_packet_built_rate: 0.8667,
+  relation_dual_domain_ok_rate: 0.8667,
+  report_mode_correct_rate: 0.9222,
 };
 
 const GATES = {
@@ -33,6 +34,10 @@ type EvalResult = {
     report_mode_correct_rate: number;
   };
   passes: boolean;
+  decision_grade_ready: boolean;
+  provenance_gate_pass: boolean;
+  run_complete: boolean;
+  provenance_warnings: string[];
   score: number;
   summaryPath: string;
 };
@@ -43,6 +48,18 @@ type GateAssessment = {
   threshold: number;
   comparator: ">=";
   pass: boolean;
+};
+
+type BaselineMetrics = {
+  relation_packet_built_rate: number;
+  relation_dual_domain_ok_rate: number;
+  report_mode_correct_rate: number;
+};
+
+type BaselineResolution = {
+  metrics: BaselineMetrics;
+  source: string;
+  warnings: string[];
 };
 
 const nowStamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
@@ -153,14 +170,59 @@ const buildGateAssessment = (metrics: EvalResult["metrics"]): GateAssessment[] =
   });
 };
 
-const percentile = (values: number[], q: number): number => {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const index = Math.max(0, Math.ceil((q / 100) * sorted.length) - 1);
-  return sorted[index] ?? 0;
+const parseBaselineFromSummary = async (summaryPath: string): Promise<BaselineMetrics | null> => {
+  try {
+    const summaryRaw = await fs.readFile(summaryPath, "utf8");
+    const summary = JSON.parse(summaryRaw) as {
+      metrics?: {
+        report_mode_correct_rate?: number;
+        relation_packet_built_rate?: number;
+        relation_dual_domain_ok_rate?: number;
+      };
+    };
+    const relationPacket = Number(summary.metrics?.relation_packet_built_rate ?? Number.NaN);
+    const relationDual = Number(summary.metrics?.relation_dual_domain_ok_rate ?? Number.NaN);
+    const reportMode = Number(summary.metrics?.report_mode_correct_rate ?? Number.NaN);
+    if (!Number.isFinite(relationPacket) || !Number.isFinite(relationDual) || !Number.isFinite(reportMode)) {
+      return null;
+    }
+    return {
+      relation_packet_built_rate: relationPacket,
+      relation_dual_domain_ok_rate: relationDual,
+      report_mode_correct_rate: reportMode,
+    };
+  } catch {
+    return null;
+  }
 };
 
-const evaluateCandidate = async (candidate: Candidate, rootOutDir: string): Promise<EvalResult> => {
+const resolveBaselineMetrics = async (): Promise<BaselineResolution> => {
+  if (!BASELINE_SUMMARY_PATH.trim()) {
+    return {
+      metrics: BASELINE_DEFAULT,
+      source: "default",
+      warnings: ["baseline_summary_path_missing_using_default_metrics"],
+    };
+  }
+
+  const resolved = path.resolve(BASELINE_SUMMARY_PATH);
+  const parsed = await parseBaselineFromSummary(resolved);
+  if (!parsed) {
+    return {
+      metrics: BASELINE_DEFAULT,
+      source: "default",
+      warnings: [`baseline_summary_invalid_or_unreadable:${resolved}`],
+    };
+  }
+
+  return {
+    metrics: parsed,
+    source: resolved,
+    warnings: [],
+  };
+};
+
+const evaluateCandidate = async (candidate: Candidate, rootOutDir: string, baseline: BaselineMetrics): Promise<EvalResult> => {
   const runLabel = `${candidate.id}-${Date.now()}`;
   const runOutDir = path.join(rootOutDir, runLabel);
   await fs.mkdir(runOutDir, { recursive: true });
@@ -191,6 +253,10 @@ const evaluateCandidate = async (candidate: Candidate, rootOutDir: string): Prom
         report_mode_correct_rate: 0,
       },
       passes: false,
+      decision_grade_ready: false,
+      provenance_gate_pass: false,
+      run_complete: false,
+      provenance_warnings: [],
       score: Number.NEGATIVE_INFINITY,
       summaryPath: path.join(runOutDir, "(failed run)"),
     };
@@ -204,6 +270,11 @@ const evaluateCandidate = async (candidate: Candidate, rootOutDir: string): Prom
   ]);
 
   const summary = JSON.parse(summaryRaw) as {
+    run_complete?: boolean;
+    provenance?: {
+      gate_pass?: boolean;
+      warnings?: string[];
+    };
     metrics?: {
       report_mode_correct_rate?: number;
       relation_packet_built_rate?: number;
@@ -217,17 +288,36 @@ const evaluateCandidate = async (candidate: Candidate, rootOutDir: string): Prom
     report_mode_correct_rate: Number(summary.metrics?.report_mode_correct_rate ?? 0),
   };
 
+  const runComplete = summary.run_complete !== false;
+  const provenanceGatePass = summary.provenance?.gate_pass === true;
+  const provenanceWarnings = Array.isArray(summary.provenance?.warnings)
+    ? summary.provenance?.warnings.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const decisionGradeReady = runComplete && provenanceGatePass;
+
   const passes =
+    decisionGradeReady &&
     gatePassForRate(metrics.relation_packet_built_rate, GATES.relation_packet_built_rate) &&
     gatePassForRate(metrics.relation_dual_domain_ok_rate, GATES.relation_dual_domain_ok_rate) &&
     gatePassForRate(metrics.report_mode_correct_rate, GATES.report_mode_correct_rate);
 
   const score =
-    (metrics.relation_packet_built_rate - BASELINE.relation_packet_built_rate) * 100 +
-    (metrics.relation_dual_domain_ok_rate - BASELINE.relation_dual_domain_ok_rate) * 100 +
-    (metrics.report_mode_correct_rate - BASELINE.report_mode_correct_rate) * 100;
+    (metrics.relation_packet_built_rate - baseline.relation_packet_built_rate) * 100 +
+    (metrics.relation_dual_domain_ok_rate - baseline.relation_dual_domain_ok_rate) * 100 +
+    (metrics.report_mode_correct_rate - baseline.report_mode_correct_rate) * 100 +
+    (decisionGradeReady ? 0 : -1000);
 
-  return { id: candidate.id, metrics, passes, score, summaryPath };
+  return {
+    id: candidate.id,
+    metrics,
+    passes,
+    decision_grade_ready: decisionGradeReady,
+    provenance_gate_pass: provenanceGatePass,
+    run_complete: runComplete,
+    provenance_warnings: provenanceWarnings,
+    score,
+    summaryPath,
+  };
 };
 
 async function main() {
@@ -291,6 +381,9 @@ async function main() {
     process.exit(2);
   }
 
+  const baselineResolution = await resolveBaselineMetrics();
+  const baseline = baselineResolution.metrics;
+
   const candidates: Candidate[] = [
     { id: "quake-core-00", weights: { balanced: { goal: 1.03, evidenceGain: 1.15, latencyCost: 0.92, risk: 1, budgetPressure: 0.92 }, evidence_first: { goal: 1.02, evidenceGain: 1.6, latencyCost: 0.66, risk: 0.98, budgetPressure: 0.8 }, latency_first: { goal: 0.95, evidenceGain: 1.02, latencyCost: 1.25, risk: 1, budgetPressure: 1.08 } } },
     { id: "quake-core-01", weights: { balanced: { goal: 1.02, evidenceGain: 1.12, latencyCost: 0.91, risk: 1, budgetPressure: 0.9 }, evidence_first: { goal: 1.01, evidenceGain: 1.56, latencyCost: 0.65, risk: 0.98, budgetPressure: 0.78 }, latency_first: { goal: 0.95, evidenceGain: 1.0, latencyCost: 1.27, risk: 1, budgetPressure: 1.08 } } },
@@ -308,18 +401,22 @@ async function main() {
 
   const results: EvalResult[] = [];
   for (const candidate of candidates) {
-    const result = await evaluateCandidate(candidate, outDir);
+    const result = await evaluateCandidate(candidate, outDir, baseline);
     results.push(result);
   }
 
   const gateFailCount = (entry: EvalResult): number => {
     let fails = 0;
+    if (!entry.decision_grade_ready) fails += 1;
     if (!gatePassForRate(entry.metrics.relation_packet_built_rate, GATES.relation_packet_built_rate)) fails += 1;
     if (!gatePassForRate(entry.metrics.relation_dual_domain_ok_rate, GATES.relation_dual_domain_ok_rate)) fails += 1;
     if (!gatePassForRate(entry.metrics.report_mode_correct_rate, GATES.report_mode_correct_rate)) fails += 1;
     return fails;
   };
   const ranked = [...results].sort((a, b) => {
+    if (a.decision_grade_ready !== b.decision_grade_ready) {
+      return a.decision_grade_ready ? -1 : 1;
+    }
     const gateDelta = gateFailCount(a) - gateFailCount(b);
     if (gateDelta !== 0) return gateDelta;
     return b.score - a.score;
@@ -336,9 +433,9 @@ async function main() {
         gate_fail_count: gateFailCount(winner),
         top_nearest: promoted ? [] : topNearest.map((r) => ({ id: r.id, score: r.score, metrics: r.metrics })),
         delta: {
-          relation_packet_built_rate: Number((winner.metrics.relation_packet_built_rate - BASELINE.relation_packet_built_rate).toFixed(4)),
-          relation_dual_domain_ok_rate: Number((winner.metrics.relation_dual_domain_ok_rate - BASELINE.relation_dual_domain_ok_rate).toFixed(4)),
-          report_mode_correct_rate: Number((winner.metrics.report_mode_correct_rate - BASELINE.report_mode_correct_rate).toFixed(4)),
+          relation_packet_built_rate: Number((winner.metrics.relation_packet_built_rate - baseline.relation_packet_built_rate).toFixed(4)),
+          relation_dual_domain_ok_rate: Number((winner.metrics.relation_dual_domain_ok_rate - baseline.relation_dual_domain_ok_rate).toFixed(4)),
+          report_mode_correct_rate: Number((winner.metrics.report_mode_correct_rate - baseline.report_mode_correct_rate).toFixed(4)),
         },
       }
     : { baseline_run_id: BASELINE_RUN_ID, promoted: false, reason: "no_candidates" };
@@ -346,12 +443,25 @@ async function main() {
   const summary = {
     status: "OK",
     baseline_run_id: BASELINE_RUN_ID,
+    baseline: {
+      source: baselineResolution.source,
+      metrics: baseline,
+      warnings: baselineResolution.warnings,
+    },
     probes,
     gates: GATES,
     promoted,
     winner_id: winner?.id ?? null,
     candidate_count: results.length,
-    ranking: ranked.map((r) => ({ id: r.id, passes: r.passes, score: r.score, gate_fail_count: gateFailCount(r) })),
+    decision_grade_ready_candidates: results.filter((entry) => entry.decision_grade_ready).length,
+    provenance_blocked_candidates: results.filter((entry) => !entry.decision_grade_ready).length,
+    ranking: ranked.map((r) => ({
+      id: r.id,
+      passes: r.passes,
+      decision_grade_ready: r.decision_grade_ready,
+      score: r.score,
+      gate_fail_count: gateFailCount(r),
+    })),
   };
 
   const winnerAssessments = winner ? buildGateAssessment(winner.metrics) : [];
@@ -361,19 +471,42 @@ async function main() {
         promoted,
         recommendation: promoted
           ? "PROMOTE: winner meets all strict Step 4 thresholds."
-          : "HOLD: winner fails one or more strict Step 4 thresholds.",
+          : winner.decision_grade_ready
+            ? "HOLD: winner fails one or more strict Step 4 thresholds."
+            : "HOLD: winner is not decision-grade ready due to provenance/run completeness gating.",
         winner_id: winner.id,
         score: winner.score,
+        decision_grade_ready: winner.decision_grade_ready,
+        provenance_gate_pass: winner.provenance_gate_pass,
+        run_complete: winner.run_complete,
+        provenance_warnings: winner.provenance_warnings,
         metrics: winner.metrics,
         gates: {
-          passed: winnerAssessments.filter((item) => item.pass).map((item) => item.metric),
-          failed: winnerAssessments.filter((item) => !item.pass).map((item) => item.metric),
+          passed: [
+            ...(winner.decision_grade_ready ? ["decision_grade_ready"] : []),
+            ...winnerAssessments.filter((item) => item.pass).map((item) => item.metric),
+          ],
+          failed: [
+            ...(!winner.decision_grade_ready ? ["decision_grade_ready"] : []),
+            ...winnerAssessments.filter((item) => !item.pass).map((item) => item.metric),
+          ],
         },
         gate_assessment: winnerAssessments,
         gate_details: Object.fromEntries(
-          winnerAssessments.map((item) => {
-            return [item.metric, { actual: item.actual, threshold: item.threshold, comparator: item.comparator, passed: item.pass }];
-          }),
+          [
+            [
+              "decision_grade_ready",
+              {
+                actual: winner.decision_grade_ready ? 1 : 0,
+                threshold: 1,
+                comparator: ">=",
+                passed: winner.decision_grade_ready,
+              },
+            ],
+            ...winnerAssessments.map((item) => {
+              return [item.metric, { actual: item.actual, threshold: item.threshold, comparator: item.comparator, passed: item.pass }];
+            }),
+          ],
         ),
         summaryPath: winner.summaryPath,
       }

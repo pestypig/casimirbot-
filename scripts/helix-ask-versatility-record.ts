@@ -988,10 +988,20 @@ const main = async () => {
     }),
   );
 
-  const worst = [...rawRuns]
+  const worstRows = [...rawRuns]
     .sort((a, b) => b.failures.length - a.failures.length || b.latency_ms - a.latency_ms)
-    .slice(0, 15)
-    .map((row) => ({
+    .reduce<RawRun[]>((acc, row) => {
+      if (acc.some((entry) => entry.prompt_id === row.prompt_id)) {
+        return acc;
+      }
+      if (acc.length >= 15) {
+        return acc;
+      }
+      acc.push(row);
+      return acc;
+    }, []);
+
+  const worst = worstRows.map((row) => ({
       prompt_id: row.prompt_id,
       family: row.family,
       question: row.question,
