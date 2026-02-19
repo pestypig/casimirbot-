@@ -85,7 +85,7 @@ const metricFromPayload = (status: number, payload: AskResponse | null) => {
   const linkage = Number(payload?.debug?.semantic_quality?.claim_citation_link_rate ?? 0);
   const unsupported = Number(payload?.debug?.semantic_quality?.unsupported_claim_rate ?? 1);
   const failReasons = payload?.debug?.semantic_quality?.fail_reasons ?? [];
-  const pass = status === 200 && !payload?.fail_reason && failReasons.length === 0;
+  const pass = status === 200 && hasRequiredFields(payload) && !payload?.fail_reason && failReasons.length === 0;
   return {
     pass,
     contradiction: hasContradiction(payload),
@@ -100,6 +100,7 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
   const traceId = `phase6-live-${arm}-${prompt.id}-s${seed}-r${replayIndex}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let hardTimeout: ReturnType<typeof setTimeout> | undefined;
   const started = Date.now();
   try {
     const resp = await Promise.race([
@@ -118,8 +119,14 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
         }),
         signal: controller.signal,
       }),
-      new Promise<Response>((_, reject) => setTimeout(() => reject(new Error("hard_timeout")), REQUEST_HARD_TIMEOUT_MS)),
+      new Promise<Response>((_, reject) => {
+        hardTimeout = setTimeout(() => {
+          controller.abort();
+          reject(new Error("hard_timeout"));
+        }, REQUEST_HARD_TIMEOUT_MS);
+      }),
     ]);
+    if (hardTimeout) clearTimeout(hardTimeout);
     const payload = (await resp.json().catch(() => null)) as AskResponse | null;
     return {
       arm,
@@ -133,7 +140,10 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
       metrics: metricFromPayload(resp.status, payload),
     };
   } catch (error) {
-    const failClass = error instanceof Error && error.name === "AbortError" ? "timeout" : "transport_error";
+    const isTimeout =
+      (error instanceof Error && error.name === "AbortError") ||
+      (error instanceof Error && error.message === "hard_timeout");
+    const failClass = isTimeout ? "timeout" : "transport_error";
     const payload: AskResponse = {
       fail_reason: error instanceof Error ? error.message : "request_failed",
       fail_class: failClass,
@@ -151,6 +161,7 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
     };
   } finally {
     clearTimeout(timeout);
+    if (hardTimeout) clearTimeout(hardTimeout);
   }
 };
 
