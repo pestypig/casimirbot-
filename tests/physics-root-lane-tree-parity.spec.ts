@@ -30,6 +30,7 @@ type TreeNode = {
   id: string;
   derived_residual?: {
     schema?: string;
+    equation_ref?: string;
     tolerance?: { max?: number };
     uncertainty?: { model?: string };
   };
@@ -44,6 +45,11 @@ const REQUIRED_ROOT_TREE_MAP: Record<string, string> = {
   physics_prebiotic_chemistry: "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json",
   physics_biology_life: "docs/knowledge/physics/physics-biology-life-tree.json",
   physics_runtime_safety_control: "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
+};
+
+const CANONICAL_RESIDUAL_EQUATION_BY_ROOT: Record<string, string> = {
+  physics_spacetime_gr: "efe_baseline",
+  physics_quantum_semiclassical: "semiclassical_coupling",
 };
 
 describe("physics root-lane tree parity", () => {
@@ -101,18 +107,30 @@ describe("physics root-lane tree parity", () => {
 
   it("requires derived residual schema plus tolerance and uncertainty declaration for each physics root lane tree", () => {
     const repoRoot = process.cwd();
+    const backbonePath = path.join(repoRoot, "configs", "physics-equation-backbone.v1.json");
+    const backbone = JSON.parse(fs.readFileSync(backbonePath, "utf8")) as {
+      equations: Array<{ id?: string }>;
+    };
+    const canonicalEquationIds = new Set(
+      (backbone.equations ?? []).map((entry) => String(entry.id ?? "").trim()).filter(Boolean),
+    );
 
-    for (const treePath of Object.values(REQUIRED_ROOT_TREE_MAP)) {
+    for (const [rootId, treePath] of Object.entries(REQUIRED_ROOT_TREE_MAP)) {
       const fullTreePath = path.join(repoRoot, treePath);
       const tree = JSON.parse(fs.readFileSync(fullTreePath, "utf8")) as LaneTree;
 
       const residualNodes = tree.nodes.filter((node) => Boolean(node.derived_residual));
       expect(residualNodes.length).toBeGreaterThan(0);
 
+      const expectedCanonicalRef = CANONICAL_RESIDUAL_EQUATION_BY_ROOT[rootId];
       const hasDeclaredContract = residualNodes.some((node) => {
         const residual = node.derived_residual;
+        const hasCanonicalRef = expectedCanonicalRef
+          ? residual?.equation_ref === expectedCanonicalRef
+          : true;
         return Boolean(
           residual?.schema &&
+            hasCanonicalRef &&
             typeof residual.tolerance?.max === "number" &&
             residual.uncertainty?.model,
         );

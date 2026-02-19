@@ -89,6 +89,7 @@ export type HelixAskGraphCongruenceDiagnostics = {
     chart_mismatch: number;
     condition_unsatisfied: number;
     unresolved_target: number;
+    node_missing_equation_ref: number;
   };
   blockedByCondition: Record<string, number>;
   strictSignals: {
@@ -296,7 +297,8 @@ type GraphFilterReason =
   | "cl_exceeds_allowed"
   | "chart_mismatch"
   | "condition_unsatisfied"
-  | "unresolved_target";
+  | "unresolved_target"
+  | "node_missing_equation_ref";
 
 type GraphEdgeDecision = {
   allowed: boolean;
@@ -642,6 +644,14 @@ const evaluateCongruenceEdge = (
   return { allowed: true };
 };
 
+
+const isPhysicsAssertionNodeWithoutEquationRef = (node: GraphNode): boolean => {
+  const nodeType = String(node.nodeType ?? "").trim().toLowerCase();
+  if (nodeType !== "physics_assertion") return false;
+  const validity = node.validity && typeof node.validity === "object" ? node.validity : undefined;
+  const equationRef = typeof validity?.equation_ref === "string" ? validity.equation_ref.trim() : "";
+  return equationRef.length === 0;
+};
 const shouldIncludeEdge = (
   meta: GraphEdgeMeta | undefined,
   config: CongruenceWalkConfig,
@@ -693,6 +703,7 @@ const loadGraphTree = (
       chart_mismatch: 0,
       condition_unsatisfied: 0,
       unresolved_target: 0,
+      node_missing_equation_ref: 0,
     };
     const blockedByCondition: Record<string, number> = {};
     let allowedEdges = 0;
@@ -714,6 +725,12 @@ const loadGraphTree = (
       return true;
     };
     for (const node of nodes) {
+      if (isPhysicsAssertionNodeWithoutEquationRef(node)) {
+        const localEdgeCount = node.children.length + node.links.length;
+        blockedEdges += localEdgeCount;
+        blockedByReason.node_missing_equation_ref += localEdgeCount;
+        continue;
+      }
       for (const child of node.children) {
         const meta = node.childMeta?.[child];
         evaluatedEdges += 1;
@@ -1288,6 +1305,7 @@ export function __testOnlyResolveBridgeMissingEvidencePath(input: {
           chart_mismatch: 0,
           condition_unsatisfied: 0,
           unresolved_target: 0,
+          node_missing_equation_ref: 0,
         },
         blockedByCondition: {},
         strictSignals: {

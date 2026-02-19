@@ -538,6 +538,21 @@ describe("helix ask graph resolver congruence overrides", () => {
   });
 
 
+
+  it("blocks physics assertion edges when equation_ref is missing", () => {
+    const neighbors = __testOnlyResolveTreeNeighborIds({
+      treeId: "assertion-fixture",
+      treePath: "tests/fixtures/graph-physics-assertion-missing-equation-tree.json",
+      nodeId: "assertion-root",
+      congruenceWalkOverride: {
+        allowedCL: "CL4",
+        allowConceptual: false,
+        allowProxies: false,
+      },
+    });
+
+    expect(neighbors).toEqual([]);
+  });
 });
 
 describe("runtime safety gate validator", () => {
@@ -597,3 +612,18 @@ describe("runtime safety gate validator", () => {
   });
 });
 
+
+describe("atomic stress-energy bridge placeholder rail", () => {
+  it("declares deterministic FAIL_NO_ATOMIC_TO_TMU_NU_MAPPING for unresolved atomic to stress-energy routing", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+
+    const tree = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "docs/knowledge/physics/atomic-systems-tree.json"), "utf8"),
+    ) as { nodes: Array<{ id: string; validity?: { strict_fail_reason?: string } }> };
+
+    const placeholder = tree.nodes.find((node) => node.id === "atomic-stress-energy-bridge-placeholder");
+    expect(placeholder).toBeTruthy();
+    expect(placeholder?.validity?.strict_fail_reason).toBe("FAIL_NO_ATOMIC_TO_TMU_NU_MAPPING");
+  });
+});

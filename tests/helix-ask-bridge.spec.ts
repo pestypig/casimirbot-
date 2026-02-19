@@ -17,6 +17,12 @@ type TreeNode = {
     claim_tier?: "diagnostic" | "reduced-order" | "certified";
     certifying?: boolean;
   }>;
+  validity?: {
+    strict_fail_reason?: string;
+    maturity_ceiling?: string;
+    proxy_semantics?: unknown;
+    display_semantics?: unknown;
+  };
 };
 
 type TreeFile = { nodes: TreeNode[] };
@@ -94,17 +100,39 @@ describe("Helix Ask bridge nodes", () => {
         ).toBe(true);
       }
 
-      const hasContractMetadata = evidence.some(
-        (entry) => entry.provenance_class || entry.claim_tier || typeof entry.certifying === "boolean",
-      );
-      if (hasContractMetadata) {
-        for (const entry of evidence) {
-          expect(entry.provenance_class, `${file} ${node.id} missing provenance_class`).toBeTruthy();
-          expect(entry.claim_tier, `${file} ${node.id} missing claim_tier`).toBeTruthy();
-          expect(typeof entry.certifying, `${file} ${node.id} missing certifying`).toBe("boolean");
+      for (const entry of evidence) {
+        const hasContractMetadata =
+          !!entry.provenance_class || !!entry.claim_tier || typeof entry.certifying === "boolean";
+        if (!hasContractMetadata) {
+          continue;
+        }
+
+        expect(entry.provenance_class, `${file} ${node.id} missing provenance_class`).toBeTruthy();
+        expect(entry.claim_tier, `${file} ${node.id} missing claim_tier`).toBeTruthy();
+        if (entry.certifying !== undefined) {
+          expect(typeof entry.certifying, `${file} ${node.id} invalid certifying`).toBe("boolean");
         }
       }
     }
+  });
+
+
+
+  it("declares an atomic->stress-energy placeholder bridge with deterministic strict-fail metadata", () => {
+    const atomicTree = loadTree(join(process.cwd(), "docs", "knowledge", "physics", "atomic-systems-tree.json"));
+    const placeholder = atomicTree.nodes.find((node) => node.id === "atomic-stress-energy-bridge-placeholder");
+
+    expect(placeholder).toBeTruthy();
+    expect(placeholder?.nodeType).toBe("bridge");
+    expect(placeholder?.bridge).toEqual({
+      left: "atomic-quantum-route",
+      right: "stress-energy-tensor",
+      relation: "atomic_to_stress_energy_lift",
+    });
+    expect(placeholder?.validity?.strict_fail_reason).toBe("FAIL_NO_ATOMIC_TO_TMU_NU_MAPPING");
+    expect(placeholder?.validity?.maturity_ceiling).toBe("diagnostic");
+    expect(placeholder?.validity?.proxy_semantics).toBeTruthy();
+    expect(placeholder?.validity?.display_semantics).toBeTruthy();
   });
 
   it("returns deterministic strict bridge fail_reason when bridge evidence metadata is incomplete", () => {

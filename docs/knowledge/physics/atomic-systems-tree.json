@@ -19,7 +19,8 @@
         "atomic-parameter-contract",
         "atomic-quantum-route",
         "atomic-classical-route",
-        "bridge-atomic-quantum-route-atomic-classical-route"
+        "bridge-atomic-quantum-route-atomic-classical-route",
+        "atomic-stress-energy-bridge-placeholder"
       ],
       "links": [
         {
@@ -488,6 +489,117 @@
         "class": "bridge",
         "chart": null,
         "congruenceLevel": null
+      }
+    },
+    {
+      "id": "atomic-stress-energy-bridge-placeholder",
+      "slug": "atomic-stress-energy-bridge-placeholder",
+      "title": "Atomic -> Stress-Energy Bridge Placeholder",
+      "excerpt": "Placeholder bridge that must hard-fail until an explicit stress-energy mapping contract is declared.",
+      "bodyMD": "This placeholder prevents silent atomic-to-<T_mu_nu> routing. It is blocked unless an explicit equation-bound stress-energy mapping and uncertainty model are present.\n\nDeterministic fail reason: FAIL_NO_ATOMIC_TO_TMU_NU_MAPPING.",
+      "tags": [
+        "atomic",
+        "bridge",
+        "stress-energy",
+        "guardrail"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "atomic-systems-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "atomic-quantum-route",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "stress-energy-tensor",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Hard-fail placeholder for missing atomic stress-energy mapping contracts.",
+      "nodeType": "bridge",
+      "inputs": [
+        {
+          "name": "orbital_density_proxy",
+          "value": "diagnostic only"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "stress_energy_mapping_status",
+          "value": "blocked"
+        },
+        {
+          "name": "display_mode",
+          "value": "proxy_only"
+        }
+      ],
+      "assumptions": [
+        "No explicit atomic to <T_mu_nu> mapping is currently declared."
+      ],
+      "validity": {
+        "mode": "diagnostic",
+        "maturity_ceiling": "diagnostic",
+        "routing_policy": "blocked_until_equation_mapping",
+        "strict_fail_reason": "FAIL_NO_ATOMIC_TO_TMU_NU_MAPPING",
+        "requires": {
+          "equation_ref": "semiclassical_coupling",
+          "uncertainty_model_id": "required",
+          "stress_energy_mapping": "required"
+        },
+        "proxy_semantics": {
+          "mode": "display_only_proxy",
+          "enforcement": "strict_fail",
+          "notes": "Any atomic->stress-energy lift is proxy visualization only until equation binding is declared."
+        },
+        "display_semantics": {
+          "status": "placeholder_visible",
+          "label": "Atomic -> Stress-Energy (Blocked: mapping required)"
+        }
+      },
+      "deterministic": true,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "atomic-systems-tree"
+      ],
+      "predictability": {
+        "status": "blocked",
+        "missing": [
+          "equation_ref",
+          "uncertainty_model_id",
+          "stress_energy_mapping"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/atomic-systems-tree.json",
+          "scope": "left"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/atomic-systems-tree.json",
+          "scope": "right"
+        }
+      ],
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      },
+      "bridge": {
+        "left": "atomic-quantum-route",
+        "right": "stress-energy-tensor",
+        "relation": "atomic_to_stress_energy_lift"
       }
     }
   ],
