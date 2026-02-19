@@ -97,6 +97,7 @@ export type TimeDilationDiagnostics = {
       deterministicBlockId: "TIDAL_E_IJ_MISSING";
     };
   };
+  redshift: RedshiftDiagnostics;
   provenance: Record<string, {
     source: string;
     observer: string | null;
@@ -179,6 +180,46 @@ type CanonicalField = {
   match: string | null;
 };
 
+type RedshiftStatus = "computed" | "proxy" | "unavailable";
+
+type RedshiftDiagnostics = {
+  status: RedshiftStatus;
+  method: "null_transport_reduced_order" | "proxy" | "unavailable";
+  onePlusZ: number | null;
+  z: number | null;
+  worldlines: {
+    emitter: { id: string | null; uSource: string | null; chart: string | null; normalization: "c=1" };
+    receiver: { id: string | null; uSource: string | null; chart: string | null; normalization: "c=1" };
+  };
+  transport: {
+    bounded: boolean;
+    kEmitterSource: string | null;
+    kReceiverSource: string | null;
+    stepCount: number | null;
+    maxSteps: number | null;
+    lambdaSpan: number | null;
+    maxLambdaSpan: number | null;
+    residual: number | null;
+    residualTolerance: number | null;
+  };
+  confidence: number;
+  limitations: string[];
+  proxy?: { source: string; units: string };
+  unavailable?: {
+    reason:
+      | "worldline_contract_missing"
+      | "null_transport_missing"
+      | "transport_ratio_singular"
+      | "transport_ratio_nonphysical";
+    required: string[];
+    deterministicBlockId:
+      | "REDSHIFT_WORLDLINE_CONTRACT_MISSING"
+      | "REDSHIFT_NULL_TRANSPORT_MISSING"
+      | "REDSHIFT_TRANSPORT_RATIO_SINGULAR"
+      | "REDSHIFT_TRANSPORT_RATIO_NONPHYSICAL";
+  };
+};
+
 type Definitions = {
   theta_definition: string | null;
   kij_sign_convention: string | null;
@@ -237,6 +278,20 @@ const finiteVec3 = (value: unknown): [number, number, number] | null => {
   if (x == null || y == null || z == null) return null;
   return [x, y, z];
 };
+
+
+const finiteVec4 = (value: unknown): [number, number, number, number] | null => {
+  if (!Array.isArray(value) || value.length < 4) return null;
+  const t = toNumber(value[0]);
+  const x = toNumber(value[1]);
+  const y = toNumber(value[2]);
+  const z = toNumber(value[3]);
+  if (t == null || x == null || y == null || z == null) return null;
+  return [t, x, y, z];
+};
+
+const dot4 = (a: [number, number, number, number], b: [number, number, number, number]) =>
+  a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
 
 const resolveShipWorldline = (pipeline: any): { dxdt: [number, number, number] | null; source: string | null } => {
   const candidates: Array<{ value: unknown; source: string }> = [
@@ -309,6 +364,225 @@ const resolveShipComovingDtauDt = (pipeline: any, proofPack: ProofPack | null) =
       alpha,
       underRoot,
     },
+  };
+};
+
+const resolveRedshiftDiagnostics = (
+  pipeline: any,
+  proofPack: ProofPack | null,
+  canonical: CanonicalField,
+): RedshiftDiagnostics => {
+  const emitterUCandidates: Array<{ value: unknown; source: string }> = [
+    { value: pipeline?.redshift?.emitter?.uCovariant, source: "pipeline.redshift.emitter.uCovariant" },
+    { value: pipeline?.redshift?.transport?.emitter?.uCovariant, source: "pipeline.redshift.transport.emitter.uCovariant" },
+    { value: pipeline?.transport?.redshift?.emitter?.uCovariant, source: "pipeline.transport.redshift.emitter.uCovariant" },
+  ];
+  const receiverUCandidates: Array<{ value: unknown; source: string }> = [
+    { value: pipeline?.redshift?.receiver?.uCovariant, source: "pipeline.redshift.receiver.uCovariant" },
+    { value: pipeline?.redshift?.transport?.receiver?.uCovariant, source: "pipeline.redshift.transport.receiver.uCovariant" },
+    { value: pipeline?.transport?.redshift?.receiver?.uCovariant, source: "pipeline.transport.redshift.receiver.uCovariant" },
+  ];
+  const kEmitterCandidates: Array<{ value: unknown; source: string }> = [
+    { value: pipeline?.redshift?.kCovariantEmit, source: "pipeline.redshift.kCovariantEmit" },
+    { value: pipeline?.redshift?.transport?.kCovariantEmit, source: "pipeline.redshift.transport.kCovariantEmit" },
+    { value: pipeline?.transport?.redshift?.kCovariantEmit, source: "pipeline.transport.redshift.kCovariantEmit" },
+  ];
+  const kReceiverCandidates: Array<{ value: unknown; source: string }> = [
+    { value: pipeline?.redshift?.kCovariantRecv, source: "pipeline.redshift.kCovariantRecv" },
+    { value: pipeline?.redshift?.transport?.kCovariantRecv, source: "pipeline.redshift.transport.kCovariantRecv" },
+    { value: pipeline?.transport?.redshift?.kCovariantRecv, source: "pipeline.transport.redshift.kCovariantRecv" },
+  ];
+
+  const pickVec4 = (candidates: Array<{ value: unknown; source: string }>) => {
+    for (const candidate of candidates) {
+      const parsed = finiteVec4(candidate.value);
+      if (parsed) return { vec: parsed, source: candidate.source };
+    }
+    return { vec: null, source: null };
+  };
+
+  const emitterU = pickVec4(emitterUCandidates);
+  const receiverU = pickVec4(receiverUCandidates);
+  const kEmitter = pickVec4(kEmitterCandidates);
+  const kReceiver = pickVec4(kReceiverCandidates);
+
+  const stepCount =
+    toNumber(pipeline?.redshift?.transport?.stepCount) ??
+    toNumber(pipeline?.transport?.redshift?.stepCount) ??
+    null;
+  const maxSteps =
+    toNumber(pipeline?.redshift?.transport?.maxSteps) ??
+    toNumber(pipeline?.transport?.redshift?.maxSteps) ??
+    null;
+  const lambdaSpan =
+    toNumber(pipeline?.redshift?.transport?.lambdaSpan) ??
+    toNumber(pipeline?.transport?.redshift?.lambdaSpan) ??
+    null;
+  const maxLambdaSpan =
+    toNumber(pipeline?.redshift?.transport?.maxLambdaSpan) ??
+    toNumber(pipeline?.transport?.redshift?.maxLambdaSpan) ??
+    null;
+  const residual =
+    toNumber(pipeline?.redshift?.transport?.residual) ??
+    toNumber(pipeline?.transport?.redshift?.residual) ??
+    null;
+  const residualTolerance =
+    toNumber(pipeline?.redshift?.transport?.residualTolerance) ??
+    toNumber(pipeline?.transport?.redshift?.residualTolerance) ??
+    null;
+  const boundedExplicit =
+    pipeline?.redshift?.transport?.bounded === true || pipeline?.transport?.redshift?.bounded === true;
+  const boundedByLimits =
+    (stepCount != null && maxSteps != null && stepCount <= maxSteps) ||
+    (lambdaSpan != null && maxLambdaSpan != null && lambdaSpan <= maxLambdaSpan);
+  const bounded = boundedExplicit || boundedByLimits;
+
+  const base: Omit<RedshiftDiagnostics, "status" | "method" | "onePlusZ" | "z" | "confidence" | "limitations"> = {
+    worldlines: {
+      emitter: {
+        id: typeof pipeline?.redshift?.emitter?.id === "string" ? pipeline.redshift.emitter.id : null,
+        uSource: emitterU.source,
+        chart: canonical.chart,
+        normalization: "c=1",
+      },
+      receiver: {
+        id: typeof pipeline?.redshift?.receiver?.id === "string" ? pipeline.redshift.receiver.id : null,
+        uSource: receiverU.source,
+        chart: canonical.chart,
+        normalization: "c=1",
+      },
+    },
+    transport: {
+      bounded,
+      kEmitterSource: kEmitter.source,
+      kReceiverSource: kReceiver.source,
+      stepCount,
+      maxSteps,
+      lambdaSpan,
+      maxLambdaSpan,
+      residual,
+      residualTolerance,
+    },
+  };
+
+  if (!emitterU.vec || !receiverU.vec) {
+    return {
+      status: "unavailable",
+      method: "unavailable",
+      onePlusZ: null,
+      z: null,
+      confidence: 0,
+      limitations: ["Emitter/receiver worldline contract missing u_covector for one or both observers."],
+      ...base,
+      unavailable: {
+        reason: "worldline_contract_missing",
+        required: ["redshift.emitter.uCovariant", "redshift.receiver.uCovariant"],
+        deterministicBlockId: "REDSHIFT_WORLDLINE_CONTRACT_MISSING",
+      },
+    };
+  }
+
+  if (!kEmitter.vec || !kReceiver.vec) {
+    const proofProxy = getProofValue(proofPack, "redshift_proxy");
+    const proxy =
+      toNumber(pipeline?.redshift?.proxyOnePlusZ) ??
+      toNumber(pipeline?.redshift?.proxyZ) ??
+      toNumber(proofProxy?.value);
+    if (proxy != null) {
+      const onePlusZ = pipeline?.redshift?.proxyOnePlusZ != null ? proxy : 1 + proxy;
+      return {
+        status: "proxy",
+        method: "proxy",
+        onePlusZ,
+        z: onePlusZ - 1,
+        confidence: 0.3,
+        limitations: ["Null transport unavailable; reporting proxy redshift estimate only."],
+        ...base,
+        proxy: {
+          source:
+            pipeline?.redshift?.proxyOnePlusZ != null
+              ? "pipeline.redshift.proxyOnePlusZ"
+              : pipeline?.redshift?.proxyZ != null
+                ? "pipeline.redshift.proxyZ"
+                : "proof.values.redshift_proxy",
+          units: "dimensionless",
+        },
+      };
+    }
+    return {
+      status: "unavailable",
+      method: "unavailable",
+      onePlusZ: null,
+      z: null,
+      confidence: 0,
+      limitations: ["Null transport missing k_covector at emitter and/or receiver."],
+      ...base,
+      unavailable: {
+        reason: "null_transport_missing",
+        required: ["redshift.kCovariantEmit", "redshift.kCovariantRecv"],
+        deterministicBlockId: "REDSHIFT_NULL_TRANSPORT_MISSING",
+      },
+    };
+  }
+
+  const kuEmit = dot4(kEmitter.vec, emitterU.vec);
+  const kuRecv = dot4(kReceiver.vec, receiverU.vec);
+  if (!Number.isFinite(kuRecv) || Math.abs(kuRecv) < 1e-12) {
+    return {
+      status: "unavailable",
+      method: "unavailable",
+      onePlusZ: null,
+      z: null,
+      confidence: 0,
+      limitations: ["Receiver contraction (k·u)_recv is singular or numerically unstable."],
+      ...base,
+      unavailable: {
+        reason: "transport_ratio_singular",
+        required: ["finite (k·u)_recv"],
+        deterministicBlockId: "REDSHIFT_TRANSPORT_RATIO_SINGULAR",
+      },
+    };
+  }
+
+  const onePlusZ = kuEmit / kuRecv;
+  if (!Number.isFinite(onePlusZ) || onePlusZ <= 0) {
+    return {
+      status: "unavailable",
+      method: "unavailable",
+      onePlusZ: null,
+      z: null,
+      confidence: 0,
+      limitations: ["Reduced-order transport yielded nonphysical 1+z <= 0."],
+      ...base,
+      unavailable: {
+        reason: "transport_ratio_nonphysical",
+        required: ["positive finite (k·u)_emit/(k·u)_recv"],
+        deterministicBlockId: "REDSHIFT_TRANSPORT_RATIO_NONPHYSICAL",
+      },
+    };
+  }
+
+  let confidence = 0.8;
+  const limitations: string[] = [
+    "Reduced-order null transport assumes precomputed endpoint k_covectors and does not integrate full geodesic bundle dynamics.",
+  ];
+  if (!bounded) {
+    confidence -= 0.2;
+    limitations.push("Transport bounds are missing or exceeded; treat value as low-confidence diagnostic.");
+  }
+  if (residual != null && residualTolerance != null && residual > residualTolerance) {
+    confidence -= 0.2;
+    limitations.push("Transport residual exceeds tolerance.");
+  }
+
+  return {
+    status: "computed",
+    method: "null_transport_reduced_order",
+    onePlusZ,
+    z: onePlusZ - 1,
+    confidence: Math.max(0, Math.min(1, confidence)),
+    limitations,
+    ...base,
   };
 };
 
@@ -863,6 +1137,7 @@ export async function buildTimeDilationDiagnostics(
   const congruenceRequirements = resolveCongruenceRequirements(canonical, definitions);
   const shipComovingDtauDt = resolveShipComovingDtauDt(pipeline, proofPack);
   const tidalIndicator = resolveTidalIndicator(pipeline, proofPack);
+  const redshift = resolveRedshiftDiagnostics(pipeline, proofPack, canonical);
 
   if (congruenceKind === "ship_comoving" && !shipComovingDtauDt.valid) {
     congruenceRequirements.requiredFieldsOk = false;
@@ -970,6 +1245,28 @@ export async function buildTimeDilationDiagnostics(
         },
   };
 
+  observables.redshift = {
+    source: redshift.status === "computed" ? "reduced_order_null_transport" : redshift.status,
+    observerFamily: congruenceKind,
+    chart: canonical.chart,
+    units: "dimensionless",
+    valid: redshift.status === "computed",
+    missingFields: redshift.unavailable?.required ?? [],
+    value: redshift.z,
+    formula: "1+z = (k.u)_emit / (k.u)_recv",
+    details: {
+      status: redshift.status,
+      method: redshift.method,
+      onePlusZ: redshift.onePlusZ,
+      confidence: redshift.confidence,
+      limitations: redshift.limitations,
+      worldlines: redshift.worldlines,
+      transport: redshift.transport,
+      proxy: redshift.proxy,
+      unavailable: redshift.unavailable,
+    },
+  };
+
   const divBetaRms = toNumber((pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaRms);
   const divBetaMaxAbs = toNumber((pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaMaxAbs);
   const natarioExpansionTolerance = toNumber(readProofString(proofPack, "natario_expansion_tolerance")) ?? 1e-3;
@@ -1029,6 +1326,7 @@ export async function buildTimeDilationDiagnostics(
     },
     observables,
     tidal: tidalIndicator,
+    redshift,
     provenance,
     proofPack,
     renderingSeed,

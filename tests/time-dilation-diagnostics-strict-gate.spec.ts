@@ -180,4 +180,81 @@ describe("time dilation strict verification gate", () => {
     expect(dtauDt?.missingFields).toEqual([]);
     expect(dtauDt?.value ?? 0).toBeCloseTo(Math.sqrt(1 - 0.3 * 0.3), 6);
   });
+
+  it("marks redshift unavailable when emitter/receiver worldline contract is missing", async () => {
+    stubFetch({
+      ...basePipeline,
+      viability: {
+        certificateHash: "cert:1",
+        integrityOk: true,
+        constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+      },
+      redshift: {},
+    });
+
+    const diagnostics = await buildTimeDilationDiagnostics({ baseUrl: "http://example.test", publish: false });
+    expect(diagnostics.redshift.status).toBe("unavailable");
+    expect(diagnostics.redshift.unavailable?.deterministicBlockId).toBe("REDSHIFT_WORLDLINE_CONTRACT_MISSING");
+    expect(diagnostics.observables.redshift?.valid).toBe(false);
+  });
+
+  it("falls back to explicit proxy redshift when transport vectors are missing", async () => {
+    stubFetch({
+      ...basePipeline,
+      viability: {
+        certificateHash: "cert:1",
+        integrityOk: true,
+        constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+      },
+      redshift: {
+        emitter: { uCovariant: [1, 0, 0, 0], id: "ship" },
+        receiver: { uCovariant: [1, 0, 0, 0], id: "remote" },
+        proxyZ: 0.05,
+      },
+    });
+
+    const diagnostics = await buildTimeDilationDiagnostics({ baseUrl: "http://example.test", publish: false });
+    expect(diagnostics.redshift.status).toBe("proxy");
+    expect(diagnostics.redshift.z ?? 0).toBeCloseTo(0.05, 8);
+    expect(diagnostics.redshift.proxy?.source).toBe("pipeline.redshift.proxyZ");
+    expect(diagnostics.observables.redshift?.details).toEqual(
+      expect.objectContaining({ status: "proxy", method: "proxy" }),
+    );
+  });
+
+  it("computes reduced-order redshift from bounded null transport endpoint contractions", async () => {
+    stubFetch({
+      ...basePipeline,
+      viability: {
+        certificateHash: "cert:1",
+        integrityOk: true,
+        constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+      },
+      redshift: {
+        emitter: { uCovariant: [1, 0, 0, 0], id: "ship" },
+        receiver: { uCovariant: [1, 0, 0, 0], id: "receiver" },
+        kCovariantEmit: [2, 0, 0, 0],
+        kCovariantRecv: [1.9, 0, 0, 0],
+        transport: {
+          bounded: true,
+          stepCount: 24,
+          maxSteps: 64,
+          residual: 1e-7,
+          residualTolerance: 1e-5,
+        },
+      },
+    });
+
+    const diagnostics = await buildTimeDilationDiagnostics({ baseUrl: "http://example.test", publish: false });
+    expect(diagnostics.redshift.status).toBe("computed");
+    expect(diagnostics.redshift.method).toBe("null_transport_reduced_order");
+    expect(diagnostics.redshift.onePlusZ ?? 0).toBeCloseTo(2 / 1.9, 8);
+    expect(diagnostics.observables.redshift).toEqual(
+      expect.objectContaining({
+        formula: "1+z = (k.u)_emit / (k.u)_recv",
+        valid: true,
+      }),
+    );
+  });
+
 });
