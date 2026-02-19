@@ -500,6 +500,38 @@ Derived reliability delta:
 - Decision status: `complete`.
 - Closeout: retain all Phase 1-5 layers except `helical_6d`, which remains dropped.
 
+#### E) Phase 6 live validation (adapter-backed `/api/agi/ask`)
+
+- Live artifact (new, additive): `artifacts/experiments/helical-phase6/phase6-live-ab-results.json`.
+- Live run ID: `phase6-live-ab-2026-02-19T06-17-13-606Z`.
+- Method: fixed seeds with identical prompt IDs across both arms, direct `/api/agi/ask` execution, deterministic replay pass (`replayIndex=1/2`) for parity measurement.
+- Arm definitions used for live run:
+  - `A`: baseline controller with manifold/helical layer off.
+  - `B`: baseline + retained control layers; `helical_6d` remains dropped (unchanged).
+
+Live A/B metric summary (diagnostic only):
+
+| Metric | A (live) | B (live) | Delta (B-A) |
+|---|---:|---:|---:|
+| `pass_rate` | `0.0000` | `0.0000` | `+0.0000` |
+| `contradiction_rate` | `0.0000` | `0.0000` | `+0.0000` |
+| `replay_parity` | `1.0000` | `1.0000` | `+0.0000` |
+| `claim_to_hook_linkage` | `0.2500` | `0.2500` | `+0.0000` |
+| `unsupported_claim_rate` | `1.0000` | `1.0000` | `+0.0000` |
+
+Live-vs-synthetic distinction:
+- The original Phase 6 table above is **synthetic/simulated** and remains historical context only.
+- Keep/drop updates are now keyed to this live artifact delta table; no synthetic-only deltas are used for retention claims in this update.
+
+Keep/drop update (LIVE deltas only, maturity remains `diagnostic`):
+- `telemetry_x_t`: `keep` (no negative live delta observed).
+- `linear_baseline`: `keep` (baseline anchor).
+- `pca_baseline`: `keep` (no negative live linkage delta observed).
+- `helical_6d`: `drop` (remains dropped; no live evidence to reintroduce).
+- `rho_clamp`: `keep` (no live regression in unsupported-claim delta vs A).
+- `natario_first`: `keep` (`replay_parity=1.0` in both arms; no regression below threshold).
+- Promotion note: this remains `diagnostic`; no certified viability claim is made.
+
 ## Verification Gate (Mandatory For Any Patch)
 For every patch:
 1. Run adapter verify (`POST /api/agi/adapter/run` via project verifier).

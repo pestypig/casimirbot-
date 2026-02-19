@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 type Family = 'relation'|'repo_technical'|'ambiguous_general';
 type PromptCase = {id:string; family:Family; question:string; noisy?:boolean};
@@ -77,7 +78,7 @@ type ReadyProbeResult = {
   reason: string | null;
 };
 
-const prompts = (): PromptCase[] => {
+export const helixUtilityPrompts = (): PromptCase[] => {
   const relation = [
     ['How does warp bubble viability relate to mission ethos constraints in this repo?', false],
     ['Map warp bubble evidence to ideology accountability and falsifiability checks.', false],
@@ -412,7 +413,7 @@ async function run() {
   const variantDir = path.resolve(OUT_ROOT, VARIANT);
   const rawDir = path.resolve(variantDir, 'raw');
   await fs.mkdir(rawDir, {recursive:true});
-  const promptList = prompts();
+  const promptList = helixUtilityPrompts();
 
   const ready = await ensureReady();
   if (!ready.ok) {
@@ -583,7 +584,7 @@ async function run() {
     commit: COMMIT,
     run_id: runId,
     base_url: BASE_URL,
-    prompt_count: prompts().length,
+    prompt_count: helixUtilityPrompts().length,
     run_count: rows.length,
     usable_run_count: usableRows.length,
     avg_utility: avgUtility,
@@ -648,4 +649,8 @@ async function run() {
   await fs.writeFile(path.resolve(OUT_ROOT, 'prompt-pack.json'), `${JSON.stringify(promptPack,null,2)}\n`, 'utf8');
 }
 
-run().catch((err)=>{ console.error(err); process.exitCode = 1; });
+const isMain = process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
+
+if (isMain) {
+  run().catch((err)=>{ console.error(err); process.exitCode = 1; });
+}
