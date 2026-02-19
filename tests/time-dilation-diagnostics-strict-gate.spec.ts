@@ -56,4 +56,59 @@ describe("time dilation strict verification gate", () => {
     expect(diagnostics.strict.failId).toBe("ADAPTER_CONSTRAINTS_UNKNOWN");
     expect(diagnostics.strict.failClosedReasons).toContain("hard_constraints_unknown");
   });
+
+  it("reports ship-comoving dtau/dt observable with valid=false and missingFields when worldline inputs are absent", async () => {
+    stubFetch({
+      ...basePipeline,
+      viability: {
+        certificateHash: "cert:1",
+        integrityOk: true,
+        constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+      },
+      warp: {
+        metricT00Contract: { family: "natario" },
+        metricAdapter: {
+          alpha: 1,
+          gammaDiag: [1, 1, 1],
+        },
+      },
+    });
+    const diagnostics = await buildTimeDilationDiagnostics({ baseUrl: "http://example.test", publish: false });
+    expect(diagnostics.observables.ship_comoving_dtau_dt).toEqual(
+      expect.objectContaining({
+        observerFamily: "ship_comoving",
+        valid: false,
+      }),
+    );
+    expect(diagnostics.observables.ship_comoving_dtau_dt?.missingFields).toEqual(
+      expect.arrayContaining(["shipKinematics.betaCoord", "shipKinematics.dxdt"]),
+    );
+  });
+
+  it("computes ship-comoving dtau/dt from ADM variables when worldline inputs are present", async () => {
+    stubFetch({
+      ...basePipeline,
+      viability: {
+        certificateHash: "cert:1",
+        integrityOk: true,
+        constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+      },
+      shipKinematics: {
+        dxdt: [0.1, 0, 0],
+        betaCoord: [0.2, 0, 0],
+      },
+      warp: {
+        metricT00Contract: { family: "natario" },
+        metricAdapter: {
+          alpha: 1,
+          gammaDiag: [1, 1, 1],
+        },
+      },
+    });
+    const diagnostics = await buildTimeDilationDiagnostics({ baseUrl: "http://example.test", publish: false });
+    const dtauDt = diagnostics.observables.ship_comoving_dtau_dt;
+    expect(dtauDt?.valid).toBe(true);
+    expect(dtauDt?.missingFields).toEqual([]);
+    expect(dtauDt?.value ?? 0).toBeCloseTo(Math.sqrt(1 - 0.3 * 0.3), 6);
+  });
 });
