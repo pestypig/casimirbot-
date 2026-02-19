@@ -375,6 +375,36 @@
       "weight": 1.1
     },
     {
+      "id": "orbital-ephemeris-provenance",
+      "label": "Orbital Ephemeris Provenance Lane",
+      "path": "docs/knowledge/orbital-ephemeris-provenance-tree.json",
+      "topicTags": [
+        "orbital",
+        "provenance",
+        "contracts",
+        "knowledge"
+      ],
+      "matchers": [
+        "orbital ephemeris provenance",
+        "horizons provenance",
+        "ephemeris drift",
+        "ephemeris nondeterminism",
+        "orbital time model evidence",
+        "halobank horizons consistency"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 3,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.12
+    },
+    {
       "id": "stellar-restoration",
       "label": "Stellar Restoration Walk",
       "path": "docs/knowledge/stellar-restoration-tree.json",

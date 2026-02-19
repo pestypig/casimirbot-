@@ -16397,7 +16397,7 @@ const executeHelixAsk = async ({
             ok: false,
             mode: askMode,
             text: "Verification failed.",
-            fail_reason: degradeReason ?? "VERDICT_FAIL",
+            fail_reason: degradeReason ?? halobankConsistency?.firstFailId ?? "VERDICT_FAIL",
             claim_tier: "diagnostic",
             provenance_class: "inferred",
             certifying: false,
