@@ -140,6 +140,30 @@
       }
     },
     {
+      "id": "physics_spacetime_gr__curvature_unit_proxy_contract",
+      "root_id": "physics_spacetime_gr",
+      "equation_id": "curvature_unit_proxy_contract",
+      "binding": {
+        "operator": "equals",
+        "lhs": "kappa_proxy",
+        "rhs": "map_units(curvature_signal, scale_assumptions)"
+      },
+      "residual": {
+        "metric": "curvature_unit_proxy_residual",
+        "comparator": "<=",
+        "threshold": "0.05"
+      },
+      "falsifier": {
+        "condition": "curvature_unit_proxy_residual > 0.05",
+        "evidence": "curvature_unit_proxy_diagnostic_trace"
+      },
+      "maturity_label": "experimental",
+      "claim_tier": "diagnostic",
+      "uncertainty_model_id": "curvature_proxy_uncertainty_v1",
+      "cross_lane_bridge": true,
+      "runtime_safety_eligible": true
+    },
+    {
       "id": "physics_spacetime_gr__efe_baseline",
       "root_id": "physics_spacetime_gr",
       "equation_id": "efe_baseline",

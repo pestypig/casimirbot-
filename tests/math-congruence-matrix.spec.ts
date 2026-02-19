@@ -70,6 +70,26 @@ describe("buildMathCongruenceMatrix", () => {
 });
 
 describe("validateMathCongruenceMatrix", () => {
+  it("requires canonical curvature proxy equation bindings in repo matrix", () => {
+    const repoRoot = process.cwd();
+    const backbone = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "configs", "physics-equation-backbone.v1.json"), "utf8"),
+    ) as { equations: Array<{ id: string }> };
+    const matrix = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "configs", "math-congruence-matrix.v1.json"), "utf8"),
+    ) as { rows: Array<{ id: string; equation_id: string; root_id: string }> };
+
+    expect(backbone.equations.some((equation) => equation.id === "curvature_unit_proxy_contract")).toBe(true);
+    expect(
+      matrix.rows.some(
+        (row) =>
+          row.id === "physics_spacetime_gr__curvature_unit_proxy_contract" &&
+          row.root_id === "physics_spacetime_gr" &&
+          row.equation_id === "curvature_unit_proxy_contract",
+      ),
+    ).toBe(true);
+  });
+
   it("passes for deterministic matrix with full root/equation coverage", () => {
     const repoRoot = fixtureRepoRoot();
     const result = validateMathCongruenceMatrix({ repoRoot });

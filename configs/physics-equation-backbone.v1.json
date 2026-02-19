@@ -150,6 +150,52 @@
           "units": "boolean"
         }
       ]
+    },
+    {
+      "id": "curvature_unit_proxy_contract",
+      "name": "Curvature-unit proxy contract",
+      "category": "curvature_proxy",
+      "expression": "kappa_proxy = map_units(curvature_signal, scale_assumptions) ; residual = abs(kappa_proxy - kappa_ref)/max(abs(kappa_ref), eps)",
+      "claim_tier": "diagnostic",
+      "maturity_label": "experimental",
+      "symbols": [
+        {
+          "symbol": "kappa_proxy",
+          "quantity": "curvature-unit proxy scalar",
+          "units": "1/m^2"
+        },
+        {
+          "symbol": "curvature_signal",
+          "quantity": "diagnostic curvature signal",
+          "units": "arb_curvature_units"
+        },
+        {
+          "symbol": "scale_assumptions",
+          "quantity": "unit-mapping assumptions",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "kappa_ref",
+          "quantity": "reference curvature scalar",
+          "units": "1/m^2"
+        },
+        {
+          "symbol": "eps",
+          "quantity": "numerical floor",
+          "units": "1/m^2"
+        }
+      ],
+      "residual_contract": {
+        "metric": "curvature_unit_proxy_residual",
+        "definition": "abs(kappa_proxy - kappa_ref)/max(abs(kappa_ref), eps)",
+        "threshold": "<= 0.05"
+      },
+      "uncertainty_assumptions": [
+        "mapping_scale_is_declared",
+        "proxy_lane_only_not_certifying",
+        "calibration_window_traceable"
+      ],
+      "root_lane": "physics_spacetime_gr"
     }
   ]
 }

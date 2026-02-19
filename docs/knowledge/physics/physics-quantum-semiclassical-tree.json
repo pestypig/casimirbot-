@@ -124,7 +124,7 @@
       ],
       "derived_residual": {
         "schema": "equation_residual/v1",
-        "equation_ref": "physics-quantum-semiclassical-tree",
+        "equation_ref": "semiclassical_coupling",
         "residual_symbol": "R_lane",
         "tolerance": {
           "metric": "rms",

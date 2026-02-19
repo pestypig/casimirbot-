@@ -81,6 +81,23 @@ Use maturity as a hard communication boundary:
 
 Do not present reduced-order claims as certified.
 
+
+## Atomic ↔ Curvature Bridge Claim Requirements
+
+The following bridge claim IDs are required for TOE curvature-atomic congruence rails:
+
+- `atomic_energy_to_energy_density_proxy.v1`
+- `curvature_unit_proxy_contract.v1`
+
+For these bridge claims, the checker enforces:
+
+1. claim presence in the registry set
+2. `validityDomain.system` is populated
+3. `validityDomain.constraints` is a non-empty array
+4. `sources` include concrete non-placeholder citations
+
+Missing required bridge claims or missing bridge-domain metadata is an ERROR.
+
 ## CI Gate Semantics
 
 Default checker behavior:

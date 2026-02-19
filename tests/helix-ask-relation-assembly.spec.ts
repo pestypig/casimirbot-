@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  __testOnlyResolveCrossLaneUncertaintyValidation,
+  __testOnlyResolveMaturityCeilingValidation,
   buildRelationAssemblyPacket,
   evaluateRelationPacketFloors,
   resolveRelationTopologySignal,
@@ -64,5 +66,47 @@ describe("relation assembly packet", () => {
     );
     expect(evidenceFail.ok).toBe(false);
     expect(evidenceFail.failReason).toBe("evidence_count_low");
+  });
+
+  it("fails deterministically when runtime-eligible cross-lane rows miss uncertainty models", async () => {
+    const fs = await import("node:fs");
+    const existsSpy = vi.spyOn(fs.default ?? fs, "existsSync").mockReturnValue(true);
+    const readSpy = vi.spyOn(fs.default ?? fs, "readFileSync").mockReturnValue(
+      JSON.stringify({
+        rows: [
+          {
+            id: "physics_spacetime_gr__curvature_unit_proxy_contract",
+            runtime_safety_eligible: true,
+            cross_lane_bridge: true,
+            uncertainty_model_id: "",
+          },
+        ],
+      }) as any,
+    );
+
+    const result = __testOnlyResolveCrossLaneUncertaintyValidation();
+    expect(result.referenced).toBe(true);
+    expect(result.pass).toBe(false);
+    expect(result.failReason).toBe("FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL");
+
+    readSpy.mockRestore();
+    existsSpy.mockRestore();
+  });
+
+  it("blocks over-promotion above diagnostic maturity ceiling", () => {
+    const result = __testOnlyResolveMaturityCeilingValidation([
+      {
+        evidence_id: "ev_cert",
+        path: "docs/knowledge/warp/warp-bubble.md",
+        span: "L1-L1",
+        snippet: "certified lane statement",
+        domain: "warp",
+        claim_tier: "certified",
+      },
+    ]);
+
+    expect(result.referenced).toBe(true);
+    expect(result.pass).toBe(false);
+    expect(result.failReason).toBe("FAIL_MATURITY_CEILING_VIOLATION");
   });
 });
