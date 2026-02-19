@@ -522,6 +522,13 @@ Latest live run validity status:
 - Failed gates: `A/B usable_response_rate`, `A/B http_status_ok_rate`, non-degenerate checks for both semantic metrics in both arms.
 - Dominant diagnostics: `fail_class=timeout`, `fail_reason="This operation was aborted"`, `http_status=0` histogram for all primary episodes in both arms.
 
+Phase 6 live harness hardening (2026-02-19 patch, lowest-risk scope):
+- `scripts/helical-phase6-ab.ts` now enforces contract-aware scoreability: scoreable episodes require `text`, `debug.semantic_quality.claim_citation_link_rate`, `debug.semantic_quality.unsupported_claim_rate`, `debug.semantic_quality.contradiction_flag`, and `debug.semantic_quality.fail_reasons[]`; missing/invalid inputs are explicitly non-scoreable.
+- Added explicit failure classes in the live harness path for parse/contract/metric and timeout/http outcomes: `invalid_json`, `schema_mismatch`, `metric_input_missing`, `timeout_soft`, `timeout_hard`, `http_error`.
+- Removed silent status defaults for non-HTTP outcomes: `status=0` rows now always carry explicit classified `fail_class` + `fail_reason`, and exported `traceRefs` source fail metadata from normalized metric classification.
+- Pass logic remains strict: no scoreable pass is possible unless required semantic fields are present and no fail reason is set.
+- Added focused harness tests in `tests/helical-phase6-ab.spec.ts` for failure classification taxonomy and scoreable/non-scoreable decision behavior.
+
 Live A/B metric summary (diagnostic only; **invalid run context**):
 
 | Metric | A (live) | B (live) | Delta (B-A) |
