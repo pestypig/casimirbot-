@@ -1,8 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-18T23:41:19.164Z",
-  "generated_at": "2026-02-18T23:38:54.774Z",
-  "generated_at": "2026-02-18T23:36:23.777Z",
+  "generated_at": "2026-02-19T00:10:12.533Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -15,43 +13,29 @@
     "certified": 1
   },
   "totals": {
-    "tickets_total": 74,
-    "tickets_with_evidence": 74,
+    "tickets_total": 77,
+    "tickets_with_evidence": 77,
     "claim_tier_counts": {
-      "diagnostic": 69,
-      "reduced-order": 5,
-      "certified": 0
-    },
-    "weighted_score_sum": 20.25,
-    "toe_progress_pct": 27.4,
-    "forest_owner_coverage_pct": 100,
-    "strict_ready_progress_pct": 6.8,
-    "strict_ready_delta_ticket_count": 69,
-      "diagnostic": 67,
+      "diagnostic": 70,
       "reduced-order": 7,
       "certified": 0
     },
-    "weighted_score_sum": 20.95,
-    "toe_progress_pct": 28.3,
-    "forest_owner_coverage_pct": 97.6,
-    "strict_ready_progress_pct": 9.5,
-    "strict_ready_delta_ticket_count": 67,
+    "weighted_score_sum": 21.7,
+    "toe_progress_pct": 28.2,
+    "forest_owner_coverage_pct": 100,
+    "strict_ready_progress_pct": 9.1,
+    "strict_ready_delta_ticket_count": 70,
     "strict_ready_release_gate": {
       "status": "blocked",
       "blocked_reasons": [
         "missing_verified_pass",
         "missing_research_artifacts"
       ],
-      "blocked_ticket_count": 69,
-      "ready_ticket_count": 5
-    },
-    "research_gated_tickets_total": 29,
-    "research_artifact_complete_tickets_total": 28
-      "blocked_ticket_count": 67,
+      "blocked_ticket_count": 70,
       "ready_ticket_count": 7
     },
-    "research_gated_tickets_total": 29,
-    "research_artifact_complete_tickets_total": 29
+    "research_gated_tickets_total": 32,
+    "research_artifact_complete_tickets_total": 30
   },
   "segments": {
     "core": {
@@ -69,64 +53,42 @@
       "research_artifact_complete_tickets_total": 0
     },
     "extension": {
-      "tickets_total": 64,
-      "tickets_with_evidence": 64,
+      "tickets_total": 67,
+      "tickets_with_evidence": 67,
       "claim_tier_counts": {
-        "diagnostic": 60,
-        "reduced-order": 4,
-        "certified": 0
-      },
-      "weighted_score_sum": 17.4,
-      "toe_progress_pct": 27.2,
-      "strict_ready_progress_pct": 6.3,
-      "research_gated_tickets_total": 29,
-      "research_artifact_complete_tickets_total": 28
-        "diagnostic": 58,
+        "diagnostic": 61,
         "reduced-order": 6,
         "certified": 0
       },
-      "weighted_score_sum": 18.1,
-      "toe_progress_pct": 28.3,
-      "strict_ready_progress_pct": 9.4,
-      "research_gated_tickets_total": 29,
-      "research_artifact_complete_tickets_total": 29
+      "weighted_score_sum": 18.85,
+      "toe_progress_pct": 28.1,
+      "strict_ready_progress_pct": 9,
+      "research_gated_tickets_total": 32,
+      "research_artifact_complete_tickets_total": 30
     },
     "combined": {
-      "tickets_total": 74,
-      "tickets_with_evidence": 74,
+      "tickets_total": 77,
+      "tickets_with_evidence": 77,
       "claim_tier_counts": {
-        "diagnostic": 69,
-        "reduced-order": 5,
-        "certified": 0
-      },
-      "weighted_score_sum": 20.25,
-      "toe_progress_pct": 27.4,
-      "strict_ready_progress_pct": 6.8,
-      "strict_ready_delta_ticket_count": 69,
-        "diagnostic": 67,
+        "diagnostic": 70,
         "reduced-order": 7,
         "certified": 0
       },
-      "weighted_score_sum": 20.95,
-      "toe_progress_pct": 28.3,
-      "strict_ready_progress_pct": 9.5,
-      "strict_ready_delta_ticket_count": 67,
+      "weighted_score_sum": 21.7,
+      "toe_progress_pct": 28.2,
+      "strict_ready_progress_pct": 9.1,
+      "strict_ready_delta_ticket_count": 70,
       "strict_ready_release_gate": {
         "status": "blocked",
         "blocked_reasons": [
           "missing_verified_pass",
           "missing_research_artifacts"
         ],
-        "blocked_ticket_count": 69,
-        "ready_ticket_count": 5
-      },
-      "research_gated_tickets_total": 29,
-      "research_artifact_complete_tickets_total": 28
-        "blocked_ticket_count": 67,
+        "blocked_ticket_count": 70,
         "ready_ticket_count": 7
       },
-      "research_gated_tickets_total": 29,
-      "research_artifact_complete_tickets_total": 29
+      "research_gated_tickets_total": 32,
+      "research_artifact_complete_tickets_total": 30
     }
   },
   "strict_ready_delta_targets": [
@@ -537,7 +499,15 @@
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": false
+    },
+    {
       "ticket_id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": true
+    },
+    {
+      "ticket_id": "TOE-078-life-cosmology-bridge-dag-contract",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": true
@@ -1203,15 +1173,23 @@
     },
     {
       "ticket_id": "TOE-076-helix-ask-system-quality-delta-pack",
-      "ticket_id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
       "claim_tier": "diagnostic",
       "verification_ok": true,
       "score": 0.25,
       "research_gated": true,
       "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-076-helix-ask-system-quality-delta-pack.20260218T234000Z.json"
+    },
+    {
+      "ticket_id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
       "research_artifact_complete": false,
       "result_file": "docs/audits/ticket-results/TOE-074-stellar-ps1-bridges-owner-coverage-contract.20260218T233836Z.json"
+    },
+    {
       "ticket_id": "TOE-075-helix-ask-strict-ready-verified-pass-pack",
       "claim_tier": "reduced-order",
       "verification_ok": true,
@@ -1219,6 +1197,15 @@
       "research_gated": true,
       "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-075-helix-ask-strict-ready-verified-pass-pack.20260218T233453Z.json"
+    },
+    {
+      "ticket_id": "TOE-078-life-cosmology-bridge-dag-contract",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": false,
+      "result_file": "docs/audits/ticket-results/TOE-078-life-cosmology-bridge-dag-contract.20260219T001000Z.json"
     }
   ]
 }
