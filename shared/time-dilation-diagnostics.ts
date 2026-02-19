@@ -61,6 +61,26 @@ export type TimeDilationDiagnostics = {
     field_provenance_schema: string | null;
   };
   fieldProvenance: Record<string, unknown>;
+  congruence: {
+    kind: "eulerian_adm" | "grid_static" | "ship_comoving" | "geodesic_bundle";
+    requiredFieldsOk: boolean;
+    missingFields: string[];
+    gaugeNote: string | null;
+  };
+  observables: Record<string, {
+    source: string;
+    observerFamily: "eulerian_adm" | "grid_static" | "ship_comoving" | "geodesic_bundle";
+    chart: string | null;
+    units: string | null;
+  }>;
+  provenance: Record<string, {
+    source: string;
+    observer: string | null;
+    chart: string | null;
+    units: string | null;
+    definitionId: string;
+    derivedFrom: string;
+  }>;
   proofPack?: unknown;
   renderingSeed?: string;
   renderingProbe?: string;
@@ -116,6 +136,8 @@ type Definitions = {
   field_provenance_schema: string | null;
 };
 
+type CongruenceKind = "eulerian_adm" | "grid_static" | "ship_comoving" | "geodesic_bundle";
+
 const canonicalizeCanonicalField = (canonical: CanonicalField): CanonicalField => ({
   family: canonical.family,
   chart: canonical.chart ?? "unknown",
@@ -124,6 +146,30 @@ const canonicalizeCanonicalField = (canonical: CanonicalField): CanonicalField =
   unitSystem: canonical.unitSystem ?? "unknown",
   match: canonical.match ?? "unknown",
 });
+
+const resolveCongruenceKind = (canonical: CanonicalField): CongruenceKind => {
+  const observer = (canonical.observer ?? "").toLowerCase();
+  const chart = (canonical.chart ?? "").toLowerCase();
+  if (observer.includes("euler") || chart.includes("adm")) return "eulerian_adm";
+  if (observer.includes("grid") || chart.includes("static")) return "grid_static";
+  if (observer.includes("ship") || chart.includes("comoving")) return "ship_comoving";
+  return "geodesic_bundle";
+};
+
+const resolveCongruenceRequirements = (canonical: CanonicalField, definitions: Definitions) => {
+  const missingFields = [
+    canonical.chart === "unknown" ? "canonical.chart" : null,
+    canonical.observer === "unknown" ? "canonical.observer" : null,
+    canonical.normalization === "unknown" ? "canonical.normalization" : null,
+    !definitions.theta_definition ? "definitions.theta_definition" : null,
+    !definitions.kij_sign_convention ? "definitions.kij_sign_convention" : null,
+  ].filter((value): value is string => typeof value === "string");
+
+  return {
+    requiredFieldsOk: missingFields.length === 0,
+    missingFields,
+  };
+};
 
 const toNumber = (value: unknown): number | null => {
   const num = typeof value === "number" ? value : Number(value);
@@ -480,6 +526,64 @@ export async function buildTimeDilationDiagnostics(
     geometryEnabled: renderPlan.enableGeometryWarp,
   });
 
+  const congruenceKind = resolveCongruenceKind(canonical);
+  const congruenceRequirements = resolveCongruenceRequirements(canonical, definitions);
+
+  const provenance = {
+    alpha: {
+      source: String(renderPlan.sourceForAlpha),
+      observer: canonical.observer,
+      chart: canonical.chart,
+      units: canonical.unitSystem,
+      definitionId: "alpha",
+      derivedFrom: "warp.metricAdapter.alpha",
+    },
+    beta: {
+      source: String(renderPlan.sourceForBeta),
+      observer: canonical.observer,
+      chart: canonical.chart,
+      units: "1/s",
+      definitionId: "betaU",
+      derivedFrom: "warp.metricAdapter.beta",
+    },
+    gamma: {
+      source: "gr-brick",
+      observer: canonical.observer,
+      chart: canonical.chart,
+      units: canonical.unitSystem,
+      definitionId: "gamma",
+      derivedFrom: "warp.metricAdapter.gammaDiag",
+    },
+    theta: {
+      source: String(renderPlan.sourceForTheta),
+      observer: canonical.observer,
+      chart: canonical.chart,
+      units: "1/s",
+      definitionId: "theta",
+      derivedFrom: "warp.metricAdapter.theta",
+    },
+    kTrace: {
+      source: "gr-brick",
+      observer: canonical.observer,
+      chart: canonical.chart,
+      units: "1/s",
+      definitionId: "K",
+      derivedFrom: "warp.metricAdapter.Ktrace",
+    },
+  };
+
+  const observables = Object.fromEntries(
+    Object.entries(provenance).map(([field, info]) => [
+      field,
+      {
+        source: info.source,
+        observerFamily: congruenceKind,
+        chart: info.chart,
+        units: info.units,
+      },
+    ]),
+  );
+
   const diagnostics: TimeDilationDiagnostics = {
     kind: "time_dilation_diagnostics",
     captured_at: new Date().toISOString(),
@@ -496,6 +600,17 @@ export async function buildTimeDilationDiagnostics(
       field_provenance_schema: definitions.field_provenance_schema,
     },
     fieldProvenance,
+    congruence: {
+      kind: congruenceKind,
+      requiredFieldsOk: congruenceRequirements.requiredFieldsOk,
+      missingFields: congruenceRequirements.missingFields,
+      gaugeNote:
+        canonical.chart === "unknown"
+          ? "Gauge/chart metadata is incomplete; interpret plotted diagnostics as observer-relative only."
+          : null,
+    },
+    observables,
+    provenance,
     proofPack,
     renderingSeed,
     renderingProbe,
