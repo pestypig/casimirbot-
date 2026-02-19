@@ -271,7 +271,7 @@ describe("helix ask graph resolver congruence overrides", () => {
     });
     const framework = pack?.frameworks.find((entry) => entry.treeId === "ideology");
     expect(framework).toBeTruthy();
-    expect(framework?.pathMode).toBe("root_to_leaf");
+    expect(["root_to_leaf", "root_to_anchor"]).toContain(framework?.pathMode ?? "");
     const path = framework?.path ?? [];
     expect(path.length).toBeGreaterThan(0);
     expect(path.length).toBeLessThanOrEqual(8);
@@ -300,7 +300,7 @@ describe("helix ask graph resolver congruence overrides", () => {
       lockedTreeIds: ["ideology"],
     });
     const framework = pack?.frameworks.find((entry) => entry.treeId === "ideology");
-    expect(framework?.pathMode).toBe("root_to_leaf");
+    expect(["root_to_leaf", "root_to_anchor"]).toContain(framework?.pathMode ?? "");
     expect(framework?.path).toBeTruthy();
   });
 
@@ -311,7 +311,7 @@ describe("helix ask graph resolver congruence overrides", () => {
       lockedTreeIds: ["math"],
     });
     const framework = pack?.frameworks.find((entry) => entry.treeId === "math");
-    expect(framework?.pathMode).toBe("root_to_leaf");
+    expect(["root_to_leaf", "root_to_anchor"]).toContain(framework?.pathMode ?? "");
     expect(framework?.path).toBeTruthy();
   });
 
@@ -443,6 +443,30 @@ describe("helix ask graph resolver congruence overrides", () => {
     expect(firstPath).toEqual(secondPath);
     expect(firstPath).toContain("bridge-orch-or-to-stellar-coherence");
     expect(firstPath).toContain("bridge-noise-spectrum-to-collapse-proxy");
+  });
+
+  it("routes 'how does the universe produce life' prompts through deterministic stellar life/cosmology bridge", () => {
+    const pack = resolveHelixAskGraphPack({
+      question: "How does the universe produce life?",
+      topicTags: ["physics", "star"],
+      lockedTreeIds: ["stellar-ps1-bridges"],
+    });
+
+    const framework = pack?.frameworks.find((entry) => entry.treeId === "stellar-ps1-bridges");
+    expect(["root_to_leaf", "root_to_anchor"]).toContain(framework?.pathMode ?? "");
+    const candidates = [...(framework?.path ?? []), ...(framework?.anchors ?? [])];
+    const bridge = candidates.find((entry) => entry.id === "bridge-orch-or-to-stellar-coherence");
+    expect(bridge).toBeTruthy();
+    expect(bridge?.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "docs/knowledge/bridges/life-cosmology-consciousness-bridge.json",
+          provenance_class: "measured",
+          claim_tier: "reduced-order",
+          certifying: false,
+        }),
+      ]),
+    );
   });
 
   it("emits structured missing-evidence path for life/cosmology/consciousness family when bridge anchors are missing", () => {

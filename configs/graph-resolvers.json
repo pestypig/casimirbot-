@@ -34,6 +34,7 @@
       "id": "stellar-ps1-bridges",
       "label": "Stellar PS1 Bridge Walk",
       "path": "docs/knowledge/bridges/stellar-ps1-bridge-tree.json",
+      "pathMode": "root_to_leaf",
       "topicTags": [
         "physics",
         "star",
@@ -43,6 +44,7 @@
       "matchers": [
         "life emergence",
         "origin of life",
+        "how does the universe produce life",
         "consciousness",
         "cosmology",
         "stellar consciousness",

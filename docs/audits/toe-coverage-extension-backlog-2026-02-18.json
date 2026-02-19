@@ -1892,6 +1892,17 @@
         "Before/after metric deltas are emitted with deterministic thresholds and pass/fail marks",
         "Strict fail determinism probe is measured and reported",
         "Receipt artifact records validator/preflight runs plus Casimir PASS certificate integrity"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
       "id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
       "tree_owner": "stellar-ps1-bridges",
       "primitive": "Stellar PS1 bridges resolver owner coverage contract",
@@ -1902,6 +1913,28 @@
         "configs/graph-resolvers.json",
         "server/services/helix-ask/graph-resolver.ts",
         "tests/helix-ask-graph-resolver.spec.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "scripts/validate-resolver-owner-coverage.ts"
+      ],
+      "done_criteria": [
+        "Stellar PS1 bridge resolver path remains deterministic and active under lock + path walk",
+        "Bridge resolver contract requires deterministic evidence metadata and at least one certifying evidence record",
+        "Resolver owner coverage marks stellar-ps1-bridges as covered_extension with validation green"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
       "id": "TOE-075-helix-ask-strict-ready-verified-pass-pack",
       "tree_owner": "helix-ask",
       "primitive": "Helix Ask strict-ready verified PASS pack",
@@ -1918,13 +1951,6 @@
         "docs/audits/toe-progress-snapshot.json"
       ],
       "required_tests": [
-        "tests/helix-ask-graph-resolver.spec.ts",
-        "scripts/validate-resolver-owner-coverage.ts"
-      ],
-      "done_criteria": [
-        "Stellar PS1 bridge resolver path remains deterministic and active under lock + path walk",
-        "Bridge resolver contract requires deterministic evidence metadata and at least one certifying evidence record",
-        "Resolver owner coverage marks stellar-ps1-bridges as covered_extension with validation green"
         "tests/helix-ask-modes.spec.ts",
         "tests/helix-ask-evidence-gate.spec.ts",
         "tests/helix-ask-answer-artifacts.spec.ts"
@@ -1934,6 +1960,40 @@
         "Highest-impact Helix Ask blockers are promoted to verified PASS-ready state with deterministic gates",
         "Strict fail reasons remain deterministic and replay-safe across fallback paths",
         "Progress snapshot and ticket receipt capture before/after strict-ready counters"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-078-life-cosmology-bridge-dag-contract",
+      "tree_owner": "stellar-ps1-bridges",
+      "primitive": "Life/Cosmology bridge DAG-tree congruence and strict evidence contract",
+      "primary_path_prefix": "server/services/helix-ask/relation-assembly.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "configs/graph-resolvers.json",
+        "server/services/helix-ask/graph-resolver.ts",
+        "server/services/helix-ask/relation-assembly.ts",
+        "docs/knowledge/bridges",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/helix-ask-bridge.spec.ts",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/helix-ask-bridge.spec.ts"
+      ],
+      "done_criteria": [
+        "Life/cosmology/consciousness resolver path is deterministic under replay for locked stellar bridge tree",
+        "Bridge evidence packet carries provenance_class, claim_tier, and certifying metadata for routable claims",
+        "Strict bridge gate fails deterministically for missing/weak life-cosmology evidence contracts"
       ],
       "research_gate": {
         "risk_class": "runtime_contract",
