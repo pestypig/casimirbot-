@@ -24,6 +24,13 @@ describe("gr constraint gate", () => {
     expect(evaluation.gate.status).toBe("unknown");
   });
 
+  it("fails closed when hard diagnostics are unknown in strict policy", () => {
+    const evaluation = evaluateGrConstraintGateFromMetrics({ H_rms: 0.005 });
+    expect(evaluation.gate.status).toBe("fail");
+    expect(evaluation.gate.policy.unknownAsFail).toBe(true);
+    expect(evaluation.constraints.find((entry) => entry.id === "BSSN_M_rms")?.status).toBe("unknown");
+  });
+
   it("fails when a hard constraint exceeds threshold", () => {
     const evaluation = evaluateGrConstraintGateFromMetrics({
       H_rms: 0.02,

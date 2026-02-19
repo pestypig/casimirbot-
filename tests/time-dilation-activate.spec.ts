@@ -103,6 +103,109 @@ describe("/api/helix/time-dilation/activate contract", () => {
     expect(res.body?.warnings).toEqual(expect.arrayContaining(["diagnostics_partial"]));
   });
 
+
+
+  it("returns diagnostics_partial warning when strict gate is blocked by missing congruence fields", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, overallStatus: "NOMINAL", strictCongruence: true }),
+      text: async () => "",
+    }));
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    buildDiagnosticsMock.mockResolvedValue({
+      kind: "time_dilation_diagnostics",
+      renderingSeed: "diag:seed:blocked",
+      gate: { banner: "BLOCKED", reasons: ["verification:hard_constraints_unknown"] },
+      strict: {
+        strictCongruence: true,
+        latticeMetricOnly: true,
+        strictMetricMissing: true,
+        anyProxy: true,
+        mathStageOK: true,
+        grCertified: false,
+        banner: "BLOCKED",
+        failId: "ADAPTER_CONSTRAINTS_UNKNOWN",
+        failClosedReasons: ["hard_constraints_unknown"],
+      },
+      canonical: {
+        family: "natario",
+        chart: "comoving_cartesian",
+        observer: "ship",
+        normalization: "metric",
+        unitSystem: null,
+        match: null,
+      },
+      definitions: {
+        theta_definition: null,
+        kij_sign_convention: null,
+        gamma_field_naming: null,
+        field_provenance_schema: null,
+      },
+      fieldProvenance: {},
+      metric_contract: {
+        metric_t00_contract_ok: true,
+        metric_chart_contract_status: "ok",
+        metric_chart_notes: null,
+        metric_coordinate_map: null,
+      },
+      render_plan: {},
+      sources: { proof_pack_proxy: false, gr_guardrails_proxy: false },
+      wall: {},
+      captured_at: new Date().toISOString(),
+      observables: {
+        ship_comoving_dtau_dt: {
+          source: "adm_worldline",
+          observerFamily: "ship_comoving",
+          chart: "comoving_cartesian",
+          units: "dimensionless",
+          valid: false,
+          missingFields: ["shipKinematics.betaCoord", "shipKinematics.dxdt"],
+        },
+      },
+      provenance: {},
+      congruence: {
+        kind: "ship_comoving",
+        requiredFieldsOk: false,
+        missingFields: ["shipKinematics.betaCoord", "shipKinematics.dxdt"],
+        gaugeNote: null,
+      },
+      natarioCanonical: {
+        requiredFieldsOk: false,
+        canonicalSatisfied: false,
+        checks: {
+          divBeta: { status: "unknown", rms: null, maxAbs: null, tolerance: 0.1, source: "x" },
+          thetaKConsistency: { status: "unknown", theta: null, kTrace: null, residualAbs: null, tolerance: 0.1, source: "x" },
+        },
+        reason: "natario_required_fields_missing",
+      },
+      gr: { dims: null, meta: null, solverHealth: null },
+    });
+
+    const { helixTimeDilationRouter } = await import("../server/routes/helix/time-dilation");
+    const app = express();
+    app.use(express.json());
+    app.use("/api/helix/time-dilation", helixTimeDilationRouter);
+
+    const res = await request(app)
+      .post("/api/helix/time-dilation/activate")
+      .send({ warpFieldType: "natario", grEnabled: true, strictCongruence: true, async: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body?.warnings).toEqual(expect.arrayContaining(["diagnostics_partial"]));
+    expect(res.body?.diagnostics?.strict).toEqual(
+      expect.objectContaining({
+        grCertified: false,
+        failId: "ADAPTER_CONSTRAINTS_UNKNOWN",
+      }),
+    );
+    expect(res.body?.diagnostics?.congruence).toEqual(
+      expect.objectContaining({
+        requiredFieldsOk: false,
+      }),
+    );
+  });
+
   it("publishes explicit error diagnostics shape when async background fails", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,

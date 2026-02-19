@@ -315,6 +315,29 @@ describe("warp viability congruence wiring", () => {
   });
 
 
+
+
+  it("fails TS_ratio_min in strict mode when TS metric provenance is missing", async () => {
+    runtime.pipeline = makePipeline({
+      tsMetricDerived: false,
+      tsMetricDerivedSource: undefined,
+      tsMetricDerivedReason: undefined,
+      warp: {
+        metricT00: -100,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.natario.shift",
+        metricAdapter: { betaDiagnostics: { thetaMax: 0.5, method: "finite-diff" } },
+      },
+    });
+
+    const result = await evaluateWarpViability({});
+    const ts = result.constraints.find((c) => c.id === "TS_ratio_min");
+    expect(ts?.passed).toBe(false);
+    expect(ts?.note).toBe("proxy_input");
+    expect(ts?.details).toContain("metric_source=false");
+    expect(ts?.details).toContain("ts_source=unknown");
+  });
+
   it("uses conservative non-certifying defaults when provenance metadata is missing", async () => {
     runtime.pipeline = makePipeline({
       tsMetricDerived: undefined,
