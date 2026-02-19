@@ -1,0 +1,22 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-023-telemetry-console-provenance-contract",
+  "files_changed": [
+    "server/services/console-telemetry/store.ts",
+    "server/services/console-telemetry/persist.ts",
+    "server/services/console-telemetry/summarize.ts",
+    "tests/console-telemetry-contract.spec.ts"
+  ],
+  "tests_run": [
+    "tests/console-telemetry-contract.spec.ts"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:58ed9099-306b-495e-9114-6b75c05b655e",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

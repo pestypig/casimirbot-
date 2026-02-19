@@ -1,0 +1,24 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-022-analysis-loops-provenance-gate",
+  "claim_tier": "reduced-order",
+  "files_changed": [
+    "server/routes/analysis-loops.ts",
+    "modules/analysis/constraint-loop.ts",
+    "modules/analysis/noise-field-loop.ts",
+    "tests/analysis-loops-route.spec.ts",
+    "tests/analysis-loop-contract.spec.ts"
+  ],
+  "tests_run": [
+    "tests/analysis-loops-route.spec.ts",
+    "tests/analysis-loop-contract.spec.ts"
+  ],
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:71a29dc0-bd63-4c00-b9ed-a33db13ac8c0",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

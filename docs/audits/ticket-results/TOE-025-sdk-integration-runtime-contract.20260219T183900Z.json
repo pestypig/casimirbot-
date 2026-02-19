@@ -1,0 +1,23 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-025-sdk-integration-runtime-contract",
+  "files_changed": [
+    "sdk/src/types.ts",
+    "sdk/src/client.ts",
+    "sdk/src/runtime.ts",
+    "sdk/src/index.ts",
+    "tests/sdk-integration-contract.spec.ts"
+  ],
+  "tests_run": [
+    "tests/sdk-integration-contract.spec.ts"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:9e3e7c53-edb2-4ca6-82c1-f77a45dcc10d",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

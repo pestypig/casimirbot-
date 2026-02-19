@@ -1,0 +1,26 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-018-hardware-telemetry-provenance-gate",
+  "files_changed": [
+    "server/services/telemetry/panels.ts",
+    "server/services/telemetry/badges.ts",
+    "server/skills/telemetry.panels.ts",
+    "server/skills/telemetry.badges.ts",
+    "tests/hardware-telemetry-provenance.spec.ts",
+    "tests/ideology-telemetry.spec.ts"
+  ],
+  "tests_run": [
+    "tests/hardware-telemetry-provenance.spec.ts",
+    "tests/ideology-telemetry.spec.ts"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:1d78bfb9-74a6-436f-903a-fd75ae8a1b48",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true,
+    "status": "GREEN"
+  },
+  "remaining_gaps": []
+}

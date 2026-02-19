@@ -1,0 +1,127 @@
+{
+  "schema_version": "toe_verified_pass_pack_receipt/1",
+  "ticket_id": "TOE-102-strict-ready-verified-pass-pack-3",
+  "generated_at": "2026-02-19T18:27:00Z",
+  "objective": {
+    "missing_verified_pass_reduction_min": 8,
+    "preserve_missing_research_artifacts_zero": true,
+    "preserve_missing_math_congruence_zero": true
+  },
+  "baseline": {
+    "strict_ready_progress_pct": 17.0,
+    "blocked_ticket_count": 83,
+    "ready_ticket_count": 17,
+    "blocked_reasons": [
+      "missing_verified_pass"
+    ],
+    "blocker_counts": {
+      "missing_verified_pass": 83,
+      "missing_research_artifacts": 0,
+      "missing_math_congruence": 0
+    }
+  },
+  "result": {
+    "strict_ready_progress_pct": 33.0,
+    "blocked_ticket_count": 67,
+    "ready_ticket_count": 33,
+    "blocked_reasons": [
+      "missing_verified_pass"
+    ],
+    "blocker_counts": {
+      "missing_verified_pass": 67,
+      "missing_research_artifacts": 0,
+      "missing_math_congruence": 0
+    }
+  },
+  "promoted_tickets": [
+    {
+      "ticket_id": "TOE-002-semiclassical-coupling-contract",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-003-quantum-provenance-class",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-004-uncertainty-propagation-gates",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-005-prediction-observation-ledger",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-006-firstfail-taxonomy-normalization",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-012-halobank-horizons-consistency-gate",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-014-robotics-recollection-provenance-contract",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-018-hardware-telemetry-provenance-gate",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-019-ui-backend-binding-claim-tier-surface",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-020-llm-runtime-artifact-provenance-contract",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-021-queue-orchestration-runtime-contract",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-022-analysis-loops-provenance-gate",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-023-telemetry-console-provenance-contract",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-024-skills-tooling-risk-contract",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-025-sdk-integration-runtime-contract",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    },
+    {
+      "ticket_id": "TOE-026-knowledge-ingestion-provenance-budget-contract",
+      "before_claim_tier": "diagnostic",
+      "after_claim_tier": "reduced-order"
+    }
+  ],
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:2fb69a95-7b46-4828-a0cb-b97cf212c049",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "integrity_ok": true,
+    "status": "GREEN"
+  }
+}
