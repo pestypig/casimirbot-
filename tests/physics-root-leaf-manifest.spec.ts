@@ -66,6 +66,53 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
         },
       },
       {
+        id: "path_spacetime_to_life",
+        root_id: "physics_spacetime_gr",
+        leaf_id: "leaf_universe_produces_life",
+        nodes: [
+          "physics_spacetime_gr",
+          "physics_quantum_semiclassical",
+          "physics_thermodynamics_entropy",
+          "physics_biology_life",
+          "leaf_universe_produces_life",
+        ],
+        dag_bridges: ["life-cosmology-consciousness-bridge"],
+        falsifier: {
+          observable: "equation-grounded path completeness",
+          reject_rule: "missing canonical equation refs",
+          uncertainty_model: "deterministic_threshold_contract_v1",
+          test_refs: ["scripts/validate-physics-root-leaf-manifest.ts"],
+        },
+        maturity_gate: {
+          max_claim_tier: "diagnostic",
+          required_evidence_types: ["proxy", "inferred"],
+          strict_fail_reason: "ROOT_LEAF_PATH_INCOMPLETE",
+        },
+      },
+      {
+        id: "path_quantum_to_consciousness",
+        root_id: "physics_quantum_semiclassical",
+        leaf_id: "leaf_universe_produces_life",
+        nodes: [
+          "physics_quantum_semiclassical",
+          "physics_information_dynamics",
+          "physics_thermodynamics_entropy",
+          "leaf_universe_produces_life",
+        ],
+        dag_bridges: ["life-cosmology-consciousness-bridge"],
+        falsifier: {
+          observable: "bridge provenance determinism",
+          reject_rule: "strict bridge gate missing deterministic reason",
+          uncertainty_model: "deterministic_contract_gate",
+          test_refs: ["tests/helix-ask-bridge.spec.ts"],
+        },
+        maturity_gate: {
+          max_claim_tier: "diagnostic",
+          required_evidence_types: ["proxy", "inferred"],
+          strict_fail_reason: "ROOT_LEAF_STRICT_BRIDGE_FAIL",
+        },
+      },
+      {
         id: "path_information_to_life",
         root_id: "physics_information_dynamics",
         leaf_id: "leaf_universe_produces_life",
