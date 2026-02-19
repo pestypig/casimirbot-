@@ -6,37 +6,53 @@
     {
       "id": "physics_spacetime_gr",
       "name": "Spacetime and general relativity baseline",
-      "equation_refs": ["efe_baseline"]
+      "equation_refs": [
+        "efe_baseline"
+      ]
     },
     {
       "id": "physics_quantum_semiclassical",
       "name": "Semiclassical quantum coupling baseline",
-      "equation_refs": ["semiclassical_coupling"]
+      "equation_refs": [
+        "semiclassical_coupling"
+      ]
     },
     {
       "id": "physics_thermodynamics_entropy",
       "name": "Thermodynamics and entropy directionality",
-      "equation_refs": ["uncertainty_propagation"]
+      "equation_refs": [
+        "uncertainty_propagation"
+      ]
     },
     {
       "id": "physics_information_dynamics",
       "name": "Information dynamics and coherence bounds",
-      "equation_refs": ["uncertainty_propagation", "runtime_safety_gate"]
+      "equation_refs": [
+        "uncertainty_propagation",
+        "runtime_safety_gate"
+      ]
     },
     {
       "id": "physics_prebiotic_chemistry",
       "name": "Prebiotic chemistry and molecular selection",
-      "equation_refs": ["stress_energy_conservation", "uncertainty_propagation"]
+      "equation_refs": [
+        "stress_energy_conservation",
+        "uncertainty_propagation"
+      ]
     },
     {
       "id": "physics_biology_life",
       "name": "Biological life emergence constraints",
-      "equation_refs": ["uncertainty_propagation"]
+      "equation_refs": [
+        "uncertainty_propagation"
+      ]
     },
     {
       "id": "physics_runtime_safety_control",
       "name": "Runtime safety and decision control gates",
-      "equation_refs": ["runtime_safety_gate"]
+      "equation_refs": [
+        "runtime_safety_gate"
+      ]
     }
   ],
   "leaves": [
@@ -84,7 +100,11 @@
       },
       "maturity_gate": {
         "max_claim_tier": "diagnostic",
-        "required_evidence_types": ["measured", "proxy", "inferred"],
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
         "strict_fail_reason": "ROOT_LEAF_FALSIFIER_MISSING"
       }
     },
@@ -115,7 +135,10 @@
       },
       "maturity_gate": {
         "max_claim_tier": "diagnostic",
-        "required_evidence_types": ["proxy", "inferred"],
+        "required_evidence_types": [
+          "proxy",
+          "inferred"
+        ],
         "strict_fail_reason": "ROOT_LEAF_PATH_INCOMPLETE"
       }
     },
@@ -144,7 +167,10 @@
       },
       "maturity_gate": {
         "max_claim_tier": "diagnostic",
-        "required_evidence_types": ["proxy", "inferred"],
+        "required_evidence_types": [
+          "proxy",
+          "inferred"
+        ],
         "strict_fail_reason": "ROOT_LEAF_STRICT_BRIDGE_FAIL"
       }
     },
@@ -172,8 +198,108 @@
       },
       "maturity_gate": {
         "max_claim_tier": "diagnostic",
-        "required_evidence_types": ["measured", "proxy", "inferred"],
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
         "strict_fail_reason": "ROOT_LEAF_RUNTIME_SAFETY_MISSING"
+      }
+    },
+    {
+      "id": "path_information_dynamics_to_life",
+      "root_id": "physics_information_dynamics",
+      "leaf_id": "leaf_universe_produces_life",
+      "nodes": [
+        "physics_information_dynamics",
+        "physics_prebiotic_chemistry",
+        "physics_biology_life",
+        "leaf_universe_produces_life"
+      ],
+      "dag_bridges": [
+        "life-cosmology-consciousness-bridge",
+        "bridge-information-coherence-to-biogenesis"
+      ],
+      "falsifier": {
+        "observable": "information-coherence-to-biogenesis path linkage coverage",
+        "reject_rule": "information_coherence_linkage_rate < 0.95 OR prebiotic_selection_alignment_rate < 0.95 OR biogenesis_path_order_ok != true",
+        "uncertainty_model": "deterministic_threshold_contract_v1",
+        "test_refs": [
+          "tests/physics-root-leaf-manifest.spec.ts",
+          "scripts/validate-physics-root-leaf-manifest.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_INFORMATION_DYNAMICS_PATH_MISSING"
+      }
+    },
+    {
+      "id": "path_prebiotic_chemistry_to_life",
+      "root_id": "physics_prebiotic_chemistry",
+      "leaf_id": "leaf_universe_produces_life",
+      "nodes": [
+        "physics_prebiotic_chemistry",
+        "physics_biology_life",
+        "leaf_universe_produces_life"
+      ],
+      "dag_bridges": [
+        "life-cosmology-consciousness-bridge",
+        "bridge-prebiotic-selection-to-life-emergence"
+      ],
+      "falsifier": {
+        "observable": "prebiotic-to-life emergence pathway coverage",
+        "reject_rule": "prebiotic_selection_alignment_rate < 0.95 OR life_emergence_transition_coverage < 0.95",
+        "uncertainty_model": "deterministic_threshold_contract_v1",
+        "test_refs": [
+          "tests/physics-root-leaf-manifest.spec.ts",
+          "tests/helix-ask-graph-resolver.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_PREBIOTIC_PATH_MISSING"
+      }
+    },
+    {
+      "id": "path_runtime_safety_control_to_financial_safety",
+      "root_id": "physics_runtime_safety_control",
+      "leaf_id": "leaf_human_ai_financial_safety",
+      "nodes": [
+        "physics_runtime_safety_control",
+        "physics_information_dynamics",
+        "leaf_human_ai_financial_safety"
+      ],
+      "dag_bridges": [
+        "life-cosmology-consciousness-bridge",
+        "bridge-runtime-control-to-financial-guardrails"
+      ],
+      "falsifier": {
+        "observable": "runtime-control guardrail determinism for financial safety responses",
+        "reject_rule": "guardrail_decision_determinism_rate < 0.98 OR citation_presence_rate < 0.95 OR non_200_rate > 0.02",
+        "uncertainty_model": "runtime_gate_thresholds",
+        "test_refs": [
+          "tests/physics-root-leaf-manifest.spec.ts",
+          "tests/casimir-verify-ps2.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_RUNTIME_CONTROL_PATH_MISSING"
       }
     }
   ]

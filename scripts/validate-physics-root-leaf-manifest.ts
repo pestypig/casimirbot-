@@ -62,6 +62,12 @@ const REQUIRED_ROOT_IDS = [
   "physics_runtime_safety_control",
 ];
 
+const REQUIRED_ENTRYPOINT_ROOT_IDS = [
+  "physics_information_dynamics",
+  "physics_prebiotic_chemistry",
+  "physics_runtime_safety_control",
+];
+
 function parseFlag(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
   if (index < 0 || index + 1 >= process.argv.length) {
@@ -187,6 +193,7 @@ export function validatePhysicsRootLeafManifest(options?: {
   });
 
   const coveredLeaves = new Set<string>();
+  const coveredRootEntrypoints = new Set<string>();
   const pathIds = new Set<string>();
 
   paths.forEach((entry, index) => {
@@ -204,6 +211,8 @@ export function validatePhysicsRootLeafManifest(options?: {
     const leafId = typeof entry.leaf_id === "string" ? entry.leaf_id.trim() : "";
     if (!rootId || !rootIds.has(rootId)) {
       errors.push(`${loc}.root_id must reference a declared root`);
+    } else {
+      coveredRootEntrypoints.add(rootId);
     }
     if (!leafId || !leafIds.has(leafId)) {
       errors.push(`${loc}.leaf_id must reference a declared leaf`);
@@ -271,6 +280,12 @@ export function validatePhysicsRootLeafManifest(options?: {
   for (const leafId of leafIds) {
     if (!coveredLeaves.has(leafId)) {
       errors.push(`leaf not covered by any root-to-leaf path: ${leafId}`);
+    }
+  }
+
+  for (const rootId of REQUIRED_ENTRYPOINT_ROOT_IDS) {
+    if (!coveredRootEntrypoints.has(rootId)) {
+      errors.push(`missing required root-lane entrypoint path for root_id: ${rootId}`);
     }
   }
 
