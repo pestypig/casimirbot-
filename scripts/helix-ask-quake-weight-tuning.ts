@@ -37,6 +37,14 @@ type EvalResult = {
   summaryPath: string;
 };
 
+type GateAssessment = {
+  metric: keyof typeof GATES;
+  actual: number;
+  threshold: number;
+  comparator: ">=";
+  pass: boolean;
+};
+
 const nowStamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
 
 const postAskProbe = async (): Promise<{ status: number; ok: boolean; body: Record<string, unknown> }> => {
@@ -136,6 +144,14 @@ export const extractStopReason = (row: Record<string, unknown>): string => {
 };
 
 const gatePassForRate = (actual: number, threshold: number): boolean => actual >= threshold;
+
+const buildGateAssessment = (metrics: EvalResult["metrics"]): GateAssessment[] => {
+  return (Object.entries(GATES) as Array<[keyof typeof GATES, number]>).map(([metric, threshold]) => {
+    const actual = Number(metrics[metric] ?? 0);
+    const pass = gatePassForRate(actual, threshold);
+    return { metric, actual, threshold, comparator: ">=", pass };
+  });
+};
 
 const percentile = (values: number[], q: number): number => {
   if (!values.length) return 0;
@@ -338,31 +354,25 @@ async function main() {
     ranking: ranked.map((r) => ({ id: r.id, passes: r.passes, score: r.score, gate_fail_count: gateFailCount(r) })),
   };
 
+  const winnerAssessments = winner ? buildGateAssessment(winner.metrics) : [];
+
   const winnerPayload = winner
     ? {
         promoted,
+        recommendation: promoted
+          ? "PROMOTE: winner meets all strict Step 4 thresholds."
+          : "HOLD: winner fails one or more strict Step 4 thresholds.",
         winner_id: winner.id,
         score: winner.score,
         metrics: winner.metrics,
         gates: {
-          passed: Object.entries(GATES)
-            .filter(([key, threshold]) => {
-              const actual = winner.metrics[key as keyof typeof winner.metrics];
-              return gatePassForRate(actual, threshold);
-            })
-            .map(([key]) => key),
-          failed: Object.entries(GATES)
-            .filter(([key, threshold]) => {
-              const actual = winner.metrics[key as keyof typeof winner.metrics];
-              return !gatePassForRate(actual, threshold);
-            })
-            .map(([key]) => key),
+          passed: winnerAssessments.filter((item) => item.pass).map((item) => item.metric),
+          failed: winnerAssessments.filter((item) => !item.pass).map((item) => item.metric),
         },
+        gate_assessment: winnerAssessments,
         gate_details: Object.fromEntries(
-          Object.entries(GATES).map(([key, threshold]) => {
-            const actual = winner.metrics[key as keyof typeof winner.metrics];
-            const passed = gatePassForRate(actual, threshold);
-            return [key, { actual, threshold, comparator: ">=", passed }];
+          winnerAssessments.map((item) => {
+            return [item.metric, { actual: item.actual, threshold: item.threshold, comparator: item.comparator, passed: item.pass }];
           }),
         ),
         summaryPath: winner.summaryPath,
