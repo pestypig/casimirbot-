@@ -1058,6 +1058,102 @@ const scoreGraphCandidate = (anchorScore: number, pathScore: number, hitCount: n
   anchorScore * 2 + pathScore + hitCount;
 
 const VALID_BRIDGE_EVIDENCE_SCOPE = new Set(["left", "right"]);
+const EXTERNAL_INTEGRATION_TREE_ID = "external-integrations-tree";
+
+export type ExternalIntegrationEvidenceFailureReason =
+  | "missing_provenance_metadata"
+  | "contradictory_provenance_metadata";
+
+const classifyExternalIntegrationEvidenceFailure = (
+  evidence: HelixAskGraphEvidence[],
+): ExternalIntegrationEvidenceFailureReason | undefined => {
+  const normalizedEvidence = [...evidence].sort((left, right) => {
+    const leftKey = [
+      left.path ?? "",
+      left.symbol ?? "",
+      left.heading ?? "",
+      left.field ?? "",
+      left.contains ?? "",
+      left.note ?? "",
+      left.scope ?? "",
+      left.type,
+    ].join("::");
+    const rightKey = [
+      right.path ?? "",
+      right.symbol ?? "",
+      right.heading ?? "",
+      right.field ?? "",
+      right.contains ?? "",
+      right.note ?? "",
+      right.scope ?? "",
+      right.type,
+    ].join("::");
+    return leftKey.localeCompare(rightKey);
+  });
+  const evidenceContractByPath = new Map<string, string>();
+  let hasMissingMetadata = false;
+  for (const entry of normalizedEvidence) {
+    const hasProvenanceClass = typeof entry.provenance_class === "string";
+    const hasClaimTier = typeof entry.claim_tier === "string";
+    if (!hasProvenanceClass || !hasClaimTier) {
+      hasMissingMetadata = true;
+      continue;
+    }
+    const evidenceKey =
+      entry.path ??
+      [entry.type, entry.symbol, entry.heading, entry.field, entry.contains, entry.note, entry.scope]
+        .filter(Boolean)
+        .join("::");
+    const evidenceContract = `${entry.provenance_class}::${entry.claim_tier}`;
+    const current = evidenceContractByPath.get(evidenceKey);
+    if (!current) {
+      evidenceContractByPath.set(evidenceKey, evidenceContract);
+      continue;
+    }
+    if (current !== evidenceContract) {
+      return "contradictory_provenance_metadata";
+    }
+  }
+  if (hasMissingMetadata) return "missing_provenance_metadata";
+  return undefined;
+};
+
+const hasExternalIntegrationsEvidenceContract = (framework: HelixAskGraphFramework): boolean => {
+  if (framework.treeId !== EXTERNAL_INTEGRATION_TREE_ID) return true;
+  const integrationNodes = framework.path.filter((node) => node.id !== EXTERNAL_INTEGRATION_TREE_ID);
+  if (integrationNodes.length === 0) return false;
+  return integrationNodes.every((node) => {
+    const evidence = node.evidence ?? [];
+    if (evidence.length === 0) return false;
+    return !classifyExternalIntegrationEvidenceFailure(evidence);
+  });
+};
+
+export const __testOnlyClassifyExternalIntegrationEvidenceFailure =
+  classifyExternalIntegrationEvidenceFailure;
+
+export function __testOnlyHasExternalIntegrationsEvidenceContract(input: {
+  treeId?: string;
+  path: Array<{ id: string; evidence?: HelixAskGraphEvidence[] }>;
+}): boolean {
+  return hasExternalIntegrationsEvidenceContract({
+    treeId: input.treeId ?? EXTERNAL_INTEGRATION_TREE_ID,
+    treeLabel: input.treeId,
+    sourcePath: "tests/fixtures/external-integrations-contract-tree.json",
+    anchors: [],
+    path: input.path.map((entry, depth) => ({
+      id: entry.id,
+      title: entry.id,
+      tags: [],
+      score: 1,
+      depth,
+      evidence: entry.evidence,
+    })),
+    scaffoldText: "",
+    contextText: "",
+    preferGraph: true,
+  });
+}
 
 const hasStellarBridgeEvidenceContract = (framework: HelixAskGraphFramework): boolean => {
   if (framework.treeId !== "stellar-ps1-bridges") return true;
