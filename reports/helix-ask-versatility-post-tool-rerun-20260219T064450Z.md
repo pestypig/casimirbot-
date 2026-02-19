@@ -61,5 +61,6 @@
 - integrityOk: true
 
 ## Commit / PR
-- commit: 03d6555
+- patch commit: e6874a3
+- merge hash in main: 5c1b219
 - PR URL: unavailable (make_pr tool did not return a URL)

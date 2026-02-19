@@ -28,7 +28,7 @@
   },
   "metrics_note": "Prior tuning metrics intentionally unchanged unless explicitly recomputed.",
   "scm": {
-    "patch_commit": "recorded-at-release-step",
-    "merge_hash_in_main": "N/A"
+    "patch_commit": "e6874a3",
+    "merge_hash_in_main": "5c1b219"
   }
 }

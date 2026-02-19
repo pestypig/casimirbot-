@@ -64,10 +64,37 @@ const postAskProbe = async (): Promise<{ status: number; ok: boolean; body: Reco
   return { status: response.status, ok: response.status === 200, body };
 };
 
+type SpawnExecution = {
+  command: string;
+  args: string[];
+  shell: boolean;
+};
+
+export const buildSpawnExecution = (command: string, args: string[], platform = process.platform): SpawnExecution => {
+  if (platform === "win32") {
+    return {
+      command: [command, ...args].join(" "),
+      args: [],
+      shell: true,
+    };
+  }
+
+  return {
+    command,
+    args,
+    shell: false,
+  };
+};
+
 const runCommand = async (command: string, args: string[], env: NodeJS.ProcessEnv): Promise<{ code: number; stdout: string; stderr: string }> => {
   const { spawn } = await import("node:child_process");
+  const execution = buildSpawnExecution(command, args);
   return await new Promise((resolve) => {
-    const child = spawn(command, args, { env: { ...process.env, ...env }, cwd: process.cwd(), shell: process.platform === "win32" });
+    const child = spawn(execution.command, execution.args, {
+      env: { ...process.env, ...env },
+      cwd: process.cwd(),
+      shell: execution.shell,
+    });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => {

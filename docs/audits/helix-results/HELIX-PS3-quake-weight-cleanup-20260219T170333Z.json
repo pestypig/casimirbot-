@@ -1,0 +1,40 @@
+{
+  "task": "HELIX-PS3.2 Bookkeeping Cleanup + Portability Test",
+  "timestamp": "20260219T170333Z",
+  "changes": {
+    "bookkeeping_scm_semantics_corrected": true,
+    "cross_platform_command_runner_test_coverage": true,
+    "move_scoring_behavior_changed": false,
+    "weights_retuned": false
+  },
+  "tests": {
+    "vitest": [
+      {
+        "command": "npx vitest run tests/helix-ask-quake-weight-tuning.spec.ts",
+        "status": "PASS",
+        "files_passed": 1,
+        "tests_passed": 3
+      },
+      {
+        "command": "npx vitest run tests/helix-ask-quake-move-policy.spec.ts tests/helix-ask-semantic-quality.spec.ts",
+        "status": "PASS",
+        "files_passed": 2,
+        "tests_passed": 13
+      }
+    ]
+  },
+  "casimir_verify": {
+    "command": "npm run casimir:verify -- --pack repo-convergence --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace-quake-weight-cleanup.jsonl --trace-limit 200 --ci",
+    "verdict": "PASS",
+    "trace_id": "adapter:f99344a3-f7be-4e7e-bb4b-55f775f54a6f",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "integrity_ok": true,
+    "status": "GREEN"
+  },
+  "scm": {
+    "patch_commit": "e6874a3",
+    "merge_hash_in_main": "5c1b219"
+  }
+}
