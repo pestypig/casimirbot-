@@ -135,6 +135,18 @@ describe("Helix Ask focused utility hardening", () => {
     }
   }, 120000);
 
+
+  it("avoids selectedMove TDZ crash when ask is temporarily unavailable", async () => {
+    const payload = await ask("Trigger reliability fallback path", 7, "focused-utility-selected-move-tdz");
+    if (payload.status === 200) {
+      expect(typeof (payload.debug as any)?.fuzzy_move_selector?.selected).toBe("string");
+      return;
+    }
+    expect([500, 503]).toContain(payload.status);
+    const lastError = String((payload.debug as any)?.last_error ?? "");
+    expect(lastError).not.toContain("selectedMove");
+  }, 60000);
+
   it("covers 12-family focused mini-pack without placeholder/scaffold collapse", async () => {
     const cases = [
       "How does the universe produce life",
