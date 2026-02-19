@@ -6,16 +6,35 @@
       "id": "robotics-recollection",
       "label": "Robotics Recollection",
       "summary": "Demonstration ingestion, primitive DAG retargeting, replay traces, and controller-boundary safety.",
+      "falsifier": {
+        "template": "robotics-recollection-lane-promotion.v1",
+        "observable": "lane_replay_veto_contract_coverage",
+        "reject_rule": "missing_falsifier_templates OR deterministic_fail_reason_missing",
+        "deterministic_fail_reasons": [
+          "ROBOTICS_RECOLLECTION_FALSIFIER_MISSING",
+          "ROBOTICS_RECOLLECTION_FAIL_REASON_MISSING"
+        ]
+      },
       "links": [
         { "to": "demonstration-ingest", "type": "child" },
         { "to": "primitive-segmentation", "type": "child" },
-        { "to": "replay-certificate", "type": "child" }
+        { "to": "replay-certificate", "type": "child" },
+        { "to": "replay-veto-contract", "type": "child" }
       ]
     },
     {
       "id": "demonstration-ingest",
       "label": "Demonstration Ingestion Boundary",
       "summary": "Ingest skeleton/joint frames into a validated adapter boundary before planning.",
+      "falsifier": {
+        "template": "demonstration-ingest-boundary.v1",
+        "observable": "adapter_boundary_validation_rate",
+        "reject_rule": "controller_boundary_violation_detected OR schema_validation_fail",
+        "deterministic_fail_reasons": [
+          "ROBOTICS_DEMONSTRATION_BOUNDARY_VIOLATION",
+          "ROBOTICS_DEMONSTRATION_SCHEMA_INVALID"
+        ]
+      },
       "links": [
         { "to": "primitive-segmentation", "type": "child" }
       ]
@@ -24,6 +43,15 @@
       "id": "primitive-segmentation",
       "label": "Primitive Segmentation",
       "summary": "Segment demonstrations into reach/grasp/transport/place primitives with kinematic checks.",
+      "falsifier": {
+        "template": "primitive-segmentation-kinematic-contract.v1",
+        "observable": "primitive_path_kinematic_consistency",
+        "reject_rule": "primitive_segmentation_missing OR kinematic_consistency_ratio < 1.0",
+        "deterministic_fail_reasons": [
+          "ROBOTICS_PRIMITIVE_SEGMENTATION_MISSING",
+          "ROBOTICS_PRIMITIVE_KINEMATIC_MISMATCH"
+        ]
+      },
       "links": [
         { "to": "replay-certificate", "type": "child" }
       ]
@@ -31,7 +59,39 @@
     {
       "id": "replay-certificate",
       "label": "Replay and Gate Artifacts",
-      "summary": "Persist movement episodes with deterministic trace IDs, deltas, and certificate-linked gate outputs."
+      "summary": "Persist movement episodes with deterministic trace IDs, deltas, and certificate-linked gate outputs.",
+      "falsifier": {
+        "template": "replay-certificate-integrity.v1",
+        "observable": "certificate_hash_integrity_and_linkage",
+        "reject_rule": "certificate_missing OR certificate_integrity_fail OR certificate_ref_linkage_missing",
+        "deterministic_fail_reasons": [
+          "ADAPTER_CERTIFICATE_MISSING",
+          "ADAPTER_CERTIFICATE_INTEGRITY",
+          "ROBOTICS_REPLAY_CERTIFICATE_LINKAGE_MISSING"
+        ]
+      }
+    },
+    {
+      "id": "replay-veto-contract",
+      "label": "Replay / Veto Determinism Contract",
+      "summary": "Robotics veto paths and replay summaries must emit deterministic fail_reason IDs and replay seeds.",
+      "falsifier": {
+        "template": "replay-veto-determinism.v1",
+        "observable": "veto_and_replay_fail_reason_determinism",
+        "reject_rule": "veto_without_fail_reason OR replay_summary_missing_fail_reason",
+        "deterministic_fail_reasons": [
+          "ROBOTICS_SAFETY_COLLISION_MARGIN",
+          "ROBOTICS_SAFETY_TORQUE_BOUNDS",
+          "ROBOTICS_SAFETY_SPEED_BOUNDS",
+          "ROBOTICS_SAFETY_STABILITY_MARGIN",
+          "ROBOTICS_CERTIFICATE_INTEGRITY",
+          "ROBOTICS_CERTIFICATE_AUTHENTICITY_REQUIRED",
+          "ADAPTER_CONSTRAINT_FAIL"
+        ]
+      },
+      "links": [
+        { "to": "replay-certificate", "type": "child" }
+      ]
     }
   ]
 }

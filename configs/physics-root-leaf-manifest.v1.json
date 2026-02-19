@@ -8,21 +8,27 @@
       "name": "Spacetime and general relativity baseline",
       "equation_refs": [
         "efe_baseline"
-      ]
+      ],
+      "tree_lane": "physics_spacetime_gr",
+      "tree_path": "docs/knowledge/physics/physics-spacetime-gr-tree.json"
     },
     {
       "id": "physics_quantum_semiclassical",
       "name": "Semiclassical quantum coupling baseline",
       "equation_refs": [
         "semiclassical_coupling"
-      ]
+      ],
+      "tree_lane": "physics_quantum_semiclassical",
+      "tree_path": "docs/knowledge/physics/physics-quantum-semiclassical-tree.json"
     },
     {
       "id": "physics_thermodynamics_entropy",
       "name": "Thermodynamics and entropy directionality",
       "equation_refs": [
         "uncertainty_propagation"
-      ]
+      ],
+      "tree_lane": "physics_thermodynamics_entropy",
+      "tree_path": "docs/knowledge/physics/physics-thermodynamics-entropy-tree.json"
     },
     {
       "id": "physics_information_dynamics",
@@ -30,7 +36,9 @@
       "equation_refs": [
         "uncertainty_propagation",
         "runtime_safety_gate"
-      ]
+      ],
+      "tree_lane": "physics_information_dynamics",
+      "tree_path": "docs/knowledge/physics/physics-information-dynamics-tree.json"
     },
     {
       "id": "physics_prebiotic_chemistry",
@@ -38,21 +46,27 @@
       "equation_refs": [
         "stress_energy_conservation",
         "uncertainty_propagation"
-      ]
+      ],
+      "tree_lane": "physics_prebiotic_chemistry",
+      "tree_path": "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json"
     },
     {
       "id": "physics_biology_life",
       "name": "Biological life emergence constraints",
       "equation_refs": [
         "uncertainty_propagation"
-      ]
+      ],
+      "tree_lane": "physics_biology_life",
+      "tree_path": "docs/knowledge/physics/physics-biology-life-tree.json"
     },
     {
       "id": "physics_runtime_safety_control",
       "name": "Runtime safety and decision control gates",
       "equation_refs": [
         "runtime_safety_gate"
-      ]
+      ],
+      "tree_lane": "physics_runtime_safety_control",
+      "tree_path": "docs/knowledge/physics/physics-runtime-safety-control-tree.json"
     }
   ],
   "leaves": [
@@ -226,7 +240,8 @@
         "uncertainty_model": "deterministic_threshold_contract_v1",
         "test_refs": [
           "tests/physics-root-leaf-manifest.spec.ts",
-          "scripts/validate-physics-root-leaf-manifest.ts"
+          "scripts/validate-physics-root-leaf-manifest.ts",
+          "tests/physics-root-lane-tree-parity.spec.ts"
         ]
       },
       "maturity_gate": {

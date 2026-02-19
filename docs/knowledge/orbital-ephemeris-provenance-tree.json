@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "treeId": "orbital-ephemeris-provenance",
+  "rootId": "orbital-ephemeris-provenance-root",
+  "nodes": [
+    {
+      "id": "orbital-ephemeris-provenance-root",
+      "title": "Orbital Ephemeris Provenance Contracts",
+      "tags": ["orbital", "ephemeris", "provenance", "determinism"],
+      "bodyMD": "Deterministic provenance lane for orbital/time outputs with explicit falsifier nodes.",
+      "children": [
+        "ephemeris-evidence-contract",
+        "ephemeris-drift-falsifier",
+        "ephemeris-nondeterminism-falsifier",
+        "toe083-tool-receipt-compatibility"
+      ]
+    },
+    {
+      "id": "ephemeris-evidence-contract",
+      "title": "Ephemeris evidence contract",
+      "tags": ["evidence", "contract", "runtime-contract-audit"],
+      "bodyMD": "Live ephemeris claims require explicit verification metadata, canonical evidence reference, bounded residual, minimum samples, and long-window calibration.",
+      "links": [
+        { "to": "ephemeris-drift-falsifier", "rel": "verifies" },
+        { "to": "ephemeris-nondeterminism-falsifier", "rel": "verifies" }
+      ],
+      "evidence": [
+        { "type": "code", "path": "server/services/halobank/time-model.ts", "contains": "computeEphemerisConsistency" },
+        { "type": "test", "path": "tests/halobank-time-model.spec.ts", "contains": "explicit verification evidence" }
+      ]
+    },
+    {
+      "id": "ephemeris-drift-falsifier",
+      "title": "Drift falsifier",
+      "tags": ["falsifier", "drift", "deterministic-fail"],
+      "bodyMD": "Residual drift above envelope must deterministically FAIL with HALOBANK_HORIZONS_RESIDUAL_DRIFT_OUT_OF_ENVELOPE.",
+      "links": [
+        { "to": "ephemeris-evidence-contract", "rel": "parent" }
+      ],
+      "evidence": [
+        { "type": "test", "path": "tests/halobank-time-model.spec.ts", "contains": "HALOBANK_HORIZONS_RESIDUAL_DRIFT_OUT_OF_ENVELOPE" }
+      ]
+    },
+    {
+      "id": "ephemeris-nondeterminism-falsifier",
+      "title": "Nondeterminism falsifier",
+      "tags": ["falsifier", "nondeterminism", "deterministic-fail"],
+      "bodyMD": "Non-integer residual samples or residual window inputs must deterministically FAIL with HALOBANK_HORIZONS_NONDETERMINISTIC_RESIDUAL_INPUT.",
+      "links": [
+        { "to": "ephemeris-evidence-contract", "rel": "parent" }
+      ],
+      "evidence": [
+        { "type": "test", "path": "tests/halobank-time-model.spec.ts", "contains": "HALOBANK_HORIZONS_NONDETERMINISTIC_RESIDUAL_INPUT" }
+      ]
+    },
+    {
+      "id": "toe083-tool-receipt-compatibility",
+      "title": "TOE-083 tool receipt compatibility",
+      "tags": ["TOE-083", "tool_execution_receipt", "compatibility"],
+      "bodyMD": "Orbital/time verification outputs remain consumable by deterministic tool execution receipts emitted by the Helix ask action path.",
+      "links": [
+        { "to": "ephemeris-evidence-contract", "rel": "see-also" }
+      ],
+      "evidence": [
+        { "type": "code", "path": "server/routes/agi.plan.ts", "contains": "buildDeterministicToolExecutionReceipt" },
+        { "type": "test", "path": "tests/horizons-proxy.spec.ts", "contains": "diagnostic non-certifying fallback semantics" }
+      ]
+    }
+  ]
+}

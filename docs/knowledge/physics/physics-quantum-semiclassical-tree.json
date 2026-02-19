@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "rootId": "physics-quantum-semiclassical-tree",
+  "nodes": [
+    {
+      "id": "physics-quantum-semiclassical-tree",
+      "slug": "physics-quantum-semiclassical-tree",
+      "title": "Physics Quantum Semiclassical Tree",
+      "excerpt": "Dedicated lane for semiclassical quantum stress-energy coupling.",
+      "bodyMD": "This lane isolates curved-spacetime quantum expectations used in root-to-leaf paths.",
+      "tags": ["physics", "quantum", "semiclassical"],
+      "children": ["vacuum-fluctuations", "stress-energy-tensor"],
+      "links": [],
+      "summary": "Dedicated lane for semiclassical quantum stress-energy coupling.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        { "type": "doc", "path": "docs/knowledge/physics/vacuum-fluctuations.md" },
+        { "type": "doc", "path": "docs/knowledge/physics/stress-energy-tensor.md" }
+      ]
+    },
+    {
+      "id": "vacuum-fluctuations",
+      "slug": "vacuum-fluctuations",
+      "title": "Vacuum Fluctuations",
+      "excerpt": "Quantum vacuum expectations in curved backgrounds.",
+      "bodyMD": "Semiclassical lane anchor for expectation-value stress-energy behavior.",
+      "tags": ["physics", "quantum", "vacuum"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "physics-quantum-semiclassical-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "summary": "Quantum vacuum expectations in curved backgrounds.",
+      "nodeType": "concept",
+      "dependencies": ["physics-quantum-semiclassical-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/vacuum-fluctuations.md" }]
+    },
+    {
+      "id": "stress-energy-tensor",
+      "slug": "stress-energy-tensor",
+      "title": "Stress-Energy Tensor",
+      "excerpt": "Expectation-value stress-energy coupling anchor.",
+      "bodyMD": "Bridge node connecting QFT expectation values to semiclassical Einstein coupling.",
+      "tags": ["physics", "semiclassical", "stress-energy"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "physics-quantum-semiclassical-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "summary": "Expectation-value stress-energy coupling anchor.",
+      "nodeType": "concept",
+      "dependencies": ["physics-quantum-semiclassical-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/stress-energy-tensor.md" }]
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

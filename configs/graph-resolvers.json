@@ -175,6 +175,199 @@
       "weight": 1.1
     },
     {
+      "id": "physics_quantum_semiclassical",
+      "label": "Physics Quantum Semiclassical Lane",
+      "path": "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+      "topicTags": [
+        "physics",
+        "quantum",
+        "semiclassical"
+      ],
+      "matchers": [
+        "semiclassical",
+        "qft in curved spacetime",
+        "renormalized stress-energy",
+        "quantum fields"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_spacetime_gr",
+      "label": "Physics Spacetime GR Lane",
+      "path": "docs/knowledge/physics/physics-spacetime-gr-tree.json",
+      "topicTags": [
+        "physics",
+        "gr",
+        "spacetime"
+      ],
+      "matchers": [
+        "spacetime",
+        "general relativity",
+        "einstein field equations",
+        "metric tensor",
+        "curvature"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_thermodynamics_entropy",
+      "label": "Physics Thermodynamics Entropy Lane",
+      "path": "docs/knowledge/physics/physics-thermodynamics-entropy-tree.json",
+      "topicTags": [
+        "physics",
+        "thermodynamics",
+        "entropy"
+      ],
+      "matchers": [
+        "thermodynamics",
+        "entropy",
+        "arrow of time",
+        "irreversibility",
+        "entropy gradient"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_information_dynamics",
+      "label": "Physics Information Dynamics Lane",
+      "path": "docs/knowledge/physics/physics-information-dynamics-tree.json",
+      "topicTags": [
+        "physics",
+        "information",
+        "dynamics"
+      ],
+      "matchers": [
+        "information dynamics",
+        "coherence",
+        "information flow",
+        "signal fidelity",
+        "falsifier"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_prebiotic_chemistry",
+      "label": "Physics Prebiotic Chemistry Lane",
+      "path": "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json",
+      "topicTags": [
+        "physics",
+        "prebiotic",
+        "chemistry"
+      ],
+      "matchers": [
+        "prebiotic chemistry",
+        "chemical evolution",
+        "abiogenesis chemistry",
+        "molecular selection"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_biology_life",
+      "label": "Physics Biology Life Lane",
+      "path": "docs/knowledge/physics/physics-biology-life-tree.json",
+      "topicTags": [
+        "physics",
+        "biology",
+        "life"
+      ],
+      "matchers": [
+        "biology",
+        "life emergence",
+        "biogenesis",
+        "living systems"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_runtime_safety_control",
+      "label": "Physics Runtime Safety Control Lane",
+      "path": "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
+      "topicTags": [
+        "physics",
+        "runtime",
+        "safety",
+        "control"
+      ],
+      "matchers": [
+        "runtime safety",
+        "control gates",
+        "guardrail determinism",
+        "safe control"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
       "id": "warp-mechanics",
       "label": "Warp Mechanics Walk",
       "path": "docs/knowledge/warp/warp-mechanics-tree.json",
@@ -316,6 +509,93 @@
         "see-also": 1
       },
       "weight": 1.05
+    },
+    {
+      "id": "evidence-falsifier-ledger",
+      "label": "Evidence Falsifier Ledger Lane",
+      "path": "docs/knowledge/evidence-falsifier-ledger-tree.json",
+      "topicTags": [
+        "ledger",
+        "knowledge"
+      ],
+      "matchers": [
+        "evidence falsifier ledger",
+        "evidence schema",
+        "claim tier consistency",
+        "provenance consistency",
+        "contract contradiction",
+        "missing evidence contract",
+        "runtime contract audit"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 3,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.1
+    },
+    {
+      "id": "tool-plan-contracts",
+      "label": "Tool Plan Contracts Lane",
+      "path": "docs/knowledge/tool-plan-contracts-tree.json",
+      "topicTags": [
+        "tooling",
+        "contracts",
+        "knowledge"
+      ],
+      "matchers": [
+        "tool plan contracts",
+        "deterministic receipt",
+        "execution receipt contract",
+        "tool replay determinism",
+        "invalid receipt fail reason"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 3,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.1
+    },
+    {
+      "id": "orbital-ephemeris-provenance",
+      "label": "Orbital Ephemeris Provenance Lane",
+      "path": "docs/knowledge/orbital-ephemeris-provenance-tree.json",
+      "topicTags": [
+        "orbital",
+        "provenance",
+        "contracts",
+        "knowledge"
+      ],
+      "matchers": [
+        "orbital ephemeris provenance",
+        "horizons provenance",
+        "ephemeris drift",
+        "ephemeris nondeterminism",
+        "orbital time model evidence",
+        "halobank horizons consistency"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 3,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.12
     },
     {
       "id": "stellar-restoration",

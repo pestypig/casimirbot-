@@ -503,4 +503,38 @@ describe("helix ask graph resolver congruence overrides", () => {
     expect(missing?.bridgeNodes).toContain("bridge-noise-spectrum-to-collapse-proxy");
   });
 
+  it("registers evidence falsifier ledger lane and routes evidence schema prompts deterministically", () => {
+    const question = "validate evidence schema provenance claim tier consistency";
+    const first = resolveHelixAskGraphPack({
+      question,
+      topicTags: ["ledger", "knowledge"],
+      lockedTreeIds: ["evidence-falsifier-ledger"],
+      pathMode: "root_to_leaf",
+    });
+    const second = resolveHelixAskGraphPack({
+      question,
+      topicTags: ["ledger", "knowledge"],
+      lockedTreeIds: ["evidence-falsifier-ledger"],
+      pathMode: "root_to_leaf",
+    });
+
+    const firstFramework = first?.frameworks.find((entry) => entry.treeId === "evidence-falsifier-ledger");
+    const secondFramework = second?.frameworks.find((entry) => entry.treeId === "evidence-falsifier-ledger");
+    expect(firstFramework).toBeTruthy();
+    expect(secondFramework).toBeTruthy();
+    expect(firstFramework?.sourcePath).toBe("docs/knowledge/evidence-falsifier-ledger-tree.json");
+    expect(secondFramework?.sourcePath).toBe("docs/knowledge/evidence-falsifier-ledger-tree.json");
+
+    const firstPath = (firstFramework?.path ?? []).map((entry) => entry.id);
+    const secondPath = (secondFramework?.path ?? []).map((entry) => entry.id);
+    const firstCandidates = [
+      ...(firstFramework?.anchors ?? []).map((entry) => entry.id),
+      ...firstPath,
+    ];
+    expect(firstPath).toEqual(secondPath);
+    expect(firstCandidates).toContain("evidence-schema-contract");
+    expect(firstCandidates).toContain("provenance-claim-tier-consistency");
+  });
+
+
 });

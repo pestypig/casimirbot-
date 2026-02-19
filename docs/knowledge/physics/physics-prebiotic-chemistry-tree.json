@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "rootId": "physics-prebiotic-chemistry-tree",
+  "nodes": [
+    {
+      "id": "physics-prebiotic-chemistry-tree",
+      "slug": "physics-prebiotic-chemistry-tree",
+      "title": "Physics Prebiotic Chemistry Tree",
+      "excerpt": "Dedicated lane for prebiotic chemistry constraints that bridge physics roots to biogenesis claims.",
+      "bodyMD": "This lane captures molecular selection, reaction network constraints, and deterministic linkage toward life-emergence pathways.",
+      "tags": ["physics", "prebiotic", "chemistry"],
+      "children": ["chemical-selection", "reaction-network-constraints"],
+      "links": [],
+      "summary": "Dedicated lane for prebiotic chemistry constraints that bridge physics roots to biogenesis claims.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        { "type": "doc", "path": "docs/knowledge/physics/chemical-selection.md" },
+        { "type": "doc", "path": "docs/knowledge/physics/reaction-network-constraints.md" }
+      ]
+    },
+    {
+      "id": "chemical-selection",
+      "slug": "chemical-selection",
+      "title": "Chemical Selection",
+      "excerpt": "Molecular selection assumptions used by prebiotic-path falsifiers.",
+      "bodyMD": "Defines deterministic criteria for molecular pathway selection under constrained environments.",
+      "tags": ["physics", "prebiotic", "selection"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-prebiotic-chemistry-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+      ],
+      "summary": "Molecular selection assumptions used by prebiotic-path falsifiers.",
+      "nodeType": "concept",
+      "dependencies": ["physics-prebiotic-chemistry-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/chemical-selection.md" }]
+    },
+    {
+      "id": "reaction-network-constraints",
+      "slug": "reaction-network-constraints",
+      "title": "Reaction Network Constraints",
+      "excerpt": "Constraint contracts for prebiotic reaction networks and transition coverage.",
+      "bodyMD": "Links reaction-path completeness to observable transition-coverage thresholds.",
+      "tags": ["physics", "prebiotic", "reaction-network"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-prebiotic-chemistry-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+      ],
+      "summary": "Constraint contracts for prebiotic reaction networks and transition coverage.",
+      "nodeType": "concept",
+      "dependencies": ["physics-prebiotic-chemistry-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/reaction-network-constraints.md" }]
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

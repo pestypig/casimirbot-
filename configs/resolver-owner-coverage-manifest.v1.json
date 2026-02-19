@@ -143,6 +143,9 @@
     },
     "zen-society": {
       "status": "covered_extension"
+    },
+    "evidence-falsifier-ledger": {
+      "status": "covered_extension"
     }
   }
 }

@@ -24,6 +24,22 @@
         "docs/audits/ideology-physics-claim-gap-audit-2026-02-17.md",
         "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json"
       ]
+    },
+    {
+      "primitive_id": "TOE-089-external-integrations-lane-promotion",
+      "tree_owner": "external-integrations",
+      "policy_source": {
+        "path": "docs/knowledge/external-integrations-tree.json",
+        "selector": "rootId:external-integrations-tree"
+      },
+      "evaluator": {
+        "path": "server/services/helix-ask/graph-resolver.ts",
+        "symbol": "__testOnlyHasExternalIntegrationsEvidenceContract"
+      },
+      "tests": [
+        "tests/startup-config.spec.ts",
+        "tests/external-integrations-contract.spec.ts"
+      ]
     }
   ]
 }

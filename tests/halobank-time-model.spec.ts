@@ -95,7 +95,7 @@ describe("halobank time model", () => {
     });
     expect(result.ok).toBe(true);
     expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
-    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_OUT_OF_ENVELOPE");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_DRIFT_OUT_OF_ENVELOPE");
     expect(result.ephemeris?.provenance.evidence.residualStatus).toBe("out_of_envelope");
     expect(result.ephemeris?.provenance.claim_tier_recommendation).toBe("diagnostic");
   });
@@ -161,11 +161,34 @@ describe("halobank time model", () => {
 
     expect(result.ok).toBe(true);
     expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
-    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_NONDETERMINISTIC_RESIDUAL_INPUT");
     expect(result.ephemeris?.provenance.evidence.residualStatus).toBe("incomplete_evidence");
   });
 
 
+
+
+
+  it("fails deterministically when residual calibration window is non-integer", () => {
+    const result = computeHaloBankTimeModel({
+      timestamp: "2025-03-01T12:00:00.000Z",
+      place: { lat: 40.7128, lon: -74.006 },
+      model: {
+        orbitalAlignment: true,
+        ephemerisSource: "live",
+        ephemerisEvidenceVerified: true,
+        ephemerisEvidenceRef: "artifact:jpl-horizons:run-123",
+        residualPpm: 0.8,
+        residualSampleCount: 7,
+        residualWindowHours: 72.5,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_NONDETERMINISTIC_RESIDUAL_INPUT");
+    expect(result.ephemeris?.provenance.evidence.residualWindowStatus).toBe("incomplete_evidence");
+  });
 
   it("fails deterministically when residual calibration window is shorter than long-window minimum", () => {
     const result = computeHaloBankTimeModel({

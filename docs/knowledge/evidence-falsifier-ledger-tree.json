@@ -1,0 +1,92 @@
+{
+  "id": "evidence-falsifier-ledger-tree",
+  "label": "Evidence Falsifier Ledger Tree",
+  "version": "1.0.0",
+  "rootId": "evidence-falsifier-ledger-root",
+  "nodes": [
+    {
+      "id": "evidence-falsifier-ledger-root",
+      "slug": "evidence-falsifier-ledger-root",
+      "title": "Evidence Falsifier Ledger Root",
+      "summary": "Defines deterministic ledger checks for evidence schema and bridge metadata contracts.",
+      "tags": [
+        "evidence falsifier ledger",
+        "evidence schema",
+        "contract"
+      ],
+      "children": [
+        "evidence-schema-contract",
+        "provenance-claim-tier-consistency",
+        "deterministic-failure-taxonomy"
+      ],
+      "links": []
+    },
+    {
+      "id": "evidence-schema-contract",
+      "slug": "evidence-schema-contract",
+      "title": "Evidence Schema Contract",
+      "summary": "Evidence records must include deterministic schema fields and be replay-safe.",
+      "tags": [
+        "evidence",
+        "schema",
+        "runtime-contract-audit"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "evidence-falsifier-ledger-root"
+        },
+        {
+          "rel": "see-also",
+          "to": "provenance-claim-tier-consistency"
+        }
+      ]
+    },
+    {
+      "id": "provenance-claim-tier-consistency",
+      "slug": "provenance-claim-tier-consistency",
+      "title": "Provenance / Claim-Tier Consistency",
+      "summary": "Bridge evidence contract metadata must stay internally consistent for certifying claims.",
+      "tags": [
+        "provenance",
+        "claim tier",
+        "consistency"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "evidence-falsifier-ledger-root"
+        },
+        {
+          "rel": "see-also",
+          "to": "deterministic-failure-taxonomy"
+        }
+      ]
+    },
+    {
+      "id": "deterministic-failure-taxonomy",
+      "slug": "deterministic-failure-taxonomy",
+      "title": "Deterministic Failure Taxonomy",
+      "summary": "Missing metadata and contradictory metadata resolve to deterministic fail reasons.",
+      "tags": [
+        "deterministic",
+        "failure taxonomy",
+        "missing",
+        "contradictory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "evidence-falsifier-ledger-root"
+        },
+        {
+          "rel": "see-also",
+          "to": "evidence-schema-contract"
+        }
+      ]
+    }
+  ]
+}

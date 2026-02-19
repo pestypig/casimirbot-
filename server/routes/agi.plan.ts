@@ -726,6 +726,18 @@ type ExecutionErrorInfo = {
   policyReason?: string;
 };
 
+export type DeterministicToolExecutionReceipt = {
+  schema_version: "tool_execution_receipt.v1";
+  deterministic: true;
+  tool: string;
+  mode: "act" | "observe" | "verify";
+  status: "ok" | "failed";
+  fail_reason: "NONE" | "TOOL_RECEIPT_MISSING" | "TOOL_RECEIPT_INVALID" | "TOOL_EXECUTION_FAILED";
+  input_hash: string;
+  output_hash: string;
+  receipt_hash: string;
+};
+
 const MAX_EXECUTION_ERROR_MESSAGE = 220;
 
 const coerceString = (value: unknown): string | undefined =>
@@ -829,6 +841,63 @@ const buildExecutionFingerprint = (input: {
     code: input.errorCode,
     stack: input.stackFingerprint,
   });
+};
+
+const normalizeDeterministicToolOutput = (value: unknown): unknown => {
+  if (!value || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((entry) => normalizeDeterministicToolOutput(entry));
+  const record = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(record).sort()) {
+    if (["requestId", "request_id", "timestamp", "ts", "generatedAt", "runtimeMs"].includes(key)) continue;
+    out[key] = normalizeDeterministicToolOutput(record[key]);
+  }
+  return out;
+};
+
+export const buildDeterministicToolExecutionReceipt = (input: {
+  tool: string;
+  mode: "act" | "observe" | "verify";
+  requestPayload: Record<string, unknown>;
+  actionOutput: unknown;
+}): DeterministicToolExecutionReceipt => {
+  const normalizedOutput = normalizeDeterministicToolOutput(input.actionOutput);
+  let failReason: DeterministicToolExecutionReceipt["fail_reason"] = "NONE";
+  let status: DeterministicToolExecutionReceipt["status"] = "ok";
+  if (input.actionOutput === null || input.actionOutput === undefined) {
+    failReason = "TOOL_RECEIPT_MISSING";
+    status = "failed";
+  } else if (typeof input.actionOutput !== "object") {
+    failReason = "TOOL_RECEIPT_INVALID";
+    status = "failed";
+  } else if ((input.actionOutput as { ok?: unknown }).ok === false) {
+    failReason = "TOOL_EXECUTION_FAILED";
+    status = "failed";
+  }
+
+  const inputHash = hashStableJson({ tool: input.tool, mode: input.mode, request: input.requestPayload });
+  const outputHash = hashStableJson(normalizedOutput ?? null);
+  const receiptHash = hashStableJson({
+    schema_version: "tool_execution_receipt.v1",
+    tool: input.tool,
+    mode: input.mode,
+    status,
+    fail_reason: failReason,
+    input_hash: inputHash,
+    output_hash: outputHash,
+  });
+
+  return {
+    schema_version: "tool_execution_receipt.v1",
+    deterministic: true,
+    tool: input.tool,
+    mode: input.mode,
+    status,
+    fail_reason: failReason,
+    input_hash: inputHash,
+    output_hash: outputHash,
+    receipt_hash: receiptHash,
+  };
 };
 
 const resolveToolName = (
@@ -16181,8 +16250,9 @@ const executeHelixAsk = async ({
       }
       const actionStarted = Date.now();
       let actionOutput: unknown = null;
+      let toolPayload: Record<string, unknown> = { question: goalText, prompt: prompt ?? goalText };
       try {
-        const payload: Record<string, unknown> = { question: goalText, prompt: prompt ?? goalText };
+        const payload: Record<string, unknown> = toolPayload;
         if (toolName === "telemetry.time_dilation.control.set") {
           payload.command = "set";
           payload.args = { goal: goalText };
@@ -16277,6 +16347,12 @@ const executeHelixAsk = async ({
       });
       const consistencyGateFailed = halobankConsistency?.verdict === "FAIL";
       const degradeReason = policyDegradeReason ?? (consistencyGateFailed ? "VERDICT_FAIL" : null);
+      const tool_execution_receipt = buildDeterministicToolExecutionReceipt({
+        tool: toolName,
+        mode: askMode,
+        requestPayload: toolPayload,
+        actionOutput,
+      });
       const proof = {
         verdict: adapter?.verdict ?? "FAIL",
         firstFail:
@@ -16321,12 +16397,12 @@ const executeHelixAsk = async ({
             ok: false,
             mode: askMode,
             text: "Verification failed.",
-            fail_reason: degradeReason ?? "VERDICT_FAIL",
+            fail_reason: degradeReason ?? halobankConsistency?.firstFailId ?? "VERDICT_FAIL",
             claim_tier: "diagnostic",
             provenance_class: "inferred",
             certifying: false,
             proof,
-            action: { tool: toolName, output: actionOutput },
+            action: { tool: toolName, output: actionOutput, tool_execution_receipt },
           });
           return;
         }
@@ -16338,7 +16414,7 @@ const executeHelixAsk = async ({
         claim_tier: "diagnostic",
         provenance_class: "inferred",
         certifying: false,
-        action: { tool: toolName, output: actionOutput },
+        action: { tool: toolName, output: actionOutput, tool_execution_receipt },
         proof,
       });
       return;

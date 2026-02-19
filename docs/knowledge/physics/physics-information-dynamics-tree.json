@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "rootId": "physics-information-dynamics-tree",
+  "nodes": [
+    {
+      "id": "physics-information-dynamics-tree",
+      "slug": "physics-information-dynamics-tree",
+      "title": "Physics Information Dynamics Tree",
+      "excerpt": "Dedicated lane for information-flow, coherence, and falsifier-linked dynamics.",
+      "bodyMD": "This lane provides explicit information-dynamics roots for falsifiable theory paths.",
+      "tags": ["physics", "information", "dynamics"],
+      "children": ["coherence-bounds", "signal-fidelity"],
+      "links": [],
+      "summary": "Dedicated lane for information-flow, coherence, and falsifier-linked dynamics.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        { "type": "doc", "path": "docs/knowledge/physics/coherence-bounds.md" },
+        { "type": "doc", "path": "docs/knowledge/physics/signal-fidelity.md" }
+      ]
+    },
+    {
+      "id": "coherence-bounds",
+      "slug": "coherence-bounds",
+      "title": "Coherence Bounds",
+      "excerpt": "Bounded coherence assumptions used by information-dynamics falsifiers.",
+      "bodyMD": "Defines bounded coherence thresholds for path-level reject rules.",
+      "tags": ["physics", "information", "coherence"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "physics-information-dynamics-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "summary": "Bounded coherence assumptions used by information-dynamics falsifiers.",
+      "nodeType": "concept",
+      "dependencies": ["physics-information-dynamics-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/coherence-bounds.md" }]
+    },
+    {
+      "id": "signal-fidelity",
+      "slug": "signal-fidelity",
+      "title": "Signal Fidelity",
+      "excerpt": "Signal transfer reliability anchor for information-flow diagnostics.",
+      "bodyMD": "Ties information propagation assumptions to measurable fidelity observables.",
+      "tags": ["physics", "information", "signal"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "physics-information-dynamics-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "summary": "Signal transfer reliability anchor for information-flow diagnostics.",
+      "nodeType": "concept",
+      "dependencies": ["physics-information-dynamics-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/signal-fidelity.md" }]
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

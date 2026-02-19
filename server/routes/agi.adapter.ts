@@ -68,6 +68,14 @@ const normalizeFailFirstFail = (
   };
 };
 
+const deriveDeterministicFailReason = (
+  firstFail: TrainingTraceConstraint | null | undefined,
+  fallback: string = "ADAPTER_CONSTRAINT_FAIL",
+): string => {
+  const id = typeof firstFail?.id === "string" ? firstFail.id.trim() : "";
+  return id || fallback;
+};
+
 type AuthenticityLadderConsequence = "low" | "medium" | "high";
 
 type RoboticsSafetyGateResult = {
@@ -308,6 +316,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
     });
     if (!safety.pass) {
       const roboticsProvenance = deriveRoboticsEpisodeProvenance(roboticsSafety, safety.certificate);
+      const failReason = deriveDeterministicFailReason(safety.firstFail, "ROBOTICS_SAFETY_ENVELOPE_FAIL");
       recordTrainingTrace({
         traceId,
         tenantId: tenantGuard.tenantId,
@@ -335,14 +344,15 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
                 metadata: {
                   gate: "robotics-safety-v1",
                   firstFailId: safety.firstFail?.id,
+                  failReason,
                 },
               },
             ],
             replaySeed: roboticsProvenance.replaySeed,
-            notes: ["robotics-safety-veto"],
+            notes: ["robotics-safety-veto", `fail_reason=${failReason}`],
           },
         },
-        notes: ["phase=5", "robotics-safety=veto"],
+        notes: ["phase=5", "robotics-safety=veto", `fail_reason=${failReason}`],
       });
       const roboticsRunId = `robotics-veto:${crypto.randomUUID()}`;
       emitEventSpine({
@@ -353,6 +363,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
           verdict: "FAIL",
           pass: false,
           firstFailId: safety.firstFail?.id,
+          failReason,
         },
       });
       return res.json({
@@ -361,6 +372,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         verdict: "FAIL",
         pass: false,
         firstFail: safety.firstFail ?? normalizeFailFirstFail("FAIL", null, safety.certificate),
+        failReason,
         deltas: safety.deltas,
         premeditation: premeditationResult,
         certificate: safety.certificate,
@@ -397,6 +409,9 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
           | { status?: string; certificateHash?: string | null; integrityOk?: boolean }
           | null,
       );
+      const failReason = result.verdict === "FAIL"
+        ? deriveDeterministicFailReason(normalizedFirstFail)
+        : "NONE";
       const certificateRefs = [result.certificate?.certificateHash, result.certificate?.certificateId].filter(
         (value): value is string => Boolean(value),
       );
@@ -442,10 +457,10 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
               },
             ],
             replaySeed: `${traceId}:${premeditationResult.chosenCandidateId ?? "none"}`,
-            notes: premeditationResult.rationaleTags,
+            notes: [...premeditationResult.rationaleTags, `fail_reason=${failReason}`],
           },
         },
-        notes: ["phase=2", "premeditation=enabled"],
+        notes: ["phase=2", "premeditation=enabled", `fail_reason=${failReason}`],
       });
       recordTrainingTrace({
         traceId,
@@ -462,6 +477,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
             accepted: result.pass ? 1 : 0,
             acceptanceRate: result.pass ? 1 : 0,
             byFailure: normalizedFirstFail ? { [normalizedFirstFail.id]: 1 } : {},
+            failReason,
           },
           provenance: {
             provenanceClass: "robotics.demonstration",
@@ -469,7 +485,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
             certificateRefs,
           },
         },
-        notes: ["phase=3", "trajectory-replay-summary=linked"],
+        notes: ["phase=3", "trajectory-replay-summary=linked", `fail_reason=${failReason}`],
       });
     }
 
@@ -480,6 +496,9 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         | { status?: string; certificateHash?: string | null; integrityOk?: boolean }
         | null,
     );
+    const failReason = result.verdict === "FAIL"
+      ? deriveDeterministicFailReason(normalizedFirstFail)
+      : "NONE";
 
     emitEventSpine({
       kind: "adapter.verdict",
@@ -489,6 +508,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         verdict: result.verdict,
         pass: result.pass,
         firstFailId: normalizedFirstFail?.id,
+        failReason,
       },
     });
 
@@ -498,6 +518,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
       verdict: result.verdict,
       pass: result.pass,
       firstFail: normalizedFirstFail,
+      failReason,
       deltas: result.deltas,
       premeditation: premeditationResult,
       certificate: result.certificate ?? null,

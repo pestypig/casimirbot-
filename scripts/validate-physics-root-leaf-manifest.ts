@@ -5,6 +5,8 @@ type RootEntry = {
   id?: string;
   name?: string;
   equation_refs?: string[];
+  tree_lane?: string;
+  tree_path?: string;
 };
 
 type LeafEntry = {
@@ -61,6 +63,39 @@ const REQUIRED_ROOT_IDS = [
   "physics_biology_life",
   "physics_runtime_safety_control",
 ];
+
+
+const REQUIRED_TREE_LANE_BY_ROOT: Record<string, { tree_lane: string; tree_path: string }> = {
+  physics_spacetime_gr: {
+    tree_lane: "physics_spacetime_gr",
+    tree_path: "docs/knowledge/physics/physics-spacetime-gr-tree.json",
+  },
+  physics_quantum_semiclassical: {
+    tree_lane: "physics_quantum_semiclassical",
+    tree_path: "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+  },
+  physics_thermodynamics_entropy: {
+    tree_lane: "physics_thermodynamics_entropy",
+    tree_path: "docs/knowledge/physics/physics-thermodynamics-entropy-tree.json",
+  },
+  physics_information_dynamics: {
+    tree_lane: "physics_information_dynamics",
+    tree_path: "docs/knowledge/physics/physics-information-dynamics-tree.json",
+  },
+  physics_prebiotic_chemistry: {
+    tree_lane: "physics_prebiotic_chemistry",
+    tree_path: "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json",
+  },
+  physics_biology_life: {
+    tree_lane: "physics_biology_life",
+    tree_path: "docs/knowledge/physics/physics-biology-life-tree.json",
+  },
+  physics_runtime_safety_control: {
+    tree_lane: "physics_runtime_safety_control",
+    tree_path: "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
+  },
+};
+
 
 function parseFlag(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
@@ -157,6 +192,16 @@ export function validatePhysicsRootLeafManifest(options?: {
     rootIds.add(id);
     if (typeof entry.name !== "string" || entry.name.trim().length === 0) {
       errors.push(`${loc}.name is required`);
+    }
+
+    const laneSpec = REQUIRED_TREE_LANE_BY_ROOT[id];
+    if (laneSpec) {
+      if (entry.tree_lane !== laneSpec.tree_lane) {
+        errors.push(`${loc}.tree_lane must be ${laneSpec.tree_lane}`);
+      }
+      if (entry.tree_path !== laneSpec.tree_path) {
+        errors.push(`${loc}.tree_path must be ${laneSpec.tree_path}`);
+      }
     }
   });
 

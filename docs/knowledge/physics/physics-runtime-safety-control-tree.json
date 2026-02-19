@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "rootId": "physics-runtime-safety-control-tree",
+  "nodes": [
+    {
+      "id": "physics-runtime-safety-control-tree",
+      "slug": "physics-runtime-safety-control-tree",
+      "title": "Physics Runtime Safety Control Tree",
+      "excerpt": "Dedicated lane for runtime safety controls and deterministic guardrail enforcement.",
+      "bodyMD": "This lane captures control-gate determinism, fail-reason contracts, and runtime auditability requirements.",
+      "tags": ["physics", "runtime", "safety", "control"],
+      "children": ["guardrail-determinism", "control-loop-audit"],
+      "links": [],
+      "summary": "Dedicated lane for runtime safety controls and deterministic guardrail enforcement.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        { "type": "doc", "path": "docs/knowledge/physics/guardrail-determinism.md" },
+        { "type": "doc", "path": "docs/knowledge/physics/control-loop-audit.md" }
+      ]
+    },
+    {
+      "id": "guardrail-determinism",
+      "slug": "guardrail-determinism",
+      "title": "Guardrail Determinism",
+      "excerpt": "Deterministic fail-reason and decision contracts for runtime safety paths.",
+      "bodyMD": "Defines strict decision reproducibility and stable fail-reason semantics across runtime checks.",
+      "tags": ["physics", "runtime", "guardrails"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-runtime-safety-control-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+      ],
+      "summary": "Deterministic fail-reason and decision contracts for runtime safety paths.",
+      "nodeType": "concept",
+      "dependencies": ["physics-runtime-safety-control-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/guardrail-determinism.md" }]
+    },
+    {
+      "id": "control-loop-audit",
+      "slug": "control-loop-audit",
+      "title": "Control Loop Audit",
+      "excerpt": "Audit traceability for runtime control loops and safety contracts.",
+      "bodyMD": "Connects runtime decisions to auditable artifacts for contract-only risk classification.",
+      "tags": ["physics", "runtime", "audit"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-runtime-safety-control-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+      ],
+      "summary": "Audit traceability for runtime control loops and safety contracts.",
+      "nodeType": "concept",
+      "dependencies": ["physics-runtime-safety-control-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/control-loop-audit.md" }]
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

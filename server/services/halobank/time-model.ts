@@ -304,16 +304,18 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
     Number.isFinite(input.model?.residualSampleCount) && Number(input.model?.residualSampleCount) >= 0
       ? Number(input.model?.residualSampleCount)
       : null;
-  const residualSampleCount =
-    residualSampleCountRaw !== null && Number.isInteger(residualSampleCountRaw) ? residualSampleCountRaw : null;
+  const residualSampleCountIsInteger = residualSampleCountRaw === null || Number.isInteger(residualSampleCountRaw);
+  const residualSampleCount = residualSampleCountIsInteger && residualSampleCountRaw !== null ? residualSampleCountRaw : null;
   const hasMinimumResidualSamples =
     residualSampleCount !== null &&
     residualSampleCount >= RESIDUAL_MIN_SAMPLES &&
     residualSampleCount <= RESIDUAL_MAX_SAMPLES;
-  const residualWindowHours =
+  const residualWindowHoursRaw =
     Number.isFinite(input.model?.residualWindowHours) && Number(input.model?.residualWindowHours) >= 0
       ? Number(input.model?.residualWindowHours)
       : null;
+  const residualWindowHoursIsInteger = residualWindowHoursRaw === null || Number.isInteger(residualWindowHoursRaw);
+  const residualWindowHours = residualWindowHoursIsInteger && residualWindowHoursRaw !== null ? residualWindowHoursRaw : null;
   const hasLongWindowResidualEvidence =
     residualWindowHours !== null &&
     residualWindowHours >= residualLongWindowMinHours &&
@@ -340,8 +342,12 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
       ? "within_envelope"
       : "out_of_envelope";
 
+  const nondeterministicResidualInput = !residualSampleCountIsInteger || !residualWindowHoursIsInteger;
+
   const firstFailId = fallback
     ? "HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY"
+    : nondeterministicResidualInput
+      ? "HALOBANK_HORIZONS_NONDETERMINISTIC_RESIDUAL_INPUT"
     : explicitEvidence && hasEvidenceRef && !hasCanonicalEvidenceRef
       ? "HALOBANK_HORIZONS_EVIDENCE_REF_INVALID"
       : !hasLongWindowResidualEvidence && residualWindowHours !== null
@@ -350,10 +356,14 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
       ? "HALOBANK_HORIZONS_RESIDUAL_EVIDENCE_INCOMPLETE"
       : residualWithinEnvelope
         ? null
-        : "HALOBANK_HORIZONS_RESIDUAL_OUT_OF_ENVELOPE";
+        : "HALOBANK_HORIZONS_RESIDUAL_DRIFT_OUT_OF_ENVELOPE";
 
   const reasons = fallback
     ? ["Fallback ephemeris source detected; diagnostic-only and non-certifying."]
+    : nondeterministicResidualInput
+      ? [
+          "Live ephemeris residual evidence uses non-integer sample/window values; deterministic nondeterminism guardrail fail applied.",
+        ]
     : explicitEvidence && hasEvidenceRef && !hasCanonicalEvidenceRef
       ? [
           "Live ephemeris evidence reference is not canonical; deterministic conservative diagnostic downgrade applied.",
@@ -370,7 +380,7 @@ function computeEphemerisConsistency(input: HaloBankTimeComputeInput): HaloBankT
         ? [
             "Live ephemeris residual is within bounded envelope with complete evidence; reduced-order recommendation eligible.",
           ]
-        : ["Live ephemeris residual exceeds bounded envelope; deterministic diagnostic downgrade applied."];
+        : ["Live ephemeris residual drift exceeds bounded envelope; deterministic diagnostic downgrade applied."];
 
   const claimTierRecommendation: "diagnostic" | "reduced-order" =
     !firstFailId && source === "live" && residualStatus === "within_envelope" ? "reduced-order" : "diagnostic";
