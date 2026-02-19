@@ -8,13 +8,24 @@ type RootEntry = {
   tree_path?: string;
 };
 
-type Manifest = { roots: RootEntry[] };
+type PathFalsifier = {
+  test_refs?: string[];
+};
+
+type PathEntry = {
+  root_id: string;
+  falsifier?: PathFalsifier;
+};
+
+type Manifest = { roots: RootEntry[]; paths: PathEntry[] };
 type ResolverTree = { id: string; path: string };
 type Resolvers = { trees: ResolverTree[] };
 
 const REQUIRED_ROOT_TREE_MAP: Record<string, string> = {
   physics_spacetime_gr: "docs/knowledge/physics/physics-spacetime-gr-tree.json",
   physics_quantum_semiclassical: "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+  physics_thermodynamics_entropy: "docs/knowledge/physics/physics-thermodynamics-entropy-tree.json",
+  physics_information_dynamics: "docs/knowledge/physics/physics-information-dynamics-tree.json",
 };
 
 describe("physics root-lane tree parity", () => {
@@ -37,4 +48,20 @@ describe("physics root-lane tree parity", () => {
       expect(treesById.get(rootId)).toBe(expectedPath);
     }
   });
+
+  it("requires explicit falsifier linkage for information-dynamics paths", () => {
+    const repoRoot = process.cwd();
+    const manifestPath = path.join(repoRoot, "configs", "physics-root-leaf-manifest.v1.json");
+
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as Manifest;
+
+    const informationPaths = manifest.paths.filter((entry) => entry.root_id === "physics_information_dynamics");
+    expect(informationPaths.length).toBeGreaterThan(0);
+
+    for (const entry of informationPaths) {
+      expect(entry.falsifier).toBeTruthy();
+      expect(entry.falsifier?.test_refs ?? []).toContain("tests/physics-root-lane-tree-parity.spec.ts");
+    }
+  });
+
 });
