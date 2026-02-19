@@ -155,7 +155,8 @@
       },
       "falsifier": {
         "condition": "curvature_unit_proxy_residual > 0.05",
-        "evidence": "curvature_unit_proxy_diagnostic_trace"
+        "evidence": "curvature_unit_proxy_diagnostic_trace",
+        "uncertainty_model": "proxy_bridge_uncertainty(curvature_proxy_uncertainty_v1)"
       },
       "maturity_label": "experimental",
       "claim_tier": "diagnostic",
