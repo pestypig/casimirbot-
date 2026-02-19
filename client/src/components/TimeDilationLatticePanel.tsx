@@ -6758,6 +6758,17 @@ function TimeDilationLatticePanelInner({
           <div>theta: {natarioCanonicalDiagnostics.thetaK.status === "pass" ? "metric-derived" : "proxy/unknown"} | units 1/s | normalization {String((renderPlan.normalization as any)?.theta ?? "n/a")}</div>
           <div>divBeta: {natarioCanonicalDiagnostics.divBeta.status} | units 1/s | RMS {formatSci(natarioCanonicalDiagnostics.divBeta.rms, 2)} max {formatSci(natarioCanonicalDiagnostics.divBeta.maxAbs, 2)}</div>
           <div>K-trace: {natarioCanonicalDiagnostics.thetaK.kTrace == null ? "missing" : "metric-derived"} | units 1/s</div>
+          <div>
+            redshift: {(() => {
+              const redshift = (pipelineState as any)?.redshift;
+              const hasWorldlines = Array.isArray(redshift?.emitter?.uCovariant) && Array.isArray(redshift?.receiver?.uCovariant);
+              const hasTransport = Array.isArray(redshift?.kCovariantEmit) && Array.isArray(redshift?.kCovariantRecv);
+              if (hasWorldlines && hasTransport) return "computed (reduced-order null transport)";
+              if (hasWorldlines && (redshift?.proxyOnePlusZ != null || redshift?.proxyZ != null)) return "proxy";
+              if (!hasWorldlines) return "unavailable (worldline contract missing)";
+              return "unavailable (null transport missing)";
+            })()} | formula 1+z=(k.u)_emit/(k.u)_recv
+          </div>
         </div>
         {(debugOverlayEnabled ||
           geometryControlsEnabled ||

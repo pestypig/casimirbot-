@@ -155,8 +155,12 @@ E_{\mu\nu} = R_{\mu\alpha\nu\beta}u^\alpha u^\beta
 2. Add Natario checks: `div(beta)` RMS/maxAbs, `K`, `theta` and explicit pass/fail labels.
 3. Stage redshift path:
    - Diagnostic: label static-clock proxy as non-redshift
-   - Reduced-order: bounded null-ray transport for canonical emitter/receiver pairs
+   - Reduced-order: bounded null-ray transport for canonical emitter/receiver pairs using
+     `1+z = (k.u)_emit / (k.u)_recv` with explicit emitter/receiver worldline contract
+     and confidence limits.
    - Certified: convergence/error tracking
+   - If transport inputs are missing, the payload must mark redshift as either
+     `proxy` (explicit fallback source) or `unavailable` (deterministic block id).
 4. Add tidal indicators (`E_ij` or explicit unavailable flag).
 
 ### API Payload
