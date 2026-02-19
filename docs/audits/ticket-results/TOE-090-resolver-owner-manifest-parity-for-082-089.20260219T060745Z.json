@@ -1,0 +1,22 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-090-resolver-owner-manifest-parity-for-082-089",
+  "files_changed": [
+    "configs/resolver-owner-coverage-manifest.v1.json",
+    "docs/audits/toe-progress-snapshot.json",
+    "docs/audits/ticket-results/TOE-090-resolver-owner-manifest-parity-for-082-089.20260219T060745Z.json"
+  ],
+  "tests_run": [
+    "scripts/validate-resolver-owner-coverage.ts",
+    "scripts/toe-agent-preflight.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:a78f1b81-5ef0-4341-9e02-4803292d714a",
+    "run_id": "5",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

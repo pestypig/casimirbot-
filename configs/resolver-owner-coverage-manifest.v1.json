@@ -1,6 +1,6 @@
 {
   "schema_version": "resolver_owner_coverage_manifest/1",
-  "generated_at": "2026-02-18T02:01:54.905Z",
+  "generated_at": "2026-02-19T06:06:54.745Z",
   "sources": {
     "graph_resolvers": "configs/graph-resolvers.json",
     "core_backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
@@ -51,6 +51,9 @@
     "ethos-knowledge": {
       "status": "covered_extension"
     },
+    "evidence-falsifier-ledger": {
+      "status": "covered_extension"
+    },
     "external-integrations": {
       "status": "covered_extension"
     },
@@ -81,11 +84,35 @@
     "ops-deployment": {
       "status": "covered_core"
     },
+    "orbital-ephemeris-provenance": {
+      "status": "covered_extension"
+    },
     "packages": {
       "status": "covered_extension"
     },
     "physics-foundations": {
       "status": "covered_core"
+    },
+    "physics_biology_life": {
+      "status": "covered_extension"
+    },
+    "physics_information_dynamics": {
+      "status": "covered_extension"
+    },
+    "physics_prebiotic_chemistry": {
+      "status": "covered_extension"
+    },
+    "physics_quantum_semiclassical": {
+      "status": "covered_extension"
+    },
+    "physics_runtime_safety_control": {
+      "status": "covered_extension"
+    },
+    "physics_spacetime_gr": {
+      "status": "covered_extension"
+    },
+    "physics_thermodynamics_entropy": {
+      "status": "covered_extension"
     },
     "pipeline-ledger": {
       "status": "covered_extension"
@@ -114,13 +141,16 @@
     "star-materials-environment": {
       "status": "covered_extension"
     },
-    "stellar-restoration": {
-      "status": "covered_extension"
-    },
     "stellar-ps1-bridges": {
       "status": "covered_extension"
     },
+    "stellar-restoration": {
+      "status": "covered_extension"
+    },
     "telemetry-console": {
+      "status": "covered_extension"
+    },
+    "tool-plan-contracts": {
       "status": "covered_extension"
     },
     "trace-system": {
@@ -142,9 +172,6 @@
       "status": "covered_extension"
     },
     "zen-society": {
-      "status": "covered_extension"
-    },
-    "evidence-falsifier-ledger": {
       "status": "covered_extension"
     }
   }
