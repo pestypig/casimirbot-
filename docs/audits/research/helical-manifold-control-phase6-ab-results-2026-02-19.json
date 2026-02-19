@@ -1,0 +1,41 @@
+{
+  "runAt": "2026-02-19T06:03:31.858Z",
+  "runId": "phase6-ab-2026-02-19T06-03-31-858Z",
+  "fixedSeeds": [1103, 2081, 3191, 4273, 5399, 6421, 7507, 8629, 9733, 10859, 11939, 13007, 14143, 15269, 16381, 17489, 18617, 19739, 20849, 21961],
+  "episodesPerSeed": 5,
+  "totalEpisodesPerArm": 100,
+  "arms": {
+    "A": {
+      "episodeCount": 100,
+      "pass_rate": 0.53,
+      "contradiction_rate": 0.45,
+      "replay_parity": 0.9600732575281387,
+      "claim_to_hook_linkage": 0.8021550367942735,
+      "unsupported_claim_rate": 0.16209483044409334
+    },
+    "B": {
+      "episodeCount": 100,
+      "pass_rate": 0.67,
+      "contradiction_rate": 0.32,
+      "replay_parity": 0.9800732575281392,
+      "claim_to_hook_linkage": 0.9390102709510053,
+      "unsupported_claim_rate": 0.08511389531889633
+    }
+  },
+  "deltas": {
+    "pass_rate": 0.14,
+    "contradiction_rate": -0.13,
+    "contradiction_rate_delta_rel": -0.2888888888888889,
+    "replay_parity": 0.020000000000000573,
+    "claim_to_hook_linkage": 0.13685523415673184,
+    "unsupported_claim_rate": -0.076980935125197
+  },
+  "layerDecisions": [
+    {"layer": "telemetry_x_t", "decision": "keep", "falsifierOutcome": "H1 not falsified", "rationale": "State-vector features remain required for deterministic per-episode risk and linkage accounting."},
+    {"layer": "linear_baseline", "decision": "keep", "falsifierOutcome": "H2 not falsified", "rationale": "Linear baseline retained as mandatory anchor arm (A) and calibration reference."},
+    {"layer": "pca_baseline", "decision": "keep", "falsifierOutcome": "H3 not falsified", "rationale": "B metrics improved versus A with PCA-inclusive stack and no replay-parity regression."},
+    {"layer": "helical_6d", "decision": "drop", "falsifierOutcome": "H4 falsified", "rationale": "No incremental evidence above baseline gate; remains excluded from B controller."},
+    {"layer": "rho_clamp", "decision": "keep", "falsifierOutcome": "H5 not falsified (policy component)", "rationale": "Unsupported-claim rate improved by >= 0.05 absolute in B arm."},
+    {"layer": "natario_first", "decision": "keep", "falsifierOutcome": "H5 not falsified (ordering component)", "rationale": "Replay parity in B held at/above threshold while policy stack stayed deterministic."}
+  ]
+}

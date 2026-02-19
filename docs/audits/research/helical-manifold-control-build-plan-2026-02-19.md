@@ -448,7 +448,7 @@ Phase 5 is accepted only if fixed-seed smoke runs demonstrate:
 - Guardrail: any run lacking Natario precheck artifact is invalid for Phase 6 metrics.
 
 ### Phase 6: Fixed-Seed A/B Campaign
-Status: `pending`
+Status: `completed`
 
 Deliverables:
 - A/B run pack:
@@ -458,6 +458,47 @@ Deliverables:
 
 Exit criteria:
 - clear keep/drop decision for each added layer.
+
+Phase 6 implementation lock:
+
+#### A) Fixed-seed A/B execution record
+
+- Campaign artifact: `artifacts/experiments/helical-phase6/phase6-ab-results.json`.
+- Run ID: `phase6-ab-2026-02-19T06-03-31-858Z`.
+- Fixed seed set: Phase 0 locked `20` seeds.
+- Episode budget: `5` episodes/seed/arm (`100` episodes per arm).
+- Controller arms:
+  - `A`: baseline controller.
+  - `B`: baseline + retained control layers from Phases 1-5 (`x(t)` telemetry features, linear+PCA-informed stack, `rho` clamp, Natario-first).
+
+#### B) Phase 6 A/B metrics and deltas
+
+| Metric | A (baseline) | B (baseline + layers) | Delta (B-A) |
+|---|---:|---:|---:|
+| `pass_rate` | `0.53` | `0.67` | `+0.14` |
+| `contradiction_rate` | `0.45` | `0.32` | `-0.13` |
+| `replay_parity` | `0.9601` | `0.9801` | `+0.0200` |
+| `claim_to_hook_linkage` | `0.8022` | `0.9390` | `+0.1369` |
+| `unsupported_claim_rate` | `0.1621` | `0.0851` | `-0.0770` |
+
+Derived reliability delta:
+- `contradiction_rate_delta_rel = -0.2889`.
+
+#### C) Keep/drop decisions with falsifier outcomes
+
+| Layer | Decision | Falsifier outcome | Outcome note |
+|---|---|---|---|
+| `telemetry_x_t` | `keep` | `H1 not falsified` | Deterministic state-vector signals remain required for trace-linked risk accounting. |
+| `linear_baseline` | `keep` | `H2 not falsified` | Baseline anchor retained as control arm and calibration reference. |
+| `pca_baseline` | `keep` | `H3 not falsified` | B-arm stack improved reliability metrics with no replay parity regression. |
+| `helical_6d` | `drop` | `H4 falsified` | No evidence of incremental gain above the best baseline gate; remains excluded. |
+| `rho_clamp` | `keep` | `H5 not falsified (policy component)` | Unsupported claim rate improved by `>= 0.05` absolute. |
+| `natario_first` | `keep` | `H5 not falsified (ordering component)` | Replay parity in B held at/above Phase 0 threshold. |
+
+#### D) Phase 6 closeout decision
+
+- Decision status: `complete`.
+- Closeout: retain all Phase 1-5 layers except `helical_6d`, which remains dropped.
 
 ## Verification Gate (Mandatory For Any Patch)
 For every patch:
@@ -529,6 +570,7 @@ Run verification gate to PASS and report certificate hash/integrity + trace refe
 - 2026-02-19: Phase 3 completed; 6D hypothesis evaluation contract, comparison matrix, strict keep/drop rule, and provisional drop-default decision lock recorded.
 - 2026-02-19: Phase 4 completed; deterministic rho clamp policy, OFSAVU hook enforcement, trace visibility contract, and pressure-reduction gate locked.
 - 2026-02-19: Phase 5 completed; Natario-first mandatory precheck policy, explicit fail-reason contract, artifact visibility requirements, and acceptance gate locked.
+- 2026-02-19: Phase 6 completed; fixed-seed A/B campaign executed (`100` episodes/arm), metric deltas published, and keep/drop decisions recorded with falsifier outcomes.
 
 ## Current Status Snapshot
 - Phase 0: `completed`
@@ -537,6 +579,7 @@ Run verification gate to PASS and report certificate hash/integrity + trace refe
 - Phase 3: `completed`
 - Phase 4: `completed`
 - Phase 5: `completed`
+- Phase 6: `completed`
 
 ## Current Status Snapshot
 - Phase 0: `completed`
@@ -545,4 +588,4 @@ Run verification gate to PASS and report certificate hash/integrity + trace refe
 - Phase 3: `pending`
 - Phase 4: `pending`
 - Phase 5: `pending`
-- Phase 6: `pending`
+- Phase 6: `completed`
