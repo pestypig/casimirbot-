@@ -40,6 +40,12 @@ directory (`docs/audits/spine-results/`, `docs/audits/helix-results/`).
 
 `research_artifacts` is optional for non-research-gated tickets. For tickets where `research_gate.required_artifacts` is non-empty in either ToE backlog, every listed required artifact must be present in `research_artifacts`.
 
+For theory-congruence tickets, include explicit audit tags where applicable:
+- `root-leaf-congruence-audit`
+- `runtime-contract-audit`
+- `physics-research-brief`
+- `comparative-evidence-pack`
+
 ## Enforcement
 
 Validation is enforced by:
