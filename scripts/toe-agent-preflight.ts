@@ -33,7 +33,7 @@ type StrictReadySnapshot = {
     strict_ready_progress_pct?: number;
     strict_ready_release_gate?: {
       status?: "ready" | "blocked";
-      blocked_reasons?: Array<"missing_verified_pass" | "missing_research_artifacts">;
+      blocked_reasons?: Array<"missing_verified_pass" | "missing_research_artifacts" | "missing_math_congruence">;
       blocked_ticket_count?: number;
       ready_ticket_count?: number;
     };
@@ -134,6 +134,7 @@ const stageConfigs: StageConfig[] = [
   { id: "validate-physics-root-leaf-manifest", script: path.join("scripts", "validate-physics-root-leaf-manifest.ts"), required: true },
   { id: "validate-resolver-owner-coverage", script: path.join("scripts", "validate-resolver-owner-coverage.ts"), required: true },
   { id: "validate-toe-research-gate-policy", script: path.join("scripts", "validate-toe-research-gate-policy.ts"), required: false },
+  { id: "validate-math-congruence-matrix", script: path.join("scripts", "validate-math-congruence-matrix.ts"), required: true },
   { id: "compute-toe-progress", script: path.join("scripts", "compute-toe-progress.ts"), required: true },
   {
     id: "validate-evidence-falsifier-ledger",
@@ -153,7 +154,7 @@ const stageConfigs: StageConfig[] = [
 
 type StrictReadyReleaseGateSummary = {
   status: "ready" | "blocked";
-  blocked_reasons: Array<"missing_verified_pass" | "missing_research_artifacts">;
+  blocked_reasons: Array<"missing_verified_pass" | "missing_research_artifacts" | "missing_math_congruence">;
   blocked_ticket_count: number;
   ready_ticket_count: number;
 };
@@ -313,8 +314,10 @@ function readStrictReadyReleaseGate(stages: StageSummary[]): StrictReadyReleaseG
     status: gate.status,
     blocked_reasons: Array.isArray(gate.blocked_reasons)
       ? gate.blocked_reasons.filter(
-          (reason): reason is "missing_verified_pass" | "missing_research_artifacts" =>
-            reason === "missing_verified_pass" || reason === "missing_research_artifacts",
+          (reason): reason is "missing_verified_pass" | "missing_research_artifacts" | "missing_math_congruence" =>
+            reason === "missing_verified_pass" ||
+            reason === "missing_research_artifacts" ||
+            reason === "missing_math_congruence",
         )
       : [],
     blocked_ticket_count:
