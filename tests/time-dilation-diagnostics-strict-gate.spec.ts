@@ -85,6 +85,72 @@ describe("time dilation strict verification gate", () => {
     );
   });
 
+
+
+  it("surfaces tidal indicator as explicitly unavailable when E_ij tensor is missing", async () => {
+    stubFetch({
+      ...basePipeline,
+      viability: {
+        certificateHash: "cert:1",
+        integrityOk: true,
+        constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+      },
+      warp: {
+        metricT00Contract: { family: "natario" },
+        metricAdapter: {
+          alpha: 1,
+          gammaDiag: [1, 1, 1],
+        },
+      },
+    });
+
+    const diagnostics = await buildTimeDilationDiagnostics({ baseUrl: "http://example.test", publish: false });
+    expect(diagnostics.tidal).toEqual(
+      expect.objectContaining({
+        status: "unavailable",
+        scalar: null,
+        units: "1/s^2",
+      }),
+    );
+    expect(diagnostics.tidal.unavailable).toEqual(
+      expect.objectContaining({ deterministicBlockId: "TIDAL_E_IJ_MISSING" }),
+    );
+    expect(diagnostics.observables.tidal_indicator?.valid).toBe(false);
+  });
+
+  it("computes tidal indicator from pipeline E_ij tensor with provenance", async () => {
+    stubFetch({
+      ...basePipeline,
+      viability: {
+        certificateHash: "cert:1",
+        integrityOk: true,
+        constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+      },
+      warp: {
+        metricT00Contract: { family: "natario" },
+        metricAdapter: {
+          alpha: 1,
+          gammaDiag: [1, 1, 1],
+          tidalTensorEij: [
+            [1, 2, 0],
+            [2, 3, 0],
+            [0, 0, 4],
+          ],
+        },
+      },
+    });
+
+    const diagnostics = await buildTimeDilationDiagnostics({ baseUrl: "http://example.test", publish: false });
+    expect(diagnostics.tidal.status).toBe("available");
+    expect(diagnostics.tidal.scalar ?? 0).toBeCloseTo(Math.sqrt(34), 8);
+    expect(diagnostics.tidal.provenance.source).toBe("pipeline.warp.metricAdapter.tidalTensorEij");
+    expect(diagnostics.observables.tidal_indicator).toEqual(
+      expect.objectContaining({
+        valid: true,
+        units: "1/s^2",
+      }),
+    );
+  });
   it("computes ship-comoving dtau/dt from ADM variables when worldline inputs are present", async () => {
     stubFetch({
       ...basePipeline,

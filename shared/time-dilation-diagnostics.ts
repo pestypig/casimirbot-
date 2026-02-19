@@ -79,6 +79,24 @@ export type TimeDilationDiagnostics = {
     formula?: string;
     details?: Record<string, unknown>;
   }>;
+  tidal: {
+    status: "available" | "unavailable";
+    scalar: number | null;
+    units: "1/s^2";
+    method: "E_ij_frobenius_norm";
+    provenance: {
+      source: string;
+      tensorPath: string | null;
+      tensorLayout: "matrix3x3";
+      definitionId: "tidal_indicator_v1";
+      derivedFrom: "E_ij";
+    };
+    unavailable?: {
+      reason: "required_tensor_missing";
+      required: string[];
+      deterministicBlockId: "TIDAL_E_IJ_MISSING";
+    };
+  };
   provenance: Record<string, {
     source: string;
     observer: string | null;
@@ -294,7 +312,110 @@ const resolveShipComovingDtauDt = (pipeline: any, proofPack: ProofPack | null) =
   };
 };
 
+const resolveTidalTensorEij = (pipeline: any, proofPack: ProofPack | null) => {
+  const pipelineCandidates: Array<{ value: unknown; source: string; tensorPath: string }> = [
+    {
+      value: pipeline?.warp?.metricAdapter?.tidalTensorEij,
+      source: "pipeline.warp.metricAdapter.tidalTensorEij",
+      tensorPath: "pipeline.warp.metricAdapter.tidalTensorEij",
+    },
+    {
+      value: pipeline?.warp?.metricAdapter?.electricWeylEij,
+      source: "pipeline.warp.metricAdapter.electricWeylEij",
+      tensorPath: "pipeline.warp.metricAdapter.electricWeylEij",
+    },
+    {
+      value: pipeline?.warp?.metricAdapter?.E_ij,
+      source: "pipeline.warp.metricAdapter.E_ij",
+      tensorPath: "pipeline.warp.metricAdapter.E_ij",
+    },
+  ];
+
+  for (const candidate of pipelineCandidates) {
+    const matrix = finiteMatrix3x3(candidate.value);
+    if (matrix) {
+      return {
+        matrix,
+        source: candidate.source,
+        tensorPath: candidate.tensorPath,
+      };
+    }
+  }
+
+  const fromProof = [
+    ["tidal_e_ij_xx", "tidal_e_ij_xy", "tidal_e_ij_xz"],
+    ["tidal_e_ij_yx", "tidal_e_ij_yy", "tidal_e_ij_yz"],
+    ["tidal_e_ij_zx", "tidal_e_ij_zy", "tidal_e_ij_zz"],
+  ].map((row) => row.map((entry) => toNumber(readProofString(proofPack, entry))));
+
+  if (fromProof.flat().every((entry) => entry != null)) {
+    return {
+      matrix: fromProof as [[number, number, number], [number, number, number], [number, number, number]],
+      source: "proof_pack",
+      tensorPath: "proof.values.tidal_e_ij_*",
+    };
+  }
+
+  return null;
+};
+
+const finiteMatrix3x3 = (value: unknown): [[number, number, number], [number, number, number], [number, number, number]] | null => {
+  if (!Array.isArray(value) || value.length < 3) return null;
+  const rows = value.slice(0, 3).map((row) => finiteVec3(row));
+  if (rows.some((entry) => !entry)) return null;
+  return rows as [[number, number, number], [number, number, number], [number, number, number]];
+};
+
+const resolveTidalIndicator = (pipeline: any, proofPack: ProofPack | null) => {
+  const tensor = resolveTidalTensorEij(pipeline, proofPack);
+  const units = "1/s^2" as const;
+  if (!tensor) {
+    return {
+      status: "unavailable" as const,
+      scalar: null,
+      units,
+      method: "E_ij_frobenius_norm" as const,
+      provenance: {
+        source: "unavailable",
+        tensorPath: null,
+        tensorLayout: "matrix3x3" as const,
+        definitionId: "tidal_indicator_v1" as const,
+        derivedFrom: "E_ij" as const,
+      },
+      unavailable: {
+        reason: "required_tensor_missing" as const,
+        required: [
+          "warp.metricAdapter.tidalTensorEij",
+          "warp.metricAdapter.electricWeylEij",
+          "warp.metricAdapter.E_ij",
+        ],
+        deterministicBlockId: "TIDAL_E_IJ_MISSING" as const,
+      },
+    };
+  }
+
+  const scalar = Math.sqrt(
+    tensor.matrix
+      .flat()
+      .reduce((sum, component) => sum + component * component, 0),
+  );
+  return {
+    status: "available" as const,
+    scalar,
+    units,
+    method: "E_ij_frobenius_norm" as const,
+    provenance: {
+      source: tensor.source,
+      tensorPath: tensor.tensorPath,
+      tensorLayout: "matrix3x3" as const,
+      definitionId: "tidal_indicator_v1" as const,
+      derivedFrom: "E_ij" as const,
+    },
+  };
+};
+
 const toNumber = (value: unknown): number | null => {
+  if (value == null) return null;
   const num = typeof value === "number" ? value : Number(value);
   return Number.isFinite(num) ? num : null;
 };
@@ -741,6 +862,7 @@ export async function buildTimeDilationDiagnostics(
   const congruenceKind = resolveCongruenceKind(canonical);
   const congruenceRequirements = resolveCongruenceRequirements(canonical, definitions);
   const shipComovingDtauDt = resolveShipComovingDtauDt(pipeline, proofPack);
+  const tidalIndicator = resolveTidalIndicator(pipeline, proofPack);
 
   if (congruenceKind === "ship_comoving" && !shipComovingDtauDt.valid) {
     congruenceRequirements.requiredFieldsOk = false;
@@ -791,6 +913,14 @@ export async function buildTimeDilationDiagnostics(
       definitionId: "K",
       derivedFrom: "warp.metricAdapter.Ktrace",
     },
+    tidal_indicator: {
+      source: tidalIndicator.provenance.source,
+      observer: canonical.observer,
+      chart: canonical.chart,
+      units: tidalIndicator.units,
+      definitionId: tidalIndicator.provenance.definitionId,
+      derivedFrom: tidalIndicator.provenance.derivedFrom,
+    },
   };
 
   const observables = Object.fromEntries(
@@ -815,6 +945,29 @@ export async function buildTimeDilationDiagnostics(
     value: shipComovingDtauDt.value,
     formula: "dτ/dt = sqrt(alpha^2 - gamma_ij (dx^i/dt + beta^i)(dx^j/dt + beta^j))",
     details: shipComovingDtauDt.details,
+  };
+
+  observables.tidal_indicator = {
+    source: tidalIndicator.provenance.source,
+    observerFamily: congruenceKind,
+    chart: canonical.chart,
+    units: tidalIndicator.units,
+    valid: tidalIndicator.status === "available",
+    missingFields: tidalIndicator.status === "available" ? [] : tidalIndicator.unavailable?.required,
+    value: tidalIndicator.scalar,
+    formula: "||E_ij||_F = sqrt(sum_ij E_ij E^ij)",
+    details:
+      tidalIndicator.status === "available"
+        ? {
+          method: tidalIndicator.method,
+          tensorPath: tidalIndicator.provenance.tensorPath,
+          tensorLayout: tidalIndicator.provenance.tensorLayout,
+        }
+        : {
+          status: tidalIndicator.status,
+          reason: tidalIndicator.unavailable?.reason,
+          deterministicBlockId: tidalIndicator.unavailable?.deterministicBlockId,
+        },
   };
 
   const divBetaRms = toNumber((pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaRms);
@@ -875,6 +1028,7 @@ export async function buildTimeDilationDiagnostics(
           : null,
     },
     observables,
+    tidal: tidalIndicator,
     provenance,
     proofPack,
     renderingSeed,
