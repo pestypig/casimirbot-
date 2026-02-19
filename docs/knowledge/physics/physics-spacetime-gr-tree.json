@@ -124,7 +124,7 @@
       ],
       "derived_residual": {
         "schema": "equation_residual/v1",
-        "equation_ref": "physics-spacetime-gr-tree",
+        "equation_ref": "efe_baseline",
         "residual_symbol": "R_lane",
         "tolerance": {
           "metric": "rms",

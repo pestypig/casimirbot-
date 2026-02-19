@@ -317,5 +317,11 @@
         "strict_fail_reason": "ROOT_LEAF_RUNTIME_CONTROL_PATH_MISSING"
       }
     }
-  ]
+  ],
+  "maturity_propagation_policy": {
+    "enabled": true,
+    "no_over_promotion": true,
+    "strict_fail_reason": "FAIL_MATURITY_CEILING_VIOLATION",
+    "default_max_claim_tier": "diagnostic"
+  }
 }

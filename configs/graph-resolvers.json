@@ -1548,5 +1548,28 @@
       },
       "weight": 1.05
     }
-  ]
+  ],
+  "routingPolicy": {
+    "assertion_node_types": {
+      "display_only": [
+        "concept",
+        "viewer_contract"
+      ],
+      "proxy": [
+        "bridge",
+        "derived_metric"
+      ],
+      "physics_assertion": [
+        "physics_assertion"
+      ]
+    },
+    "equation_binding_rail": {
+      "enabled": true,
+      "required_node_types": [
+        "physics_assertion"
+      ],
+      "required_field": "validity.equation_ref",
+      "strict_fail_reason": "FAIL_NODE_MISSING_EQUATION_REF"
+    }
+  }
 }

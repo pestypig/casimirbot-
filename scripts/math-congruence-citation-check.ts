@@ -76,6 +76,21 @@ const files = {
 
 const issues: Issue[] = [];
 
+const REQUIRED_ATOMIC_CURVATURE_BRIDGE_CLAIMS = new Set([
+  "atomic_energy_to_energy_density_proxy.v1",
+  "curvature_unit_proxy_contract.v1",
+]);
+
+const hasBridgeClaimMetadata = (claim: ClaimRecord): boolean => {
+  if (!claim || typeof claim !== "object") return false;
+  const validity = claim.validityDomain;
+  if (!validity || typeof validity !== "object") return false;
+  const hasSystem = typeof validity.system === "string" && validity.system.trim().length > 0;
+  const constraints = Array.isArray(validity.constraints) ? validity.constraints.filter((c) => typeof c === "string" && c.trim()) : [];
+  return hasSystem && constraints.length > 0;
+};
+
+
 function addIssue(level: IssueLevel, code: string, message: string, file?: string): void {
   issues.push({ level, code, message, file });
 }
@@ -541,6 +556,17 @@ async function runCitationChecks(): Promise<void> {
         }
       }
 
+
+      const claimId = typeof claim.claimId === "string" ? claim.claimId.trim() : "";
+      if (claimId && REQUIRED_ATOMIC_CURVATURE_BRIDGE_CLAIMS.has(claimId) && !hasBridgeClaimMetadata(claim)) {
+        addIssue(
+          "error",
+          "bridge_claim_metadata_missing",
+          `Bridge claim '${claimId}' must include validityDomain.system and non-empty validityDomain.constraints`,
+          claimPrefix,
+        );
+      }
+
       if (typeof claim.statement !== "string" || claim.statement.trim().length < 8) {
         addIssue("error", "claim_statement_missing", "statement is required", claimPrefix);
       }
@@ -623,6 +649,18 @@ async function runCitationChecks(): Promise<void> {
           }
         }
       }
+    }
+  }
+
+
+  for (const requiredClaimId of REQUIRED_ATOMIC_CURVATURE_BRIDGE_CLAIMS) {
+    if (!seenClaimIds.has(requiredClaimId)) {
+      addIssue(
+        "error",
+        "bridge_claim_required_missing",
+        `Missing required atomic-curvature bridge claim: ${requiredClaimId}`,
+        files.claimDir,
+      );
     }
   }
 

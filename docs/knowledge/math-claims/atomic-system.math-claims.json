@@ -181,7 +181,67 @@
         "client/src/components/ElectronOrbitalPanel.tsx"
       ],
       "notes": "This claim intentionally blocks certification semantics for telemetry drift coupling."
+    },
+    {
+      "claimId": "atomic_energy_to_energy_density_proxy.v1",
+      "statement": "Atomic energy scalars may be transformed into a diagnostic energy-density proxy only when an explicit volume scale is declared; this is not a stress-energy tensor mapping.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "atomic-to-curvature bridge diagnostic proxy lane",
+        "constraints": [
+          "requires declared effective volume scale",
+          "not equivalent to <T_mu_nu> mapping",
+          "non-certifying diagnostic claim tier"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "spec",
+          "citation": "docs/audits/research/curvature-atomic-congruence-gap-audit-2026-02-19.md",
+          "equation": "rho_proxy = E_atomic / V_eff",
+          "note": "Defines proxy-only bridge requirement and maturity ceiling."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "docs/knowledge/physics/atomic-systems-tree.json",
+          "note": "Bridge guardrail node enforces deterministic failure until explicit stress-energy mapping contract is added."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/atomic-systems-tree.json",
+        "configs/math-congruence-matrix.v1.json"
+      ]
+    },
+    {
+      "claimId": "curvature_unit_proxy_contract.v1",
+      "statement": "Curvature-unit diagnostics in the atomic-curvature bridge are treated as experimental proxy contracts with explicit residual thresholds and uncertainty assumptions.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "curvature proxy diagnostics for Helix Ask TOE congruence",
+        "constraints": [
+          "experimental maturity label",
+          "residual threshold required",
+          "uncertainty-model declaration required for runtime-eligible cross-lane use"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "repo-code",
+          "citation": "configs/physics-equation-backbone.v1.json",
+          "equation": "curvature_unit_proxy_residual = abs(kappa_proxy-kappa_ref)/max(abs(kappa_ref), eps)",
+          "note": "Canonical equation reference for curvature proxy contract."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "configs/math-congruence-matrix.v1.json",
+          "note": "Congruence matrix row binds equation id and runtime uncertainty rail metadata."
+        }
+      ],
+      "repoBindings": [
+        "configs/physics-equation-backbone.v1.json",
+        "configs/math-congruence-matrix.v1.json",
+        "server/services/helix-ask/relation-assembly.ts"
+      ]
     }
   ]
 }
-

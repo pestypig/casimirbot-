@@ -1,0 +1,22 @@
+{
+  "rootId": "assertion-root",
+  "nodes": [
+    {
+      "id": "assertion-root",
+      "title": "Assertion Root",
+      "nodeType": "physics_assertion",
+      "validity": {},
+      "children": ["assertion-target"],
+      "links": [],
+      "tags": ["physics"]
+    },
+    {
+      "id": "assertion-target",
+      "title": "Assertion Target",
+      "nodeType": "concept",
+      "children": [],
+      "links": [],
+      "tags": ["physics"]
+    }
+  ]
+}

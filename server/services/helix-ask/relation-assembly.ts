@@ -23,7 +23,9 @@ export type RelationAssemblyPacket = {
     | "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_MISSING"
     | "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_CONTRADICTORY"
     | "RUNTIME_SAFETY_GATE_MISSING_DATA"
-    | "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS";
+    | "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS"
+    | "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL"
+    | "FAIL_MATURITY_CEILING_VIOLATION";
   definitions: {
     warp_definition: string;
     ethos_definition: string;
@@ -38,7 +40,9 @@ export type RelationAssemblyPacket = {
 type RuntimeSafetyGateValidation = {
   referenced: boolean;
   pass: boolean;
-  failReason?: "RUNTIME_SAFETY_GATE_MISSING_DATA" | "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS";
+  failReason?: "RUNTIME_SAFETY_GATE_MISSING_DATA" | "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS"
+    | "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL"
+    | "FAIL_MATURITY_CEILING_VIOLATION";
   summary?: string;
 };
 
@@ -294,6 +298,100 @@ const resolveRuntimeSafetyGateValidation = (candidatePaths: string[]): RuntimeSa
 
 export const __testOnlyResolveRuntimeSafetyGateValidation = resolveRuntimeSafetyGateValidation;
 
+type CrossLaneUncertaintyValidation = {
+  referenced: boolean;
+  pass: boolean;
+  failReason?: "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL";
+  summary?: string;
+};
+
+const TOE_CONGRUENCE_MATRIX = "configs/math-congruence-matrix.v1.json";
+
+const resolveCrossLaneUncertaintyValidation = (): CrossLaneUncertaintyValidation => {
+  const fullPath = path.resolve(process.cwd(), TOE_CONGRUENCE_MATRIX);
+  if (!fs.existsSync(fullPath)) {
+    return { referenced: true, pass: false, failReason: "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL", summary: "cross_lane_uncertainty=missing_matrix" };
+  }
+  let parsed: any;
+  try {
+    parsed = JSON.parse(fs.readFileSync(fullPath, "utf8"));
+  } catch {
+    return { referenced: true, pass: false, failReason: "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL", summary: "cross_lane_uncertainty=invalid_matrix_json" };
+  }
+  const rows = Array.isArray(parsed?.rows) ? parsed.rows : [];
+  const scoped = rows.filter((row: any) => row?.runtime_safety_eligible === true || row?.cross_lane_bridge === true);
+  if (scoped.length === 0) return { referenced: false, pass: true };
+  const missing = scoped
+    .filter((row: any) => typeof row?.uncertainty_model_id !== "string" || !row.uncertainty_model_id.trim())
+    .map((row: any) => String(row?.id ?? "unknown"));
+  if (missing.length > 0) {
+    return {
+      referenced: true,
+      pass: false,
+      failReason: "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL",
+      summary: `cross_lane_uncertainty=missing_uncertainty_model_id:${missing.sort((a,b)=>a.localeCompare(b)).join(",")}`,
+    };
+  }
+  return {
+    referenced: true,
+    pass: true,
+    summary: `cross_lane_uncertainty=ok:${scoped.map((row: any)=>String(row.id)).sort((a,b)=>a.localeCompare(b)).join(",")}`,
+  };
+};
+
+export const __testOnlyResolveCrossLaneUncertaintyValidation = resolveCrossLaneUncertaintyValidation;
+
+type MaturityCeilingValidation = {
+  referenced: boolean;
+  pass: boolean;
+  failReason?: "FAIL_MATURITY_CEILING_VIOLATION";
+  summary?: string;
+};
+
+const TOE_ROOT_LEAF_MANIFEST = "configs/physics-root-leaf-manifest.v1.json";
+const CLAIM_TIER_ORDER: Record<string, number> = {
+  diagnostic: 1,
+  "reduced-order": 2,
+  certified: 3,
+};
+
+const resolveMaturityCeilingValidation = (evidence: RelationAssemblyEvidence[]): MaturityCeilingValidation => {
+  const fullPath = path.resolve(process.cwd(), TOE_ROOT_LEAF_MANIFEST);
+  if (!fs.existsSync(fullPath)) {
+    return { referenced: true, pass: false, failReason: "FAIL_MATURITY_CEILING_VIOLATION", summary: "maturity_ceiling=missing_manifest" };
+  }
+  let parsed: any;
+  try {
+    parsed = JSON.parse(fs.readFileSync(fullPath, "utf8"));
+  } catch {
+    return { referenced: true, pass: false, failReason: "FAIL_MATURITY_CEILING_VIOLATION", summary: "maturity_ceiling=invalid_manifest_json" };
+  }
+  const policy = parsed?.maturity_propagation_policy;
+  if (!policy || policy.enabled !== true || policy.no_over_promotion !== true) {
+    return { referenced: false, pass: true };
+  }
+  const maxTier = String(policy.default_max_claim_tier ?? parsed?.claim_tier_ceiling ?? "diagnostic").trim();
+  const maxOrder = CLAIM_TIER_ORDER[maxTier] ?? CLAIM_TIER_ORDER.diagnostic;
+  const violations = evidence
+    .filter((entry) => typeof entry.claim_tier === "string")
+    .filter((entry) => (CLAIM_TIER_ORDER[String(entry.claim_tier)] ?? CLAIM_TIER_ORDER.diagnostic) > maxOrder)
+    .map((entry) => `${entry.evidence_id}:${entry.claim_tier}`)
+    .sort((a, b) => a.localeCompare(b));
+  if (violations.length > 0) {
+    return {
+      referenced: true,
+      pass: false,
+      failReason: "FAIL_MATURITY_CEILING_VIOLATION",
+      summary: `maturity_ceiling=violations(max=${maxTier}):${violations.join(",")}`,
+    };
+  }
+  return { referenced: true, pass: true, summary: `maturity_ceiling=ok(max=${maxTier})` };
+};
+
+export const __testOnlyResolveMaturityCeilingValidation = resolveMaturityCeilingValidation;
+
+
+
 const firstSentence = (text: string, fallback: string): string => {
   const first = text.split(/(?<=[.!?])\s+/)[0] ?? "";
   const normalized = clip(sanitizeSnippet(first), 220);
@@ -474,11 +572,23 @@ export function buildRelationAssemblyPacket(args: {
   if (runtimeValidation.referenced && runtimeValidation.summary) {
     falsifiability_hooks.push(runtimeValidation.summary);
   }
+  const crossLaneUncertaintyValidation = resolveCrossLaneUncertaintyValidation();
+  if (crossLaneUncertaintyValidation.referenced && crossLaneUncertaintyValidation.summary) {
+    falsifiability_hooks.push(crossLaneUncertaintyValidation.summary);
+  }
+  const maturityCeilingValidation = resolveMaturityCeilingValidation(evidence);
+  if (maturityCeilingValidation.referenced && maturityCeilingValidation.summary) {
+    falsifiability_hooks.push(maturityCeilingValidation.summary);
+  }
   const failReason = strictBridgeEvidence
     ? strictFailReason
     : runtimeValidation.referenced && !runtimeValidation.pass
       ? runtimeValidation.failReason
-      : undefined;
+      : crossLaneUncertaintyValidation.referenced && !crossLaneUncertaintyValidation.pass
+        ? crossLaneUncertaintyValidation.failReason
+        : maturityCeilingValidation.referenced && !maturityCeilingValidation.pass
+          ? maturityCeilingValidation.failReason
+          : undefined;
 
   return {
     question: args.question,
