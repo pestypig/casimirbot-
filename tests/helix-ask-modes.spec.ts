@@ -174,7 +174,19 @@ describe("Helix Ask modes", () => {
     const payload = (await response.json()) as {
       ok?: boolean;
       mode?: string;
-      action?: { tool?: string; output?: { ok?: boolean; comparison?: { deltas?: Record<string, unknown> } } };
+      action?: {
+        tool?: string;
+        output?: { ok?: boolean; comparison?: { deltas?: Record<string, unknown> } };
+        tool_execution_receipt?: {
+          schema_version?: string;
+          deterministic?: boolean;
+          status?: string;
+          fail_reason?: string;
+          input_hash?: string;
+          output_hash?: string;
+          receipt_hash?: string;
+        };
+      };
     };
     expect(payload.ok).toBe(true);
     expect(payload.mode).toBe("act");
