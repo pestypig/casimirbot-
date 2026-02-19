@@ -180,6 +180,11 @@ import {
   type HelixAskMathSolveResult,
 } from "../services/helix-ask/math";
 import {
+  buildHelixToolCatalog,
+  buildHelixToolPlan,
+  collectMissingRequiredInputs,
+} from "../services/helix-ask/tool-space";
+import {
   resolveHelixAskGraphPack,
   type HelixAskCongruenceWalkOverride,
   type HelixAskGraphEvidence,
@@ -12737,6 +12742,11 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
       .optional(),
     debug: z.boolean().optional(),
     dryRun: z.boolean().optional(),
+    tool: z
+      .object({
+        dryRun: z.boolean().optional(),
+      })
+      .optional(),
     verbosity: z.enum(["brief", "normal", "extended"]).optional(),
     searchQuery: z.string().optional(),
     coverageSlots: z.array(z.string().min(1)).max(12).optional(),
@@ -16168,17 +16178,34 @@ const executeHelixAsk = async ({
       await ensureDefaultTools();
       const goalText = question ?? prompt ?? "";
       const manifest = listTools();
-      const toolName = selectToolForGoal(goalText, manifest);
+      const toolPlan = buildHelixToolPlan({
+        goal: goalText,
+        manifest,
+        allowTools: askAllowTools,
+        mode: askMode,
+      });
+      const toolName = toolPlan.selectedTool || selectToolForGoal(goalText, manifest);
       const tool = getTool(toolName);
       if (!tool) {
-        responder.send(500, { ok: false, error: "tool_not_found", toolName });
+        responder.send(500, { ok: false, error: "tool_not_found", toolName, debug: { tool_plan: toolPlan } });
         return;
       }
       const toolAllowed = isAskToolAllowed(toolName, askAllowTools);
       if (!toolAllowed && askMode !== "observe") {
-        responder.send(400, { ok: false, error: "tool_not_allowed", toolName });
+        responder.send(400, {
+          ok: false,
+          error: "tool_not_allowed",
+          toolName,
+          debug: {
+            tool_plan: {
+              ...toolPlan,
+              blocked: [...toolPlan.blocked, { tool: toolName, reason: "selected_tool_not_allowed" }],
+            },
+          },
+        });
         return;
       }
+      const toolDryRun = parsed.data.tool?.dryRun === true || parsed.data.dryRun === true;
       const actionStarted = Date.now();
       let actionOutput: unknown = null;
       try {
@@ -16230,9 +16257,37 @@ const executeHelixAsk = async ({
             return;
           }
         }
+        const clarifySlots = collectMissingRequiredInputs(toolName, payload);
+        if (clarifySlots.length > 0) {
+          responder.send(200, {
+            ok: false,
+            mode: "clarify",
+            fail_reason: "TOOL_INPUT_MISSING",
+            clarify_slots: clarifySlots,
+            debug: { tool_plan: toolPlan },
+          });
+          return;
+        }
+        if (toolDryRun) {
+          responder.send(200, {
+            ok: true,
+            mode: askMode,
+            dry_run: true,
+            text: "Dry-run complete.",
+            predicted_contract_path: `tool://${toolName}/handler`,
+            tool_plan: toolPlan,
+            debug: { tool_plan: toolPlan },
+          });
+          return;
+        }
         actionOutput = await tool.handler(payload, { personaId, sessionId: parsed.data.sessionId, traceId: askTraceId });
       } catch (error) {
-        responder.send(500, { ok: false, error: "tool_execution_failed", message: error instanceof Error ? error.message : String(error) });
+        responder.send(500, {
+          ok: false,
+          error: "tool_execution_failed",
+          message: error instanceof Error ? error.message : String(error),
+          debug: { tool_plan: toolPlan },
+        });
         return;
       }
       const defaultProofArtifacts = [
@@ -16327,6 +16382,7 @@ const executeHelixAsk = async ({
             certifying: false,
             proof,
             action: { tool: toolName, output: actionOutput },
+            debug: { tool_plan: toolPlan },
           });
           return;
         }
@@ -16340,6 +16396,7 @@ const executeHelixAsk = async ({
         certifying: false,
         action: { tool: toolName, output: actionOutput },
         proof,
+        debug: { tool_plan: toolPlan },
       });
       return;
     }
@@ -28242,6 +28299,18 @@ planRouter.get("/tools/manifest", async (_req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: "manifest_error", message });
+  }
+});
+
+planRouter.get("/tools/catalog", async (_req, res) => {
+  try {
+    await ensureDefaultTools();
+    const manifest = listTools();
+    const catalog = buildHelixToolCatalog(manifest);
+    res.json(catalog);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: "catalog_error", message });
   }
 });
 

@@ -364,9 +364,14 @@ describe("Helix Ask modes", () => {
       }),
     });
     expect(response.status).toBe(400);
-    const payload = (await response.json()) as { error?: string; toolName?: string };
+    const payload = (await response.json()) as {
+      error?: string;
+      toolName?: string;
+      debug?: { tool_plan?: { blocked?: Array<{ tool?: string; reason?: string }> } };
+    };
     expect(payload.error).toBe("tool_not_allowed");
     expect(payload.toolName).toBe("halobank.time.compute");
+    expect(payload.debug?.tool_plan?.blocked?.some((entry) => entry.tool === "halobank.time.compute")).toBe(true);
   }, 30000);
 
   it("returns atomic viewer launch claim tier metadata and blocks certified narration", async () => {

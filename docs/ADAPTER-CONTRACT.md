@@ -126,3 +126,37 @@ Notes
   attempt; if no change is detected, the list can be empty.
 
 - When authenticity is required and fails, `firstFail.id` is `ADAPTER_CERTIFICATE_AUTHENTICITY_REQUIRED` (class `certificate_authenticity_required`).
+
+## Helix Ask tool-space MVP additions
+
+### Tool catalog endpoint
+- `GET /api/agi/tools/catalog`
+- Returns capability cards with fields:
+  - `id` / `name`
+  - `purpose`
+  - `intents[]`
+  - `requiredInputs[]`
+  - `sideEffectClass` (`none|read|write|external`)
+  - `dryRunSupported`
+  - `trustRequirements[]`
+  - `verifyRequirements[]`
+
+### Ask request additions (tool flow)
+- Existing: top-level `dryRun` (still supported)
+- New: `tool.dryRun` (preferred for tool-flow dry run)
+
+### Ask response additions (tool flow)
+- `debug.tool_plan` (deterministic planning surface):
+  - `candidates[]` (`tool`, `score`, `reason`)
+  - `selectedTool`
+  - `blocked[]` (`tool`, `reason`)
+  - `tieBreakReason`
+- Dry-run returns:
+  - `dry_run: true`
+  - `tool_plan`
+  - `predicted_contract_path`
+- Structured clarify for missing tool inputs returns:
+  - `ok: false`
+  - `mode: "clarify"`
+  - `fail_reason: "TOOL_INPUT_MISSING"`
+  - `clarify_slots: string[]`

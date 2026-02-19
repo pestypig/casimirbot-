@@ -2671,6 +2671,41 @@ export const adapterPremeditationResultSchema = z.object({
 });
 export type AdapterPremeditationResult = z.infer<typeof adapterPremeditationResultSchema>;
 
+export const helixToolSideEffectClassSchema = z.enum(["none", "read", "write", "external"]);
+export type HelixToolSideEffectClass = z.infer<typeof helixToolSideEffectClassSchema>;
+
+export const helixToolCatalogEntrySchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  purpose: z.string().min(1),
+  intents: z.array(z.string().min(1)),
+  requiredInputs: z.array(z.string().min(1)),
+  sideEffectClass: helixToolSideEffectClassSchema,
+  dryRunSupported: z.boolean(),
+  trustRequirements: z.array(z.string().min(1)),
+  verifyRequirements: z.array(z.string().min(1)),
+});
+export type HelixToolCatalogEntry = z.infer<typeof helixToolCatalogEntrySchema>;
+
+export const helixToolPlanSchema = z.object({
+  candidates: z.array(
+    z.object({
+      tool: z.string().min(1),
+      score: z.number(),
+      reason: z.string().min(1),
+    }),
+  ),
+  selectedTool: z.string().min(1),
+  blocked: z.array(
+    z.object({
+      tool: z.string().min(1),
+      reason: z.string().min(1),
+    }),
+  ),
+  tieBreakReason: z.string().min(1),
+});
+export type HelixToolPlan = z.infer<typeof helixToolPlanSchema>;
+
 
 
 export const adapterRoboticsSafetySchema = z.object({
