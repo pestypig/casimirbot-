@@ -130,3 +130,19 @@ export function collapseEvidenceBullets(text: string): string {
   if (listLines.length === 0) return "";
   return collapseListParagraph(listLines.join("\n"));
 }
+
+const REPORT_SHAPE_HEADER_RE = /^#{1,6}\s*(?:report|overview|summary|findings?|recommendations?|next steps?)\b/i;
+const REPORT_SHAPE_BLOCK_RE = /^\s*(?:block\s*\d+|section\s*\d+)\s*[:\-]/i;
+
+export function enforceNonReportPromptShape(answer: string, reportModeEnabled: boolean): string {
+  if (!answer || reportModeEnabled) return answer;
+  const lines = answer.split(/\r?\n/);
+  const cleaned = lines.filter((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return true;
+    if (REPORT_SHAPE_HEADER_RE.test(trimmed)) return false;
+    if (REPORT_SHAPE_BLOCK_RE.test(trimmed)) return false;
+    return true;
+  });
+  return cleaned.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}

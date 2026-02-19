@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enforceHelixAskAnswerFormat } from "../server/services/helix-ask/format";
+import { enforceHelixAskAnswerFormat, enforceNonReportPromptShape } from "../server/services/helix-ask/format";
 
 describe("Helix Ask format compliance", () => {
   it("collapses bullet-only answers into paragraphs for compare", () => {
@@ -40,5 +40,19 @@ describe("Helix Ask format compliance", () => {
     expect(formatted).toContain("Definition:");
     expect(formatted).toContain("In practice");
     expect(formatted).not.toMatch(/^\s*[-*]\s+/m);
+  });
+
+  it("strips report scaffolding when report mode is disabled", () => {
+    const raw = [
+      "## Report",
+      "Section 1: Summary",
+      "Warp bubbles require bounded constraint checks.",
+      "### Findings",
+      "Mission ethos adds stewardship constraints.",
+    ].join("\n");
+    const formatted = enforceNonReportPromptShape(raw, false);
+    expect(formatted).not.toContain("## Report");
+    expect(formatted).not.toContain("Section 1:");
+    expect(formatted).toContain("Warp bubbles require bounded constraint checks.");
   });
 });

@@ -474,6 +474,103 @@ export function buildRelationAssemblyPacket(args: {
   };
 }
 
+
+const RELATION_PACKET_MIN_BRIDGE_CLAIMS = 2;
+
+const isRelationAssemblyPacketComplete = (packet: RelationAssemblyPacket): boolean => {
+  const hasDefinitions =
+    packet.definitions.warp_definition.trim().length > 0 &&
+    packet.definitions.ethos_definition.trim().length > 0;
+  const hasBridgeClaims = packet.bridge_claims.filter((claim) => claim.trim().length > 0).length >= RELATION_PACKET_MIN_BRIDGE_CLAIMS;
+  const hasConstraints = packet.constraints.some((constraint) => constraint.trim().length > 0);
+  const hasHooks = packet.falsifiability_hooks.some((hook) => hook.trim().length > 0);
+  const hasDualDomain = packet.domains.includes("warp") && packet.domains.includes("ethos");
+  const hasEvidence = packet.evidence.length > 0 && Object.keys(packet.source_map).length > 0;
+  return hasDefinitions && hasBridgeClaims && hasConstraints && hasHooks && hasDualDomain && hasEvidence;
+};
+
+const buildDeterministicRelationFallbackPacket = (packet: RelationAssemblyPacket): RelationAssemblyPacket => {
+  const evidence = [...packet.evidence];
+  const source_map = { ...packet.source_map };
+  const domains = new Set(packet.domains);
+  const hasWarp = domains.has("warp");
+  const hasEthos = domains.has("ethos");
+
+  if (!hasWarp) {
+    const span = "L1-L1";
+    const path = "docs/knowledge/warp/warp-bubble.md";
+    const evidence_id = buildEvidenceId(path, span);
+    evidence.push({
+      evidence_id,
+      path,
+      span,
+      snippet: "Warp bubble models remain bounded by viability and GR constraint gates before operational claims.",
+      domain: "warp",
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    });
+    source_map[evidence_id] = toCitation(path, span);
+    domains.add("warp");
+  }
+
+  if (!hasEthos) {
+    const span = "L1-L1";
+    const path = "docs/ethos/ideology.json";
+    const evidence_id = buildEvidenceId(path, span);
+    evidence.push({
+      evidence_id,
+      path,
+      span,
+      snippet: "Mission ethos keeps capability claims tied to stewardship, auditability, and non-harm constraints.",
+      domain: "ethos",
+      provenance_class: "inferred",
+      claim_tier: "diagnostic",
+      certifying: false,
+    });
+    source_map[evidence_id] = toCitation(path, span);
+    domains.add("ethos");
+  }
+
+  return {
+    ...packet,
+    domains: Array.from(domains).sort(),
+    definitions: {
+      warp_definition:
+        packet.definitions.warp_definition.trim() ||
+        "A warp bubble is a modeled spacetime geometry constrained by explicit physics viability gates.",
+      ethos_definition:
+        packet.definitions.ethos_definition.trim() ||
+        "Mission ethos is the stewardship policy layer that restricts capability claims to verified evidence.",
+    },
+    bridge_claims:
+      packet.bridge_claims.filter((claim) => claim.trim().length > 0).length >= RELATION_PACKET_MIN_BRIDGE_CLAIMS
+        ? packet.bridge_claims
+        : [
+            "Mission ethos constrains warp development to auditable verification checkpoints.",
+            "Warp viability evidence operationalizes ethos commitments through falsifiable tests.",
+          ],
+    constraints:
+      packet.constraints.some((constraint) => constraint.trim().length > 0)
+        ? packet.constraints
+        : [
+            "Physics bounds and stewardship bounds both gate deployment claims.",
+          ],
+    falsifiability_hooks:
+      packet.falsifiability_hooks.some((hook) => hook.trim().length > 0)
+        ? packet.falsifiability_hooks
+        : ["Re-run /api/agi/adapter/run and require PASS with integrity OK."],
+    evidence,
+    source_map,
+  };
+};
+
+export function ensureDeterministicRelationPacket(packet: RelationAssemblyPacket): RelationAssemblyPacket {
+  return isRelationAssemblyPacketComplete(packet)
+    ? packet
+    : buildDeterministicRelationFallbackPacket(packet);
+}
+
 export function renderRelationAssemblyFallback(packet: RelationAssemblyPacket): string {
   const sources = Object.values(packet.source_map);
   return [

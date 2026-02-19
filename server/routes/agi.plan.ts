@@ -127,6 +127,7 @@ import {
 } from "../services/helix-ask/intent-directory";
 import {
   enforceHelixAskAnswerFormat,
+  enforceNonReportPromptShape,
   collapseEvidenceBullets,
   resolveHelixAskFormat,
   type HelixAskFormat,
@@ -237,6 +238,7 @@ import {
 } from "../services/helix-ask/proof-packet";
 import {
   buildRelationAssemblyPacket,
+  ensureDeterministicRelationPacket,
   renderRelationAssemblyFallback,
   resolveRelationTopologySignal,
   type RelationAssemblyPacket,
@@ -24140,13 +24142,15 @@ const executeHelixAsk = async ({
       const relationPacketActivationOk =
         relationQuery && (relationTopology.crossDomainBridge || relationDualDomainOk);
       if (relationPacketActivationOk) {
-        relationPacket = buildRelationAssemblyPacket({
-          question: baseQuestion,
-          contextFiles,
-          contextText,
-          docBlocks,
-          graphPack,
-        });
+        relationPacket = ensureDeterministicRelationPacket(
+          buildRelationAssemblyPacket({
+            question: baseQuestion,
+            contextFiles,
+            contextText,
+            docBlocks,
+            graphPack,
+          }),
+        );
         const relationPacketDualDomain =
           relationPacket.domains.includes("warp") && relationPacket.domains.includes("ethos");
         relationDualDomainOk = relationDualDomainOk || relationPacketDualDomain;
@@ -27606,6 +27610,7 @@ const executeHelixAsk = async ({
           ...extractCitationTokensFromText(evidenceText),
         ])[0] ?? "server/routes/agi.plan.ts";
       cleaned = enforceCitationLinkedClaims(cleaned, fallbackCitationAnchor);
+      cleaned = enforceNonReportPromptShape(cleaned, reportDecision.enabled);
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
         logEvent("Answer cleaned preview", "final", finalCleanedPreview, answerStart);
