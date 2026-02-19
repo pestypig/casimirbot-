@@ -61,6 +61,27 @@ export type AtomicViewerLaunchParams = {
   l: number;
   m: number;
   sampleCount?: number;
+  stress_energy_proxy?: {
+    schema_version: "atomic_stress_energy_proxy/1";
+    value_J_m3: number;
+    units: {
+      value: "J/m^3";
+      uncertainty: "relative_1sigma";
+    };
+    uncertainty: {
+      relative_1sigma: number;
+      absolute_1sigma_J_m3: number;
+      confidence: number;
+    };
+    equation: {
+      id: "atomic_stress_energy_proxy_eq.v1";
+      expression: string;
+    };
+    citations: string[];
+    claim_tier: "diagnostic";
+    provenance_class: "proxy";
+    certifying: false;
+  };
 };
 
 export type AtomicViewerLaunch = {

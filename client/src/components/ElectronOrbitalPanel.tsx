@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   useElectronOrbitSim,
+  type AtomicStressEnergyProxy,
   type CoulombExperiment,
   type ElectronState,
   type OrbitEvent,
@@ -112,6 +113,7 @@ export default function ElectronOrbitalPanel() {
   const [state, actions] = useElectronOrbitSim();
   const [selectedId, setSelectedId] = useState<string | null>(state.electrons[0]?.id ?? null);
   const [showDriftHelp, setShowDriftHelp] = useState(true);
+  const [launchStressProxy, setLaunchStressProxy] = useState<AtomicStressEnergyProxy | null>(null);
   const selected = useMemo(
     () => state.electrons.find((e) => e.id === selectedId) ?? state.electrons[0] ?? null,
     [selectedId, state.electrons]
@@ -129,6 +131,7 @@ export default function ElectronOrbitalPanel() {
     [selected?.id, state.orbitalClouds]
   );
   const telemetryLabel = state.telemetrySources.join(", ");
+  const effectiveStressProxy = launchStressProxy ?? state.derived.stressEnergyProxy;
 
   useEffect(() => {
     if (!state.electrons.find((e) => e.id === selectedId)) {
@@ -166,6 +169,7 @@ export default function ElectronOrbitalPanel() {
           ? selectedId
           : state.electrons[0]?.id) ?? null;
       if (!targetId) return;
+      setLaunchStressProxy((payload.params as { stress_energy_proxy?: AtomicStressEnergyProxy }).stress_energy_proxy ?? null);
       actions.setElectrons((prev) =>
         prev.map((electron) => {
           if (electron.id !== targetId) return electron;
@@ -254,6 +258,10 @@ export default function ElectronOrbitalPanel() {
             </div>
             <p className="mt-2 text-[11px] text-slate-400">
               {state.coupling.note}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Stress-energy proxy: {formatNumber(effectiveStressProxy.value_J_m3, 3)} {effectiveStressProxy.units.value} ±
+              {Math.round(effectiveStressProxy.uncertainty.relative_1sigma * 100)}% (1σ)
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">

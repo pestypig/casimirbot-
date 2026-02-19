@@ -133,6 +133,28 @@ export type OrbitWavefieldState = {
   }>;
 };
 
+export type AtomicStressEnergyProxy = {
+  schema_version: "atomic_stress_energy_proxy/1";
+  value_J_m3: number;
+  units: {
+    value: "J/m^3";
+    uncertainty: "relative_1sigma";
+  };
+  uncertainty: {
+    relative_1sigma: number;
+    absolute_1sigma_J_m3: number;
+    confidence: number;
+  };
+  equation: {
+    id: "atomic_stress_energy_proxy_eq.v1";
+    expression: string;
+  };
+  citations: string[];
+  claim_tier: "diagnostic";
+  provenance_class: "proxy";
+  certifying: false;
+};
+
 export type ElectronOrbitalCloud = {
   electronId: string;
   cloud: AtomicOrbitalCloud;
@@ -160,6 +182,7 @@ export type OrbitSimState = {
     fineStructureAlpha: number;
     pipelineDuty: number;
     normalizationError: number;
+    stressEnergyProxy: AtomicStressEnergyProxy;
   };
   events: OrbitEvent[];
   telemetrySources: string[];
@@ -258,15 +281,47 @@ export function useElectronOrbitSim(): [OrbitSimState, OrbitSimActions] {
   const derived = useMemo(() => {
     const bohrRadius = BOHR_RADIUS / Math.max(1, potential.Z);
     const normalizationError = Math.abs(1 - wavefields.normalization);
+    const leadElectron = electrons[0];
+    const n = Math.max(1, leadElectron?.orbital.n ?? 1);
+    const l = Math.max(0, leadElectron?.orbital.l ?? 0);
+    const m = leadElectron?.orbital.m ?? 0;
+    const modelWeight = atomModel === "quantum" ? 1 : 0.82;
+    const value_J_m3 = Number((9.0e10 * potential.Z * ((n + l + Math.abs(m) + 1) / n) * modelWeight).toPrecision(12));
+    const relative_1sigma = 0.12;
+    const stressEnergyProxy: AtomicStressEnergyProxy = {
+      schema_version: "atomic_stress_energy_proxy/1",
+      value_J_m3,
+      units: {
+        value: "J/m^3",
+        uncertainty: "relative_1sigma",
+      },
+      uncertainty: {
+        relative_1sigma,
+        absolute_1sigma_J_m3: Number((value_J_m3 * relative_1sigma).toPrecision(12)),
+        confidence: 0.95,
+      },
+      equation: {
+        id: "atomic_stress_energy_proxy_eq.v1",
+        expression: "u_proxy = 9.0e10 * Z * ((n + l + |m| + 1) / n) * model_weight",
+      },
+      citations: [
+        "docs/knowledge/physics/atomic-systems-tree.json#atomic-stress-energy-bridge-placeholder",
+        "tests/fixtures/graph-congruence-conditions-tree.json#atomic-stress-energy-bridge-placeholder",
+      ],
+      claim_tier: "diagnostic",
+      provenance_class: "proxy",
+      certifying: false,
+    };
     return {
       bohrRadius,
       classicalRadius: CLASSICAL_RADIUS,
       comptonWavelength: COMPTON_WAVELENGTH,
       fineStructureAlpha: FINE_STRUCTURE_ALPHA,
       pipelineDuty,
-      normalizationError
+      normalizationError,
+      stressEnergyProxy,
     };
-  }, [pipelineDuty, potential.Z, wavefields.normalization]);
+  }, [atomModel, electrons, pipelineDuty, potential.Z, wavefields.normalization]);
 
   const telemetrySources = useMemo(() => {
     const sources: string[] = [];

@@ -449,6 +449,21 @@ describe("Helix Ask modes", () => {
           claim_tier?: string;
           provenance_class?: string;
           certifying?: boolean;
+          stress_energy_proxy?: {
+            schema_version?: string;
+            value_J_m3?: number;
+            units?: { value?: string; uncertainty?: string };
+            uncertainty?: {
+              relative_1sigma?: number;
+              absolute_1sigma_J_m3?: number;
+              confidence?: number;
+            };
+            equation?: { id?: string; expression?: string };
+            citations?: string[];
+            claim_tier?: string;
+            provenance_class?: string;
+            certifying?: boolean;
+          };
         };
       };
     };
@@ -461,6 +476,15 @@ describe("Helix Ask modes", () => {
     expect(payload.viewer_launch?.params?.claim_tier).toBe("diagnostic");
     expect(payload.viewer_launch?.params?.provenance_class).toMatch(/^(simulation|proxy)$/);
     expect(payload.viewer_launch?.params?.certifying).toBe(false);
+    expect(payload.viewer_launch?.params?.stress_energy_proxy?.schema_version).toBe("atomic_stress_energy_proxy/1");
+    expect(payload.viewer_launch?.params?.stress_energy_proxy?.units?.value).toBe("J/m^3");
+    expect(payload.viewer_launch?.params?.stress_energy_proxy?.units?.uncertainty).toBe("relative_1sigma");
+    expect(payload.viewer_launch?.params?.stress_energy_proxy?.uncertainty?.confidence).toBe(0.95);
+    expect(payload.viewer_launch?.params?.stress_energy_proxy?.equation?.id).toBe("atomic_stress_energy_proxy_eq.v1");
+    expect(payload.viewer_launch?.params?.stress_energy_proxy?.citations?.length ?? 0).toBeGreaterThan(0);
+    expect(payload.viewer_launch?.params?.stress_energy_proxy?.claim_tier).toBe("diagnostic");
+    expect(payload.viewer_launch?.params?.stress_energy_proxy?.provenance_class).toBe("proxy");
+    expect(payload.viewer_launch?.params?.stress_energy_proxy?.certifying).toBe(false);
     expect(payload.text ?? "").not.toMatch(/\bcertified\b/i);
   }, 90000);
 
