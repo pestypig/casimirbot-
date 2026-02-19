@@ -17,6 +17,9 @@
     "cli/casimir-verify.ts"
   ],
   "claim_tier": "diagnostic",
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
   "casimir": {
     "verdict": "PASS",
     "trace_id": "adapter:6de55ea6-66ab-4d11-ab8c-1f9e6ace5904",

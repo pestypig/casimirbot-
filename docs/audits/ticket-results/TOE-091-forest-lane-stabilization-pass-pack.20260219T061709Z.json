@@ -17,6 +17,9 @@
     "scripts/validate-toe-ticket-results.ts"
   ],
   "claim_tier": "diagnostic",
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
   "stabilization": {
     "preflight_stage_pass": true,
     "preflight_overall_pass": true,

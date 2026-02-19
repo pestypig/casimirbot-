@@ -11,6 +11,9 @@
     "scripts/toe-agent-preflight.ts"
   ],
   "claim_tier": "diagnostic",
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
   "casimir": {
     "verdict": "PASS",
     "trace_id": "adapter:a78f1b81-5ef0-4341-9e02-4803292d714a",

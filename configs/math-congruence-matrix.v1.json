@@ -1,6 +1,6 @@
 {
   "schema_version": "math_congruence_matrix/1",
-  "manifest_id": "toe-092-math-congruence-build-matrix",
+  "manifest_id": "toe-098-math-congruence-matrix-snapshot",
   "generated_from": {
     "root_leaf_manifest": "configs/physics-root-leaf-manifest.v1.json",
     "equation_backbone": "configs/physics-equation-backbone.v1.json"
