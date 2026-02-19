@@ -8,14 +8,18 @@
       "name": "Spacetime and general relativity baseline",
       "equation_refs": [
         "efe_baseline"
-      ]
+      ],
+      "tree_lane": "physics_spacetime_gr",
+      "tree_path": "docs/knowledge/physics/physics-spacetime-gr-tree.json"
     },
     {
       "id": "physics_quantum_semiclassical",
       "name": "Semiclassical quantum coupling baseline",
       "equation_refs": [
         "semiclassical_coupling"
-      ]
+      ],
+      "tree_lane": "physics_quantum_semiclassical",
+      "tree_path": "docs/knowledge/physics/physics-quantum-semiclassical-tree.json"
     },
     {
       "id": "physics_thermodynamics_entropy",

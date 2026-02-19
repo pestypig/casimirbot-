@@ -175,6 +175,61 @@
       "weight": 1.1
     },
     {
+      "id": "physics_quantum_semiclassical",
+      "label": "Physics Quantum Semiclassical Lane",
+      "path": "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+      "topicTags": [
+        "physics",
+        "quantum",
+        "semiclassical"
+      ],
+      "matchers": [
+        "semiclassical",
+        "qft in curved spacetime",
+        "renormalized stress-energy",
+        "quantum fields"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_spacetime_gr",
+      "label": "Physics Spacetime GR Lane",
+      "path": "docs/knowledge/physics/physics-spacetime-gr-tree.json",
+      "topicTags": [
+        "physics",
+        "gr",
+        "spacetime"
+      ],
+      "matchers": [
+        "spacetime",
+        "general relativity",
+        "einstein field equations",
+        "metric tensor",
+        "curvature"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
       "id": "warp-mechanics",
       "label": "Warp Mechanics Walk",
       "path": "docs/knowledge/warp/warp-mechanics-tree.json",

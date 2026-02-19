@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "rootId": "physics-spacetime-gr-tree",
+  "nodes": [
+    {
+      "id": "physics-spacetime-gr-tree",
+      "slug": "physics-spacetime-gr-tree",
+      "title": "Physics Spacetime GR Tree",
+      "excerpt": "Dedicated lane for spacetime geometry and general-relativity constraints.",
+      "bodyMD": "This lane isolates core GR scaffolding used by root-to-leaf theory paths.",
+      "tags": ["physics", "spacetime", "gr"],
+      "children": ["spacetime-metric-basics", "einstein-field-equations"],
+      "links": [],
+      "summary": "Dedicated lane for spacetime geometry and general-relativity constraints.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        { "type": "doc", "path": "docs/knowledge/physics/spacetime-metric-basics.md" },
+        { "type": "doc", "path": "docs/knowledge/physics/einstein-field-equations.md" }
+      ]
+    },
+    {
+      "id": "spacetime-metric-basics",
+      "slug": "spacetime-metric-basics",
+      "title": "Spacetime Metric Basics",
+      "excerpt": "Metric tensor and interval conventions.",
+      "bodyMD": "Foundational metric conventions for GR lane routing.",
+      "tags": ["physics", "spacetime", "metric"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "physics-spacetime-gr-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "summary": "Metric tensor and interval conventions.",
+      "nodeType": "concept",
+      "dependencies": ["physics-spacetime-gr-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/spacetime-metric-basics.md" }]
+    },
+    {
+      "id": "einstein-field-equations",
+      "slug": "einstein-field-equations",
+      "title": "Einstein Field Equations",
+      "excerpt": "Baseline GR field equation lane anchor.",
+      "bodyMD": "Equation-level anchor for curvature-to-stress-energy coupling.",
+      "tags": ["physics", "gr", "equations"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "physics-spacetime-gr-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "summary": "Baseline GR field equation lane anchor.",
+      "nodeType": "concept",
+      "dependencies": ["physics-spacetime-gr-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/einstein-field-equations.md" }]
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}
