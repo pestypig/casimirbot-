@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "id": "life-cosmology-consciousness-bridge",
+  "title": "Life/Cosmology/Consciousness Evidence Bridge",
+  "deterministic": true,
+  "intent_hints": [
+    "how does the universe produce life",
+    "origin of life",
+    "cosmology consciousness bridge"
+  ],
+  "required_anchors": [
+    "uncertainty-mechanics",
+    "no-feasibility-claims",
+    "sampling-time-bounds",
+    "scaling-laws",
+    "qi-diagnostics-schema",
+    "expansion_frontier"
+  ],
+  "claim_tier_policy": {
+    "minimum": "diagnostic",
+    "recommended": "reduced-order",
+    "strict_certifying_requires": {
+      "provenance_class": "measured",
+      "claim_tier": "certified"
+    }
+  },
+  "provenance_requirements": [
+    "path",
+    "provenance_class",
+    "claim_tier",
+    "certifying"
+  ],
+  "notes": "Bridge packet must carry provenance metadata for all bridge evidence and fail strict mode deterministically when missing or contradictory."
+}

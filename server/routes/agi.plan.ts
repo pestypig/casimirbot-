@@ -26800,12 +26800,13 @@ const executeHelixAsk = async ({
             beforeCitationGuard.trim() !== cleaned.trim();
         }
       }
+      let selectedMove: ReturnType<typeof selectDeterministicMove> = "missing_evidence_report";
       const securityRiskPrompt = isSecurityRiskPrompt(baseQuestion);
       const groundednessScore = evidenceGateOk ? 1 : 0.35;
       const uncertaintyScore = Math.min(1, Math.max(0, (coverageSlotSummary?.missingSlots?.length ?? 0) / Math.max(1, slotPlan?.slots?.length ?? 1)));
       const safetyScore = securityRiskPrompt ? 1 : 0.3;
       const coverageScore = Math.min(1, Math.max(0, coverageSlotSummary?.coverageRatio ?? (docSlotSummary?.slotCoverageRatio ?? 0)));
-      const selectedMove = selectDeterministicMove({
+      selectedMove = selectDeterministicMove({
         groundedness: groundednessScore,
         uncertainty: uncertaintyScore,
         safety: safetyScore,

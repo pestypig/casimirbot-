@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-19T00:14:10.891Z",
+  "generated_at": "2026-02-19T00:10:12.533Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -13,28 +13,28 @@
     "certified": 1
   },
   "totals": {
-    "tickets_total": 76,
-    "tickets_with_evidence": 76,
+    "tickets_total": 77,
+    "tickets_with_evidence": 77,
     "claim_tier_counts": {
-      "diagnostic": 69,
+      "diagnostic": 70,
       "reduced-order": 7,
       "certified": 0
     },
-    "weighted_score_sum": 21.45,
+    "weighted_score_sum": 21.7,
     "toe_progress_pct": 28.2,
     "forest_owner_coverage_pct": 100,
-    "strict_ready_progress_pct": 9.2,
-    "strict_ready_delta_ticket_count": 69,
+    "strict_ready_progress_pct": 9.1,
+    "strict_ready_delta_ticket_count": 70,
     "strict_ready_release_gate": {
       "status": "blocked",
       "blocked_reasons": [
         "missing_verified_pass",
         "missing_research_artifacts"
       ],
-      "blocked_ticket_count": 69,
+      "blocked_ticket_count": 70,
       "ready_ticket_count": 7
     },
-    "research_gated_tickets_total": 31,
+    "research_gated_tickets_total": 32,
     "research_artifact_complete_tickets_total": 30
   },
   "segments": {
@@ -53,41 +53,41 @@
       "research_artifact_complete_tickets_total": 0
     },
     "extension": {
-      "tickets_total": 66,
-      "tickets_with_evidence": 66,
+      "tickets_total": 67,
+      "tickets_with_evidence": 67,
       "claim_tier_counts": {
-        "diagnostic": 60,
+        "diagnostic": 61,
         "reduced-order": 6,
         "certified": 0
       },
-      "weighted_score_sum": 18.6,
-      "toe_progress_pct": 28.2,
-      "strict_ready_progress_pct": 9.1,
-      "research_gated_tickets_total": 31,
+      "weighted_score_sum": 18.85,
+      "toe_progress_pct": 28.1,
+      "strict_ready_progress_pct": 9,
+      "research_gated_tickets_total": 32,
       "research_artifact_complete_tickets_total": 30
     },
     "combined": {
-      "tickets_total": 76,
-      "tickets_with_evidence": 76,
+      "tickets_total": 77,
+      "tickets_with_evidence": 77,
       "claim_tier_counts": {
-        "diagnostic": 69,
+        "diagnostic": 70,
         "reduced-order": 7,
         "certified": 0
       },
-      "weighted_score_sum": 21.45,
+      "weighted_score_sum": 21.7,
       "toe_progress_pct": 28.2,
-      "strict_ready_progress_pct": 9.2,
-      "strict_ready_delta_ticket_count": 69,
+      "strict_ready_progress_pct": 9.1,
+      "strict_ready_delta_ticket_count": 70,
       "strict_ready_release_gate": {
         "status": "blocked",
         "blocked_reasons": [
           "missing_verified_pass",
           "missing_research_artifacts"
         ],
-        "blocked_ticket_count": 69,
+        "blocked_ticket_count": 70,
         "ready_ticket_count": 7
       },
-      "research_gated_tickets_total": 31,
+      "research_gated_tickets_total": 32,
       "research_artifact_complete_tickets_total": 30
     }
   },
@@ -502,6 +502,12 @@
     },
     {
       "ticket_id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": true
+    },
+    {
+      "ticket_id": "TOE-078-life-cosmology-bridge-dag-contract",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": true
@@ -1191,6 +1197,15 @@
       "research_gated": true,
       "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-075-helix-ask-strict-ready-verified-pass-pack.20260218T233453Z.json"
+    },
+    {
+      "ticket_id": "TOE-078-life-cosmology-bridge-dag-contract",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": false,
+      "result_file": "docs/audits/ticket-results/TOE-078-life-cosmology-bridge-dag-contract.20260219T001000Z.json"
     }
   ]
 }

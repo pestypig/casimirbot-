@@ -1,0 +1,39 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-078-life-cosmology-bridge-dag-contract",
+  "files_changed": [
+    "configs/graph-resolvers.json",
+    "server/services/helix-ask/graph-resolver.ts",
+    "server/services/helix-ask/relation-assembly.ts",
+    "docs/knowledge/bridges/stellar-ps1-bridge-tree.json",
+    "docs/knowledge/bridges/life-cosmology-consciousness-bridge.json",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "tests/helix-ask-bridge.spec.ts",
+    "docs/audits/ticket-results/TOE-078-life-cosmology-bridge-dag-contract.20260219T001000Z.json",
+    "docs/audits/toe-progress-snapshot.json",
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
+  ],
+  "tests_run": [
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "tests/helix-ask-bridge.spec.ts",
+    "scripts/validate-toe-ticket-backlog.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "scripts/validate-resolver-owner-coverage.ts",
+    "scripts/compute-toe-progress.ts",
+    "cli/casimir-verify.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:d735a9f2-50ad-4191-a224-adcf9db7a069",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "receipt": {
+    "owner_coverage_validated": true,
+    "strict_bridge_gate": "deterministic_missing_or_contradictory",
+    "trace_export": "artifacts/training-trace.jsonl"
+  },
+  "remaining_gaps": []
+}

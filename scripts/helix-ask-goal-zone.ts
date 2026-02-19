@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { precheckHelixAskAvailability } from "./helix-ask-availability-precheck";
 
 type AskDebug = {
   intent_id?: string;
@@ -148,23 +149,11 @@ const ensureServerReady = async (timeoutMs = 120000): Promise<void> => {
     }
     await sleep(1000);
   }
-  // Fallback probe: if /api/ready is unreliable, validate ask endpoint directly.
-  for (let i = 0; i < 5; i += 1) {
-    try {
-      const response = await fetch(new URL("/api/agi/ask", BASE_URL), {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ question: "health check", debug: false, temperature: 0 }),
-      });
-      if (response.status === 200) {
-        return;
-      }
-    } catch {
-      // ignore probe failures while waiting for readiness
-    }
-    await sleep(500);
-  }
-  throw new Error(`server not ready at ${BASE_URL}`);
+  await precheckHelixAskAvailability({
+    baseUrl: BASE_URL,
+    timeoutMs: Math.min(10000, timeoutMs),
+    label: "server readiness precheck",
+  });
 };
 
 const startServer = async () => {
@@ -587,6 +576,11 @@ const main = async () => {
   } else {
     await ensureServerReady();
   }
+  await precheckHelixAskAvailability({
+    baseUrl: BASE_URL,
+    timeoutMs: Math.min(10000, REQUEST_TIMEOUT_MS),
+    label: "goal-zone campaign precheck",
+  });
 
   try {
     for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
