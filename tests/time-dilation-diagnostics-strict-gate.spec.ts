@@ -83,6 +83,9 @@ describe("time dilation strict verification gate", () => {
     expect(diagnostics.observables.ship_comoving_dtau_dt?.missingFields).toEqual(
       expect.arrayContaining(["shipKinematics.betaCoord", "shipKinematics.dxdt"]),
     );
+    expect(diagnostics.congruence.requiredFieldsOk).toBe(false);
+    expect(diagnostics.natarioCanonical.requiredFieldsOk).toBe(false);
+    expect(diagnostics.natarioCanonical.reason).toBe("natario_required_fields_missing");
   });
 
 
