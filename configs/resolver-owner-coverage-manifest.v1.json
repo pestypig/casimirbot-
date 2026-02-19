@@ -51,6 +51,9 @@
     "ethos-knowledge": {
       "status": "covered_extension"
     },
+    "equation-binding-fixture": {
+      "status": "covered_extension"
+    },
     "evidence-falsifier-ledger": {
       "status": "covered_extension"
     },
