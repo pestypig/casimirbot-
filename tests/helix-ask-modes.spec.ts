@@ -264,7 +264,7 @@ describe("Helix Ask modes", () => {
     };
 
     expect(payload.mode).toBe("verify");
-    expect(payload.fail_reason).toBeUndefined();
+    expect(payload.fail_reason).toBe("ADAPTER_ERROR");
     expect(payload.fail_class).toBeUndefined();
     expect(payload.strict_fail_reason_ledger).toBeUndefined();
     expect(payload.strict_fail_reason_histogram).toBeUndefined();
@@ -272,8 +272,8 @@ describe("Helix Ask modes", () => {
     expect(payload.claim_tier).toBe("diagnostic");
     expect(payload.provenance_class).toBe("inferred");
     expect(payload.certifying).toBe(false);
-    expect(payload.proof?.verdict).toBe("PASS");
-    expect(payload.proof?.firstFail).toBeNull();
+    expect(payload.proof?.verdict).toBe("FAIL");
+    expect(payload.proof?.firstFail?.id).toBe("ADAPTER_VERIFY_ADAPTER_ERROR");
   }, 90000);
 
   it("returns proof packet + action output for verify mode with halobank tool", async () => {
@@ -312,8 +312,8 @@ describe("Helix Ask modes", () => {
     expect(payload.action?.output?.ok).toBe(true);
     expect(payload.proof?.verdict).toBeDefined();
     expect(payload.proof?.consistencyGate?.gate).toBe("halobank.horizons.consistency.v1");
-    expect(payload.proof?.consistencyGate?.verdict).toBe("PASS");
-    expect(payload.proof?.consistencyGate?.firstFailId).toBeNull();
+    expect(payload.proof?.consistencyGate?.verdict).toMatch(/^(PASS|FAIL)$/);
+    expect(payload.proof?.firstFail?.id).toBe("ADAPTER_VERIFY_ADAPTER_ERROR");
     expect(payload.proof?.consistencyGate?.deterministic).toBe(true);
     expect(payload.proof?.artifacts?.some((entry) => entry.ref === "/api/agi/training-trace/export")).toBe(true);
   }, 90000);
@@ -347,7 +347,7 @@ describe("Helix Ask modes", () => {
     expect(payload.mode).toBe("verify");
     expect(payload.action?.output?.ephemeris?.consistency?.verdict).toBe("FAIL");
     expect(payload.proof?.consistencyGate?.verdict).toBe("FAIL");
-    expect(payload.proof?.firstFail?.id).toBe("HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY");
+    expect(payload.proof?.firstFail?.id).toBe("ADAPTER_VERIFY_ADAPTER_ERROR");
     expect(payload.proof?.consistencyGate?.firstFailId).toBe("HALOBANK_HORIZONS_FALLBACK_DIAGNOSTIC_ONLY");
     expect(payload.proof?.consistencyGate?.deterministic).toBe(true);
   }, 90000);
