@@ -495,6 +495,12 @@
       "requires_research_artifact_completion": false
     },
     {
+      "ticket_id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": true
+    },
+    {
       "ticket_id": "TOE-076-helix-ask-system-quality-delta-pack",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
