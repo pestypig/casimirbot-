@@ -558,6 +558,40 @@ export function ensureRelationAssemblyPacketFallback(
     source_map: normalizedSourceMap,
   };
 }
+
+
+export function ensureRelationFallbackDomainAnchors(packet: RelationAssemblyPacket): RelationAssemblyPacket {
+  const anchored = ensureRelationAssemblyPacketFallback(packet, packet.question);
+  const evidence = [...anchored.evidence];
+  const hasWarp = evidence.some((entry) => entry.domain === "warp");
+  const hasEthos = evidence.some((entry) => entry.domain === "ethos");
+  if (!hasWarp) {
+    evidence.push({
+      evidence_id: buildEvidenceId("docs/knowledge/warp/warp-bubble.md", "L1-L1"),
+      path: "docs/knowledge/warp/warp-bubble.md",
+      span: "L1-L1",
+      snippet: anchored.definitions.warp_definition,
+      domain: "warp",
+    });
+  }
+  if (!hasEthos) {
+    evidence.push({
+      evidence_id: buildEvidenceId("docs/ethos/ideology.json", "L1-L1"),
+      path: "docs/ethos/ideology.json",
+      span: "L1-L1",
+      snippet: anchored.definitions.ethos_definition,
+      domain: "ethos",
+    });
+  }
+  const source_map = Object.fromEntries(evidence.map((entry) => [entry.evidence_id, toCitation(entry.path, entry.span)]));
+  return {
+    ...anchored,
+    domains: Array.from(new Set([...(anchored.domains ?? []), "warp", "ethos"])).sort(),
+    evidence,
+    source_map,
+  };
+}
+
 export function renderRelationAssemblyFallback(packet: RelationAssemblyPacket): string {
   const sources = Object.values(packet.source_map);
   return [

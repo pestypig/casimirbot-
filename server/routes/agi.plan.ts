@@ -226,6 +226,8 @@ import { isFastModeRuntimeMissingSymbolError } from "../services/helix-ask/runti
 import { stripRunawayAnswerArtifacts } from "../services/helix-ask/answer-artifacts";
 import {
   buildEventStableFields,
+  computeRelationSecondPassDelta,
+  decideRelationSecondPassAttempt,
   evaluateSemanticQuality,
   precomputeBridgeTraversalCandidates,
   selectDeterministicMoveWithDebug,
@@ -239,6 +241,7 @@ import {
 import {
   buildRelationAssemblyPacket,
   ensureRelationAssemblyPacketFallback,
+  ensureRelationFallbackDomainAnchors,
   evaluateRelationPacketFloors,
   renderRelationAssemblyFallback,
   resolveRelationTopologySignal,
@@ -19500,6 +19503,14 @@ const executeHelixAsk = async ({
     let promptItems: HelixAskPromptItem[] = [];
     let toolResultsBlock = "";
     let relationPacket: RelationAssemblyPacket | null = null;
+    let relationDualDomainOk = false;
+    let relationPacketFloorCheck = {
+      ok: false,
+      bridgeCount: 0,
+      evidenceCount: 0,
+      failReason: undefined as "bridge_count_low" | "evidence_count_low" | undefined,
+    };
+    let relationSecondPassAttempted = false;
     if (preIntentClarify) {
       if (HELIX_ASK_SCIENTIFIC_CLARIFY) {
         const scientific = buildScientificMicroReport({
@@ -24137,21 +24148,21 @@ const executeHelixAsk = async ({
           HELIX_ASK_RELATION_ETHOS_QUERY_RE.test(contextText) ||
           HELIX_ASK_RELATION_ETHOS_QUERY_RE.test(evidenceText),
       };
-      let relationDualDomainOk =
+      relationDualDomainOk =
         relationTopology.dualDomainAnchors ||
         (relationSlotDomainSignal.hasWarp && relationSlotDomainSignal.hasEthos) ||
         (relationContextDomainSignal.hasWarp && relationContextDomainSignal.hasEthos);
       const relationPacketActivationOk =
         relationQuery && (relationTopology.crossDomainBridge || relationDualDomainOk);
+      const relationSeedFiles = Array.from(
+        new Set([
+          ...contextFiles,
+          "docs/knowledge/warp/warp-bubble.md",
+          "docs/ethos/ideology.json",
+        ]),
+      );
+      const relationRetryFailures: string[] = [];
       if (relationPacketActivationOk) {
-        const relationSeedFiles = Array.from(
-          new Set([
-            ...contextFiles,
-            "docs/knowledge/warp/warp-bubble.md",
-            "docs/ethos/ideology.json",
-          ]),
-        );
-        const relationRetryFailures: string[] = [];
         for (let attempt = 0; attempt <= HELIX_ASK_RELATION_PACKET_MAX_RETRIES; attempt += 1) {
           const attemptPacket = buildRelationAssemblyPacket({
             question: baseQuestion,
@@ -24164,6 +24175,7 @@ const executeHelixAsk = async ({
             minBridges: HELIX_ASK_RELATION_PACKET_MIN_BRIDGES,
             minEvidence: HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE,
           });
+          relationPacketFloorCheck = floorCheck;
           if (floorCheck.ok) {
             relationPacket = attemptPacket;
             break;
@@ -24180,6 +24192,10 @@ const executeHelixAsk = async ({
         }
         if (relationPacket) {
           relationPacket = ensureRelationAssemblyPacketFallback(relationPacket, baseQuestion);
+          relationPacketFloorCheck = evaluateRelationPacketFloors(relationPacket, {
+            minBridges: HELIX_ASK_RELATION_PACKET_MIN_BRIDGES,
+            minEvidence: HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE,
+          });
           const relationPacketDualDomain =
             relationPacket.domains.includes("warp") && relationPacket.domains.includes("ethos");
           relationDualDomainOk = relationDualDomainOk || relationPacketDualDomain;
@@ -27065,11 +27081,15 @@ const executeHelixAsk = async ({
       if (relationIntentActiveFinal) {
         relationPacket = ensureRelationAssemblyPacketFallback(relationPacket, baseQuestion);
       }
+      const relationSecondPassFailed = relationSecondPassAttempted && (!relationPacketFloorCheck.ok || !relationDualDomainOk);
+      if (relationSecondPassFailed && relationPacket) {
+        relationPacket = ensureRelationFallbackDomainAnchors(relationPacket);
+      }
       const relationDeterministicGuardEligible =
         relationIntentActiveFinal && Boolean(relationPacket);
       if (relationDeterministicGuardEligible && relationPacket) {
         const relationFallbackReasons = detectRelationDeterministicFallbackReasons(cleaned);
-        if (relationFallbackReasons.length > 0) {
+        if (relationFallbackReasons.length > 0 || relationSecondPassFailed) {
           cleaned = renderRelationAssemblyFallback(relationPacket);
           answerPath.push("relationFallback:deterministic_guard");
           logEvent(
@@ -27217,6 +27237,79 @@ const executeHelixAsk = async ({
           },
         };
       }
+      const relationSecondPassDeficits = {
+        bridgeDeficit: relationPacketFloorCheck.bridgeCount < HELIX_ASK_RELATION_PACKET_MIN_BRIDGES,
+        evidenceDeficit: relationPacketFloorCheck.evidenceCount < HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE,
+        dualDomainDeficit: relationIntentActive && !relationDualDomainOk,
+      };
+      const relationSecondPassDecision = decideRelationSecondPassAttempt({
+        selectedMove,
+        deficits: relationSecondPassDeficits,
+        alreadyAttempted: relationSecondPassAttempted,
+      });
+      if (debugPayload) {
+        debugPayload.second_pass_attempted = false;
+        debugPayload.second_pass_skipped_reason = relationSecondPassDecision.skippedReason ?? "eligible";
+        debugPayload.second_pass_result = "not_run";
+      }
+      if (relationSecondPassDecision.shouldAttempt) {
+        relationSecondPassAttempted = true;
+        const beforeSecondPass = {
+          bridgeCount: relationPacketFloorCheck.bridgeCount,
+          evidenceCount: relationPacketFloorCheck.evidenceCount,
+          dualDomainOk: relationDualDomainOk,
+        };
+        const secondPassRetrieval = await buildSafeRetrievalFallback(baseQuestion);
+        if (secondPassRetrieval.candidates.length > 0) {
+          contextFiles = Array.from(
+            new Set([...contextFiles, ...secondPassRetrieval.candidates.map((entry) => entry.path).filter(Boolean)]),
+          );
+        }
+        const secondPassPacket = ensureRelationAssemblyPacketFallback(
+          buildRelationAssemblyPacket({
+            question: baseQuestion,
+            contextFiles: Array.from(
+              new Set([
+                ...contextFiles,
+                "docs/knowledge/warp/warp-bubble.md",
+                "docs/ethos/ideology.json",
+              ]),
+            ),
+            contextText,
+            docBlocks,
+            graphPack,
+          }),
+          baseQuestion,
+        );
+        relationPacket = secondPassPacket;
+        relationPacketFloorCheck = evaluateRelationPacketFloors(secondPassPacket, {
+          minBridges: HELIX_ASK_RELATION_PACKET_MIN_BRIDGES,
+          minEvidence: HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE,
+        });
+        const secondPassDualDomain =
+          secondPassPacket.domains.includes("warp") && secondPassPacket.domains.includes("ethos");
+        relationDualDomainOk = relationDualDomainOk || secondPassDualDomain;
+        const secondPassDelta = computeRelationSecondPassDelta({
+          before: beforeSecondPass,
+          after: {
+            bridgeCount: relationPacketFloorCheck.bridgeCount,
+            evidenceCount: relationPacketFloorCheck.evidenceCount,
+            dualDomainOk: relationDualDomainOk,
+          },
+        });
+        if (debugPayload) {
+          debugPayload.second_pass_attempted = true;
+          debugPayload.second_pass_skipped_reason = "none";
+          debugPayload.second_pass_result = relationPacketFloorCheck.ok && relationDualDomainOk ? "pass" : "fail";
+          debugPayload.second_pass_bridge_delta = secondPassDelta.bridgeDelta;
+          debugPayload.second_pass_evidence_delta = secondPassDelta.evidenceDelta;
+          debugPayload.second_pass_dual_domain_delta = secondPassDelta.dualDomainDelta;
+          debugPayload.relation_packet_evidence_count = relationPacket.evidence.length;
+          debugPayload.relation_packet_bridge_count = relationPacket.bridge_claims.length;
+          debugPayload.relation_dual_domain_ok = relationDualDomainOk;
+        }
+      }
+
       const weakEvidenceForDeterministicFallback =
         !evidenceGateOk ||
         claimGateFailed ||

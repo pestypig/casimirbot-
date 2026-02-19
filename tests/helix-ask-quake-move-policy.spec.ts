@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { selectDeterministicMoveWithDebug } from "../server/services/helix-ask/quake-frame-loop";
+import {
+  computeRelationSecondPassDelta,
+  decideRelationSecondPassAttempt,
+  selectDeterministicMoveWithDebug,
+} from "../server/services/helix-ask/quake-frame-loop";
 
 describe("HELIX-PS3 quake-style weighted move policy", () => {
   it("returns deterministic debug fields", () => {
@@ -103,5 +107,47 @@ describe("HELIX_ASK_MOVE_PROFILE_WEIGHTS hardening", () => {
     const overridden = overrideModule.selectDeterministicMoveWithDebug(input).selectedMove;
 
     expect(overridden).toBe(baseline);
+  });
+});
+
+
+describe("HELIX relation second-pass deterministic policy", () => {
+  it("triggers second pass for retrieve_more/relation_build when deficits exist", () => {
+    const retrieveMore = decideRelationSecondPassAttempt({
+      selectedMove: "retrieve_more",
+      deficits: { bridgeDeficit: false, evidenceDeficit: true, dualDomainDeficit: false },
+    });
+    const relationBuild = decideRelationSecondPassAttempt({
+      selectedMove: "relation_build",
+      deficits: { bridgeDeficit: true, evidenceDeficit: false, dualDomainDeficit: false },
+    });
+    expect(retrieveMore).toEqual({ shouldAttempt: true });
+    expect(relationBuild).toEqual({ shouldAttempt: true });
+  });
+
+  it("enforces max one extra pass and returns deterministic skip reasons", () => {
+    const firstSkip = decideRelationSecondPassAttempt({
+      selectedMove: "clarify",
+      deficits: { bridgeDeficit: true, evidenceDeficit: true, dualDomainDeficit: true },
+    });
+    const secondSkip = decideRelationSecondPassAttempt({
+      selectedMove: "retrieve_more",
+      deficits: { bridgeDeficit: true, evidenceDeficit: true, dualDomainDeficit: true },
+      alreadyAttempted: true,
+    });
+    expect(firstSkip).toEqual({ shouldAttempt: false, skippedReason: "move_not_eligible" });
+    expect(secondSkip).toEqual({ shouldAttempt: false, skippedReason: "already_attempted" });
+  });
+
+  it("computes deterministic second-pass deltas from recomputed relation fields", () => {
+    const delta = computeRelationSecondPassDelta({
+      before: { bridgeCount: 1, evidenceCount: 2, dualDomainOk: false },
+      after: { bridgeCount: 3, evidenceCount: 5, dualDomainOk: true },
+    });
+    expect(delta).toEqual({
+      bridgeDelta: 2,
+      evidenceDelta: 3,
+      dualDomainDelta: "gained",
+    });
   });
 });
