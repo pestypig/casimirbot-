@@ -1,0 +1,36 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-081-entropy-foundations-root-lane-contract",
+  "files_changed": [
+    "configs/physics-root-leaf-manifest.v1.json",
+    "docs/knowledge/bridges/life-cosmology-consciousness-bridge.json",
+    "docs/knowledge/bridges/stellar-ps1-bridge-tree.json",
+    "server/services/helix-ask/graph-resolver.ts",
+    "scripts/validate-physics-root-leaf-manifest.ts",
+    "tests/physics-root-leaf-manifest.spec.ts",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "docs/audits/toe-progress-snapshot.json",
+    "docs/audits/ticket-results/TOE-081-entropy-foundations-root-lane-contract.20260219T013100Z.json"
+  ],
+  "tests_run": [
+    "tests/physics-root-leaf-manifest.spec.ts",
+    "scripts/validate-physics-root-leaf-manifest.ts",
+    "scripts/toe-agent-preflight.ts",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "tests/helix-ask-bridge.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:60b6bee8-b9bd-496e-87af-0f98700e9c23",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "root-leaf-congruence-audit",
+    "physics-research-brief",
+    "falsifier-matrix"
+  ],
+  "remaining_gaps": []
+}

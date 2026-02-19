@@ -16,7 +16,8 @@
         "bridge-orch-or-to-stellar-coherence",
         "physics-time-crystal-clock-coupling",
         "stellar-plasma-collapse-signature-model",
-        "bridge-noise-spectrum-to-collapse-proxy"
+        "bridge-noise-spectrum-to-collapse-proxy",
+        "entropy-directionality"
       ],
       "links": []
     },
@@ -65,6 +66,10 @@
         {
           "rel": "enables",
           "to": "scaling-laws"
+        },
+        {
+          "rel": "constrains",
+          "to": "entropy-directionality"
         }
       ],
       "bridge": {
@@ -209,6 +214,45 @@
           "path": "docs/knowledge/bridges/ideology-physics-bridge-tree.json",
           "scope": "right",
           "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "entropy-directionality",
+      "nodeType": "derived",
+      "title": "Entropy Directionality Foundation",
+      "summary": "Thermodynamic entropy directionality anchor that must precede life-emergence bridge interpretations.",
+      "tags": [
+        "derived",
+        "thermodynamics",
+        "entropy",
+        "life",
+        "cosmology"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "constrains",
+          "to": "uncertainty-mechanics"
+        },
+        {
+          "rel": "enables",
+          "to": "sampling-time-bounds"
+        },
+        {
+          "rel": "enables",
+          "to": "scaling-laws"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "configs/physics-root-leaf-manifest.v1.json",
+          "scope": "left",
+          "provenance_class": "proxy",
           "claim_tier": "diagnostic",
           "certifying": false
         }

@@ -14,11 +14,12 @@
     "sampling-time-bounds",
     "scaling-laws",
     "qi-diagnostics-schema",
-    "expansion_frontier"
+    "expansion_frontier",
+    "entropy-directionality"
   ],
   "claim_tier_policy": {
     "minimum": "diagnostic",
-    "recommended": "reduced-order",
+    "recommended": "diagnostic",
     "strict_certifying_requires": {
       "provenance_class": "measured",
       "claim_tier": "certified"
@@ -30,5 +31,5 @@
     "claim_tier",
     "certifying"
   ],
-  "notes": "Bridge packet must carry provenance metadata for all bridge evidence and fail strict mode deterministically when missing or contradictory."
+  "notes": "Bridge packet must carry provenance metadata for all bridge evidence and fail strict mode deterministically when missing or contradictory. Entropy-rooted paths must remain deterministic and diagnostic unless measured certifying bridge evidence is present."
 }

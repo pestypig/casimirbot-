@@ -274,6 +274,21 @@ export function validatePhysicsRootLeafManifest(options?: {
     }
   }
 
+  const hasEntropyFirstLifePath = paths.some((entry) => {
+    const rootId = typeof entry.root_id === "string" ? entry.root_id.trim() : "";
+    const leafId = typeof entry.leaf_id === "string" ? entry.leaf_id.trim() : "";
+    const nodes = normalizeList(entry.nodes);
+    if (rootId !== "physics_thermodynamics_entropy") return false;
+    if (leafId !== "leaf_universe_produces_life") return false;
+    const lifeNodeIndex = nodes.indexOf("physics_biology_life");
+    return lifeNodeIndex > 0 && nodes[0] === "physics_thermodynamics_entropy";
+  });
+  if (!hasEntropyFirstLifePath) {
+    errors.push(
+      "paths must include at least one canonical entropy-first path ending at leaf_universe_produces_life",
+    );
+  }
+
   return {
     ok: errors.length === 0,
     errors,

@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-19T00:56:15.593Z",
+  "generated_at": "2026-02-19T01:31:55.438Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -14,28 +14,28 @@
   },
   "totals": {
     "tickets_total": 80,
-    "tickets_with_evidence": 78,
+    "tickets_with_evidence": 79,
     "claim_tier_counts": {
-      "diagnostic": 71,
-      "reduced-order": 7,
+      "diagnostic": 73,
+      "reduced-order": 6,
       "certified": 0
     },
-    "weighted_score_sum": 21.95,
-    "toe_progress_pct": 27.4,
+    "weighted_score_sum": 21.85,
+    "toe_progress_pct": 27.3,
     "forest_owner_coverage_pct": 100,
-    "strict_ready_progress_pct": 8.8,
-    "strict_ready_delta_ticket_count": 73,
+    "strict_ready_progress_pct": 7.5,
+    "strict_ready_delta_ticket_count": 74,
     "strict_ready_release_gate": {
       "status": "blocked",
       "blocked_reasons": [
         "missing_verified_pass",
         "missing_research_artifacts"
       ],
-      "blocked_ticket_count": 73,
-      "ready_ticket_count": 7
+      "blocked_ticket_count": 74,
+      "ready_ticket_count": 6
     },
-    "research_gated_tickets_total": 33,
-    "research_artifact_complete_tickets_total": 30
+    "research_gated_tickets_total": 34,
+    "research_artifact_complete_tickets_total": 31
   },
   "segments": {
     "core": {
@@ -54,41 +54,41 @@
     },
     "extension": {
       "tickets_total": 70,
-      "tickets_with_evidence": 68,
+      "tickets_with_evidence": 69,
       "claim_tier_counts": {
-        "diagnostic": 62,
-        "reduced-order": 6,
+        "diagnostic": 64,
+        "reduced-order": 5,
         "certified": 0
       },
-      "weighted_score_sum": 19.1,
-      "toe_progress_pct": 27.3,
-      "strict_ready_progress_pct": 8.6,
-      "research_gated_tickets_total": 33,
-      "research_artifact_complete_tickets_total": 30
+      "weighted_score_sum": 19,
+      "toe_progress_pct": 27.1,
+      "strict_ready_progress_pct": 7.1,
+      "research_gated_tickets_total": 34,
+      "research_artifact_complete_tickets_total": 31
     },
     "combined": {
       "tickets_total": 80,
-      "tickets_with_evidence": 78,
+      "tickets_with_evidence": 79,
       "claim_tier_counts": {
-        "diagnostic": 71,
-        "reduced-order": 7,
+        "diagnostic": 73,
+        "reduced-order": 6,
         "certified": 0
       },
-      "weighted_score_sum": 21.95,
-      "toe_progress_pct": 27.4,
-      "strict_ready_progress_pct": 8.8,
-      "strict_ready_delta_ticket_count": 73,
+      "weighted_score_sum": 21.85,
+      "toe_progress_pct": 27.3,
+      "strict_ready_progress_pct": 7.5,
+      "strict_ready_delta_ticket_count": 74,
       "strict_ready_release_gate": {
         "status": "blocked",
         "blocked_reasons": [
           "missing_verified_pass",
           "missing_research_artifacts"
         ],
-        "blocked_ticket_count": 73,
-        "ready_ticket_count": 7
+        "blocked_ticket_count": 74,
+        "ready_ticket_count": 6
       },
-      "research_gated_tickets_total": 33,
-      "research_artifact_complete_tickets_total": 30
+      "research_gated_tickets_total": 34,
+      "research_artifact_complete_tickets_total": 31
     }
   },
   "strict_ready_delta_targets": [
@@ -471,6 +471,12 @@
       "requires_research_artifact_completion": false
     },
     {
+      "ticket_id": "TOE-068-helix-ask-strict-fail-reason-ledger",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
+    },
+    {
       "ticket_id": "TOE-069-helix-ask-retrieval-citation-persistence-pack",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
@@ -517,6 +523,12 @@
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": true
+    },
+    {
+      "ticket_id": "TOE-081-entropy-foundations-root-lane-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false
     }
   ],
   "tickets": [
@@ -527,7 +539,7 @@
       "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-205121.json"
+      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-1538.json"
     },
     {
       "ticket_id": "TOE-002-semiclassical-coupling-contract",
@@ -581,7 +593,7 @@
       "score": 0.25,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-234300.json"
+      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-232559.json"
     },
     {
       "ticket_id": "TOE-008-certificate-authenticity-policy",
@@ -1125,12 +1137,12 @@
     },
     {
       "ticket_id": "TOE-068-helix-ask-strict-fail-reason-ledger",
-      "claim_tier": "reduced-order",
+      "claim_tier": "diagnostic",
       "verification_ok": true,
-      "score": 0.6,
+      "score": 0.25,
       "research_gated": true,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-068-helix-ask-strict-fail-reason-ledger.20260218T233453Z.json"
+      "result_file": "docs/audits/ticket-results/TOE-068-helix-ask-strict-fail-reason-ledger.20260218T210353Z.json"
     },
     {
       "ticket_id": "TOE-069-helix-ask-retrieval-citation-persistence-pack",
@@ -1175,7 +1187,7 @@
       "score": 0.25,
       "research_gated": true,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T225336Z.json"
+      "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T224927Z.json"
     },
     {
       "ticket_id": "TOE-076-helix-ask-system-quality-delta-pack",
@@ -1231,10 +1243,12 @@
     },
     {
       "ticket_id": "TOE-081-entropy-foundations-root-lane-contract",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-081-entropy-foundations-root-lane-contract.20260219T013100Z.json"
     }
   ]
 }

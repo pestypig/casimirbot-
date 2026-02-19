@@ -485,6 +485,7 @@ describe("helix ask graph resolver congruence overrides", () => {
         "qi-diagnostics-schema",
         "sampling-time-bounds",
         "scaling-laws",
+        "entropy-directionality",
       ]),
     );
   });

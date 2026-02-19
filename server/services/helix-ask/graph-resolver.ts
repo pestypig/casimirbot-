@@ -1137,6 +1137,7 @@ const resolveBridgeMissingEvidencePath = (input: {
           "scaling-laws",
           "qi-diagnostics-schema",
           "expansion_frontier",
+          "entropy-directionality",
         ]
       : [
           "uncertainty-mechanics",

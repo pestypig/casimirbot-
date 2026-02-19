@@ -134,6 +134,26 @@ describe("validatePhysicsRootLeafManifest", () => {
     expect(result.errors.join("\n")).toContain("paths[0].nodes must start with root_id");
   });
 
+  it("fails when canonical entropy-first life path is missing", () => {
+    const repoRoot = makeFixture((manifest) => {
+      const paths = manifest.paths as Array<Record<string, unknown>>;
+      const target = paths[0];
+      target.root_id = "physics_quantum_semiclassical";
+      target.nodes = [
+        "physics_quantum_semiclassical",
+        "physics_information_dynamics",
+        "physics_biology_life",
+        "leaf_universe_produces_life",
+      ];
+    });
+
+    const result = validatePhysicsRootLeafManifest({ repoRoot });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toContain(
+      "paths must include at least one canonical entropy-first path ending at leaf_universe_produces_life",
+    );
+  });
+
   it("fails when falsifier and maturity gate are incomplete", () => {
     const repoRoot = makeFixture((manifest) => {
       const paths = manifest.paths as Array<Record<string, unknown>>;

@@ -73,13 +73,13 @@
         "bridge-orch-or-to-stellar-coherence"
       ],
       "falsifier": {
-        "observable": "life-claim citation-linked mechanism coverage",
-        "reject_rule": "claim_citation_linkage_pass_rate < 0.90 OR mechanism_sentence_present_rate < 0.95",
-        "uncertainty_model": "GUM_linear_or_equivalent",
+        "observable": "entropy-gradient-to-prebiotic-mechanism linkage coverage",
+        "reject_rule": "entropy_gradient_linkage_rate < 0.95 OR prebiotic_mechanism_alignment_rate < 0.95 OR entropy_to_life_path_order_ok != true",
+        "uncertainty_model": "deterministic_threshold_contract_v1",
         "test_refs": [
-          "tests/helix-ask-focused-utility-hardening.spec.ts",
-          "tests/helix-ask-mechanism-maturity-contract.spec.ts",
-          "tests/helix-ask-ps2-runtime-report.spec.ts"
+          "tests/physics-root-leaf-manifest.spec.ts",
+          "tests/helix-ask-graph-resolver.spec.ts",
+          "tests/helix-ask-bridge.spec.ts"
         ]
       },
       "maturity_gate": {
@@ -104,9 +104,9 @@
         "bridge-noise-spectrum-to-collapse-proxy"
       ],
       "falsifier": {
-        "observable": "equation-grounded path completeness",
-        "reject_rule": "missing canonical equation refs OR missing bridge provenance metadata",
-        "uncertainty_model": "contract_thresholds",
+        "observable": "entropy-lane-preserving equation-grounded path completeness",
+        "reject_rule": "missing canonical equation refs OR missing bridge provenance metadata OR entropy_to_life_path_order_ok != true",
+        "uncertainty_model": "deterministic_threshold_contract_v1",
         "test_refs": [
           "scripts/validate-physics-equation-backbone.ts",
           "scripts/validate-physics-root-leaf-manifest.ts",
