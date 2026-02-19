@@ -129,6 +129,7 @@ import {
   enforceHelixAskAnswerFormat,
   collapseEvidenceBullets,
   resolveHelixAskFormat,
+  stripNonReportScaffolding,
   type HelixAskFormat,
 } from "../services/helix-ask/format";
 import { buildHelixAskEnvelope } from "../services/helix-ask/envelope";
@@ -237,6 +238,7 @@ import {
 } from "../services/helix-ask/proof-packet";
 import {
   buildRelationAssemblyPacket,
+  ensureRelationAssemblyPacketFallback,
   evaluateRelationPacketFloors,
   renderRelationAssemblyFallback,
   resolveRelationTopologySignal,
@@ -24177,6 +24179,7 @@ const executeHelixAsk = async ({
           relationSeedFiles.push(...attemptPacket.evidence.map((entry) => entry.path));
         }
         if (relationPacket) {
+          relationPacket = ensureRelationAssemblyPacketFallback(relationPacket, baseQuestion);
           const relationPacketDualDomain =
             relationPacket.domains.includes("warp") && relationPacket.domains.includes("ethos");
           relationDualDomainOk = relationDualDomainOk || relationPacketDualDomain;
@@ -25854,6 +25857,10 @@ const executeHelixAsk = async ({
       if (enforceFormat) {
         cleaned = enforceHelixAskAnswerFormat(cleaned, formatSpec.format, baseQuestion);
       }
+      const nonReportOutput = !reportDecision.enabled && intentStrategy !== "constraint_report";
+      if (nonReportOutput) {
+        cleaned = stripNonReportScaffolding(cleaned);
+      }
       cleaned = stripTruncationMarkers(cleaned);
       if (!cleaned.trim()) {
         const fallback = stripPromptEchoFromAnswer(result.text, baseQuestion);
@@ -27054,8 +27061,12 @@ const executeHelixAsk = async ({
         allowedSourcePaths,
         extractCitationTokensFromText(evidenceText),
       );
+      const relationIntentActiveFinal = intentProfile.id === "hybrid.warp_ethos_relation";
+      if (relationIntentActiveFinal) {
+        relationPacket = ensureRelationAssemblyPacketFallback(relationPacket, baseQuestion);
+      }
       const relationDeterministicGuardEligible =
-        intentProfile.id === "hybrid.warp_ethos_relation" && Boolean(relationPacket);
+        relationIntentActiveFinal && Boolean(relationPacket);
       if (relationDeterministicGuardEligible && relationPacket) {
         const relationFallbackReasons = detectRelationDeterministicFallbackReasons(cleaned);
         if (relationFallbackReasons.length > 0) {

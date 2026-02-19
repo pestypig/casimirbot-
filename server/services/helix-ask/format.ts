@@ -130,3 +130,15 @@ export function collapseEvidenceBullets(text: string): string {
   if (listLines.length === 0) return "";
   return collapseListParagraph(listLines.join("\n"));
 }
+
+const REPORT_SCAFFOLD_LINE_RE =
+  /^\s*(?:executive\s+summary|coverage\s+map|slot\s+coverage|report\s+blocks?|block\s+\d+|diagnostic\s+report)\s*:\s*/i;
+
+export function stripNonReportScaffolding(answer: string): string {
+  if (!answer) return "";
+  const lines = answer.split(/\r?\n/);
+  const normalized = lines
+    .map((line) => line.trimEnd())
+    .filter((line) => !REPORT_SCAFFOLD_LINE_RE.test(line.trim()));
+  return normalized.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}

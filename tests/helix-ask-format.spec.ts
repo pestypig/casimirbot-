@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enforceHelixAskAnswerFormat } from "../server/services/helix-ask/format";
+import { enforceHelixAskAnswerFormat, stripNonReportScaffolding } from "../server/services/helix-ask/format";
 
 describe("Helix Ask format compliance", () => {
   it("collapses bullet-only answers into paragraphs for compare", () => {
@@ -40,5 +40,18 @@ describe("Helix Ask format compliance", () => {
     expect(formatted).toContain("Definition:");
     expect(formatted).toContain("In practice");
     expect(formatted).not.toMatch(/^\s*[-*]\s+/m);
+  });
+
+  it("strips report scaffolding markers from non-report outputs", () => {
+    const raw = [
+      "Executive summary:",
+      "Coverage map: warp, ethos",
+      "Warp bubble viability is constrained by measurable gates.",
+      "In practice, governance links claims to falsifiable checks.",
+    ].join("\n\n");
+    const cleaned = stripNonReportScaffolding(raw);
+    expect(cleaned).not.toMatch(/Executive summary:/i);
+    expect(cleaned).not.toMatch(/Coverage map:/i);
+    expect(cleaned).toMatch(/Warp bubble viability is constrained/i);
   });
 });
