@@ -595,6 +595,88 @@ describe("helix ask graph resolver congruence overrides", () => {
 
 
 
+
+  it("blocks guarded physics assertion traversal when equation_ref is unknown to canonical backbone", async () => {
+    const fs = await import("node:fs");
+    const fsMod = fs.default ?? fs;
+    const realReadFileSync = fsMod.readFileSync.bind(fsMod);
+    const readSpy = vi.spyOn(fsMod, "readFileSync").mockImplementation((target: any, ...args: any[]) => {
+      const filePath = String(target ?? "").replace(/\\/g, "/");
+      if (filePath.endsWith("tests/fixtures/graph-physics-assertion-missing-equation-tree.json")) {
+        return JSON.stringify({
+          rootId: "assertion-root",
+          nodes: [
+            {
+              id: "assertion-root",
+              title: "Assertion Root",
+              nodeType: "physics_assertion",
+              validity: { equation_ref: "non_canonical_equation_ref", claim_ids: ["curvature_unit_proxy_contract.v1"] },
+              children: ["assertion-target"],
+              links: [],
+              tags: ["physics"],
+            },
+            { id: "assertion-target", title: "Assertion Target", nodeType: "concept", children: [], links: [], tags: ["physics"] },
+          ],
+        }) as any;
+      }
+      return realReadFileSync(target, ...(args as [any]));
+    });
+
+    const neighbors = __testOnlyResolveTreeNeighborIds({
+      treeId: "assertion-fixture",
+      treePath: "tests/fixtures/graph-physics-assertion-missing-equation-tree.json",
+      nodeId: "assertion-root",
+      congruenceWalkOverride: {
+        allowedCL: "CL4",
+        allowConceptual: false,
+        allowProxies: false,
+      },
+    });
+
+    expect(neighbors).toEqual([]);
+    readSpy.mockRestore();
+  });
+
+  it("blocks guarded nodes when claim_ids linkage is missing", async () => {
+    const fs = await import("node:fs");
+    const fsMod = fs.default ?? fs;
+    const realReadFileSync = fsMod.readFileSync.bind(fsMod);
+    const readSpy = vi.spyOn(fsMod, "readFileSync").mockImplementation((target: any, ...args: any[]) => {
+      const filePath = String(target ?? "").replace(/\\/g, "/");
+      if (filePath.endsWith("tests/fixtures/graph-physics-assertion-missing-equation-tree.json")) {
+        return JSON.stringify({
+          rootId: "assertion-root",
+          nodes: [
+            {
+              id: "assertion-root",
+              title: "Assertion Root",
+              nodeType: "physics_assertion",
+              validity: { equation_ref: "efe_baseline" },
+              children: ["assertion-target"],
+              links: [],
+              tags: ["physics"],
+            },
+            { id: "assertion-target", title: "Assertion Target", nodeType: "concept", children: [], links: [], tags: ["physics"] },
+          ],
+        }) as any;
+      }
+      return realReadFileSync(target, ...(args as [any]));
+    });
+
+    const neighbors = __testOnlyResolveTreeNeighborIds({
+      treeId: "assertion-fixture-claim-linkage",
+      treePath: "tests/fixtures/graph-physics-assertion-missing-equation-tree.json",
+      nodeId: "assertion-root",
+      congruenceWalkOverride: {
+        allowedCL: "CL4",
+        allowConceptual: false,
+        allowProxies: false,
+      },
+    });
+    expect(neighbors).toEqual([]);
+    readSpy.mockRestore();
+  });
+
   it("blocks physics assertion edges when equation_ref is missing", () => {
     const neighbors = __testOnlyResolveTreeNeighborIds({
       treeId: "assertion-fixture",

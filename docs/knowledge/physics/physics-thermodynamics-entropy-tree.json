@@ -124,7 +124,7 @@
       ],
       "derived_residual": {
         "schema": "equation_residual/v1",
-        "equation_ref": "physics-thermodynamics-entropy-tree",
+        "equation_ref": "stress_energy_conservation",
         "residual_symbol": "R_lane",
         "tolerance": {
           "metric": "rms",
@@ -137,7 +137,13 @@
           "coverage": 0.95
         }
       },
-      "evidence": []
+      "evidence": [],
+      "validity": {
+        "equation_ref": "stress_energy_conservation",
+        "claim_ids": [
+          "curvature_unit_proxy_contract.v1"
+        ]
+      }
     }
   ],
   "schema": {

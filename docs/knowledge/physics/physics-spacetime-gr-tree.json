@@ -137,7 +137,13 @@
           "coverage": 0.95
         }
       },
-      "evidence": []
+      "evidence": [],
+      "validity": {
+        "equation_ref": "efe_baseline",
+        "claim_ids": [
+          "curvature_unit_proxy_contract.v1"
+        ]
+      }
     }
   ],
   "schema": {

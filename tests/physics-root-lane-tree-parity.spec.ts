@@ -47,10 +47,6 @@ const REQUIRED_ROOT_TREE_MAP: Record<string, string> = {
   physics_runtime_safety_control: "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
 };
 
-const CANONICAL_RESIDUAL_EQUATION_BY_ROOT: Record<string, string> = {
-  physics_spacetime_gr: "efe_baseline",
-  physics_quantum_semiclassical: "semiclassical_coupling",
-};
 
 describe("physics root-lane tree parity", () => {
   it("maps dedicated manifest root lanes to deterministic graph resolver tree lanes", () => {
@@ -122,17 +118,12 @@ describe("physics root-lane tree parity", () => {
       const residualNodes = tree.nodes.filter((node) => Boolean(node.derived_residual));
       expect(residualNodes.length).toBeGreaterThan(0);
 
-      const expectedCanonicalRef = CANONICAL_RESIDUAL_EQUATION_BY_ROOT[rootId];
-
       for (const node of residualNodes) {
         const residual = node.derived_residual;
         expect(residual?.schema).toBeTruthy();
         expect(typeof residual?.tolerance?.max).toBe("number");
         expect(residual?.uncertainty?.model).toBeTruthy();
-        if (expectedCanonicalRef) {
-          expect(canonicalEquationIds.has(String(residual?.equation_ref ?? ""))).toBe(true);
-          expect(residual?.equation_ref).toBe(expectedCanonicalRef);
-        }
+        expect(canonicalEquationIds.has(String(residual?.equation_ref ?? ""))).toBe(true);
       }
     }
   });

@@ -125,7 +125,7 @@
       ],
       "derived_residual": {
         "schema": "equation_residual/v1",
-        "equation_ref": "physics-runtime-safety-control-tree",
+        "equation_ref": "runtime_safety_gate",
         "residual_symbol": "R_lane",
         "tolerance": {
           "metric": "rms",
@@ -138,7 +138,13 @@
           "coverage": 0.95
         }
       },
-      "evidence": []
+      "evidence": [],
+      "validity": {
+        "equation_ref": "runtime_safety_gate",
+        "claim_ids": [
+          "curvature_unit_proxy_contract.v1"
+        ]
+      }
     }
   ],
   "schema": {

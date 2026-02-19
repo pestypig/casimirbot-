@@ -460,7 +460,11 @@
       "inputs": [],
       "outputs": [],
       "assumptions": [],
-      "validity": {},
+      "validity": {
+        "claim_ids": [
+          "curvature_unit_proxy_contract.v1"
+        ]
+      },
       "deterministic": true,
       "tolerance": null,
       "environment": null,
@@ -563,7 +567,10 @@
         "display_semantics": {
           "status": "placeholder_visible",
           "label": "Atomic -> Stress-Energy (Blocked: mapping required)"
-        }
+        },
+        "claim_ids": [
+          "curvature_unit_proxy_contract.v1"
+        ]
       },
       "deterministic": true,
       "tolerance": null,
