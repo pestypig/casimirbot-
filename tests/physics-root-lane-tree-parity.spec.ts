@@ -123,20 +123,17 @@ describe("physics root-lane tree parity", () => {
       expect(residualNodes.length).toBeGreaterThan(0);
 
       const expectedCanonicalRef = CANONICAL_RESIDUAL_EQUATION_BY_ROOT[rootId];
-      const hasDeclaredContract = residualNodes.some((node) => {
-        const residual = node.derived_residual;
-        const hasCanonicalRef = expectedCanonicalRef
-          ? residual?.equation_ref === expectedCanonicalRef
-          : true;
-        return Boolean(
-          residual?.schema &&
-            hasCanonicalRef &&
-            typeof residual.tolerance?.max === "number" &&
-            residual.uncertainty?.model,
-        );
-      });
 
-      expect(hasDeclaredContract).toBe(true);
+      for (const node of residualNodes) {
+        const residual = node.derived_residual;
+        expect(residual?.schema).toBeTruthy();
+        expect(typeof residual?.tolerance?.max).toBe("number");
+        expect(residual?.uncertainty?.model).toBeTruthy();
+        if (expectedCanonicalRef) {
+          expect(canonicalEquationIds.has(String(residual?.equation_ref ?? ""))).toBe(true);
+          expect(residual?.equation_ref).toBe(expectedCanonicalRef);
+        }
+      }
     }
   });
 
