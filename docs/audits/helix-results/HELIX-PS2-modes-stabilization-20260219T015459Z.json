@@ -1,0 +1,55 @@
+{
+  "schema_version": "helix_build_session_bookkeeping/1",
+  "ticket_id": "HELIX-PS2-modes-stabilization",
+  "recorded_at": "2026-02-19T01:54:59Z",
+  "source": "codex-cloud",
+  "executive_summary": [
+    "Reproduced failures in tests/helix-ask-modes.spec.ts and confirmed drift against current verify adapter behavior.",
+    "Applied a minimal test-only alignment patch to preserve strict fail-closed runtime semantics while matching canonical degraded firstFail IDs.",
+    "Re-ran the targeted Helix Ask validation suite and mandatory Casimir verify gate; all required checks passed."
+  ],
+  "root_cause": "Expectation drift in verify-mode test assertions: current fail-closed contract emits ADAPTER_ERROR + ADAPTER_VERIFY_ADAPTER_ERROR when adapter proof execution degrades, which superseded earlier assumptions about omitted fail_reason and halobank consistency-first firstFail IDs.",
+  "files_changed": [
+    "tests/helix-ask-modes.spec.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/helix-ask-modes.spec.ts",
+    "timeout 240s npx vitest run tests/helix-ask-modes.spec.ts --silent --reporter=verbose",
+    "timeout 240s npx vitest run tests/helix-ask-availability-precheck.spec.ts",
+    "timeout 240s npx vitest run tests/helix-ask-semantic-quality.spec.ts",
+    "timeout 240s npx vitest run tests/helix-ask-focused-utility-hardening.spec.ts",
+    "timeout 240s npx vitest run tests/helix-ask-ps2-runtime-report.spec.ts",
+    "npm run dev",
+    "npm run casimir:verify -- --pack repo-convergence --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace-modes-fix.jsonl --trace-limit 200 --ci"
+  ],
+  "test_results": [
+    {
+      "status": "PASS",
+      "item": "timeout 240s npx vitest run tests/helix-ask-modes.spec.ts --silent --reporter=verbose"
+    },
+    {
+      "status": "PASS",
+      "item": "timeout 240s npx vitest run tests/helix-ask-availability-precheck.spec.ts"
+    },
+    {
+      "status": "PASS",
+      "item": "timeout 240s npx vitest run tests/helix-ask-semantic-quality.spec.ts"
+    },
+    {
+      "status": "PASS",
+      "item": "timeout 240s npx vitest run tests/helix-ask-focused-utility-hardening.spec.ts"
+    },
+    {
+      "status": "PASS",
+      "item": "timeout 240s npx vitest run tests/helix-ask-ps2-runtime-report.spec.ts"
+    }
+  ],
+  "casimir": {
+    "verdict": "PASS",
+    "traceId": "adapter:0f31eed7-a67e-4d38-a1fa-f123b26ca239",
+    "runId": "51",
+    "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrityOk": true,
+    "trace_out": "artifacts/training-trace-modes-fix.jsonl"
+  }
+}
