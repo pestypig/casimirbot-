@@ -1,0 +1,67 @@
+{
+  "schema_version": "helix_build_session_bookkeeping/1",
+  "ticket_id": "HELIX-PS2-selectedmove-availability-precheck-fix",
+  "recorded_at": "2026-02-19T00:25:26Z",
+  "reported_commit_hash": "3c18807",
+  "commit_visibility_local_clone": "missing",
+  "source": "user-provided cloud run bookkeeping",
+  "executive_summary": [
+    "Fixed selectedMove initialization ordering in Helix Ask to prevent TDZ-style access by declaring a safe default before deterministic move scoring/selection.",
+    "Added reusable availability precheck utility for POST /api/agi/ask with fail-fast error and context propagation (including fail_reason/debug.last_error).",
+    "Wired hard availability prechecks into goal-zone and versatility heavy campaign entrypoints before iteration/run execution.",
+    "Added tests for precheck pass/fail-fast behavior and non-regression for selectedMove-before-initialization crash symptom."
+  ],
+  "files_changed": [
+    "scripts/helix-ask-availability-precheck.ts",
+    "scripts/helix-ask-goal-zone.ts",
+    "scripts/helix-ask-versatility-record.ts",
+    "server/routes/agi.plan.ts",
+    "tests/helix-ask-availability-precheck.spec.ts",
+    "tests/helix-ask-focused-utility-hardening.spec.ts"
+  ],
+  "test_results": [
+    {
+      "status": "PASS",
+      "item": "npx vitest run tests/helix-ask-availability-precheck.spec.ts"
+    },
+    {
+      "status": "PASS",
+      "item": "npx vitest run tests/helix-ask-semantic-quality.spec.ts"
+    },
+    {
+      "status": "PASS",
+      "item": "npx vitest run tests/helix-ask-focused-utility-hardening.spec.ts"
+    },
+    {
+      "status": "FAIL",
+      "item": "npx vitest run tests/helix-ask-ps2-runtime-report.spec.ts",
+      "detail": "Existing syntax error in test file (Expected identifier near 'runs focused PS2 asks and writes required artifacts')."
+    },
+    {
+      "status": "WARN",
+      "item": "npx vitest run tests/helix-ask-modes.spec.ts",
+      "detail": "Long/noisy runtime in cloud environment; command did not cleanly conclude within output window."
+    },
+    {
+      "status": "WARN",
+      "item": "npx vitest run tests/helix-ask-focused-utility-hardening.spec.ts tests/helix-ask-ps2-runtime-report.spec.ts tests/helix-ask-semantic-quality.spec.ts tests/helix-ask-modes.spec.ts",
+      "detail": "Aggregate run output truncated/long-running; ps2 runtime report test independently reproduces parse failure."
+    },
+    {
+      "status": "PASS",
+      "item": "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+    }
+  ],
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:73e1efc1-a642-4da7-98a0-ecc93c09ab22",
+    "run_id": "24",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "follow_up_blockers": [
+    "Fix syntax failure in tests/helix-ask-ps2-runtime-report.spec.ts so full suite can conclude deterministically.",
+    "Stabilize/trim tests/helix-ask-modes.spec.ts runtime noise for CI observability.",
+    "Rerun full goal-zone and 270-run versatility campaign once the test baseline is clean."
+  ]
+}

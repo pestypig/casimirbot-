@@ -265,3 +265,23 @@ Mandatory Casimir + trace export and full gate table.
   - `docs/audits/helix-results/HELIX-PS2-versatility-audit-and-availability-precheck.20260218T233700Z.json`
 - Next single highest-priority task:
   - Land/validate selectedMove ordering + availability precheck hardening on the campaign branch, then rerun the exact 90 prompt x 3 seed versatility matrix only after `/api/agi/ask` precheck is 200 for all probes.
+
+### Handoff Snapshot 2026-02-19T00:25:26Z
+- Branch/HEAD: cloud run (reported commit `3c18807`; commit not visible in this local clone)
+- Result type: needs_patch (partial pass with remaining suite blockers)
+- Stage completed: Stage B2 support lane hardening rerun (selectedMove ordering + availability precheck integration)
+- Gates passed:
+  - selectedMove initialization ordering fix reported
+  - availability precheck utility added and integrated into goal-zone + versatility entrypoints
+  - targeted tests passed: `helix-ask-availability-precheck`, `helix-ask-semantic-quality`, `helix-ask-focused-utility-hardening`
+  - Casimir verify reported PASS with integrity OK
+- Gates failed:
+  - `tests/helix-ask-ps2-runtime-report.spec.ts` parse/syntax failure (existing test-file issue)
+  - `tests/helix-ask-modes.spec.ts` remained noisy/long-running in that cloud environment
+- Casimir:
+  - PASS `traceId=adapter:73e1efc1-a642-4da7-98a0-ecc93c09ab22`, `runId=24`
+  - `certificateHash=6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`, `integrityOk=true`
+- New artifacts:
+  - `docs/audits/helix-results/HELIX-PS2-selectedmove-availability-precheck-fix.20260219T002526Z.json`
+- Next single highest-priority task:
+  - Fix `tests/helix-ask-ps2-runtime-report.spec.ts` syntax issue, stabilize `tests/helix-ask-modes.spec.ts` runtime noise, then run decision-grade goal-zone + 270-run versatility campaign after passing precheck probes.
