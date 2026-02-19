@@ -1,0 +1,41 @@
+{
+  "schema_version": "uncertainty_model_registry/1",
+  "registry_id": "toe-094-uncertainty-model-registry",
+  "models": [
+    {
+      "id": "deterministic_threshold_contract_v1",
+      "description": "Deterministic threshold contract with explicit acceptance/rejection bands.",
+      "required_parameters": [
+        "pass_threshold",
+        "fail_threshold"
+      ],
+      "optional_parameters": [
+        "window",
+        "aggregation"
+      ]
+    },
+    {
+      "id": "deterministic_contract_gate",
+      "description": "Deterministic gate contract requiring strict-ready fail semantics.",
+      "required_parameters": [
+        "decision_mode",
+        "strict_reason_required"
+      ],
+      "optional_parameters": [
+        "replay_window"
+      ]
+    },
+    {
+      "id": "runtime_gate_thresholds",
+      "description": "Runtime safety thresholds for response integrity and guardrail enforcement.",
+      "required_parameters": [
+        "determinism_min",
+        "citation_min",
+        "non_200_max"
+      ],
+      "optional_parameters": [
+        "latency_p95_max_ms"
+      ]
+    }
+  ]
+}

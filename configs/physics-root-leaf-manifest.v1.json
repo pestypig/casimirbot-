@@ -105,7 +105,7 @@
       "falsifier": {
         "observable": "entropy-gradient-to-prebiotic-mechanism linkage coverage",
         "reject_rule": "entropy_gradient_linkage_rate < 0.95 OR prebiotic_mechanism_alignment_rate < 0.95 OR entropy_to_life_path_order_ok != true",
-        "uncertainty_model": "deterministic_threshold_contract_v1",
+        "uncertainty_model": "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90,window=rolling_20)",
         "test_refs": [
           "tests/physics-root-leaf-manifest.spec.ts",
           "tests/helix-ask-graph-resolver.spec.ts",
@@ -140,7 +140,7 @@
       "falsifier": {
         "observable": "entropy-lane-preserving equation-grounded path completeness",
         "reject_rule": "missing canonical equation refs OR missing bridge provenance metadata OR entropy_to_life_path_order_ok != true",
-        "uncertainty_model": "deterministic_threshold_contract_v1",
+        "uncertainty_model": "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90,window=rolling_20)",
         "test_refs": [
           "scripts/validate-physics-equation-backbone.ts",
           "scripts/validate-physics-root-leaf-manifest.ts",
@@ -173,7 +173,7 @@
       "falsifier": {
         "observable": "strict bridge provenance determinism",
         "reject_rule": "strict bridge gate returns missing/contradictory or non-deterministic fail reason",
-        "uncertainty_model": "deterministic_contract_gate",
+        "uncertainty_model": "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=session)",
         "test_refs": [
           "tests/helix-ask-bridge.spec.ts",
           "tests/helix-ask-graph-resolver.spec.ts"
@@ -204,7 +204,7 @@
       "falsifier": {
         "observable": "safety-action citation and maturity contract",
         "reject_rule": "citation_presence_rate < 0.95 OR maturity_label_present_rate < 0.95 OR non_200_rate > 0.02",
-        "uncertainty_model": "runtime_gate_thresholds",
+        "uncertainty_model": "runtime_gate_thresholds(determinism_min=0.98,citation_min=0.95,non_200_max=0.02,latency_p95_max_ms=1200)",
         "test_refs": [
           "tests/helix-ask-focused-utility-hardening.spec.ts",
           "tests/casimir-verify-ps2.spec.ts"
@@ -237,7 +237,7 @@
       "falsifier": {
         "observable": "information-coherence-to-biogenesis path linkage coverage",
         "reject_rule": "information_coherence_linkage_rate < 0.95 OR prebiotic_selection_alignment_rate < 0.95 OR biogenesis_path_order_ok != true",
-        "uncertainty_model": "deterministic_threshold_contract_v1",
+        "uncertainty_model": "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90,window=rolling_20)",
         "test_refs": [
           "tests/physics-root-leaf-manifest.spec.ts",
           "scripts/validate-physics-root-leaf-manifest.ts",
@@ -269,7 +269,7 @@
       "falsifier": {
         "observable": "prebiotic-to-life emergence pathway coverage",
         "reject_rule": "prebiotic_selection_alignment_rate < 0.95 OR life_emergence_transition_coverage < 0.95",
-        "uncertainty_model": "deterministic_threshold_contract_v1",
+        "uncertainty_model": "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90,window=rolling_20)",
         "test_refs": [
           "tests/physics-root-leaf-manifest.spec.ts",
           "tests/helix-ask-graph-resolver.spec.ts"
@@ -301,7 +301,7 @@
       "falsifier": {
         "observable": "runtime-control guardrail determinism for financial safety responses",
         "reject_rule": "guardrail_decision_determinism_rate < 0.98 OR citation_presence_rate < 0.95 OR non_200_rate > 0.02",
-        "uncertainty_model": "runtime_gate_thresholds",
+        "uncertainty_model": "runtime_gate_thresholds(determinism_min=0.98,citation_min=0.95,non_200_max=0.02,latency_p95_max_ms=1200)",
         "test_refs": [
           "tests/physics-root-leaf-manifest.spec.ts",
           "tests/casimir-verify-ps2.spec.ts"

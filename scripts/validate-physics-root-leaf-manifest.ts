@@ -47,6 +47,16 @@ type PhysicsRootLeafManifest = {
   paths?: PathEntry[];
 };
 
+type UncertaintyModel = {
+  id?: string;
+  required_parameters?: string[];
+  optional_parameters?: string[];
+};
+
+type UncertaintyModelRegistry = {
+  models?: UncertaintyModel[];
+};
+
 export type ValidationResult = {
   ok: boolean;
   errors: string[];
@@ -81,18 +91,6 @@ const REQUIRED_TREE_LANE_BY_ROOT: Record<string, { tree_lane: string; tree_path:
   physics_information_dynamics: {
     tree_lane: "physics_information_dynamics",
     tree_path: "docs/knowledge/physics/physics-information-dynamics-tree.json",
-  },
-  physics_prebiotic_chemistry: {
-    tree_lane: "physics_prebiotic_chemistry",
-    tree_path: "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json",
-  },
-  physics_biology_life: {
-    tree_lane: "physics_biology_life",
-    tree_path: "docs/knowledge/physics/physics-biology-life-tree.json",
-  },
-  physics_runtime_safety_control: {
-    tree_lane: "physics_runtime_safety_control",
-    tree_path: "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
   },
 };
 
@@ -131,6 +129,61 @@ function readJson<T>(filePath: string): T {
   return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
 }
 
+function parseModelReference(value: string): { modelId: string; parameters: Map<string, string> } | null {
+  const ref = value.trim();
+  const match = /^([a-zA-Z0-9_\-]+)\((.*)\)$/.exec(ref);
+  if (!match) {
+    return null;
+  }
+  const modelId = match[1].trim();
+  const inner = match[2].trim();
+  if (!modelId || !inner) {
+    return null;
+  }
+
+  const pairs = inner.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+  if (pairs.length === 0) {
+    return null;
+  }
+
+  const parameters = new Map<string, string>();
+  for (const pair of pairs) {
+    const eqIndex = pair.indexOf("=");
+    if (eqIndex <= 0 || eqIndex === pair.length - 1) {
+      return null;
+    }
+    const key = pair.slice(0, eqIndex).trim();
+    const raw = pair.slice(eqIndex + 1).trim();
+    if (!key || !raw || parameters.has(key)) {
+      return null;
+    }
+    parameters.set(key, raw);
+  }
+
+  return { modelId, parameters };
+}
+
+function loadUncertaintyRegistry(repoRoot: string): Map<string, { required: Set<string>; allowed: Set<string> }> {
+  const registryPath = path.resolve(repoRoot, "configs", "uncertainty-model-registry.v1.json");
+  if (!fs.existsSync(registryPath)) {
+    return new Map();
+  }
+
+  const parsed = readJson<UncertaintyModelRegistry>(registryPath);
+  const models = Array.isArray(parsed.models) ? parsed.models : [];
+  const out = new Map<string, { required: Set<string>; allowed: Set<string> }>();
+  for (const model of models) {
+    const id = typeof model.id === "string" ? model.id.trim() : "";
+    if (!id) {
+      continue;
+    }
+    const required = new Set(normalizeList(model.required_parameters));
+    const allowed = new Set([...required, ...normalizeList(model.optional_parameters)]);
+    out.set(id, { required, allowed });
+  }
+  return out;
+}
+
 export function validatePhysicsRootLeafManifest(options?: {
   manifestPath?: string;
   repoRoot?: string;
@@ -153,6 +206,7 @@ export function validatePhysicsRootLeafManifest(options?: {
   }
 
   const errors: string[] = [];
+  const uncertaintyModels = loadUncertaintyRegistry(repoRoot);
 
   if (manifest.schema_version !== REQUIRED_SCHEMA) {
     errors.push(`schema_version must be ${REQUIRED_SCHEMA}`);
@@ -288,6 +342,35 @@ export function validatePhysicsRootLeafManifest(options?: {
       falsifier.uncertainty_model.trim().length === 0
     ) {
       errors.push(`${loc}.falsifier.uncertainty_model is required`);
+    } else if (uncertaintyModels.size > 0) {
+      const parsedRef = parseModelReference(falsifier.uncertainty_model);
+      if (!parsedRef) {
+        errors.push(
+          `${loc}.falsifier.uncertainty_model must be parameterized as model_id(param=value,...)`,
+        );
+      } else {
+        const spec = uncertaintyModels.get(parsedRef.modelId);
+        if (!spec) {
+          errors.push(
+            `${loc}.falsifier.uncertainty_model references undefined model: ${parsedRef.modelId}`,
+          );
+        } else {
+          for (const requiredParameter of spec.required) {
+            if (!parsedRef.parameters.has(requiredParameter)) {
+              errors.push(
+                `${loc}.falsifier.uncertainty_model missing required parameter: ${requiredParameter}`,
+              );
+            }
+          }
+          for (const key of parsedRef.parameters.keys()) {
+            if (!spec.allowed.has(key)) {
+              errors.push(
+                `${loc}.falsifier.uncertainty_model parameter not permitted for ${parsedRef.modelId}: ${key}`,
+              );
+            }
+          }
+        }
+      }
     }
     const testRefs = normalizeList(falsifier.test_refs);
     if (testRefs.length === 0) {
