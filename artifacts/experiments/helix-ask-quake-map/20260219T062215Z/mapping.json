@@ -1,0 +1,108 @@
+{
+  "generated_at": "2026-02-19T06:22:15Z",
+  "scope": "quake3-to-helix-decision-primitives",
+  "sources": [
+    "https://raw.githubusercontent.com/ioquake/ioq3/master/code/qcommon/common.c",
+    "https://raw.githubusercontent.com/ioquake/ioq3/master/code/qcommon/vm.c",
+    "https://raw.githubusercontent.com/ioquake/ioq3/master/code/client/cl_cgame.c",
+    "https://raw.githubusercontent.com/ioquake/ioq3/master/code/game/ai_main.c",
+    "https://raw.githubusercontent.com/ioquake/ioq3/master/code/botlib/be_ai_weap.c",
+    "https://raw.githubusercontent.com/ioquake/ioq3/master/code/botlib/be_ai_gen.c"
+  ],
+  "primitives": [
+    {
+      "name": "event_pump_journaling",
+      "quake_anchors": [
+        "common.c:L1917-L1939",
+        "common.c:L2061-L2092",
+        "common.c:L3080-L3145"
+      ],
+      "helix_modules": [
+        "server/services/helix-ask/quake-frame-loop.ts",
+        "server/routes/agi.adapter.ts",
+        "server/routes/training-trace.ts",
+        "server/services/observability/training-trace-store.ts"
+      ],
+      "adopt_priority": "P0",
+      "expected_versatility_impact_pp": [3, 5]
+    },
+    {
+      "name": "vm_syscall_boundary",
+      "quake_anchors": [
+        "vm.c:L338-L355",
+        "vm.c:L576-L627",
+        "vm.c:L807-L850",
+        "cl_cgame.c:L736-L746",
+        "cl_cgame.c:L795-L797"
+      ],
+      "helix_modules": [
+        "server/routes/agi.adapter.ts",
+        "server/services/helix-ask/quake-frame-loop.ts"
+      ],
+      "adopt_priority": "P1",
+      "expected_versatility_impact_pp": [2, 3]
+    },
+    {
+      "name": "fixed_think_cadence",
+      "quake_anchors": [
+        "ai_main.c:L1459-L1483",
+        "ai_main.c:L1553-L1568",
+        "ai_main.c:L1666-L1677"
+      ],
+      "helix_modules": [
+        "server/services/helix-ask/quake-frame-loop.ts",
+        "scripts/helix-ask-sweep.ts"
+      ],
+      "adopt_priority": "P1",
+      "expected_versatility_impact_pp": [2, 4]
+    },
+    {
+      "name": "fuzzy_weighted_action_selection",
+      "quake_anchors": [
+        "be_ai_weap.c:L404-L433"
+      ],
+      "helix_modules": [
+        "server/services/helix-ask/quake-frame-loop.ts"
+      ],
+      "adopt_priority": "P0",
+      "expected_versatility_impact_pp": [4, 7]
+    },
+    {
+      "name": "offline_parameter_tuning_loop",
+      "quake_anchors": [
+        "ai_main.c:L563-L581",
+        "ai_main.c:L1457",
+        "be_ai_gen.c:L90-L134"
+      ],
+      "helix_modules": [
+        "scripts/helix-ask-sweep.ts",
+        "server/routes/training-trace.ts",
+        "server/routes/agi.adapter.ts"
+      ],
+      "adopt_priority": "P2",
+      "expected_versatility_impact_pp": [1, 3]
+    }
+  ],
+  "ranked_adopt_now": [
+    {
+      "priority": "P0",
+      "items": [
+        "Expand deterministic weighted move selection across all answer-mode forks",
+        "Emit stable decision journal packet at every stage boundary"
+      ]
+    },
+    {
+      "priority": "P1",
+      "items": [
+        "Introduce residual fixed-cadence interactive/deep tick split",
+        "Normalize all tool/model calls behind syscall-like boundary wrappers"
+      ]
+    },
+    {
+      "priority": "P2",
+      "items": [
+        "Run genetic-style offline tuning of gate thresholds/weights/traversal budgets from traces"
+      ]
+    }
+  ]
+}
