@@ -286,6 +286,88 @@
       "weight": 1.15
     },
     {
+      "id": "physics_prebiotic_chemistry",
+      "label": "Physics Prebiotic Chemistry Lane",
+      "path": "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json",
+      "topicTags": [
+        "physics",
+        "prebiotic",
+        "chemistry"
+      ],
+      "matchers": [
+        "prebiotic chemistry",
+        "chemical evolution",
+        "abiogenesis chemistry",
+        "molecular selection"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_biology_life",
+      "label": "Physics Biology Life Lane",
+      "path": "docs/knowledge/physics/physics-biology-life-tree.json",
+      "topicTags": [
+        "physics",
+        "biology",
+        "life"
+      ],
+      "matchers": [
+        "biology",
+        "life emergence",
+        "biogenesis",
+        "living systems"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_runtime_safety_control",
+      "label": "Physics Runtime Safety Control Lane",
+      "path": "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
+      "topicTags": [
+        "physics",
+        "runtime",
+        "safety",
+        "control"
+      ],
+      "matchers": [
+        "runtime safety",
+        "control gates",
+        "guardrail determinism",
+        "safe control"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
       "id": "warp-mechanics",
       "label": "Warp Mechanics Walk",
       "path": "docs/knowledge/warp/warp-mechanics-tree.json",

@@ -46,21 +46,27 @@
       "equation_refs": [
         "stress_energy_conservation",
         "uncertainty_propagation"
-      ]
+      ],
+      "tree_lane": "physics_prebiotic_chemistry",
+      "tree_path": "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json"
     },
     {
       "id": "physics_biology_life",
       "name": "Biological life emergence constraints",
       "equation_refs": [
         "uncertainty_propagation"
-      ]
+      ],
+      "tree_lane": "physics_biology_life",
+      "tree_path": "docs/knowledge/physics/physics-biology-life-tree.json"
     },
     {
       "id": "physics_runtime_safety_control",
       "name": "Runtime safety and decision control gates",
       "equation_refs": [
         "runtime_safety_gate"
-      ]
+      ],
+      "tree_lane": "physics_runtime_safety_control",
+      "tree_path": "docs/knowledge/physics/physics-runtime-safety-control-tree.json"
     }
   ],
   "leaves": [

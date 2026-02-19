@@ -82,6 +82,18 @@ const REQUIRED_TREE_LANE_BY_ROOT: Record<string, { tree_lane: string; tree_path:
     tree_lane: "physics_information_dynamics",
     tree_path: "docs/knowledge/physics/physics-information-dynamics-tree.json",
   },
+  physics_prebiotic_chemistry: {
+    tree_lane: "physics_prebiotic_chemistry",
+    tree_path: "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json",
+  },
+  physics_biology_life: {
+    tree_lane: "physics_biology_life",
+    tree_path: "docs/knowledge/physics/physics-biology-life-tree.json",
+  },
+  physics_runtime_safety_control: {
+    tree_lane: "physics_runtime_safety_control",
+    tree_path: "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
+  },
 };
 
 

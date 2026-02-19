@@ -9,12 +9,18 @@ type RootEntry = {
 };
 
 type PathFalsifier = {
+  uncertainty_model?: string;
   test_refs?: string[];
+};
+
+type PathMaturityGate = {
+  strict_fail_reason?: string;
 };
 
 type PathEntry = {
   root_id: string;
   falsifier?: PathFalsifier;
+  maturity_gate?: PathMaturityGate;
 };
 
 type Manifest = { roots: RootEntry[]; paths: PathEntry[] };
@@ -26,6 +32,9 @@ const REQUIRED_ROOT_TREE_MAP: Record<string, string> = {
   physics_quantum_semiclassical: "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
   physics_thermodynamics_entropy: "docs/knowledge/physics/physics-thermodynamics-entropy-tree.json",
   physics_information_dynamics: "docs/knowledge/physics/physics-information-dynamics-tree.json",
+  physics_prebiotic_chemistry: "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json",
+  physics_biology_life: "docs/knowledge/physics/physics-biology-life-tree.json",
+  physics_runtime_safety_control: "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
 };
 
 describe("physics root-lane tree parity", () => {
@@ -61,6 +70,23 @@ describe("physics root-lane tree parity", () => {
     for (const entry of informationPaths) {
       expect(entry.falsifier).toBeTruthy();
       expect(entry.falsifier?.test_refs ?? []).toContain("tests/physics-root-lane-tree-parity.spec.ts");
+    }
+  });
+
+
+  it("requires explicit deterministic strict fail reasons for runtime safety control paths", () => {
+    const repoRoot = process.cwd();
+    const manifestPath = path.join(repoRoot, "configs", "physics-root-leaf-manifest.v1.json");
+
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as Manifest;
+
+    const runtimePaths = manifest.paths.filter((entry) => entry.root_id === "physics_runtime_safety_control");
+    expect(runtimePaths.length).toBeGreaterThan(0);
+
+    for (const entry of runtimePaths) {
+      expect(entry.falsifier).toBeTruthy();
+      expect(entry.falsifier?.uncertainty_model).toBe("runtime_gate_thresholds");
+      expect(entry.maturity_gate?.strict_fail_reason).toBe("ROOT_LEAF_RUNTIME_CONTROL_PATH_MISSING");
     }
   });
 
