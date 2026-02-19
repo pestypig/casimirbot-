@@ -12516,6 +12516,29 @@ const renderHelixAskAnswerContract = (
   format: HelixAskFormat,
   question: string,
 ): string => {
+  const isNoisyRenderedContractSentence = (value: string): boolean => {
+    const trimmed = value.trim();
+    if (!trimmed) return true;
+    if (/^(?:key\s+questions?|notes?)\s*:/i.test(trimmed)) return true;
+    if (/^section\s*:/i.test(trimmed)) return true;
+    if (/^span\s*:/i.test(trimmed)) return true;
+    return false;
+  };
+  const dedupeRenderedContractSentences = (sentences: string[], summary: string): string[] => {
+    const deduped: string[] = [];
+    const seen = new Set<string>();
+    const normalizedSummary = normalizeContractGateLine(summary);
+    for (const sentence of sentences) {
+      const normalizedSentence = normalizeContractGateLine(sentence);
+      if (!normalizedSentence) continue;
+      if (normalizedSummary && normalizedSentence === normalizedSummary) continue;
+      if (seen.has(normalizedSentence)) continue;
+      if (isNoisyRenderedContractSentence(sentence)) continue;
+      seen.add(normalizedSentence);
+      deduped.push(sentence);
+    }
+    return deduped;
+  };
   const wantsPlainLanguage = /\bplain language\b/i.test(question);
   const leadSummary = (): string => {
     const summary = ensureSentence(normalizeContractText(contract.summary, 360));
@@ -12525,15 +12548,35 @@ const renderHelixAskAnswerContract = (
     }
     return summary;
   };
-  const claimSentences = (contract.claims ?? [])
+  const claimSentencesRaw = (contract.claims ?? [])
     .map((claim) => ensureSentence(normalizeContractText(claim.text, 260)))
     .filter(Boolean);
+  const summarySeed = ensureSentence(normalizeContractText(contract.summary, 360)) || "";
+  const normalizedSummarySeed = normalizeContractGateLine(summarySeed);
+  const claimSentences = dedupeRenderedContractSentences(claimSentencesRaw, summarySeed);
+  const semanticClaims = claimSentences.filter(
+    (claim) => !/^(?:mechanism|maturity|missing evidence)\b/i.test(claim.trim()),
+  );
+  const mechanismClaims = claimSentences.filter((claim) =>
+    /^mechanism\b/i.test(claim.trim()),
+  );
   const practiceCandidate =
     contract.uncertainty ||
-    claimSentences.find((claim) => claim.toLowerCase() !== contract.summary.toLowerCase()) ||
+    semanticClaims.find((claim) => claim.toLowerCase() !== summarySeed.toLowerCase()) ||
+    mechanismClaims[0] ||
     "";
-  const practiceLine = practiceCandidate
-    ? `In practice, ${ensureSentence(normalizeContractText(practiceCandidate, 220)).replace(/^in practice[,:\s]*/i, "")}`
+  const normalizePracticeCandidate = (value: string): string => {
+    let normalized = ensureSentence(normalizeContractText(value, 220));
+    if (!normalized) return "";
+    normalized = normalized.replace(/^mechanism\s*:\s*/i, "");
+    if (/->/.test(normalized)) {
+      normalized = "coupled constraints and feedback loops determine how outcomes evolve over time.";
+    }
+    return ensureSentence(normalizeContractText(normalized, 220));
+  };
+  const practiceText = practiceCandidate ? normalizePracticeCandidate(practiceCandidate) : "";
+  const practiceLine = practiceText
+    ? `In practice, ${practiceText.replace(/^in practice[,:\s]*/i, "")}`
     : "";
   const sections: string[] = [];
   const summaryLine = leadSummary();
@@ -12548,12 +12591,25 @@ const renderHelixAskAnswerContract = (
       sections.push(practiceLine);
     }
   } else if (format === "compare") {
+    const explicitCompareLines = (contract.comparisons ?? [])
+      .map((entry) => {
+        const detail = ensureSentence(normalizeContractText(entry.detail, 220));
+        const label = normalizeContractText(entry.label, 60);
+        if (!detail || !label) return "";
+        if (normalizedSummarySeed && normalizeContractGateLine(detail) === normalizedSummarySeed) {
+          return "";
+        }
+        if (/^(?:mechanism|maturity|missing evidence)\b/i.test(detail.trim())) {
+          return "";
+        }
+        if (isNoisyRenderedContractSentence(detail)) return "";
+        return `- ${ensureSentence(`${label}: ${detail}`)}`;
+      })
+      .filter(Boolean);
     const compareLines =
-      (contract.comparisons ?? []).length > 0
-        ? (contract.comparisons ?? []).map(
-            (entry) => `- ${ensureSentence(`${entry.label}: ${entry.detail}`)}`,
-          )
-        : claimSentences.slice(0, 3).map((claim, index) => {
+      explicitCompareLines.length > 0
+        ? explicitCompareLines
+        : semanticClaims.slice(0, 3).map((claim, index) => {
             if (index === 0) return `- ${ensureSentence(`What it is: ${claim}`)}`;
             if (index === 1) return `- ${ensureSentence(`Why it matters: ${claim}`)}`;
             return `- ${ensureSentence(`Constraint: ${claim}`)}`;
