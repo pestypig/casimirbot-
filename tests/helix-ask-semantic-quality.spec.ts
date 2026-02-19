@@ -3,6 +3,8 @@ import {
   evaluateSemanticQuality,
   precomputeBridgeTraversalCandidates,
   selectDeterministicMove,
+  rankMovesDeterministically,
+  selectDeterministicMoveWithDebug,
 } from "../server/services/helix-ask/quake-frame-loop";
 
 describe("Helix Ask semantic quality gates", () => {
@@ -29,13 +31,91 @@ describe("Helix Ask semantic quality gates", () => {
 
 describe("Helix Ask deterministic fuzzy move selector", () => {
   it("picks deterministic direct answer for strong groundedness", () => {
-    const move = selectDeterministicMove({ groundedness: 0.95, uncertainty: 0.1, safety: 0.2, coverage: 0.9 });
+    const move = selectDeterministicMove({ groundedness: 0.95, uncertainty: 0.1, safety: 0.2, coverage: 0.9, evidenceGain: 0.2, latencyCost: 0.2, risk: 0.1, budgetPressure: 0.1 });
     expect(move).toBe("direct_answer");
   });
 
-  it("picks missing evidence report for low coverage", () => {
-    const move = selectDeterministicMove({ groundedness: 0.1, uncertainty: 0.6, safety: 1, coverage: 0.05 });
-    expect(move).toBe("missing_evidence_report");
+  it("picks deterministic fail closed for high risk/pressure", () => {
+    const move = selectDeterministicMove({
+      groundedness: 0.1,
+      uncertainty: 0.6,
+      safety: 1,
+      coverage: 0.05,
+      evidenceGain: 0.8,
+      latencyCost: 0.8,
+      risk: 0.95,
+      budgetPressure: 0.95,
+    });
+    expect(move).toBe("fail_closed");
+  });
+
+  it("keeps stable tie-break ordering with identical scores", () => {
+    const ranked = rankMovesDeterministically({
+      direct_answer: 1,
+      retrieve_more: 1,
+      relation_build: 1,
+      clarify: 1,
+      fail_closed: 1,
+    });
+    expect(ranked.map((entry) => entry.move)).toEqual([
+      "direct_answer",
+      "retrieve_more",
+      "relation_build",
+      "clarify",
+      "fail_closed",
+    ]);
+  });
+
+  it("changes move preference by profile", () => {
+    const baseInput = {
+      groundedness: 0.4,
+      uncertainty: 0.5,
+      safety: 0.2,
+      coverage: 0.3,
+      evidenceGain: 0.9,
+      latencyCost: 0.85,
+      risk: 0.2,
+      budgetPressure: 0.7,
+    } as const;
+    const evidence = selectDeterministicMoveWithDebug({ ...baseInput, profile: "evidence_first" });
+    const latency = selectDeterministicMoveWithDebug({ ...baseInput, profile: "latency_first" });
+    expect(evidence.selectedMove).toBe("retrieve_more");
+    expect(latency.selectedMove).toBe("direct_answer");
+  });
+
+  it("applies relation intent override toward relation_build", () => {
+    const input = {
+      groundedness: 0.25,
+      uncertainty: 0.7,
+      safety: 0.25,
+      coverage: 0.3,
+      evidenceGain: 0.8,
+      latencyCost: 0.5,
+      risk: 0.3,
+      budgetPressure: 0.3,
+      profile: "evidence_first" as const,
+    };
+    const withoutRelation = selectDeterministicMoveWithDebug({ ...input, relationIntentActive: false });
+    const withRelation = selectDeterministicMoveWithDebug({ ...input, relationIntentActive: true });
+    expect(withoutRelation.selectedMove).not.toBe("relation_build");
+    expect(withRelation.moveScores.relation_build).toBeGreaterThan(withoutRelation.moveScores.relation_build);
+  });
+
+  it("keeps clarify above fail_closed below threshold and flips above threshold", () => {
+    const near = {
+      groundedness: 0.2,
+      uncertainty: 0.8,
+      safety: 0.4,
+      coverage: 0.25,
+      evidenceGain: 0.4,
+      latencyCost: 0.4,
+      budgetPressure: 0.35,
+      clarifyFailClosedThreshold: 0.72,
+    };
+    const clarify = selectDeterministicMoveWithDebug({ ...near, risk: 0.55 });
+    const closed = selectDeterministicMoveWithDebug({ ...near, risk: 0.9 });
+    expect(clarify.selectedMove).toBe("clarify");
+    expect(closed.selectedMove).toBe("fail_closed");
   });
 });
 

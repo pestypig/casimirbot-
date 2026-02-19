@@ -106,6 +106,12 @@ describe("Helix Ask focused utility hardening", () => {
       expect((payload.debug as any)?.runtime_clock_a?.complete_contract_on_budget).toBe(true);
       expect((payload.debug as any)?.runtime_clock_b?.non_blocking).toBe(true);
       expect(typeof (payload.debug as any)?.fuzzy_move_selector?.selected).toBe("string");
+      expect(typeof (payload.debug as any)?.fuzzy_move_selector?.selected_move).toBe("string");
+      expect(typeof (payload.debug as any)?.fuzzy_move_selector?.move_scores).toBe("object");
+      expect(Array.isArray((payload.debug as any)?.fuzzy_move_selector?.rejected_moves)).toBe(true);
+      expect(typeof (payload.debug as any)?.fuzzy_move_selector?.reject_reasons).toBe("object");
+      expect(typeof (payload.debug as any)?.fuzzy_move_selector?.budget_pressure).toBe("number");
+      expect(typeof (payload.debug as any)?.fuzzy_move_selector?.stop_reason).toBe("string");
       expect((payload.debug as any)?.event_stable_fields?.retrieval_route).toBeTruthy();
       expect((payload.debug as any)?.event_stable_fields?.fallback_decision).toBeTruthy();
       expect((payload.debug as any)?.event_stable_fields?.contract_renderer_path).toBeTruthy();
