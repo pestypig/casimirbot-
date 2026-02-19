@@ -24,7 +24,7 @@ export type RelationAssemblyPacket = {
     | "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_CONTRADICTORY"
     | "RUNTIME_SAFETY_GATE_MISSING_DATA"
     | "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS"
-    | "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL"
+    | "FAIL_MISSING_UNCERTAINTY_MODEL"
     | "FAIL_MATURITY_CEILING_VIOLATION";
   definitions: {
     warp_definition: string;
@@ -41,7 +41,7 @@ type RuntimeSafetyGateValidation = {
   referenced: boolean;
   pass: boolean;
   failReason?: "RUNTIME_SAFETY_GATE_MISSING_DATA" | "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS"
-    | "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL"
+    | "FAIL_MISSING_UNCERTAINTY_MODEL"
     | "FAIL_MATURITY_CEILING_VIOLATION";
   summary?: string;
 };
@@ -301,7 +301,7 @@ export const __testOnlyResolveRuntimeSafetyGateValidation = resolveRuntimeSafety
 type CrossLaneUncertaintyValidation = {
   referenced: boolean;
   pass: boolean;
-  failReason?: "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL";
+  failReason?: "FAIL_MISSING_UNCERTAINTY_MODEL";
   summary?: string;
 };
 
@@ -310,26 +310,34 @@ const TOE_CONGRUENCE_MATRIX = "configs/math-congruence-matrix.v1.json";
 const resolveCrossLaneUncertaintyValidation = (): CrossLaneUncertaintyValidation => {
   const fullPath = path.resolve(process.cwd(), TOE_CONGRUENCE_MATRIX);
   if (!fs.existsSync(fullPath)) {
-    return { referenced: true, pass: false, failReason: "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL", summary: "cross_lane_uncertainty=missing_matrix" };
+    return { referenced: true, pass: false, failReason: "FAIL_MISSING_UNCERTAINTY_MODEL", summary: "cross_lane_uncertainty=missing_matrix" };
   }
   let parsed: any;
   try {
     parsed = JSON.parse(fs.readFileSync(fullPath, "utf8"));
   } catch {
-    return { referenced: true, pass: false, failReason: "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL", summary: "cross_lane_uncertainty=invalid_matrix_json" };
+    return { referenced: true, pass: false, failReason: "FAIL_MISSING_UNCERTAINTY_MODEL", summary: "cross_lane_uncertainty=invalid_matrix_json" };
   }
   const rows = Array.isArray(parsed?.rows) ? parsed.rows : [];
-  const scoped = rows.filter((row: any) => row?.runtime_safety_eligible === true || row?.cross_lane_bridge === true);
+  const scoped = rows.filter(
+    (row: any) => row?.runtime_safety_eligible === true && (row?.cross_lane_bridge === true || row?.provenance_class === "proxy"),
+  );
   if (scoped.length === 0) return { referenced: false, pass: true };
   const missing = scoped
-    .filter((row: any) => typeof row?.uncertainty_model_id !== "string" || !row.uncertainty_model_id.trim())
+    .filter(
+      (row: any) =>
+        typeof row?.uncertainty_model_id !== "string" ||
+        !row.uncertainty_model_id.trim() ||
+        typeof row?.falsifier?.uncertainty_model !== "string" ||
+        !row.falsifier.uncertainty_model.trim(),
+    )
     .map((row: any) => String(row?.id ?? "unknown"));
   if (missing.length > 0) {
     return {
       referenced: true,
       pass: false,
-      failReason: "FAIL_CROSS_LANE_MISSING_UNCERTAINTY_MODEL",
-      summary: `cross_lane_uncertainty=missing_uncertainty_model_id:${missing.sort((a,b)=>a.localeCompare(b)).join(",")}`,
+      failReason: "FAIL_MISSING_UNCERTAINTY_MODEL",
+      summary: `cross_lane_uncertainty=missing_uncertainty_metadata:${missing.sort((a,b)=>a.localeCompare(b)).join(",")}`,
     };
   }
   return {
