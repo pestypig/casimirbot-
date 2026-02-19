@@ -283,3 +283,26 @@ Use these locations when collecting fields for automation:
   - `gamma_phys_ij` or (`phi` + `tilde_gamma_ij`)
   - `Ktrace`, `Kij`, `theta`, optional `g_tt`
   - invariants: `kretschmann`, `riemannSq`, `ricciSq`, `ricciScalar4`, `weylSq`
+
+
+## 8) Diagnostics route payload envelope (implementation note)
+
+Current Helix route behavior for diagnostics:
+
+- `GET /api/helix/time-dilation/diagnostics` returns an envelope with `ok`, `status`, `updatedAt`, `source`, `renderingSeed`, `seedStatus`, `reason`, and `payload`.
+- `GET /api/helix/time-dilation/diagnostics?raw=1` currently returns the same envelope shape.
+- `POST /api/helix/time-dilation/diagnostics` persists caller payload into `payload` and marks status `ready`.
+
+When validating claim-bearing fields, read from `payload.<key>` first (for example `payload.observables`, `payload.strict`, `payload.gate`, `payload.natarioCanonical`).
+
+## 9) Claim discipline quick block
+
+**What we can claim**
+- Diagnostic congruence-tagged observables when provenance and strict state are present in payload.
+- Reduced-order redshift only when status is `computed`, and only with limitations/confidence attached.
+- Natario check outcomes only as explicit `natarioCanonical` pass/fail fields.
+
+**What we cannot claim**
+- Physical viability/admissibility from diagnostics payload alone.
+- Certified viability when HARD constraints, `ADMISSIBLE`, and certificate integrity/hash are missing or failed.
+- Physical redshift when payload is `proxy` or `unavailable`.
