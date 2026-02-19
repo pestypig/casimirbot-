@@ -2087,12 +2087,21 @@
         "docs/audits/root-to-leaf-theory-congruence-audit.md",
         "docs/audits/toe-progress-snapshot.json",
         "WARP_AGENTS.md",
-        "docs/audits/ticket-results/README.md"
+        "docs/audits/ticket-results/README.md",
+        "docs/knowledge/bridges/life-cosmology-consciousness-bridge.json",
+        "docs/knowledge/bridges/stellar-ps1-bridge-tree.json",
+        "server/services/helix-ask/graph-resolver.ts",
+        "server/services/helix-ask/relation-assembly.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/helix-ask-bridge.spec.ts",
+        "docs/audits/ticket-results"
       ],
       "required_tests": [
         "tests/physics-root-leaf-manifest.spec.ts",
         "scripts/validate-physics-root-leaf-manifest.ts",
-        "scripts/toe-agent-preflight.ts"
+        "scripts/toe-agent-preflight.ts",
+        "tests/helix-ask-graph-resolver.spec.ts",
+        "tests/helix-ask-bridge.spec.ts"
       ],
       "done_criteria": [
         "Root lanes include entropy as a first-class foundation before life/cosmology leaves",
