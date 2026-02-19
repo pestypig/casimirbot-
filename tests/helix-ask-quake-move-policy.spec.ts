@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { selectDeterministicMoveWithDebug } from "../server/services/helix-ask/quake-frame-loop";
 
 describe("HELIX-PS3 quake-style weighted move policy", () => {
@@ -44,5 +44,64 @@ describe("HELIX-PS3 quake-style weighted move policy", () => {
     const a = selectDeterministicMoveWithDebug(input);
     const b = selectDeterministicMoveWithDebug(input);
     expect(a).toEqual(b);
+  });
+});
+
+describe("HELIX_ASK_MOVE_PROFILE_WEIGHTS hardening", () => {
+  afterEach(() => {
+    delete process.env.HELIX_ASK_MOVE_PROFILE_WEIGHTS;
+    vi.resetModules();
+  });
+
+  it("ignores invalid partial override fields and keeps finite move_scores", async () => {
+    process.env.HELIX_ASK_MOVE_PROFILE_WEIGHTS = JSON.stringify({
+      balanced: { goal: "not-a-number", evidenceGain: 1.2 },
+    });
+    vi.resetModules();
+    const { selectDeterministicMoveWithDebug: selectWithOverride } = await import("../server/services/helix-ask/quake-frame-loop");
+    const out = selectWithOverride({
+      groundedness: 0.63,
+      uncertainty: 0.31,
+      safety: 0.2,
+      coverage: 0.7,
+      evidenceGain: 0.4,
+      latencyCost: 0.3,
+      risk: 0.2,
+      budgetPressure: 0.2,
+      profile: "balanced",
+    });
+
+    for (const value of Object.values(out.moveScores)) {
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).not.toBeNaN();
+    }
+  });
+
+  it("preserves deterministic move selection under partial overrides", async () => {
+    const input = {
+      groundedness: 0.4,
+      uncertainty: 0.5,
+      safety: 0.2,
+      coverage: 0.3,
+      evidenceGain: 0.9,
+      latencyCost: 0.85,
+      risk: 0.2,
+      budgetPressure: 0.7,
+      profile: "evidence_first" as const,
+    };
+
+    delete process.env.HELIX_ASK_MOVE_PROFILE_WEIGHTS;
+    vi.resetModules();
+    const baseModule = await import("../server/services/helix-ask/quake-frame-loop");
+    const baseline = baseModule.selectDeterministicMoveWithDebug(input).selectedMove;
+
+    process.env.HELIX_ASK_MOVE_PROFILE_WEIGHTS = JSON.stringify({
+      evidence_first: { evidenceGain: 1.6, goal: "bad-value" },
+    });
+    vi.resetModules();
+    const overrideModule = await import("../server/services/helix-ask/quake-frame-loop");
+    const overridden = overrideModule.selectDeterministicMoveWithDebug(input).selectedMove;
+
+    expect(overridden).toBe(baseline);
   });
 });

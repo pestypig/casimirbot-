@@ -1,0 +1,34 @@
+{
+  "task": "HELIX-PS3.1 Hardening Patch for Quake Weight Tuning (correctness + portability)",
+  "timestamp": "20260219T080412Z",
+  "changes": {
+    "profile_weights_override_hardening": true,
+    "move_scores_finite_guarantee": true,
+    "cross_platform_command_runner": true,
+    "stop_reason_extraction_prefers_debug_fields": true,
+    "bookkeeping_scm_semantics_corrected": true
+  },
+  "tests": {
+    "vitest": {
+      "command": "npx vitest run tests/helix-ask-quake-move-policy.spec.ts tests/helix-ask-semantic-quality.spec.ts tests/helix-ask-quake-weight-tuning.spec.ts",
+      "status": "PASS",
+      "files_passed": 3,
+      "tests_passed": 14
+    }
+  },
+  "casimir_verify": {
+    "command": "npm run casimir:verify -- --pack repo-convergence --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace-quake-weight-hardening.jsonl --trace-limit 200 --ci",
+    "verdict": "PASS",
+    "trace_id": "adapter:c1adafd6-36da-49bd-b94c-67af0cffdfb2",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "integrity_ok": true,
+    "status": "GREEN"
+  },
+  "metrics_note": "Prior tuning metrics intentionally unchanged unless explicitly recomputed.",
+  "scm": {
+    "patch_commit": "recorded-at-release-step",
+    "merge_hash_in_main": "N/A"
+  }
+}
