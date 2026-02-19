@@ -1,0 +1,180 @@
+{
+  "schema_version": "physics_root_leaf_manifest/1",
+  "manifest_id": "toe-081-root-to-leaf-theory-congruence",
+  "claim_tier_ceiling": "diagnostic",
+  "roots": [
+    {
+      "id": "physics_spacetime_gr",
+      "name": "Spacetime and general relativity baseline",
+      "equation_refs": ["efe_baseline"]
+    },
+    {
+      "id": "physics_quantum_semiclassical",
+      "name": "Semiclassical quantum coupling baseline",
+      "equation_refs": ["semiclassical_coupling"]
+    },
+    {
+      "id": "physics_thermodynamics_entropy",
+      "name": "Thermodynamics and entropy directionality",
+      "equation_refs": ["uncertainty_propagation"]
+    },
+    {
+      "id": "physics_information_dynamics",
+      "name": "Information dynamics and coherence bounds",
+      "equation_refs": ["uncertainty_propagation", "runtime_safety_gate"]
+    },
+    {
+      "id": "physics_prebiotic_chemistry",
+      "name": "Prebiotic chemistry and molecular selection",
+      "equation_refs": ["stress_energy_conservation", "uncertainty_propagation"]
+    },
+    {
+      "id": "physics_biology_life",
+      "name": "Biological life emergence constraints",
+      "equation_refs": ["uncertainty_propagation"]
+    },
+    {
+      "id": "physics_runtime_safety_control",
+      "name": "Runtime safety and decision control gates",
+      "equation_refs": ["runtime_safety_gate"]
+    }
+  ],
+  "leaves": [
+    {
+      "id": "leaf_universe_produces_life",
+      "prompt_family": "how does the universe produce life",
+      "statement": "Life-emergence answers must anchor from physical roots to explicit falsifiers."
+    },
+    {
+      "id": "leaf_life_cosmology_consciousness",
+      "prompt_family": "life cosmology consciousness bridge",
+      "statement": "Cross-domain claims must expose bridge provenance and claim-tier bounds."
+    },
+    {
+      "id": "leaf_human_ai_financial_safety",
+      "prompt_family": "human protection from ai financial hack",
+      "statement": "Safety guidance must be constrained by runtime control gates and evidence class."
+    }
+  ],
+  "paths": [
+    {
+      "id": "path_entropy_to_life_emergence",
+      "root_id": "physics_thermodynamics_entropy",
+      "leaf_id": "leaf_universe_produces_life",
+      "nodes": [
+        "physics_thermodynamics_entropy",
+        "physics_information_dynamics",
+        "physics_prebiotic_chemistry",
+        "physics_biology_life",
+        "leaf_universe_produces_life"
+      ],
+      "dag_bridges": [
+        "life-cosmology-consciousness-bridge",
+        "bridge-orch-or-to-stellar-coherence"
+      ],
+      "falsifier": {
+        "observable": "life-claim citation-linked mechanism coverage",
+        "reject_rule": "claim_citation_linkage_pass_rate < 0.90 OR mechanism_sentence_present_rate < 0.95",
+        "uncertainty_model": "GUM_linear_or_equivalent",
+        "test_refs": [
+          "tests/helix-ask-focused-utility-hardening.spec.ts",
+          "tests/helix-ask-mechanism-maturity-contract.spec.ts",
+          "tests/helix-ask-ps2-runtime-report.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": ["measured", "proxy", "inferred"],
+        "strict_fail_reason": "ROOT_LEAF_FALSIFIER_MISSING"
+      }
+    },
+    {
+      "id": "path_spacetime_context_to_life",
+      "root_id": "physics_spacetime_gr",
+      "leaf_id": "leaf_universe_produces_life",
+      "nodes": [
+        "physics_spacetime_gr",
+        "physics_quantum_semiclassical",
+        "physics_thermodynamics_entropy",
+        "physics_biology_life",
+        "leaf_universe_produces_life"
+      ],
+      "dag_bridges": [
+        "life-cosmology-consciousness-bridge",
+        "bridge-noise-spectrum-to-collapse-proxy"
+      ],
+      "falsifier": {
+        "observable": "equation-grounded path completeness",
+        "reject_rule": "missing canonical equation refs OR missing bridge provenance metadata",
+        "uncertainty_model": "contract_thresholds",
+        "test_refs": [
+          "scripts/validate-physics-equation-backbone.ts",
+          "scripts/validate-physics-root-leaf-manifest.ts",
+          "tests/helix-ask-graph-resolver.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": ["proxy", "inferred"],
+        "strict_fail_reason": "ROOT_LEAF_PATH_INCOMPLETE"
+      }
+    },
+    {
+      "id": "path_quantum_to_consciousness_bridge",
+      "root_id": "physics_quantum_semiclassical",
+      "leaf_id": "leaf_life_cosmology_consciousness",
+      "nodes": [
+        "physics_quantum_semiclassical",
+        "physics_information_dynamics",
+        "physics_thermodynamics_entropy",
+        "leaf_life_cosmology_consciousness"
+      ],
+      "dag_bridges": [
+        "life-cosmology-consciousness-bridge",
+        "ideology-physics-bridge"
+      ],
+      "falsifier": {
+        "observable": "strict bridge provenance determinism",
+        "reject_rule": "strict bridge gate returns missing/contradictory or non-deterministic fail reason",
+        "uncertainty_model": "deterministic_contract_gate",
+        "test_refs": [
+          "tests/helix-ask-bridge.spec.ts",
+          "tests/helix-ask-graph-resolver.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": ["proxy", "inferred"],
+        "strict_fail_reason": "ROOT_LEAF_STRICT_BRIDGE_FAIL"
+      }
+    },
+    {
+      "id": "path_life_to_runtime_safety_actions",
+      "root_id": "physics_biology_life",
+      "leaf_id": "leaf_human_ai_financial_safety",
+      "nodes": [
+        "physics_biology_life",
+        "physics_information_dynamics",
+        "physics_runtime_safety_control",
+        "leaf_human_ai_financial_safety"
+      ],
+      "dag_bridges": [
+        "life-cosmology-consciousness-bridge"
+      ],
+      "falsifier": {
+        "observable": "safety-action citation and maturity contract",
+        "reject_rule": "citation_presence_rate < 0.95 OR maturity_label_present_rate < 0.95 OR non_200_rate > 0.02",
+        "uncertainty_model": "runtime_gate_thresholds",
+        "test_refs": [
+          "tests/helix-ask-focused-utility-hardening.spec.ts",
+          "tests/casimir-verify-ps2.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": ["measured", "proxy", "inferred"],
+        "strict_fail_reason": "ROOT_LEAF_RUNTIME_SAFETY_MISSING"
+      }
+    }
+  ]
+}

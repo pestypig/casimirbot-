@@ -101,3 +101,22 @@ For TOE parity checks, each primitive entry must include:
 - `evaluator.path`
 - `tests[]`
 - `tree_owner`
+
+## Root-to-Leaf theory congruence contract
+
+For broad physics-family claims (life/cosmology/consciousness, cross-domain
+bridges, or theory-level narratives), agents should maintain a root-to-leaf
+manifest so claim chains stay falsifiable and replay-safe.
+
+Required artifacts:
+- `configs/physics-root-leaf-manifest.v1.json`
+- `scripts/validate-physics-root-leaf-manifest.ts`
+- `docs/audits/root-to-leaf-theory-congruence-audit.md`
+
+Validation command:
+- `npm run validate:physics:root-leaf`
+
+Policy:
+- Every leaf claim must have an explicit root path and falsifier contract.
+- Missing root coverage or missing falsifier metadata should block promotion
+  above diagnostic tier.

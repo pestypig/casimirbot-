@@ -2003,6 +2003,111 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-079-canonical-equation-backbone-contract",
+      "tree_owner": "physics-foundations",
+      "primitive": "Canonical equation backbone manifest and validator contract",
+      "primary_path_prefix": "configs/physics-equation-backbone.v1.json",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "configs/physics-equation-backbone.v1.json",
+        "scripts/validate-physics-equation-backbone.ts",
+        "scripts/toe-agent-preflight.ts",
+        "tests/physics-equation-backbone.spec.ts",
+        "docs/audits/toe-progress-snapshot.json",
+        "docs/audits/ticket-results"
+      ],
+      "required_tests": [
+        "tests/physics-equation-backbone.spec.ts",
+        "scripts/validate-physics-equation-backbone.ts",
+        "scripts/toe-agent-preflight.ts"
+      ],
+      "done_criteria": [
+        "Machine-readable canonical equation backbone manifest includes required equation set",
+        "Validator enforces required equation IDs, symbols, units, and claim-tier bounds",
+        "Preflight runs equation backbone validation as a required stage"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-080-life-answer-quality-threshold-pack",
+      "tree_owner": "helix-ask",
+      "primitive": "Life-answer quality threshold pack for fixed PS2 prompt lane",
+      "primary_path_prefix": "tests/helix-ask-ps2-runtime-report.spec.ts",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "tests/helix-ask-focused-utility-hardening.spec.ts",
+        "tests/helix-ask-mechanism-maturity-contract.spec.ts",
+        "tests/helix-ask-ps2-runtime-report.spec.ts",
+        "tests/casimir-verify-ps2.spec.ts",
+        "reports",
+        "docs/audits/helix-results",
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json"
+      ],
+      "required_tests": [
+        "tests/helix-ask-focused-utility-hardening.spec.ts",
+        "tests/helix-ask-mechanism-maturity-contract.spec.ts",
+        "tests/helix-ask-ps2-runtime-report.spec.ts",
+        "tests/casimir-verify-ps2.spec.ts"
+      ],
+      "done_criteria": [
+        "Life prompt lane meets threshold gates for claim-citation linkage, mechanism sentence, maturity label, and citation presence",
+        "Strict fail determinism remains 1.00 and non_200_rate stays <= 0.02 under fixed-pack replay",
+        "PS2 report artifact includes threshold table and before/after deltas"
+      ],
+      "research_gate": {
+        "risk_class": "runtime_contract",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
+    },
+    {
+      "id": "TOE-081-entropy-foundations-root-lane-contract",
+      "tree_owner": "physics-foundations",
+      "primitive": "Root-to-leaf theory congruence audit with entropy foundations root lane",
+      "primary_path_prefix": "configs/physics-root-leaf-manifest.v1.json",
+      "allowed_paths": [
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "configs/physics-root-leaf-manifest.v1.json",
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "scripts/toe-agent-preflight.ts",
+        "tests/physics-root-leaf-manifest.spec.ts",
+        "docs/audits/root-to-leaf-theory-congruence-audit.md",
+        "docs/audits/toe-progress-snapshot.json",
+        "WARP_AGENTS.md",
+        "docs/audits/ticket-results/README.md"
+      ],
+      "required_tests": [
+        "tests/physics-root-leaf-manifest.spec.ts",
+        "scripts/validate-physics-root-leaf-manifest.ts",
+        "scripts/toe-agent-preflight.ts"
+      ],
+      "done_criteria": [
+        "Root lanes include entropy as a first-class foundation before life/cosmology leaves",
+        "Every leaf claim has at least one explicit root-to-leaf path with falsifier metadata",
+        "Preflight enforces root-to-leaf manifest validation before progress scoring"
+      ],
+      "research_gate": {
+        "risk_class": "physics_unknown",
+        "requires_audit": true,
+        "requires_research": true,
+        "required_artifacts": [
+          "physics-research-brief",
+          "falsifier-matrix"
+        ]
+      }
     }
   ]
 }

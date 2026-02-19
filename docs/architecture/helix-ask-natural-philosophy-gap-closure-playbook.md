@@ -13,6 +13,18 @@ Goal:
 - Encode hypotheses as testable branches with falsifiability hooks.
 - Use math maturity staging (exploratory -> reduced-order -> diagnostic -> certified).
 
+## Root-to-leaf congruence requirement
+- For broad theory prompts, build explicit `root -> ... -> leaf` claim chains before
+  optimizing style or verbosity.
+- Entropy/thermodynamics should be represented as first-class root lanes when
+  the prompt family depends on life-emergence reasoning.
+- Run:
+  - `npm run validate:physics:root-leaf`
+  - `npm run audit:toe:preflight`
+- Contract location:
+  - `docs/audits/root-to-leaf-theory-congruence-audit.md`
+  - `configs/physics-root-leaf-manifest.v1.json`
+
 ## Standard gap-closure method
 
 ### Phase 1: Scan (no code patch)

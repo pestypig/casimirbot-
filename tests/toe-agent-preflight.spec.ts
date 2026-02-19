@@ -22,6 +22,8 @@ function setupFakeWorkspace(failingStageId?: string) {
   const stageFiles = [
     "validate-toe-ticket-backlog.ts",
     "validate-toe-ticket-results.ts",
+    "validate-physics-equation-backbone.ts",
+    "validate-physics-root-leaf-manifest.ts",
     "validate-resolver-owner-coverage.ts",
     "compute-toe-progress.ts",
   ];
@@ -72,6 +74,8 @@ describe("toe-agent-preflight", () => {
 
     expect(statuses["validate-toe-ticket-backlog"]).toBe("pass");
     expect(statuses["validate-toe-ticket-results"]).toBe("pass");
+    expect(statuses["validate-physics-equation-backbone"]).toBe("pass");
+    expect(statuses["validate-physics-root-leaf-manifest"]).toBe("pass");
     expect(statuses["validate-resolver-owner-coverage"]).toBe("pass");
     expect(statuses["validate-toe-research-gate-policy"]).toBe("skipped");
     expect(statuses["compute-toe-progress"]).toBe("pass");
