@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-19T17:13:55.218Z",
+  "generated_at": "2026-02-19T17:23:46.523Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -13,27 +13,27 @@
     "certified": 1
   },
   "totals": {
-    "tickets_total": 98,
-    "tickets_with_evidence": 89,
+    "tickets_total": 99,
+    "tickets_with_evidence": 90,
     "claim_tier_counts": {
-      "diagnostic": 82,
-      "reduced-order": 7,
+      "diagnostic": 75,
+      "reduced-order": 15,
       "certified": 0
     },
-    "weighted_score_sum": 24.7,
-    "toe_progress_pct": 25.2,
+    "weighted_score_sum": 27.75,
+    "toe_progress_pct": 28,
     "forest_owner_coverage_pct": 100,
-    "strict_ready_progress_pct": 7.1,
-    "strict_ready_delta_ticket_count": 91,
+    "strict_ready_progress_pct": 15.2,
+    "strict_ready_delta_ticket_count": 84,
     "strict_ready_release_gate": {
       "status": "blocked",
       "blocked_reasons": [
         "missing_verified_pass"
       ],
-      "blocked_ticket_count": 91,
-      "ready_ticket_count": 7,
+      "blocked_ticket_count": 84,
+      "ready_ticket_count": 15,
       "blocker_counts": {
-        "missing_verified_pass": 91,
+        "missing_verified_pass": 84,
         "missing_research_artifacts": 0,
         "missing_math_congruence": 0
       }
@@ -42,103 +42,68 @@
       "status": "pass",
       "errors": []
     },
-    "research_gated_tickets_total": 44,
-    "research_artifact_complete_tickets_total": 44
+    "research_gated_tickets_total": 45,
+    "research_artifact_complete_tickets_total": 45
   },
   "segments": {
     "core": {
       "tickets_total": 10,
       "tickets_with_evidence": 10,
       "claim_tier_counts": {
-        "diagnostic": 9,
-        "reduced-order": 1,
+        "diagnostic": 4,
+        "reduced-order": 6,
         "certified": 0
       },
-      "weighted_score_sum": 2.85,
-      "toe_progress_pct": 28.5,
-      "strict_ready_progress_pct": 10,
+      "weighted_score_sum": 4.6,
+      "toe_progress_pct": 46,
+      "strict_ready_progress_pct": 60,
       "research_gated_tickets_total": 0,
       "research_artifact_complete_tickets_total": 0
     },
     "extension": {
-      "tickets_total": 88,
-      "tickets_with_evidence": 79,
+      "tickets_total": 89,
+      "tickets_with_evidence": 80,
       "claim_tier_counts": {
-        "diagnostic": 73,
-        "reduced-order": 6,
+        "diagnostic": 71,
+        "reduced-order": 9,
         "certified": 0
       },
-      "weighted_score_sum": 21.85,
-      "toe_progress_pct": 24.8,
-      "strict_ready_progress_pct": 6.8,
-      "research_gated_tickets_total": 44,
-      "research_artifact_complete_tickets_total": 44
+      "weighted_score_sum": 23.15,
+      "toe_progress_pct": 26,
+      "strict_ready_progress_pct": 10.1,
+      "research_gated_tickets_total": 45,
+      "research_artifact_complete_tickets_total": 45
     },
     "combined": {
-      "tickets_total": 98,
-      "tickets_with_evidence": 89,
+      "tickets_total": 99,
+      "tickets_with_evidence": 90,
       "claim_tier_counts": {
-        "diagnostic": 82,
-        "reduced-order": 7,
+        "diagnostic": 75,
+        "reduced-order": 15,
         "certified": 0
       },
-      "weighted_score_sum": 24.7,
-      "toe_progress_pct": 25.2,
-      "strict_ready_progress_pct": 7.1,
-      "strict_ready_delta_ticket_count": 91,
+      "weighted_score_sum": 27.75,
+      "toe_progress_pct": 28,
+      "strict_ready_progress_pct": 15.2,
+      "strict_ready_delta_ticket_count": 84,
       "strict_ready_release_gate": {
         "status": "blocked",
         "blocked_reasons": [
           "missing_verified_pass"
         ],
-        "blocked_ticket_count": 91,
-        "ready_ticket_count": 7,
+        "blocked_ticket_count": 84,
+        "ready_ticket_count": 15,
         "blocker_counts": {
-          "missing_verified_pass": 91,
+          "missing_verified_pass": 84,
           "missing_research_artifacts": 0,
           "missing_math_congruence": 0
         }
       },
-      "research_gated_tickets_total": 44,
-      "research_artifact_complete_tickets_total": 44
+      "research_gated_tickets_total": 45,
+      "research_artifact_complete_tickets_total": 45
     }
   },
   "strict_ready_delta_targets": [
-    {
-      "ticket_id": "TOE-002-semiclassical-coupling-contract",
-      "next_strict_ready_claim_tier": "reduced-order",
-      "requires_verified_pass": true,
-      "requires_research_artifact_completion": false,
-      "requires_math_congruence": false
-    },
-    {
-      "ticket_id": "TOE-003-quantum-provenance-class",
-      "next_strict_ready_claim_tier": "reduced-order",
-      "requires_verified_pass": true,
-      "requires_research_artifact_completion": false,
-      "requires_math_congruence": false
-    },
-    {
-      "ticket_id": "TOE-004-uncertainty-propagation-gates",
-      "next_strict_ready_claim_tier": "reduced-order",
-      "requires_verified_pass": true,
-      "requires_research_artifact_completion": false,
-      "requires_math_congruence": false
-    },
-    {
-      "ticket_id": "TOE-005-prediction-observation-ledger",
-      "next_strict_ready_claim_tier": "reduced-order",
-      "requires_verified_pass": true,
-      "requires_research_artifact_completion": false,
-      "requires_math_congruence": false
-    },
-    {
-      "ticket_id": "TOE-006-firstfail-taxonomy-normalization",
-      "next_strict_ready_claim_tier": "reduced-order",
-      "requires_verified_pass": true,
-      "requires_research_artifact_completion": false,
-      "requires_math_congruence": false
-    },
     {
       "ticket_id": "TOE-007-ideology-hard-action-gates",
       "next_strict_ready_claim_tier": "reduced-order",
@@ -175,21 +140,7 @@
       "requires_math_congruence": false
     },
     {
-      "ticket_id": "TOE-012-halobank-horizons-consistency-gate",
-      "next_strict_ready_claim_tier": "reduced-order",
-      "requires_verified_pass": true,
-      "requires_research_artifact_completion": false,
-      "requires_math_congruence": false
-    },
-    {
       "ticket_id": "TOE-013-atomic-systems-claim-tier-contract",
-      "next_strict_ready_claim_tier": "reduced-order",
-      "requires_verified_pass": true,
-      "requires_research_artifact_completion": false,
-      "requires_math_congruence": false
-    },
-    {
-      "ticket_id": "TOE-014-robotics-recollection-provenance-contract",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": false,
@@ -260,13 +211,6 @@
     },
     {
       "ticket_id": "TOE-024-skills-tooling-risk-contract",
-      "next_strict_ready_claim_tier": "reduced-order",
-      "requires_verified_pass": true,
-      "requires_research_artifact_completion": false,
-      "requires_math_congruence": false
-    },
-    {
-      "ticket_id": "TOE-025-sdk-integration-runtime-contract",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": false,
@@ -546,6 +490,13 @@
       "requires_math_congruence": false
     },
     {
+      "ticket_id": "TOE-068-helix-ask-strict-fail-reason-ledger",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": false,
+      "requires_math_congruence": false
+    },
+    {
       "ticket_id": "TOE-069-helix-ask-retrieval-citation-persistence-pack",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
@@ -687,52 +638,52 @@
       "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-205121.json"
+      "result_file": "docs/audits/ticket-results/TOE-001-curvature-stress-bridge.20260217-1538.json"
     },
     {
       "ticket_id": "TOE-002-semiclassical-coupling-contract",
-      "claim_tier": "diagnostic",
+      "claim_tier": "reduced-order",
       "verification_ok": true,
-      "score": 0.25,
+      "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-002-semiclassical-coupling-contract.20260217-212231.json"
+      "result_file": "docs/audits/ticket-results/TOE-002-semiclassical-coupling-contract.20260219-172109.json"
     },
     {
       "ticket_id": "TOE-003-quantum-provenance-class",
-      "claim_tier": "diagnostic",
+      "claim_tier": "reduced-order",
       "verification_ok": true,
-      "score": 0.25,
+      "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-003-quantum-provenance-class.20260217-214648.json"
+      "result_file": "docs/audits/ticket-results/TOE-003-quantum-provenance-class.20260219-172109.json"
     },
     {
       "ticket_id": "TOE-004-uncertainty-propagation-gates",
-      "claim_tier": "diagnostic",
+      "claim_tier": "reduced-order",
       "verification_ok": true,
-      "score": 0.25,
+      "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-004-uncertainty-propagation-gates.20260217-222834.json"
+      "result_file": "docs/audits/ticket-results/TOE-004-uncertainty-propagation-gates.20260219-172109.json"
     },
     {
       "ticket_id": "TOE-005-prediction-observation-ledger",
-      "claim_tier": "diagnostic",
+      "claim_tier": "reduced-order",
       "verification_ok": true,
-      "score": 0.25,
+      "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-005-prediction-observation-ledger.20260217-224607.json"
+      "result_file": "docs/audits/ticket-results/TOE-005-prediction-observation-ledger.20260219-172109.json"
     },
     {
       "ticket_id": "TOE-006-firstfail-taxonomy-normalization",
-      "claim_tier": "diagnostic",
+      "claim_tier": "reduced-order",
       "verification_ok": true,
-      "score": 0.25,
+      "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-006-firstfail-taxonomy-normalization.20260217-230342.json"
+      "result_file": "docs/audits/ticket-results/TOE-006-firstfail-taxonomy-normalization.20260219-172109.json"
     },
     {
       "ticket_id": "TOE-007-ideology-hard-action-gates",
@@ -741,7 +692,7 @@
       "score": 0.25,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-234300.json"
+      "result_file": "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260217-232559.json"
     },
     {
       "ticket_id": "TOE-008-certificate-authenticity-policy",
@@ -781,12 +732,12 @@
     },
     {
       "ticket_id": "TOE-012-halobank-horizons-consistency-gate",
-      "claim_tier": "diagnostic",
+      "claim_tier": "reduced-order",
       "verification_ok": true,
-      "score": 0.25,
+      "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-012-halobank-horizons-consistency-gate.20260218-012531.json"
+      "result_file": "docs/audits/ticket-results/TOE-012-halobank-horizons-consistency-gate.20260219-172109.json"
     },
     {
       "ticket_id": "TOE-013-atomic-systems-claim-tier-contract",
@@ -799,12 +750,12 @@
     },
     {
       "ticket_id": "TOE-014-robotics-recollection-provenance-contract",
-      "claim_tier": "diagnostic",
+      "claim_tier": "reduced-order",
       "verification_ok": true,
-      "score": 0.25,
+      "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-014-robotics-recollection-provenance-contract.20260218-020424.json"
+      "result_file": "docs/audits/ticket-results/TOE-014-robotics-recollection-provenance-contract.20260219-172109.json"
     },
     {
       "ticket_id": "TOE-015-external-integration-evidence-manifest",
@@ -898,12 +849,12 @@
     },
     {
       "ticket_id": "TOE-025-sdk-integration-runtime-contract",
-      "claim_tier": "diagnostic",
+      "claim_tier": "reduced-order",
       "verification_ok": true,
-      "score": 0.25,
+      "score": 0.6,
       "research_gated": false,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-025-sdk-integration-runtime-contract.20260218-030504.json"
+      "result_file": "docs/audits/ticket-results/TOE-025-sdk-integration-runtime-contract.20260219-172109.json"
     },
     {
       "ticket_id": "TOE-026-knowledge-ingestion-provenance-budget-contract",
@@ -1285,12 +1236,12 @@
     },
     {
       "ticket_id": "TOE-068-helix-ask-strict-fail-reason-ledger",
-      "claim_tier": "reduced-order",
+      "claim_tier": "diagnostic",
       "verification_ok": true,
-      "score": 0.6,
+      "score": 0.25,
       "research_gated": true,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-068-helix-ask-strict-fail-reason-ledger.20260218T233453Z.json"
+      "result_file": "docs/audits/ticket-results/TOE-068-helix-ask-strict-fail-reason-ledger.20260218T210353Z.json"
     },
     {
       "ticket_id": "TOE-069-helix-ask-retrieval-citation-persistence-pack",
@@ -1335,7 +1286,7 @@
       "score": 0.25,
       "research_gated": true,
       "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T225336Z.json"
+      "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T224927Z.json"
     },
     {
       "ticket_id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
@@ -1543,6 +1494,15 @@
       "research_gated": true,
       "research_artifact_complete": true,
       "result_file": "docs/audits/ticket-results/TOE-099-anti-pseudo-rigor-validation-gates.20260219T081000Z.json"
+    },
+    {
+      "ticket_id": "TOE-100-strict-ready-verified-pass-pack-1",
+      "claim_tier": "reduced-order",
+      "verification_ok": true,
+      "score": 0.6,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-100-strict-ready-verified-pass-pack-1.20260219-172300.json"
     }
   ]
 }

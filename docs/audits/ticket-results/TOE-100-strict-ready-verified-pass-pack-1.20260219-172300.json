@@ -1,0 +1,34 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-100-strict-ready-verified-pass-pack-1",
+  "files_changed": [
+    "docs/audits/ticket-results/TOE-002-semiclassical-coupling-contract.20260219-172109.json",
+    "docs/audits/ticket-results/TOE-003-quantum-provenance-class.20260219-172109.json",
+    "docs/audits/ticket-results/TOE-004-uncertainty-propagation-gates.20260219-172109.json",
+    "docs/audits/ticket-results/TOE-005-prediction-observation-ledger.20260219-172109.json",
+    "docs/audits/ticket-results/TOE-006-firstfail-taxonomy-normalization.20260219-172109.json",
+    "docs/audits/ticket-results/TOE-012-halobank-horizons-consistency-gate.20260219-172109.json",
+    "docs/audits/ticket-results/TOE-014-robotics-recollection-provenance-contract.20260219-172109.json",
+    "docs/audits/ticket-results/TOE-025-sdk-integration-runtime-contract.20260219-172109.json",
+    "docs/audits/toe-progress-snapshot.json",
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
+  ],
+  "tests_run": [
+    "scripts/validate-toe-ticket-results.ts",
+    "scripts/validate-math-congruence-matrix.ts",
+    "scripts/compute-toe-progress.ts",
+    "scripts/toe-agent-preflight.ts"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:86c174e2-4e68-4eb8-a7f1-b3b1a54f8226",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}
