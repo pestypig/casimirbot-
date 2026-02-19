@@ -27,7 +27,7 @@ const setCors = (res: Response) => {
 };
 
 
-type CanonicalFirstFailClass = "constraint" | "certificate_integrity" | "certificate_status" | "certificate_missing" | "certificate_authenticity_required" | "robotics_safety";
+type CanonicalFirstFailClass = "constraint" | "constraints_unknown" | "certificate_integrity" | "certificate_status" | "certificate_missing" | "certificate_authenticity_required" | "robotics_safety";
 
 const normalizeFailFirstFail = (
   verdict: "PASS" | "FAIL",
@@ -38,26 +38,31 @@ const normalizeFailFirstFail = (
   if (firstFail) return firstFail;
   const certificateHash = typeof certificate?.certificateHash === "string" ? certificate.certificateHash.trim() : "";
   const certificateStatus = typeof certificate?.status === "string" ? certificate.status.trim() : "";
-  const canonicalClass: CanonicalFirstFailClass = certificate?.integrityOk === false
-    ? "certificate_integrity"
-    : certificate?.authenticityRequired === true && certificate?.authenticityOk === false
-      ? "certificate_authenticity_required"
-      : !certificateHash
-        ? "certificate_missing"
-        : certificateStatus && certificateStatus !== "FAIL"
-          ? "certificate_status"
-          : "constraint";
+  const certificateStatusUpper = certificateStatus.toUpperCase();
+  const canonicalClass: CanonicalFirstFailClass = !certificateHash
+    ? "certificate_missing"
+    : certificate?.integrityOk !== true
+      ? "certificate_integrity"
+      : certificate?.authenticityRequired === true && certificate?.authenticityOk === false
+        ? "certificate_authenticity_required"
+        : ["UNKNOWN", "NOT_CERTIFIED"].includes(certificateStatusUpper)
+          ? "constraints_unknown"
+          : certificateStatus && certificateStatusUpper !== "FAIL"
+            ? "certificate_status"
+            : "constraint";
   const id = canonicalClass === "certificate_integrity"
     ? "ADAPTER_CERTIFICATE_INTEGRITY"
     : canonicalClass === "certificate_missing"
       ? "ADAPTER_CERTIFICATE_MISSING"
-      : canonicalClass === "certificate_status"
-        ? `ADAPTER_CERTIFICATE_STATUS_${certificateStatus.toUpperCase()}`
-        : canonicalClass === "certificate_authenticity_required"
-          ? "ADAPTER_CERTIFICATE_AUTHENTICITY_REQUIRED"
-          : canonicalClass === "robotics_safety"
-            ? "ROBOTICS_SAFETY_ENVELOPE_FAIL"
-            : "ADAPTER_CONSTRAINT_FAIL";
+      : canonicalClass === "constraints_unknown"
+        ? "ADAPTER_CONSTRAINTS_UNKNOWN"
+        : canonicalClass === "certificate_status"
+          ? `ADAPTER_CERTIFICATE_STATUS_${certificateStatusUpper || "UNKNOWN"}`
+          : canonicalClass === "certificate_authenticity_required"
+            ? "ADAPTER_CERTIFICATE_AUTHENTICITY_REQUIRED"
+            : canonicalClass === "robotics_safety"
+              ? "ROBOTICS_SAFETY_ENVELOPE_FAIL"
+              : "ADAPTER_CONSTRAINT_FAIL";
   return {
     id,
     severity: "HARD",
