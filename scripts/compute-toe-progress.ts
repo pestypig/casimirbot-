@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { validateMathCongruenceMatrix } from "./validate-math-congruence-matrix";
+
 type BacklogTicket = {
   id?: string;
   tree_owner?: string;
@@ -180,13 +182,19 @@ type StrictReadyDeltaTarget = {
   next_strict_ready_claim_tier: Extract<TierKey, "reduced-order" | "certified">;
   requires_verified_pass: true;
   requires_research_artifact_completion: boolean;
+  requires_math_congruence: boolean;
 };
 
 type StrictReadyReleaseGate = {
   status: "ready" | "blocked";
-  blocked_reasons: Array<"missing_verified_pass" | "missing_research_artifacts">;
+  blocked_reasons: Array<"missing_verified_pass" | "missing_research_artifacts" | "missing_math_congruence">;
   blocked_ticket_count: number;
   ready_ticket_count: number;
+  blocker_counts: {
+    missing_verified_pass: number;
+    missing_research_artifacts: number;
+    missing_math_congruence: number;
+  };
 };
 
 function emptySegmentSummary(): SegmentSummary {
@@ -278,6 +286,8 @@ function main() {
   let extensionResearchGatedTickets = 0;
   let extensionResearchArtifactCompleteTickets = 0;
   const strictReadyDeltaTargets: StrictReadyDeltaTarget[] = [];
+  const mathCongruenceValidation = validateMathCongruenceMatrix({ repoRoot: process.cwd() });
+  const mathCongruenceGatePass = mathCongruenceValidation.ok;
 
   const tickets = ticketIds.map((ticketId) => {
     const latest = latestByTicket.get(ticketId);
@@ -309,7 +319,7 @@ function main() {
       requiredArtifacts.size === 0 ||
       [...requiredArtifacts].every((requiredArtifact) => reportedResearchArtifacts.has(requiredArtifact));
     const strictReadyEligibleTier = claimTier === "reduced-order" || claimTier === "certified";
-    const isStrictReady = verificationOk && strictReadyEligibleTier;
+    const isStrictReady = verificationOk && strictReadyEligibleTier && mathCongruenceGatePass;
 
     if (isResearchGated) {
       researchGatedTickets += 1;
@@ -364,6 +374,7 @@ function main() {
         next_strict_ready_claim_tier: claimTier === "certified" ? "certified" : "reduced-order",
         requires_verified_pass: true,
         requires_research_artifact_completion: isResearchGated && !researchArtifactComplete,
+        requires_math_congruence: !mathCongruenceGatePass,
       });
     }
 
@@ -390,16 +401,30 @@ function main() {
   const strictReadyProgress = totalTickets > 0 ? strictReadyCount / totalTickets : 0;
   const forestOwnerCoverage = computeForestOwnerCoveragePct();
   const strictReadyDeltaTicketCount = Math.max(totalTickets - strictReadyCount, 0);
+  const blockerCounts = {
+    missing_verified_pass: strictReadyDeltaTicketCount,
+    missing_research_artifacts: strictReadyDeltaTargets.filter(
+      (target) => target.requires_research_artifact_completion,
+    ).length,
+    missing_math_congruence: mathCongruenceGatePass ? 0 : strictReadyDeltaTicketCount,
+  };
   const strictReadyReleaseGate: StrictReadyReleaseGate = {
-    status: strictReadyDeltaTicketCount === 0 ? "ready" : "blocked",
+    status:
+      strictReadyDeltaTicketCount === 0 && mathCongruenceGatePass
+        ? "ready"
+        : "blocked",
     blocked_reasons: [
       ...(strictReadyDeltaTicketCount > 0 ? (["missing_verified_pass"] as const) : []),
-      ...(strictReadyDeltaTargets.some((target) => target.requires_research_artifact_completion)
+      ...(blockerCounts.missing_research_artifacts > 0
         ? (["missing_research_artifacts"] as const)
+        : []),
+      ...(blockerCounts.missing_math_congruence > 0
+        ? (["missing_math_congruence"] as const)
         : []),
     ],
     blocked_ticket_count: strictReadyDeltaTicketCount,
     ready_ticket_count: strictReadyCount,
+    blocker_counts: blockerCounts,
   };
 
   coreSummary.tickets_total = coreTicketIdSet.size;
@@ -449,6 +474,10 @@ function main() {
       strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
       strict_ready_delta_ticket_count: strictReadyDeltaTicketCount,
       strict_ready_release_gate: strictReadyReleaseGate,
+      math_congruence_gate: {
+        status: mathCongruenceGatePass ? "pass" : "fail",
+        errors: mathCongruenceValidation.errors,
+      },
       research_gated_tickets_total: researchGatedTickets,
       research_artifact_complete_tickets_total: researchArtifactCompleteTickets,
     },

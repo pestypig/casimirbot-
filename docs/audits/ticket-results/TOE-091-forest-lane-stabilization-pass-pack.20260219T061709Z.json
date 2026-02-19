@@ -2,16 +2,19 @@
   "schema_version": "toe_agent_ticket_result/1",
   "ticket_id": "TOE-091-forest-lane-stabilization-pass-pack",
   "files_changed": [
+    "docs/audits/ticket-results/TOE-091-forest-lane-stabilization-pass-pack.20260219T061709Z.json",
     "docs/audits/toe-progress-snapshot.json",
-    "docs/audits/ticket-results/TOE-091-forest-lane-stabilization-pass-pack.20260219T061709Z.json"
+    "scripts/compute-toe-progress.ts",
+    "scripts/toe-agent-preflight.ts"
   ],
   "tests_run": [
-    "scripts/toe-agent-preflight.ts",
-    "scripts/validate-toe-ticket-backlog.ts",
-    "scripts/validate-toe-ticket-results.ts",
-    "scripts/validate-toe-research-gate-policy.ts",
+    "cli/casimir-verify.ts",
     "scripts/compute-toe-progress.ts",
-    "cli/casimir-verify.ts"
+    "scripts/toe-agent-preflight.ts",
+    "scripts/validate-math-congruence-matrix.ts",
+    "scripts/validate-toe-research-gate-policy.ts",
+    "scripts/validate-toe-ticket-backlog.ts",
+    "scripts/validate-toe-ticket-results.ts"
   ],
   "claim_tier": "diagnostic",
   "stabilization": {
@@ -28,7 +31,16 @@
         "missing_research_artifacts"
       ],
       "blocked_ticket_count": 84,
-      "ready_ticket_count": 6
+      "ready_ticket_count": 6,
+      "blocker_counts": {
+        "missing_verified_pass": 84,
+        "missing_research_artifacts": 5,
+        "missing_math_congruence": 0
+      }
+    },
+    "math_congruence_gate": {
+      "status": "pass",
+      "errors": []
     }
   },
   "casimir": {
@@ -38,5 +50,51 @@
     "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
     "integrity_ok": true
   },
-  "remaining_gaps": []
+  "remaining_gaps": [],
+  "blocker_deltas": {
+    "baseline_snapshot_ref": "HEAD:docs/audits/toe-progress-snapshot.json",
+    "current_snapshot_ref": "docs/audits/toe-progress-snapshot.json",
+    "strict_ready_release_gate": {
+      "before": {
+        "status": "blocked",
+        "blocked_reasons": [
+          "missing_verified_pass",
+          "missing_research_artifacts"
+        ],
+        "blocked_ticket_count": 84,
+        "ready_ticket_count": 6
+      },
+      "after": {
+        "status": "blocked",
+        "blocked_reasons": [
+          "missing_verified_pass",
+          "missing_research_artifacts"
+        ],
+        "blocked_ticket_count": 84,
+        "ready_ticket_count": 6,
+        "blocker_counts": {
+          "missing_verified_pass": 84,
+          "missing_research_artifacts": 5,
+          "missing_math_congruence": 0
+        }
+      }
+    },
+    "blocker_counts": {
+      "missing_math_congruence": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "missing_research_artifacts": {
+        "before": 84,
+        "after": 5,
+        "delta": -79
+      },
+      "missing_verified_pass": {
+        "before": 84,
+        "after": 84,
+        "delta": 0
+      }
+    }
+  }
 }
