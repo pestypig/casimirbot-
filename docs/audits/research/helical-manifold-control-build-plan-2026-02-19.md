@@ -517,20 +517,29 @@ Validity-gate definition (finalized for `contract_version="phase6.ask.v1"`; conf
   - retry/backoff: `max_attempts=2`, `backoff_base_ms=250`, `backoff_multiplier=2`, `backoff_jitter_ms=125`
   - cooldown/circuit breaker: open for `cooldown_ms=3000` after `failure_threshold=8` consecutive failed episodes.
 - Per-arm validity gates:
-  - `usable_response_rate >= 0.90` (`status=200` and scoreable response with required semantic fields).
-  - `http_status_ok_rate >= 0.95`.
-  - `json_ok_rate >= 0.95` (episodes not classified `invalid_json`).
-  - `schema_ok_rate >= 0.95` (episodes not classified `schema_mismatch`/`metric_input_missing`).
+  - Primary-episode outcome booleans are now explicit and computed per episode:
+    - `transport_ok`: HTTP response object received from `/api/agi/ask`.
+    - `http_ok`: HTTP status is 2xx.
+    - `json_ok`: response body parsed as JSON (non-HTTP and synthetic skip paths are forced `false`).
+    - `schema_ok`: `json_ok && contract_version == "phase6.ask.v1" && required envelope fields/type checks pass`.
+    - `scoreable`: semantic requirements present (`text`, semantic linkage/unsupported/contradiction fields, and fail_reasons array).
+  - Gate formulas (computed as means over primary episodes):
+    - `http_status_ok_rate = mean(http_ok)` and must be `>= 0.95`.
+    - `json_ok_rate = mean(json_ok)` and must be `>= 0.95`.
+    - `schema_ok_rate = mean(schema_ok)` and must be `>= 0.95`.
+    - `usable_response_rate = mean(scoreable && http_ok)` and must be `>= 0.90`.
   - `seed_coverage_rate >= 1.0`.
   - `episode_coverage_rate >= 1.0`.
   - Non-degenerate semantic metric checks:
     - `claim_to_hook_linkage` must not be a constant floor artifact (`max-min > epsilon` OR `avg > floor_max`, with `epsilon=1e-6`, `floor_max=0.25`).
     - `unsupported_claim_rate` must not be a constant `1.0` artifact (`max-min > epsilon` OR `avg < 1.0`).
 - Parse/schema/contract accounting is mandatory in diagnostics:
+  - `transport_ok_rate`
   - `json_ok_rate`
   - `schema_ok_rate`
   - `fail_class_histogram`
   - `fail_reason_histogram`
+- Circuit-breaker synthetic skips are explicit `fail_class="circuit_breaker_skip"`, and are always treated as `transport_ok=false`, `http_ok=false`, `json_ok=false`, `schema_ok=false`, `scoreable=false`.
 - Blocked-run rule (strict): if any validity gate fails, set `evaluation.blocked=true` with reason `evaluation_blocked_due_to_run_invalidity`, and retain locked layer decisions unchanged.
 
 Latest live run validity status:
@@ -578,7 +587,7 @@ Keep/drop update (LIVE invalidity policy applied; maturity remains `diagnostic`)
 
 Latest full live validation rerun (`no reduced prompt/smoke mode`):
 - Artifact: `artifacts/experiments/helical-phase6/phase6-live-ab-results.json`.
-- Run ID: `phase6-live-ab-2026-02-19T17-44-04-064Z`.
+- Run ID: `phase6-live-ab-2026-02-19T18-25-48-407Z`.
 - Validity verdict: `invalid` (`valid=false`).
 - Decision status: `blocked` with reason `evaluation_blocked_due_to_run_invalidity`.
 
@@ -591,12 +600,29 @@ Rerun metric summary:
 | `replay_parity` | `0.0000` | `0.0000` | `+0.0000` |
 | `claim_to_hook_linkage` | `0.0000` | `0.0000` | `+0.0000` |
 | `unsupported_claim_rate` | `1.0000` | `1.0000` | `+0.0000` |
+| `transport_ok_rate` | `0.0417` | `0.0417` | `+0.0000` |
 | `usable_response_rate` | `0.0000` | `0.0000` | `+0.0000` |
-| `http_status_ok_rate` | `0.0333` | `0.0333` | `+0.0000` |
+| `http_status_ok_rate` | `0.0417` | `0.0417` | `+0.0000` |
+| `json_ok_rate` | `0.0000` | `0.0000` | `+0.0000` |
+| `schema_ok_rate` | `0.0000` | `0.0000` | `+0.0000` |
 
 Rerun gate outcomes:
-- Failed: `A/B usable_response_rate`, `A/B http_status_ok_rate`, `A/B claim_to_hook_linkage_not_constant_floor_artifact`, `A/B unsupported_claim_rate_not_constant_one_artifact`.
-- Passed: `A/B json_ok_rate`, `A/B schema_ok_rate`, `A/B seed_coverage_rate`, `A/B episode_coverage_rate`.
+
+| Gate | Threshold | A value | B value | Outcome |
+|---|---:|---:|---:|---|
+| `usable_response_rate` | `>= 0.90` | `0.0000` | `0.0000` | fail (A/B) |
+| `http_status_ok_rate` | `>= 0.95` | `0.0417` | `0.0417` | fail (A/B) |
+| `json_ok_rate` | `>= 0.95` | `0.0000` | `0.0000` | fail (A/B) |
+| `schema_ok_rate` | `>= 0.95` | `0.0000` | `0.0000` | fail (A/B) |
+| `seed_coverage_rate` | `>= 1.0` | `1.0000` | `1.0000` | pass (A/B) |
+| `episode_coverage_rate` | `>= 1.0` | `1.0000` | `1.0000` | pass (A/B) |
+| `claim_to_hook_linkage_not_constant_floor_artifact` | `max-min > 1e-6 OR avg > 0.25` | `avg=0.0000` | `avg=0.0000` | fail (A/B) |
+| `unsupported_claim_rate_not_constant_one_artifact` | `max-min > 1e-6 OR avg < 1.0` | `avg=1.0000` | `avg=1.0000` | fail (A/B) |
+
+Final validity verdict (rerun):
+- `valid=false` (run invalid).
+- `evaluation.blocked=true` with reason `evaluation_blocked_due_to_run_invalidity`.
+- Locked layer decisions retained unchanged.
 
 ## Verification Gate (Mandatory For Any Patch)
 For every patch:

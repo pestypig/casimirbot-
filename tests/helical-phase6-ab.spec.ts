@@ -72,6 +72,9 @@ describe("helical phase6 harness scoreability classification", () => {
   it("uses explicit classifications for parse/http/non-http outcomes", () => {
     expect(__test.metricFromPayload(0, { fail_class: "timeout_soft", fail_reason: "aborted" })).toMatchObject({
       scoreable: false,
+      transport_ok: false,
+      json_ok: false,
+      schema_ok: false,
       pass: false,
       fail_class: "timeout_soft",
       fail_reason: "aborted",
@@ -79,6 +82,9 @@ describe("helical phase6 harness scoreability classification", () => {
 
     expect(__test.metricFromPayload(0, { fail_class: "timeout_hard", fail_reason: "hard_timeout" })).toMatchObject({
       scoreable: false,
+      transport_ok: false,
+      json_ok: false,
+      schema_ok: false,
       pass: false,
       fail_class: "timeout_hard",
       fail_reason: "hard_timeout",
@@ -86,13 +92,19 @@ describe("helical phase6 harness scoreability classification", () => {
 
     expect(__test.metricFromPayload(0, null)).toMatchObject({
       scoreable: false,
+      transport_ok: false,
+      json_ok: false,
+      schema_ok: false,
       pass: false,
       fail_class: "schema_mismatch",
       fail_reason: "response_payload_not_object",
     });
 
-    expect(__test.metricFromPayload(200, { fail_class: "invalid_json", fail_reason: "Unexpected token" })).toMatchObject({
+    expect(__test.metricFromPayload(200, { contract_version: "phase6.ask.v1", fail_class: "invalid_json", fail_reason: "Unexpected token" }, { transportOk: true, jsonOk: false })).toMatchObject({
       scoreable: false,
+      transport_ok: true,
+      json_ok: false,
+      schema_ok: false,
       pass: false,
       fail_class: "invalid_json",
       fail_reason: "Unexpected token",
@@ -100,9 +112,23 @@ describe("helical phase6 harness scoreability classification", () => {
 
     expect(__test.metricFromPayload(503, null)).toMatchObject({
       scoreable: false,
+      transport_ok: true,
+      json_ok: true,
+      schema_ok: false,
       pass: false,
       fail_class: "http_error",
       fail_reason: "http_status_503",
+    });
+
+    expect(
+      __test.metricFromPayload(0, { contract_version: "phase6.ask.v1", fail_class: "circuit_breaker_skip", fail_reason: "circuit_breaker_open_cooldown" }, { transportOk: false, jsonOk: false }),
+    ).toMatchObject({
+      scoreable: false,
+      transport_ok: false,
+      http_ok: false,
+      json_ok: false,
+      schema_ok: false,
+      fail_class: "circuit_breaker_skip",
     });
   });
 });
@@ -133,6 +159,10 @@ describe("helical phase6 validity gates and blocked decision policy", () => {
     },
     metrics: {
       pass: true,
+      transport_ok: true,
+      http_ok: true,
+      json_ok: true,
+      schema_ok: true,
       scoreable: true,
       contradiction: false,
       claim_to_hook_linkage: 0.8,
@@ -168,6 +198,10 @@ describe("helical phase6 validity gates and blocked decision policy", () => {
         metrics: {
           ...makeRow().metrics,
           pass: false,
+          transport_ok: false,
+          http_ok: false,
+          json_ok: false,
+          schema_ok: false,
           scoreable: false,
           claim_to_hook_linkage: 0,
           unsupported_claim_rate: 1,
@@ -194,5 +228,60 @@ describe("helical phase6 validity gates and blocked decision policy", () => {
       decision: "keep",
     });
     expect(String(resolved.layerDecisions[0].basis)).toContain("evaluation_blocked_due_to_run_invalidity");
+  });
+
+  it("non-http outcomes do not inflate json/schema rates and invalid payload paths lower gates", () => {
+    const rows = [
+      makeRow({ promptId: "p1", seed: 1103 }),
+      makeRow({
+        promptId: "p2",
+        seed: 1103,
+        status: 200,
+        metrics: {
+          ...makeRow().metrics,
+          pass: false,
+          json_ok: false,
+          schema_ok: false,
+          scoreable: false,
+          fail_class: "invalid_json",
+          fail_reason: "Unexpected token",
+        },
+      }),
+      makeRow({
+        promptId: "p1",
+        seed: 2081,
+        status: 200,
+        metrics: {
+          ...makeRow().metrics,
+          pass: false,
+          schema_ok: false,
+          scoreable: false,
+          fail_class: "schema_mismatch",
+          fail_reason: "contract_version_mismatch",
+        },
+      }),
+      makeRow({
+        promptId: "p2",
+        seed: 2081,
+        status: 0,
+        metrics: {
+          ...makeRow().metrics,
+          pass: false,
+          transport_ok: false,
+          http_ok: false,
+          json_ok: false,
+          schema_ok: false,
+          scoreable: false,
+          fail_class: "circuit_breaker_skip",
+          fail_reason: "circuit_breaker_open_cooldown",
+        },
+      }),
+    ] as never[];
+
+    const summary = __test.summarizeArm(rows, seeds, 4);
+    expect(summary.http_status_ok_rate).toBeCloseTo(0.75, 5);
+    expect(summary.json_ok_rate).toBeCloseTo(0.5, 5);
+    expect(summary.schema_ok_rate).toBeCloseTo(0.25, 5);
+    expect(summary.usable_response_rate).toBeCloseTo(0.25, 5);
   });
 });

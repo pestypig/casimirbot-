@@ -6,7 +6,14 @@ import { helixUtilityPrompts } from "./helix-ask-utility-ab";
 
 type LayerId = "telemetry_x_t" | "linear_baseline" | "pca_baseline" | "helical_6d" | "rho_clamp" | "natario_first";
 type ArmName = "A" | "B";
-type FailureClass = "invalid_json" | "schema_mismatch" | "metric_input_missing" | "timeout_soft" | "timeout_hard" | "http_error";
+type FailureClass =
+  | "invalid_json"
+  | "schema_mismatch"
+  | "metric_input_missing"
+  | "timeout_soft"
+  | "timeout_hard"
+  | "http_error"
+  | "circuit_breaker_skip";
 type RuntimeEnvelope = {
   timeout_ms: number;
   hard_timeout_ms: number;
@@ -33,6 +40,7 @@ const FAILURE_CLASSES: ReadonlySet<FailureClass> = new Set([
 ]);
 
 type AskResponse = {
+  contract_version?: string;
   text?: string;
   fail_reason?: string | null;
   fail_class?: string | null;
@@ -49,6 +57,14 @@ type AskResponse = {
       event_hash?: string;
     };
   } & Record<string, unknown>;
+};
+
+type OutcomeFlags = {
+  transport_ok: boolean;
+  http_ok: boolean;
+  json_ok: boolean;
+  schema_ok: boolean;
+  scoreable: boolean;
 };
 
 type PromptCase = ReturnType<typeof helixUtilityPrompts>[number];
@@ -129,6 +145,16 @@ const hasRequiredFields = (payload: AskResponse | null): boolean => {
   return typeof text === "string" && text.trim().length > 0 && Number.isFinite(linkage) && Number.isFinite(unsupported) && typeof contradiction === "boolean" && Array.isArray(reasons);
 };
 
+const hasEnvelopeSchema = (payload: AskResponse | null): boolean => {
+  if (!payload || typeof payload !== "object") return false;
+  if (payload.contract_version !== "phase6.ask.v1") return false;
+  if (payload.trace_id !== undefined && typeof payload.trace_id !== "string") return false;
+  if (payload.fail_class !== undefined && payload.fail_class !== null && typeof payload.fail_class !== "string") return false;
+  if (payload.fail_reason !== undefined && payload.fail_reason !== null && typeof payload.fail_reason !== "string") return false;
+  if (payload.debug !== undefined && (typeof payload.debug !== "object" || payload.debug === null)) return false;
+  return true;
+};
+
 const classifyScoreability = (payload: AskResponse | null): { scoreable: boolean; failClass: FailureClass | null; failReason: string | null } => {
   if (!payload || typeof payload !== "object") {
     return { scoreable: false, failClass: "schema_mismatch", failReason: "response_payload_not_object" };
@@ -169,13 +195,19 @@ const hasContradiction = (payload: AskResponse | null): boolean => {
   return Boolean(payload?.debug?.semantic_quality?.contradiction_flag) || reasons.some((reason) => /contradiction/i.test(reason));
 };
 
-const metricFromPayload = (status: number, payload: AskResponse | null) => {
+const metricFromPayload = (status: number, payload: AskResponse | null, options: { transportOk?: boolean; jsonOk?: boolean } = {}) => {
+  const transportOk = options.transportOk ?? status > 0;
+  const httpOk = status >= 200 && status < 300;
+  const jsonOk = options.jsonOk ?? transportOk;
+  const schemaOk = jsonOk && hasEnvelopeSchema(payload);
   const linkage = Number(payload?.debug?.semantic_quality?.claim_citation_link_rate ?? 0);
   const unsupported = Number(payload?.debug?.semantic_quality?.unsupported_claim_rate ?? 1);
   const failReasons = payload?.debug?.semantic_quality?.fail_reasons ?? [];
   const scoreability = classifyScoreability(payload);
-  const classification = status === 200
+  const classification = httpOk
     ? scoreability
+    : payload?.fail_class === "circuit_breaker_skip"
+      ? { scoreable: false, failClass: "circuit_breaker_skip" as FailureClass, failReason: payload.fail_reason ?? "circuit_breaker_open_cooldown" }
     : status > 0
       ? { scoreable: false, failClass: "http_error" as FailureClass, failReason: `http_status_${status}` }
       : scoreability.failClass
@@ -183,10 +215,17 @@ const metricFromPayload = (status: number, payload: AskResponse | null) => {
         : { scoreable: false, failClass: "schema_mismatch" as FailureClass, failReason: "non_http_outcome_missing_classification" };
   const failClass = payload?.fail_class ?? classification.failClass;
   const failReason = payload?.fail_reason ?? classification.failReason;
-  const pass = status === 200 && classification.scoreable && !failReason && failReasons.length === 0;
+  const pass = httpOk && classification.scoreable && !failReason && failReasons.length === 0;
+  const outcomeFlags: OutcomeFlags = {
+    transport_ok: transportOk,
+    http_ok: httpOk,
+    json_ok: jsonOk,
+    schema_ok: schemaOk,
+    scoreable: classification.scoreable,
+  };
   return {
     pass,
-    scoreable: classification.scoreable,
+    ...outcomeFlags,
     contradiction: hasContradiction(payload),
     claim_to_hook_linkage: Number.isFinite(linkage) ? Math.max(0, Math.min(1, linkage)) : 0,
     unsupported_claim_rate: Number.isFinite(unsupported) ? Math.max(0, Math.min(1, unsupported)) : 1,
@@ -246,11 +285,12 @@ const runAskAttempt = async (arm: ArmName, prompt: PromptCase, seed: number, rep
       status: resp.status,
       latencyMs: Date.now() - started,
       payload,
-      metrics: metricFromPayload(resp.status, payload),
+      metrics: metricFromPayload(resp.status, payload, { transportOk: true, jsonOk: true }),
     };
   } catch (error) {
     if (error instanceof SyntaxError) {
       const payload: AskResponse = {
+        contract_version: "phase6.ask.v1",
         fail_reason: error.message,
         fail_class: "invalid_json",
       };
@@ -264,13 +304,14 @@ const runAskAttempt = async (arm: ArmName, prompt: PromptCase, seed: number, rep
         status: 200,
         latencyMs: Date.now() - started,
         payload,
-        metrics: metricFromPayload(200, payload),
+        metrics: metricFromPayload(200, payload, { transportOk: true, jsonOk: false }),
       };
     }
     const isHardTimeout = error instanceof Error && error.message === "hard_timeout";
     const isSoftTimeout = error instanceof Error && error.name === "AbortError";
     const failClass: FailureClass = isHardTimeout ? "timeout_hard" : isSoftTimeout ? "timeout_soft" : "http_error";
     const payload: AskResponse = {
+      contract_version: "phase6.ask.v1",
       fail_reason: error instanceof Error ? error.message : "request_failed",
       fail_class: failClass,
     };
@@ -284,7 +325,7 @@ const runAskAttempt = async (arm: ArmName, prompt: PromptCase, seed: number, rep
       status: 0,
       latencyMs: Date.now() - started,
       payload,
-      metrics: metricFromPayload(0, payload),
+      metrics: metricFromPayload(0, payload, { transportOk: false, jsonOk: false }),
     };
   } finally {
     clearTimeout(timeout);
@@ -300,7 +341,11 @@ const runAsk = async (
   circuitState: { consecutiveFailures: number; openUntilMs: number },
 ) => {
   if (Date.now() < circuitState.openUntilMs) {
-    const payload: AskResponse = { fail_class: "http_error", fail_reason: "circuit_breaker_open_cooldown" };
+    const payload: AskResponse = {
+      contract_version: "phase6.ask.v1",
+      fail_class: "circuit_breaker_skip",
+      fail_reason: "circuit_breaker_open_cooldown",
+    };
     return {
       arm,
       promptId: prompt.id,
@@ -311,7 +356,7 @@ const runAsk = async (
       status: 0,
       latencyMs: 0,
       payload,
-      metrics: metricFromPayload(0, payload),
+      metrics: metricFromPayload(0, payload, { transportOk: false, jsonOk: false }),
     };
   }
 
@@ -371,9 +416,6 @@ const summarizeArm = (rows: Array<Awaited<ReturnType<typeof runAsk>>>, expectedS
 
   const uniqueSeeds = new Set(primaryRows.map((entry) => entry.seed));
   const coveredEpisodes = new Set(primaryRows.map((entry) => `${entry.promptId}:${entry.seed}`));
-  const jsonOkRate = avg(primaryRows.map((entry) => (entry.metrics.fail_class === "invalid_json" ? 0 : 1)));
-  const schemaOkRate = avg(primaryRows.map((entry) => (entry.metrics.fail_class === "schema_mismatch" || entry.metrics.fail_class === "metric_input_missing" ? 0 : 1)));
-
   return {
     episodeCount: primaryRows.length,
     seed_coverage_rate: expectedSeeds.length ? uniqueSeeds.size / expectedSeeds.length : 0,
@@ -383,10 +425,11 @@ const summarizeArm = (rows: Array<Awaited<ReturnType<typeof runAsk>>>, expectedS
     replay_parity: avg(parity),
     claim_to_hook_linkage: avg(primaryRows.map((entry) => entry.metrics.claim_to_hook_linkage)),
     unsupported_claim_rate: avg(primaryRows.map((entry) => entry.metrics.unsupported_claim_rate)),
-    http_status_ok_rate: avg(primaryRows.map((entry) => (entry.status === 200 ? 1 : 0))),
-    usable_response_rate: avg(primaryRows.map((entry) => (entry.status === 200 && entry.metrics.scoreable ? 1 : 0))),
-    json_ok_rate: jsonOkRate,
-    schema_ok_rate: schemaOkRate,
+    transport_ok_rate: avg(primaryRows.map((entry) => (entry.metrics.transport_ok ? 1 : 0))),
+    http_status_ok_rate: avg(primaryRows.map((entry) => (entry.metrics.http_ok ? 1 : 0))),
+    usable_response_rate: avg(primaryRows.map((entry) => (entry.metrics.scoreable && entry.metrics.http_ok ? 1 : 0))),
+    json_ok_rate: avg(primaryRows.map((entry) => (entry.metrics.json_ok ? 1 : 0))),
+    schema_ok_rate: avg(primaryRows.map((entry) => (entry.metrics.schema_ok ? 1 : 0))),
     diagnostics: {
       claim_to_hook_linkage_min: claimValues.length ? Math.min(...claimValues) : 0,
       claim_to_hook_linkage_max: claimValues.length ? Math.max(...claimValues) : 0,
