@@ -125,6 +125,10 @@ function normalizeList(value: unknown): string[] {
     .filter((entry) => entry.length > 0);
 }
 
+function hasResidualSignal(value: string): boolean {
+  return /\b(residual(s)?|constraint(s)?)\b/i.test(value);
+}
+
 function readJson<T>(filePath: string): T {
   return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
 }
@@ -337,36 +341,27 @@ export function validatePhysicsRootLeafManifest(options?: {
     if (typeof falsifier.reject_rule !== "string" || falsifier.reject_rule.trim().length === 0) {
       errors.push(`${loc}.falsifier.reject_rule is required`);
     }
-    if (
-      typeof falsifier.uncertainty_model !== "string" ||
-      falsifier.uncertainty_model.trim().length === 0
-    ) {
+    const uncertaintyModel =
+      typeof falsifier.uncertainty_model === "string" ? falsifier.uncertainty_model.trim() : "";
+    if (uncertaintyModel.length === 0) {
       errors.push(`${loc}.falsifier.uncertainty_model is required`);
-    } else if (uncertaintyModels.size > 0) {
-      const parsedRef = parseModelReference(falsifier.uncertainty_model);
+    } else {
+      const parsedRef = parseModelReference(uncertaintyModel);
       if (!parsedRef) {
-        errors.push(
-          `${loc}.falsifier.uncertainty_model must be parameterized as model_id(param=value,...)`,
-        );
+        errors.push(`${loc}.falsifier.uncertainty_model must be parameterized as model_id(param=value,...)`);
       } else {
         const spec = uncertaintyModels.get(parsedRef.modelId);
         if (!spec) {
-          errors.push(
-            `${loc}.falsifier.uncertainty_model references undefined model: ${parsedRef.modelId}`,
-          );
+          errors.push(`${loc}.falsifier.uncertainty_model references undefined model: ${parsedRef.modelId}`);
         } else {
           for (const requiredParameter of spec.required) {
             if (!parsedRef.parameters.has(requiredParameter)) {
-              errors.push(
-                `${loc}.falsifier.uncertainty_model missing required parameter: ${requiredParameter}`,
-              );
+              errors.push(`${loc}.falsifier.uncertainty_model missing required parameter: ${requiredParameter}`);
             }
           }
           for (const key of parsedRef.parameters.keys()) {
             if (!spec.allowed.has(key)) {
-              errors.push(
-                `${loc}.falsifier.uncertainty_model parameter not permitted for ${parsedRef.modelId}: ${key}`,
-              );
+              errors.push(`${loc}.falsifier.uncertainty_model parameter not permitted for ${parsedRef.modelId}: ${key}`);
             }
           }
         }
@@ -396,6 +391,31 @@ export function validatePhysicsRootLeafManifest(options?: {
       maturityGate.strict_fail_reason.trim().length === 0
     ) {
       errors.push(`${loc}.maturity_gate.strict_fail_reason is required`);
+    }
+
+    const claimsEquationGrounding =
+      (typeof falsifier.observable === "string" && /\bequation\b/i.test(falsifier.observable)) ||
+      (typeof falsifier.reject_rule === "string" && /\bequation\b/i.test(falsifier.reject_rule));
+    if (claimsEquationGrounding) {
+      const hasResidualInObservable =
+        typeof falsifier.observable === "string" && hasResidualSignal(falsifier.observable);
+      const hasResidualInRejectRule =
+        typeof falsifier.reject_rule === "string" && hasResidualSignal(falsifier.reject_rule);
+      const hasResidualTestRef = testRefs.some((ref) => hasResidualSignal(ref));
+      if (!hasResidualInObservable && !hasResidualInRejectRule && !hasResidualTestRef) {
+        errors.push(`${loc} references equation-grounded claims but does not provide residual evidence`);
+      }
+    }
+
+    const maxTier = maxClaimTier;
+    const overclaimText = [
+      typeof falsifier.observable === "string" ? falsifier.observable : "",
+      typeof falsifier.reject_rule === "string" ? falsifier.reject_rule : "",
+      typeof maturityGate.strict_fail_reason === "string" ? maturityGate.strict_fail_reason : "",
+    ].join(" ");
+    const hasOverclaimPattern = /\b(certified|proven|physically viable|admissible)\b/i.test(overclaimText);
+    if (maxTier !== "certified" && hasOverclaimPattern) {
+      errors.push(`${loc} contains tier over-claim language inconsistent with max_claim_tier=${maxTier}`);
     }
   });
 

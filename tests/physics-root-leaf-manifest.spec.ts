@@ -76,8 +76,8 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
         falsifier: {
           observable: "citation linkage",
           reject_rule: "link_rate < 0.9",
-          uncertainty_model: "GUM_linear",
-          test_refs: ["tests/helix-ask-ps2-runtime-report.spec.ts"],
+          uncertainty_model: "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90)",
+          test_refs: ["tests/helix-ask-ps2-runtime-report.spec.ts", "tests/gr-constraint-network.spec.ts"],
         },
         maturity_gate: {
           max_claim_tier: "diagnostic",
@@ -100,8 +100,8 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
         falsifier: {
           observable: "equation-grounded path completeness",
           reject_rule: "missing canonical equation refs",
-          uncertainty_model: "deterministic_threshold_contract_v1",
-          test_refs: ["scripts/validate-physics-root-leaf-manifest.ts"],
+          uncertainty_model: "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90)",
+          test_refs: ["scripts/validate-physics-root-leaf-manifest.ts", "tests/gr-constraint-gate.spec.ts"],
         },
         maturity_gate: {
           max_claim_tier: "diagnostic",
@@ -123,8 +123,8 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
         falsifier: {
           observable: "bridge provenance determinism",
           reject_rule: "strict bridge gate missing deterministic reason",
-          uncertainty_model: "deterministic_contract_gate",
-          test_refs: ["tests/helix-ask-bridge.spec.ts"],
+          uncertainty_model: "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true)",
+          test_refs: ["tests/helix-ask-bridge.spec.ts", "tests/gr-agent-loop.spec.ts"],
         },
         maturity_gate: {
           max_claim_tier: "diagnostic",
@@ -146,8 +146,8 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
         falsifier: {
           observable: "coherence linkage",
           reject_rule: "coherence_link_rate < 0.9",
-          uncertainty_model: "GUM_linear",
-          test_refs: ["tests/physics-root-leaf-manifest.spec.ts"],
+          uncertainty_model: "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90)",
+          test_refs: ["tests/physics-root-leaf-manifest.spec.ts", "tests/gr-constraint-network.spec.ts"],
         },
         maturity_gate: {
           max_claim_tier: "diagnostic",
@@ -168,8 +168,8 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
         falsifier: {
           observable: "prebiotic alignment",
           reject_rule: "prebiotic_alignment_rate < 0.9",
-          uncertainty_model: "GUM_linear",
-          test_refs: ["tests/physics-root-leaf-manifest.spec.ts"],
+          uncertainty_model: "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90)",
+          test_refs: ["tests/physics-root-leaf-manifest.spec.ts", "tests/gr-constraint-network.spec.ts"],
         },
         maturity_gate: {
           max_claim_tier: "diagnostic",
@@ -190,8 +190,8 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
         falsifier: {
           observable: "runtime determinism",
           reject_rule: "determinism_rate < 0.98",
-          uncertainty_model: "runtime_gate_thresholds",
-          test_refs: ["tests/casimir-verify-ps2.spec.ts"],
+          uncertainty_model: "runtime_gate_thresholds(determinism_min=0.98,citation_min=0.95,non_200_max=0.02)",
+          test_refs: ["tests/casimir-verify-ps2.spec.ts", "tests/gr-constraint-network.spec.ts"],
         },
         maturity_gate: {
           max_claim_tier: "diagnostic",
@@ -212,8 +212,8 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
         falsifier: {
           observable: "non_200 rate",
           reject_rule: "non_200_rate > 0.02",
-          uncertainty_model: "runtime_gate_thresholds",
-          test_refs: ["tests/casimir-verify-ps2.spec.ts"],
+          uncertainty_model: "runtime_gate_thresholds(determinism_min=0.98,citation_min=0.95,non_200_max=0.02)",
+          test_refs: ["tests/casimir-verify-ps2.spec.ts", "tests/gr-constraint-network.spec.ts"],
         },
         maturity_gate: {
           max_claim_tier: "diagnostic",
@@ -226,6 +226,27 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
 
   mutator?.(manifest);
   writeJson(path.join(repoRoot, "configs", "physics-root-leaf-manifest.v1.json"), manifest);
+  writeJson(path.join(repoRoot, "configs", "uncertainty-model-registry.v1.json"), {
+    schema_version: "uncertainty_model_registry/1",
+    registry_id: "fixture-registry",
+    models: [
+      {
+        id: "deterministic_threshold_contract_v1",
+        required_parameters: ["pass_threshold", "fail_threshold"],
+        optional_parameters: ["window", "aggregation"],
+      },
+      {
+        id: "deterministic_contract_gate",
+        required_parameters: ["decision_mode", "strict_reason_required"],
+        optional_parameters: ["replay_window"],
+      },
+      {
+        id: "runtime_gate_thresholds",
+        required_parameters: ["determinism_min", "citation_min", "non_200_max"],
+        optional_parameters: ["latency_p95_max_ms"],
+      },
+    ],
+  });
   return repoRoot;
 }
 
@@ -338,4 +359,76 @@ describe("validatePhysicsRootLeafManifest", () => {
     expect(combined).toContain("paths[0].maturity_gate.max_claim_tier cannot exceed claim_tier_ceiling");
     expect(combined).toContain("paths[0].maturity_gate.strict_fail_reason is required");
   });
+
+  it("fails deterministically when equation-grounded paths omit residual evidence", () => {
+    const repoRoot = makeFixture((manifest) => {
+      const paths = manifest.paths as Array<Record<string, unknown>>;
+      const target = paths[1];
+      target.falsifier = {
+        observable: "equation-grounded path completeness",
+        reject_rule: "missing canonical equation refs",
+        uncertainty_model:
+          "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90)",
+        test_refs: ["scripts/validate-physics-root-leaf-manifest.ts"],
+      };
+    });
+
+    const result = validatePhysicsRootLeafManifest({ repoRoot });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toContain(
+      "paths[1] references equation-grounded claims but does not provide residual evidence",
+    );
+  });
+
+  it("fails deterministically on unknown uncertainty models", () => {
+    const repoRoot = makeFixture((manifest) => {
+      const paths = manifest.paths as Array<Record<string, unknown>>;
+      const target = paths[0];
+      target.falsifier = {
+        ...(target.falsifier as Record<string, unknown>),
+        uncertainty_model: "unknown_model(pass_threshold=0.95)",
+      };
+    });
+
+    const result = validatePhysicsRootLeafManifest({ repoRoot });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toContain(
+      "paths[0].falsifier.uncertainty_model references undefined model: unknown_model",
+    );
+  });
+
+  it("fails deterministically on unparameterized uncertainty models", () => {
+    const repoRoot = makeFixture((manifest) => {
+      const paths = manifest.paths as Array<Record<string, unknown>>;
+      const target = paths[0];
+      target.falsifier = {
+        ...(target.falsifier as Record<string, unknown>),
+        uncertainty_model: "deterministic_threshold_contract_v1",
+      };
+    });
+
+    const result = validatePhysicsRootLeafManifest({ repoRoot });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toContain(
+      "paths[0].falsifier.uncertainty_model must be parameterized as model_id(param=value,...)",
+    );
+  });
+
+  it("fails deterministically on tier over-claim patterns", () => {
+    const repoRoot = makeFixture((manifest) => {
+      const paths = manifest.paths as Array<Record<string, unknown>>;
+      const target = paths[0];
+      target.falsifier = {
+        ...(target.falsifier as Record<string, unknown>),
+        observable: "certified physically viable proof",
+      };
+    });
+
+    const result = validatePhysicsRootLeafManifest({ repoRoot });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toContain(
+      "paths[0] contains tier over-claim language inconsistent with max_claim_tier=diagnostic",
+    );
+  });
+
 });
