@@ -576,6 +576,28 @@ Keep/drop update (LIVE invalidity policy applied; maturity remains `diagnostic`)
 - Explicit policy statement: **no efficacy conclusion is made when the live run is invalid**.
 - Promotion note: this remains `diagnostic`; no certified viability claim is made.
 
+Latest full live validation rerun (`no reduced prompt/smoke mode`):
+- Artifact: `artifacts/experiments/helical-phase6/phase6-live-ab-results.json`.
+- Run ID: `phase6-live-ab-2026-02-19T17-44-04-064Z`.
+- Validity verdict: `invalid` (`valid=false`).
+- Decision status: `blocked` with reason `evaluation_blocked_due_to_run_invalidity`.
+
+Rerun metric summary:
+
+| Metric | A (live) | B (live) | Delta (B-A) |
+|---|---:|---:|---:|
+| `pass_rate` | `0.0000` | `0.0000` | `+0.0000` |
+| `contradiction_rate` | `0.0000` | `0.0000` | `+0.0000` |
+| `replay_parity` | `0.0000` | `0.0000` | `+0.0000` |
+| `claim_to_hook_linkage` | `0.0000` | `0.0000` | `+0.0000` |
+| `unsupported_claim_rate` | `1.0000` | `1.0000` | `+0.0000` |
+| `usable_response_rate` | `0.0000` | `0.0000` | `+0.0000` |
+| `http_status_ok_rate` | `0.0333` | `0.0333` | `+0.0000` |
+
+Rerun gate outcomes:
+- Failed: `A/B usable_response_rate`, `A/B http_status_ok_rate`, `A/B claim_to_hook_linkage_not_constant_floor_artifact`, `A/B unsupported_claim_rate_not_constant_one_artifact`.
+- Passed: `A/B json_ok_rate`, `A/B schema_ok_rate`, `A/B seed_coverage_rate`, `A/B episode_coverage_rate`.
+
 ## Verification Gate (Mandatory For Any Patch)
 For every patch:
 1. Run adapter verify (`POST /api/agi/adapter/run` via project verifier).
