@@ -9,6 +9,14 @@ export type HelixAskMove =
 
 export type HelixAskMovePolicyProfile = "balanced" | "evidence_first" | "latency_first";
 
+type HelixAskProfileWeights = {
+  goal: number;
+  evidenceGain: number;
+  latencyCost: number;
+  risk: number;
+  budgetPressure: number;
+};
+
 export type HelixAskMoveScoreInput = {
   groundedness: number;
   uncertainty: number;
@@ -63,14 +71,37 @@ const MOVE_TIE_BREAK_ORDER: HelixAskMove[] = [
   "fail_closed",
 ];
 
-const PROFILE_WEIGHTS: Record<
-  HelixAskMovePolicyProfile,
-  { goal: number; evidenceGain: number; latencyCost: number; risk: number; budgetPressure: number }
-> = {
+const PROFILE_WEIGHTS: Record<HelixAskMovePolicyProfile, HelixAskProfileWeights> = {
   balanced: { goal: 1, evidenceGain: 1, latencyCost: 1, risk: 1, budgetPressure: 1 },
   evidence_first: { goal: 1, evidenceGain: 1.35, latencyCost: 0.85, risk: 1, budgetPressure: 0.9 },
   latency_first: { goal: 1, evidenceGain: 0.8, latencyCost: 1.35, risk: 1, budgetPressure: 1.2 },
 };
+
+const parseProfileWeightsOverride = (): Partial<Record<HelixAskMovePolicyProfile, Partial<HelixAskProfileWeights>>> => {
+  const raw = process.env.HELIX_ASK_MOVE_PROFILE_WEIGHTS;
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out: Partial<Record<HelixAskMovePolicyProfile, Partial<HelixAskProfileWeights>>> = {};
+    for (const profile of ["balanced", "evidence_first", "latency_first"] as const) {
+      const row = parsed?.[profile];
+      if (!row || typeof row !== "object") continue;
+      const candidate = row as Record<string, unknown>;
+      out[profile] = {
+        goal: Number(candidate.goal ?? Number.NaN),
+        evidenceGain: Number(candidate.evidenceGain ?? Number.NaN),
+        latencyCost: Number(candidate.latencyCost ?? Number.NaN),
+        risk: Number(candidate.risk ?? Number.NaN),
+        budgetPressure: Number(candidate.budgetPressure ?? Number.NaN),
+      };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+};
+
+const PROFILE_WEIGHTS_OVERRIDE = parseProfileWeightsOverride();
 
 const clamp01 = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
@@ -93,7 +124,10 @@ const scoreMoveDeterministically = (input: {
   wRisk: number;
   wBudgetPressure: number;
 }): number => {
-  const weights = PROFILE_WEIGHTS[input.profile] ?? PROFILE_WEIGHTS.balanced;
+  const weights = {
+    ...(PROFILE_WEIGHTS[input.profile] ?? PROFILE_WEIGHTS.balanced),
+    ...(PROFILE_WEIGHTS_OVERRIDE[input.profile] ?? {}),
+  };
   return (
     weights.goal * input.wGoal +
     weights.evidenceGain * input.wEvidenceGain -

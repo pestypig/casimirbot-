@@ -1,0 +1,49 @@
+{
+  "task": "HELIX-PS3 Quake-Style Weight Tuning + Promotion Gate (Replay + Matrix)",
+  "timestamp": "20260219T073428Z",
+  "baseline_run_id": "versatility-1771461446899",
+  "promotion": {
+    "status": "NO_PROMOTE",
+    "winner_id": "quake-balance-a",
+    "all_gates_passed": false
+  },
+  "winner_metrics": {
+    "report_mode_mismatch": 21,
+    "relation_failures": 12,
+    "citation_missing": 9,
+    "clocka_tool_cap_stop_rate": 0,
+    "latency_total_p95_ms": 1899,
+    "invalid_error_rate": 0
+  },
+  "gates": {
+    "report_mode_mismatch_max": 10,
+    "relation_failures_max": 6,
+    "citation_missing_max": 4,
+    "clocka_tool_cap_stop_rate_max": 0.35,
+    "latency_total_p95_ms_max": 1600,
+    "invalid_error_rate_eq": 0
+  },
+  "strict_validation": {
+    "goal_zone": {
+      "command": "HELIX_ASK_GOAL_ALLOW_STUB=0 npm run helix:ask:goal-zone",
+      "exit_code": 2,
+      "status": "FAIL"
+    },
+    "versatility": {
+      "run_id": "versatility-1771487178612",
+      "expected_runs": 270,
+      "total_runs": 270,
+      "run_complete": true,
+      "latency_total_p95_ms": 1912
+    }
+  },
+  "casimir_verify": {
+    "verdict": "PASS",
+    "trace_id": "adapter:8d88c340-f9e5-41c6-9f37-36abebae2e83",
+    "run_id": "1408",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "integrity_ok": true,
+    "status": "GREEN"
+  }
+}
