@@ -1,0 +1,28 @@
+{
+  "id": "HELIX-PS2-random-versatility-20260219T191659Z",
+  "timestamp": "2026-02-19T19:27:25.208242Z",
+  "campaign": {
+    "canary_run_id": "versatility-1771528620550",
+    "full_run_id": "versatility-1771528759695",
+    "replay_run_id": "versatility-1771529054648",
+    "seeds": {
+      "canary": [
+        7
+      ],
+      "full": [
+        7,
+        11,
+        13
+      ]
+    },
+    "temperature": 0.2,
+    "prompt_order_mode": "stratified_seeded"
+  },
+  "verdict": {
+    "decision": "needs_patch",
+    "decision_grade_ready": false
+  },
+  "deterministic_replay": {
+    "stable_aggregate_verdict": true
+  }
+}
