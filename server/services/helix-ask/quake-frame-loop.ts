@@ -63,6 +63,23 @@ export type HelixAskEventStableFields = {
   gate_outcomes: Record<string, boolean>;
 };
 
+export type HelixAskRelationSecondPassDeficits = {
+  bridgeDeficit: boolean;
+  evidenceDeficit: boolean;
+  dualDomainDeficit: boolean;
+};
+
+export type HelixAskRelationSecondPassDecision = {
+  shouldAttempt: boolean;
+  skippedReason?: string;
+};
+
+export type HelixAskRelationSecondPassDelta = {
+  bridgeDelta: number;
+  evidenceDelta: number;
+  dualDomainDelta: "gained" | "lost" | "unchanged";
+};
+
 const MOVE_TIE_BREAK_ORDER: HelixAskMove[] = [
   "direct_answer",
   "retrieve_more",
@@ -356,4 +373,35 @@ export const buildEventStableFields = (input: {
   fallback_decision: input.fallbackDecision,
   contract_renderer_path: input.contractRendererPath,
   gate_outcomes: { ...input.gateOutcomes },
+});
+
+export const decideRelationSecondPassAttempt = (input: {
+  selectedMove: HelixAskMove;
+  deficits: HelixAskRelationSecondPassDeficits;
+  alreadyAttempted?: boolean;
+}): HelixAskRelationSecondPassDecision => {
+  if (input.alreadyAttempted) {
+    return { shouldAttempt: false, skippedReason: "already_attempted" };
+  }
+  if (input.selectedMove !== "retrieve_more" && input.selectedMove !== "relation_build") {
+    return { shouldAttempt: false, skippedReason: "move_not_eligible" };
+  }
+  if (!input.deficits.bridgeDeficit && !input.deficits.evidenceDeficit && !input.deficits.dualDomainDeficit) {
+    return { shouldAttempt: false, skippedReason: "no_deficits" };
+  }
+  return { shouldAttempt: true };
+};
+
+export const computeRelationSecondPassDelta = (input: {
+  before: { bridgeCount: number; evidenceCount: number; dualDomainOk: boolean };
+  after: { bridgeCount: number; evidenceCount: number; dualDomainOk: boolean };
+}): HelixAskRelationSecondPassDelta => ({
+  bridgeDelta: input.after.bridgeCount - input.before.bridgeCount,
+  evidenceDelta: input.after.evidenceCount - input.before.evidenceCount,
+  dualDomainDelta:
+    input.after.dualDomainOk === input.before.dualDomainOk
+      ? "unchanged"
+      : input.after.dualDomainOk
+        ? "gained"
+        : "lost",
 });

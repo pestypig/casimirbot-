@@ -4,6 +4,7 @@ import {
   __testOnlyResolveMaturityCeilingValidation,
   buildRelationAssemblyPacket,
   ensureRelationAssemblyPacketFallback,
+  ensureRelationFallbackDomainAnchors,
   evaluateRelationPacketFloors,
   resolveRelationTopologySignal,
 } from "../server/services/helix-ask/relation-assembly";
@@ -92,6 +93,39 @@ describe("relation assembly packet", () => {
 
     readSpy.mockRestore();
     existsSpy.mockRestore();
+  });
+
+  it("injects deterministic dual-domain anchors for relation fallback packets", () => {
+    const anchored = ensureRelationFallbackDomainAnchors(
+      ensureRelationAssemblyPacketFallback(
+        {
+          question: "How does warp relate to mission ethos?",
+          domains: ["warp"],
+          definitions: {
+            warp_definition: "warp definition",
+            ethos_definition: "ethos definition",
+          },
+          bridge_claims: ["bridge claim"],
+          constraints: ["constraint"],
+          falsifiability_hooks: ["hook"],
+          evidence: [
+            {
+              evidence_id: "ev_existing",
+              path: "docs/knowledge/warp/warp-bubble.md",
+              span: "L1-L1",
+              snippet: "warp",
+              domain: "warp",
+            },
+          ],
+          source_map: { ev_existing: "docs/knowledge/warp/warp-bubble.md#L1-L1" },
+        },
+        "How does warp relate to mission ethos?",
+      ),
+    );
+    expect(anchored.domains).toEqual(["ethos", "warp"]);
+    expect(anchored.evidence.some((entry) => entry.domain === "warp")).toBe(true);
+    expect(anchored.evidence.some((entry) => entry.domain === "ethos")).toBe(true);
+    expect(Object.values(anchored.source_map)).toContain("docs/ethos/ideology.json#L1-L1");
   });
 
   it("blocks over-promotion above diagnostic maturity ceiling", () => {
