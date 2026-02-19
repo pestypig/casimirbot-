@@ -1591,7 +1591,11 @@
         "physics_assertion"
       ],
       "required_field": "validity.equation_ref",
-      "strict_fail_reason": "FAIL_NODE_MISSING_EQUATION_REF"
+      "strict_fail_reason": "FAIL_NODE_MISSING_EQUATION_REF",
+      "canonical_backbone_path": "configs/physics-equation-backbone.v1.json"
+    },
+    "claim_ids_linkage_rail": {
+      "strict_fail_reason": "FAIL_NODE_MISSING_CLAIM_IDS"
     }
   }
 }

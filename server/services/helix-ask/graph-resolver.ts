@@ -90,6 +90,7 @@ export type HelixAskGraphCongruenceDiagnostics = {
     condition_unsatisfied: number;
     unresolved_target: number;
     node_missing_equation_ref: number;
+    node_missing_claim_ids: number;
   };
   blockedByCondition: Record<string, number>;
   strictSignals: {
@@ -145,6 +146,10 @@ type GraphResolverConfig = {
   trees?: GraphResolverTreeConfig[];
   routingPolicy?: {
     equation_binding_rail?: {
+      canonical_backbone_path?: string;
+      strict_fail_reason?: string;
+    };
+    claim_ids_linkage_rail?: {
       strict_fail_reason?: string;
     };
   };
@@ -246,6 +251,9 @@ const MAX_PACK_TREES_LIMIT = 6;
 const LOCKED_TREE_SCORE_BONUS = 4;
 const DEFAULT_GRAPH_PATH_MODE: HelixAskGraphPathMode = "full";
 const DEFAULT_MISSING_EQUATION_REF_FAIL_REASON = "FAIL_NODE_MISSING_EQUATION_REF";
+const DEFAULT_MISSING_CLAIM_IDS_FAIL_REASON = "FAIL_NODE_MISSING_CLAIM_IDS";
+const DEFAULT_EQUATION_BACKBONE_PATH = "configs/physics-equation-backbone.v1.json";
+const DEFAULT_MATH_CLAIMS_DIR = "docs/knowledge/math-claims";
 
 const LIFE_COSMOLOGY_CONSCIOUSNESS_RE =
   /\b(life|origin(?:s)? of life|abiogenesis|cosmology|consciousness|stellar consciousness|open-world)\b/i;
@@ -272,6 +280,10 @@ const DEFAULT_CONGRUENCE_WALK_CONFIG = {
 
 type GraphConfigCache = { config: GraphResolverConfig; path: string; mtimeMs: number };
 let graphConfigCache: GraphConfigCache | null = null;
+type EquationBackboneCache = { ids: Set<string>; fullPath: string; mtimeMs: number };
+let equationBackboneCache: EquationBackboneCache | null = null;
+type ClaimRegistryCache = { ids: Set<string>; dirPath: string; fingerprint: string };
+let claimRegistryCache: ClaimRegistryCache | null = null;
 
 const graphTreeCache = new Map<string, { tree: GraphTree; mtimeMs: number }>();
 
@@ -304,7 +316,8 @@ type GraphFilterReason =
   | "chart_mismatch"
   | "condition_unsatisfied"
   | "unresolved_target"
-  | "node_missing_equation_ref";
+  | "node_missing_equation_ref"
+  | "node_missing_claim_ids";
 
 type GraphEdgeDecision = {
   allowed: boolean;
@@ -651,10 +664,88 @@ const evaluateCongruenceEdge = (
 };
 
 
-const hasKnownEquationRef = (node: GraphNode): boolean => {
+const resolveEquationBackbonePath = (config?: GraphResolverConfig | null): string => {
+  const configured = String(config?.routingPolicy?.equation_binding_rail?.canonical_backbone_path ?? "").trim();
+  return configured || DEFAULT_EQUATION_BACKBONE_PATH;
+};
+
+const loadCanonicalEquationRefs = (config?: GraphResolverConfig | null): Set<string> => {
+  const relPath = resolveEquationBackbonePath(config);
+  const fullPath = path.resolve(process.cwd(), relPath);
+  if (!fs.existsSync(fullPath)) {
+    return new Set<string>();
+  }
+  try {
+    const stats = fs.statSync(fullPath);
+    if (
+      equationBackboneCache &&
+      equationBackboneCache.fullPath === fullPath &&
+      equationBackboneCache.mtimeMs === stats.mtimeMs
+    ) {
+      return equationBackboneCache.ids;
+    }
+    const raw = fs.readFileSync(fullPath, "utf8");
+    const parsed = JSON.parse(raw) as { equations?: Array<{ id?: string }> };
+    const ids = new Set(
+      ensureArray<{ id?: string }>(parsed?.equations)
+        .map((entry) => String(entry?.id ?? "").trim())
+        .filter(Boolean),
+    );
+    equationBackboneCache = { ids, fullPath, mtimeMs: stats.mtimeMs };
+    return ids;
+  } catch {
+    return new Set<string>();
+  }
+};
+
+const loadKnownClaimIds = (): Set<string> => {
+  const dirPath = path.resolve(process.cwd(), DEFAULT_MATH_CLAIMS_DIR);
+  if (!fs.existsSync(dirPath)) return new Set<string>();
+  try {
+    const files = fs
+      .readdirSync(dirPath)
+      .filter((entry) => entry.toLowerCase().endsWith(".json"))
+      .sort((a, b) => a.localeCompare(b));
+    const fingerprintParts: string[] = [];
+    const ids = new Set<string>();
+    for (const file of files) {
+      const full = path.join(dirPath, file);
+      const stats = fs.statSync(full);
+      fingerprintParts.push(`${file}:${stats.mtimeMs}`);
+      const raw = fs.readFileSync(full, "utf8");
+      const parsed = JSON.parse(raw) as { claims?: Array<{ claimId?: string }> };
+      for (const claim of ensureArray<{ claimId?: string }>(parsed?.claims)) {
+        const claimId = String(claim?.claimId ?? "").trim();
+        if (claimId) ids.add(claimId);
+      }
+    }
+    const fingerprint = fingerprintParts.join("|");
+    if (claimRegistryCache && claimRegistryCache.dirPath === dirPath && claimRegistryCache.fingerprint === fingerprint) {
+      return claimRegistryCache.ids;
+    }
+    claimRegistryCache = { ids, dirPath, fingerprint };
+    return ids;
+  } catch {
+    return new Set<string>();
+  }
+};
+
+const hasValidClaimLinkage = (node: GraphNode, knownClaimIds: Set<string>): boolean => {
+  const validity = node.validity && typeof node.validity === "object" ? node.validity : undefined;
+  const claimIds = Array.isArray(validity?.claim_ids)
+    ? validity.claim_ids.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+    : [];
+  if (claimIds.length === 0) return false;
+  if (knownClaimIds.size === 0) return false;
+  return claimIds.every((claimId) => knownClaimIds.has(claimId));
+};
+
+const hasKnownEquationRef = (node: GraphNode, canonicalEquationRefs: Set<string>): boolean => {
   const validity = node.validity && typeof node.validity === "object" ? node.validity : undefined;
   const equationRef = typeof validity?.equation_ref === "string" ? validity.equation_ref.trim() : "";
-  return equationRef.length > 0;
+  if (!equationRef) return false;
+  if (canonicalEquationRefs.size === 0) return false;
+  return canonicalEquationRefs.has(equationRef);
 };
 
 const isEquationBindingGuardedNode = (node: GraphNode): boolean => {
@@ -697,6 +788,8 @@ const loadGraphTree = (
     }
     const raw = fs.readFileSync(fullPath, "utf8");
     const parsed = JSON.parse(raw) as { rootId?: string; nodes?: unknown[] };
+    const canonicalEquationRefs = loadCanonicalEquationRefs(loadGraphResolverConfig());
+    const knownClaimIds = loadKnownClaimIds();
     const nodes = ensureArray(parsed.nodes).map(coerceNode).filter(Boolean) as GraphNode[];
     const nodeById = new Map<string, GraphNode>();
     nodes.forEach((node) => nodeById.set(node.id, node));
@@ -719,6 +812,7 @@ const loadGraphTree = (
       condition_unsatisfied: 0,
       unresolved_target: 0,
       node_missing_equation_ref: 0,
+      node_missing_claim_ids: 0,
     };
     const blockedByCondition: Record<string, number> = {};
     let allowedEdges = 0;
@@ -743,9 +837,14 @@ const loadGraphTree = (
       for (const child of node.children) {
         const meta = node.childMeta?.[child];
         evaluatedEdges += 1;
-        if (requiresEquationBindingRail(node, meta) && !hasKnownEquationRef(node)) {
+        if (requiresEquationBindingRail(node, meta) && !hasKnownEquationRef(node, canonicalEquationRefs)) {
           blockedEdges += 1;
           blockedByReason.node_missing_equation_ref += 1;
+          continue;
+        }
+        if (isEquationBindingGuardedNode(node) && !hasValidClaimLinkage(node, knownClaimIds)) {
+          blockedEdges += 1;
+          blockedByReason.node_missing_claim_ids += 1;
           continue;
         }
         const decision = evaluateCongruenceEdge(meta, congruenceConfig, blockedSet, {
@@ -782,9 +881,14 @@ const loadGraphTree = (
           chartDependency: link.chartDependency ?? null,
         };
         evaluatedEdges += 1;
-        if (requiresEquationBindingRail(node, meta) && !hasKnownEquationRef(node)) {
+        if (requiresEquationBindingRail(node, meta) && !hasKnownEquationRef(node, canonicalEquationRefs)) {
           blockedEdges += 1;
           blockedByReason.node_missing_equation_ref += 1;
+          continue;
+        }
+        if (isEquationBindingGuardedNode(node) && !hasValidClaimLinkage(node, knownClaimIds)) {
+          blockedEdges += 1;
+          blockedByReason.node_missing_claim_ids += 1;
           continue;
         }
         const decision = evaluateCongruenceEdge(meta, congruenceConfig, blockedSet, {
@@ -1923,6 +2027,9 @@ export function resolveHelixAskGraphPack(input: {
     selectedIds.add(id);
     if ((candidate.framework.congruenceDiagnostics?.blockedByReason.node_missing_equation_ref ?? 0) > 0) {
       candidate.framework.pathFallbackReason = missingEquationRefFailReason;
+    }
+    if ((candidate.framework.congruenceDiagnostics?.blockedByReason.node_missing_claim_ids ?? 0) > 0) {
+      candidate.framework.pathFallbackReason = candidate.framework.pathFallbackReason ?? missingClaimIdsFailReason;
     }
     selected.push(candidate.framework);
   };

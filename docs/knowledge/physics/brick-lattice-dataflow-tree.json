@@ -1103,7 +1103,11 @@
       "inputs": [],
       "outputs": [],
       "assumptions": [],
-      "validity": {},
+      "validity": {
+        "claim_ids": [
+          "curvature_unit_proxy_contract.v1"
+        ]
+      },
       "deterministic": null,
       "tolerance": null,
       "environment": null,

@@ -72,6 +72,7 @@ const files = {
   adapter: "client/src/lib/atomic-orbitals.ts",
   claimSchema: "docs/qa/schemas/math-claim-registry.schema.json",
   claimDir: "docs/knowledge/math-claims",
+  physicsDir: "docs/knowledge/physics",
 } as const;
 
 const issues: Issue[] = [];
@@ -696,7 +697,58 @@ async function runCitationChecks(): Promise<void> {
     }
   }
 
+  await runPhysicsClaimLinkageChecks(new Set(seenClaimIds.keys()));
   addIssue("info", "claim_registry_checked", `Checked ${checkedClaims} claim(s) across ${entries.length} file(s).`);
+}
+
+
+async function runPhysicsClaimLinkageChecks(knownClaimIds: Set<string>): Promise<void> {
+  const physicsRoot = path.resolve(cwd, files.physicsDir);
+  if (!existsSync(physicsRoot)) {
+    addIssue("warning", "physics_dir_missing", `Physics tree directory not found: ${files.physicsDir}`, files.physicsDir);
+    return;
+  }
+  let entries: string[] = [];
+  try {
+    entries = (await fs.readdir(physicsRoot))
+      .filter((name) => name.toLowerCase().endsWith(".json"))
+      .sort((a, b) => a.localeCompare(b));
+  } catch (error) {
+    addIssue("error", "physics_dir_read_failed", `${files.physicsDir}: ${(error as Error).message}`, files.physicsDir);
+    return;
+  }
+
+  for (const entry of entries) {
+    const relPath = `${files.physicsDir}/${entry}`;
+    const text = await readTextFile(relPath);
+    if (!text) continue;
+    const doc = parseJsonText<{ nodes?: Array<Record<string, unknown>> }>(text, relPath);
+    if (!doc || !Array.isArray(doc.nodes)) continue;
+
+    for (const [index, node] of doc.nodes.entries()) {
+      const nodeType = String(node?.nodeType ?? "").trim().toLowerCase();
+      if (!["physics_assertion", "bridge", "derived_metric"].includes(nodeType)) continue;
+      const validity = node?.validity as Record<string, unknown> | undefined;
+      const claimIds = Array.isArray(validity?.claim_ids)
+        ? validity.claim_ids.map((id) => String(id ?? "").trim()).filter(Boolean)
+        : [];
+      const nodePrefix = `${relPath}#node:${String(node?.id ?? index)}`;
+      if (claimIds.length === 0) {
+        addIssue("error", "node_claim_ids_missing", "Guarded physics/proxy node must define validity.claim_ids", nodePrefix);
+        continue;
+      }
+      for (const claimId of claimIds) {
+        if (!knownClaimIds.has(claimId)) {
+          addIssue(
+            "error",
+            "node_claim_id_unknown",
+            `Guarded node references unknown claimId '${claimId}'`,
+            nodePrefix,
+          );
+        }
+      }
+    }
+  }
 }
 
 function printTextSummary(): void {

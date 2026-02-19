@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+
+const normalizePathForMatch = (target: unknown): string => String(target ?? "").replace(/\\/g, "/");
 import {
   __testOnlyResolveCrossLaneUncertaintyValidation,
   __testOnlyResolveMaturityCeilingValidation,
@@ -102,13 +104,13 @@ describe("relation assembly packet", () => {
     const realExistsSync = fsMod.existsSync.bind(fsMod);
     const realReadFileSync = fsMod.readFileSync.bind(fsMod);
     const existsSpy = vi.spyOn(fsMod, "existsSync").mockImplementation((target: any) => {
-      const path = String(target ?? "");
-      if (path.endsWith("configs/math-congruence-matrix.v1.json")) return true;
+      const normalized = normalizePathForMatch(target);
+      if (normalized.endsWith("configs/math-congruence-matrix.v1.json")) return true;
       return realExistsSync(target);
     });
     const readSpy = vi.spyOn(fsMod, "readFileSync").mockImplementation((target: any, ...args: any[]) => {
-      const path = String(target ?? "");
-      if (path.endsWith("configs/math-congruence-matrix.v1.json")) {
+      const normalized = normalizePathForMatch(target);
+      if (normalized.endsWith("configs/math-congruence-matrix.v1.json")) {
         return JSON.stringify({
           rows: [
             {
@@ -199,13 +201,13 @@ describe("relation assembly packet", () => {
     const realExistsSync = fsMod.existsSync.bind(fsMod);
     const realReadFileSync = fsMod.readFileSync.bind(fsMod);
     const existsSpy = vi.spyOn(fsMod, "existsSync").mockImplementation((target: any) => {
-      const filePath = String(target ?? "");
-      if (filePath.endsWith("configs/physics-root-leaf-manifest.v1.json")) return true;
+      const normalized = normalizePathForMatch(target);
+      if (normalized.endsWith("configs/physics-root-leaf-manifest.v1.json")) return true;
       return realExistsSync(target);
     });
     const readSpy = vi.spyOn(fsMod, "readFileSync").mockImplementation((target: any, ...args: any[]) => {
-      const filePath = String(target ?? "");
-      if (filePath.endsWith("configs/physics-root-leaf-manifest.v1.json")) {
+      const normalized = normalizePathForMatch(target);
+      if (normalized.endsWith("configs/physics-root-leaf-manifest.v1.json")) {
         return JSON.stringify({
           claim_tier_ceiling: "certified",
           maturity_propagation_policy: {
