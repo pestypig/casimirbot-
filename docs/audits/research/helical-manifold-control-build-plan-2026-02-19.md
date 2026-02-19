@@ -503,33 +503,41 @@ Derived reliability delta:
 #### E) Phase 6 live validation (adapter-backed `/api/agi/ask`)
 
 - Live artifact (new, additive): `artifacts/experiments/helical-phase6/phase6-live-ab-results.json`.
-- Live run ID: `phase6-live-ab-2026-02-19T06-17-13-606Z`.
+- Live run ID: `phase6-live-ab-2026-02-19T07-23-50-629Z`.
 - Method: fixed seeds with identical prompt IDs across both arms, direct `/api/agi/ask` execution, deterministic replay pass (`replayIndex=1/2`) for parity measurement.
 - Arm definitions used for live run:
   - `A`: baseline controller with manifold/helical layer off.
   - `B`: baseline + retained control layers; `helical_6d` remains dropped (unchanged).
 
-Live A/B metric summary (diagnostic only):
+Validity-gate definition (diagnostic hardening; configurable env thresholds with defaults):
+- `usable_response_rate >= 0.90` for each arm (`status=200` and parseable payload with required semantic fields).
+- `http_status_ok_rate >= 0.95` for each arm.
+- Non-degenerate semantic metric checks per arm:
+  - `claim_to_hook_linkage` must not be a constant floor artifact (`max-min > epsilon` OR `avg > floor_max`).
+  - `unsupported_claim_rate` must not be a constant `1.0` artifact (`max-min > epsilon` OR `avg < 1.0`).
+- If any gate fails, mark run `valid=false`, retain prior layer decisions, and annotate `evaluation_blocked_due_to_run_invalidity`.
+
+Latest live run validity status:
+- `valid=false`.
+- Failed gates: `A/B usable_response_rate`, `A/B http_status_ok_rate`, non-degenerate checks for both semantic metrics in both arms.
+- Dominant diagnostics: `fail_class=timeout`, `fail_reason="This operation was aborted"`, `http_status=0` histogram for all primary episodes in both arms.
+
+Live A/B metric summary (diagnostic only; **invalid run context**):
 
 | Metric | A (live) | B (live) | Delta (B-A) |
 |---|---:|---:|---:|
 | `pass_rate` | `0.0000` | `0.0000` | `+0.0000` |
 | `contradiction_rate` | `0.0000` | `0.0000` | `+0.0000` |
-| `replay_parity` | `1.0000` | `1.0000` | `+0.0000` |
-| `claim_to_hook_linkage` | `0.2500` | `0.2500` | `+0.0000` |
+| `replay_parity` | `0.0000` | `0.0000` | `+0.0000` |
+| `claim_to_hook_linkage` | `0.0000` | `0.0000` | `+0.0000` |
 | `unsupported_claim_rate` | `1.0000` | `1.0000` | `+0.0000` |
+| `usable_response_rate` | `0.0000` | `0.0000` | `+0.0000` |
+| `http_status_ok_rate` | `0.0000` | `0.0000` | `+0.0000` |
 
-Live-vs-synthetic distinction:
-- The original Phase 6 table above is **synthetic/simulated** and remains historical context only.
-- Keep/drop updates are now keyed to this live artifact delta table; no synthetic-only deltas are used for retention claims in this update.
-
-Keep/drop update (LIVE deltas only, maturity remains `diagnostic`):
-- `telemetry_x_t`: `keep` (no negative live delta observed).
-- `linear_baseline`: `keep` (baseline anchor).
-- `pca_baseline`: `keep` (no negative live linkage delta observed).
-- `helical_6d`: `drop` (remains dropped; no live evidence to reintroduce).
-- `rho_clamp`: `keep` (no live regression in unsupported-claim delta vs A).
-- `natario_first`: `keep` (`replay_parity=1.0` in both arms; no regression below threshold).
+Keep/drop update (LIVE invalidity policy applied; maturity remains `diagnostic`):
+- Evaluation status: `blocked` with reason `evaluation_blocked_due_to_run_invalidity`.
+- Layer decisions remain unchanged from locked Phase 6 decisions.
+- Explicit policy statement: **no efficacy conclusion is made when the live run is invalid**.
 - Promotion note: this remains `diagnostic`; no certified viability claim is made.
 
 ## Verification Gate (Mandatory For Any Patch)
