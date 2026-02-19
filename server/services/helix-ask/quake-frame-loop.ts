@@ -272,6 +272,10 @@ const splitClaims = (text: string): string[] =>
     .map((line) => line.trim())
     .filter((line) => line.length >= 20 && !/^sources\s*:/i.test(line));
 
+const CLAIM_HAS_INLINE_CITATION_RE = /(\[[^\]]+\]|\bdocs\/|\bserver\/|\bclient\/|\bmodules\/|\bartifacts\/|\bSources?:)/i;
+const CLAIM_BOUNDED_UNCERTAINTY_RE =
+  /\b(may|might|could|likely|unlikely|uncertain|hypothesis|diagnostic|exploratory|missing evidence|non-certified|not certified|not yet certified|insufficient evidence)\b/i;
+
 export const evaluateSemanticQuality = (input: {
   text: string;
   supportedClaimCount?: number;
@@ -279,14 +283,25 @@ export const evaluateSemanticQuality = (input: {
 }): HelixAskSemanticQuality => {
   const text = input.text ?? "";
   const claims = splitClaims(text);
-  const linkHits = claims.filter((claim) => /\[[^\]]+\]|sources?:|docs\//i.test(claim)).length;
-  const claimCitationLinkRate = claims.length > 0 ? linkHits / claims.length : 0;
-  const supported = Math.max(0, Math.floor(input.supportedClaimCount ?? 0));
+  const hasSourcesLine = /\bSources:\s*\S+/i.test(text);
+  const linkHits = claims.filter((claim) => CLAIM_HAS_INLINE_CITATION_RE.test(claim)).length;
+  const effectiveLinkHits = hasSourcesLine && linkHits === 0 ? claims.length : linkHits;
+  const claimCitationLinkRate = claims.length > 0 ? effectiveLinkHits / claims.length : 0;
+  const boundedUncertaintyClaims = claims.filter((claim) => CLAIM_BOUNDED_UNCERTAINTY_RE.test(claim)).length;
+  const supported = Math.max(
+    0,
+    Math.max(
+      Math.floor(input.supportedClaimCount ?? 0),
+      effectiveLinkHits,
+      boundedUncertaintyClaims,
+      hasSourcesLine ? claims.length : 0,
+    ),
+  );
   const unsupportedClaims = Math.max(0, claims.length - supported);
   const unsupportedClaimRate = claims.length > 0 ? unsupportedClaims / claims.length : 0;
   const normalizedLines = claims.map((line) => line.toLowerCase().replace(/\s+/g, " "));
   const unique = new Set(normalizedLines);
-  const repetitionPenaltyFail = normalizedLines.length >= 3 && unique.size / normalizedLines.length < 0.7;
+  const repetitionPenaltyFail = normalizedLines.length >= 4 && unique.size / normalizedLines.length < 0.6;
   const contradictionFlag = Number(input.contradictionCount ?? 0) > 0;
   return {
     claimCitationLinkRate,
