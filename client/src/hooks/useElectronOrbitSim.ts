@@ -5,6 +5,10 @@ import {
   type AtomicOrbitalCloud,
   type AtomicSimulationMode
 } from "@/lib/atomic-orbitals";
+import {
+  buildAtomicPipelineCouplingContract,
+  type AtomicPipelineCouplingContract,
+} from "@/lib/atomic-pipeline-coupling";
 
 const EPSILON_0 = 8.8541878128e-12;
 const ELECTRON_CHARGE = 1.602176634e-19;
@@ -139,6 +143,7 @@ export type OrbitSimState = {
   potential: PotentialConfig;
   atomModel: AtomicSimulationMode;
   cloudSampleCount: number | null;
+  coupling: AtomicPipelineCouplingContract;
   time: {
     tSim: number;
     dt: number;
@@ -191,12 +196,15 @@ export function useElectronOrbitSim(): [OrbitSimState, OrbitSimActions] {
   const [events, setEvents] = useState<OrbitEvent[]>([]);
 
   const pipelineDuty = pipeline?.dutyEffectiveFR ?? pipeline?.dutyCycle ?? 0;
-  const pipelineDrift = useMemo(() => {
-    const stability = pipeline?.TS_ratio ?? 100;
-    const driftFromTS = (stability - 100) / 600;
-    const dutyMod = pipelineDuty * 0.25;
-    return 1 + driftFromTS + dutyMod;
-  }, [pipeline?.TS_ratio, pipelineDuty]);
+  const coupling = useMemo(
+    () =>
+      buildAtomicPipelineCouplingContract({
+        tsRatio: pipeline?.TS_ratio,
+        duty: pipelineDuty,
+      }),
+    [pipeline?.TS_ratio, pipelineDuty],
+  );
+  const pipelineDrift = coupling.driftFactor;
 
   useEffect(() => {
     if (!time.playing) return;
@@ -507,6 +515,7 @@ export function useElectronOrbitSim(): [OrbitSimState, OrbitSimActions] {
     potential,
     atomModel,
     cloudSampleCount,
+    coupling,
     time,
     orbitalClouds,
     wavefields,

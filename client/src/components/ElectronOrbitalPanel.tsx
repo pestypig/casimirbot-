@@ -217,8 +217,8 @@ export default function ElectronOrbitalPanel() {
               Electron Orbital Simulator
             </CardTitle>
             <CardDescription className="text-sm text-slate-300">
-              Orbital probability clouds stitched to the live energy pipeline so you can instrument
-              charge, spin and Coulomb constants in the same telemetry loop.
+              Orbital probability clouds with telemetry-seeded drift visualization for diagnostic
+              instrumentation of charge, spin, and Coulomb constants.
             </CardDescription>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-300">
               <Badge variant="outline" className="border-white/15 bg-white/5 text-[10px] uppercase tracking-wide">
@@ -226,6 +226,12 @@ export default function ElectronOrbitalPanel() {
               </Badge>
               <Badge variant="secondary" className="bg-slate-800 text-[10px]">
                 Data: {telemetryLabel || "Mock seeds"}
+              </Badge>
+              <Badge variant="outline" className="border-amber-400/40 bg-amber-500/10 text-[10px] text-amber-200">
+                Coupling: {state.coupling.mode.replace("_", " ")}
+              </Badge>
+              <Badge variant="outline" className="border-white/15 bg-white/5 text-[10px]">
+                Tier: {state.coupling.claim_tier} · non-certifying
               </Badge>
               <Button
                 variant="ghost"
@@ -246,6 +252,9 @@ export default function ElectronOrbitalPanel() {
                 Open Energy Flux
               </Button>
             </div>
+            <p className="mt-2 text-[11px] text-slate-400">
+              {state.coupling.note}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Select
@@ -758,7 +767,7 @@ function CoulombExperimentControls({
         </Button>
       </div>
       <p className="text-[11px] text-slate-400">
-        Tip: toggle electrons to “Pointlike (QED)” above to confirm the pipeline reproduces canonical k.
+        Tip: toggle electrons to "Pointlike (QED)" to compare proxy drift against the canonical k baseline.
       </p>
     </div>
   );

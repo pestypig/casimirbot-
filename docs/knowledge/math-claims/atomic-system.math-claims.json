@@ -3,7 +3,7 @@
   "schemaVersion": "1.0.0",
   "registryId": "atomic-system-core",
   "domain": "atomic-simulation",
-  "updatedAt": "2026-02-16",
+  "updatedAt": "2026-02-19",
   "claims": [
     {
       "claimId": "atomic.hydrogenic.energy.nonrel.approx",
@@ -144,6 +144,43 @@
         "client/src/components/helix/HelixAskPill.tsx",
         "client/src/components/ElectronOrbitalPanel.tsx"
       ]
+    },
+    {
+      "claimId": "atomic.telemetry.drift.display-proxy.v1",
+      "statement": "Pipeline-derived drift in the orbital instrumentation loop is a diagnostic display proxy and must not be treated as an equation-bound physics assertion.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "electron orbital simulator instrumentation",
+        "constraints": [
+          "telemetry-seeded display proxy only",
+          "not mapped to stress-energy tensor",
+          "non-certifying claim tier"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "repo-code",
+          "citation": "client/src/lib/atomic-pipeline-coupling.ts",
+          "equation": "driftFactor = 1 + ((TS_ratio - 100)/600) + (0.25 * duty)",
+          "note": "Defines display_proxy coupling mode and non-certifying metadata."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "client/src/hooks/useElectronOrbitSim.ts",
+          "note": "Applies coupling drift factor in instrumentation calculations."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "client/src/components/ElectronOrbitalPanel.tsx",
+          "note": "UI labels coupling as display_proxy and diagnostic."
+        }
+      ],
+      "repoBindings": [
+        "client/src/lib/atomic-pipeline-coupling.ts",
+        "client/src/hooks/useElectronOrbitSim.ts",
+        "client/src/components/ElectronOrbitalPanel.tsx"
+      ],
+      "notes": "This claim intentionally blocks certification semantics for telemetry drift coupling."
     }
   ]
 }
