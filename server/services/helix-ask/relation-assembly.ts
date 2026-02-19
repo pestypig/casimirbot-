@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import type { HelixAskGraphPack } from "./graph-resolver";
 
 export type RelationAssemblyEvidence = {
@@ -19,7 +21,9 @@ export type RelationAssemblyPacket = {
     | "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING"
     | "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY"
     | "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_MISSING"
-    | "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_CONTRADICTORY";
+    | "EVIDENCE_FALSIFIER_LEDGER_CONTRACT_CONTRADICTORY"
+    | "RUNTIME_SAFETY_GATE_MISSING_DATA"
+    | "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS";
   definitions: {
     warp_definition: string;
     ethos_definition: string;
@@ -29,6 +33,13 @@ export type RelationAssemblyPacket = {
   falsifiability_hooks: string[];
   evidence: RelationAssemblyEvidence[];
   source_map: Record<string, string>;
+};
+
+type RuntimeSafetyGateValidation = {
+  referenced: boolean;
+  pass: boolean;
+  failReason?: "RUNTIME_SAFETY_GATE_MISSING_DATA" | "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS";
+  summary?: string;
 };
 
 export type RelationTopologySignal = {
@@ -152,6 +163,136 @@ const classifyStrictBridgeEvidenceFailure = (
 };
 
 export const __testOnlyClassifyStrictBridgeEvidenceFailure = classifyStrictBridgeEvidenceFailure;
+
+const RUNTIME_SAFETY_GATE_THRESHOLDS = {
+  determinism_min: 0.98,
+  citation_min: 0.95,
+  non_200_max: 0.02,
+  latency_p95_max_ms: 1200,
+} as const;
+
+const TOE_RUNTIME_MANIFEST = "configs/physics-root-leaf-manifest.v1.json";
+
+const roundResidual = (value: number): string => (Object.is(value, -0) ? 0 : value).toFixed(4);
+
+const resolveRuntimeSafetyGateValidation = (candidatePaths: string[]): RuntimeSafetyGateValidation => {
+  const hasManifestRef = candidatePaths.some((entry) => path.normalize(entry) === path.normalize(TOE_RUNTIME_MANIFEST));
+  if (!hasManifestRef) {
+    return { referenced: false, pass: true };
+  }
+
+  const fullPath = path.resolve(process.cwd(), TOE_RUNTIME_MANIFEST);
+  if (!fs.existsSync(fullPath)) {
+    return {
+      referenced: true,
+      pass: false,
+      failReason: "RUNTIME_SAFETY_GATE_MISSING_DATA",
+      summary: "runtime_safety_gate residuals=missing_manifest",
+    };
+  }
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(fs.readFileSync(fullPath, "utf8"));
+  } catch {
+    return {
+      referenced: true,
+      pass: false,
+      failReason: "RUNTIME_SAFETY_GATE_MISSING_DATA",
+      summary: "runtime_safety_gate residuals=invalid_manifest_json",
+    };
+  }
+
+  const runtimeRoots = new Set(
+    (Array.isArray(parsed?.roots) ? parsed.roots : [])
+      .filter((root: any) => String(root?.id ?? "").trim() === "physics_runtime_safety_control")
+      .map((root: any) => String(root?.id ?? "").trim())
+      .filter(Boolean),
+  );
+  const runtimePaths = (Array.isArray(parsed?.paths) ? parsed.paths : [])
+    .filter((entry: any) => {
+      const model = String(entry?.falsifier?.uncertainty_model ?? "").trim();
+      const referencesRuntimeRoot =
+        runtimeRoots.has(String(entry?.root_id ?? "")) ||
+        (Array.isArray(entry?.nodes) && entry.nodes.some((node: string) => runtimeRoots.has(String(node ?? ""))));
+      return referencesRuntimeRoot || /runtime_gate_thresholds\(/i.test(model);
+    })
+    .map((entry: any) => ({
+      id: String(entry?.id ?? "").trim(),
+      model: String(entry?.falsifier?.uncertainty_model ?? "").trim(),
+    }))
+    .filter((entry: { id: string; model: string }) => Boolean(entry.id));
+
+  if (runtimePaths.length === 0) {
+    return {
+      referenced: true,
+      pass: false,
+      failReason: "RUNTIME_SAFETY_GATE_MISSING_DATA",
+      summary: "runtime_safety_gate residuals=missing_runtime_paths",
+    };
+  }
+
+  const summaries: string[] = [];
+  for (const entry of runtimePaths.sort((a, b) => a.id.localeCompare(b.id))) {
+    const match = entry.model.match(/runtime_gate_thresholds\(([^)]*)\)/i);
+    if (!match) {
+      return {
+        referenced: true,
+        pass: false,
+        failReason: "RUNTIME_SAFETY_GATE_MISSING_DATA",
+        summary: `runtime_safety_gate residuals=${entry.id}:missing_uncertainty_model`,
+      };
+    }
+    const thresholds = Object.fromEntries(
+      match[1]
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => {
+          const [rawKey, rawValue] = part.split("=").map((p) => p.trim());
+          return [rawKey, Number(rawValue)];
+        }),
+    ) as Record<string, number>;
+
+    for (const [key, expected] of Object.entries(RUNTIME_SAFETY_GATE_THRESHOLDS)) {
+      const actual = thresholds[key];
+      if (!Number.isFinite(actual)) {
+        return {
+          referenced: true,
+          pass: false,
+          failReason: "RUNTIME_SAFETY_GATE_MISSING_DATA",
+          summary: `runtime_safety_gate residuals=${entry.id}:${key}=missing`,
+        };
+      }
+      const residual = Number((actual - expected).toFixed(6));
+      if (key.endsWith("_min") && actual < expected) {
+        return {
+          referenced: true,
+          pass: false,
+          failReason: "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS",
+          summary: `runtime_safety_gate residuals=${entry.id}:${key}=${actual}<${expected} (delta=${roundResidual(residual)})`,
+        };
+      }
+      if (key.endsWith("_max") && actual > expected) {
+        return {
+          referenced: true,
+          pass: false,
+          failReason: "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS",
+          summary: `runtime_safety_gate residuals=${entry.id}:${key}=${actual}>${expected} (delta=${roundResidual(residual)})`,
+        };
+      }
+      summaries.push(`${entry.id}:${key}=${actual} (delta=${roundResidual(residual)})`);
+    }
+  }
+
+  return {
+    referenced: true,
+    pass: true,
+    summary: `runtime_safety_gate residuals=${summaries.join("; ")}`,
+  };
+};
+
+export const __testOnlyResolveRuntimeSafetyGateValidation = resolveRuntimeSafetyGateValidation;
 
 const firstSentence = (text: string, fallback: string): string => {
   const first = text.split(/(?<=[.!?])\s+/)[0] ?? "";
@@ -305,11 +446,22 @@ export function buildRelationAssemblyPacket(args: {
     requireStrongEvidence: requireStrongBridgeEvidence,
     evidenceFalsifierLane,
   });
+  const runtimeValidation = resolveRuntimeSafetyGateValidation([
+    ...new Set(evidenceSeed.map((entry) => String(entry.path || "").trim()).filter(Boolean)),
+  ]);
+  if (runtimeValidation.referenced && runtimeValidation.summary) {
+    falsifiability_hooks.push(runtimeValidation.summary);
+  }
+  const failReason = strictBridgeEvidence
+    ? strictFailReason
+    : runtimeValidation.referenced && !runtimeValidation.pass
+      ? runtimeValidation.failReason
+      : undefined;
 
   return {
     question: args.question,
     domains: Array.from(domainSet).sort(),
-    fail_reason: strictBridgeEvidence ? strictFailReason : undefined,
+    fail_reason: failReason,
     definitions: {
       warp_definition: warpDefinition,
       ethos_definition: ethosDefinition,
