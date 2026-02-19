@@ -1,6 +1,7 @@
 import express from "express";
 import type { Server } from "http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { HELIX_ASK_RUNTIME_UNAVAILABLE_FAIL_REASON } from "../server/services/helix-ask/runtime-errors";
 
 describe("Helix Ask modes", () => {
   let server: Server;
@@ -416,5 +417,12 @@ describe("Helix Ask modes", () => {
     expect(response.status).toBe(200);
     const payload = (await response.json()) as Array<{ name?: string }>;
     expect(payload.some((entry) => entry.name === "halobank.time.compute")).toBe(true);
+  });
+});
+
+
+describe("Helix Ask runtime fail-reason constants", () => {
+  it("uses deterministic runtime-unavailable fail reason", () => {
+    expect(HELIX_ASK_RUNTIME_UNAVAILABLE_FAIL_REASON).toBe("HELIX_ASK_RUNTIME_UNAVAILABLE");
   });
 });

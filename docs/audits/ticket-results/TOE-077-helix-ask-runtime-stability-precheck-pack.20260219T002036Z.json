@@ -1,0 +1,43 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-077-helix-ask-runtime-stability-precheck-pack",
+  "files_changed": [
+    "server/routes/agi.plan.ts",
+    "server/services/helix-ask/runtime-errors.ts",
+    "scripts/helix-ask-availability-precheck.ts",
+    "scripts/helix-ask-goal-zone.ts",
+    "tests/helix-ask-modes.spec.ts",
+    "tests/helix-ask-availability-precheck.spec.ts",
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+    "docs/audits/toe-progress-snapshot.json"
+  ],
+  "tests_run": [
+    "tests/helix-ask-modes.spec.ts",
+    "tests/helix-ask-availability-precheck.spec.ts",
+    "npx vitest run tests/helix-ask-modes.spec.ts tests/helix-ask-availability-precheck.spec.ts",
+    "npx tsx scripts/validate-toe-ticket-backlog.ts",
+    "npx tsx scripts/validate-toe-ticket-results.ts",
+    "npm run validate:toe:research-gates",
+    "npx tsx scripts/compute-toe-progress.ts",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:94cd7f96-1070-4cc8-84e5-b43a419b4701",
+    "run_id": "4",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": [
+    "Full helix-ask-modes suite is long-running in this environment; command execution output was truncated during capture"
+  ],
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "receipt": {
+    "runtime_fail_reason": "HELIX_ASK_RUNTIME_UNAVAILABLE",
+    "availability_precheck_required_consecutive_200": 3,
+    "casimir_trace_out": "artifacts/training-trace.jsonl"
+  }
+}

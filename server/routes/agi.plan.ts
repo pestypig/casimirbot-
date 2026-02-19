@@ -221,7 +221,10 @@ import {
   recordHelixAskSessionMemory,
   type HelixAskSessionMemory,
 } from "../services/helix-ask/session-memory";
-import { isFastModeRuntimeMissingSymbolError } from "../services/helix-ask/runtime-errors";
+import {
+  HELIX_ASK_RUNTIME_UNAVAILABLE_FAIL_REASON,
+  isFastModeRuntimeMissingSymbolError,
+} from "../services/helix-ask/runtime-errors";
 import { stripRunawayAnswerArtifacts } from "../services/helix-ask/answer-artifacts";
 import {
   buildEventStableFields,
@@ -26805,12 +26808,17 @@ const executeHelixAsk = async ({
       const uncertaintyScore = Math.min(1, Math.max(0, (coverageSlotSummary?.missingSlots?.length ?? 0) / Math.max(1, slotPlan?.slots?.length ?? 1)));
       const safetyScore = securityRiskPrompt ? 1 : 0.3;
       const coverageScore = Math.min(1, Math.max(0, coverageSlotSummary?.coverageRatio ?? (docSlotSummary?.slotCoverageRatio ?? 0)));
-      const selectedMove = selectDeterministicMove({
-        groundedness: groundednessScore,
-        uncertainty: uncertaintyScore,
-        safety: safetyScore,
-        coverage: coverageScore,
-      });
+      let selectedMove: ReturnType<typeof selectDeterministicMove> = "targeted_clarification";
+      try {
+        selectedMove = selectDeterministicMove({
+          groundedness: groundednessScore,
+          uncertainty: uncertaintyScore,
+          safety: safetyScore,
+          coverage: coverageScore,
+        });
+      } catch {
+        selectedMove = "targeted_clarification";
+      }
       answerPath.push(`moveSelector:${selectedMove}`);
       if (debugPayload) {
         (debugPayload as Record<string, unknown>).fuzzy_move_selector = {
@@ -27437,7 +27445,7 @@ const executeHelixAsk = async ({
         text: fallbackText,
         answer: fallbackText,
         fallback: "fast_mode_runtime_missing",
-        fail_reason: "GENERIC_COLLAPSE",
+        fail_reason: HELIX_ASK_RUNTIME_UNAVAILABLE_FAIL_REASON,
         fail_class: "infra_fail",
       });
       return;
@@ -27453,7 +27461,7 @@ const executeHelixAsk = async ({
         text: fallbackText,
         answer: fallbackText,
         fallback: "helper_runtime_missing",
-        fail_reason: "GENERIC_COLLAPSE",
+        fail_reason: HELIX_ASK_RUNTIME_UNAVAILABLE_FAIL_REASON,
         fail_class: "infra_fail",
       });
       return;
