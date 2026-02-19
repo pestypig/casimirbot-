@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const BASE_URL = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5173";
 const BASELINE_RUN_ID = "versatility-1771461446899";
@@ -63,10 +64,10 @@ const postAskProbe = async (): Promise<{ status: number; ok: boolean; body: Reco
   return { status: response.status, ok: response.status === 200, body };
 };
 
-const runCommand = async (command: string, env: NodeJS.ProcessEnv): Promise<{ code: number; stdout: string; stderr: string }> => {
+const runCommand = async (command: string, args: string[], env: NodeJS.ProcessEnv): Promise<{ code: number; stdout: string; stderr: string }> => {
   const { spawn } = await import("node:child_process");
   return await new Promise((resolve) => {
-    const child = spawn("bash", ["-lc", command], { env: { ...process.env, ...env }, cwd: process.cwd() });
+    const child = spawn(command, args, { env: { ...process.env, ...env }, cwd: process.cwd(), shell: process.platform === "win32" });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => {
@@ -83,6 +84,18 @@ const runCommand = async (command: string, env: NodeJS.ProcessEnv): Promise<{ co
       resolve({ code: code ?? 1, stdout, stderr });
     });
   });
+};
+
+
+export const extractStopReason = (row: Record<string, unknown>): string => {
+  const debug = row.debug;
+  const debugRecord = debug && typeof debug === "object" ? (debug as Record<string, unknown>) : undefined;
+  return String(
+    debugRecord?.agent_stop_reason ??
+      debugRecord?.controller_stop_reason ??
+      row.stop_reason ??
+      "",
+  );
 };
 
 const countFailures = (failures: Array<{ key: string; count: number }>, key: string): number =>
@@ -118,8 +131,7 @@ const evaluateCandidate = async (candidate: Candidate, rootOutDir: string): Prom
     HELIX_ASK_VERSATILITY_FAIL_ON_INCOMPLETE: "1",
   };
 
-  const cmd = "npx tsx scripts/helix-ask-versatility-record.ts";
-  const result = await runCommand(cmd, env);
+  const result = await runCommand("npx", ["tsx", "scripts/helix-ask-versatility-record.ts"], env);
   if (result.code !== 0) {
     return {
       id: candidate.id,
@@ -158,7 +170,7 @@ const evaluateCandidate = async (candidate: Candidate, rootOutDir: string): Prom
     rows.push(one);
   }
 
-  const clockaStops = rows.filter((row) => String(row.stop_reason ?? "") === "clocka_tool_cap").length;
+  const clockaStops = rows.filter((row) => extractStopReason(row) === "clocka_tool_cap").length;
   const invalidErrors = rows.filter((row) => {
     const failures = (row.failures ?? []) as unknown[];
     return failures.some((f) => String(f).startsWith("request_failed:"));
@@ -292,7 +304,11 @@ async function main() {
   console.log(JSON.stringify({ outDir, summary, winner }, null, 2));
 }
 
-main().catch((error) => {
-  console.error("[helix-ask-quake-weight-tuning] failed", error);
-  process.exit(1);
-});
+const isMainModule = process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
+
+if (isMainModule) {
+  main().catch((error) => {
+    console.error("[helix-ask-quake-weight-tuning] failed", error);
+    process.exit(1);
+  });
+}

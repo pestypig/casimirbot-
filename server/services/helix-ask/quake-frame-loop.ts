@@ -77,6 +77,14 @@ const PROFILE_WEIGHTS: Record<HelixAskMovePolicyProfile, HelixAskProfileWeights>
   latency_first: { goal: 1, evidenceGain: 0.8, latencyCost: 1.35, risk: 1, budgetPressure: 1.2 },
 };
 
+const PROFILE_WEIGHT_KEYS: Array<keyof HelixAskProfileWeights> = [
+  "goal",
+  "evidenceGain",
+  "latencyCost",
+  "risk",
+  "budgetPressure",
+];
+
 const parseProfileWeightsOverride = (): Partial<Record<HelixAskMovePolicyProfile, Partial<HelixAskProfileWeights>>> => {
   const raw = process.env.HELIX_ASK_MOVE_PROFILE_WEIGHTS;
   if (!raw) return {};
@@ -87,13 +95,16 @@ const parseProfileWeightsOverride = (): Partial<Record<HelixAskMovePolicyProfile
       const row = parsed?.[profile];
       if (!row || typeof row !== "object") continue;
       const candidate = row as Record<string, unknown>;
-      out[profile] = {
-        goal: Number(candidate.goal ?? Number.NaN),
-        evidenceGain: Number(candidate.evidenceGain ?? Number.NaN),
-        latencyCost: Number(candidate.latencyCost ?? Number.NaN),
-        risk: Number(candidate.risk ?? Number.NaN),
-        budgetPressure: Number(candidate.budgetPressure ?? Number.NaN),
-      };
+      const safeWeights: Partial<HelixAskProfileWeights> = {};
+      for (const key of PROFILE_WEIGHT_KEYS) {
+        const numeric = Number(candidate[key]);
+        if (Number.isFinite(numeric)) {
+          safeWeights[key] = numeric;
+        }
+      }
+      if (Object.keys(safeWeights).length > 0) {
+        out[profile] = safeWeights;
+      }
     }
     return out;
   } catch {
@@ -107,6 +118,8 @@ const clamp01 = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
 };
+
+const finiteNumber = (value: number): number => (Number.isFinite(value) ? value : 0);
 
 export const rankMovesDeterministically = (
   moveScores: Record<HelixAskMove, number>,
@@ -212,7 +225,7 @@ export const selectDeterministicMoveWithDebug = (
 
   const selectedMove = ranked[0]?.move ?? "clarify";
   const moveScores = Object.fromEntries(
-    ranked.map((entry) => [entry.move, entry.score]),
+    ranked.map((entry) => [entry.move, finiteNumber(entry.score)]),
   ) as Record<HelixAskMove, number>;
   const rejectedMoves = ranked.slice(1).map((entry) => entry.move);
   const rejectReasons: Record<HelixAskMove, string[]> = {
