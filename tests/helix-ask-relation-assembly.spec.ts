@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildRelationAssemblyPacket, resolveRelationTopologySignal } from "../server/services/helix-ask/relation-assembly";
+import {
+  buildRelationAssemblyPacket,
+  evaluateRelationPacketFloors,
+  resolveRelationTopologySignal,
+} from "../server/services/helix-ask/relation-assembly";
 
 describe("relation assembly packet", () => {
   it("builds warp+ethos packet with deterministic bridge claims", () => {
@@ -28,5 +32,37 @@ describe("relation assembly packet", () => {
     });
     expect(signal.dualDomainAnchors).toBe(false);
     expect(signal.missingAnchors).toContain("ethos");
+  });
+
+
+  it("enforces relation packet floors with structured fail reasons", () => {
+    const lowBridgePacket = {
+      question: "q",
+      domains: ["warp", "ethos"],
+      definitions: { warp_definition: "w", ethos_definition: "e" },
+      bridge_claims: ["only-one"],
+      constraints: [],
+      falsifiability_hooks: [],
+      evidence: [
+        {
+          evidence_id: "ev_1",
+          path: "docs/knowledge/warp/warp-bubble.md",
+          span: "L1-L1",
+          snippet: "warp",
+          domain: "warp" as const,
+        },
+      ],
+      source_map: { ev_1: "docs/knowledge/warp/warp-bubble.md#L1-L1" },
+    };
+    const bridgeFail = evaluateRelationPacketFloors(lowBridgePacket, { minBridges: 2, minEvidence: 2 });
+    expect(bridgeFail.ok).toBe(false);
+    expect(bridgeFail.failReason).toBe("bridge_count_low");
+
+    const evidenceFail = evaluateRelationPacketFloors(
+      { ...lowBridgePacket, bridge_claims: ["a", "b"] },
+      { minBridges: 2, minEvidence: 2 },
+    );
+    expect(evidenceFail.ok).toBe(false);
+    expect(evidenceFail.failReason).toBe("evidence_count_low");
   });
 });

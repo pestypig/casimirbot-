@@ -54,6 +54,19 @@ describe("stripRunawayAnswerArtifacts", () => {
       "Sources: server/services/helix-ask/repo-search.ts, server/routes/agi.plan.ts",
     ].join("\n"));
   });
+
+  it("keeps at least one Sources line after artifact stripping", () => {
+    const input = [
+      "Grounded relation answer body.",
+      "",
+      "sources: docs/knowledge/warp/warp-bubble.md, docs/ethos/ideology.json",
+      "",
+      "Tree Walk",
+      "- debug",
+    ].join("\n");
+    const cleaned = stripRunawayAnswerArtifacts(input);
+    expect(cleaned).toMatch(/Sources:\s*docs\/knowledge\/warp\/warp-bubble\.md/i);
+  });
 });
 
 
