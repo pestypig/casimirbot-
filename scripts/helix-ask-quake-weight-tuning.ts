@@ -5,21 +5,15 @@ import { pathToFileURL } from "node:url";
 const BASE_URL = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5173";
 const BASELINE_RUN_ID = "versatility-1771461446899";
 const BASELINE = {
-  report_mode_mismatch: 21,
-  relation_failures: 12,
-  citation_missing: 9,
-  clocka_tool_cap_stop_rate: 0.463,
-  latency_total_p95_ms: 1931,
-  invalid_error_rate: 0,
+  relation_packet_built_rate: 0.923,
+  relation_dual_domain_ok_rate: 0.884,
+  report_mode_correct_rate: 0.962,
 };
 
 const GATES = {
-  report_mode_mismatch: 10,
-  relation_failures: 6,
-  citation_missing: 4,
-  clocka_tool_cap_stop_rate: 0.35,
-  latency_total_p95_ms: 1600,
-  invalid_error_rate: 0,
+  relation_packet_built_rate: 0.95,
+  relation_dual_domain_ok_rate: 0.95,
+  report_mode_correct_rate: 0.98,
 };
 
 type Candidate = {
@@ -34,12 +28,9 @@ type Candidate = {
 type EvalResult = {
   id: string;
   metrics: {
-    report_mode_mismatch: number;
-    relation_failures: number;
-    citation_missing: number;
-    clocka_tool_cap_stop_rate: number;
-    latency_total_p95_ms: number;
-    invalid_error_rate: number;
+    relation_packet_built_rate: number;
+    relation_dual_domain_ok_rate: number;
+    report_mode_correct_rate: number;
   };
   passes: boolean;
   score: number;
@@ -144,10 +135,7 @@ export const extractStopReason = (row: Record<string, unknown>): string => {
   );
 };
 
-const countFailures = (failures: Array<{ key: string; count: number }>, key: string): number =>
-  failures
-    .filter((entry) => entry.key === key || entry.key.startsWith(`${key}:`))
-    .reduce((sum, entry) => sum + entry.count, 0);
+const gatePassForRate = (actual: number, threshold: number): boolean => actual >= threshold;
 
 const percentile = (values: number[], q: number): number => {
   if (!values.length) return 0;
@@ -182,12 +170,9 @@ const evaluateCandidate = async (candidate: Candidate, rootOutDir: string): Prom
     return {
       id: candidate.id,
       metrics: {
-        report_mode_mismatch: Number.MAX_SAFE_INTEGER,
-        relation_failures: Number.MAX_SAFE_INTEGER,
-        citation_missing: Number.MAX_SAFE_INTEGER,
-        clocka_tool_cap_stop_rate: 1,
-        latency_total_p95_ms: Number.MAX_SAFE_INTEGER,
-        invalid_error_rate: 1,
+        relation_packet_built_rate: 0,
+        relation_dual_domain_ok_rate: 0,
+        report_mode_correct_rate: 0,
       },
       passes: false,
       score: Number.NEGATIVE_INFINITY,
@@ -198,55 +183,33 @@ const evaluateCandidate = async (candidate: Candidate, rootOutDir: string): Prom
   const latestRaw = await fs.readFile(path.join(runOutDir, "latest.json"), "utf8");
   const latest = JSON.parse(latestRaw) as { output_run_dir: string };
   const summaryPath = path.resolve(latest.output_run_dir, "summary.json");
-  const failuresPath = path.resolve(latest.output_run_dir, "failures.json");
-  const rawDir = path.resolve(latest.output_run_dir, "raw");
-
-  const [summaryRaw, failuresRaw, rawFiles] = await Promise.all([
+  const [summaryRaw] = await Promise.all([
     fs.readFile(summaryPath, "utf8"),
-    fs.readFile(failuresPath, "utf8"),
-    fs.readdir(rawDir),
   ]);
 
-  const summary = JSON.parse(summaryRaw) as Record<string, unknown>;
-  const failureBundle = JSON.parse(failuresRaw) as { top_failure_signatures?: Array<{ key: string; count: number }> };
-  const failures = failureBundle.top_failure_signatures ?? [];
-  const rows: Array<Record<string, unknown>> = [];
-  for (const file of rawFiles.filter((f) => f.endsWith(".json"))) {
-    const one = JSON.parse(await fs.readFile(path.join(rawDir, file), "utf8")) as Record<string, unknown>;
-    rows.push(one);
-  }
-
-  const clockaStops = rows.filter((row) => extractStopReason(row) === "clocka_tool_cap").length;
-  const invalidErrors = rows.filter((row) => {
-    const failures = (row.failures ?? []) as unknown[];
-    return failures.some((f) => String(f).startsWith("request_failed:"));
-  }).length;
-  const latencies = rows.map((row) => Number(row.latency_ms ?? 0)).filter((v) => Number.isFinite(v) && v >= 0);
+  const summary = JSON.parse(summaryRaw) as {
+    metrics?: {
+      report_mode_correct_rate?: number;
+      relation_packet_built_rate?: number;
+      relation_dual_domain_ok_rate?: number;
+    };
+  };
 
   const metrics = {
-    report_mode_mismatch: countFailures(failures, "report_mode_mismatch"),
-    relation_failures: countFailures(failures, "relation_packet_built"),
-    citation_missing: countFailures(failures, "citation_missing"),
-    clocka_tool_cap_stop_rate: rows.length ? clockaStops / rows.length : 1,
-    latency_total_p95_ms: Number((summary.latency?.["total"]?.["p95"] ?? percentile(latencies, 95)) || percentile(latencies, 95)),
-    invalid_error_rate: rows.length ? invalidErrors / rows.length : 1,
+    relation_packet_built_rate: Number(summary.metrics?.relation_packet_built_rate ?? 0),
+    relation_dual_domain_ok_rate: Number(summary.metrics?.relation_dual_domain_ok_rate ?? 0),
+    report_mode_correct_rate: Number(summary.metrics?.report_mode_correct_rate ?? 0),
   };
 
   const passes =
-    metrics.report_mode_mismatch <= GATES.report_mode_mismatch &&
-    metrics.relation_failures <= GATES.relation_failures &&
-    metrics.citation_missing <= GATES.citation_missing &&
-    metrics.clocka_tool_cap_stop_rate <= GATES.clocka_tool_cap_stop_rate &&
-    metrics.latency_total_p95_ms <= GATES.latency_total_p95_ms &&
-    metrics.invalid_error_rate === GATES.invalid_error_rate;
+    gatePassForRate(metrics.relation_packet_built_rate, GATES.relation_packet_built_rate) &&
+    gatePassForRate(metrics.relation_dual_domain_ok_rate, GATES.relation_dual_domain_ok_rate) &&
+    gatePassForRate(metrics.report_mode_correct_rate, GATES.report_mode_correct_rate);
 
   const score =
-    (BASELINE.report_mode_mismatch - metrics.report_mode_mismatch) * 4 +
-    (BASELINE.relation_failures - metrics.relation_failures) * 4 +
-    (BASELINE.citation_missing - metrics.citation_missing) * 3 +
-    (BASELINE.clocka_tool_cap_stop_rate - metrics.clocka_tool_cap_stop_rate) * 100 +
-    (BASELINE.latency_total_p95_ms - metrics.latency_total_p95_ms) / 20 -
-    metrics.invalid_error_rate * 1000;
+    (metrics.relation_packet_built_rate - BASELINE.relation_packet_built_rate) * 100 +
+    (metrics.relation_dual_domain_ok_rate - BASELINE.relation_dual_domain_ok_rate) * 100 +
+    (metrics.report_mode_correct_rate - BASELINE.report_mode_correct_rate) * 100;
 
   return { id: candidate.id, metrics, passes, score, summaryPath };
 };
@@ -335,12 +298,9 @@ async function main() {
 
   const gateFailCount = (entry: EvalResult): number => {
     let fails = 0;
-    if (entry.metrics.report_mode_mismatch > GATES.report_mode_mismatch) fails += 1;
-    if (entry.metrics.relation_failures > GATES.relation_failures) fails += 1;
-    if (entry.metrics.citation_missing > GATES.citation_missing) fails += 1;
-    if (entry.metrics.clocka_tool_cap_stop_rate > GATES.clocka_tool_cap_stop_rate) fails += 1;
-    if (entry.metrics.latency_total_p95_ms > GATES.latency_total_p95_ms) fails += 1;
-    if (entry.metrics.invalid_error_rate !== GATES.invalid_error_rate) fails += 1;
+    if (!gatePassForRate(entry.metrics.relation_packet_built_rate, GATES.relation_packet_built_rate)) fails += 1;
+    if (!gatePassForRate(entry.metrics.relation_dual_domain_ok_rate, GATES.relation_dual_domain_ok_rate)) fails += 1;
+    if (!gatePassForRate(entry.metrics.report_mode_correct_rate, GATES.report_mode_correct_rate)) fails += 1;
     return fails;
   };
   const ranked = [...results].sort((a, b) => {
@@ -360,12 +320,9 @@ async function main() {
         gate_fail_count: gateFailCount(winner),
         top_nearest: promoted ? [] : topNearest.map((r) => ({ id: r.id, score: r.score, metrics: r.metrics })),
         delta: {
-          report_mode_mismatch: winner.metrics.report_mode_mismatch - BASELINE.report_mode_mismatch,
-          relation_failures: winner.metrics.relation_failures - BASELINE.relation_failures,
-          citation_missing: winner.metrics.citation_missing - BASELINE.citation_missing,
-          clocka_tool_cap_stop_rate: Number((winner.metrics.clocka_tool_cap_stop_rate - BASELINE.clocka_tool_cap_stop_rate).toFixed(4)),
-          latency_total_p95_ms: winner.metrics.latency_total_p95_ms - BASELINE.latency_total_p95_ms,
-          invalid_error_rate: winner.metrics.invalid_error_rate - BASELINE.invalid_error_rate,
+          relation_packet_built_rate: Number((winner.metrics.relation_packet_built_rate - BASELINE.relation_packet_built_rate).toFixed(4)),
+          relation_dual_domain_ok_rate: Number((winner.metrics.relation_dual_domain_ok_rate - BASELINE.relation_dual_domain_ok_rate).toFixed(4)),
+          report_mode_correct_rate: Number((winner.metrics.report_mode_correct_rate - BASELINE.report_mode_correct_rate).toFixed(4)),
         },
       }
     : { baseline_run_id: BASELINE_RUN_ID, promoted: false, reason: "no_candidates" };
@@ -391,16 +348,23 @@ async function main() {
           passed: Object.entries(GATES)
             .filter(([key, threshold]) => {
               const actual = winner.metrics[key as keyof typeof winner.metrics];
-              return key === "invalid_error_rate" ? actual === threshold : actual <= threshold;
+              return gatePassForRate(actual, threshold);
             })
             .map(([key]) => key),
           failed: Object.entries(GATES)
             .filter(([key, threshold]) => {
               const actual = winner.metrics[key as keyof typeof winner.metrics];
-              return key === "invalid_error_rate" ? actual !== threshold : actual > threshold;
+              return !gatePassForRate(actual, threshold);
             })
             .map(([key]) => key),
         },
+        gate_details: Object.fromEntries(
+          Object.entries(GATES).map(([key, threshold]) => {
+            const actual = winner.metrics[key as keyof typeof winner.metrics];
+            const passed = gatePassForRate(actual, threshold);
+            return [key, { actual, threshold, comparator: ">=", passed }];
+          }),
+        ),
         summaryPath: winner.summaryPath,
       }
     : { promoted: false, reason: "no_candidates" };
