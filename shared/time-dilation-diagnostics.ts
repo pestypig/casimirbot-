@@ -25,6 +25,7 @@ const BETA_WARP_PERCENTILE = 0.98;
 const THETA_WARP_PERCENTILE = 0.98;
 const GAMMA_WARP_PERCENTILE = 0.98;
 const SHEAR_WARP_PERCENTILE = 0.98;
+const SPEED_OF_LIGHT_MPS = 299_792_458;
 
 const STAGE_RANK: Record<string, number> = {
   unstaged: -1,
@@ -72,6 +73,11 @@ export type TimeDilationDiagnostics = {
     observerFamily: "eulerian_adm" | "grid_static" | "ship_comoving" | "geodesic_bundle";
     chart: string | null;
     units: string | null;
+    valid?: boolean;
+    missingFields?: string[];
+    value?: number | null;
+    formula?: string;
+    details?: Record<string, unknown>;
   }>;
   provenance: Record<string, {
     source: string;
@@ -202,6 +208,89 @@ const resolveCongruenceRequirements = (canonical: CanonicalField, definitions: D
   return {
     requiredFieldsOk: missingFields.length === 0,
     missingFields,
+  };
+};
+
+const finiteVec3 = (value: unknown): [number, number, number] | null => {
+  if (!Array.isArray(value) || value.length < 3) return null;
+  const x = toNumber(value[0]);
+  const y = toNumber(value[1]);
+  const z = toNumber(value[2]);
+  if (x == null || y == null || z == null) return null;
+  return [x, y, z];
+};
+
+const resolveShipWorldline = (pipeline: any): { dxdt: [number, number, number] | null; source: string | null } => {
+  const candidates: Array<{ value: unknown; source: string }> = [
+    { value: pipeline?.shipKinematics?.dxdt, source: "pipeline.shipKinematics.dxdt" },
+    { value: pipeline?.shipKinematics?.dxdt_mps, source: "pipeline.shipKinematics.dxdt_mps" },
+    { value: pipeline?.shipKinematics?.velocity_mps, source: "pipeline.shipKinematics.velocity_mps" },
+    { value: pipeline?.worldline?.dxdt, source: "pipeline.worldline.dxdt" },
+    { value: pipeline?.navPose?.velocity_mps, source: "pipeline.navPose.velocity_mps" },
+  ];
+  for (const entry of candidates) {
+    const parsed = finiteVec3(entry.value);
+    if (parsed) return { dxdt: parsed, source: entry.source };
+  }
+  return { dxdt: null, source: null };
+};
+
+const resolveShipComovingDtauDt = (pipeline: any, proofPack: ProofPack | null) => {
+  const missingFields: string[] = [];
+  const alpha = toNumber((pipeline as any)?.warp?.metricAdapter?.alpha) ?? toNumber(readProofString(proofPack, "metric_alpha"));
+  const gammaDiag = finiteVec3((pipeline as any)?.warp?.metricAdapter?.gammaDiag) ?? [
+    toNumber(readProofString(proofPack, "metric_gamma_xx")) ?? NaN,
+    toNumber(readProofString(proofPack, "metric_gamma_yy")) ?? NaN,
+    toNumber(readProofString(proofPack, "metric_gamma_zz")) ?? NaN,
+  ];
+  const beta =
+    finiteVec3((pipeline as any)?.shipKinematics?.betaCoord) ??
+    finiteVec3((pipeline as any)?.shipKinematics?.beta_xyz) ??
+    finiteVec3((pipeline as any)?.warp?.metricAdapter?.betaVector) ??
+    finiteVec3((pipeline as any)?.warp?.shiftVectorField?.betaVector);
+  const { dxdt, source: worldlineSource } = resolveShipWorldline(pipeline);
+
+  if (alpha == null) missingFields.push("warp.metricAdapter.alpha");
+  if (!finiteVec3(gammaDiag)) missingFields.push("warp.metricAdapter.gammaDiag");
+  if (!beta) missingFields.push("shipKinematics.betaCoord");
+  if (!dxdt) missingFields.push("shipKinematics.dxdt");
+
+  const valid = missingFields.length === 0;
+  if (!valid) {
+    return { valid, missingFields, value: null, details: { worldlineSource } };
+  }
+
+  const vRaw = dxdt as [number, number, number];
+  const mpsLike = Math.max(Math.abs(vRaw[0]), Math.abs(vRaw[1]), Math.abs(vRaw[2])) > 1;
+  const vCoord: [number, number, number] = mpsLike
+    ? [vRaw[0] / SPEED_OF_LIGHT_MPS, vRaw[1] / SPEED_OF_LIGHT_MPS, vRaw[2] / SPEED_OF_LIGHT_MPS]
+    : vRaw;
+  const betaEff: [number, number, number] = [
+    vCoord[0] + (beta as [number, number, number])[0],
+    vCoord[1] + (beta as [number, number, number])[1],
+    vCoord[2] + (beta as [number, number, number])[2],
+  ];
+  const gamma = gammaDiag as [number, number, number];
+  const spatialTerm =
+    gamma[0] * betaEff[0] * betaEff[0] +
+    gamma[1] * betaEff[1] * betaEff[1] +
+    gamma[2] * betaEff[2] * betaEff[2];
+  const underRoot = (alpha as number) * (alpha as number) - spatialTerm;
+
+  return {
+    valid: underRoot > 0,
+    missingFields,
+    value: underRoot > 0 ? Math.sqrt(underRoot) : null,
+    details: {
+      worldlineSource,
+      velocityInput: vRaw,
+      velocityInterpreted: mpsLike ? "m/s" : "coordinate",
+      velocityCoord: vCoord,
+      betaCoord: beta,
+      gammaDiag: gamma,
+      alpha,
+      underRoot,
+    },
   };
 };
 
@@ -651,6 +740,15 @@ export async function buildTimeDilationDiagnostics(
 
   const congruenceKind = resolveCongruenceKind(canonical);
   const congruenceRequirements = resolveCongruenceRequirements(canonical, definitions);
+  const shipComovingDtauDt = resolveShipComovingDtauDt(pipeline, proofPack);
+
+  if (congruenceKind === "ship_comoving" && !shipComovingDtauDt.valid) {
+    congruenceRequirements.requiredFieldsOk = false;
+    congruenceRequirements.missingFields = [
+      ...congruenceRequirements.missingFields,
+      ...shipComovingDtauDt.missingFields,
+    ];
+  }
 
   const provenance = {
     alpha: {
@@ -706,6 +804,18 @@ export async function buildTimeDilationDiagnostics(
       },
     ]),
   );
+
+  observables.ship_comoving_dtau_dt = {
+    source: "adm_worldline",
+    observerFamily: "ship_comoving",
+    chart: canonical.chart,
+    units: "dimensionless",
+    valid: shipComovingDtauDt.valid,
+    missingFields: shipComovingDtauDt.missingFields,
+    value: shipComovingDtauDt.value,
+    formula: "dτ/dt = sqrt(alpha^2 - gamma_ij (dx^i/dt + beta^i)(dx^j/dt + beta^j))",
+    details: shipComovingDtauDt.details,
+  };
 
   const divBetaRms = toNumber((pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaRms);
   const divBetaMaxAbs = toNumber((pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaMaxAbs);
