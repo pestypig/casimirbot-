@@ -139,7 +139,7 @@
       ],
       "falsifier": {
         "observable": "entropy-lane-preserving equation-grounded path completeness",
-        "reject_rule": "missing canonical equation refs OR missing bridge provenance metadata OR entropy_to_life_path_order_ok != true",
+        "reject_rule": "missing canonical equation refs OR missing bridge provenance metadata OR entropy_to_life_path_order_ok != true OR missing residual evidence",
         "uncertainty_model": "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90,window=rolling_20)",
         "test_refs": [
           "scripts/validate-physics-equation-backbone.ts",
