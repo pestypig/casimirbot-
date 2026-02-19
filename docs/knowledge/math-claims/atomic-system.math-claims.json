@@ -146,13 +146,13 @@
       ]
     },
     {
-      "claimId": "atomic.telemetry.drift.display-proxy.v1",
-      "statement": "Pipeline-derived drift in the orbital instrumentation loop is a diagnostic display proxy and must not be treated as an equation-bound physics assertion.",
+      "claimId": "telemetry_drift_injection_for_atomic_instrumentation.v1",
+      "statement": "Telemetry drift injection in the orbital instrumentation loop is a diagnostic display proxy and must not be treated as an equation-bound physics assertion.",
       "maturity": "diagnostic",
       "validityDomain": {
-        "system": "electron orbital simulator instrumentation",
+        "system": "electron orbital simulator instrumentation bridge lane",
         "constraints": [
-          "telemetry-seeded display proxy only",
+          "telemetry-seeded drift injection for display proxy only",
           "not mapped to stress-energy tensor",
           "non-certifying claim tier"
         ]
@@ -180,7 +180,7 @@
         "client/src/hooks/useElectronOrbitSim.ts",
         "client/src/components/ElectronOrbitalPanel.tsx"
       ],
-      "notes": "This claim intentionally blocks certification semantics for telemetry drift coupling."
+      "notes": "This bridge claim intentionally blocks certification semantics for telemetry drift coupling."
     },
     {
       "claimId": "atomic_energy_to_energy_density_proxy.v1",

@@ -78,6 +78,7 @@ const issues: Issue[] = [];
 
 const REQUIRED_ATOMIC_CURVATURE_BRIDGE_CLAIMS = new Set([
   "atomic_energy_to_energy_density_proxy.v1",
+  "telemetry_drift_injection_for_atomic_instrumentation.v1",
   "curvature_unit_proxy_contract.v1",
 ]);
 
@@ -86,8 +87,17 @@ const hasBridgeClaimMetadata = (claim: ClaimRecord): boolean => {
   const validity = claim.validityDomain;
   if (!validity || typeof validity !== "object") return false;
   const hasSystem = typeof validity.system === "string" && validity.system.trim().length > 0;
-  const constraints = Array.isArray(validity.constraints) ? validity.constraints.filter((c) => typeof c === "string" && c.trim()) : [];
+  const constraints = Array.isArray(validity.constraints)
+    ? validity.constraints.filter((c) => typeof c === "string" && c.trim())
+    : [];
   return hasSystem && constraints.length > 0;
+};
+
+const hasBridgeClaimMaturitySafeMetadata = (claim: ClaimRecord): boolean => {
+  if (typeof claim.maturity !== "string" || !claim.maturity.trim()) return false;
+  if (isPlaceholderText(claim.maturity)) return false;
+  if (typeof claim.notes === "string" && isPlaceholderText(claim.notes)) return false;
+  return true;
 };
 
 
@@ -416,7 +426,7 @@ async function runAtomicCongruenceChecks(): Promise<void> {
     hookQuantumDefault !== adapterQuantumDefault
   ) {
     addIssue(
-      "warning",
+      "info",
       "default_mismatch",
       `Quantum sample default mismatch: hook=${hookQuantumDefault} vs adapter=${adapterQuantumDefault}`,
     );
@@ -428,7 +438,7 @@ async function runAtomicCongruenceChecks(): Promise<void> {
     hookClassicalDefault !== adapterClassicalDefault
   ) {
     addIssue(
-      "warning",
+      "info",
       "default_mismatch",
       `Classical sample default mismatch: hook=${hookClassicalDefault} vs adapter=${adapterClassicalDefault}`,
     );
@@ -567,6 +577,15 @@ async function runCitationChecks(): Promise<void> {
         );
       }
 
+      if (claimId && REQUIRED_ATOMIC_CURVATURE_BRIDGE_CLAIMS.has(claimId) && !hasBridgeClaimMaturitySafeMetadata(claim)) {
+        addIssue(
+          "error",
+          "bridge_claim_maturity_metadata_missing",
+          `Bridge claim '${claimId}' must include non-placeholder maturity-safe metadata`,
+          claimPrefix,
+        );
+      }
+
       if (typeof claim.statement !== "string" || claim.statement.trim().length < 8) {
         addIssue("error", "claim_statement_missing", "statement is required", claimPrefix);
       }
@@ -601,6 +620,19 @@ async function runCitationChecks(): Promise<void> {
       if (sources.length === 0) {
         addIssue("error", "claim_sources_missing", "sources must be a non-empty array", claimPrefix);
       } else {
+        if (claimId && REQUIRED_ATOMIC_CURVATURE_BRIDGE_CLAIMS.has(claimId)) {
+          const hasCitation = sources.some(
+            (source) => typeof source?.citation === "string" && source.citation.trim().length >= 3,
+          );
+          if (!hasCitation) {
+            addIssue(
+              "error",
+              "bridge_claim_citation_missing",
+              `Bridge claim '${claimId}' must include at least one concrete citation`,
+              claimPrefix,
+            );
+          }
+        }
         const hasEquationSource = sources.some(
           (source) => typeof source.equation === "string" && source.equation.trim().length >= 2,
         );

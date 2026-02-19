@@ -87,6 +87,7 @@ Do not present reduced-order claims as certified.
 The following bridge claim IDs are required for TOE curvature-atomic congruence rails:
 
 - `atomic_energy_to_energy_density_proxy.v1`
+- `telemetry_drift_injection_for_atomic_instrumentation.v1`
 - `curvature_unit_proxy_contract.v1`
 
 For these bridge claims, the checker enforces:
@@ -95,8 +96,9 @@ For these bridge claims, the checker enforces:
 2. `validityDomain.system` is populated
 3. `validityDomain.constraints` is a non-empty array
 4. `sources` include concrete non-placeholder citations
+5. non-placeholder maturity-safe metadata (maturity required; placeholder maturity/notes rejected)
 
-Missing required bridge claims or missing bridge-domain metadata is an ERROR.
+Missing required bridge claims or missing bridge citation/domain/maturity metadata is an ERROR.
 
 ## CI Gate Semantics
 
