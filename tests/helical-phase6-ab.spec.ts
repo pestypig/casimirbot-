@@ -106,3 +106,93 @@ describe("helical phase6 harness scoreability classification", () => {
     });
   });
 });
+
+describe("helical phase6 validity gates and blocked decision policy", () => {
+  const seeds = [1103, 2081] as const;
+
+  const makeRow = (overrides: Record<string, unknown> = {}) => ({
+    arm: "A",
+    promptId: "p1",
+    seed: 1103,
+    replayIndex: 1,
+    attempt: 1,
+    traceId: "t1",
+    status: 200,
+    latencyMs: 10,
+    payload: {
+      text: "ok",
+      debug: {
+        semantic_quality: {
+          claim_citation_link_rate: 0.8,
+          unsupported_claim_rate: 0.2,
+          contradiction_flag: false,
+          fail_reasons: [],
+        },
+        event_journal: { replay_parity: true, event_hash: "h" },
+      },
+    },
+    metrics: {
+      pass: true,
+      scoreable: true,
+      contradiction: false,
+      claim_to_hook_linkage: 0.8,
+      unsupported_claim_rate: 0.2,
+      replay_flag: true,
+      event_hash: "h",
+      fail_class: null,
+      fail_reason: null,
+    },
+    ...overrides,
+  });
+
+  it("passes validity gates for complete and scoreable coverage", () => {
+    const armRows = [
+      makeRow({ promptId: "p1", seed: 1103 }),
+      makeRow({ promptId: "p2", seed: 1103, metrics: { ...makeRow().metrics, claim_to_hook_linkage: 0.6 } }),
+      makeRow({ promptId: "p1", seed: 2081, metrics: { ...makeRow().metrics, unsupported_claim_rate: 0.3 } }),
+      makeRow({ promptId: "p2", seed: 2081 }),
+    ] as never[];
+
+    const summaryA = __test.summarizeArm(armRows, seeds, 4);
+    const summaryB = __test.summarizeArm(armRows, seeds, 4);
+    const validity = __test.computeValidity(summaryA, summaryB);
+
+    expect(validity.valid).toBe(true);
+    expect(validity.failures).toEqual([]);
+  });
+
+  it("blocks decisions and retains locked layers when validity fails", () => {
+    const badRows = [
+      makeRow({
+        status: 0,
+        metrics: {
+          ...makeRow().metrics,
+          pass: false,
+          scoreable: false,
+          claim_to_hook_linkage: 0,
+          unsupported_claim_rate: 1,
+          fail_class: "timeout_soft",
+          fail_reason: "aborted",
+        },
+      }),
+    ] as never[];
+    const summaryA = __test.summarizeArm(badRows, seeds, 4);
+    const summaryB = __test.summarizeArm(badRows, seeds, 4);
+    const validity = __test.computeValidity(summaryA, summaryB);
+
+    const recommended = [{ layer: "telemetry_x_t", decision: "drop", basis: "x" }];
+    const locked = [{ layer: "telemetry_x_t", decision: "keep", basis: "phase6_locked_decision" }];
+    const resolved = __test.resolveLayerDecisions(validity.valid, recommended as never, locked as never);
+
+    expect(validity.valid).toBe(false);
+    expect(resolved.evaluation).toEqual({
+      blocked: true,
+      reason: "evaluation_blocked_due_to_run_invalidity",
+    });
+    expect(resolved.layerDecisions[0]).toMatchObject({
+      layer: "telemetry_x_t",
+      decision: "keep",
+    });
+    expect(String(resolved.layerDecisions[0].basis)).toContain("evaluation_blocked_due_to_run_invalidity");
+  });
+});
