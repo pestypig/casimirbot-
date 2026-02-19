@@ -5,7 +5,7 @@ import {
   __testOnlyResolveBridgeMissingEvidencePath,
   __testOnlyResolveTreeNeighborIds,
   resolveHelixAskGraphPack,
-} from "../server/services/helix-ask/graph-resolver";
+  } from "../server/services/helix-ask/graph-resolver";
 import { __testOnlyResolveRuntimeSafetyGateValidation } from "../server/services/helix-ask/relation-assembly";
 
 const BASE_REGION = {
@@ -235,6 +235,62 @@ describe("helix ask graph resolver congruence overrides", () => {
 
     expect(neighborsWithCondition).toContain("cl3-target");
     expect(neighborsWithoutCondition).not.toContain("cl3-target");
+  });
+
+
+  it("keeps conceptual traversal behavior intact for non-physics nodes", () => {
+    const neighbors = __testOnlyResolveTreeNeighborIds({
+      treeId: "condition-fixture",
+      treePath: "tests/fixtures/graph-congruence-conditions-tree.json",
+      nodeId: "condition-root",
+      congruenceWalkOverride: {
+        allowedCL: "CL4",
+        allowConceptual: true,
+        allowProxies: false,
+      },
+    });
+
+    expect(neighbors).toContain("conceptual-child");
+  });
+
+  it("blocks proxy/physics bridge traversal when equation_ref is missing", () => {
+    const neighbors = __testOnlyResolveTreeNeighborIds({
+      treeId: "condition-fixture",
+      treePath: "tests/fixtures/graph-congruence-conditions-tree.json",
+      nodeId: "condition-root",
+      congruenceWalkOverride: {
+        allowedCL: "CL4",
+        allowConceptual: false,
+        allowProxies: true,
+        region: {
+          ...BASE_REGION,
+          atomic_to_t_mu_nu_mapping_declared_equals_true: true,
+        },
+      },
+    });
+
+    expect(neighbors).not.toContain("proxy-bridge-target");
+  });
+
+  it("returns deterministic FAIL_NODE_MISSING_EQUATION_REF fallback reason", () => {
+    const pack = resolveHelixAskGraphPack({
+      question: "equation binding fixture rail",
+      topicTags: ["physics"],
+      lockedTreeIds: ["equation-binding-fixture"],
+      congruenceWalkOverride: {
+        allowedCL: "CL4",
+        allowConceptual: false,
+        allowProxies: true,
+        region: {
+          ...BASE_REGION,
+          atomic_to_t_mu_nu_mapping_declared_equals_true: true,
+        },
+      },
+    });
+
+    const framework = pack?.frameworks.find((entry) => entry.treeId === "equation-binding-fixture");
+    expect(framework?.treeId).toBe("equation-binding-fixture");
+    expect(framework?.pathFallbackReason).toBe("FAIL_NODE_MISSING_EQUATION_REF");
   });
 
   it("resolves cross-tree strict guardrail targets into traversal diagnostics", () => {

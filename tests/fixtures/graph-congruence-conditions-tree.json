@@ -6,7 +6,8 @@
       "title": "Condition Root",
       "tags": [],
       "children": [
-        "atomic-stress-energy-bridge-placeholder"
+        "atomic-stress-energy-bridge-placeholder",
+        "conceptual-child"
       ],
       "links": [
         {
@@ -43,8 +44,18 @@
           "edgeType": "guardrail_congruent",
           "requiresCL": "CL4",
           "condition": "atomic_to_t_mu_nu_mapping_declared=true"
+        },
+        {
+          "rel": "see-also",
+          "to": "proxy-bridge-target",
+          "edgeType": "proxy_only"
         }
-      ]
+      ],
+      "childMeta": {
+        "conceptual-child": {
+          "edgeType": "hierarchy"
+        }
+      }
     },
     {
       "id": "theta-target",
@@ -117,6 +128,27 @@
           "scope": "right"
         }
       ]
+    },
+    {
+      "id": "conceptual-child",
+      "title": "Conceptual Child",
+      "tags": [],
+      "children": [],
+      "links": []
+    },
+    {
+      "id": "proxy-bridge-target",
+      "title": "Proxy Bridge Target",
+      "nodeType": "bridge",
+      "tags": [
+        "proxy",
+        "bridge"
+      ],
+      "children": [],
+      "links": [],
+      "validity": {
+        "maturity_ceiling": "diagnostic"
+      }
     }
   ]
 }

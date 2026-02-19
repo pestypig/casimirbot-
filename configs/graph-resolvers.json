@@ -1547,6 +1547,28 @@
         "see-also": 1
       },
       "weight": 1.05
+    },
+    {
+      "id": "equation-binding-fixture",
+      "label": "Equation Binding Fixture",
+      "path": "tests/fixtures/graph-congruence-conditions-tree.json",
+      "topicTags": [
+        "physics"
+      ],
+      "matchers": [
+        "equation binding fixture rail"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 1,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 0.2
     }
   ],
   "routingPolicy": {
