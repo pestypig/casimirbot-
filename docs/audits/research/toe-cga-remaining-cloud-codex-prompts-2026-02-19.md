@@ -284,3 +284,227 @@ Done criteria:
 1. `Prompt 0` once.
 2. `Prompt 1` through `Prompt 7` sequentially.
 3. After each prompt, checkpoint commit and preserve verifier metadata in the commit note or ticket log.
+
+---
+
+## Post-Closure Remaining Build Prompts (Pre-New-Research)
+
+Use this section now that `TOE-CGA-001..008` rails/contracts are landed.  
+The remaining gap from the last research audit is **P2 implementation**:
+
+- actual `atomic -> stress-energy proxy` computation
+- explicit units/uncertainty/citation payloads for Helix paths
+- deterministic non-certifying semantics preserved
+
+### Prompt 8: P2 Coordinator (run once)
+
+```text
+Current repo status:
+- TOE-CGA-001..008 rails are already implemented and tested.
+- Remaining obligation is P2: implement actual atomic->stress-energy proxy computation and wire outputs into Helix viewer launch surfaces.
+
+Execution order (one commit per prompt):
+Prompt 9 -> Prompt 10 -> Prompt 11 -> Prompt 12
+
+Rules:
+1) Keep maturity ceiling diagnostic/reduced-order unless explicit certified evidence exists.
+2) Preserve strict-fail rails already landed (do not weaken placeholder fail paths).
+3) Additive changes only; no destructive rewrites.
+4) After each prompt run tests + Casimir verify.
+
+Required verify command after each prompt:
+npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci
+
+Report after each prompt:
+- files changed
+- behavior delta
+- tests run + result
+- casimir verify summary: verdict, firstFail, certificateHash, integrityOk, traceId, runId
+```
+
+### Prompt 9: P2-A Atomic Stress-Energy Proxy Compute Kernel
+
+```text
+Ticket: P2-A atomic stress-energy proxy compute
+Objective: Add deterministic computation that maps atomic orbital state parameters to a diagnostic stress-energy-relevant proxy payload with explicit units/uncertainty/citations.
+
+Allowed paths:
+- client/src/lib/atomic-orbitals.ts
+- shared/curvature-proxy.ts (read-only usage preferred; only patch if needed)
+- tests/atomic-orbital-claim-tier.spec.ts
+- add new test file under tests/, e.g. tests/atomic-stress-energy-proxy.spec.ts
+
+Implementation requirements:
+1) Add a typed output structure for atomic proxy mapping from orbital parameters:
+   - energy_scalar_eV
+   - energy_scalar_J
+   - effective_volume_m3
+   - energy_density_J_m3 (proxy, not <T_mu_nu>)
+   - kappa_proxy_m2 (via shared curvature helper if available)
+2) Attach explicit governance metadata to this proxy object:
+   - equation_ref: "atomic_energy_to_energy_density_proxy"
+   - uncertainty_model_id: non-empty deterministic id
+   - citation_claim_ids includes "atomic_energy_to_energy_density_proxy.v1"
+   - claim_tier: "diagnostic"
+   - provenance_class: "proxy"
+   - certifying: false
+3) Add a conservative uncertainty payload:
+   - relative_1sigma and absolute_1sigma_J_m3
+   - uncertainty assumptions text/labels for volume-scale ambiguity
+4) Keep semantics explicit: this is a diagnostic proxy, not stress-energy tensor inference.
+
+Required tests/commands:
+- npm run test -- tests/atomic-orbital-claim-tier.spec.ts tests/atomic-stress-energy-proxy.spec.ts
+- npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci
+
+Done criteria:
+- Deterministic atomic proxy compute exists and is test-covered.
+- Output includes units, uncertainty, equation ref, and citation claim ids.
+- Non-certifying proxy semantics enforced.
+```
+
+### Prompt 10: P2-B Wire Proxy into Atomic Runtime + Viewer Launch Contract
+
+```text
+Ticket: P2-B proxy wiring
+Objective: Surface computed atomic stress-energy proxy metadata through atomic runtime state and Helix viewer launch payloads.
+
+Allowed paths:
+- client/src/hooks/useElectronOrbitSim.ts
+- server/routes/agi.plan.ts
+- client/src/lib/agi/api.ts
+- client/src/components/ElectronOrbitalPanel.tsx
+- tests/helix-ask-modes.spec.ts
+- tests/atomic-orbital-claim-tier.spec.ts (if contract assertions belong here)
+
+Implementation requirements:
+1) Integrate proxy compute into atomic runtime hook output.
+2) Extend Helix atomic viewer launch type/contracts to include proxy payload block:
+   - stress_energy_proxy (or equivalent deterministic field name)
+   - include units + uncertainty + citation/equation metadata from Prompt 9
+3) Keep existing launch params backward-compatible.
+4) Ensure UI can read/use payload without breaking existing behavior.
+5) Do not emit certified wording or certifying=true for this lane.
+
+Required tests/commands:
+- npm run test -- tests/helix-ask-modes.spec.ts tests/atomic-orbital-claim-tier.spec.ts
+- npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci
+
+Done criteria:
+- Helix viewer launch includes deterministic proxy payload with governance metadata.
+- Existing atomic launch behavior remains compatible.
+- Tests and Casimir verify PASS.
+```
+
+### Prompt 11: P2-C Canonical Equation + Congruence Binding for Atomic Proxy
+
+```text
+Ticket: P2-C equation/cross-lane binding
+Objective: Canonically register the atomic energy-density proxy equation and bind it into matrix/rails without over-promoting maturity.
+
+Allowed paths:
+- configs/physics-equation-backbone.v1.json
+- configs/math-congruence-matrix.v1.json
+- docs/knowledge/physics/atomic-systems-tree.json
+- tests/physics-equation-backbone.spec.ts
+- tests/math-congruence-matrix.spec.ts
+- tests/helix-ask-graph-resolver.spec.ts
+
+Implementation requirements:
+1) Add equation id `atomic_energy_to_energy_density_proxy` to backbone with SI symbols and diagnostic claim tier.
+2) Add congruence matrix row for this equation with residual + falsifier metadata and explicit uncertainty model id.
+3) In atomic tree, add/upgrade node metadata for the proxy-compute path:
+   - validity.equation_ref bound to new canonical id
+   - claim_ids include atomic proxy claim id
+   - keep placeholder hard-fail node for unresolved atomic-><T_mu_nu> mapping
+4) Ensure graph resolver rails treat the new proxy node as equation-bound and claim-linked while preserving strict fail for actual tensor lift when missing.
+
+Required tests/commands:
+- npm run test -- tests/physics-equation-backbone.spec.ts tests/math-congruence-matrix.spec.ts tests/helix-ask-graph-resolver.spec.ts
+- npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci
+
+Done criteria:
+- Atomic proxy equation is canonical and matrix-bound.
+- Atomic tree expresses proxy path and preserves unresolved tensor-lift strict fail path.
+```
+
+### Prompt 12: P2-D Citation/Contract/Strict-rail Closure
+
+```text
+Ticket: P2-D contract closure
+Objective: Ensure citation checker and relation assembly rails recognize and enforce new atomic proxy outputs end-to-end.
+
+Allowed paths:
+- docs/knowledge/math-claims/atomic-system.math-claims.json
+- scripts/math-congruence-citation-check.ts
+- docs/math-citation-contract.md
+- server/services/helix-ask/relation-assembly.ts
+- tests/helix-ask-relation-assembly.spec.ts
+- tests/helix-ask-math.spec.ts
+
+Implementation requirements:
+1) Confirm atomic proxy claim entry includes required citations/validity-domain metadata for emitted payload.
+2) Extend checker coverage to fail when proxy-emitting nodes omit required claim ids/equation linkage metadata.
+3) Ensure relation assembly emits deterministic fail reason when proxy payload is missing uncertainty/citation metadata on cross-lane usage.
+4) Keep maturity ceiling propagation intact (diagnostic upstream cannot silently promote to certified outputs).
+
+Required tests/commands:
+- npm run math:congruence:check:strict
+- npm run test -- tests/helix-ask-relation-assembly.spec.ts tests/helix-ask-math.spec.ts
+- npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci
+
+Done criteria:
+- Citation and rail enforcement includes the new atomic proxy path.
+- Deterministic fail semantics remain explicit and tested.
+```
+
+### Prompt 13: Strict-Ready Release Gate Cleanup (Recommended)
+
+```text
+Ticket: P2-E strict-ready release cleanup
+Objective: Clear strict-ready release block in progress snapshot:
+- strict_ready_release_gate.status = blocked
+- blocked_reasons includes missing_verified_pass and missing_math_congruence
+
+Allowed paths:
+- configs/math-congruence-matrix.v1.json
+- docs/audits/toe-progress-snapshot.json
+- docs/audits/ticket-results/*.json (only if needed to fix stale/non-pass verification metadata)
+- docs/audits/research/* (only for run report artifacts)
+
+Implementation requirements:
+1) Resolve `missing_math_congruence` first:
+   - rebuild deterministic matrix:
+     tsx scripts/build-math-congruence-matrix.ts
+   - validate matrix:
+     tsx scripts/validate-math-congruence-matrix.ts
+2) Recompute strict-ready snapshot:
+   - tsx scripts/compute-toe-progress.ts
+3) Run preflight with strict gate enforcement and capture blockers:
+   - set TOE_STRICT_READY_RELEASE_GATE_ENFORCE=1
+   - npm run audit:toe:preflight
+4) If `missing_verified_pass` remains:
+   - identify exact delta target tickets from `strict_ready_delta_targets`
+   - patch only the minimal eligible ticket-result artifacts needed to convert blocked targets to verified-pass + maturity-eligible tiers
+   - rerun steps 1-3 after each additive subset
+5) Keep all changes replay-safe and deterministic; do not weaken release gates.
+
+Required tests/commands:
+- tsx scripts/build-math-congruence-matrix.ts
+- tsx scripts/validate-math-congruence-matrix.ts
+- tsx scripts/compute-toe-progress.ts
+- cross-env TOE_STRICT_READY_RELEASE_GATE_ENFORCE=1 npm run audit:toe:preflight
+- npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci
+
+Done criteria:
+- `totals.math_congruence_gate.status` is `pass`.
+- `totals.strict_ready_release_gate.status` is `ready` OR remaining blockers are reduced and explicitly enumerated with deterministic next-ticket list.
+- Casimir verification PASS with certificate integrity OK.
+```
+
+### Suggested Run Order (Post-Closure)
+
+1. `Prompt 8` once.
+2. `Prompt 9` through `Prompt 12` sequentially.
+3. `Prompt 13` for strict-ready release cleanup.
+4. After each prompt, keep one commit and include Casimir verification summary fields in commit notes or ticket logs.
