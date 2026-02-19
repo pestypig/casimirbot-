@@ -81,6 +81,28 @@ export type TimeDilationDiagnostics = {
     unitSystem: string | null;
     match: string | null;
   };
+  natarioCanonical: {
+    requiredFieldsOk: boolean;
+    canonicalSatisfied: boolean;
+    checks: {
+      divBeta: {
+        status: "pass" | "fail" | "unknown";
+        rms: number | null;
+        maxAbs: number | null;
+        tolerance: number | null;
+        source: string;
+      };
+      thetaKConsistency: {
+        status: "pass" | "fail" | "unknown";
+        theta: number | null;
+        kTrace: number | null;
+        residualAbs: number | null;
+        tolerance: number | null;
+        source: string;
+      };
+    };
+    reason: string | null;
+  };
   metric_contract: {
     metric_t00_contract_ok: unknown;
     metric_chart_contract_status: unknown;
@@ -128,6 +150,12 @@ const canonicalizeCanonicalField = (canonical: CanonicalField): CanonicalField =
 const toNumber = (value: unknown): number | null => {
   const num = typeof value === "number" ? value : Number(value);
   return Number.isFinite(num) ? num : null;
+};
+
+const boolFromProof = (proofPack: ProofPack | null, key: string): boolean | null => {
+  const entry = getProofValue(proofPack, key);
+  if (!entry || entry.proxy) return null;
+  return entry.value === true;
 };
 
 const fetchJson = async <T>(url: string, timeoutMs?: number): Promise<T> => {
@@ -480,6 +508,70 @@ export async function buildTimeDilationDiagnostics(
     geometryEnabled: renderPlan.enableGeometryWarp,
   });
 
+  const natarioExpansionTolerance =
+    toNumber((pipeline as any)?.warp?.expansionTolerance) ??
+    toNumber((pipeline as any)?.expansionTolerance) ??
+    1e-6;
+  const betaDiag = (pipeline as any)?.warp?.metricAdapter?.betaDiagnostics;
+  const divBetaRms =
+    toNumber(betaDiag?.thetaRms) ??
+    toNumber((pipeline as any)?.warp?.hodgeDiagnostics?.rmsDiv) ??
+    toNumber((pipeline as any)?.warp?.expansionScalar) ??
+    null;
+  const divBetaMaxAbs =
+    toNumber(betaDiag?.thetaMax) ??
+    toNumber((pipeline as any)?.warp?.hodgeDiagnostics?.maxDiv) ??
+    null;
+  const divBetaMissing = divBetaRms == null && divBetaMaxAbs == null;
+  const divBetaPass =
+    !divBetaMissing &&
+    Math.max(Math.abs(divBetaRms ?? 0), Math.abs(divBetaMaxAbs ?? 0)) <= natarioExpansionTolerance;
+  const divBetaStatus: "pass" | "fail" | "unknown" = divBetaMissing
+    ? "unknown"
+    : divBetaPass
+      ? "pass"
+      : "fail";
+
+  const thetaGeom = toNumber((pipeline as any)?.theta_geom) ?? toNumber(getProofValue(proofPack, "theta_geom")?.value);
+  const kTrace =
+    toNumber((pipeline as any)?.warp?.metricStressDiagnostics?.kTraceMean) ??
+    toNumber(getProofValue(proofPack, "metric_k_trace_mean")?.value);
+  const thetaKResidualAbs =
+    thetaGeom != null && kTrace != null ? Math.abs(thetaGeom + kTrace) : null;
+  const thetaKTolerance =
+    thetaGeom != null || kTrace != null
+      ? Math.max(
+          natarioExpansionTolerance,
+          1e-9,
+          1e-3 * Math.max(Math.abs(thetaGeom ?? 0), Math.abs(kTrace ?? 0), 1),
+        )
+      : null;
+  const thetaKMissing = thetaGeom == null || kTrace == null;
+  const thetaKPass =
+    !thetaKMissing &&
+    thetaKResidualAbs != null &&
+    thetaKTolerance != null &&
+    thetaKResidualAbs <= thetaKTolerance;
+  const thetaKStatus: "pass" | "fail" | "unknown" = thetaKMissing
+    ? "unknown"
+    : thetaKPass
+      ? "pass"
+      : "fail";
+
+  const natarioRequiredFieldsOk = divBetaStatus === "pass" && thetaKStatus === "pass";
+  const natarioCanonicalSatisfied =
+    canonicalFamily === "natario" &&
+    natarioRequiredFieldsOk &&
+    boolFromProof(proofPack, "metric_t00_contract_ok") === true &&
+    boolFromProof(proofPack, "theta_metric_derived") === true;
+  const natarioReason = !natarioRequiredFieldsOk
+    ? divBetaStatus !== "pass"
+      ? `divBeta_${divBetaStatus}`
+      : `theta_k_${thetaKStatus}`
+    : !natarioCanonicalSatisfied
+      ? "contract_or_metric_derivation_missing"
+      : null;
+
   const diagnostics: TimeDilationDiagnostics = {
     kind: "time_dilation_diagnostics",
     captured_at: new Date().toISOString(),
@@ -515,6 +607,28 @@ export async function buildTimeDilationDiagnostics(
       normalization: canonical.normalization,
       unitSystem: canonical.unitSystem,
       match: canonical.match,
+    },
+    natarioCanonical: {
+      requiredFieldsOk: natarioRequiredFieldsOk,
+      canonicalSatisfied: natarioCanonicalSatisfied,
+      checks: {
+        divBeta: {
+          status: divBetaStatus,
+          rms: divBetaRms,
+          maxAbs: divBetaMaxAbs,
+          tolerance: natarioExpansionTolerance,
+          source: "pipeline.warp.metricAdapter.betaDiagnostics",
+        },
+        thetaKConsistency: {
+          status: thetaKStatus,
+          theta: thetaGeom,
+          kTrace,
+          residualAbs: thetaKResidualAbs,
+          tolerance: thetaKTolerance,
+          source: "pipeline.theta_geom + proof.metric_k_trace_mean",
+        },
+      },
+      reason: natarioReason,
     },
     metric_contract: {
       metric_t00_contract_ok: getProofValue(proofPack, "metric_t00_contract_ok")?.value ?? null,
