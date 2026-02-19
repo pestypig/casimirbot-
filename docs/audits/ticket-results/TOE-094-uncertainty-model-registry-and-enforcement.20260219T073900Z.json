@@ -1,0 +1,38 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-094-uncertainty-model-registry-and-enforcement",
+  "risk_class": "contract_only",
+  "requires_audit": true,
+  "requires_research": false,
+  "required_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "artifacts": {
+    "runtime-contract-audit": {
+      "status": "present",
+      "notes": "Uncertainty model registry added and root-leaf manifest validator enforces parameterized model references against declared registry definitions."
+    }
+  },
+  "files_changed": [
+    "configs/physics-root-leaf-manifest.v1.json",
+    "configs/uncertainty-model-registry.v1.json",
+    "scripts/validate-physics-root-leaf-manifest.ts",
+    "scripts/validate-uncertainty-model-registry.ts",
+    "tests/uncertainty-model-registry.spec.ts",
+    "docs/audits/ticket-results/TOE-094-uncertainty-model-registry-and-enforcement.20260219T073900Z.json"
+  ],
+  "tests_run": [
+    "npx tsx scripts/validate-uncertainty-model-registry.ts",
+    "npx tsx scripts/validate-physics-root-leaf-manifest.ts",
+    "npx vitest run tests/physics-root-leaf-manifest.spec.ts tests/uncertainty-model-registry.spec.ts"
+  ],
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "toe-094-casimir-verify",
+    "run_id": "1",
+    "certificate_hash": "d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d",
+    "integrity_ok": true
+  },
+  "summary": "Added a first-class uncertainty model registry and enforced parameterized manifest references with model/parameter validation.",
+  "remaining_gaps": []
+}
