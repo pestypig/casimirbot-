@@ -60,6 +60,7 @@ const tsxCliPath = path.join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs")
 const stageConfigs: StageConfig[] = [
   { id: "validate-toe-ticket-backlog", script: path.join("scripts", "validate-toe-ticket-backlog.ts"), required: true },
   { id: "validate-toe-ticket-results", script: path.join("scripts", "validate-toe-ticket-results.ts"), required: true },
+  { id: "validate-physics-equation-backbone", script: path.join("scripts", "validate-physics-equation-backbone.ts"), required: true },
   { id: "validate-resolver-owner-coverage", script: path.join("scripts", "validate-resolver-owner-coverage.ts"), required: true },
   { id: "validate-toe-research-gate-policy", script: path.join("scripts", "validate-toe-research-gate-policy.ts"), required: false },
   { id: "compute-toe-progress", script: path.join("scripts", "compute-toe-progress.ts"), required: true },

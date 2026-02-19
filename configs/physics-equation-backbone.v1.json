@@ -1,0 +1,73 @@
+{
+  "schema_version": "physics_equation_backbone/1",
+  "manifest_id": "toe-079-canonical-equation-backbone",
+  "unit_system": "SI",
+  "claim_tier": "diagnostic",
+  "equations": [
+    {
+      "id": "efe_baseline",
+      "name": "Einstein field equation baseline",
+      "category": "gr_baseline",
+      "expression": "G_mu_nu + Lambda * g_mu_nu = (8 * pi * G / c^4) * T_mu_nu",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        { "symbol": "G_mu_nu", "quantity": "Einstein tensor", "units": "1/m^2" },
+        { "symbol": "Lambda", "quantity": "cosmological constant", "units": "1/m^2" },
+        { "symbol": "g_mu_nu", "quantity": "metric tensor", "units": "dimensionless" },
+        { "symbol": "G", "quantity": "gravitational constant", "units": "m^3/(kg*s^2)" },
+        { "symbol": "c", "quantity": "speed of light", "units": "m/s" },
+        { "symbol": "T_mu_nu", "quantity": "stress-energy tensor", "units": "Pa" }
+      ]
+    },
+    {
+      "id": "semiclassical_coupling",
+      "name": "Semiclassical Einstein coupling",
+      "category": "quantum_gr_bridge",
+      "expression": "G_mu_nu + Lambda * g_mu_nu = (8 * pi * G / c^4) * <T_mu_nu>",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        { "symbol": "<T_mu_nu>", "quantity": "renormalized expectation stress-energy tensor", "units": "Pa" },
+        { "symbol": "G_mu_nu", "quantity": "Einstein tensor", "units": "1/m^2" },
+        { "symbol": "Lambda", "quantity": "cosmological constant", "units": "1/m^2" },
+        { "symbol": "g_mu_nu", "quantity": "metric tensor", "units": "dimensionless" }
+      ]
+    },
+    {
+      "id": "stress_energy_conservation",
+      "name": "Stress-energy conservation",
+      "category": "conservation",
+      "expression": "nabla_mu T_mu_nu = 0",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        { "symbol": "nabla_mu", "quantity": "covariant derivative", "units": "1/m" },
+        { "symbol": "T_mu_nu", "quantity": "stress-energy tensor", "units": "Pa" }
+      ]
+    },
+    {
+      "id": "uncertainty_propagation",
+      "name": "First-order uncertainty propagation",
+      "category": "uncertainty",
+      "expression": "sigma_f^2 = sum_i ((partial f / partial x_i)^2 * sigma_x_i^2)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        { "symbol": "sigma_f", "quantity": "output standard uncertainty", "units": "output_units" },
+        { "symbol": "partial f / partial x_i", "quantity": "local sensitivity", "units": "output_units/input_units" },
+        { "symbol": "sigma_x_i", "quantity": "input standard uncertainty", "units": "input_units" }
+      ]
+    },
+    {
+      "id": "runtime_safety_gate",
+      "name": "Runtime safety gate",
+      "category": "runtime_gate",
+      "expression": "abs(delta_T00 / max(abs(T00_ref), eps)) <= rho_delta_max AND qi_bound_ok = true",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        { "symbol": "delta_T00", "quantity": "stress-energy residual", "units": "J/m^3" },
+        { "symbol": "T00_ref", "quantity": "reference energy density", "units": "J/m^3" },
+        { "symbol": "eps", "quantity": "numerical floor", "units": "J/m^3" },
+        { "symbol": "rho_delta_max", "quantity": "relative residual threshold", "units": "dimensionless" },
+        { "symbol": "qi_bound_ok", "quantity": "quantum-inequality bound verdict", "units": "boolean" }
+      ]
+    }
+  ]
+}

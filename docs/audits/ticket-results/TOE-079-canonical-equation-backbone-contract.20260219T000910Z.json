@@ -1,0 +1,31 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-079-canonical-equation-backbone-contract",
+  "files_changed": [
+    "configs/physics-equation-backbone.v1.json",
+    "scripts/validate-physics-equation-backbone.ts",
+    "scripts/toe-agent-preflight.ts",
+    "tests/physics-equation-backbone.spec.ts",
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+    "docs/audits/toe-progress-snapshot.json"
+  ],
+  "tests_run": [
+    "tests/physics-equation-backbone.spec.ts",
+    "scripts/validate-physics-equation-backbone.ts",
+    "scripts/toe-agent-preflight.ts",
+    "scripts/validate-toe-ticket-backlog.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "scripts/validate-toe-research-gate-policy.ts",
+    "scripts/compute-toe-progress.ts",
+    "cli/casimir-verify.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:892c4c99-e711-4397-89ae-49c2e5c434a5",
+    "run_id": "1",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}
