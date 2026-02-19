@@ -143,6 +143,11 @@ type GraphResolverConfig = {
   version?: number;
   pack?: GraphResolverPackConfig;
   trees?: GraphResolverTreeConfig[];
+  routingPolicy?: {
+    equation_binding_rail?: {
+      strict_fail_reason?: string;
+    };
+  };
 };
 
 type GraphLink = {
@@ -240,6 +245,7 @@ const DEFAULT_PACK_MIN_SCORE_RATIO = 0.25;
 const MAX_PACK_TREES_LIMIT = 6;
 const LOCKED_TREE_SCORE_BONUS = 4;
 const DEFAULT_GRAPH_PATH_MODE: HelixAskGraphPathMode = "full";
+const DEFAULT_MISSING_EQUATION_REF_FAIL_REASON = "FAIL_NODE_MISSING_EQUATION_REF";
 
 const LIFE_COSMOLOGY_CONSCIOUSNESS_RE =
   /\b(life|origin(?:s)? of life|abiogenesis|cosmology|consciousness|stellar consciousness|open-world)\b/i;
@@ -645,12 +651,21 @@ const evaluateCongruenceEdge = (
 };
 
 
-const isPhysicsAssertionNodeWithoutEquationRef = (node: GraphNode): boolean => {
-  const nodeType = String(node.nodeType ?? "").trim().toLowerCase();
-  if (nodeType !== "physics_assertion") return false;
+const hasKnownEquationRef = (node: GraphNode): boolean => {
   const validity = node.validity && typeof node.validity === "object" ? node.validity : undefined;
   const equationRef = typeof validity?.equation_ref === "string" ? validity.equation_ref.trim() : "";
-  return equationRef.length === 0;
+  return equationRef.length > 0;
+};
+
+const isEquationBindingGuardedNode = (node: GraphNode): boolean => {
+  const nodeType = String(node.nodeType ?? "").trim().toLowerCase();
+  return nodeType === "physics_assertion" || nodeType === "bridge" || nodeType === "derived_metric";
+};
+
+const requiresEquationBindingRail = (node: GraphNode, edgeMeta?: GraphEdgeMeta): boolean => {
+  if (isEquationBindingGuardedNode(node)) return true;
+  const edgeType = String(edgeMeta?.edgeType ?? "").trim().toLowerCase();
+  return edgeType === "proxy_only";
 };
 const shouldIncludeEdge = (
   meta: GraphEdgeMeta | undefined,
@@ -725,15 +740,14 @@ const loadGraphTree = (
       return true;
     };
     for (const node of nodes) {
-      if (isPhysicsAssertionNodeWithoutEquationRef(node)) {
-        const localEdgeCount = node.children.length + node.links.length;
-        blockedEdges += localEdgeCount;
-        blockedByReason.node_missing_equation_ref += localEdgeCount;
-        continue;
-      }
       for (const child of node.children) {
         const meta = node.childMeta?.[child];
         evaluatedEdges += 1;
+        if (requiresEquationBindingRail(node, meta) && !hasKnownEquationRef(node)) {
+          blockedEdges += 1;
+          blockedByReason.node_missing_equation_ref += 1;
+          continue;
+        }
         const decision = evaluateCongruenceEdge(meta, congruenceConfig, blockedSet, {
           source: node.id,
           target: child,
@@ -768,6 +782,11 @@ const loadGraphTree = (
           chartDependency: link.chartDependency ?? null,
         };
         evaluatedEdges += 1;
+        if (requiresEquationBindingRail(node, meta) && !hasKnownEquationRef(node)) {
+          blockedEdges += 1;
+          blockedByReason.node_missing_equation_ref += 1;
+          continue;
+        }
         const decision = evaluateCongruenceEdge(meta, congruenceConfig, blockedSet, {
           source: node.id,
           target,
@@ -1823,6 +1842,8 @@ export function resolveHelixAskGraphPack(input: {
 }): HelixAskGraphPack | null {
   const config = loadGraphResolverConfig();
   if (!config?.trees?.length) return null;
+  const missingEquationRefFailReason =
+    config.routingPolicy?.equation_binding_rail?.strict_fail_reason ?? DEFAULT_MISSING_EQUATION_REF_FAIL_REASON;
   const packConfig = config.pack ?? {};
   const maxPackTrees = clampNumber(
     Math.floor(coerceNumber(packConfig.maxTrees, DEFAULT_MAX_PACK_TREES)),
@@ -1900,6 +1921,9 @@ export function resolveHelixAskGraphPack(input: {
     const id = candidate.framework.treeId;
     if (selectedIds.has(id)) return;
     selectedIds.add(id);
+    if ((candidate.framework.congruenceDiagnostics?.blockedByReason.node_missing_equation_ref ?? 0) > 0) {
+      candidate.framework.pathFallbackReason = missingEquationRefFailReason;
+    }
     selected.push(candidate.framework);
   };
   for (const candidate of lockedCandidates) {
