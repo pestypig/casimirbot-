@@ -1,0 +1,28 @@
+{
+  "schema_version": "helix_ask_versatility_failure_taxonomy/1",
+  "run_id": "20260219T023617Z",
+  "source": "reports/helix-ask-versatility-report.md",
+  "top_failure_signatures": [
+    { "name": "report_mode_mismatch", "count": 21, "class": "routing_or_mode_selection" },
+    { "name": "relation_packet_built", "count": 12, "class": "relation_packet_assembly" },
+    { "name": "relation_dual_domain", "count": 12, "class": "cross_domain_linking" },
+    { "name": "bridge_count_low", "count": 12, "class": "bridge_coverage" },
+    { "name": "evidence_count_low", "count": 12, "class": "evidence_coverage" },
+    { "name": "citation_missing", "count": 9, "class": "citation_persistence" },
+    { "name": "intent_mismatch", "count": 6, "class": "intent_identification" }
+  ],
+  "root_cause_hypotheses": [
+    {
+      "hypothesis": "Relation packets are not consistently built for relation intents when routing drifts to hybrid explain mode.",
+      "evidence": ["relation_packet_built", "relation_dual_domain", "bridge_count_low", "evidence_count_low"]
+    },
+    {
+      "hypothesis": "Mode selection is unstable under high-variance prompts for repo and ambiguous families.",
+      "evidence": ["report_mode_mismatch"]
+    },
+    {
+      "hypothesis": "Citation line retention can be dropped during cleanup in low-signal responses.",
+      "evidence": ["citation_missing"]
+    }
+  ]
+}

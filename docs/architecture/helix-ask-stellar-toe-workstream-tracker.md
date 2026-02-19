@@ -352,3 +352,25 @@ Mandatory Casimir + trace export and full gate table.
   - `artifacts/experiments/helix-ask-quake-frame-loop/<run-id>/failure-signatures.json`
 - Next single highest-priority task:
   - Tighten semantic quality gates (claim-citation binding + unsupported-claim suppression + placeholder elimination), then rerun B2 with mandatory Casimir PASS.
+
+### Handoff Snapshot 2026-02-19T02:36:17Z
+- Branch/HEAD: codex/research/helix-ask-versatility-deep-audit-fixup / pending_local_commit
+- Result type: pass (research artifact fixup)
+- Stage completed: Stage B support lane (versatility deep-research bookkeeping completion)
+- Gates passed:
+  - Required deep-research deliverables emitted in repo for run `20260219T023617Z`
+  - Source artifact existence re-verified before conclusions
+  - Latest matrix metrics mirrored into deep-research summary artifacts
+- Gates failed:
+  - Historical baseline JSON artifact set `versatility-1771457356197` remains missing in current snapshot
+- Casimir: PASS, certificateHash=6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45, integrityOk=true
+- New artifacts:
+  - `reports/helix-ask-versatility-deep-research-20260219T023617Z.md`
+  - `artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/summary.json`
+  - `artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/failure-taxonomy.json`
+  - `artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/tool-friction.json`
+  - `artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/counterfactuals.json`
+  - `artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/recommendation.json`
+  - `docs/audits/helix-results/HELIX-PS2-versatility-deep-research-20260219T023617Z.json`
+- Next single highest-priority task:
+  - Restore/reconstruct missing baseline JSON artifacts to regain strict before/after reproducibility.
