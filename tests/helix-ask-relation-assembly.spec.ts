@@ -192,4 +192,62 @@ describe("relation assembly packet", () => {
     expect(result.pass).toBe(false);
     expect(result.failReason).toBe("FAIL_MATURITY_CEILING_VIOLATION");
   });
+
+  it("blocks diagnostic/proxy upstream evidence from implying certified surfaces", async () => {
+    const fs = await import("node:fs");
+    const fsMod = fs.default ?? fs;
+    const realExistsSync = fsMod.existsSync.bind(fsMod);
+    const realReadFileSync = fsMod.readFileSync.bind(fsMod);
+    const existsSpy = vi.spyOn(fsMod, "existsSync").mockImplementation((target: any) => {
+      const filePath = String(target ?? "");
+      if (filePath.endsWith("configs/physics-root-leaf-manifest.v1.json")) return true;
+      return realExistsSync(target);
+    });
+    const readSpy = vi.spyOn(fsMod, "readFileSync").mockImplementation((target: any, ...args: any[]) => {
+      const filePath = String(target ?? "");
+      if (filePath.endsWith("configs/physics-root-leaf-manifest.v1.json")) {
+        return JSON.stringify({
+          claim_tier_ceiling: "certified",
+          maturity_propagation_policy: {
+            enabled: true,
+            no_over_promotion: true,
+            strict_fail_reason: "FAIL_MATURITY_CEILING_VIOLATION",
+            default_max_claim_tier: "certified",
+            upstream_claim_tier_blocklist_for_certified: ["diagnostic", "reduced-order"],
+            upstream_provenance_blocklist_for_certified: ["proxy", "inferred"],
+          },
+        }) as any;
+      }
+      return realReadFileSync(target, ...(args as [any]));
+    });
+
+    const result = __testOnlyResolveMaturityCeilingValidation([
+      {
+        evidence_id: "ev_upstream_proxy",
+        path: "docs/knowledge/warp/warp-bubble.md",
+        span: "L1-L1",
+        snippet: "proxy upstream diagnostic",
+        domain: "warp",
+        provenance_class: "proxy",
+        claim_tier: "diagnostic",
+      },
+      {
+        evidence_id: "ev_surface_cert",
+        path: "docs/ethos/ideology.json",
+        span: "L1-L1",
+        snippet: "certified downstream output",
+        domain: "ethos",
+        provenance_class: "measured",
+        claim_tier: "certified",
+      },
+    ]);
+
+    expect(result.referenced).toBe(true);
+    expect(result.pass).toBe(false);
+    expect(result.failReason).toBe("FAIL_MATURITY_CEILING_VIOLATION");
+    expect(result.summary).toContain("maturity_ceiling=upstream_to_certified_violation");
+
+    readSpy.mockRestore();
+    existsSpy.mockRestore();
+  });
 });

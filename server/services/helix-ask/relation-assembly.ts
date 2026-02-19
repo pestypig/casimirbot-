@@ -363,6 +363,27 @@ const CLAIM_TIER_ORDER: Record<string, number> = {
   certified: 3,
 };
 
+type MaturityPropagationPolicy = {
+  enabled?: boolean;
+  no_over_promotion?: boolean;
+  strict_fail_reason?: string;
+  default_max_claim_tier?: string;
+  upstream_claim_tier_blocklist_for_certified?: string[];
+  upstream_provenance_blocklist_for_certified?: string[];
+};
+
+const DEFAULT_UPSTREAM_CLAIM_TIER_BLOCKLIST_FOR_CERTIFIED = ["diagnostic", "reduced-order"];
+const DEFAULT_UPSTREAM_PROVENANCE_BLOCKLIST_FOR_CERTIFIED = ["proxy", "inferred"];
+
+const normalizePolicyList = (value: unknown, fallback: string[]): string[] => {
+  if (!Array.isArray(value)) return fallback;
+  const normalized = value
+    .map((entry) => String(entry ?? "").trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+  return normalized.length > 0 ? normalized : fallback;
+};
+
 const resolveMaturityCeilingValidation = (evidence: RelationAssemblyEvidence[]): MaturityCeilingValidation => {
   const fullPath = path.resolve(process.cwd(), TOE_ROOT_LEAF_MANIFEST);
   if (!fs.existsSync(fullPath)) {
@@ -374,9 +395,18 @@ const resolveMaturityCeilingValidation = (evidence: RelationAssemblyEvidence[]):
   } catch {
     return { referenced: true, pass: false, failReason: "FAIL_MATURITY_CEILING_VIOLATION", summary: "maturity_ceiling=invalid_manifest_json" };
   }
-  const policy = parsed?.maturity_propagation_policy;
+  const policy = (parsed?.maturity_propagation_policy ?? {}) as MaturityPropagationPolicy;
   if (!policy || policy.enabled !== true || policy.no_over_promotion !== true) {
     return { referenced: false, pass: true };
+  }
+  const strictFailReason = String(policy.strict_fail_reason ?? "FAIL_MATURITY_CEILING_VIOLATION").trim();
+  if (strictFailReason !== "FAIL_MATURITY_CEILING_VIOLATION") {
+    return {
+      referenced: true,
+      pass: false,
+      failReason: "FAIL_MATURITY_CEILING_VIOLATION",
+      summary: `maturity_ceiling=invalid_strict_fail_reason:${strictFailReason || "__missing__"}`,
+    };
   }
   const maxTier = String(policy.default_max_claim_tier ?? parsed?.claim_tier_ceiling ?? "diagnostic").trim();
   const maxOrder = CLAIM_TIER_ORDER[maxTier] ?? CLAIM_TIER_ORDER.diagnostic;
@@ -393,6 +423,39 @@ const resolveMaturityCeilingValidation = (evidence: RelationAssemblyEvidence[]):
       summary: `maturity_ceiling=violations(max=${maxTier}):${violations.join(",")}`,
     };
   }
+
+  const blockedClaimTiers = normalizePolicyList(
+    policy.upstream_claim_tier_blocklist_for_certified,
+    DEFAULT_UPSTREAM_CLAIM_TIER_BLOCKLIST_FOR_CERTIFIED,
+  );
+  const blockedProvenance = normalizePolicyList(
+    policy.upstream_provenance_blocklist_for_certified,
+    DEFAULT_UPSTREAM_PROVENANCE_BLOCKLIST_FOR_CERTIFIED,
+  );
+  const certifiedSurfaces = evidence.filter((entry) => entry.claim_tier === "certified");
+  if (certifiedSurfaces.length > 0) {
+    const upstreamViolations = evidence
+      .filter((entry) => {
+        const claimTier = String(entry.claim_tier ?? "").trim();
+        const provenance = String(entry.provenance_class ?? "").trim();
+        return blockedClaimTiers.includes(claimTier) || blockedProvenance.includes(provenance);
+      })
+      .map((entry) => `${entry.evidence_id}:${entry.provenance_class ?? "__missing__"}:${entry.claim_tier ?? "__missing__"}`)
+      .sort((a, b) => a.localeCompare(b));
+
+    if (upstreamViolations.length > 0) {
+      return {
+        referenced: true,
+        pass: false,
+        failReason: "FAIL_MATURITY_CEILING_VIOLATION",
+        summary:
+          `maturity_ceiling=upstream_to_certified_violation(certified_surfaces=${certifiedSurfaces.length};` +
+          `blocked_tiers=${blockedClaimTiers.join("|")};blocked_provenance=${blockedProvenance.join("|")}):` +
+          upstreamViolations.join(","),
+      };
+    }
+  }
+
   return { referenced: true, pass: true, summary: `maturity_ceiling=ok(max=${maxTier})` };
 };
 
