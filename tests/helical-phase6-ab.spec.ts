@@ -61,12 +61,34 @@ describe("helical phase6 harness scoreability classification", () => {
     });
   });
 
-  it("uses explicit classifications for non-HTTP and parse outcomes", () => {
+  it("does not allow unknown fail_class values", () => {
+    expect(__test.classifyScoreability({ fail_class: "weird_failure", fail_reason: "x" } as never)).toEqual({
+      scoreable: false,
+      failClass: "schema_mismatch",
+      failReason: "unknown_fail_class",
+    });
+  });
+
+  it("uses explicit classifications for parse/http/non-http outcomes", () => {
     expect(__test.metricFromPayload(0, { fail_class: "timeout_soft", fail_reason: "aborted" })).toMatchObject({
       scoreable: false,
       pass: false,
       fail_class: "timeout_soft",
       fail_reason: "aborted",
+    });
+
+    expect(__test.metricFromPayload(0, { fail_class: "timeout_hard", fail_reason: "hard_timeout" })).toMatchObject({
+      scoreable: false,
+      pass: false,
+      fail_class: "timeout_hard",
+      fail_reason: "hard_timeout",
+    });
+
+    expect(__test.metricFromPayload(0, null)).toMatchObject({
+      scoreable: false,
+      pass: false,
+      fail_class: "schema_mismatch",
+      fail_reason: "response_payload_not_object",
     });
 
     expect(__test.metricFromPayload(200, { fail_class: "invalid_json", fail_reason: "Unexpected token" })).toMatchObject({

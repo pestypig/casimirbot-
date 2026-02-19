@@ -8,6 +8,15 @@ type LayerId = "telemetry_x_t" | "linear_baseline" | "pca_baseline" | "helical_6
 type ArmName = "A" | "B";
 type FailureClass = "invalid_json" | "schema_mismatch" | "metric_input_missing" | "timeout_soft" | "timeout_hard" | "http_error";
 
+const FAILURE_CLASSES: ReadonlySet<FailureClass> = new Set([
+  "invalid_json",
+  "schema_mismatch",
+  "metric_input_missing",
+  "timeout_soft",
+  "timeout_hard",
+  "http_error",
+]);
+
 type AskResponse = {
   text?: string;
   fail_reason?: string | null;
@@ -84,6 +93,16 @@ const classifyScoreability = (payload: AskResponse | null): { scoreable: boolean
   if (!payload || typeof payload !== "object") {
     return { scoreable: false, failClass: "schema_mismatch", failReason: "response_payload_not_object" };
   }
+  if (typeof payload.fail_class === "string") {
+    if (FAILURE_CLASSES.has(payload.fail_class as FailureClass)) {
+      return {
+        scoreable: false,
+        failClass: payload.fail_class as FailureClass,
+        failReason: payload.fail_reason ?? `classified_${payload.fail_class}`,
+      };
+    }
+    return { scoreable: false, failClass: "schema_mismatch", failReason: "unknown_fail_class" };
+  }
   const semantic = payload.debug?.semantic_quality;
   if (!semantic || typeof semantic !== "object") {
     return { scoreable: false, failClass: "metric_input_missing", failReason: "missing_semantic_quality" };
@@ -117,7 +136,11 @@ const metricFromPayload = (status: number, payload: AskResponse | null) => {
   const scoreability = classifyScoreability(payload);
   const classification = status === 200
     ? scoreability
-    : { scoreable: false, failClass: "http_error" as FailureClass, failReason: `http_status_${status}` };
+    : status > 0
+      ? { scoreable: false, failClass: "http_error" as FailureClass, failReason: `http_status_${status}` }
+      : scoreability.failClass
+        ? scoreability
+        : { scoreable: false, failClass: "schema_mismatch" as FailureClass, failReason: "non_http_outcome_missing_classification" };
   const failClass = payload?.fail_class ?? classification.failClass;
   const failReason = payload?.fail_reason ?? classification.failReason;
   const pass = status === 200 && classification.scoreable && !failReason && failReasons.length === 0;
