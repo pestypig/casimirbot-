@@ -48,6 +48,7 @@ not only as retrieval metadata.
 - Manifest: `configs/physics-root-leaf-manifest.v1.json`
 - Validator: `scripts/validate-physics-root-leaf-manifest.ts`
 - Test: `tests/physics-root-leaf-manifest.spec.ts`
+- Research handoff brief: `docs/audits/first-class-root-lane-gap-research-brief.md`
 
 ## Agent workflow
 1. Update root/leaf paths in the manifest for new theory lanes.
