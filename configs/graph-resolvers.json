@@ -347,6 +347,34 @@
       "weight": 1.1
     },
     {
+      "id": "tool-plan-contracts",
+      "label": "Tool Plan Contracts Lane",
+      "path": "docs/knowledge/tool-plan-contracts-tree.json",
+      "topicTags": [
+        "tooling",
+        "contracts",
+        "knowledge"
+      ],
+      "matchers": [
+        "tool plan contracts",
+        "deterministic receipt",
+        "execution receipt contract",
+        "tool replay determinism",
+        "invalid receipt fail reason"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 3,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.1
+    },
+    {
       "id": "stellar-restoration",
       "label": "Stellar Restoration Walk",
       "path": "docs/knowledge/stellar-restoration-tree.json",

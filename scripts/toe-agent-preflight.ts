@@ -63,6 +63,10 @@ const EVIDENCE_FALSIFIER_LEDGER_TREE_PATH = path.resolve(
   workspaceRoot,
   path.join("docs", "knowledge", "evidence-falsifier-ledger-tree.json"),
 );
+const TOOL_PLAN_CONTRACTS_TREE_PATH = path.resolve(
+  workspaceRoot,
+  path.join("docs", "knowledge", "tool-plan-contracts-tree.json"),
+);
 const GRAPH_RESOLVERS_PATH = path.resolve(workspaceRoot, path.join("configs", "graph-resolvers.json"));
 const RESOLVER_OWNER_COVERAGE_PATH = path.resolve(
   workspaceRoot,
@@ -103,6 +107,26 @@ function validateEvidenceFalsifierLedgerStage(): { pass: boolean; stderr?: strin
   return { pass: true };
 }
 
+function validateToolPlanContractsStage(): { pass: boolean; stderr?: string } {
+  if (!fs.existsSync(TOOL_PLAN_CONTRACTS_TREE_PATH)) {
+    return { pass: false, stderr: `missing tool-plan-contracts tree: ${TOOL_PLAN_CONTRACTS_TREE_PATH}` };
+  }
+  if (!fs.existsSync(GRAPH_RESOLVERS_PATH)) {
+    return { pass: false, stderr: `missing graph resolvers config: ${GRAPH_RESOLVERS_PATH}` };
+  }
+  const resolvers = JSON.parse(fs.readFileSync(GRAPH_RESOLVERS_PATH, "utf8")) as {
+    trees?: Array<{ id?: string; path?: string }>;
+  };
+  const tree = resolvers.trees?.find((entry) => entry.id === "tool-plan-contracts");
+  if (!tree) {
+    return { pass: false, stderr: "graph-resolvers missing tool-plan-contracts lane" };
+  }
+  if (tree.path !== "docs/knowledge/tool-plan-contracts-tree.json") {
+    return { pass: false, stderr: "tool-plan-contracts lane path is not pinned to expected tree" };
+  }
+  return { pass: true };
+}
+
 const stageConfigs: StageConfig[] = [
   { id: "validate-toe-ticket-backlog", script: path.join("scripts", "validate-toe-ticket-backlog.ts"), required: true },
   { id: "validate-toe-ticket-results", script: path.join("scripts", "validate-toe-ticket-results.ts"), required: true },
@@ -116,6 +140,12 @@ const stageConfigs: StageConfig[] = [
     required: true,
     command: "inline:validate-evidence-falsifier-ledger",
     check: validateEvidenceFalsifierLedgerStage,
+  },
+  {
+    id: "validate-tool-plan-contracts",
+    required: true,
+    command: "inline:validate-tool-plan-contracts",
+    check: validateToolPlanContractsStage,
   },
 ];
 

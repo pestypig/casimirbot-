@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "treeId": "tool-plan-contracts",
+  "rootId": "tool-plan-contracts-root",
+  "nodes": [
+    {
+      "id": "tool-plan-contracts-root",
+      "title": "Tool Plan + Execution Contracts",
+      "tags": ["tooling", "contracts", "determinism"],
+      "bodyMD": "Deterministic contract lane for plan/execute tool receipts and replay checks.",
+      "children": [
+        "deterministic-tool-receipt-shape",
+        "tool-replay-determinism",
+        "invalid-receipt-fail-reasons"
+      ]
+    },
+    {
+      "id": "deterministic-tool-receipt-shape",
+      "title": "Deterministic tool receipt shape",
+      "tags": ["receipt", "contract"],
+      "bodyMD": "Tool execution must emit schema_version, deterministic flag, status, fail_reason, input_hash, output_hash, and receipt_hash.",
+      "links": [
+        { "to": "tool-replay-determinism", "rel": "enables" }
+      ],
+      "evidence": [
+        { "type": "code", "path": "server/routes/agi.plan.ts", "contains": "buildDeterministicToolExecutionReceipt" }
+      ]
+    },
+    {
+      "id": "tool-replay-determinism",
+      "title": "Replay determinism",
+      "tags": ["replay", "deterministic"],
+      "bodyMD": "Given identical tool plan input, deterministic receipt fields and hashes must remain stable.",
+      "links": [
+        { "to": "invalid-receipt-fail-reasons", "rel": "verifies" }
+      ],
+      "evidence": [
+        { "type": "test", "path": "tests/tool-contracts-replay.spec.ts" }
+      ]
+    },
+    {
+      "id": "invalid-receipt-fail-reasons",
+      "title": "Deterministic fail reasons for missing/invalid receipts",
+      "tags": ["fail_reason", "contract"],
+      "bodyMD": "Missing or malformed receipts map to stable fail reasons (TOOL_RECEIPT_MISSING/TOOL_RECEIPT_INVALID).",
+      "evidence": [
+        { "type": "test", "path": "tests/tool-contracts-replay.spec.ts", "contains": "TOOL_RECEIPT_MISSING" },
+        { "type": "test", "path": "tests/tool-contracts-replay.spec.ts", "contains": "TOOL_RECEIPT_INVALID" }
+      ]
+    }
+  ]
+}
