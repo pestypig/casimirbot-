@@ -3,6 +3,7 @@ import {
   __testOnlyResolveCrossLaneUncertaintyValidation,
   __testOnlyResolveMaturityCeilingValidation,
   buildRelationAssemblyPacket,
+  ensureRelationAssemblyPacketFallback,
   evaluateRelationPacketFloors,
   resolveRelationTopologySignal,
 } from "../server/services/helix-ask/relation-assembly";

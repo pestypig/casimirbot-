@@ -606,6 +606,68 @@ export function buildRelationAssemblyPacket(args: {
   };
 }
 
+
+
+const RELATION_PACKET_FALLBACK_DEFINITIONS = {
+  warp_definition:
+    "A warp bubble is a modeled spacetime geometry with strict constraint gates and verification bounds.",
+  ethos_definition:
+    "Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation.",
+} as const;
+
+export function ensureRelationAssemblyPacketFallback(
+  packet: RelationAssemblyPacket | null,
+  question: string,
+): RelationAssemblyPacket {
+  const normalizedQuestion = String(question || packet?.question || "").trim() || "How does warp relate to mission ethos?";
+  const normalizedEvidence = (packet?.evidence ?? []).filter((entry) =>
+    Boolean(entry?.evidence_id && entry?.path && entry?.span && entry?.snippet && entry?.domain),
+  );
+  const normalizedSourceMap = Object.fromEntries(
+    normalizedEvidence
+      .map((entry) => [entry.evidence_id, toCitation(entry.path, entry.span)] as const)
+      .filter(([id, citation]) => Boolean(id && citation)),
+  );
+  const domains = new Set<string>(packet?.domains ?? []);
+  if (normalizedEvidence.some((entry) => entry.domain === "warp")) domains.add("warp");
+  if (normalizedEvidence.some((entry) => entry.domain === "ethos")) domains.add("ethos");
+
+  const warpDefinition = packet?.definitions?.warp_definition?.trim() || RELATION_PACKET_FALLBACK_DEFINITIONS.warp_definition;
+  const ethosDefinition = packet?.definitions?.ethos_definition?.trim() || RELATION_PACKET_FALLBACK_DEFINITIONS.ethos_definition;
+  const bridgeClaims = (packet?.bridge_claims ?? []).filter(Boolean);
+  const constraints = (packet?.constraints ?? []).filter(Boolean);
+  const hooks = (packet?.falsifiability_hooks ?? []).filter(Boolean);
+
+  return {
+    question: normalizedQuestion,
+    domains: Array.from(domains).sort(),
+    fail_reason: packet?.fail_reason,
+    definitions: {
+      warp_definition: warpDefinition,
+      ethos_definition: ethosDefinition,
+    },
+    bridge_claims:
+      bridgeClaims.length > 0
+        ? bridgeClaims
+        : [
+            "Mission ethos constrains warp development to measured, auditable checkpoints before deployment.",
+            "Verification hooks translate design ambition into falsifiable tests across physics and policy layers.",
+          ],
+    constraints:
+      constraints.length > 0
+        ? constraints
+        : [
+            "Physics bounds: Ford-Roman QI, theta calibration, and GR constraint gates must pass before viability claims.",
+            "Policy bounds: mission ethos requires stewardship, non-harm, and traceable evidence for operational decisions.",
+          ],
+    falsifiability_hooks:
+      hooks.length > 0
+        ? hooks
+        : ["Re-run /api/agi/adapter/run with updated action payload and require PASS with certificate integrity OK."],
+    evidence: normalizedEvidence,
+    source_map: normalizedSourceMap,
+  };
+}
 export function renderRelationAssemblyFallback(packet: RelationAssemblyPacket): string {
   const sources = Object.values(packet.source_map);
   return [
