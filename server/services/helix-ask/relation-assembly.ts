@@ -99,7 +99,10 @@ const hasBridgeEvidenceContractContradiction = (entry: BridgeEvidenceContract): 
 const bridgeEvidenceContractFingerprint = (entry: BridgeEvidenceContract): string =>
   [entry.provenance_class ?? "__missing__", entry.claim_tier ?? "__missing__", String(entry.certifying)].join("|");
 
-const classifyStrictBridgeEvidenceFailure = (contracts: BridgeEvidenceContract[]): BridgeEvidenceStrictFailReason => {
+const classifyStrictBridgeEvidenceFailure = (
+  contracts: BridgeEvidenceContract[],
+  options?: { requireStrongEvidence?: boolean },
+): BridgeEvidenceStrictFailReason => {
   const canonical = [...contracts].sort(
     (a, b) =>
       (a.path ?? "").localeCompare(b.path ?? "") ||
@@ -123,10 +126,16 @@ const classifyStrictBridgeEvidenceFailure = (contracts: BridgeEvidenceContract[]
   }
 
   const hasPathCollision = Array.from(byPath.values()).some((fingerprints) => fingerprints.size > 1);
+  const hasStrongEvidence = canonical.some(
+    (contract) => contract.certifying === true && contract.provenance_class === "measured" && contract.claim_tier === "certified",
+  );
   if (hasIntrinsicContradiction || hasPathCollision) {
     return "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_CONTRADICTORY";
   }
   if (hasGap) {
+    return "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING";
+  }
+  if (options?.requireStrongEvidence && !hasStrongEvidence) {
     return "IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING";
   }
   return undefined;
@@ -278,7 +287,12 @@ export function buildRelationAssemblyPacket(args: {
   if (ethosEvidence.length > 0) domainSet.add("ethos");
 
   const strictBridgeEvidence = args.strictBridgeEvidence === true;
-  const strictFailReason = classifyStrictBridgeEvidenceFailure(graphEvidenceContracts);
+  const requireStrongBridgeEvidence = /\b(life|origin(?:s)? of life|abiogenesis|cosmology|consciousness|open-world|universe produce life)\b/i.test(
+    args.question,
+  );
+  const strictFailReason = classifyStrictBridgeEvidenceFailure(graphEvidenceContracts, {
+    requireStrongEvidence: requireStrongBridgeEvidence,
+  });
 
   return {
     question: args.question,

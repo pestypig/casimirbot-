@@ -339,4 +339,54 @@ describe("Helix Ask bridge nodes", () => {
     expect(packet.fail_reason).toBeUndefined();
   });
 
+  it("fails strict bridge evidence deterministically for life/cosmology prompts when only weak evidence exists", () => {
+    const packet = buildRelationAssemblyPacket({
+      question: "How does the universe produce life from cosmology and consciousness constraints?",
+      contextFiles: ["docs/stellar-consciousness-orch-or-review.md"],
+      contextText: "life cosmology consciousness bridge",
+      docBlocks: [],
+      strictBridgeEvidence: true,
+      graphPack: {
+        frameworks: [
+          {
+            treeId: "stellar-ps1-bridges",
+            sourcePath: "docs/knowledge/bridges/stellar-ps1-bridge-tree.json",
+            anchors: [],
+            path: [
+              {
+                id: "bridge-node",
+                title: "Bridge",
+                tags: [],
+                score: 1,
+                depth: 0,
+                nodeType: "bridge",
+                evidence: [
+                  {
+                    type: "doc",
+                    path: "docs/stellar-consciousness-orch-or-review.md",
+                    scope: "left",
+                    provenance_class: "inferred",
+                    claim_tier: "diagnostic",
+                    certifying: false,
+                  },
+                ],
+              },
+            ],
+            scaffoldText: "",
+            contextText: "",
+            preferGraph: true,
+          },
+        ],
+        scaffoldText: "",
+        contextText: "",
+        preferGraph: true,
+        sourcePaths: ["docs/knowledge/bridges/stellar-ps1-bridge-tree.json"],
+        treeIds: ["stellar-ps1-bridges"],
+      },
+    });
+
+    expect(packet.fail_reason).toBe("IDEOLOGY_PHYSICS_BRIDGE_EVIDENCE_MISSING");
+  });
+
+
 });

@@ -53,6 +53,18 @@
         {
           "rel": "escalates_to",
           "to": "expansion_frontier"
+        },
+        {
+          "rel": "enables",
+          "to": "sampling-time-bounds"
+        },
+        {
+          "rel": "verifies",
+          "to": "qi-diagnostics-schema"
+        },
+        {
+          "rel": "enables",
+          "to": "scaling-laws"
         }
       ],
       "bridge": {
@@ -76,8 +88,25 @@
           "provenance_class": "measured",
           "claim_tier": "certified",
           "certifying": true
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/bridges/life-cosmology-consciousness-bridge.json",
+          "scope": "left",
+          "provenance_class": "measured",
+          "claim_tier": "reduced-order",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/qi-diagnostics-schema.md",
+          "scope": "right",
+          "provenance_class": "measured",
+          "claim_tier": "certified",
+          "certifying": true
         }
-      ]
+      ],
+      "deterministic": true
     },
     {
       "id": "physics-time-crystal-clock-coupling",
@@ -100,7 +129,8 @@
           "rel": "rollback_to",
           "to": "math-maturity-stages"
         }
-      ]
+      ],
+      "deterministic": true
     },
     {
       "id": "stellar-plasma-collapse-signature-model",
@@ -124,7 +154,8 @@
           "rel": "verifies",
           "to": "qi-diagnostics-schema"
         }
-      ]
+      ],
+      "deterministic": true
     },
     {
       "id": "bridge-noise-spectrum-to-collapse-proxy",
@@ -181,7 +212,8 @@
           "claim_tier": "diagnostic",
           "certifying": false
         }
-      ]
+      ],
+      "deterministic": true
     }
   ]
 }

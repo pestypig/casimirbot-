@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-19T00:09:32.194Z",
+  "generated_at": "2026-02-19T00:10:12.533Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -507,7 +507,13 @@
       "requires_research_artifact_completion": false
     },
     {
-      "ticket_id": "TOE-079-canonical-equation-backbone-contract",
+      "ticket_id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": true
+    },
+    {
+      "ticket_id": "TOE-078-life-cosmology-bridge-dag-contract",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": true
@@ -1172,6 +1178,15 @@
       "result_file": "docs/audits/ticket-results/TOE-073-helix-ask-semantic-claim-citation-contract.20260218T224927Z.json"
     },
     {
+      "ticket_id": "TOE-076-helix-ask-system-quality-delta-pack",
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": true,
+      "result_file": "docs/audits/ticket-results/TOE-076-helix-ask-system-quality-delta-pack.20260218T234000Z.json"
+    },
+    {
       "ticket_id": "TOE-074-stellar-ps1-bridges-owner-coverage-contract",
       "claim_tier": "diagnostic",
       "verification_ok": true,
@@ -1190,22 +1205,13 @@
       "result_file": "docs/audits/ticket-results/TOE-075-helix-ask-strict-ready-verified-pass-pack.20260218T233453Z.json"
     },
     {
-      "ticket_id": "TOE-076-helix-ask-system-quality-delta-pack",
-      "claim_tier": "diagnostic",
-      "verification_ok": true,
-      "score": 0.25,
-      "research_gated": true,
-      "research_artifact_complete": true,
-      "result_file": "docs/audits/ticket-results/TOE-076-helix-ask-system-quality-delta-pack.20260218T234000Z.json"
-    },
-    {
-      "ticket_id": "TOE-079-canonical-equation-backbone-contract",
+      "ticket_id": "TOE-078-life-cosmology-bridge-dag-contract",
       "claim_tier": "diagnostic",
       "verification_ok": true,
       "score": 0.25,
       "research_gated": true,
       "research_artifact_complete": false,
-      "result_file": "docs/audits/ticket-results/TOE-079-canonical-equation-backbone-contract.20260219T000910Z.json"
+      "result_file": "docs/audits/ticket-results/TOE-078-life-cosmology-bridge-dag-contract.20260219T001000Z.json"
     }
   ]
 }
