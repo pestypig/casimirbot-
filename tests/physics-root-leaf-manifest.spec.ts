@@ -66,6 +66,73 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
         },
       },
       {
+        id: "path_information_to_life",
+        root_id: "physics_information_dynamics",
+        leaf_id: "leaf_universe_produces_life",
+        nodes: [
+          "physics_information_dynamics",
+          "physics_prebiotic_chemistry",
+          "physics_biology_life",
+          "leaf_universe_produces_life",
+        ],
+        dag_bridges: ["life-cosmology-consciousness-bridge"],
+        falsifier: {
+          observable: "coherence linkage",
+          reject_rule: "coherence_link_rate < 0.9",
+          uncertainty_model: "GUM_linear",
+          test_refs: ["tests/physics-root-leaf-manifest.spec.ts"],
+        },
+        maturity_gate: {
+          max_claim_tier: "diagnostic",
+          required_evidence_types: ["proxy", "inferred"],
+          strict_fail_reason: "ROOT_LEAF_INFORMATION_DYNAMICS_PATH_MISSING",
+        },
+      },
+      {
+        id: "path_prebiotic_to_life",
+        root_id: "physics_prebiotic_chemistry",
+        leaf_id: "leaf_universe_produces_life",
+        nodes: [
+          "physics_prebiotic_chemistry",
+          "physics_biology_life",
+          "leaf_universe_produces_life",
+        ],
+        dag_bridges: ["life-cosmology-consciousness-bridge"],
+        falsifier: {
+          observable: "prebiotic alignment",
+          reject_rule: "prebiotic_alignment_rate < 0.9",
+          uncertainty_model: "GUM_linear",
+          test_refs: ["tests/physics-root-leaf-manifest.spec.ts"],
+        },
+        maturity_gate: {
+          max_claim_tier: "diagnostic",
+          required_evidence_types: ["measured", "proxy", "inferred"],
+          strict_fail_reason: "ROOT_LEAF_PREBIOTIC_PATH_MISSING",
+        },
+      },
+      {
+        id: "path_runtime_control_to_safety",
+        root_id: "physics_runtime_safety_control",
+        leaf_id: "leaf_human_ai_financial_safety",
+        nodes: [
+          "physics_runtime_safety_control",
+          "physics_information_dynamics",
+          "leaf_human_ai_financial_safety",
+        ],
+        dag_bridges: ["life-cosmology-consciousness-bridge"],
+        falsifier: {
+          observable: "runtime determinism",
+          reject_rule: "determinism_rate < 0.98",
+          uncertainty_model: "runtime_gate_thresholds",
+          test_refs: ["tests/casimir-verify-ps2.spec.ts"],
+        },
+        maturity_gate: {
+          max_claim_tier: "diagnostic",
+          required_evidence_types: ["proxy", "inferred"],
+          strict_fail_reason: "ROOT_LEAF_RUNTIME_CONTROL_PATH_MISSING",
+        },
+      },
+      {
         id: "path_life_to_safety",
         root_id: "physics_biology_life",
         leaf_id: "leaf_human_ai_financial_safety",
@@ -151,6 +218,19 @@ describe("validatePhysicsRootLeafManifest", () => {
     expect(result.ok).toBe(false);
     expect(result.errors.join("\n")).toContain(
       "paths must include at least one canonical entropy-first path ending at leaf_universe_produces_life",
+    );
+  });
+
+  it("fails when required root-lane entrypoint coverage is missing", () => {
+    const repoRoot = makeFixture((manifest) => {
+      const paths = manifest.paths as Array<Record<string, unknown>>;
+      manifest.paths = paths.filter((entry) => entry.root_id !== "physics_runtime_safety_control");
+    });
+
+    const result = validatePhysicsRootLeafManifest({ repoRoot });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toContain(
+      "missing required root-lane entrypoint path for root_id: physics_runtime_safety_control",
     );
   });
 
