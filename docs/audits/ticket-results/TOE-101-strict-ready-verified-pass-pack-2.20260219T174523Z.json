@@ -1,0 +1,35 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-101-strict-ready-verified-pass-pack-2",
+  "files_changed": [
+    "docs/audits/ticket-results/TOE-007-ideology-hard-action-gates.20260219T174523Z.json",
+    "docs/audits/ticket-results/TOE-008-certificate-authenticity-policy.20260219T174523Z.json",
+    "docs/audits/ticket-results/TOE-009-verify-endpoint-hardening.20260219T174523Z.json",
+    "docs/audits/ticket-results/TOE-010-unified-primitive-manifest.20260219T174523Z.json",
+    "docs/audits/ticket-results/TOE-011-orbital-ephemeris-provenance-bridge.20260219T174523Z.json",
+    "docs/audits/ticket-results/TOE-013-atomic-systems-claim-tier-contract.20260219T174523Z.json",
+    "docs/audits/ticket-results/TOE-015-external-integration-evidence-manifest.20260219T174523Z.json",
+    "docs/audits/ticket-results/TOE-016-resolver-forest-owner-coverage-manifest.20260219T174523Z.json",
+    "docs/audits/ticket-results/TOE-017-pipeline-ledger-provenance-contract.20260219T174523Z.json",
+    "docs/audits/toe-progress-snapshot.json",
+    "docs/audits/toe-coverage-extension-backlog-2026-02-18.json"
+  ],
+  "tests_run": [
+    "scripts/validate-toe-ticket-results.ts",
+    "scripts/validate-math-congruence-matrix.ts",
+    "scripts/compute-toe-progress.ts",
+    "scripts/toe-agent-preflight.ts"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:d4f703d0-a1a4-48fb-b2d3-5cd30776189c",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}
