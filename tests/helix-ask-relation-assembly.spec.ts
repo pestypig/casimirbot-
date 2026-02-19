@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRelationAssemblyPacket,
+  ensureRelationAssemblyPacketFallback,
   evaluateRelationPacketFloors,
   resolveRelationTopologySignal,
 } from "../server/services/helix-ask/relation-assembly";
@@ -65,4 +66,27 @@ describe("relation assembly packet", () => {
     expect(evidenceFail.ok).toBe(false);
     expect(evidenceFail.failReason).toBe("evidence_count_low");
   });
+
+  it("fills incomplete relation packets with deterministic fallback fields", () => {
+    const repaired = ensureRelationAssemblyPacketFallback(
+      {
+        question: "",
+        domains: [],
+        definitions: { warp_definition: "", ethos_definition: "" },
+        bridge_claims: [],
+        constraints: [],
+        falsifiability_hooks: [],
+        evidence: [],
+        source_map: {},
+      },
+      "How does warp relate to mission ethos?",
+    );
+    expect(repaired.question).toBe("How does warp relate to mission ethos?");
+    expect(repaired.definitions.warp_definition.length).toBeGreaterThan(10);
+    expect(repaired.definitions.ethos_definition.length).toBeGreaterThan(10);
+    expect(repaired.bridge_claims.length).toBeGreaterThanOrEqual(2);
+    expect(repaired.constraints.length).toBeGreaterThanOrEqual(2);
+    expect(repaired.falsifiability_hooks.length).toBeGreaterThanOrEqual(1);
+  });
+
 });
