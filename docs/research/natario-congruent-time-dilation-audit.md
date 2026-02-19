@@ -149,6 +149,23 @@ E_{\mu\nu} = R_{\mu\alpha\nu\beta}u^\alpha u^\beta
 
 ## Section E: Concrete Repo Action Plan
 
+## Section E1: Shipped Observable Traceability Matrix (implementation-synced)
+
+The current diagnostics payload emits observables under `diagnostics.payload.observables` (or `diagnostics.observables` when the raw payload is returned directly), with per-channel provenance in `provenance`/`fieldProvenance` and strict-gate state in `strict`, `gate`, and verification-derived reasons.
+
+| Payload key | Equation / definition | Congruence | Provenance source in code | Validity / certification gate requirement |
+|---|---|---|---|---|
+| `observables.alpha` | Eulerian clock-rate primitive: `(dτ/dt)_Euler = alpha` | `eulerian_adm` (or payload `congruence.kind`) | `render_plan.sourceForAlpha`, `warp.metricAdapter.alpha`, `provenance.alpha` | Certified interpretation only when `strict.strictCongruence=true`, `strict.anyProxy=false`, `strict.grCertified=true`, verification reasons do not include hard fail; otherwise diagnostic-only. |
+| `observables.beta` | ADM shift vector `beta^i` (kinematic input to clocking/transport formulas) | payload `congruence.kind` | `render_plan.sourceForBeta`, `warp.metricAdapter.beta`, `provenance.beta` | Same strict gate as above; proxy/missing source forces non-certified usage. |
+| `observables.gamma` | Spatial metric term `gamma_ij` used in ADM contractions | payload `congruence.kind` | fixed `gr-brick`, `warp.metricAdapter.gammaDiag`, `provenance.gamma` | Must remain metric-derived (`gr-brick`) for strict Natario claims. |
+| `observables.theta` | Expansion scalar, Eulerian relation `theta = -Ktrace` under declared sign convention | payload `congruence.kind` | `render_plan.sourceForTheta`, `warp.metricAdapter.theta`, plus `definitions.theta_definition` and `definitions.kij_sign_convention` | Natario canonical claim requires theta/K consistency pass in `natarioCanonical.checks.thetaKConsistency`. |
+| `observables.kTrace` | Trace of extrinsic curvature `K = gamma^{ij}K_ij` | payload `congruence.kind` | fixed `gr-brick`, `warp.metricAdapter.Ktrace`, `provenance.kTrace` | Required for strict metric completeness (`strict.strictMetricMissing=false`) and Natario theta/K consistency. |
+| `observables.ship_comoving_dtau_dt` | `dτ/dt = sqrt(alpha^2 - gamma_ij (dx^i/dt + beta^i)(dx^j/dt + beta^j))` | `ship_comoving` | `resolveShipComovingDtauDt` details in diagnostics builder; emits `valid`, `missingFields`, `details` | Never certified when `valid=false` or missing required worldline/metric fields; route must keep it as diagnostic or blocked. |
+| `observables.tidal_indicator` | `||E_ij||_F = sqrt(sum_ij E_ij E^ij)` | payload `congruence.kind` | `resolveTidalIndicator` from `warp.metricAdapter.tidalTensorEij`/`electricWeylEij`/`E_ij` or proof fallback, with deterministic missing block id | Certified usage requires available tensor (no `TIDAL_E_IJ_MISSING`) and strict no-proxy gate. |
+| `observables.redshift` | `1+z = (k.u)_emit / (k.u)_recv` (reduced-order transport path) | payload `congruence.kind` | `resolveRedshiftDiagnostics` from pipeline redshift transport/worldline fields; emits computed/proxy/unavailable status and deterministic block ids | Redshift can only be claimed as physical when `status="computed"`; proxy/unavailable must be labeled non-certifying diagnostic fallback. |
+
+Natario-specific gate observables are additionally shipped in `natarioCanonical.checks.divBeta` and `natarioCanonical.checks.thetaKConsistency`, and must both pass (with required fields present) for `natarioCanonical.canonicalSatisfied=true`.
+
 ### Diagnostics Layer
 
 1. Add congruence registry (`eulerian_adm`, `grid_static`, `ship_comoving`, `geodesic_bundle`) with required fields.
@@ -163,14 +180,19 @@ E_{\mu\nu} = R_{\mu\alpha\nu\beta}u^\alpha u^\beta
      `proxy` (explicit fallback source) or `unavailable` (deterministic block id).
 4. Add tidal indicators (`E_ij` or explicit unavailable flag).
 
-### API Payload
+### API Payload (current route behavior)
 
-Add:
+Implemented route behavior for `GET /api/helix/time-dilation/diagnostics` returns an envelope:
 
-- `congruence: { kind, requiredFieldsOk, missingFields, gaugeNote }`
-- `observables: { tauRate, theta, sigma2, omega2, tidal, redshift }`
-- `validity: { grCertified, constraints, certificate: { id, hash, integrityOk }, unknownAsFailApplied }`
-- `provenance` per observable (`metricDerived`, `source`, chart/normalization)
+- `ok`, `status`, `updatedAt`, `source`, `renderingSeed`, `seedStatus`, `reason`, `payload`
+- The diagnostics contract lives under `payload` (same data is returned for `?raw=1` currently).
+- `POST /api/helix/time-dilation/diagnostics` stores arbitrary payload and updates `latestDiagnostics` as status `ready`.
+
+Within `payload`, the implementation-backed keys for claim-bearing diagnostics are:
+
+- `congruence`, `observables`, `provenance`, `fieldProvenance`
+- `strict`, `gate`, `canonical`, `natarioCanonical`, `redshift`, `tidal`
+- `metric_contract`, `render_plan`, `sources`, `wall`, `gr`
 
 ### Panel UX
 
@@ -192,18 +214,22 @@ Strict mode:
 2. Natario tests for divergence-free and non-divergence-free shift cases.
 3. Adapter verification assertions: deterministic `verdict`, `firstFail`, `deltas`, artifact/certificate references.
 
-## Section F: Claim Discipline
+## Section F: Claim Discipline (explicit)
 
-Permitted now (diagnostic):
+### What we can claim
 
-- "Visualization of congruence-specific clock-rate diagnostics" when congruence and provenance are explicit and strict gating is active.
+- We can claim **diagnostic visualization** of congruence-tagged observables when payload keys are present and provenance is explicit (`congruence`, `observables`, `provenance`, `fieldProvenance`).
+- We can claim **strict-gate status** only as reported by payload booleans/reasons (`strict.*`, `gate.banner`, `gate.reasons`, `natarioCanonical.*`).
+- We can claim **computed reduced-order redshift diagnostics** only when `observables.redshift.details.status="computed"`, with limitations/confidence attached.
+- We can claim **Natario canonical check outcome** only as the explicit check outputs (`natarioCanonical.checks.divBeta`, `natarioCanonical.checks.thetaKConsistency`, `natarioCanonical.canonicalSatisfied`).
 
-Not permitted without full gate evidence:
+### What we cannot claim
 
-- "Physically viable warp"
-- "Certified/admissible" labeling without `HARD` pass + `ADMISSIBLE` + certificate integrity OK
-- "Redshift map" without two-observer definition and null transport
-- "Natario zero expansion satisfied" unless computed and shown (`div beta ~ 0`, `K ~ 0`, `theta ~ 0`)
+- We cannot claim **physical viability** or mission readiness from time-dilation diagnostics alone.
+- We cannot claim **certified/admissible warp** unless all `HARD` constraints pass, viability status is `ADMISSIBLE`, and certificate hash/integrity are present and OK.
+- We cannot claim **physical redshift** when payload reports `proxy`/`unavailable` or missing two-observer/null-transport contract fields.
+- We cannot claim **Natario zero expansion satisfied** unless required fields are present and both Natario checks pass.
+- We cannot upgrade a run above diagnostic maturity when strict fail-closed signals are present (`strict.anyProxy=true`, missing required fields, verification fail reasons).
 
 ## References
 
