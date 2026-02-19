@@ -21,8 +21,18 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
     manifest_id: "fixture",
     claim_tier_ceiling: "diagnostic",
     roots: [
-      { id: "physics_spacetime_gr", name: "GR" },
-      { id: "physics_quantum_semiclassical", name: "QFT curved spacetime" },
+      {
+        id: "physics_spacetime_gr",
+        name: "GR",
+        tree_lane: "physics_spacetime_gr",
+        tree_path: "docs/knowledge/physics/physics-spacetime-gr-tree.json",
+      },
+      {
+        id: "physics_quantum_semiclassical",
+        name: "QFT curved spacetime",
+        tree_lane: "physics_quantum_semiclassical",
+        tree_path: "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+      },
       { id: "physics_thermodynamics_entropy", name: "Thermodynamics" },
       { id: "physics_information_dynamics", name: "Information dynamics" },
       { id: "physics_prebiotic_chemistry", name: "Prebiotic chemistry" },
@@ -221,6 +231,18 @@ describe("validatePhysicsRootLeafManifest", () => {
     const result = validatePhysicsRootLeafManifest({ repoRoot });
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
+  });
+
+
+  it("fails when dedicated root tree lane metadata is missing", () => {
+    const repoRoot = makeFixture((manifest) => {
+      const roots = manifest.roots as Array<Record<string, unknown>>;
+      delete roots[0].tree_lane;
+    });
+
+    const result = validatePhysicsRootLeafManifest({ repoRoot });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toContain("roots[0].tree_lane must be physics_spacetime_gr");
   });
 
   it("fails when a required root is missing", () => {
