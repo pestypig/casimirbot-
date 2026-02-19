@@ -20,8 +20,10 @@ type StageSummary = {
 
 type StageConfig = {
   id: string;
-  script: string;
+  script?: string;
   required: boolean;
+  check?: () => { pass: boolean; stderr?: string };
+  command?: string;
 };
 
 
@@ -57,6 +59,50 @@ const repoRoot = path.resolve(scriptDir, "..");
 const workspaceRoot = path.resolve(process.env.TOE_PREFLIGHT_ROOT ?? repoRoot);
 const tsxCliPath = path.join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs");
 
+const EVIDENCE_FALSIFIER_LEDGER_TREE_PATH = path.resolve(
+  workspaceRoot,
+  path.join("docs", "knowledge", "evidence-falsifier-ledger-tree.json"),
+);
+const GRAPH_RESOLVERS_PATH = path.resolve(workspaceRoot, path.join("configs", "graph-resolvers.json"));
+const RESOLVER_OWNER_COVERAGE_PATH = path.resolve(
+  workspaceRoot,
+  path.join("configs", "resolver-owner-coverage-manifest.v1.json"),
+);
+
+function validateEvidenceFalsifierLedgerStage(): { pass: boolean; stderr?: string } {
+  if (!fs.existsSync(EVIDENCE_FALSIFIER_LEDGER_TREE_PATH)) {
+    return { pass: false, stderr: `missing ledger tree: ${EVIDENCE_FALSIFIER_LEDGER_TREE_PATH}` };
+  }
+  if (!fs.existsSync(GRAPH_RESOLVERS_PATH)) {
+    return { pass: false, stderr: `missing graph resolvers config: ${GRAPH_RESOLVERS_PATH}` };
+  }
+  if (!fs.existsSync(RESOLVER_OWNER_COVERAGE_PATH)) {
+    return { pass: false, stderr: `missing owner coverage manifest: ${RESOLVER_OWNER_COVERAGE_PATH}` };
+  }
+
+  const resolvers = JSON.parse(fs.readFileSync(GRAPH_RESOLVERS_PATH, "utf8")) as {
+    trees?: Array<{ id?: string; path?: string }>;
+  };
+  const owners = JSON.parse(fs.readFileSync(RESOLVER_OWNER_COVERAGE_PATH, "utf8")) as {
+    owners?: Record<string, { status?: string }>;
+  };
+
+  const tree = resolvers.trees?.find((entry) => entry.id === "evidence-falsifier-ledger");
+  if (!tree) {
+    return { pass: false, stderr: "graph-resolvers missing evidence-falsifier-ledger lane" };
+  }
+  if (tree.path !== "docs/knowledge/evidence-falsifier-ledger-tree.json") {
+    return { pass: false, stderr: "evidence-falsifier-ledger lane path is not pinned to expected tree" };
+  }
+
+  const ownerStatus = owners.owners?.["evidence-falsifier-ledger"]?.status;
+  if (!ownerStatus || !ownerStatus.startsWith("covered_")) {
+    return { pass: false, stderr: "resolver owner coverage missing evidence-falsifier-ledger coverage" };
+  }
+
+  return { pass: true };
+}
+
 const stageConfigs: StageConfig[] = [
   { id: "validate-toe-ticket-backlog", script: path.join("scripts", "validate-toe-ticket-backlog.ts"), required: true },
   { id: "validate-toe-ticket-results", script: path.join("scripts", "validate-toe-ticket-results.ts"), required: true },
@@ -65,6 +111,12 @@ const stageConfigs: StageConfig[] = [
   { id: "validate-resolver-owner-coverage", script: path.join("scripts", "validate-resolver-owner-coverage.ts"), required: true },
   { id: "validate-toe-research-gate-policy", script: path.join("scripts", "validate-toe-research-gate-policy.ts"), required: false },
   { id: "compute-toe-progress", script: path.join("scripts", "compute-toe-progress.ts"), required: true },
+  {
+    id: "validate-evidence-falsifier-ledger",
+    required: true,
+    command: "inline:validate-evidence-falsifier-ledger",
+    check: validateEvidenceFalsifierLedgerStage,
+  },
 ];
 
 
@@ -82,10 +134,12 @@ const TOE_PROGRESS_SNAPSHOT_PATH = path.resolve(
 );
 
 function runStage(stage: StageConfig): StageSummary {
-  const scriptPath = path.resolve(workspaceRoot, stage.script);
-  const command = `node ${path.relative(workspaceRoot, tsxCliPath)} ${path.relative(workspaceRoot, scriptPath)}`;
+  const scriptPath = stage.script ? path.resolve(workspaceRoot, stage.script) : null;
+  const command =
+    stage.command ??
+    (scriptPath ? `node ${path.relative(workspaceRoot, tsxCliPath)} ${path.relative(workspaceRoot, scriptPath)}` : "inline");
   const start = Date.now();
-  const present = fs.existsSync(scriptPath);
+  const present = stage.check ? true : scriptPath ? fs.existsSync(scriptPath) : false;
 
   if (!present && !stage.required) {
     return {
@@ -117,7 +171,25 @@ function runStage(stage: StageConfig): StageSummary {
     };
   }
 
-  const result = spawnSync(process.execPath, [tsxCliPath, scriptPath], {
+
+  if (stage.check) {
+    const result = stage.check();
+    const status: StageStatus = result.pass ? "pass" : "fail";
+    return {
+      id: stage.id,
+      command,
+      required: stage.required,
+      status,
+      pass: result.pass,
+      present,
+      exit_code: result.pass ? 0 : 1,
+      duration_ms: Date.now() - start,
+      stdout: "",
+      stderr: result.stderr ?? "",
+    };
+  }
+
+  const result = spawnSync(process.execPath, [tsxCliPath, scriptPath as string], {
     cwd: workspaceRoot,
     env: process.env,
     encoding: "utf8",
