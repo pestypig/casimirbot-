@@ -227,7 +227,7 @@ import {
   buildEventStableFields,
   evaluateSemanticQuality,
   precomputeBridgeTraversalCandidates,
-  selectDeterministicMove,
+  selectDeterministicMoveWithDebug,
 } from "../services/helix-ask/quake-frame-loop";
 import {
   HELIX_ASK_TYPED_FAIL_REASONS,
@@ -26876,22 +26876,60 @@ const executeHelixAsk = async ({
             beforeCitationGuard.trim() !== cleaned.trim();
         }
       }
-      let selectedMove: ReturnType<typeof selectDeterministicMove> = "missing_evidence_report";
+      let selectedMove: "direct_answer" | "retrieve_more" | "relation_build" | "clarify" | "fail_closed" =
+        "fail_closed";
       const securityRiskPrompt = isSecurityRiskPrompt(baseQuestion);
+      const relationIntentActive =
+        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
+        isWarpEthosRelationQuestion(baseQuestion) ||
+        intentProfile.id === "hybrid.warp_ethos_relation";
       const groundednessScore = evidenceGateOk ? 1 : 0.35;
-      const uncertaintyScore = Math.min(1, Math.max(0, (coverageSlotSummary?.missingSlots?.length ?? 0) / Math.max(1, slotPlan?.slots?.length ?? 1)));
+      const uncertaintyScore = Math.min(
+        1,
+        Math.max(0, (coverageSlotSummary?.missingSlots?.length ?? 0) / Math.max(1, slotPlan?.slots?.length ?? 1)),
+      );
       const safetyScore = securityRiskPrompt ? 1 : 0.3;
-      const coverageScore = Math.min(1, Math.max(0, coverageSlotSummary?.coverageRatio ?? (docSlotSummary?.slotCoverageRatio ?? 0)));
-      selectedMove = selectDeterministicMove({
+      const coverageScore = Math.min(
+        1,
+        Math.max(0, coverageSlotSummary?.coverageRatio ?? (docSlotSummary?.slotCoverageRatio ?? 0)),
+      );
+      const moveSelection = selectDeterministicMoveWithDebug({
         groundedness: groundednessScore,
         uncertainty: uncertaintyScore,
         safety: safetyScore,
         coverage: coverageScore,
+        evidenceGain: Math.min(1, Math.max(0, 1 - coverageScore)),
+        latencyCost: Math.min(1, Math.max(0, (Date.now() - askRequestStartedAt) / Math.max(1, runtimeContract.clockA.p95_ms))),
+        risk: Math.min(
+          1,
+          Math.max(0, securityRiskPrompt ? 0.92 : claimGateFailed || failClosedRepoEvidence ? 0.76 : 0.22),
+        ),
+        budgetPressure:
+          runtimeBudgetRecommend === "force_clarify" || runtimeBudgetRecommend === "queue_deep_work"
+            ? 1
+            : runtimeBudgetRecommend === "reduce_tool_calls"
+              ? 0.55
+              : 0.15,
+        relationIntentActive,
+        profile:
+          runtimeBudgetRecommend === "force_clarify" || runtimeBudgetRecommend === "queue_deep_work"
+            ? "latency_first"
+            : relationIntentActive
+              ? "evidence_first"
+              : "balanced",
+        clarifyFailClosedThreshold: 0.72,
       });
+      selectedMove = moveSelection.selectedMove;
       answerPath.push(`moveSelector:${selectedMove}`);
       if (debugPayload) {
         (debugPayload as Record<string, unknown>).fuzzy_move_selector = {
           selected: selectedMove,
+          selected_move: selectedMove,
+          move_scores: moveSelection.moveScores,
+          rejected_moves: moveSelection.rejectedMoves,
+          reject_reasons: moveSelection.rejectReasons,
+          budget_pressure: moveSelection.budgetPressure,
+          stop_reason: moveSelection.stopReason,
           scores: {
             groundedness: groundednessScore,
             uncertainty: uncertaintyScore,
@@ -26903,8 +26941,9 @@ const executeHelixAsk = async ({
       const weakEvidenceForDeterministicFallback =
         !evidenceGateOk ||
         claimGateFailed ||
-        selectedMove === "missing_evidence_report" ||
-        selectedMove === "targeted_clarification";
+        selectedMove === "retrieve_more" ||
+        selectedMove === "clarify" ||
+        selectedMove === "fail_closed";
       if (weakEvidenceForDeterministicFallback) {
         const allowed = normalizeCitations([
           ...extractFilePathsFromText(evidenceText),
