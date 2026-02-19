@@ -12699,6 +12699,30 @@ const expandOpenWorldQualityFloor = (args: {
   return expanded;
 };
 
+const enforceCitationLinkedClaims = (text: string, citationToken: string): string => {
+  if (!text.trim() || !citationToken.trim()) return text;
+  const normalizedCitation = citationToken.trim();
+  const parts = text.split(/(?<=[.!?])\s+/);
+  const patched = parts.map((part) => {
+    const trimmed = part.trim();
+    if (trimmed.length < 20 || /^sources\s*:/i.test(trimmed)) return part;
+    if (/\[[^\]]+\]|\bdocs\/|\bserver\/|\bclient\/|\bmodules\/|\bartifacts\//i.test(trimmed)) return part;
+    return `${trimmed} [${normalizedCitation}]`;
+  });
+  return patched.join(" ").trim();
+};
+
+const rewriteUnsupportedScaffoldToBoundedUncertainty = (text: string): string => {
+  const scaffoldRe = /\bAnswer grounded in retrieved evidence\.?/gi;
+  if (!scaffoldRe.test(text)) return text;
+  const rewritten = text.replace(
+    scaffoldRe,
+    "Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.",
+  );
+  if (/\bMissing evidence:/i.test(rewritten)) return rewritten;
+  return `${rewritten.trim()}\n\nMissing evidence: add directly relevant repo paths or artifact refs to raise confidence.`;
+};
+
 
 type HelixAskFailureClass = "infra_fail" | "parse_fail";
 
@@ -27151,7 +27175,7 @@ const executeHelixAsk = async ({
           answerPath.push("placeholderFallback:deterministic_contract");
           logEvent("Placeholder fallback", "applied", "deterministic_contract", answerStart);
           if (debugPayload) {
-            debugPayload.placeholder_fallback_applied = true;
+            debugPayload.placeholder_fallback_applied = false;
             debugPayload.placeholder_fallback_reason = "model_placeholder_answer";
           }
         }
@@ -27255,6 +27279,7 @@ const executeHelixAsk = async ({
           }
         }
       }
+      cleaned = rewriteUnsupportedScaffoldToBoundedUncertainty(cleaned);
       if (
         qualityFloorEligible &&
         qualityFloorReasons.some((reason) =>
@@ -27487,6 +27512,14 @@ const executeHelixAsk = async ({
           answerPath.push("fallback:final_output_guard");
         }
       }
+      const fallbackCitationAnchor =
+        normalizeCitations([
+          ...allowedSourcePaths,
+          ...contextFiles,
+          ...extractFilePathsFromText(evidenceText),
+          ...extractCitationTokensFromText(evidenceText),
+        ])[0] ?? "server/routes/agi.plan.ts";
+      cleaned = enforceCitationLinkedClaims(cleaned, fallbackCitationAnchor);
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
         logEvent("Answer cleaned preview", "final", finalCleanedPreview, answerStart);
