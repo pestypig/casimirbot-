@@ -285,3 +285,70 @@ Mandatory Casimir + trace export and full gate table.
   - `docs/audits/helix-results/HELIX-PS2-selectedmove-availability-precheck-fix.20260219T002526Z.json`
 - Next single highest-priority task:
   - Fix `tests/helix-ask-ps2-runtime-report.spec.ts` syntax issue, stabilize `tests/helix-ask-modes.spec.ts` runtime noise, then run decision-grade goal-zone + 270-run versatility campaign after passing precheck probes.
+
+### Handoff Snapshot 2026-02-19T01:31:05Z
+- Branch/HEAD: cloud run (reported commit `a94ca97`; commit not visible in this local clone)
+- Result type: pass_with_followups
+- Stage completed: Stage B2 support lane post-fix validation campaign (availability-gated goal-zone + versatility)
+- Gates passed:
+  - Hard availability precheck passed with 3/3 successful probes to `POST /api/agi/ask` (all HTTP 200)
+  - Goal-zone run executed after gate pass
+  - Full versatility matrix executed after gate pass
+  - Validation suites passed: `helix-ask-availability-precheck`, `helix-ask-semantic-quality`, `helix-ask-focused-utility-hardening`, `helix-ask-ps2-runtime-report`
+  - Casimir verify PASS with integrity OK (`repo-convergence`)
+- Gates failed:
+  - `tests/helix-ask-modes.spec.ts` failed (3 assertions; adapter/consistency behavior mismatch with spec expectations)
+  - Baseline summary artifact missing for direct before/after delta comparison (`artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/summary.json`)
+- Key after metrics (baseline unavailable):
+  - `intent_id_correct_rate=0.9333`
+  - `report_mode_correct_rate=0.9222`
+  - `relation_packet_built_rate=0.8667`
+  - `relation_dual_domain_ok_rate=0.8667`
+  - `citation_presence_rate=0.9667`
+  - `min_text_length_pass_rate=1.0000`
+  - `invalid/error_rate=0.0000`
+  - `completion_rate=1.0000`
+- Top failure signatures:
+  - `report_mode_mismatch` (21)
+  - `relation_packet_built` (12)
+  - `relation_dual_domain` (12)
+  - `bridge_count_low` (12)
+  - `evidence_count_low` (12)
+  - `citation_missing` (9)
+  - `intent_mismatch` (6)
+- Casimir:
+  - PASS `traceId=adapter:5f499abf-edc3-4885-952d-cfdafcad9de0`, `runId=294`
+  - `certificateHash=6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`, `integrityOk=true`
+- New artifacts:
+  - `docs/audits/helix-results/HELIX-PS2-post-fix-validation-campaign.20260219T013105Z.json`
+- Next single highest-priority task:
+  - Fix `tests/helix-ask-modes.spec.ts` assertion drift and restore missing baseline summary artifact so subsequent campaigns can report strict before/after deltas.
+
+### Handoff Snapshot 2026-02-19T02:00:00Z
+- Branch/HEAD: cloud run, commit `744f650`
+- Result type: needs_quality_patch (serviceable preflight; semantic gates failed) + Casimir FAIL
+- Stage completed: Stage B2 rerun with runtime reliability fallback patch
+- Gates passed:
+  - Runtime reliability patch converted generic `/api/agi/ask` runtime/model failure path from HTTP 500 into deterministic fallback + HTTP 200
+  - Availability preflight passed (`/api/ready=true`, ask smoke 200-rate `1.000`)
+  - Semantic gates passed: `contradiction_flag_rate=0.000`, `repetition_penalty_fail_rate=0.000`
+  - Non-200 and latency gates passed (`non_200_rate=0.000`, `p95_latency=1753ms`)
+- Gates failed:
+  - `claim_citation_link_rate=0.625` (threshold `>=0.90`)
+  - `unsupported_claim_rate=1.000` (threshold `<=0.10`)
+  - `placeholder_fallback_rate=0.375` (threshold `==0`)
+  - Casimir verification failed in that run (`adapter-run-failed`, autoscale not settled)
+- Casimir:
+  - FAIL (`certificateHash` unavailable, `integrityOk` unavailable)
+  - Adapter error: `Autoscale not settled for certification: zetaRaw=4165962008945087`
+  - Trace export still returned HTTP 200 in that run
+- New artifacts (reported by cloud run):
+  - `reports/helix-ask-quake-frame-loop-2026-02-19T00-47-34-081Z.md`
+  - `artifacts/experiments/helix-ask-quake-frame-loop/<run-id>/summary.json`
+  - `artifacts/experiments/helix-ask-quake-frame-loop/<run-id>/recommendation.json`
+  - `artifacts/experiments/helix-ask-quake-frame-loop/<run-id>/focused-qa.json`
+  - `artifacts/experiments/helix-ask-quake-frame-loop/<run-id>/semantic-gates.json`
+  - `artifacts/experiments/helix-ask-quake-frame-loop/<run-id>/preflight.json`
+  - `artifacts/experiments/helix-ask-quake-frame-loop/<run-id>/failure-signatures.json`
+- Next single highest-priority task:
+  - Tighten semantic quality gates (claim-citation binding + unsupported-claim suppression + placeholder elimination), then rerun B2 with mandatory Casimir PASS.

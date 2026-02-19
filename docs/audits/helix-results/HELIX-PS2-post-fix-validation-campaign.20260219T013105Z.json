@@ -1,0 +1,162 @@
+{
+  "schema_version": "helix_build_session_bookkeeping/1",
+  "ticket_id": "HELIX-PS2-post-fix-validation-campaign",
+  "recorded_at": "2026-02-19T01:31:05Z",
+  "reported_commit_hash": "a94ca97",
+  "commit_visibility_local_clone": "missing",
+  "source": "user-provided cloud run bookkeeping",
+  "executive_summary": [
+    "Completed post-fix Helix Ask validation campaign in Codex Cloud with app running on :5173.",
+    "Hard availability gate passed with 3/3 probes to POST /api/agi/ask at HTTP 200.",
+    "Strict goal-zone run and full versatility matrix executed after precheck pass.",
+    "Baseline summary for before/after deltas was missing, so baseline values are recorded as N/A and after metrics are reported as absolute.",
+    "Mandatory Casimir verification passed with certificate integrity OK."
+  ],
+  "availability_precheck": [
+    {
+      "probe": 1,
+      "http_status": 200,
+      "error": null,
+      "fail_reason": null,
+      "debug_last_error": null
+    },
+    {
+      "probe": 2,
+      "http_status": 200,
+      "error": null,
+      "fail_reason": null,
+      "debug_last_error": null
+    },
+    {
+      "probe": 3,
+      "http_status": 200,
+      "error": null,
+      "fail_reason": null,
+      "debug_last_error": null
+    }
+  ],
+  "metrics_before_after": [
+    {
+      "metric": "intent_id_correct_rate",
+      "before": "N/A (baseline missing)",
+      "after": 0.9333
+    },
+    {
+      "metric": "report_mode_correct_rate",
+      "before": "N/A (baseline missing)",
+      "after": 0.9222
+    },
+    {
+      "metric": "relation_packet_built_rate",
+      "before": "N/A (baseline missing)",
+      "after": 0.8667
+    },
+    {
+      "metric": "relation_dual_domain_ok_rate",
+      "before": "N/A (baseline missing)",
+      "after": 0.8667
+    },
+    {
+      "metric": "citation_presence_rate",
+      "before": "N/A (baseline missing)",
+      "after": 0.9667
+    },
+    {
+      "metric": "min_text_length_pass_rate",
+      "before": "N/A (baseline missing)",
+      "after": 1.0
+    },
+    {
+      "metric": "invalid_error_rate",
+      "before": "N/A (baseline missing)",
+      "after": 0.0
+    },
+    {
+      "metric": "run_complete",
+      "before": "N/A (baseline missing)",
+      "after": true
+    },
+    {
+      "metric": "completion_rate",
+      "before": "N/A (baseline missing)",
+      "after": 1.0
+    }
+  ],
+  "baseline_missing_path": "artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/summary.json",
+  "top_failure_signatures": [
+    {
+      "key": "report_mode_mismatch",
+      "count": 21
+    },
+    {
+      "key": "relation_packet_built",
+      "count": 12
+    },
+    {
+      "key": "relation_dual_domain",
+      "count": 12
+    },
+    {
+      "key": "bridge_count_low",
+      "count": 12
+    },
+    {
+      "key": "evidence_count_low",
+      "count": 12
+    },
+    {
+      "key": "citation_missing",
+      "count": 9
+    },
+    {
+      "key": "intent_mismatch",
+      "count": 6
+    }
+  ],
+  "commands_run": [
+    "npm run dev:agi:5173",
+    "node - <<'NODE' ... fetch('http://127.0.0.1:5173/api/agi/ask') ... NODE",
+    "HELIX_ASK_GOAL_ALLOW_STUB=0 npm run helix:ask:goal-zone",
+    "HELIX_ASK_VERSATILITY_START_SERVER=0 HELIX_ASK_VERSATILITY_SEEDS=7,11,13 HELIX_ASK_VERSATILITY_TEMPS=0.2 HELIX_ASK_VERSATILITY_MAX_RETRIES=3 HELIX_ASK_VERSATILITY_TIMEOUT_MS=15000 HELIX_ASK_VERSATILITY_MAX_CASE_WALL_MS=25000 HELIX_ASK_VERSATILITY_CHECKPOINT_EVERY=10 HELIX_ASK_VERSATILITY_FAIL_ON_INCOMPLETE=1 npx tsx scripts/helix-ask-versatility-record.ts",
+    "npx vitest run tests/helix-ask-availability-precheck.spec.ts",
+    "npx vitest run tests/helix-ask-semantic-quality.spec.ts",
+    "npx vitest run tests/helix-ask-focused-utility-hardening.spec.ts",
+    "npx vitest run tests/helix-ask-ps2-runtime-report.spec.ts",
+    "npx vitest run tests/helix-ask-modes.spec.ts",
+    "npm run casimir:verify -- --pack repo-convergence --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace-post-fix-validation.jsonl --trace-limit 200 --ci"
+  ],
+  "test_results": [
+    {
+      "status": "PASS",
+      "item": "npx vitest run tests/helix-ask-availability-precheck.spec.ts"
+    },
+    {
+      "status": "PASS",
+      "item": "npx vitest run tests/helix-ask-semantic-quality.spec.ts"
+    },
+    {
+      "status": "PASS",
+      "item": "npx vitest run tests/helix-ask-focused-utility-hardening.spec.ts"
+    },
+    {
+      "status": "PASS",
+      "item": "npx vitest run tests/helix-ask-ps2-runtime-report.spec.ts"
+    },
+    {
+      "status": "FAIL",
+      "item": "npx vitest run tests/helix-ask-modes.spec.ts",
+      "detail": "3 failing assertions; runtime adapter/consistency behavior diverged from spec expectations."
+    }
+  ],
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:5f499abf-edc3-4885-952d-cfdafcad9de0",
+    "run_id": "294",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "follow_up_blockers": [
+    "Resolve failing assertions in tests/helix-ask-modes.spec.ts to align runtime adapter/consistency behavior with expectations.",
+    "Restore or archive the missing baseline summary file to recover direct before/after comparability."
+  ]
+}
