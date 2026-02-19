@@ -1,5 +1,9 @@
 # Helix Ask Goal Zone - Iteration 3
 
+- pass: yes
+- pass_rate: 100.0%
+- failed_cases: 0/5
+- duration_ms: 7269
 - pass: no
 - pass_rate: 0.0%
 - failed_cases: 5/5
