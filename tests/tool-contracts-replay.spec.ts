@@ -80,10 +80,18 @@ describe("tool execution receipt contracts", () => {
       requestPayload: { question: "x" },
       actionOutput: "bad-output",
     });
+    const malformed = buildDeterministicToolExecutionReceipt({
+      tool: "halobank.time.compute",
+      mode: "verify",
+      requestPayload: { question: "x" },
+      actionOutput: { receipt: { token: "missing-ok-flag" } },
+    });
 
     expect(missing.status).toBe("failed");
     expect(missing.fail_reason).toBe("TOOL_RECEIPT_MISSING");
     expect(invalid.status).toBe("failed");
     expect(invalid.fail_reason).toBe("TOOL_RECEIPT_INVALID");
+    expect(malformed.status).toBe("failed");
+    expect(malformed.fail_reason).toBe("TOOL_RECEIPT_INVALID");
   });
 });
