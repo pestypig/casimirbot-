@@ -2,12 +2,13 @@
   "schema_version": "helix_build_session_bookkeeping/1",
   "ticket_id": "HELIX-PS2-versatility-deep-research",
   "recorded_at": "2026-02-19T02:36:17Z",
-  "reported_commit_hash": "pending_local_commit",
+  "reported_commit_hash": "165020c0",
   "source": "local deep research fixup",
   "executive_summary": [
     "Created all required deep-research deliverable files in-repo for the 20260219T023617Z audit run.",
     "Verified required source reports exist before writing conclusions.",
-    "Confirmed baseline JSON artifacts for 20260218T232914Z / versatility-1771457356197 are absent in the current snapshot and treated as missing.",
+    "Confirmed baseline JSON artifacts for 20260218T232914Z / versatility-1771457356197 are present in the current snapshot.",
+    "Classified that baseline as runtime-failed/non-informative for quality deltas due request_failed=270.",
     "Aligned summary metrics with the latest matrix in reports/helix-ask-versatility-report.md.",
     "Normalized citation formatting to repository-native path references only."
   ],
@@ -16,13 +17,12 @@
       "reports/helix-ask-versatility-report.md",
       "reports/helix-ask-versatility-20260218T232914Z.md",
       "reports/helix-ask-post-e1ccd1e6-validation.md",
-      "reports/helix-ask-versatility-post-fix-20260218T233657Z-blocked-precheck.md"
-    ],
-    "missing": [
+      "reports/helix-ask-versatility-post-fix-20260218T233657Z-blocked-precheck.md",
       "artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/summary.json",
       "artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/failures.json",
       "artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/recommendation.json"
-    ]
+    ],
+    "missing": []
   },
   "output_artifacts": [
     "reports/helix-ask-versatility-deep-research-20260219T023617Z.md",

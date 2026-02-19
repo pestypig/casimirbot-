@@ -354,7 +354,7 @@ Mandatory Casimir + trace export and full gate table.
   - Tighten semantic quality gates (claim-citation binding + unsupported-claim suppression + placeholder elimination), then rerun B2 with mandatory Casimir PASS.
 
 ### Handoff Snapshot 2026-02-19T02:36:17Z
-- Branch/HEAD: codex/research/helix-ask-versatility-deep-audit-fixup / pending_local_commit
+- Branch/HEAD: codex/research/helix-ask-versatility-deep-audit-fixup / `165020c0` (merged via PR #185 as `3d835471`)
 - Result type: pass (research artifact fixup)
 - Stage completed: Stage B support lane (versatility deep-research bookkeeping completion)
 - Gates passed:
@@ -362,7 +362,7 @@ Mandatory Casimir + trace export and full gate table.
   - Source artifact existence re-verified before conclusions
   - Latest matrix metrics mirrored into deep-research summary artifacts
 - Gates failed:
-  - Historical baseline JSON artifact set `versatility-1771457356197` remains missing in current snapshot
+  - No structural gate failure; baseline JSON artifact set is present but the baseline run is runtime-failed (`request_failed=270`) and non-informative for quality deltas
 - Casimir: PASS, certificateHash=6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45, integrityOk=true
 - New artifacts:
   - `reports/helix-ask-versatility-deep-research-20260219T023617Z.md`
@@ -373,4 +373,4 @@ Mandatory Casimir + trace export and full gate table.
   - `artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/recommendation.json`
   - `docs/audits/helix-results/HELIX-PS2-versatility-deep-research-20260219T023617Z.json`
 - Next single highest-priority task:
-  - Restore/reconstruct missing baseline JSON artifacts to regain strict before/after reproducibility.
+  - Capture a stable baseline versatility run (non-503) to regain strict before/after quality reproducibility.

@@ -12,9 +12,9 @@
 | `reports/helix-ask-versatility-20260218T232914Z.md` | yes | Earlier campaign report present in repo. |
 | `reports/helix-ask-post-e1ccd1e6-validation.md` | yes | Post-change validation report present in repo. |
 | `reports/helix-ask-versatility-post-fix-20260218T233657Z-blocked-precheck.md` | yes | Blocked precheck report present in repo. |
-| `artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/summary.json` | no | Baseline JSON artifact not present in current snapshot. |
-| `artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/failures.json` | no | Baseline JSON artifact not present in current snapshot. |
-| `artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/recommendation.json` | no | Baseline JSON artifact not present in current snapshot. |
+| `artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/summary.json` | yes | Baseline JSON artifact present in current snapshot. |
+| `artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/failures.json` | yes | Baseline JSON artifact present in current snapshot. |
+| `artifacts/experiments/helix-ask-versatility/20260218T232914Z/versatility-1771457356197/recommendation.json` | yes | Baseline JSON artifact present in current snapshot. |
 
 ## Latest matrix metrics (copied from `reports/helix-ask-versatility-report.md`)
 
@@ -42,10 +42,7 @@ Corrected in this fixup:
    - `reports/helix-ask-versatility-20260218T232914Z.md`
    - `reports/helix-ask-post-e1ccd1e6-validation.md`
    - `reports/helix-ask-versatility-post-fix-20260218T233657Z-blocked-precheck.md`
-2. The following baseline JSON artifacts are genuinely missing in current snapshot and are explicitly tracked as absent:
-   - `.../summary.json`
-   - `.../failures.json`
-   - `.../recommendation.json`
+2. The baseline JSON trio for `versatility-1771457356197` is present in current snapshot, but its metrics are runtime-failed (`request_failed=270`) and therefore non-informative for quality deltas.
 
 ## Deep-research outputs emitted
 
