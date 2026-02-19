@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { helixUtilityPrompts } from "./helix-ask-utility-ab";
 
 type LayerId = "telemetry_x_t" | "linear_baseline" | "pca_baseline" | "helical_6d" | "rho_clamp" | "natario_first";
 type ArmName = "A" | "B";
+type FailureClass = "invalid_json" | "schema_mismatch" | "metric_input_missing" | "timeout_soft" | "timeout_hard" | "http_error";
 
 type AskResponse = {
   text?: string;
@@ -73,7 +75,34 @@ const hasRequiredFields = (payload: AskResponse | null): boolean => {
   const linkage = semantic?.claim_citation_link_rate;
   const unsupported = semantic?.unsupported_claim_rate;
   const contradiction = semantic?.contradiction_flag;
-  return Number.isFinite(linkage) && Number.isFinite(unsupported) && typeof contradiction === "boolean";
+  const text = payload.text;
+  const reasons = semantic?.fail_reasons;
+  return typeof text === "string" && text.trim().length > 0 && Number.isFinite(linkage) && Number.isFinite(unsupported) && typeof contradiction === "boolean" && Array.isArray(reasons);
+};
+
+const classifyScoreability = (payload: AskResponse | null): { scoreable: boolean; failClass: FailureClass | null; failReason: string | null } => {
+  if (!payload || typeof payload !== "object") {
+    return { scoreable: false, failClass: "schema_mismatch", failReason: "response_payload_not_object" };
+  }
+  const semantic = payload.debug?.semantic_quality;
+  if (!semantic || typeof semantic !== "object") {
+    return { scoreable: false, failClass: "metric_input_missing", failReason: "missing_semantic_quality" };
+  }
+  const hasRequired = hasRequiredFields(payload);
+  if (hasRequired) {
+    return { scoreable: true, failClass: null, failReason: null };
+  }
+  const missingMetricInputs =
+    typeof payload.text !== "string" ||
+    payload.text.trim().length === 0 ||
+    semantic.claim_citation_link_rate === undefined ||
+    semantic.unsupported_claim_rate === undefined ||
+    semantic.contradiction_flag === undefined ||
+    !Array.isArray(semantic.fail_reasons);
+  if (missingMetricInputs) {
+    return { scoreable: false, failClass: "metric_input_missing", failReason: "required_metric_inputs_missing" };
+  }
+  return { scoreable: false, failClass: "schema_mismatch", failReason: "semantic_metric_type_mismatch" };
 };
 
 const hasContradiction = (payload: AskResponse | null): boolean => {
@@ -85,14 +114,23 @@ const metricFromPayload = (status: number, payload: AskResponse | null) => {
   const linkage = Number(payload?.debug?.semantic_quality?.claim_citation_link_rate ?? 0);
   const unsupported = Number(payload?.debug?.semantic_quality?.unsupported_claim_rate ?? 1);
   const failReasons = payload?.debug?.semantic_quality?.fail_reasons ?? [];
-  const pass = status === 200 && hasRequiredFields(payload) && !payload?.fail_reason && failReasons.length === 0;
+  const scoreability = classifyScoreability(payload);
+  const classification = status === 200
+    ? scoreability
+    : { scoreable: false, failClass: "http_error" as FailureClass, failReason: `http_status_${status}` };
+  const failClass = payload?.fail_class ?? classification.failClass;
+  const failReason = payload?.fail_reason ?? classification.failReason;
+  const pass = status === 200 && classification.scoreable && !failReason && failReasons.length === 0;
   return {
     pass,
+    scoreable: classification.scoreable,
     contradiction: hasContradiction(payload),
     claim_to_hook_linkage: Number.isFinite(linkage) ? Math.max(0, Math.min(1, linkage)) : 0,
     unsupported_claim_rate: Number.isFinite(unsupported) ? Math.max(0, Math.min(1, unsupported)) : 1,
     replay_flag: payload?.debug?.event_journal?.replay_parity === true,
     event_hash: String(payload?.debug?.event_journal?.event_hash ?? ""),
+    fail_class: failClass,
+    fail_reason: failReason,
   };
 };
 
@@ -127,7 +165,10 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
       }),
     ]);
     if (hardTimeout) clearTimeout(hardTimeout);
-    const payload = (await resp.json().catch(() => null)) as AskResponse | null;
+    const rawBody = await resp.text();
+    const payload = rawBody.length
+      ? (JSON.parse(rawBody) as AskResponse)
+      : ({ fail_class: "invalid_json", fail_reason: "empty_json_response" } as AskResponse);
     return {
       arm,
       promptId: prompt.id,
@@ -140,10 +181,26 @@ const runAsk = async (arm: ArmName, prompt: PromptCase, seed: number, replayInde
       metrics: metricFromPayload(resp.status, payload),
     };
   } catch (error) {
-    const isTimeout =
-      (error instanceof Error && error.name === "AbortError") ||
-      (error instanceof Error && error.message === "hard_timeout");
-    const failClass = isTimeout ? "timeout" : "transport_error";
+    if (error instanceof SyntaxError) {
+      const payload: AskResponse = {
+        fail_reason: error.message,
+        fail_class: "invalid_json",
+      };
+      return {
+        arm,
+        promptId: prompt.id,
+        seed,
+        replayIndex,
+        traceId,
+        status: 200,
+        latencyMs: Date.now() - started,
+        payload,
+        metrics: metricFromPayload(200, payload),
+      };
+    }
+    const isHardTimeout = error instanceof Error && error.message === "hard_timeout";
+    const isSoftTimeout = error instanceof Error && error.name === "AbortError";
+    const failClass: FailureClass = isHardTimeout ? "timeout_hard" : isSoftTimeout ? "timeout_soft" : "http_error";
     const payload: AskResponse = {
       fail_reason: error instanceof Error ? error.message : "request_failed",
       fail_class: failClass,
@@ -182,8 +239,8 @@ const summarizeArm = (rows: Array<Awaited<ReturnType<typeof runAsk>>>) => {
   const failClassHistogram = new Map<string, number>();
   const httpStatusHistogram = new Map<string, number>();
   for (const entry of primaryRows) {
-    const reason = String(entry.payload?.fail_reason ?? "none");
-    const klass = String(entry.payload?.fail_class ?? "none");
+    const reason = String(entry.metrics.fail_reason ?? "none");
+    const klass = String(entry.metrics.fail_class ?? "none");
     const statusKey = String(entry.status);
     failReasonHistogram.set(reason, (failReasonHistogram.get(reason) ?? 0) + 1);
     failClassHistogram.set(klass, (failClassHistogram.get(klass) ?? 0) + 1);
@@ -201,7 +258,7 @@ const summarizeArm = (rows: Array<Awaited<ReturnType<typeof runAsk>>>) => {
     claim_to_hook_linkage: avg(primaryRows.map((entry) => entry.metrics.claim_to_hook_linkage)),
     unsupported_claim_rate: avg(primaryRows.map((entry) => entry.metrics.unsupported_claim_rate)),
     http_status_ok_rate: avg(primaryRows.map((entry) => (entry.status === 200 ? 1 : 0))),
-    usable_response_rate: avg(primaryRows.map((entry) => (entry.status === 200 && hasRequiredFields(entry.payload) ? 1 : 0))),
+    usable_response_rate: avg(primaryRows.map((entry) => (entry.status === 200 && entry.metrics.scoreable ? 1 : 0))),
     diagnostics: {
       claim_to_hook_linkage_min: claimValues.length ? Math.min(...claimValues) : 0,
       claim_to_hook_linkage_max: claimValues.length ? Math.max(...claimValues) : 0,
@@ -387,8 +444,8 @@ const main = async () => {
       traceId: entry.traceId,
       status: entry.status,
       latencyMs: entry.latencyMs,
-      failReason: entry.payload?.fail_reason ?? null,
-      failClass: entry.payload?.fail_class ?? null,
+      failReason: entry.metrics.fail_reason ?? null,
+      failClass: entry.metrics.fail_class ?? null,
     })),
     arms: { A, B },
     deltas,
@@ -407,7 +464,15 @@ const main = async () => {
   console.log(JSON.stringify({ outPath, runId, episodesPerArm: out.episodesPerArm }, null, 2));
 };
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+export const __test = {
+  hasRequiredFields,
+  classifyScoreability,
+  metricFromPayload,
+};
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
