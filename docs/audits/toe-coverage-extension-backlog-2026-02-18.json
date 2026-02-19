@@ -2749,6 +2749,39 @@
           "runtime-contract-audit"
         ]
       }
+    },
+    {
+      "id": "TOE-101-strict-ready-verified-pass-pack-2",
+      "tree_owner": "release-engineering",
+      "primitive": "Strict-ready verified-pass reduction pack phase 2 receipt and progress snapshot refresh",
+      "primary_path_prefix": "docs/audits/ticket-results",
+      "allowed_paths": [
+        "docs/audits/ticket-results",
+        "docs/audits/toe-progress-snapshot.json",
+        "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
+        "reports/",
+        "docs/audits/helix-results/"
+      ],
+      "required_tests": [
+        "scripts/validate-toe-ticket-results.ts",
+        "scripts/validate-math-congruence-matrix.ts",
+        "scripts/compute-toe-progress.ts",
+        "scripts/toe-agent-preflight.ts"
+      ],
+      "done_criteria": [
+        "Promote next eligible diagnostic tickets to reduced-order with PASS+integrity and empty remaining gaps",
+        "strict_ready_release_gate.blocker_counts.missing_verified_pass decreases by at least 8",
+        "missing_research_artifacts and missing_math_congruence remain 0 after snapshot recompute",
+        "Casimir verify returns PASS with integrity_ok=true and exported training trace artifact"
+      ],
+      "research_gate": {
+        "risk_class": "contract_only",
+        "requires_audit": true,
+        "requires_research": false,
+        "required_artifacts": [
+          "runtime-contract-audit"
+        ]
+      }
     }
   ]
 }

@@ -1,0 +1,26 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-016-resolver-forest-owner-coverage-manifest",
+  "files_changed": [
+    "configs/resolver-owner-coverage-manifest.v1.json",
+    "scripts/compute-toe-progress.ts",
+    "scripts/validate-resolver-owner-coverage.ts",
+    "tests/toe-progress.spec.ts"
+  ],
+  "tests_run": [
+    "tests/toe-progress.spec.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "scripts/validate-resolver-owner-coverage.ts",
+    "scripts/compute-toe-progress.ts",
+    "npm run casimir:verify -- --url http://localhost:5173/api/agi/adapter/run --export-url http://localhost:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci"
+  ],
+  "claim_tier": "reduced-order",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:d4f703d0-a1a4-48fb-b2d3-5cd30776189c",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}
