@@ -529,6 +529,19 @@ Phase 6 live harness hardening (2026-02-19 patch, lowest-risk scope):
 - Pass logic remains strict: no scoreable pass is possible unless required semantic fields are present and no fail reason is set.
 - Added focused harness tests in `tests/helical-phase6-ab.spec.ts` for failure classification taxonomy (`invalid_json`, `schema_mismatch`, `metric_input_missing`, `timeout_soft`, `timeout_hard`, `http_error`) and scoreable/non-scoreable decision behavior, including unknown `fail_class` rejection.
 
+Finalized `/api/agi/ask` output contract for Phase 6 scoring (server-normalized error envelope):
+- Error responses are JSON-only and normalized under `contract_version="phase6.ask.v1"`.
+- Stable top-level fields on error outcomes:
+  - `contract_version`
+  - `request_metadata` with `seed`, `episode`, `replay.index`, `replay.isReplay`, `trace_id`, `session_id`
+  - `status.ok`, `status.http_status`, `status.fail_class`, `status.fail_reason`
+  - `timing.elapsed_ms`
+  - `debug.trace_id`, `debug.run_id`
+- Timeout taxonomy is explicit and non-ambiguous:
+  - `timeout_soft`: client-abort style failures (e.g., aborted operation)
+  - `timeout_hard`: server/deadline timeout failures
+- Existing payload keys are preserved, but Phase 6 scorers should read normalized fields above as canonical.
+
 Live A/B metric summary (diagnostic only; **invalid run context**):
 
 | Metric | A (live) | B (live) | Delta (B-A) |

@@ -69,6 +69,47 @@ describe("Helix Ask modes", () => {
     expect((payload.text ?? "").length).toBeGreaterThanOrEqual(220);
   }, 30000);
 
+  it("returns normalized JSON error envelopes for contract failures", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: "modes-error-envelope", traceId: "phase6-live-a-p01-s7-r1" }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("content-type") ?? "").toContain("application/json");
+    const payload = (await response.json()) as {
+      contract_version?: string;
+      request_metadata?: {
+        seed?: number | null;
+        episode?: string | null;
+        replay?: { index?: number | null; isReplay?: boolean };
+      };
+      status?: {
+        ok?: boolean;
+        http_status?: number;
+        fail_class?: string;
+        fail_reason?: string;
+      };
+      timing?: { elapsed_ms?: number };
+      debug?: { trace_id?: string | null; run_id?: string | null };
+    };
+
+    expect(payload.contract_version).toBe("phase6.ask.v1");
+    expect(payload.request_metadata?.episode).toBe("phase6-live-a-p01-s7-r1");
+    expect(payload.request_metadata?.replay?.index).toBe(1);
+    expect(payload.request_metadata?.replay?.isReplay).toBe(false);
+    expect(payload.status).toMatchObject({
+      ok: false,
+      http_status: 400,
+      fail_class: "input_contract",
+      fail_reason: "bad_request",
+    });
+    expect(typeof payload.timing?.elapsed_ms).toBe("number");
+    expect(payload.debug?.trace_id).toBe("phase6-live-a-p01-s7-r1");
+    expect(payload.debug?.run_id ?? null).toBeNull();
+  });
+
 
   it("returns concept provenance metadata for concept answers", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
