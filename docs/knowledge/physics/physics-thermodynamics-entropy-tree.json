@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "rootId": "physics-thermodynamics-entropy-tree",
+  "nodes": [
+    {
+      "id": "physics-thermodynamics-entropy-tree",
+      "slug": "physics-thermodynamics-entropy-tree",
+      "title": "Physics Thermodynamics Entropy Tree",
+      "excerpt": "Dedicated lane for thermodynamic irreversibility and entropy-gradient constraints.",
+      "bodyMD": "This lane anchors entropy-first route determinism for life-emergence manifest paths.",
+      "tags": ["physics", "thermodynamics", "entropy"],
+      "children": ["entropy-gradient", "arrow-of-time"],
+      "links": [],
+      "summary": "Dedicated lane for thermodynamic irreversibility and entropy-gradient constraints.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        { "type": "doc", "path": "docs/knowledge/physics/entropy-gradient.md" },
+        { "type": "doc", "path": "docs/knowledge/physics/arrow-of-time.md" }
+      ]
+    },
+    {
+      "id": "entropy-gradient",
+      "slug": "entropy-gradient",
+      "title": "Entropy Gradient",
+      "excerpt": "Gradient structure used for deterministic entropy-first lane traversal.",
+      "bodyMD": "Constrained relation between entropy flux and ordered pathway candidate selection.",
+      "tags": ["physics", "entropy", "gradient"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "physics-thermodynamics-entropy-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "summary": "Gradient structure used for deterministic entropy-first lane traversal.",
+      "nodeType": "concept",
+      "dependencies": ["physics-thermodynamics-entropy-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/entropy-gradient.md" }]
+    },
+    {
+      "id": "arrow-of-time",
+      "slug": "arrow-of-time",
+      "title": "Arrow of Time",
+      "excerpt": "Irreversibility anchor for entropy-constrained narrative ordering.",
+      "bodyMD": "Used as a lane-level root constraint for deterministic root-to-leaf topology.",
+      "tags": ["physics", "thermodynamics", "irreversibility"],
+      "children": [],
+      "links": [{ "rel": "parent", "to": "physics-thermodynamics-entropy-tree", "edgeType": "hierarchy", "requiresCL": "none" }],
+      "summary": "Irreversibility anchor for entropy-constrained narrative ordering.",
+      "nodeType": "concept",
+      "dependencies": ["physics-thermodynamics-entropy-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/arrow-of-time.md" }]
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

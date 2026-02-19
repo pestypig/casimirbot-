@@ -230,6 +230,62 @@
       "weight": 1.15
     },
     {
+      "id": "physics_thermodynamics_entropy",
+      "label": "Physics Thermodynamics Entropy Lane",
+      "path": "docs/knowledge/physics/physics-thermodynamics-entropy-tree.json",
+      "topicTags": [
+        "physics",
+        "thermodynamics",
+        "entropy"
+      ],
+      "matchers": [
+        "thermodynamics",
+        "entropy",
+        "arrow of time",
+        "irreversibility",
+        "entropy gradient"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_information_dynamics",
+      "label": "Physics Information Dynamics Lane",
+      "path": "docs/knowledge/physics/physics-information-dynamics-tree.json",
+      "topicTags": [
+        "physics",
+        "information",
+        "dynamics"
+      ],
+      "matchers": [
+        "information dynamics",
+        "coherence",
+        "information flow",
+        "signal fidelity",
+        "falsifier"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
       "id": "warp-mechanics",
       "label": "Warp Mechanics Walk",
       "path": "docs/knowledge/warp/warp-mechanics-tree.json",

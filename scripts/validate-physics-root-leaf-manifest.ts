@@ -74,6 +74,14 @@ const REQUIRED_TREE_LANE_BY_ROOT: Record<string, { tree_lane: string; tree_path:
     tree_lane: "physics_quantum_semiclassical",
     tree_path: "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
   },
+  physics_thermodynamics_entropy: {
+    tree_lane: "physics_thermodynamics_entropy",
+    tree_path: "docs/knowledge/physics/physics-thermodynamics-entropy-tree.json",
+  },
+  physics_information_dynamics: {
+    tree_lane: "physics_information_dynamics",
+    tree_path: "docs/knowledge/physics/physics-information-dynamics-tree.json",
+  },
 };
 
 
