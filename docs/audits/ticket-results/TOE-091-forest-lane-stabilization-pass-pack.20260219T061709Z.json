@@ -1,0 +1,42 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-091-forest-lane-stabilization-pass-pack",
+  "files_changed": [
+    "docs/audits/toe-progress-snapshot.json",
+    "docs/audits/ticket-results/TOE-091-forest-lane-stabilization-pass-pack.20260219T061709Z.json"
+  ],
+  "tests_run": [
+    "scripts/toe-agent-preflight.ts",
+    "scripts/validate-toe-ticket-backlog.ts",
+    "scripts/validate-toe-ticket-results.ts",
+    "scripts/validate-toe-research-gate-policy.ts",
+    "scripts/compute-toe-progress.ts",
+    "cli/casimir-verify.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "stabilization": {
+    "preflight_stage_pass": true,
+    "preflight_overall_pass": true,
+    "toe_progress_pct": 24.8,
+    "forest_owner_coverage_pct": 100,
+    "strict_ready_progress_pct": 6.7,
+    "strict_ready_delta_ticket_count": 84,
+    "strict_ready_release_gate": {
+      "status": "blocked",
+      "blocked_reasons": [
+        "missing_verified_pass",
+        "missing_research_artifacts"
+      ],
+      "blocked_ticket_count": 84,
+      "ready_ticket_count": 6
+    }
+  },
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:ee8fd47b-b5d9-4228-a031-d95dfccddef4",
+    "run_id": "2",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining_gaps": []
+}

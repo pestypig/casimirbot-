@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-19T06:11:05.031Z",
+  "generated_at": "2026-02-19T06:17:52.110Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -14,14 +14,14 @@
   },
   "totals": {
     "tickets_total": 90,
-    "tickets_with_evidence": 80,
+    "tickets_with_evidence": 81,
     "claim_tier_counts": {
-      "diagnostic": 74,
+      "diagnostic": 75,
       "reduced-order": 6,
       "certified": 0
     },
-    "weighted_score_sum": 22.1,
-    "toe_progress_pct": 24.6,
+    "weighted_score_sum": 22.35,
+    "toe_progress_pct": 24.8,
     "forest_owner_coverage_pct": 100,
     "strict_ready_progress_pct": 6.7,
     "strict_ready_delta_ticket_count": 84,
@@ -34,7 +34,7 @@
       "blocked_ticket_count": 84,
       "ready_ticket_count": 6
     },
-    "research_gated_tickets_total": 35,
+    "research_gated_tickets_total": 36,
     "research_artifact_complete_tickets_total": 31
   },
   "segments": {
@@ -54,28 +54,28 @@
     },
     "extension": {
       "tickets_total": 80,
-      "tickets_with_evidence": 70,
+      "tickets_with_evidence": 71,
       "claim_tier_counts": {
-        "diagnostic": 65,
+        "diagnostic": 66,
         "reduced-order": 5,
         "certified": 0
       },
-      "weighted_score_sum": 19.25,
-      "toe_progress_pct": 24.1,
+      "weighted_score_sum": 19.5,
+      "toe_progress_pct": 24.4,
       "strict_ready_progress_pct": 6.3,
-      "research_gated_tickets_total": 35,
+      "research_gated_tickets_total": 36,
       "research_artifact_complete_tickets_total": 31
     },
     "combined": {
       "tickets_total": 90,
-      "tickets_with_evidence": 80,
+      "tickets_with_evidence": 81,
       "claim_tier_counts": {
-        "diagnostic": 74,
+        "diagnostic": 75,
         "reduced-order": 6,
         "certified": 0
       },
-      "weighted_score_sum": 22.1,
-      "toe_progress_pct": 24.6,
+      "weighted_score_sum": 22.35,
+      "toe_progress_pct": 24.8,
       "strict_ready_progress_pct": 6.7,
       "strict_ready_delta_ticket_count": 84,
       "strict_ready_release_gate": {
@@ -87,7 +87,7 @@
         "blocked_ticket_count": 84,
         "ready_ticket_count": 6
       },
-      "research_gated_tickets_total": 35,
+      "research_gated_tickets_total": 36,
       "research_artifact_complete_tickets_total": 31
     }
   },
@@ -532,6 +532,12 @@
     },
     {
       "ticket_id": "TOE-090-resolver-owner-manifest-parity-for-082-089",
+      "next_strict_ready_claim_tier": "reduced-order",
+      "requires_verified_pass": true,
+      "requires_research_artifact_completion": true
+    },
+    {
+      "ticket_id": "TOE-091-forest-lane-stabilization-pass-pack",
       "next_strict_ready_claim_tier": "reduced-order",
       "requires_verified_pass": true,
       "requires_research_artifact_completion": true
@@ -1323,10 +1329,12 @@
     },
     {
       "ticket_id": "TOE-091-forest-lane-stabilization-pass-pack",
-      "claim_tier": null,
-      "verification_ok": false,
-      "score": 0,
-      "result_file": null
+      "claim_tier": "diagnostic",
+      "verification_ok": true,
+      "score": 0.25,
+      "research_gated": true,
+      "research_artifact_complete": false,
+      "result_file": "docs/audits/ticket-results/TOE-091-forest-lane-stabilization-pass-pack.20260219T061709Z.json"
     }
   ]
 }
