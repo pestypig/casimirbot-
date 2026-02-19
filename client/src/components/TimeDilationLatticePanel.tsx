@@ -2596,6 +2596,35 @@ function TimeDilationLatticePanelInner({
     () => (latticeMetricOnly ? "ricci4" : "kretschmann"),
     [latticeMetricOnly],
   );
+  const natarioCanonicalDiagnostics = useMemo(() => {
+    const diagnosticsCanonical = (pipelineState as any)?.diagnostics?.natarioCanonical;
+    const payloadCanonical = (pipelineState as any)?.natarioCanonical;
+    const natarioCanonical = diagnosticsCanonical ?? payloadCanonical ?? null;
+    const checkDiv = natarioCanonical?.checks?.divBeta;
+    const checkThetaK = natarioCanonical?.checks?.thetaKConsistency;
+    const requiredFieldsOk = natarioCanonical?.requiredFieldsOk === true;
+    const reason =
+      typeof natarioCanonical?.reason === "string" && natarioCanonical.reason.trim().length > 0
+        ? natarioCanonical.reason
+        : null;
+    return {
+      requiredFieldsOk,
+      reason,
+      canonicalSatisfied: natarioCanonical?.canonicalSatisfied === true,
+      divBeta: {
+        status: typeof checkDiv?.status === "string" ? checkDiv.status : "unknown",
+        rms: Number.isFinite(Number(checkDiv?.rms)) ? Number(checkDiv.rms) : null,
+        maxAbs: Number.isFinite(Number(checkDiv?.maxAbs)) ? Number(checkDiv.maxAbs) : null,
+      },
+      thetaK: {
+        status: typeof checkThetaK?.status === "string" ? checkThetaK.status : "unknown",
+        theta: Number.isFinite(Number(checkThetaK?.theta)) ? Number(checkThetaK.theta) : null,
+        kTrace: Number.isFinite(Number(checkThetaK?.kTrace)) ? Number(checkThetaK.kTrace) : null,
+        residualAbs: Number.isFinite(Number(checkThetaK?.residualAbs)) ? Number(checkThetaK.residualAbs) : null,
+      },
+    };
+  }, [pipelineState]);
+
   const strictMetricMissing = useMemo(() => {
     if (!latticeMetricOnly) return false;
     const requirePresent = (key: string) => {
@@ -4827,7 +4856,9 @@ function TimeDilationLatticePanelInner({
     }
   }, [certActivationState, renderPlan.banner, anyProxy, grCertified]);
 
-  const renderBlocked = bannerBlocked || !mathGate.allowed;
+  const truthBannerBlocked = !natarioCanonicalDiagnostics.requiredFieldsOk;
+  const renderBlocked = bannerBlocked || !mathGate.allowed || truthBannerBlocked;
+
   const renderEnabled = certifiedModeEnabled && !renderBlocked;
   useEffect(() => {
     renderEnabledRef.current = renderEnabled;
@@ -5413,6 +5444,9 @@ function TimeDilationLatticePanelInner({
           banner: plan.banner,
         },
         canonical,
+        natarioCanonical: {
+          ...natarioCanonicalDiagnostics,
+        },
         metric_contract: metricContract,
         render_plan: plan,
         gate: {
@@ -5462,6 +5496,7 @@ function TimeDilationLatticePanelInner({
       proofPack,
       proofStr,
       canonicalFamily,
+      natarioCanonicalDiagnostics,
       strictCongruence,
       latticeMetricOnly,
       debugBlocked,
@@ -6368,6 +6403,19 @@ function TimeDilationLatticePanelInner({
             non-proxy telemetry before rendering the lattice.
           </div>
         ) : null}
+        <div className="absolute inset-x-3 top-3 z-20 rounded border border-cyan-400/40 bg-black/80 px-3 py-2 text-[10px] text-cyan-100">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 uppercase tracking-[0.18em]">
+            <span>congruence: {strictCongruence ? "strict" : "relaxed"}</span>
+            <span>gate: {renderPlan.banner}</span>
+            <span>cert integrity: {String((grAssistantSummary?.gate?.certificate as any)?.integrityStatus ?? (grAssistantSummary?.gate?.certificate as any)?.integrity ?? "unknown")}</span>
+            <span>cert: {grAssistantSummary?.gate?.certificate?.certificateHash ?? "n/a"}</span>
+          </div>
+          {truthBannerBlocked ? (
+            <div className="mt-1 text-[10px] text-amber-200">
+              requiredFieldsOk=false — canonical layer blocked{natarioCanonicalDiagnostics.reason ? ` (${natarioCanonicalDiagnostics.reason})` : ""}
+            </div>
+          ) : null}
+        </div>
         <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
           <Button
             type="button"
@@ -6704,6 +6752,13 @@ function TimeDilationLatticePanelInner({
             </div>
           </div>
         )}
+        <div className="absolute left-3 bottom-3 z-20 rounded border border-white/10 bg-black/75 px-3 py-2 text-[10px] text-slate-200">
+          <div className="uppercase tracking-[0.18em] text-slate-400">observable labels</div>
+          <div>beta: metric-derived | units 1/s | chart-normalized by render plan</div>
+          <div>theta: {natarioCanonicalDiagnostics.thetaK.status === "pass" ? "metric-derived" : "proxy/unknown"} | units 1/s | normalization {String((renderPlan.normalization as any)?.theta ?? "n/a")}</div>
+          <div>divBeta: {natarioCanonicalDiagnostics.divBeta.status} | units 1/s | RMS {formatSci(natarioCanonicalDiagnostics.divBeta.rms, 2)} max {formatSci(natarioCanonicalDiagnostics.divBeta.maxAbs, 2)}</div>
+          <div>K-trace: {natarioCanonicalDiagnostics.thetaK.kTrace == null ? "missing" : "metric-derived"} | units 1/s</div>
+        </div>
         {(debugOverlayEnabled ||
           geometryControlsEnabled ||
           casimirControlsEnabled ||

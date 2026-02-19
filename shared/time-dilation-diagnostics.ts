@@ -101,6 +101,28 @@ export type TimeDilationDiagnostics = {
     unitSystem: string | null;
     match: string | null;
   };
+  natarioCanonical: {
+    requiredFieldsOk: boolean;
+    canonicalSatisfied: boolean;
+    checks: {
+      divBeta: {
+        status: "pass" | "fail" | "unknown";
+        rms: number | null;
+        maxAbs: number | null;
+        tolerance: number | null;
+        source: string;
+      };
+      thetaKConsistency: {
+        status: "pass" | "fail" | "unknown";
+        theta: number | null;
+        kTrace: number | null;
+        residualAbs: number | null;
+        tolerance: number | null;
+        source: string;
+      };
+    };
+    reason: string | null;
+  };
   metric_contract: {
     metric_t00_contract_ok: unknown;
     metric_chart_contract_status: unknown;
@@ -174,6 +196,12 @@ const resolveCongruenceRequirements = (canonical: CanonicalField, definitions: D
 const toNumber = (value: unknown): number | null => {
   const num = typeof value === "number" ? value : Number(value);
   return Number.isFinite(num) ? num : null;
+};
+
+const boolFromProof = (proofPack: ProofPack | null, key: string): boolean | null => {
+  const entry = getProofValue(proofPack, key);
+  if (!entry || entry.proxy) return null;
+  return entry.value === true;
 };
 
 const fetchJson = async <T>(url: string, timeoutMs?: number): Promise<T> => {
@@ -630,6 +658,28 @@ export async function buildTimeDilationDiagnostics(
       normalization: canonical.normalization,
       unitSystem: canonical.unitSystem,
       match: canonical.match,
+    },
+    natarioCanonical: {
+      requiredFieldsOk: natarioRequiredFieldsOk,
+      canonicalSatisfied: natarioCanonicalSatisfied,
+      checks: {
+        divBeta: {
+          status: divBetaStatus,
+          rms: divBetaRms,
+          maxAbs: divBetaMaxAbs,
+          tolerance: natarioExpansionTolerance,
+          source: "pipeline.warp.metricAdapter.betaDiagnostics",
+        },
+        thetaKConsistency: {
+          status: thetaKStatus,
+          theta: thetaGeom,
+          kTrace,
+          residualAbs: thetaKResidualAbs,
+          tolerance: thetaKTolerance,
+          source: "pipeline.theta_geom + proof.metric_k_trace_mean",
+        },
+      },
+      reason: natarioReason,
     },
     metric_contract: {
       metric_t00_contract_ok: getProofValue(proofPack, "metric_t00_contract_ok")?.value ?? null,
