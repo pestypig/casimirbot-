@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "rootId": "physics-biology-life-tree",
+  "nodes": [
+    {
+      "id": "physics-biology-life-tree",
+      "slug": "physics-biology-life-tree",
+      "title": "Physics Biology Life Tree",
+      "excerpt": "Dedicated lane for biology and life-emergence constraints grounded in physics contracts.",
+      "bodyMD": "This lane anchors life-emergence claims to explicit transition criteria and falsifiable pathway structure.",
+      "tags": ["physics", "biology", "life"],
+      "children": ["biogenesis-transition", "adaptive-system-bounds"],
+      "links": [],
+      "summary": "Dedicated lane for biology and life-emergence constraints grounded in physics contracts.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        { "type": "doc", "path": "docs/knowledge/physics/biogenesis-transition.md" },
+        { "type": "doc", "path": "docs/knowledge/physics/adaptive-system-bounds.md" }
+      ]
+    },
+    {
+      "id": "biogenesis-transition",
+      "slug": "biogenesis-transition",
+      "title": "Biogenesis Transition",
+      "excerpt": "Transition constraints from prebiotic chemistry to stable life-like dynamics.",
+      "bodyMD": "Defines transition-coverage checks and pathway ordering for life-emergence narratives.",
+      "tags": ["physics", "biology", "biogenesis"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-biology-life-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+      ],
+      "summary": "Transition constraints from prebiotic chemistry to stable life-like dynamics.",
+      "nodeType": "concept",
+      "dependencies": ["physics-biology-life-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/biogenesis-transition.md" }]
+    },
+    {
+      "id": "adaptive-system-bounds",
+      "slug": "adaptive-system-bounds",
+      "title": "Adaptive System Bounds",
+      "excerpt": "Bounds for persistence and adaptation used by life-lane falsifiers.",
+      "bodyMD": "Links life-emergence assertions to bounded adaptive dynamics and measurable proxies.",
+      "tags": ["physics", "biology", "adaptation"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-biology-life-tree", "edgeType": "hierarchy", "requiresCL": "none" }
+      ],
+      "summary": "Bounds for persistence and adaptation used by life-lane falsifiers.",
+      "nodeType": "concept",
+      "dependencies": ["physics-biology-life-tree"],
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/adaptive-system-bounds.md" }]
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}
