@@ -14002,7 +14002,14 @@ const isWarpEthosRelationQuestion = (question: string): boolean => {
   const policyConnector = /\b(?:constrain(?:ed|s|t)?|govern(?:ed|ance|s)?|bind(?:ing|s)?|cohere(?:nce)?|alignment|policy\s+layer|technical\s+layer|dependency)\b/i.test(
     normalized,
   );
-  return hasConnector || compactConnector || policyConnector;
+  const hasImplicitIdeologyBridge =
+    /\bwhat(?:'s| is)\b[\s\S]{0,120}\b(?:in|within|under)\b[\s\S]{0,40}\b(?:mission\s+ethos|ethos|ideology)\b/i.test(
+      normalized,
+    ) ||
+    /\b(?:warp|warp\s+bubble|warp\s+drive)\b[\s\S]{0,80}\b(?:in|within|under)\b[\s\S]{0,40}\b(?:mission\s+ethos|ethos|ideology)\b/i.test(
+      normalized,
+    );
+  return hasConnector || compactConnector || policyConnector || hasImplicitIdeologyBridge;
 };
 
 const isExplicitReportRequest = (question: string): boolean => {
@@ -16589,6 +16596,10 @@ const executeHelixAsk = async ({
       FAST_QUALITY_PLAN_RETRIEVAL_BUDGET_BASE_MS * deadlineScale,
     );
     const FAST_QUALITY_HELPER_MIN_MS = Math.round(FAST_QUALITY_HELPER_MIN_BASE_MS * deadlineScale);
+    const HELIX_ASK_HELPER_TIMEOUT_MS = Math.max(
+      1000,
+      Math.floor(Number(process.env.HELIX_ASK_HELPER_TIMEOUT_MS ?? 25000)),
+    );
     const fastQualityDecisions: HelixAskFastQualityDecision[] = [];
     const getAskElapsedMs = (): number => Math.max(0, Date.now() - askRequestStartedAt);
     const getAskRemainingMs = (): number =>
@@ -16657,7 +16668,17 @@ const executeHelixAsk = async ({
       operation: () => Promise<T>,
     ): Promise<T | null> => {
       if (!fastQualityMode) {
-        return operation();
+        const timeoutMs = HELIX_ASK_HELPER_TIMEOUT_MS;
+        try {
+          return await withTimeout(operation(), timeoutMs, stage);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (message.includes(`${stage}_timeout`) || message.includes("_timeout")) {
+            logEvent("Helper timeout", stage, `timeoutMs=${timeoutMs}`);
+            return null;
+          }
+          throw error;
+        }
       }
       const stageRemainingMs = getStageRemainingMs(stageDeadlineMs);
       const totalRemainingMs = getAskRemainingMs();
@@ -17532,6 +17553,7 @@ const executeHelixAsk = async ({
       "slot_local_retry",
       "ask_slot_clarify",
     ]);
+    let relationToolCapBonus = 0;
     let agentStopReason: string | null = null;
     const getAgentStepCount = (): number =>
       agentActions.filter((entry) => agentStepActions.has(entry.action)).length;
@@ -17636,8 +17658,9 @@ const executeHelixAsk = async ({
     const getAgentBlockReason = (): string | null => {
       if (!agentLoopEnabled) return null;
       const stepCount = getAgentStepCount();
+      const toolCap = runtimeContract.clockA.max_tool_calls + relationToolCapBonus;
       if (agentActionOverBudget) return "action_budget_exhausted";
-      if (stepCount >= runtimeContract.clockA.max_tool_calls) return "clocka_tool_cap";
+      if (stepCount >= toolCap) return "clocka_tool_cap";
       if (stepCount >= agentLoopMaxSteps) return "max_steps";
       if (Date.now() - agentStart > agentLoopBudgetMs) return "budget_exhausted";
       return null;
@@ -18608,6 +18631,10 @@ const executeHelixAsk = async ({
       HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
       HELIX_ASK_REPO_EXPECTS.test(baseQuestion);
     const warpEthosRelationQuery = warpEthosRelationReportQuery;
+    if (warpEthosRelationQuery) {
+      relationToolCapBonus = 1;
+      updateAgentDebug();
+    }
     let topicTags = inferHelixAskTopicTags(
       blockScoped && blockSearchSeed ? blockSearchSeed : baseQuestion,
       parsed.data.searchQuery,
@@ -27184,7 +27211,10 @@ const executeHelixAsk = async ({
         HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
         isWarpEthosRelationQuestion(baseQuestion) ||
         intentProfile.id === "hybrid.warp_ethos_relation";
-      const openWorldExplainer = isOpenWorldExplainerQuestion(baseQuestion);
+      const openWorldExplainer =
+        isOpenWorldExplainerQuestion(baseQuestion) &&
+        intentDomain !== "repo" &&
+        intentProfile.id !== "repo.warp_definition_docs_first";
       const qualityFloorEligible =
         HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
         intentDomain === "repo" ||

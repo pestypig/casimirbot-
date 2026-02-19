@@ -250,4 +250,28 @@ describe("Helix Ask live events", () => {
     expect(payload.text).toMatch(/Sources:/i);
   }, 45000);
 
+  it("routes implicit warp-in-ideology phrasing to relation intent", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "What is a warp bubble in ideology?",
+        debug: true,
+        sessionId: "test-warp-ideology-implicit-relation",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text: string;
+      debug?: {
+        intent_id?: string;
+        report_mode?: boolean;
+      };
+    };
+    expect(payload.debug?.intent_id).toBe("hybrid.warp_ethos_relation");
+    expect(payload.debug?.intent_id).not.toBe("repo.warp_definition_docs_first");
+    expect(payload.debug?.report_mode).toBe(false);
+    expect(payload.text).toMatch(/Sources:/i);
+  }, 45000);
+
 });
