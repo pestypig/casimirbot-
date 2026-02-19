@@ -104,6 +104,7 @@ describe("agi adapter API", () => {
     expect(response.body?.verdict).toBe("FAIL");
     expect(response.body?.pass).toBe(false);
     expect(response.body?.firstFail?.id).toBe("H_constraint");
+    expect(response.body?.failReason).toBe("H_constraint");
     expect(Array.isArray(response.body?.deltas)).toBe(true);
     expect(response.body?.artifacts).toEqual(
       expect.arrayContaining([
@@ -148,6 +149,7 @@ describe("agi adapter API", () => {
     expect(response.body?.verdict).toBe("FAIL");
     expect(response.body?.pass).toBe(false);
     expect(response.body?.firstFail?.id).toBe("ADAPTER_CERTIFICATE_MISSING");
+    expect(response.body?.failReason).toBe("ADAPTER_CERTIFICATE_MISSING");
   });
 
   it("returns premeditation scoring for deterministic candidate selection", async () => {
@@ -252,6 +254,7 @@ describe("agi adapter API", () => {
     expect(response.body?.verdict).toBe("FAIL");
     expect(response.body?.pass).toBe(false);
     expect(response.body?.firstFail?.id).toBe("ROBOTICS_SAFETY_COLLISION_MARGIN");
+    expect(response.body?.failReason).toBe("ROBOTICS_SAFETY_COLLISION_MARGIN");
     expect(response.body?.certificate?.integrityOk).toBe(true);
     expect(runMock).not.toHaveBeenCalled();
     expect(traceRecordMock).toHaveBeenCalledTimes(1);
@@ -314,6 +317,8 @@ describe("agi adapter API", () => {
     expect(movement?.payload?.data?.primitivePath).toEqual(["cand-link"]);
     expect(movement?.certificate?.certificateHash).toBe("cert-link-hash");
     expect(replay?.payload?.kind).toBe("trajectory_replay_summary");
+    expect(replay?.payload?.data?.failReason).toBe("NONE");
+    expect(replay?.notes).toContain("fail_reason=NONE");
     expect(replay?.payload?.provenance?.certificateRefs).toContain("cert-link-hash");
     expect(replay?.payload?.provenance?.certificateRefs).toContain("cert-link-id");
     expect(replay?.payload?.provenance?.sensorChannelCoverage).toEqual([
