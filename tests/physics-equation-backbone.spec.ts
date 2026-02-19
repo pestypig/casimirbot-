@@ -77,6 +77,18 @@ function makeFixture(mutator?: (manifest: Record<string, unknown>) => void) {
           { symbol: "qi_bound_ok", units: "boolean" },
         ],
       },
+      {
+        id: "curvature_unit_proxy_contract",
+        expression: "kappa_proxy = map_units(curvature_signal, scale_assumptions) ; residual = abs(kappa_proxy - kappa_ref)/max(abs(kappa_ref), eps)",
+        claim_tier: "diagnostic",
+        symbols: [
+          { symbol: "kappa_proxy", units: "1/m^2" },
+          { symbol: "curvature_signal", units: "arb_curvature_units" },
+          { symbol: "scale_assumptions", units: "dimensionless" },
+          { symbol: "kappa_ref", units: "1/m^2" },
+          { symbol: "eps", units: "1/m^2" },
+        ],
+      },
     ],
   };
 
@@ -102,12 +114,12 @@ describe("validatePhysicsEquationBackbone", () => {
   it("fails when required equation entry is missing", () => {
     const repoRoot = makeFixture((manifest) => {
       const equations = manifest.equations as Array<Record<string, unknown>>;
-      manifest.equations = equations.filter((entry) => entry.id !== "runtime_safety_gate");
+      manifest.equations = equations.filter((entry) => entry.id !== "curvature_unit_proxy_contract");
     });
 
     const result = validatePhysicsEquationBackbone({ repoRoot });
     expect(result.ok).toBe(false);
-    expect(result.errors.join("\n")).toContain("missing required equation id: runtime_safety_gate");
+    expect(result.errors.join("\n")).toContain("missing required equation id: curvature_unit_proxy_contract");
   });
 
   it("fails when required symbols or units are absent", () => {

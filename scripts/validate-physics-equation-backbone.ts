@@ -60,6 +60,11 @@ const REQUIRED_EQUATIONS: Array<{
     requiredSymbols: ["delta_T00", "T00_ref", "eps", "rho_delta_max", "qi_bound_ok"],
     requiredUnits: ["J/m^3", "dimensionless", "boolean"],
   },
+  {
+    id: "curvature_unit_proxy_contract",
+    requiredSymbols: ["kappa_proxy", "curvature_signal", "scale_assumptions", "kappa_ref", "eps"],
+    requiredUnits: ["1/m^2", "arb_curvature_units", "dimensionless"],
+  },
 ];
 
 function parseArgs(flag: string): string | undefined {

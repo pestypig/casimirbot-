@@ -154,7 +154,7 @@
     {
       "id": "curvature_unit_proxy_contract",
       "name": "Curvature-unit proxy contract",
-      "category": "curvature_proxy",
+      "category": "curvature_diagnostics",
       "expression": "kappa_proxy = map_units(curvature_signal, scale_assumptions) ; residual = abs(kappa_proxy - kappa_ref)/max(abs(kappa_ref), eps)",
       "claim_tier": "diagnostic",
       "maturity_label": "experimental",

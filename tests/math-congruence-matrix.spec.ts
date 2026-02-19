@@ -80,14 +80,22 @@ describe("validateMathCongruenceMatrix", () => {
     ) as { rows: Array<{ id: string; equation_id: string; root_id: string }> };
 
     expect(backbone.equations.some((equation) => equation.id === "curvature_unit_proxy_contract")).toBe(true);
-    expect(
-      matrix.rows.some(
-        (row) =>
-          row.id === "physics_spacetime_gr__curvature_unit_proxy_contract" &&
-          row.root_id === "physics_spacetime_gr" &&
-          row.equation_id === "curvature_unit_proxy_contract",
-      ),
-    ).toBe(true);
+    const curvatureRow = matrix.rows.find(
+      (row) =>
+        row.id === "physics_spacetime_gr__curvature_unit_proxy_contract" &&
+        row.root_id === "physics_spacetime_gr" &&
+        row.equation_id === "curvature_unit_proxy_contract",
+    ) as
+      | {
+          residual?: { metric?: string; threshold?: string };
+          falsifier?: { evidence?: string };
+        }
+      | undefined;
+
+    expect(curvatureRow).toBeDefined();
+    expect(curvatureRow?.residual?.metric).toBe("curvature_unit_proxy_residual");
+    expect(curvatureRow?.residual?.threshold).toBe("0.05");
+    expect(curvatureRow?.falsifier?.evidence).toBe("curvature_unit_proxy_diagnostic_trace");
   });
 
   it("passes for deterministic matrix with full root/equation coverage", () => {
