@@ -86,16 +86,21 @@ export function buildMathCongruenceMatrix(options?: { repoRoot?: string }): Math
 
   const equationIds = new Set((backbone.equations ?? []).map((eq) => asString(eq.id)).filter(Boolean));
 
-  const rows: MatrixRow[] = [];
-  for (const root of rootLeaf.roots ?? []) {
-    const rootId = asString(root.id);
-    if (!rootId) {
-      continue;
-    }
+  const normalizedRoots = (rootLeaf.roots ?? [])
+    .map((root) => {
+      const rootId = asString(root.id);
+      const equationRefs = Array.isArray(root.equation_refs)
+        ? root.equation_refs.map((value) => asString(value)).filter(Boolean)
+        : [];
+      return { rootId, equationRefs };
+    })
+    .filter((root) => root.rootId)
+    .sort((a, b) => a.rootId.localeCompare(b.rootId));
 
-    const equationRefs = Array.isArray(root.equation_refs)
-      ? root.equation_refs.map((value) => asString(value)).filter(Boolean)
-      : [];
+  const rows: MatrixRow[] = [];
+  for (const root of normalizedRoots) {
+    const rootId = root.rootId;
+    const equationRefs = [...root.equationRefs].sort((a, b) => a.localeCompare(b));
 
     for (const equationId of equationRefs) {
       if (!equationIds.has(equationId)) {
@@ -121,7 +126,7 @@ export function buildMathCongruenceMatrix(options?: { repoRoot?: string }): Math
 
   return {
     schema_version: "math_congruence_matrix/1",
-    manifest_id: "toe-092-math-congruence-build-matrix",
+    manifest_id: "toe-098-math-congruence-matrix-snapshot",
     generated_from: {
       root_leaf_manifest: "configs/physics-root-leaf-manifest.v1.json",
       equation_backbone: "configs/physics-equation-backbone.v1.json",

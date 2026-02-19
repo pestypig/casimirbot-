@@ -42,6 +42,33 @@ afterEach(() => {
   }
 });
 
+
+describe("buildMathCongruenceMatrix", () => {
+  it("sorts rows deterministically by root/equation id", () => {
+    const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "math-congruence-matrix-sort-"));
+    tempRoots.push(repoRoot);
+
+    writeJson(path.join(repoRoot, "configs", "physics-equation-backbone.v1.json"), {
+      schema_version: "physics_equation_backbone/1",
+      equations: [{ id: "runtime_safety_gate" }, { id: "efe_baseline" }],
+    });
+
+    writeJson(path.join(repoRoot, "configs", "physics-root-leaf-manifest.v1.json"), {
+      schema_version: "physics_root_leaf_manifest/1",
+      roots: [
+        { id: "physics_runtime_safety_control", equation_refs: ["runtime_safety_gate"] },
+        { id: "physics_spacetime_gr", equation_refs: ["efe_baseline"] },
+      ],
+    });
+
+    const matrix = buildMathCongruenceMatrix({ repoRoot });
+    expect(matrix.rows.map((row) => row.id)).toEqual([
+      "physics_runtime_safety_control__runtime_safety_gate",
+      "physics_spacetime_gr__efe_baseline",
+    ]);
+  });
+});
+
 describe("validateMathCongruenceMatrix", () => {
   it("passes for deterministic matrix with full root/equation coverage", () => {
     const repoRoot = fixtureRepoRoot();
