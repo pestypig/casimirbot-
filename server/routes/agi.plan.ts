@@ -27192,6 +27192,28 @@ const executeHelixAsk = async ({
         1,
         Math.max(0, coverageSlotSummary?.coverageRatio ?? (docSlotSummary?.slotCoverageRatio ?? 0)),
       );
+      const relationSecondPassDeficits = {
+        bridgeDeficit: relationPacketFloorCheck.bridgeCount < HELIX_ASK_RELATION_PACKET_MIN_BRIDGES,
+        evidenceDeficit: relationPacketFloorCheck.evidenceCount < HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE,
+        dualDomainDeficit: relationIntentActive && !relationDualDomainOk,
+      };
+      const bridgeGap = Math.min(
+        1,
+        Math.max(
+          0,
+          (HELIX_ASK_RELATION_PACKET_MIN_BRIDGES - relationPacketFloorCheck.bridgeCount) /
+            Math.max(1, HELIX_ASK_RELATION_PACKET_MIN_BRIDGES),
+        ),
+      );
+      const evidenceGap = Math.min(
+        1,
+        Math.max(
+          0,
+          (HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE - relationPacketFloorCheck.evidenceCount) /
+            Math.max(1, HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE),
+        ),
+      );
+      const dualDomainGap = relationSecondPassDeficits.dualDomainDeficit ? 1 : 0;
       const moveSelection = selectDeterministicMoveWithDebug({
         groundedness: groundednessScore,
         uncertainty: uncertaintyScore,
@@ -27210,6 +27232,9 @@ const executeHelixAsk = async ({
               ? 0.55
               : 0.15,
         relationIntentActive,
+        bridgeGap,
+        evidenceGap,
+        dualDomainGap,
         profile:
           runtimeBudgetRecommend === "force_clarify" || runtimeBudgetRecommend === "queue_deep_work"
             ? "latency_first"
@@ -27229,6 +27254,14 @@ const executeHelixAsk = async ({
           reject_reasons: moveSelection.rejectReasons,
           budget_pressure: moveSelection.budgetPressure,
           stop_reason: moveSelection.stopReason,
+          dynamic_biases: moveSelection.dynamicBiases,
+          dynamic_bias_relation_build: moveSelection.dynamicBiases.relationBuildBias,
+          dynamic_bias_retrieve_more: moveSelection.dynamicBiases.retrieveMoreBias,
+          gaps: {
+            bridge: bridgeGap,
+            evidence: evidenceGap,
+            dual_domain: dualDomainGap,
+          },
           scores: {
             groundedness: groundednessScore,
             uncertainty: uncertaintyScore,
@@ -27237,11 +27270,6 @@ const executeHelixAsk = async ({
           },
         };
       }
-      const relationSecondPassDeficits = {
-        bridgeDeficit: relationPacketFloorCheck.bridgeCount < HELIX_ASK_RELATION_PACKET_MIN_BRIDGES,
-        evidenceDeficit: relationPacketFloorCheck.evidenceCount < HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE,
-        dualDomainDeficit: relationIntentActive && !relationDualDomainOk,
-      };
       const relationSecondPassDecision = decideRelationSecondPassAttempt({
         selectedMove,
         deficits: relationSecondPassDeficits,
