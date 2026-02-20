@@ -17,6 +17,7 @@ type Gate = {
 const ROOT = process.cwd();
 const REPORT_JSON = "reports/helix-decision-package.json";
 const REPORT_MD = "reports/helix-decision-package.md";
+const INPUTS_MANIFEST_JSON = "reports/helix-decision-inputs.json";
 
 const args = new Map<string, string>();
 for (let i = 2; i < process.argv.length; i += 1) {
@@ -78,6 +79,33 @@ function asNumber(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+function parseAheadBehind(raw: unknown): { ahead: number; behind: number } | null {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    const parts = raw
+      .trim()
+      .split(/\s+/)
+      .map((v) => Number(v));
+    if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+      return { ahead: parts[1], behind: parts[0] };
+    }
+    return null;
+  }
+  if (typeof raw === "object") {
+    const record = raw as JsonRecord;
+    const ahead = Number(record.ahead ?? record["ahead_count"] ?? Number.NaN);
+    const behind = Number(record.behind ?? record["behind_count"] ?? Number.NaN);
+    return Number.isFinite(ahead) && Number.isFinite(behind) ? { ahead, behind } : null;
+  }
+  return null;
+}
+
+function equalAheadBehind(a: { ahead: number; behind: number } | null, b: { ahead: number; behind: number } | null): boolean {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return a.ahead === b.ahead && a.behind === b.behind;
+}
+
 function walkFiles(root: string, maxDepth = 6): string[] {
   const absRoot = path.resolve(ROOT, root);
   if (!fs.existsSync(absRoot)) return [];
@@ -120,7 +148,8 @@ function newestMatching(
 function resolveSource(
   name: string,
   cliOrEnv: string,
-  validator: (doc: JsonRecord, relPath: string) => boolean,
+  shapeValidator: (doc: JsonRecord, relPath: string) => boolean,
+  roleValidator: (doc: JsonRecord, relPath: string) => boolean,
   discover: () => string | null,
 ): string {
   if (cliOrEnv) {
@@ -128,9 +157,10 @@ function resolveSource(
       fail(`required_source_missing:${name}`, { path: cliOrEnv });
     }
     const doc = tryReadJson(cliOrEnv);
-    if (!doc || !validator(doc, cliOrEnv)) {
+    if (!doc || !shapeValidator(doc, cliOrEnv)) {
       fail(`required_source_invalid_shape:${name}:${cliOrEnv}`);
     }
+    if (!roleValidator(doc, cliOrEnv)) fail(`required_source_invalid_role:${name}:${cliOrEnv}`);
     return cliOrEnv;
   }
   const found = discover();
@@ -153,6 +183,15 @@ function isHeavySummary(doc: JsonRecord): boolean {
   return typeof doc.run_id === "string" && hasMetricsObject(doc);
 }
 
+function isHeavyRole(doc: JsonRecord, relPath: string): boolean {
+  if (!isHeavySummary(doc)) return false;
+  const pathLower = relPath.toLowerCase();
+  if (/(^|\/)(narrow|precheck|smoke)(\/|$)/.test(pathLower)) return false;
+  if (doc.run_complete !== true) return false;
+  const totalRuns = asNumber(doc.total_runs) ?? asNumber(doc.runs_total) ?? asNumber((doc.summary as JsonRecord | undefined)?.total_runs);
+  return (totalRuns ?? -1) >= 270;
+}
+
 function isRecommendation(doc: JsonRecord): boolean {
   return typeof doc.decision_grade_ready === "boolean";
 }
@@ -172,6 +211,12 @@ function isNarrowSummary(doc: JsonRecord): boolean {
   return !!doc.strict_gates && typeof doc.strict_gates === "object";
 }
 
+function isNarrowRole(doc: JsonRecord): boolean {
+  if (!isNarrowSummary(doc)) return false;
+  const strict = doc.strict_gates as JsonRecord;
+  return [strict.runtime_fallback_answer, strict.runtime_tdz_intentStrategy, strict.runtime_tdz_intentProfile].every((v) => typeof v === "number");
+}
+
 function isCasimirSummary(doc: JsonRecord): boolean {
   return typeof doc.verdict === "string" && typeof doc.integrityOk === "boolean";
 }
@@ -181,7 +226,10 @@ function tempSourceValidator(expectedTemp: "t02" | "t035") {
     if (!isAbSummary(doc)) return false;
     const normalizedPath = relPath.toLowerCase();
     const variant = String(doc.variant ?? "").toLowerCase();
-    return normalizedPath.includes(`/${expectedTemp}/`) && (variant.length === 0 || variant.includes(expectedTemp));
+    const otherTemp = expectedTemp === "t02" ? "t035" : "t02";
+    const pathMatch = normalizedPath.includes(`/${expectedTemp}/`) && !normalizedPath.includes(`/${otherTemp}/`);
+    const variantMatch = variant.length > 0 && variant.includes(expectedTemp) && !variant.includes(otherTemp);
+    return pathMatch && variantMatch;
   };
 }
 
@@ -207,6 +255,7 @@ const narrowPath = resolveSource(
   "narrow",
   opt("narrow"),
   isNarrowSummary,
+  isNarrowRole,
   () => newestMatching(modernExperimentRoots, narrowDiscoveryMatcher, isNarrowSummary),
 );
 
@@ -214,10 +263,11 @@ const heavyPath = resolveSource(
   "heavy",
   opt("heavy"),
   isHeavySummary,
-  () => newestMatching(modernExperimentRoots, "summary.json", isHeavySummary),
+  isHeavyRole,
+  () => newestMatching(modernExperimentRoots, "summary.json", isHeavyRole),
 );
 
-const heavyRecommendationPath = resolveSource("heavy-recommendation", opt("heavy-recommendation"), isRecommendation, () => {
+const heavyRecommendationPath = resolveSource("heavy-recommendation", opt("heavy-recommendation"), isRecommendation, isRecommendation, () => {
   const sibling = path.join(path.dirname(heavyPath), "recommendation.json").replace(/\\/g, "/");
   if (fs.existsSync(path.resolve(ROOT, sibling))) {
     const doc = tryReadJson(sibling);
@@ -237,6 +287,7 @@ const abT02Path = resolveSource(
   "ab-t02",
   opt("ab-t02"),
   tempSourceValidator("t02"),
+  tempSourceValidator("t02"),
   () => newestMatching(["artifacts/experiments/helix-step4-ab-rerun", "artifacts/experiments", "artifacts"], "summary.json", tempSourceValidator("t02")),
 );
 
@@ -244,12 +295,14 @@ const abT035Path = resolveSource(
   "ab-t035",
   opt("ab-t035"),
   tempSourceValidator("t035"),
+  tempSourceValidator("t035"),
   () => newestMatching(["artifacts/experiments/helix-step4-ab-rerun", "artifacts/experiments", "artifacts"], "summary.json", tempSourceValidator("t035")),
 );
 
 const casimirPath = resolveSource(
   "casimir",
   opt("casimir"),
+  isCasimirSummary,
   isCasimirSummary,
   () => newestMatching(modernExperimentRoots, casimirDiscoveryMatcher, isCasimirSummary),
 );
@@ -331,6 +384,19 @@ const aheadBehind = aheadBehindRaw
       return Number.isFinite(ahead) && Number.isFinite(behind) ? { ahead, behind } : null;
     })()
   : null;
+
+const heavyOriginMain = String((heavyProvenance.originMain ?? heavyProvenance.origin_main ?? "") || "") || null;
+const heavyAheadBehind = parseAheadBehind(heavyProvenance.aheadBehind ?? heavyProvenance.ahead_behind ?? null);
+const provenanceMismatch: string[] = [];
+if (String((heavyProvenance.branch ?? "") || "") !== branch) provenanceMismatch.push("branch");
+if (String((heavyProvenance.head ?? "") || "") !== head) provenanceMismatch.push("head");
+if (heavyOriginMain !== (originMain ?? null)) provenanceMismatch.push("origin_main");
+if (!equalAheadBehind(heavyAheadBehind, aheadBehind)) provenanceMismatch.push("ahead_behind");
+if (evaluationTier === "decision_grade" && provenanceMismatch.length > 0) {
+  fail(`required_source_provenance_mismatch:${provenanceMismatch.join(",")}`, {
+    heavy: heavyPath,
+  });
+}
 
 const allArtifacts = [
   narrowPath,
@@ -419,6 +485,40 @@ const md = [
 ].join("\n");
 
 fs.mkdirSync(path.resolve(ROOT, "reports"), { recursive: true });
+const resolvedInputs = {
+  generated_at: new Date().toISOString(),
+  git: {
+    branch,
+    head,
+    origin_main: originMain,
+    ahead_behind: aheadBehind,
+  },
+  selected_paths: {
+    narrow: narrowPath,
+    heavy: heavyPath,
+    recommendation: heavyRecommendationPath,
+    ab_t02: abT02Path,
+    ab_t035: abT035Path,
+    casimir: casimirPath,
+  },
+  run_ids: {
+    narrow: String((narrow.precheck_run_id ?? narrow.run_id ?? "") || "") || null,
+    heavy: String((heavy.run_id ?? "") || "") || null,
+    recommendation: String((heavyRec.run_id ?? heavyRec.recommendation_run_id ?? "") || "") || null,
+    ab_t02: String((abT02.run_id ?? "") || "") || null,
+    ab_t035: String((abT035.run_id ?? "") || "") || null,
+    casimir: String((casimir.runId ?? casimir.run_id ?? "") || "") || null,
+  },
+  inputs: {
+    narrow: fileMeta(narrowPath),
+    heavy: fileMeta(heavyPath),
+    recommendation: fileMeta(heavyRecommendationPath),
+    ab_t02: fileMeta(abT02Path),
+    ab_t035: fileMeta(abT035Path),
+    casimir: fileMeta(casimirPath),
+  },
+};
+fs.writeFileSync(path.resolve(ROOT, INPUTS_MANIFEST_JSON), `${JSON.stringify(resolvedInputs, null, 2)}\n`);
 fs.writeFileSync(path.resolve(ROOT, REPORT_JSON), `${JSON.stringify(pkg, null, 2)}\n`);
 fs.writeFileSync(path.resolve(ROOT, REPORT_MD), `${md}\n`);
 console.log(JSON.stringify({ ok: true, output: REPORT_JSON, decision: pkg.decision.value, blockers: pkg.decision.hard_blockers }, null, 2));
