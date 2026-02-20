@@ -1,6 +1,6 @@
 # Helix Decision Package
 
-- generated_at: 2026-02-20T07:04:44.495Z
+- generated_at: 2026-02-20T07:18:41.971Z
 - evaluation_tier: decision_grade
 - decision: NO-GO
 

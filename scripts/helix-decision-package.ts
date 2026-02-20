@@ -31,10 +31,23 @@ function opt(name: string, fallback?: string): string {
   return args.get(name) ?? process.env[name.toUpperCase().replace(/-/g, "_")] ?? fallback ?? "";
 }
 
+function fail(reason: string, details?: Record<string, unknown>): never {
+  console.log(JSON.stringify({ ok: false, error: reason, ...(details ?? {}) }, null, 2));
+  process.exit(1);
+}
+
 function readJson(filePath: string): JsonRecord {
   const abs = path.resolve(ROOT, filePath);
   const raw = fs.readFileSync(abs, "utf8");
   return JSON.parse(raw) as JsonRecord;
+}
+
+function tryReadJson(filePath: string): JsonRecord | null {
+  try {
+    return readJson(filePath);
+  } catch {
+    return null;
+  }
 }
 
 function git(cmd: string): string | null {
@@ -65,19 +78,98 @@ function asNumber(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+function walkFiles(root: string, maxDepth = 6): string[] {
+  const absRoot = path.resolve(ROOT, root);
+  if (!fs.existsSync(absRoot)) return [];
+  const out: string[] = [];
+  function visit(current: string, depth: number) {
+    if (depth > maxDepth) return;
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const next = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        visit(next, depth + 1);
+      } else if (entry.isFile()) {
+        out.push(path.relative(ROOT, next).replace(/\\/g, "/"));
+      }
+    }
+  }
+  visit(absRoot, 0);
+  return out;
+}
+
+function newestMatching(
+  roots: string[],
+  filename: string,
+  validator: (doc: JsonRecord, relPath: string) => boolean,
+): string | null {
+  const candidates: Array<{ relPath: string; mtime: number }> = [];
+  for (const root of roots) {
+    for (const relPath of walkFiles(root)) {
+      if (!relPath.endsWith(`/${filename}`) && relPath !== filename) continue;
+      const doc = tryReadJson(relPath);
+      if (!doc || !validator(doc, relPath)) continue;
+      const mtime = fs.statSync(path.resolve(ROOT, relPath)).mtimeMs;
+      candidates.push({ relPath, mtime });
+    }
+  }
+  candidates.sort((a, b) => b.mtime - a.mtime);
+  return candidates[0]?.relPath ?? null;
+}
+
+function resolveSource(
+  name: string,
+  cliOrEnv: string,
+  discover: () => string | null,
+): string {
+  if (cliOrEnv) {
+    if (!fs.existsSync(path.resolve(ROOT, cliOrEnv))) {
+      fail(`required_source_missing:${name}`, { path: cliOrEnv });
+    }
+    return cliOrEnv;
+  }
+  const found = discover();
+  if (!found) {
+    fail(`required_source_unresolved:${name}`);
+  }
+  return found;
+}
+
 const evaluationTier = (opt("evaluation-tier", "decision_grade") === "exploratory" ? "exploratory" : "decision_grade") as
   | "exploratory"
   | "decision_grade";
 
-const narrowPath = opt("narrow", "reports/helix-self-tune-gate-summary.json");
-const heavyPath = opt("heavy", "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/summary.json");
-const heavyRecommendationPath = opt(
-  "heavy-recommendation",
-  "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/recommendation.json",
+const narrowPath = resolveSource("narrow", opt("narrow", "reports/helix-self-tune-gate-summary.json"), () => {
+  const rel = "reports/helix-self-tune-gate-summary.json";
+  return fs.existsSync(path.resolve(ROOT, rel)) ? rel : null;
+});
+
+const heavyPath = resolveSource("heavy", opt("heavy"), () =>
+  newestMatching(["artifacts/experiments/helix-ask-versatility-research", "artifacts/experiments/helix-step4-heavy-rerun"], "summary.json", (d) =>
+    typeof d.run_id === "string" && typeof (d.metrics ?? (d.quality_rollup as unknown)) === "object",
+  ),
 );
-const abT02Path = opt("ab-t02", "artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json");
-const abT035Path = opt("ab-t035", "artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json");
-const casimirPath = opt("casimir", "reports/helix-self-tune-casimir.json");
+
+const heavyRecommendationPath = resolveSource("heavy-recommendation", opt("heavy-recommendation"), () => {
+  const sibling = path.join(path.dirname(heavyPath), "recommendation.json").replace(/\\/g, "/");
+  if (fs.existsSync(path.resolve(ROOT, sibling))) {
+    const doc = tryReadJson(sibling);
+    if (doc && typeof doc.decision_grade_ready === "boolean") return sibling;
+  }
+  return newestMatching([path.dirname(heavyPath)], "recommendation.json", (d) => typeof d.decision_grade_ready === "boolean");
+});
+
+const abT02Path = resolveSource("ab-t02", opt("ab-t02"), () =>
+  newestMatching(["artifacts/experiments/helix-step4-ab-rerun/t02"], "summary.json", (d) => d.summary_schema_version === 2),
+);
+
+const abT035Path = resolveSource("ab-t035", opt("ab-t035"), () =>
+  newestMatching(["artifacts/experiments/helix-step4-ab-rerun/t035"], "summary.json", (d) => d.summary_schema_version === 2),
+);
+
+const casimirPath = resolveSource("casimir", opt("casimir", "reports/helix-self-tune-casimir.json"), () => {
+  const rel = "reports/helix-self-tune-casimir.json";
+  return fs.existsSync(path.resolve(ROOT, rel)) ? rel : null;
+});
 
 const narrow = readJson(narrowPath);
 const heavy = readJson(heavyPath);
