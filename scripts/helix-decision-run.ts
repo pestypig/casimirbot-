@@ -93,6 +93,29 @@ function newestMatching(
   return candidates[0]?.relPath ?? null;
 }
 
+function isABTempSource(doc: Record<string, unknown>, relPath: string, expected: "t02" | "t035"): boolean {
+  if (doc.summary_schema_version !== 2) return false;
+  const variant = String(doc.variant ?? "").toLowerCase();
+  const normalizedPath = relPath.toLowerCase();
+  const other = expected === "t02" ? "t035" : "t02";
+  return variant.includes(expected) && !variant.includes(other) && normalizedPath.includes(`/${expected}/`) && !normalizedPath.includes(`/${other}/`);
+}
+
+function validateResolvedSources(resolved: SourceMap): void {
+  if (path.dirname(resolved.heavy!) !== path.dirname(resolved.recommendation!)) {
+    throw new Error(`source_pair_mismatch:heavy_recommendation:${resolved.heavy}:${resolved.recommendation}`);
+  }
+
+  const abT02 = tryReadJson(resolved.ab_t02!);
+  const abT035 = tryReadJson(resolved.ab_t035!);
+  if (!abT02 || !isABTempSource(abT02, resolved.ab_t02!, "t02")) {
+    throw new Error(`source_invalid_role:ab_t02:${resolved.ab_t02}`);
+  }
+  if (!abT035 || !isABTempSource(abT035, resolved.ab_t035!, "t035")) {
+    throw new Error(`source_invalid_role:ab_t035:${resolved.ab_t035}`);
+  }
+}
+
 function resolveSources(overrides: Partial<SourceMap>): SourceMap {
   const fromOverride = (key: SourceKey): string | null => {
     const value = overrides[key] ?? null;
@@ -128,12 +151,12 @@ function resolveSources(overrides: Partial<SourceMap>): SourceMap {
     ab_t02: fromOverride("ab_t02") ?? newestMatching(
       ["artifacts/experiments/helix-step4-ab-rerun", "artifacts/experiments", "artifacts"],
       (relPath) => relPath.endsWith("/summary.json"),
-      (doc) => doc.summary_schema_version === 2 && String(doc.variant ?? "").includes("t02"),
+      (doc, relPath) => isABTempSource(doc, relPath, "t02"),
     ),
     ab_t035: fromOverride("ab_t035") ?? newestMatching(
       ["artifacts/experiments/helix-step4-ab-rerun", "artifacts/experiments", "artifacts"],
       (relPath) => relPath.endsWith("/summary.json"),
-      (doc) => doc.summary_schema_version === 2 && String(doc.variant ?? "").includes("t035"),
+      (doc, relPath) => isABTempSource(doc, relPath, "t035"),
     ),
     casimir: fromOverride("casimir") ?? newestMatching(
       ["reports", "artifacts/experiments", "artifacts"],
@@ -145,6 +168,8 @@ function resolveSources(overrides: Partial<SourceMap>): SourceMap {
   for (const [key, value] of Object.entries(resolved) as Array<[SourceKey, string | null]>) {
     if (!value) throw new Error(`source_unresolved:${key}`);
   }
+
+  validateResolvedSources(resolved);
   return resolved;
 }
 
@@ -226,8 +251,23 @@ function main(): void {
     `--ab-t035 ${sources.ab_t035}`,
     `--casimir ${sources.casimir}`,
   ].join(" ");
-  const packageRes = runCommand("decision:package", packageCmd);
+  const packageRes = runCommand("decision:package", packageCmd, { allowFail: true });
   commands.push({ name: "decision:package", cmd: packageCmd, status: packageRes.status });
+
+  if (packageRes.status !== 0) {
+    const summary = buildSummaryShape({
+      ok: false,
+      blockers: ["decision_package_blocker:package_generation_failed", `command_failed:decision:package:${packageRes.status}`],
+      package_path: "reports/helix-decision-package.json",
+      validate_path: "reports/helix-decision-validate.json",
+      selected_sources: sources,
+      commands,
+    });
+    fs.mkdirSync(path.resolve(rootDir(), "reports"), { recursive: true });
+    fs.writeFileSync(path.resolve(rootDir(), SUMMARY_PATH), `${JSON.stringify(summary, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+    process.exit(1);
+  }
 
   const validateCmd = "npm run helix:decision:validate -- --package reports/helix-decision-package.json";
   const validateRes = runCommand("decision:validate", validateCmd, { allowFail: true });

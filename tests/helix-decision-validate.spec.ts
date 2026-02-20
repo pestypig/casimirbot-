@@ -310,3 +310,14 @@ describe("helix decision package", () => {
     expect(manifest.inputs.heavy.size_bytes).toBeGreaterThan(0);
   });
 });
+
+describe("helix decision validate workflow trigger policy", () => {
+  it("requires explicit opt-in for PR decision-grade runs", () => {
+    const workflow = fs.readFileSync(path.join(repoRoot, ".github/workflows/helix-decision-validate.yml"), "utf8");
+    expect(workflow).toContain("workflow_dispatch:");
+    expect(workflow).toContain("run_decision_grade");
+    expect(workflow).toContain("run-decision-grade");
+    expect(workflow).toContain("if: >-");
+    expect(workflow).toContain("contains(github.event.pull_request.labels.*.name, 'run-decision-grade')");
+  });
+});
