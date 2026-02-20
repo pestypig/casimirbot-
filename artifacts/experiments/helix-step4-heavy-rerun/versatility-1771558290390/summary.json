@@ -1,0 +1,3053 @@
+{
+  "summary_schema_version": 2,
+  "run_id": "versatility-1771558290390",
+  "started_at": "2026-02-20T03:31:30.320Z",
+  "ended_at": "2026-02-20T03:36:07.097Z",
+  "run_duration_ms": 276776,
+  "terminated_early_reason": null,
+  "global_cooldown_applied_ms": 0,
+  "resumed_from_latest": false,
+  "resumed_runs": 0,
+  "output_root_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun",
+  "output_run_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390",
+  "base_url": "http://127.0.0.1:5173",
+  "prompt_count": 90,
+  "seed_count": 3,
+  "temperature_values": [
+    0.2
+  ],
+  "expected_runs": 270,
+  "total_runs": 270,
+  "run_complete": true,
+  "completion_rate": 1,
+  "provenance": {
+    "branch": "codex/repair-step4-decision-package-auditability",
+    "head": "188b149",
+    "originMain": null,
+    "aheadBehind": null,
+    "hasOriginRemote": false,
+    "hasMainBranch": false,
+    "gate_pass": false,
+    "warnings": [
+      "git_origin_remote_missing",
+      "git_origin_main_ref_missing"
+    ]
+  },
+  "artifact_bundle_paths": {
+    "output_root_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun",
+    "output_run_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390",
+    "summary": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/summary.json",
+    "recommendation": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/recommendation.json",
+    "failures": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/failures.json",
+    "checkpoint": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/checkpoint.json",
+    "prompts": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/prompts.jsonl",
+    "raw_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/raw",
+    "ab_outputs": [],
+    "trace_export": null
+  },
+  "diagnostics": {
+    "per_run": [
+      {
+        "prompt_id": "relation_01_how-does-a-warp-bubble-fit-in-with-the-mission-ethos",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_01_how-does-a-warp-bubble-fit-in-with-the-mission-ethos",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_01_how-does-a-warp-bubble-fit-in-with-the-mission-ethos",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_02_explain-the-relation-between-warp-bubble-physics-and-mission-ethos-in-th",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_02_explain-the-relation-between-warp-bubble-physics-and-mission-ethos-in-th",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_02_explain-the-relation-between-warp-bubble-physics-and-mission-ethos-in-th",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_03_warp-bubble-ideology-relation-what-is-the-bridge",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_03_warp-bubble-ideology-relation-what-is-the-bridge",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_03_warp-bubble-ideology-relation-what-is-the-bridge",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_05_what-s-the-relationship-between-warp-bubble-viability-and-ideology-tree-",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_05_what-s-the-relationship-between-warp-bubble-viability-and-ideology-tree-",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_05_what-s-the-relationship-between-warp-bubble-viability-and-ideology-tree-",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_06_relate-warp-bubble-design-gates-to-mission-ethos-safeguards",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_06_relate-warp-bubble-design-gates-to-mission-ethos-safeguards",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_06_relate-warp-bubble-design-gates-to-mission-ethos-safeguards",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_07_how-warp-bubble-connected-to-mission-ethos",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_07_how-warp-bubble-connected-to-mission-ethos",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_07_how-warp-bubble-connected-to-mission-ethos",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_08_warp-buble-relation-to-ideology-mission-ethos",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_08_warp-buble-relation-to-ideology-mission-ethos",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_08_warp-buble-relation-to-ideology-mission-ethos",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_09_quick-warp-bubble-vs-mission-ethos-connected-or-separate",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_09_quick-warp-bubble-vs-mission-ethos-connected-or-separate",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_09_quick-warp-bubble-vs-mission-ethos-connected-or-separate",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_10_define-warp-bubble-define-mission-ethos-then-connect-them",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_10_define-warp-bubble-define-mission-ethos-then-connect-them",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_10_define-warp-bubble-define-mission-ethos-then-connect-them",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_11_in-one-clear-narrative-why-does-mission-ethos-matter-for-warp-bubble-cla",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_11_in-one-clear-narrative-why-does-mission-ethos-matter-for-warp-bubble-cla",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_11_in-one-clear-narrative-why-does-mission-ethos-matter-for-warp-bubble-cla",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_12_how-does-the-ideology-tree-constrain-warp-bubble-deployment-decisions",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_12_how-does-the-ideology-tree-constrain-warp-bubble-deployment-decisions",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_12_how-does-the-ideology-tree-constrain-warp-bubble-deployment-decisions",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_13_bridge-warp-physics-evidence-to-ethos-stewardship-without-report-mode",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_13_bridge-warp-physics-evidence-to-ethos-stewardship-without-report-mode",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_13_bridge-warp-physics-evidence-to-ethos-stewardship-without-report-mode",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_14_what-ties-warp-bubble-verification-to-ethos-non-harm-policy",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_14_what-ties-warp-bubble-verification-to-ethos-non-harm-policy",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_14_what-ties-warp-bubble-verification-to-ethos-non-harm-policy",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": false,
+        "relation_dual_domain_ok": false
+      },
+      {
+        "prompt_id": "relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": false,
+        "relation_dual_domain_ok": false
+      },
+      {
+        "prompt_id": "relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": false,
+        "relation_dual_domain_ok": false
+      },
+      {
+        "prompt_id": "relation_16_how-is-the-warp-bubble-a-technical-layer-while-mission-ethos-is-policy-l",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_16_how-is-the-warp-bubble-a-technical-layer-while-mission-ethos-is-policy-l",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_16_how-is-the-warp-bubble-a-technical-layer-while-mission-ethos-is-policy-l",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_17_relation-of-warp-bubble-and-mission-ethos-now",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_17_relation-of-warp-bubble-and-mission-ethos-now",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_17_relation-of-warp-bubble-and-mission-ethos-now",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_18_warp-ethos-relation-prompt-test-explain-links-and-guardrails",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_18_warp-ethos-relation-prompt-test-explain-links-and-guardrails",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_18_warp-ethos-relation-prompt-test-explain-links-and-guardrails",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_19_how-do-certificate-integrity-and-mission-ethos-cohere-for-warp-bubble-wo",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_19_how-do-certificate-integrity-and-mission-ethos-cohere-for-warp-bubble-wo",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_19_how-do-certificate-integrity-and-mission-ethos-cohere-for-warp-bubble-wo",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_20_how-does-casimir-verification-connect-to-ideology-accountability-in-warp",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_20_how-does-casimir-verification-connect-to-ideology-accountability-in-warp",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_20_how-does-casimir-verification-connect-to-ideology-accountability-in-warp",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_21_need-concise-relation-warp-bubble-mission-ethos-evidence",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_21_need-concise-relation-warp-bubble-mission-ethos-evidence",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_21_need-concise-relation-warp-bubble-mission-ethos-evidence",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_22_which-shared-constraints-bind-warp-bubble-engineering-to-ideology-values",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_22_which-shared-constraints-bind-warp-bubble-engineering-to-ideology-values",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_22_which-shared-constraints-bind-warp-bubble-engineering-to-ideology-values",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_23_compare-and-connect-warp-bubble-viability-gates-with-mission-ethos-gates",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_23_compare-and-connect-warp-bubble-viability-gates-with-mission-ethos-gates",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_23_compare-and-connect-warp-bubble-viability-gates-with-mission-ethos-gates",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_25_from-docs-perspective-how-do-warp-bubble-files-and-ethos-files-relate",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_25_from-docs-perspective-how-do-warp-bubble-files-and-ethos-files-relate",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_25_from-docs-perspective-how-do-warp-bubble-files-and-ethos-files-relate",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_26_give-a-practical-relation-map-from-warp-bubble-model-to-mission-ethos-de",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_26_give-a-practical-relation-map-from-warp-bubble-model-to-mission-ethos-de",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_26_give-a-practical-relation-map-from-warp-bubble-model-to-mission-ethos-de",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_27_how-does-relation-mode-answer-tie-warp-bubble-to-ideology-without-report",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_27_how-does-relation-mode-answer-tie-warp-bubble-to-ideology-without-report",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_27_how-does-relation-mode-answer-tie-warp-bubble-to-ideology-without-report",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_28_mission-ethos-warp-bubble-what-s-the-dependency-chain",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_28_mission-ethos-warp-bubble-what-s-the-dependency-chain",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_28_mission-ethos-warp-bubble-what-s-the-dependency-chain",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_29_tell-me-the-warp-bubble-relation-to-mission-ethos-in-plain-language",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_29_tell-me-the-warp-bubble-relation-to-mission-ethos-in-plain-language",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_29_tell-me-the-warp-bubble-relation-to-mission-ethos-in-plain-language",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_30_if-warp-bubble-is-capability-how-does-ethos-govern-its-use",
+        "family": "relation",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_30_if-warp-bubble-is-capability-how-does-ethos-govern-its-use",
+        "family": "relation",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "relation_30_if-warp-bubble-is-capability-how-does-ethos-govern-its-use",
+        "family": "relation",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true
+      },
+      {
+        "prompt_id": "repo_tech_01_walk-through-api-agi-ask-routing-from-intent-detection-to-final-answer-c",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_01_walk-through-api-agi-ask-routing-from-intent-detection-to-final-answer-c",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_01_walk-through-api-agi-ask-routing-from-intent-detection-to-final-answer-c",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_02_how-does-helix-ask-choose-report-mode-vs-hybrid-explain-mode",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_02_how-does-helix-ask-choose-report-mode-vs-hybrid-explain-mode",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_02_how-does-helix-ask-choose-report-mode-vs-hybrid-explain-mode",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_03_where-are-relation-packet-fields-built-and-surfaced-in-debug-payload",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_03_where-are-relation-packet-fields-built-and-surfaced-in-debug-payload",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_03_where-are-relation-packet-fields-built-and-surfaced-in-debug-payload",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_04_explain-evidence-gate-flow-and-where-citation-repair-is-applied",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_04_explain-evidence-gate-flow-and-where-citation-repair-is-applied",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_04_explain-evidence-gate-flow-and-where-citation-repair-is-applied",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_05_how-does-deterministic-fallback-guard-relation-mode-contract-parse-failu",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_05_how-does-deterministic-fallback-guard-relation-mode-contract-parse-failu",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_05_how-does-deterministic-fallback-guard-relation-mode-contract-parse-failu",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_06_describe-how-answer-contract-primary-and-field-repair-work-in-sequence",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_06_describe-how-answer-contract-primary-and-field-repair-work-in-sequence",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_06_describe-how-answer-contract-primary-and-field-repair-work-in-sequence",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_07_how-are-ambiguity-gates-triggered-and-what-clarify-output-is-produced",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_07_how-are-ambiguity-gates-triggered-and-what-clarify-output-is-produced",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_07_how-are-ambiguity-gates-triggered-and-what-clarify-output-is-produced",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_08_what-does-api-agi-adapter-run-return-for-pass-fail-and-certificate-data",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_08_what-does-api-agi-adapter-run-return-for-pass-fail-and-certificate-data",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_08_what-does-api-agi-adapter-run-return-for-pass-fail-and-certificate-data",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_09_explain-training-trace-export-path-and-expected-payload-behavior",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_09_explain-training-trace-export-path-and-expected-payload-behavior",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_09_explain-training-trace-export-path-and-expected-payload-behavior",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_10_how-do-topic-tags-influence-intent-directory-routing-for-helix-ask",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_10_how-do-topic-tags-influence-intent-directory-routing-for-helix-ask",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_10_how-do-topic-tags-influence-intent-directory-routing-for-helix-ask",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_11_show-pipeline-stages-captured-in-debug-live-events-for-helix-ask",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_11_show-pipeline-stages-captured-in-debug-live-events-for-helix-ask",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_11_show-pipeline-stages-captured-in-debug-live-events-for-helix-ask",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_12_where-is-relation-topology-dual-domain-detection-implemented",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_12_where-is-relation-topology-dual-domain-detection-implemented",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_12_where-is-relation-topology-dual-domain-detection-implemented",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_13_how-does-goal-zone-harness-evaluate-pass-fail-across-seeds",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_13_how-does-goal-zone-harness-evaluate-pass-fail-across-seeds",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_13_how-does-goal-zone-harness-evaluate-pass-fail-across-seeds",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_14_what-determines-relation-packet-bridge-count-and-evidence-count",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_14_what-determines-relation-packet-bridge-count-and-evidence-count",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_14_what-determines-relation-packet-bridge-count-and-evidence-count",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_15_how-does-the-system-prevent-report-scaffold-responses-for-relation-promp",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_15_how-does-the-system-prevent-report-scaffold-responses-for-relation-promp",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_15_how-does-the-system-prevent-report-scaffold-responses-for-relation-promp",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_16_where-are-citation-allowlists-normalized-before-sanitizesourcesline",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_16_where-are-citation-allowlists-normalized-before-sanitizesourcesline",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_16_where-are-citation-allowlists-normalized-before-sanitizesourcesline",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_17_explain-retrieval-confidence-and-deterministic-contract-signal-threshold",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_17_explain-retrieval-confidence-and-deterministic-contract-signal-threshold",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_17_explain-retrieval-confidence-and-deterministic-contract-signal-threshold",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_18_how-does-fast-quality-mode-alter-answer-generation-deadlines",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_18_how-does-fast-quality-mode-alter-answer-generation-deadlines",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_18_how-does-fast-quality-mode-alter-answer-generation-deadlines",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_19_what-are-top-fallback-reasons-emitted-in-debug-for-helix-ask-failures",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_19_what-are-top-fallback-reasons-emitted-in-debug-for-helix-ask-failures",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_19_what-are-top-fallback-reasons-emitted-in-debug-for-helix-ask-failures",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_20_how-are-source-paths-extracted-from-evidence-text-and-context",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_20_how-are-source-paths-extracted-from-evidence-text-and-context",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_20_how-are-source-paths-extracted-from-evidence-text-and-context",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_21_explain-relation-assembly-fallback-rendering-shape-and-intended-usage",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_21_explain-relation-assembly-fallback-rendering-shape-and-intended-usage",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_21_explain-relation-assembly-fallback-rendering-shape-and-intended-usage",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_22_where-is-helix-ask-intent-directory-mapping-for-warp-ethos-relation",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_22_where-is-helix-ask-intent-directory-mapping-for-warp-ethos-relation",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_22_where-is-helix-ask-intent-directory-mapping-for-warp-ethos-relation",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_23_how-does-arbiter-mode-get-selected-for-repo-vs-hybrid-asks",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_23_how-does-arbiter-mode-get-selected-for-repo-vs-hybrid-asks",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_23_how-does-arbiter-mode-get-selected-for-repo-vs-hybrid-asks",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_24_what-files-are-considered-high-signal-for-mission-ethos-reference-intent",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_24_what-files-are-considered-high-signal-for-mission-ethos-reference-intent",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_24_what-files-are-considered-high-signal-for-mission-ethos-reference-intent",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_25_how-does-report-mode-reason-get-set-and-propagated-to-debug",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_25_how-does-report-mode-reason-get-set-and-propagated-to-debug",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_25_how-does-report-mode-reason-get-set-and-propagated-to-debug",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_26_explain-how-answer-path-is-populated-and-useful-for-diagnostics",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_26_explain-how-answer-path-is-populated-and-useful-for-diagnostics",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_26_explain-how-answer-path-is-populated-and-useful-for-diagnostics",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_27_where-are-claim-coverage-metrics-computed-and-used-as-gates",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_27_where-are-claim-coverage-metrics-computed-and-used-as-gates",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_27_where-are-claim-coverage-metrics-computed-and-used-as-gates",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_28_how-is-platonic-gate-scoring-attached-to-final-response-debug",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_28_how-is-platonic-gate-scoring-attached-to-final-response-debug",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_28_how-is-platonic-gate-scoring-attached-to-final-response-debug",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_29_what-checks-enforce-presence-of-citations-in-repo-hybrid-responses",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_29_what-checks-enforce-presence-of-citations-in-repo-hybrid-responses",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_29_what-checks-enforce-presence-of-citations-in-repo-hybrid-responses",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_30_describe-the-interaction-between-relation-query-detection-and-graph-reso",
+        "family": "repo_technical",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_30_describe-the-interaction-between-relation-query-detection-and-graph-reso",
+        "family": "repo_technical",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "repo_tech_30_describe-the-interaction-between-relation-query-detection-and-graph-reso",
+        "family": "repo_technical",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_01_define-lattice",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_01_define-lattice",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_01_define-lattice",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_02_what-s-a-cavity",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_02_what-s-a-cavity",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_02_what-s-a-cavity",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_03_explain-resonance-in-simple-terms",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_03_explain-resonance-in-simple-terms",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_03_explain-resonance-in-simple-terms",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_04_what-is-stability",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_04_what-is-stability",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_04_what-is-stability",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_05_how-should-i-think-about-uncertainty",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_05_how-should-i-think-about-uncertainty",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_05_how-should-i-think-about-uncertainty",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_06_help-me-compare-precision-and-recall-quickly",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_06_help-me-compare-precision-and-recall-quickly",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_06_help-me-compare-precision-and-recall-quickly",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_07_how-do-constraints-help-decision-making",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_07_how-do-constraints-help-decision-making",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_07_how-do-constraints-help-decision-making",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_08_what-s-a-good-way-to-summarize-evidence",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_08_what-s-a-good-way-to-summarize-evidence",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_08_what-s-a-good-way-to-summarize-evidence",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_09_can-you-explain-system-integrity-for-non-experts",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_09_can-you-explain-system-integrity-for-non-experts",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_09_can-you-explain-system-integrity-for-non-experts",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_10_what-is-model-drift",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_10_what-is-model-drift",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_10_what-is-model-drift",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_11_how-do-i-ask-better-technical-questions",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_11_how-do-i-ask-better-technical-questions",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_11_how-do-i-ask-better-technical-questions",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_12_what-s-a-clean-way-to-structure-a-short-answer",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_12_what-s-a-clean-way-to-structure-a-short-answer",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_12_what-s-a-clean-way-to-structure-a-short-answer",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_13_how-do-i-avoid-overclaiming-from-weak-data",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_13_how-do-i-avoid-overclaiming-from-weak-data",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_13_how-do-i-avoid-overclaiming-from-weak-data",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_14_what-does-falsifiable-mean-in-practice",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_14_what-does-falsifiable-mean-in-practice",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_14_what-does-falsifiable-mean-in-practice",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_15_difference-between-hypothesis-and-verified-claim",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_15_difference-between-hypothesis-and-verified-claim",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_15_difference-between-hypothesis-and-verified-claim",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_16_how-can-ambiguity-be-reduced-in-prompts",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_16_how-can-ambiguity-be-reduced-in-prompts",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_16_how-can-ambiguity-be-reduced-in-prompts",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_17_when-should-i-request-citations",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_17_when-should-i-request-citations",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_17_when-should-i-request-citations",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_18_explain-feedback-loops-without-jargon",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_18_explain-feedback-loops-without-jargon",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_18_explain-feedback-loops-without-jargon",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_19_what-makes-a-good-guardrail",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_19_what-makes-a-good-guardrail",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_19_what-makes-a-good-guardrail",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_20_how-do-i-triage-failures-quickly",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_20_how-do-i-triage-failures-quickly",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_20_how-do-i-triage-failures-quickly",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_21_give-me-a-concise-explanation-of-verification",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_21_give-me-a-concise-explanation-of-verification",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_21_give-me-a-concise-explanation-of-verification",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_22_how-can-teams-avoid-report-mode-spam-in-assistants",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_22_how-can-teams-avoid-report-mode-spam-in-assistants",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_22_how-can-teams-avoid-report-mode-spam-in-assistants",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_23_what-is-a-practical-debug-payload-used-for",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_23_what-is-a-practical-debug-payload-used-for",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_23_what-is-a-practical-debug-payload-used-for",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_24_how-should-i-read-latency-percentiles",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_24_how-should-i-read-latency-percentiles",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_24_how-should-i-read-latency-percentiles",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_25_when-is-deterministic-fallback-preferable",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_25_when-is-deterministic-fallback-preferable",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_25_when-is-deterministic-fallback-preferable",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_26_how-do-seeds-help-evaluation-reliability",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_26_how-do-seeds-help-evaluation-reliability",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_26_how-do-seeds-help-evaluation-reliability",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_27_what-s-a-robust-pass-criterion-for-prompts",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_27_what-s-a-robust-pass-criterion-for-prompts",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_27_what-s-a-robust-pass-criterion-for-prompts",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_28_how-can-i-identify-high-impact-failure-categories",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_28_how-can-i-identify-high-impact-failure-categories",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_28_how-can-i-identify-high-impact-failure-categories",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_29_explain-why-short-prompts-can-confuse-routing",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_29_explain-why-short-prompts-can-confuse-routing",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_29_explain-why-short-prompts-can-confuse-routing",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_30_what-s-the-difference-between-routing-and-assembly",
+        "family": "ambiguous_general",
+        "seed": 7,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_30_what-s-the-difference-between-routing-and-assembly",
+        "family": "ambiguous_general",
+        "seed": 11,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      },
+      {
+        "prompt_id": "ambiguous_30_what-s-the-difference-between-routing-and-assembly",
+        "family": "ambiguous_general",
+        "seed": 13,
+        "temperature": 0.2,
+        "report_mode_correct": true,
+        "relation_packet_built": null,
+        "relation_dual_domain_ok": null
+      }
+    ],
+    "rollup": {
+      "report_mode_correct": {
+        "pass": 270,
+        "fail": 0,
+        "unknown": 0
+      },
+      "relation_packet_built": {
+        "pass": 87,
+        "fail": 3,
+        "unknown": 180
+      },
+      "relation_dual_domain_ok": {
+        "pass": 87,
+        "fail": 3,
+        "unknown": 180
+      }
+    }
+  },
+  "family_summary": {
+    "relation": {
+      "runs": 90,
+      "pass_rate": 0.9666666666666667,
+      "avg_latency_ms": 864.0111111111111,
+      "p50_latency_ms": 488,
+      "p95_latency_ms": 1509,
+      "intent_correct_rate": 0.9666666666666667,
+      "report_mode_correct_rate": 1,
+      "stub_rate": 0
+    },
+    "repo_technical": {
+      "runs": 90,
+      "pass_rate": 1,
+      "avg_latency_ms": 999.1,
+      "p50_latency_ms": 763,
+      "p95_latency_ms": 2219,
+      "intent_correct_rate": 0,
+      "report_mode_correct_rate": 1,
+      "stub_rate": 0
+    },
+    "ambiguous_general": {
+      "runs": 90,
+      "pass_rate": 1,
+      "avg_latency_ms": 890.8666666666667,
+      "p50_latency_ms": 804,
+      "p95_latency_ms": 1664,
+      "intent_correct_rate": 0,
+      "report_mode_correct_rate": 1,
+      "stub_rate": 0
+    }
+  },
+  "metrics": {
+    "attempts": {
+      "avg_attempts": 1,
+      "p95_attempts": 1
+    },
+    "intent_id_correct_rate": 0.9666666666666667,
+    "report_mode_correct_rate": 1,
+    "relation_packet_built_rate": 0.9666666666666667,
+    "relation_dual_domain_ok_rate": 0.9666666666666667,
+    "stub_text_detected_rate": 0,
+    "deterministic_fallback_relation_rate": 0.9,
+    "contract_parse_fail_relation_rate": 0,
+    "citation_repair_rate": 0,
+    "citation_presence_rate": 1,
+    "min_text_length_pass_rate": 1,
+    "latency_ms": {
+      "total": {
+        "p50": 719,
+        "p95": 1996
+      },
+      "retrieval": {
+        "p50": 236,
+        "p95": 414,
+        "samples": 245
+      },
+      "synthesis": {
+        "p50": 1,
+        "p95": 1,
+        "samples": 255
+      }
+    }
+  },
+  "top_failure_signatures": [
+    {
+      "key": "intent_mismatch",
+      "count": 3
+    },
+    {
+      "key": "relation_packet_built",
+      "count": 3
+    },
+    {
+      "key": "relation_dual_domain",
+      "count": 3
+    },
+    {
+      "key": "bridge_count_low",
+      "count": 3
+    },
+    {
+      "key": "evidence_count_low",
+      "count": 3
+    }
+  ],
+  "worst_examples": [
+    {
+      "prompt_id": "relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer",
+      "family": "relation",
+      "question": "Explain warp bubble + mission ethos for a skeptical engineer.",
+      "answer": "The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. [docs/knowledge/ethos/mission-ethos.md] The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. [docs/knowledge/ethos/mission-ethos.md] Notes: Tags: stewardship, compassion; , beginners-mind, struggle-testament, devotion-course, worldview-integrity (+28 more). [docs/knowledge/ethos/mission-ethos.md] Mechanism: The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. [docs/knowledge/ethos/mission-ethos.md] -> coupled constraints and feedback operators -> observable outcomes tied to docs/ethos/ideology.json, because feedback loops shape the resulting behavior. Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached. [docs/knowledge/ethos/mission-ethos.md] Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity. [docs/knowledge/ethos/mission-ethos.md] Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md, modules/warp/warp-module.ts, modules/warp/natario-warp.ts, docs/warp-console-architecture.md, server/routes/ethos.ts, docs/knowledge/ethos/ethos-knowledge-tree.json",
+      "debug": {
+        "intent_id": "hybrid.concept_plus_system_mapping",
+        "intent_strategy": "hybrid_explain",
+        "report_mode": false,
+        "answer_path": [
+          "intent:hybrid.warp_ethos_relation",
+          "domain:hybrid",
+          "strategy:hybrid_explain",
+          "concept:mission-ethos",
+          "arbiter:hybrid",
+          "answer:llm",
+          "citationRepair:skipped(intent)",
+          "citationFallback:sources",
+          "platonic:gates",
+          "answerExtension:appended",
+          "citationPersistence:preserved",
+          "moveSelector:direct_answer",
+          "qualityFloor:deterministic_contract",
+          "qualityFloor:open_world_expansion",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [
+        "intent_mismatch:hybrid.concept_plus_system_mapping",
+        "relation_packet_built:undefined",
+        "relation_dual_domain:undefined",
+        "bridge_count_low:0",
+        "evidence_count_low:0"
+      ],
+      "likely_root_cause": "relation_topology_or_context_gap",
+      "patch_suggestion": "Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation."
+    },
+    {
+      "prompt_id": "relation_18_warp-ethos-relation-prompt-test-explain-links-and-guardrails",
+      "family": "relation",
+      "question": "warp/ethos relation prompt test: explain links and guardrails",
+      "answer": "The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. [docs/knowledge/ethos/mission-ethos.md] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/ethos/mission-ethos.md] Sources: docs/knowledge/ethos/mission-ethos.md, shared/schema.ts, server/routes/agi.plan.ts, modules/dynamic/dynamic-casimir.ts, temp_prev.ts, reports/helix-ask-versatility-post-tool-20260219t064058z.md, scripts/helix-ask-versatility-record.ts, tools/tokamak-added-value-report.ts",
+      "debug": {
+        "intent_id": "hybrid.warp_ethos_relation",
+        "intent_strategy": "hybrid_explain",
+        "report_mode": false,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true,
+        "deterministic_fallback_used_relation": true,
+        "answer_path": [
+          "concept_fast_path:preintent",
+          "intent:hybrid.warp_ethos_relation",
+          "domain:hybrid",
+          "strategy:hybrid_explain",
+          "concept_fast_path",
+          "forcedAnswer:concept",
+          "arbiter:clarify",
+          "answer:forced",
+          "citationRepair:skipped(intent)",
+          "citationFallback:sources",
+          "platonic:gates",
+          "relationFallback:deterministic_guard",
+          "citationPersistence:preserved",
+          "moveSelector:retrieve_more",
+          "fallback:RenderPlatonicFallback",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "repo_tech_21_explain-relation-assembly-fallback-rendering-shape-and-intended-usage",
+      "family": "repo_technical",
+      "question": "Explain relation-assembly fallback rendering shape and intended usage.",
+      "answer": "Constraint: score=11.500 | symbol=validateQuantumInequality | file=modules/warp/natario-warp.ts. Constraint: score=11.500 | symbol=validateQuantumInequality | file=modules/warp/natario-warp.ts. In practice, score=11.500 | symbol=validateQuantumInequality | file=modules/warp/natario-warp.ts server/services/planner/chat-b.ts export type ResonantPlanCandidate =; score=11.000 | symbol=ResonantPlanCandidate | file=s... Mechanism: Constraint: score=11.500 | symbol=validateQuantumInequality | file=modules/warp/natario-warp.ts. -> coupled constraints and feedback operators -> observable outcomes tied to modules/warp/natario-warp.ts, because feedback loops shape the resulting behavior. Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached. [client/src/physics/alcubierre.ts] Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity. [client/src/physics/alcubierre.ts] Sources: client/src/physics/alcubierre.ts, modules/warp/natario-warp.ts, server/services/planner/chat-b.ts, server/skills/llm.http.ts, shared/skills.ts, modules/dynamic/dynamic-casimir.ts, server/instruments/pump-multitone.ts, server/db/agi.ts",
+      "debug": {
+        "intent_id": "general.conceptual_define_compare",
+        "intent_strategy": "general_explain",
+        "report_mode": false,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true,
+        "answer_path": [
+          "intent:general.conceptual_define_compare",
+          "domain:general",
+          "strategy:general_explain",
+          "arbiter:repo_grounded",
+          "answer:llm",
+          "citationRepair:skipped(intent)",
+          "citationFallback:sources",
+          "platonic:gates",
+          "citationPersistence:preserved",
+          "moveSelector:retrieve_more",
+          "fallback:RenderPlatonicFallback",
+          "qualityFloor:deterministic_contract",
+          "qualityFloor:open_world_expansion",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "repo_tech_16_where-are-citation-allowlists-normalized-before-sanitizesourcesline",
+      "family": "repo_technical",
+      "question": "Where are citation allowlists normalized before sanitizeSourcesLine?",
+      "answer": "const DOCS_PREFIX = \"/docs\"; const DOC_VIEWER_INTENT_KEY = \"helix:doc-viewer:intent\";. [server/services/knowledge/citations.ts] const DOC_VIEWER_INTENT_KEY = \"helix:doc-viewer:intent\";. [server/services/knowledge/citations.ts] const fallback = `$ /papers.md`;. [server/services/knowledge/citations.ts] if (!input) return fallback;. [server/services/knowledge/citations.ts] In practice, const DOC_VIEWER_INTENT_KEY = \"helix:doc-viewer:intent\";. [server/services/knowledge/citations.ts] Sources: client/src/components/driveguardspanel.ts, server/services/knowledge/citations.ts, shared/agi-specialists.ts, modules/warp/natario-warp.ts, server/security/hull-guard.ts, server/specialists/solvers/index.ts, client/src/lib/docs/docviewer.ts, server/modules/qi/qi-controller.ts",
+      "debug": {
+        "intent_id": "general.fallback",
+        "intent_strategy": "general_explain",
+        "report_mode": false,
+        "relation_dual_domain_ok": true,
+        "answer_path": [
+          "intent:general.fallback",
+          "domain:general",
+          "strategy:general_explain",
+          "arbiter:repo_grounded",
+          "answer:llm",
+          "citationRepair:skipped(intent)",
+          "platonic:gates",
+          "answerExtension:appended",
+          "citationPersistence:append_sources",
+          "moveSelector:retrieve_more",
+          "fallback:RenderPlatonicFallback",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "repo_tech_29_what-checks-enforce-presence-of-citations-in-repo-hybrid-responses",
+      "family": "repo_technical",
+      "question": "What checks enforce presence of citations in repo/hybrid responses?",
+      "answer": "Answer grounded in retrieved evidence. [docs/knowledge/ops-deployment-tree.json] Mechanism: Answer grounded in retrieved evidence. [docs/knowledge/ops-deployment-tree.json] -> constrained interaction dynamics -> Answer grounded in retrieved evidence., because linked constraints amplify or dampen outcomes over time. [docs/knowledge/ops-deployment-tree.json] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/ops-deployment-tree.json] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/ops-deployment-tree.json] Sources: tests/theory-checks.spec.ts, client/src/lib/hud-adapter.ts, server/services/knowledge/citations.ts, shared/agi-specialists.ts, modules/dynamic/dynamic-casimir.ts, .github/workflows/casimir-verify.yml, server/skills/stt.whisper.ts, docs/knowledge/ops-deployment-tree.json",
+      "debug": {
+        "intent_id": "hybrid.concept_plus_system_mapping",
+        "intent_strategy": "hybrid_explain",
+        "report_mode": false,
+        "answer_path": [
+          "intent:hybrid.concept_plus_system_mapping",
+          "domain:hybrid",
+          "strategy:hybrid_explain",
+          "clarify:pre_intent",
+          "arbiter:repo_grounded",
+          "answer:forced",
+          "citationRepair:skipped(intent)",
+          "citationFallback:sources",
+          "platonic:gates",
+          "citationPersistence:preserved",
+          "moveSelector:direct_answer",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK",
+          "fallback:final_output_guard"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "ambiguous_20_how-do-i-triage-failures-quickly",
+      "family": "ambiguous_general",
+      "question": "How do I triage failures quickly?",
+      "answer": "Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [shared/schema.ts] 1. Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [shared/schema.ts] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [shared/schema.ts] Sources: shared/schema.ts, server/routes/agi.plan.ts, modules/dynamic/dynamic-casimir.ts, temp_prev.ts, scripts/helix-ask-utility-ab.ts, reports/helix-ask-versatility-codex-cloud.md, docs/alcubierre-alignment.md, tools/tokamak-added-value-report.ts\n\nMissing evidence: add directly relevant repo paths or artifact refs to raise confidence.",
+      "debug": {
+        "intent_id": "general.fallback",
+        "intent_strategy": "general_explain",
+        "report_mode": false,
+        "relation_dual_domain_ok": true,
+        "answer_path": [
+          "intent:general.general_how_to_process",
+          "domain:general",
+          "strategy:general_explain",
+          "arbiter:general",
+          "answer:llm",
+          "citationRepair:skipped(intent)",
+          "platonic:gates",
+          "answerExtension:appended",
+          "citationPersistence:append_sources",
+          "moveSelector:retrieve_more",
+          "fallback:RenderPlatonicFallback",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "repo_tech_07_how-are-ambiguity-gates-triggered-and-what-clarify-output-is-produced",
+      "family": "repo_technical",
+      "question": "How are ambiguity gates triggered and what clarify output is produced?",
+      "answer": "Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/ui-components-tree.json] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/ui-components-tree.json] Sources: docs/knowledge/ui-components-tree.json, client/src/hooks/use-energy-pipeline.ts, shared/schema.ts, server/helix-core.ts, modules/dynamic/gates/index.ts, tests/hull-tools.spec.ts, modules/core/module-registry.ts, server/specialists/solvers/philo.synthesis.ts\n\nMissing evidence: add directly relevant repo paths or artifact refs to raise confidence.",
+      "debug": {
+        "intent_id": "general.fallback",
+        "intent_strategy": "general_explain",
+        "report_mode": false,
+        "relation_dual_domain_ok": true,
+        "answer_path": [
+          "intent:general.fallback",
+          "domain:general",
+          "strategy:general_explain",
+          "arbiter:repo_grounded",
+          "answer:llm",
+          "citationRepair:skipped(intent)",
+          "citationFallback:sources",
+          "platonic:gates",
+          "answerExtension:appended",
+          "citationPersistence:preserved",
+          "moveSelector:retrieve_more",
+          "fallback:RenderPlatonicFallback",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "repo_tech_12_where-is-relation-topology-dual-domain-detection-implemented",
+      "family": "repo_technical",
+      "question": "Where is relation topology dual-domain detection implemented?",
+      "answer": "what_is_warp_bubble: docs/knowledge/warp/warp-bubble.md. 1. what_is_mission_ethos: docs/ethos/ideology.json. 2. how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [shared/schema.ts] Warp viability certificates enable ethos commitments by binding claims to reproducible evidence. [shared/schema.ts] Verification hooks translate design ambition into. [shared/schema.ts] 3. constraints_and_falsifiability: Physics bounds: Ford-Roman QI, theta calibration, and GR constraint gates must pass before viability claims. [shared/schema.ts] Policy bounds: mission ethos requires stewardship, non-harm, and traceable evidence for operational decisions. [shared/schema.ts] Re-run /. 4. Mechanism: what_is_mission_ethos: docs/ethos/ideology.json. -> constrained interaction dynamics -> how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [shared/schema.ts] Warp viability certificates enable ethos commit. [shared/schema.ts] 5. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [shared/schema.ts] In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity. [shared/schema.ts] Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity. [shared/schema.ts] Sources: docs/ethos/ideology.json, docs/knowledge/warp/warp-bubble.md",
+      "debug": {
+        "intent_id": "general.fallback",
+        "intent_strategy": "general_explain",
+        "report_mode": false,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true,
+        "answer_path": [
+          "intent:general.fallback",
+          "domain:general",
+          "strategy:general_explain",
+          "arbiter:general",
+          "answer:llm",
+          "citationRepair:skipped(intent)",
+          "platonic:gates",
+          "citationPersistence:append_sources",
+          "moveSelector:retrieve_more",
+          "fallback:RenderPlatonicFallback",
+          "qualityFloor:deterministic_contract",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "repo_tech_03_where-are-relation-packet-fields-built-and-surfaced-in-debug-payload",
+      "family": "repo_technical",
+      "question": "Where are relation packet fields built and surfaced in debug payload?",
+      "answer": "what_is_warp_bubble: client/src/hooks/use-energy-pipeline.ts export interface GreensPayload kind: GreensKind; m: number; // mass parameter for Helmholtz (0 ⇒ Poisson limit) normalize: boolean; phi: Float32Array; // normalized or raw potentia. 1. what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [modules/dynamic/dynamic-casimir.ts] 2. how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [modules/dynamic/dynamic-casimir.ts] Warp viability certificates enable ethos commitments by binding claims to reproducible evidence. [modules/dynamic/dynamic-casimir.ts] Verification hooks translate design ambition into. [modules/dynamic/dynamic-casimir.ts] 3. constraints_and_falsifiability: Physics bounds: Ford-Roman QI, theta calibration, and GR constraint gates must pass before viability claims. [modules/dynamic/dynamic-casimir.ts] Policy bounds: mission ethos requires stewardship, non-harm, and traceable evidence for operational decisions. [modules/dynamic/dynamic-casimir.ts] Re-run /. 4. Mechanism: what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [modules/dynamic/dynamic-casimir.ts] -> constrained interaction dynamics -> how_they_connect: Mission ethos constrains warp development to measured. [modules/dynamic/dynamic-casimir.ts] 5. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [modules/dynamic/dynamic-casimir.ts] In practice, what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [modules/dynamic/dyna",
+      "debug": {
+        "intent_id": "general.fallback",
+        "intent_strategy": "general_explain",
+        "report_mode": false,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true,
+        "answer_path": [
+          "intent:general.fallback",
+          "domain:general",
+          "strategy:general_explain",
+          "arbiter:repo_grounded",
+          "answer:llm",
+          "citationRepair:skipped(intent)",
+          "citationFallback:sources",
+          "platonic:gates",
+          "answerExtension:appended",
+          "citationPersistence:preserved",
+          "moveSelector:retrieve_more",
+          "fallback:RenderPlatonicFallback",
+          "qualityFloor:deterministic_contract",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "relation_19_how-do-certificate-integrity-and-mission-ethos-cohere-for-warp-bubble-wo",
+      "family": "relation",
+      "question": "How do certificate integrity and mission ethos cohere for warp bubble work?",
+      "answer": "The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. [docs/knowledge/ethos/mission-ethos.md] - Constraint: The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. [docs/knowledge/ethos/mission-ethos.md] Notes: Tags: stewardship, compassion; , begin... [docs/knowledge/ethos/mission-ethos.md] In practice, The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. [docs/knowledge/ethos/mission-ethos.md] Notes: Tags: stewardship, compassion; , begin... [docs/knowledge/ethos/mission-ethos.md] Sources: docs/knowledge/ethos/ethos-knowledge-tree.json, modules/warp/warp-module.ts, client/src/lib/warp-uniforms-gate.ts, server/energy-pipeline.ts, server/routes/ethos.ts, client/src/components/missionethossourcepanel.ts, client/src/hooks/use-energy-pipeline.ts, modules/warp/natario-warp.ts",
+      "debug": {
+        "intent_id": "hybrid.warp_ethos_relation",
+        "intent_strategy": "hybrid_explain",
+        "report_mode": false,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true,
+        "deterministic_fallback_used_relation": true,
+        "answer_path": [
+          "intent:hybrid.warp_ethos_relation",
+          "domain:hybrid",
+          "strategy:hybrid_explain",
+          "concept:mission-ethos",
+          "arbiter:hybrid",
+          "clarify:ambiguity",
+          "answer:forced",
+          "citationRepair:skipped(intent)",
+          "citationFallback:sources",
+          "platonic:gates",
+          "relationFallback:deterministic_guard",
+          "citationPersistence:preserved",
+          "moveSelector:retrieve_more",
+          "fallback:RenderPlatonicFallback",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "ambiguous_30_what-s-the-difference-between-routing-and-assembly",
+      "family": "ambiguous_general",
+      "question": "What's the difference between routing and assembly?",
+      "answer": "Minimal artifact: helix ask docs. [docs/knowledge/trees/helix-ask-tree.md] - Evidence: Minimal artifact: helix ask docs. [docs/knowledge/trees/helix-ask-tree.md] (see docs/knowledge/trees/helix-ask-tree.md... In practice, Minimal artifact: helix ask docs. [docs/knowledge/trees/helix-ask-tree.md] (see docs/knowledge/trees/helix-ask-tree.md... Sources: docs/knowledge/trees/helix-ask-tree.md",
+      "debug": {
+        "intent_id": "general.conceptual_define_compare",
+        "intent_strategy": "general_explain",
+        "report_mode": false,
+        "answer_path": [
+          "intent:general.conceptual_define_compare",
+          "domain:general",
+          "strategy:general_explain",
+          "arbiter:repo_grounded",
+          "answer:llm",
+          "citationRepair:skipped(intent)",
+          "citationFallback:sources",
+          "platonic:gates",
+          "answerExtension:appended",
+          "citationPersistence:preserved",
+          "moveSelector:direct_answer",
+          "placeholderFallback:deterministic_contract",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "repo_tech_13_how-does-goal-zone-harness-evaluate-pass-fail-across-seeds",
+      "family": "repo_technical",
+      "question": "How does goal-zone harness evaluate pass/fail across seeds?",
+      "answer": "In practice, score=2.000 | symbol=NatarioWarpResult | file=modules/warp/natario-warp.ts modules/dynamic/gates/index.ts export interface GateEvaluationOptions score=2.824 | symbol=GateEvaluationOptions | file=modules/dyna... In practice, score=2.000 | symbol=NatarioWarpResult | file=modules/warp/natario-warp.ts modules/dynamic/gates/index.ts export interface GateEvaluationOptions score=2.824 | symbol=GateEvaluationOptions | file=modules/dyna... 2. score=2.000 | symbol=NatarioWarpResult | file=modules/warp/natario-warp.ts modules/dynamic/gates/index.ts export interface GateEvaluationOptions score=2.824 | symbol=GateEvaluationOptions | file=modules/dynamic/gates/... Mechanism: In practice, score=2.000 | symbol=NatarioWarpResult | file=modules/warp/natario-warp.ts modules/dynamic/gates/index.ts export interface GateEvaluationOptions score=2.824 | symbol=GateEvaluationOptions | file=modules/dyna... -> coupled constraints and feedback operators -> observable outcomes tied to modules/warp/natario-warp.ts. Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached. [server/services/proposals/engine.ts] Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity. [server/services/proposals/engine.ts] Sources: server/services/proposals/engine.ts, modules/warp/natario-warp.ts, modules/dynamic/gates/index.ts, modules/warp/warp-module.ts, server/energy-pipeline.ts, client/src/hooks/use-energy-pipeline.ts, client/src/lib/whispers/seedWhispers.ts, client/src/components/AlcubierrePanel.tsx",
+      "debug": {
+        "intent_id": "general.fallback",
+        "intent_strategy": "general_explain",
+        "report_mode": false,
+        "relation_dual_domain_ok": true,
+        "answer_path": [
+          "intent:general.fallback",
+          "domain:general",
+          "strategy:general_explain",
+          "arbiter:repo_grounded",
+          "answer:llm",
+          "citationRepair:skipped(intent)",
+          "citationFallback:sources",
+          "platonic:gates",
+          "citationPersistence:preserved",
+          "moveSelector:retrieve_more",
+          "fallback:RenderPlatonicFallback",
+          "qualityFloor:deterministic_contract",
+          "qualityFloor:open_world_expansion",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "relation_03_warp-bubble-ideology-relation-what-is-the-bridge",
+      "family": "relation",
+      "question": "Warp bubble ↔ ideology relation: what is the bridge?",
+      "answer": "In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. [docs/knowledge/warp/warp-bubble.md] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/warp/warp-bubble.md] Sources: docs/knowledge/warp/warp-bubble.md, modules/warp/warp-module.ts, modules/warp/natario-warp.ts, client/src/lib/warp-uniforms-gate.ts, server/energy-pipeline.ts, client/src/components/ideologypanel.ts, server/routes/ethos.ts, client/src/hooks/use-ideology.ts",
+      "debug": {
+        "intent_id": "hybrid.warp_ethos_relation",
+        "intent_strategy": "hybrid_explain",
+        "report_mode": false,
+        "relation_packet_built": true,
+        "relation_dual_domain_ok": true,
+        "deterministic_fallback_used_relation": true,
+        "answer_path": [
+          "intent:hybrid.warp_ethos_relation",
+          "domain:hybrid",
+          "strategy:hybrid_explain",
+          "concept:warp-bubble",
+          "arbiter:hybrid",
+          "clarify:ambiguity",
+          "answer:forced",
+          "citationRepair:skipped(intent)",
+          "platonic:gates",
+          "relationFallback:deterministic_guard",
+          "citationPersistence:preserved",
+          "moveSelector:retrieve_more",
+          "fallback:RenderPlatonicFallback",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "ambiguous_08_what-s-a-good-way-to-summarize-evidence",
+      "family": "ambiguous_general",
+      "question": "What's a good way to summarize evidence?",
+      "answer": "Minimal artifact: whyBelongs schema. [docs/knowledge/trees/certainty-framework-tree.md] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/trees/certainty-framework-tree.md] Sources: docs/knowledge/trees/certainty-framework-tree.md, client/src/components/warprenderinspector.ts, server/instruments/pump-multitone.ts, modules/dynamic/natario-metric.ts, shared/essence-themes.ts, server/services/console-telemetry/summarize.ts, server/qi/qi-monitor.ts, server/routes/orchestrator.ts",
+      "debug": {
+        "intent_id": "general.conceptual_define_compare",
+        "intent_strategy": "general_explain",
+        "report_mode": false,
+        "answer_path": [
+          "intent:general.conceptual_define_compare",
+          "domain:general",
+          "strategy:general_explain",
+          "arbiter:repo_grounded",
+          "answer:llm",
+          "citationRepair:skipped(intent)",
+          "citationFallback:sources",
+          "platonic:gates",
+          "answerExtension:appended",
+          "citationPersistence:preserved",
+          "moveSelector:fail_closed",
+          "fallback:RenderPlatonicFallback",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    },
+    {
+      "prompt_id": "ambiguous_12_what-s-a-clean-way-to-structure-a-short-answer",
+      "family": "ambiguous_general",
+      "question": "What's a clean way to structure a short answer?",
+      "answer": "Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/trees/panel-concepts-tree.md] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/trees/panel-concepts-tree.md] Sources: docs/knowledge/trees/panel-concepts-tree.md, docs/knowledge/trees/panel-registry-tree.md, docs/knowledge/trees/stellar-restoration-tree.md\n\nMissing evidence: add directly relevant repo paths or artifact refs to raise confidence.",
+      "debug": {
+        "intent_id": "general.conceptual_define_compare",
+        "intent_strategy": "general_explain",
+        "report_mode": false,
+        "answer_path": [
+          "intent:general.conceptual_define_compare",
+          "domain:general",
+          "strategy:general_explain",
+          "answer:llm",
+          "citationRepair:skipped(intent)",
+          "platonic:gates",
+          "answerExtension:appended",
+          "citationPersistence:append_sources",
+          "moveSelector:direct_answer",
+          "placeholderFallback:deterministic_contract",
+          "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK"
+        ]
+      },
+      "failures": [],
+      "likely_root_cause": "mixed",
+      "patch_suggestion": "Tighten routing diagnostics and deterministic fallback conditions for this failure signature."
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "run_id": "versatility-1771558290390",
+  "expected_runs": 270,
+  "total_runs": 270,
+  "run_complete": true,
+  "artifact_bundle_paths": {
+    "output_root_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun",
+    "output_run_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390",
+    "summary": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/summary.json",
+    "recommendation": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/recommendation.json",
+    "failures": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/failures.json",
+    "checkpoint": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/checkpoint.json",
+    "prompts": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/prompts.jsonl",
+    "raw_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/raw",
+    "ab_outputs": [],
+    "trace_export": null
+  },
+  "diagnostics": {
+    "rollup": {
+      "report_mode_correct": {
+        "pass": 270,
+        "fail": 0,
+        "unknown": 0
+      },
+      "relation_packet_built": {
+        "pass": 87,
+        "fail": 3,
+        "unknown": 180
+      },
+      "relation_dual_domain_ok": {
+        "pass": 87,
+        "fail": 3,
+        "unknown": 180
+      }
+    }
+  },
+  "top_failure_signatures": [
+    {
+      "key": "intent_mismatch",
+      "count": 3
+    },
+    {
+      "key": "relation_packet_built",
+      "count": 3
+    },
+    {
+      "key": "relation_dual_domain",
+      "count": 3
+    },
+    {
+      "key": "bridge_count_low",
+      "count": 3
+    },
+    {
+      "key": "evidence_count_low",
+      "count": 3
+    }
+  ],
+  "failed_runs": [
+    {
+      "prompt_id": "relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer",
+      "family": "relation",
+      "seed": 7,
+      "temperature": 0.2,
+      "failures": [
+        "intent_mismatch:hybrid.concept_plus_system_mapping",
+        "relation_packet_built:undefined",
+        "relation_dual_domain:undefined",
+        "bridge_count_low:0",
+        "evidence_count_low:0"
+      ],
+      "intent_id": "hybrid.concept_plus_system_mapping",
+      "report_mode": false,
+      "latency_ms": 430,
+      "diagnostics": {
+        "report_mode_correct": true,
+        "relation_packet_built": false,
+        "relation_dual_domain_ok": false
+      },
+      "artifact_bundle_paths": {
+        "output_root_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun",
+        "output_run_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390",
+        "summary": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/summary.json",
+        "recommendation": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/recommendation.json",
+        "failures": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/failures.json",
+        "checkpoint": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/checkpoint.json",
+        "prompts": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/prompts.jsonl",
+        "raw_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/raw",
+        "raw_record": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/raw/versatility-1771558290390-relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer-s7-t0p2.json",
+        "ab_outputs": [],
+        "trace_export": null
+      }
+    },
+    {
+      "prompt_id": "relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer",
+      "family": "relation",
+      "seed": 11,
+      "temperature": 0.2,
+      "failures": [
+        "intent_mismatch:hybrid.concept_plus_system_mapping",
+        "relation_packet_built:undefined",
+        "relation_dual_domain:undefined",
+        "bridge_count_low:0",
+        "evidence_count_low:0"
+      ],
+      "intent_id": "hybrid.concept_plus_system_mapping",
+      "report_mode": false,
+      "latency_ms": 422,
+      "diagnostics": {
+        "report_mode_correct": true,
+        "relation_packet_built": false,
+        "relation_dual_domain_ok": false
+      },
+      "artifact_bundle_paths": {
+        "output_root_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun",
+        "output_run_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390",
+        "summary": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/summary.json",
+        "recommendation": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/recommendation.json",
+        "failures": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/failures.json",
+        "checkpoint": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/checkpoint.json",
+        "prompts": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/prompts.jsonl",
+        "raw_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/raw",
+        "raw_record": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/raw/versatility-1771558290390-relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer-s11-t0p2.json",
+        "ab_outputs": [],
+        "trace_export": null
+      }
+    },
+    {
+      "prompt_id": "relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer",
+      "family": "relation",
+      "seed": 13,
+      "temperature": 0.2,
+      "failures": [
+        "intent_mismatch:hybrid.concept_plus_system_mapping",
+        "relation_packet_built:undefined",
+        "relation_dual_domain:undefined",
+        "bridge_count_low:0",
+        "evidence_count_low:0"
+      ],
+      "intent_id": "hybrid.concept_plus_system_mapping",
+      "report_mode": false,
+      "latency_ms": 421,
+      "diagnostics": {
+        "report_mode_correct": true,
+        "relation_packet_built": false,
+        "relation_dual_domain_ok": false
+      },
+      "artifact_bundle_paths": {
+        "output_root_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun",
+        "output_run_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390",
+        "summary": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/summary.json",
+        "recommendation": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/recommendation.json",
+        "failures": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/failures.json",
+        "checkpoint": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/checkpoint.json",
+        "prompts": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/prompts.jsonl",
+        "raw_dir": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/raw",
+        "raw_record": "/workspace/casimirbot-/artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/raw/versatility-1771558290390-relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer-s13-t0p2.json",
+        "ab_outputs": [],
+        "trace_export": null
+      }
+    }
+  ]
+}

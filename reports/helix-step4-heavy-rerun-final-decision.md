@@ -1,82 +1,102 @@
-NO-GO
+# Step-4 Heavy Rerun Final Decision (Auditable)
 
-## 1) GO/NO-GO verdict
+## 0) Verdict
 **NO-GO**
 
-## 2) Strict threshold table (exact gate)
-| Metric | Threshold | Value | PASS/FAIL |
-|---|---:|---:|---|
-| relation_packet_built_rate | >= 0.95 | 0.9667 | PASS |
-| relation_dual_domain_ok_rate | >= 0.95 | 0.9667 | PASS |
-| report_mode_correct_rate | >= 0.98 | 1.0000 | PASS |
-| citation_presence_rate | >= 0.99 | 1.0000 | PASS |
-| stub_text_detected_rate | == 0.00 | 0.0000 | PASS |
+Rationale: quality metrics improved on the heavy rerun, but provenance is a hard blocker (`decision_grade_ready=false`, provenance gate does not pass) and AB novelty gates fail at both t=0.2 and t=0.35.
 
-## 3) Before/after baseline table vs versatility-1771461446899
-| Metric | Before | After | Delta |
+## 1) Runs and metric sources
+- baseline run id: `versatility-1771461446899`
+  - source: `artifacts/experiments/helix-ask-versatility-research/20260219T023617Z/summary.json` (`latest_matrix_reference` + `rates` + `latency`)
+- heavy rerun run id: `versatility-1771558290390`
+  - source: `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/summary.json`
+  - recommendation source: `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/recommendation.json`
+- AB t=0.2 run id: `2026-02-20T03-36-49-299Z`
+  - source: `artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json`
+- AB t=0.35 run id: `2026-02-20T03-38-46-614Z`
+  - source: `artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json`
+
+## 2) Strict 5-gate table
+| gate | source metric(s) | status | evidence |
+|---|---|---|---|
+| G1: Heavy run completeness | `run_complete`, `completion_rate`, `total_runs=expected_runs` | PASS | `true`, `1.0`, `270=270` |
+| G2: Heavy core quality | `report_mode_correct_rate`, `relation_packet_built_rate`, `citation_presence_rate`, `min_text_length_pass_rate` | PASS | `1.000`, `0.967`, `1.000`, `1.000` |
+| G3: Provenance gate | `provenance.gate_pass` (summary) and `decision_grade_ready` (recommendation) | FAIL (HARD BLOCKER) | `false`; `decision_grade_ready=false` |
+| G4: AB quality gate t=0.2 and t=0.35 | `quality_pass` | PASS | `true` (t=0.2), `true` (t=0.35) |
+| G5: AB novelty gate t=0.2 and t=0.35 | `novelty_pass`, `novel_response_rate` | FAIL | `false` + `0.750` (t=0.2), `false` + `0.750` (t=0.35) |
+
+## 3) Before/after vs baseline `versatility-1771461446899`
+| metric | baseline | heavy rerun | delta |
 |---|---:|---:|---:|
+| intent_id_correct_rate | 0.9333 | 0.9667 | +0.0334 |
+| report_mode_correct_rate | 0.9222 | 1.0000 | +0.0778 |
 | relation_packet_built_rate | 0.8667 | 0.9667 | +0.1000 |
 | relation_dual_domain_ok_rate | 0.8667 | 0.9667 | +0.1000 |
-| report_mode_correct_rate | 0.9222 | 1.0000 | +0.0778 |
 | citation_presence_rate | 0.9667 | 1.0000 | +0.0333 |
-| stub_text_detected_rate | 0.0000 | 0.0000 | +0.0000 |
+| latency_total_p50_ms | 669 | 719 | +50 |
+| latency_total_p95_ms | 1931 | 1996 | +65 |
 
 ## 4) Top failure signatures before/after
-| Rank | Before | After |
-|---:|---|---|
-| 1 | report_mode_mismatch (21) | intent_mismatch (3) |
-| 2 | relation_packet_built (12) | relation_packet_built (3) |
-| 3 | relation_dual_domain (12) | relation_dual_domain (3) |
-| 4 | bridge_count_low (12) | bridge_count_low (3) |
-| 5 | evidence_count_low (12) | evidence_count_low (3) |
+### Before (baseline)
+- `MISSING` (hard counts are not present in an available `summary.json`/`recommendation.json` artifact for baseline run `versatility-1771461446899`).
 
-## 5) 12 representative excerpts (4 relation, 4 repo_technical, 4 ambiguous_general; unique prompt IDs)
-| Family | Prompt ID | Excerpt | Failures |
+### After (heavy rerun)
+- intent_mismatch: 3
+- relation_packet_built: 3
+- relation_dual_domain: 3
+- bridge_count_low: 3
+- evidence_count_low: 3
+
+## 5) 12 representative excerpts (4/4/4, unique prompt IDs)
+Classification rule applied: any excerpt containing `Runtime fallback:` is classified as **failure**.
+
+| family | prompt_id | excerpt (trimmed) | classification |
 |---|---|---|---|
-| relation | relation_01_how-does-a-warp-bubble-fit-in-with-the-mission-ethos | What is warp bubble: docs/knowledge/ethos/mission-ethos.md What is mission ethos: docs/ethos/ideology.json .. How they connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployme... | none |
-| relation | relation_02_explain-the-relation-between-warp-bubble-physics-and-mission-ethos-in-th | The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. [docs/knowledge/ethos/mission-ethos.md] The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. [d... | none |
-| relation | relation_03_warp-bubble-ideology-relation-what-is-the-bridge | In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. [docs/knowledge/warp/warp-bubble.md] In practice, coupled constraints and feedback loops determine how ... | none |
-| relation | relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics | what_is_warp_bubble: modules/warp/warp-module.ts /** * TheoryRefs: * - vanden-broeck-1999: input normalization + clamps for gamma_VdB */ /** * Warp Bubble Casimir Module * Integrates Natário zero-expansion warp bubble ca... | none |
-| repo_technical | repo_tech_01_walk-through-api-agi-ask-routing-from-intent-detection-to-final-answer-c | Runtime fallback: Cannot access 'intentStrategy' before initialization Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md. Runtime fallback: Cannot access 'intentStrategy' before initialization. Mechanism: Runtim... | none |
-| repo_technical | repo_tech_02_how-does-helix-ask-choose-report-mode-vs-hybrid-explain-mode | Notes: The gap between current reasoning guards and full scientific-method rigor is tracked in `docs/helix-ask-scientific-method-gap.md`. 1. Notes: The gap between current reasoning guards and full scientific-method rigo... | none |
-| repo_technical | repo_tech_03_where-are-relation-packet-fields-built-and-surfaced-in-debug-payload | what_is_warp_bubble: client/src/hooks/use-energy-pipeline.ts export interface GreensPayload kind: GreensKind; m: number; // mass parameter for Helmholtz (0 ⇒ Poisson limit) normalize: boolean; phi: Float32Array; // norma... | none |
-| repo_technical | repo_tech_04_explain-evidence-gate-flow-and-where-citation-repair-is-applied | In plain language, Repair Debt Compact means harm creates a repair debt that must be restored, audited, and time-bounded. [docs/knowledge/ethos/repair-debt-compact.md] This is in the ideology scope. [docs/knowledge/ethos... | none |
-| ambiguous_general | ambiguous_01_define-lattice | Runtime fallback: Cannot access 'intentStrategy' before initialization Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md. Runtime fallback: Cannot access 'intentStrategy' before initialization. Mechanism: Runtim... | none |
-| ambiguous_general | ambiguous_02_what-s-a-cavity | In this repo, a cavity is the Casimir/drive cavity mechanism where geometry, gap, and quality factor (Q) control stored energy, loss, and pipeline-level drive constraints. [docs/knowledge/cavity-mechanism.md] - Evidence:... | none |
-| ambiguous_general | ambiguous_03_explain-resonance-in-simple-terms | Resonance and Code-Lattice Tree json"]... [docs/knowledge/trees/resonance-tree.md] Resonance and Code-Lattice Tree json"]... [docs/knowledge/trees/resonance-tree.md] Resonance and Code-Lattice Tree .. [docs/knowledge/tre... | none |
-| ambiguous_general | ambiguous_04_what-is-stability | Runtime fallback: Cannot access 'intentStrategy' before initialization Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md. Runtime fallback: Cannot access 'intentStrategy' before initialization. Mechanism: Runtim... | none |
+| relation | relation_01_how-does-a-warp-bubble-fit-in-with-the-mission-ethos | `What is warp bubble: docs/knowledge/ethos/mission-ethos.md ... Mission ethos constrains warp...` | pass |
+| relation | relation_03_warp-bubble-ideology-relation-what-is-the-bridge | `In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field...` | pass |
+| relation | relation_08_warp-buble-relation-to-ideology-mission-ethos | `...how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints...` | pass |
+| relation | relation_18_warp-ethos-relation-prompt-test-explain-links-and-guardrails | `The warp vessel is a vow to return radiance to the Sun...` | pass |
+| repo_technical | repo_tech_01_walk-through-api-agi-ask-routing-from-intent-detection-to-final-answer-c | `Runtime fallback: Cannot access 'intentStrategy' before initialization...` | **failure (runtime_fallback_error)** |
+| repo_technical | repo_tech_02_how-does-helix-ask-choose-report-mode-vs-hybrid-explain-mode | `Notes: The gap between current reasoning guards and full scientific-method rigor...` | pass |
+| repo_technical | repo_tech_05_how-does-deterministic-fallback-guard-relation-mode-contract-parse-failu | `Timing honesty: if burst < LC, the average claim is not earned...` | pass |
+| repo_technical | repo_tech_11_show-pipeline-stages-captured-in-debug-live-events-for-helix-ask | `Runtime fallback: Cannot access 'intentStrategy' before initialization...` | **failure (runtime_fallback_error)** |
+| ambiguous_general | ambiguous_01_define-lattice | `Runtime fallback: Cannot access 'intentStrategy' before initialization...` | **failure (runtime_fallback_error)** |
+| ambiguous_general | ambiguous_02_what-s-a-cavity | `In this repo, a cavity is the Casimir/drive cavity mechanism where geometry, gap, and quality factor...` | pass |
+| ambiguous_general | ambiguous_04_what-is-stability | `Runtime fallback: Cannot access 'intentStrategy' before initialization...` | **failure (runtime_fallback_error)** |
+| ambiguous_general | ambiguous_05_how-should-i-think-about-uncertainty | `# Uncertainty Mechanics Tree ...` | pass |
 
 ## 6) Provenance status
 - decision_grade_ready: `false`
 - provenance_gate_pass: `false`
+- provenance blocker statement: **Hard blocker** — decision package is not promotion-ready until provenance gate passes (origin/main provenance unavailable in this environment).
 
-## 7) Casimir PASS details
-- traceId: `adapter:c37245f2-90d0-42e0-bd51-d55a740ff8d4`
-- runId: `3512`
+## 7) Artifact path table (`EXISTS`/`MISSING`)
+| artifact | path | status |
+|---|---|---|
+| heavy_summary | `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/summary.json` | EXISTS |
+| heavy_recommendation | `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/recommendation.json` | EXISTS |
+| heavy_failures | `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/failures.json` | EXISTS |
+| heavy_checkpoint | `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/checkpoint.json` | MISSING |
+| heavy_prompts | `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/prompts.jsonl` | MISSING |
+| heavy_raw | `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/raw` | MISSING |
+| ab_t02_summary | `artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json` | EXISTS |
+| ab_t02_recommendation | `artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/recommendation.json` | EXISTS |
+| ab_t035_summary | `artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json` | EXISTS |
+| ab_t035_recommendation | `artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/recommendation.json` | EXISTS |
+| training_trace_export | `artifacts/experiments/helix-step4-heavy-rerun/training-trace-export.jsonl` | EXISTS |
+
+## 8) Casimir verification gate
+- traceId: `adapter:01cde50b-d354-4887-9a85-27339e5d5cbe`
+- runId: `347`
+- verdict: `PASS`
 - certificateHash: `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
-- integrityOk: `True`
+- integrityOk: `true`
 
-## 8) Exact artifact paths
-- heavy_summary: `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771555021364/summary.json`
-- heavy_recommendation: `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771555021364/recommendation.json`
-- heavy_failures: `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771555021364/failures.json`
-- heavy_checkpoint: `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771555021364/checkpoint.json`
-- heavy_prompts: `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771555021364/prompts.jsonl`
-- heavy_raw: `artifacts/experiments/helix-step4-heavy-rerun/versatility-1771555021364/raw`
-- ab_t02_summary: `artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json`
-- ab_t02_recommendation: `artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/recommendation.json`
-- ab_t035_summary: `artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json`
-- ab_t035_recommendation: `artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/recommendation.json`
-- quake_sweep_summary: `artifacts/experiments/helix-ask-quake-weight-tuning/20260220T024255Z/summary.json`
-- training_trace_export: `artifacts/experiments/helix-step4-heavy-rerun/training-trace-export.jsonl`
-
-## 9) Command log with pass/fail markers
-- ⚠️ `git remote show origin / fetch / pull (remote missing in environment)`
-- ✅ `npm ci`
+## 9) Command log
+- ⚠️ `git remote show origin && git fetch --prune` (origin missing in environment)
+- ✅ `HELIX_ASK_VERSATILITY_OUT=artifacts/experiments/helix-step4-heavy-rerun HELIX_ASK_VERSATILITY_REPORT=reports/helix-step4-heavy-rerun.md HELIX_ASK_VERSATILITY_START_SERVER=1 HELIX_ASK_VERSATILITY_SEEDS=7,11,13 HELIX_ASK_VERSATILITY_TEMPS=0.2 HELIX_ASK_VERSATILITY_MAX_RETRIES=3 HELIX_ASK_VERSATILITY_TIMEOUT_MS=15000 HELIX_ASK_VERSATILITY_MAX_CASE_WALL_MS=25000 HELIX_ASK_VERSATILITY_CHECKPOINT_EVERY=10 npm run helix:ask:versatility`
 - ✅ `npm run dev:agi:5173`
-- ✅ `curl http://127.0.0.1:5173/api/ready`
-- ✅ `npm run helix:ask:versatility (heavy 270 runs)`
-- ✅ `npx tsx scripts/helix-ask-utility-ab.ts (t=0.2)`
-- ✅ `npx tsx scripts/helix-ask-utility-ab.ts (t=0.35)`
-- ✅ `npx tsx scripts/helix-ask-quake-weight-tuning.ts`
+- ✅ `curl -sf http://127.0.0.1:5173/api/ready`
+- ✅ `HELIX_ASK_BASE_URL=http://127.0.0.1:5173 HELIX_ASK_AB_OUT=artifacts/experiments/helix-step4-ab-rerun/t02 HELIX_ASK_AB_VARIANT=helix_step4_rerun_t02 HELIX_ASK_AB_TEMP=0.2 HELIX_ASK_AB_SEEDS=7,11,13 npx tsx scripts/helix-ask-utility-ab.ts`
+- ✅ `HELIX_ASK_BASE_URL=http://127.0.0.1:5173 HELIX_ASK_AB_OUT=artifacts/experiments/helix-step4-ab-rerun/t035 HELIX_ASK_AB_VARIANT=helix_step4_rerun_t035 HELIX_ASK_AB_TEMP=0.35 HELIX_ASK_AB_SEEDS=7,11,13 npx tsx scripts/helix-ask-utility-ab.ts`
 - ✅ `npm run casimir:verify -- --pack repo-convergence --url http://127.0.0.1:5173/api/agi/adapter/run --export-url http://127.0.0.1:5173/api/agi/training-trace/export --trace-out artifacts/experiments/helix-step4-heavy-rerun/training-trace-export.jsonl --trace-limit 200 --ci`
