@@ -98,7 +98,8 @@
     "validate:physics:root-leaf": "tsx scripts/validate-physics-root-leaf-manifest.ts",
     "helix:decision:package": "tsx scripts/helix-decision-package.ts",
     "helix:decision:validate": "tsx scripts/helix-decision-validate.ts",
-    "helix:decision:run": "tsx scripts/helix-decision-run.ts"
+    "helix:decision:run": "tsx scripts/helix-decision-run.ts",
+    "validate:agibot:assets": "tsx scripts/validate-agibot-asset-manifest.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",

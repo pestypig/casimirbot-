@@ -203,7 +203,6 @@ describe("trace export route", () => {
       }),
     });
     expect(createResponse.status).toBe(200);
-
     const exportResponse = await fetch(`${baseUrl}/api/agi/training-trace/export?limit=50&tenantId=toe-005`);
     expect(exportResponse.status).toBe(200);
     const raw = await exportResponse.text();
@@ -221,5 +220,69 @@ describe("trace export route", () => {
     expect(match?.calibration?.imu_profile).toBe("imu-baseline-v1");
     expect(match?.calibration?.zero_offset).toBe(0.0125);
   });
+
+  it("rejects malformed calibration packets with deterministic reason", async () => {
+    const createResponse = await fetch(`${baseUrl}/api/agi/training-trace`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        traceId: "toe-005-calibration-malformed",
+        tenantId: "toe-005",
+        pass: true,
+        calibration: {
+          actuator_id: "joint-a1",
+          can_id: "0x101",
+          firmware_version: "fw-1.2.3",
+          // control_mode omitted on purpose
+          zero_offset: 0.0125,
+          imu_profile: "imu-baseline-v1",
+        },
+      }),
+    });
+    expect(createResponse.status).toBe(400);
+    const payload = (await createResponse.json()) as { error?: string; reason?: string };
+    expect(payload.error).toBe("invalid-training-trace");
+    expect(payload.reason).toBe("MALFORMED_CALIBRATION_PACKET");
+  });
+
+  it("exports HIL evidence packet via jsonl", async () => {
+    const createResponse = await fetch(`${baseUrl}/api/agi/training-trace`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        traceId: "toe-005-hil-v2",
+        tenantId: "toe-005",
+        pass: true,
+        hil_packet: {
+          run_id: "hil-run-001",
+          hardware_profile: "agibot-x1-desktop-rig-a",
+          preflight_status: "PASS",
+          estop_liveness_result: "PASS",
+          calibration_ref: "calibration:joint-a1:fw-1.2.3",
+          safety_gate_outcome: "PASS",
+        },
+      }),
+    });
+    expect(createResponse.status).toBe(200);
+    const created = (await createResponse.json()) as { trace?: { hil_packet?: { run_id?: string } } };
+    expect(created.trace?.hil_packet?.run_id).toBe("hil-run-001");
+
+    const exportResponse = await fetch(`${baseUrl}/api/agi/training-trace/export?limit=50&tenantId=toe-005`);
+    expect(exportResponse.status).toBe(200);
+    const raw = await exportResponse.text();
+    const lines = raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    const decoded = lines.map((line) => JSON.parse(line) as {
+      traceId?: string;
+      hil_packet?: { run_id?: string; hardware_profile?: string; safety_gate_outcome?: string };
+    });
+    const match = decoded.filter((entry) => entry.traceId === "toe-005-hil-v2").at(-1);
+    expect(match?.hil_packet?.run_id).toBe("hil-run-001");
+    expect(match?.hil_packet?.hardware_profile).toBe("agibot-x1-desktop-rig-a");
+    expect(match?.hil_packet?.safety_gate_outcome).toBe("PASS");
+  });
+
 
 });

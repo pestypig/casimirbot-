@@ -21,6 +21,13 @@
 - Hardware replay traces proving deterministic preflight-gated execution.
 - Runtime transport conformance tests across AimRT/ROS2/protobuf adapters.
 
+
+## Wave 2 execution traceability
+
+- Canonical prompt-to-commit ledger: `docs/audits/research/agibot-x1-wave2-execution-ledger-2026-02-20.md`.
+- Ledger rows track `prompt_id`, `commit_sha`, changed files, checks, and Casimir metadata for replay auditing.
+- Rebase/squash handling requires deterministic artifact references whenever direct prompt SHAs are rewritten.
+
 ## Casimir verification summary by prompt run
 
 | prompt_id | verdict | firstFail | certificateHash | integrityOk | traceId | runId |

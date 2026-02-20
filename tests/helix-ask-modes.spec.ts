@@ -511,4 +511,91 @@ describe("Helix Ask modes", () => {
     expect(payload.fail_class).toBe("input_contract");
   });
 
+  it("blocks mission mode when preflight motion scope is missing", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "check mission status",
+        mode: "act",
+        sessionId: "modes-preflight-scope-missing",
+      }),
+    });
+    expect(response.status).toBe(400);
+    const payload = (await response.json()) as {
+      fail_reason?: string;
+      fail_class?: string;
+      trace_id?: string;
+      run_id?: string;
+    };
+    expect(payload.fail_reason).toBe("DESKTOP_JOINT_SCOPE_REQUIRED");
+    expect(payload.fail_class).toBe("preflight_gate");
+    expect(typeof payload.trace_id).toBe("string");
+    expect(typeof payload.run_id).toBe("string");
+  });
+
+  it("blocks mission mode on first missing preflight check in fixed order", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "run mission diagnostics",
+        mode: "act",
+        sessionId: "modes-preflight-first-fail",
+        preflight: {
+          motion_scope: "desktop-joint-test-only",
+          calibration_complete: true,
+          imu_baseline_configured: false,
+          estop_ready: false,
+        },
+      }),
+    });
+    expect(response.status).toBe(400);
+    const payload = (await response.json()) as { fail_reason?: string; fail_class?: string };
+    expect(payload.fail_reason).toBe("IMU_BASELINE_NOT_CONFIGURED");
+    expect(payload.fail_class).toBe("preflight_gate");
+  });
+
+  it("rejects mission bridge actuator-level argument fields", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "execute mission bridge",
+        mode: "act",
+        sessionId: "modes-bridge-envelope-forbidden",
+        preflight: {
+          motion_scope: "desktop-joint-test-only",
+          calibration_complete: true,
+          imu_baseline_configured: true,
+          estop_ready: true,
+        },
+        mission_bridge: {
+          contract_version: "agibot.x1.runtime.bridge.v1",
+          trace_id: "bridge-trace-1",
+          command: {
+            name: "navigate",
+            args: {
+              joint_torque: 0.5,
+            },
+          },
+        },
+      }),
+    });
+    expect(response.status).toBe(400);
+    const payload = (await response.json()) as {
+      fail_reason?: string;
+      fail_class?: string;
+      trace_id?: string;
+      run_id?: string;
+      transport?: string;
+    };
+    expect(payload.fail_reason).toBe("FORBIDDEN_CONTROL_PATH");
+    expect(payload.fail_class).toBe("mission_bridge_contract");
+    expect(payload.transport).toBe("aimrt");
+    expect(typeof payload.trace_id).toBe("string");
+    expect(typeof payload.run_id).toBe("string");
+  });
+
+
 });
