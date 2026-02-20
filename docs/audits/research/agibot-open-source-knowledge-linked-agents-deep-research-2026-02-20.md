@@ -43,9 +43,9 @@ This is closely aligned with deterministic-lane engineering:
 
 `X1` development materials similarly emphasize open robot assets (for example BOM/CAD/SOP class artifacts) and connected open code paths for training/inference.
 
-AimRT’s runtime framing and release mechanics map to deterministic replay requirements, including record/playback compatibility and timestamp-related features.
+AimRTâ€™s runtime framing and release mechanics map to deterministic replay requirements, including record/playback compatibility and timestamp-related features.
 
-AGIBOT’s Genie Sim 3.0 messaging also reinforces open simulation workflows and benchmark-oriented reproducibility in embodied AI development.
+AGIBOTâ€™s Genie Sim 3.0 messaging also reinforces open simulation workflows and benchmark-oriented reproducibility in embodied AI development.
 
 ## Simultaneous development and closed-loop workflows
 
@@ -148,7 +148,11 @@ AGIBOT stack language around recording/replay and runtime timing strongly suppor
 
 ## Open-source trails and business-model implications
 
-The thesis that closed frontiers coexist with open-source trails maps well to AGIBOT’s public positioning:
+
+## Evidence-ledger normalization reference
+
+This research narrative is normalized into claim rows with stable IDs in `docs/audits/research/agibot-kla-evidence-ledger-2026-02-20.md` for machine-auditable execution planning and deterministic follow-up tracking.
+The thesis that closed frontiers coexist with open-source trails maps well to AGIBOTâ€™s public positioning:
 
 - open runtime and tooling layers lower integration barriers,
 - open assets and simulation workflows expand ecosystem participation,

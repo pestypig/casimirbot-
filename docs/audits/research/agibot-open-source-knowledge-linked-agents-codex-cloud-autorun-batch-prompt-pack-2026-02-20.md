@@ -322,3 +322,7 @@ If you want a one-message Codex run without per-prompt manual restarts, paste th
 ```text
 Treat Prompt 0..8 as required phases from this file. Execute sequentially, one commit per phase, and continue automatically after each successful Casimir PASS.
 ```
+
+## Template companion
+
+Reusable run templates for future waves are published at `docs/research/agibot-codex-cloud-runner-templates-2026-02-20.md`.
