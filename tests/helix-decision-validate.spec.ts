@@ -238,10 +238,10 @@ describe("helix decision validate", () => {
 });
 
 describe("helix decision package", () => {
-  it("heavy role lock rejects precheck candidate", () => {
+  it("heavy role lock rejects embedded precheck marker candidate", () => {
     const dir = mk();
     writePackageFixtureSet(dir);
-    writeJson(path.join(dir, "custom/precheck/summary.json"), {
+    writeJson(path.join(dir, "custom/heavy-precheck-run/summary.json"), {
       run_id: "bad-heavy",
       run_complete: true,
       total_runs: 300,
@@ -254,9 +254,23 @@ describe("helix decision package", () => {
       },
       provenance: { gate_pass: true, branch: "unknown", head: "unknown", originMain: null, aheadBehind: null, warnings: [] },
     });
-    const out = runTsx(dir, "scripts/helix-decision-package.ts", ["--heavy", "custom/precheck/summary.json"]);
+    const out = runTsx(dir, "scripts/helix-decision-package.ts", ["--heavy", "custom/heavy-precheck-run/summary.json"]);
     expect(out.status).not.toBe(0);
-    expect(`${out.stdout}${out.stderr}`).toContain("required_source_invalid_role:heavy:custom/precheck/summary.json");
+    expect(`${out.stdout}${out.stderr}`).toContain("required_source_invalid_role:heavy:custom/heavy-precheck-run/summary.json");
+  });
+
+  it("removes stale package outputs when package generation fails", () => {
+    const dir = mk();
+    writePackageFixtureSet(dir);
+    for (const name of ["helix-decision-package.json", "helix-decision-package.md", "helix-decision-inputs.json"]) {
+      fs.writeFileSync(path.join(dir, "reports", name), "stale");
+      expect(fs.existsSync(path.join(dir, "reports", name))).toBe(true);
+    }
+    const out = runTsx(dir, "scripts/helix-decision-package.ts", ["--heavy", "custom/heavy-precheck-run/summary.json"]);
+    expect(out.status).not.toBe(0);
+    for (const name of ["helix-decision-package.json", "helix-decision-package.md", "helix-decision-inputs.json"]) {
+      expect(fs.existsSync(path.join(dir, "reports", name))).toBe(false);
+    }
   });
 
   it("fails on provenance mismatch before writing package", () => {
@@ -280,6 +294,8 @@ describe("helix decision package", () => {
     expect(out.status).not.toBe(0);
     expect(`${out.stdout}${out.stderr}`).toContain("required_source_provenance_mismatch");
     expect(fs.existsSync(path.join(dir, "reports/helix-decision-package.json"))).toBe(false);
+    expect(fs.existsSync(path.join(dir, "reports/helix-decision-package.md"))).toBe(false);
+    expect(fs.existsSync(path.join(dir, "reports/helix-decision-inputs.json"))).toBe(false);
   });
 
   it("writes decision inputs manifest with resolved paths and hashes", () => {
