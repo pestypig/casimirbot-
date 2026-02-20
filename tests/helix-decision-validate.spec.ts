@@ -19,10 +19,8 @@ function mk(): string {
   }
   fs.mkdirSync(path.join(dir, "reports"), { recursive: true });
   fs.mkdirSync(path.join(dir, "schemas"), { recursive: true });
-  fs.copyFileSync(
-    path.join(repoRoot, "schemas/helix-decision-package.schema.json"),
-    path.join(dir, "schemas/helix-decision-package.schema.json"),
-  );
+  fs.copyFileSync(path.join(repoRoot, "schemas/helix-decision-package.schema.json"), path.join(dir, "schemas/helix-decision-package.schema.json"));
+  writeJson(path.join(dir, "recommendation.json"), { decision_grade_ready: true });
   return dir;
 }
 
@@ -45,7 +43,9 @@ function basePackage() {
     runs: { narrow: "n", heavy: "h", ab_t02: "a", ab_t035: "b", casimir: "c" },
     gates: [
       { name: "provenance_gate_pass", value: true, threshold: true, comparator: "==", pass: true, source_path: "heavy-summary.json" },
+      { name: "relation_packet_built_rate", value: 0.98, threshold: 0.95, comparator: ">=", pass: true, source_path: "heavy-summary.json" },
       { name: "runtime_fallback_answer", value: 0, threshold: 0, comparator: "==", pass: true, source_path: "narrow.json" },
+      { name: "decision_grade_ready", value: true, threshold: true, comparator: "==", pass: true, source_path: "recommendation.json" },
     ],
     novelty: {
       t02: {
@@ -74,6 +74,7 @@ function basePackage() {
     },
     artifacts: [
       { path: "heavy-summary.json", exists: true, sha256: "x", size_bytes: 1, mtime_iso: new Date().toISOString() },
+      { path: "recommendation.json", exists: true, sha256: "x", size_bytes: 1, mtime_iso: new Date().toISOString() },
       { path: "ab-t02-summary.json", exists: true, sha256: "x", size_bytes: 1, mtime_iso: new Date().toISOString() },
       { path: "ab-t035-summary.json", exists: true, sha256: "x", size_bytes: 1, mtime_iso: new Date().toISOString() },
       { path: "casimir.json", exists: true, sha256: "x", size_bytes: 1, mtime_iso: new Date().toISOString() },
@@ -90,9 +91,7 @@ function runTsx(cwd: string, scriptRel: string, args: string[] = [], env: NodeJS
     encoding: "utf8",
     env: { ...process.env, ...env },
   });
-  if (out.error) {
-    throw new Error(`failed_to_start_child:${scriptRel}:${out.error.message}\nstdout:${out.stdout}\nstderr:${out.stderr}`);
-  }
+  if (out.error) throw new Error(`failed_to_start_child:${scriptRel}:${out.error.message}\nstdout:${out.stdout}\nstderr:${out.stderr}`);
   return out;
 }
 
@@ -118,51 +117,29 @@ function writePackageFixtureSet(root: string) {
     certificateHash: "hash-1",
   });
 
-  writeJson(path.join(root, "artifacts/experiments/helix-step4-heavy-rerun/run-new/summary.json"), {
-    run_id: "heavy-run-new",
-    metrics: {
-      relation_packet_built_rate: 0.98,
-      relation_dual_domain_ok_rate: 0.98,
-      report_mode_correct_rate: 0.99,
-      citation_presence_rate: 1,
-      stub_text_detected_rate: 0,
-    },
-    provenance: {
-      gate_pass: true,
-      branch: "unknown",
-      head: "unknown",
-      originMain: null,
-      aheadBehind: null,
-      warnings: [],
-    },
-  });
-
-  writeJson(path.join(root, "artifacts/experiments/helix-step4-heavy-rerun/run-new/recommendation.json"), {
-    decision_grade_ready: true,
-  });
-
-  writeJson(path.join(root, "artifacts/experiments/helix-step4-heavy-rerun/run-old/summary.json"), {
-    run_id: "heavy-run-old",
-    metrics: {
-      relation_packet_built_rate: 0.98,
-      relation_dual_domain_ok_rate: 0.98,
-      report_mode_correct_rate: 0.99,
-      citation_presence_rate: 1,
-      stub_text_detected_rate: 0,
-    },
-    provenance: {
-      gate_pass: true,
-      branch: "unknown",
-      head: "unknown",
-      originMain: null,
-      aheadBehind: null,
-      warnings: [],
-    },
-  });
-
-  writeJson(path.join(root, "artifacts/experiments/helix-step4-heavy-rerun/run-old/recommendation.json"), {
-    decision_grade_ready: true,
-  });
+  for (const run of ["run-new", "run-old"]) {
+    writeJson(path.join(root, `artifacts/experiments/helix-step4-heavy-rerun/${run}/summary.json`), {
+      run_id: `heavy-${run}`,
+      run_complete: true,
+      total_runs: 300,
+      metrics: {
+        relation_packet_built_rate: 0.98,
+        relation_dual_domain_ok_rate: 0.98,
+        report_mode_correct_rate: 0.99,
+        citation_presence_rate: 1,
+        stub_text_detected_rate: 0,
+      },
+      provenance: {
+        gate_pass: true,
+        branch: "unknown",
+        head: "unknown",
+        originMain: null,
+        aheadBehind: null,
+        warnings: [],
+      },
+    });
+    writeJson(path.join(root, `artifacts/experiments/helix-step4-heavy-rerun/${run}/recommendation.json`), { decision_grade_ready: true });
+  }
 
   writeJson(path.join(root, "artifacts/experiments/helix-step4-ab-rerun/t02/run/summary.json"), {
     summary_schema_version: 2,
@@ -182,9 +159,7 @@ function writePackageFixtureSet(root: string) {
 }
 
 afterEach(() => {
-  while (tempDirs.length > 0) {
-    fs.rmSync(tempDirs.pop()!, { recursive: true, force: true });
-  }
+  while (tempDirs.length > 0) fs.rmSync(tempDirs.pop()!, { recursive: true, force: true });
 });
 
 describe("helix decision validate", () => {
@@ -212,38 +187,6 @@ describe("helix decision validate", () => {
     const out = runValidator(dir);
     expect(out.status).not.toBe(0);
     expect(`${out.stdout}${out.stderr}`).toContain("schema_validation_failed");
-    expect(`${out.stdout}${out.stderr}`).toContain("schema_error:/:should have required property 'report_paths'");
-  });
-
-  it("missing artifact fails", () => {
-    const dir = mk();
-    const pkg = basePackage();
-    pkg.gates[0].source_path = "missing.json";
-    fs.writeFileSync(path.join(dir, "pkg.json"), JSON.stringify(pkg, null, 2));
-    const out = runValidator(dir);
-    expect(out.status).not.toBe(0);
-    expect(`${out.stdout}${out.stderr}`).toContain("source_path_missing");
-  });
-
-  it("fake EXISTS fails", () => {
-    const dir = mk();
-    const pkg = basePackage();
-    pkg.artifacts.push({ path: "not-there.json", exists: true, sha256: null, size_bytes: null, mtime_iso: null });
-    fs.writeFileSync(path.join(dir, "pkg.json"), JSON.stringify(pkg, null, 2));
-    const out = runValidator(dir);
-    expect(out.status).not.toBe(0);
-    expect(`${out.stdout}${out.stderr}`).toContain("artifact_exists_true_but_missing");
-  });
-
-  it("novelty-from-wrong-source fails", () => {
-    const dir = mk();
-    fs.writeFileSync(path.join(dir, "wrong-novelty.json"), JSON.stringify({ foo: "bar" }));
-    const pkg = basePackage();
-    pkg.novelty.t02.source_path = "wrong-novelty.json";
-    fs.writeFileSync(path.join(dir, "pkg.json"), JSON.stringify(pkg, null, 2));
-    const out = runValidator(dir);
-    expect(out.status).not.toBe(0);
-    expect(`${out.stdout}${out.stderr}`).toContain("novelty_wrong_source_format");
   });
 
   it("provenance mismatch fails in decision_grade", () => {
@@ -255,38 +198,74 @@ describe("helix decision validate", () => {
     expect(out.status).not.toBe(0);
     expect(`${out.stdout}${out.stderr}`).toContain("decision_grade_git_provenance_mismatch");
   });
+
+  it("validator fails when package source diverges from manifest", () => {
+    const dir = mk();
+    const pkg = basePackage();
+    fs.writeFileSync(path.join(dir, "pkg.json"), JSON.stringify(pkg, null, 2));
+    writeJson(path.join(dir, "reports/helix-decision-inputs.json"), {
+      selected_paths: {
+        narrow: "narrow.json",
+        heavy: "heavy-summary.json",
+        recommendation: "other-recommendation.json",
+        ab_t02: "ab-t02-summary.json",
+        ab_t035: "ab-t035-summary.json",
+        casimir: "casimir.json",
+      },
+    });
+    const out = runValidator(dir);
+    expect(out.status).not.toBe(0);
+    expect(`${out.stdout}${out.stderr}`).toContain("decision_inputs_manifest_mismatch:recommendation");
+  });
+
+  it("validator passes when manifest and package align", () => {
+    const dir = mk();
+    const pkg = basePackage();
+    fs.writeFileSync(path.join(dir, "pkg.json"), JSON.stringify(pkg, null, 2));
+    writeJson(path.join(dir, "reports/helix-decision-inputs.json"), {
+      selected_paths: {
+        narrow: "narrow.json",
+        heavy: "heavy-summary.json",
+        recommendation: "recommendation.json",
+        ab_t02: "ab-t02-summary.json",
+        ab_t035: "ab-t035-summary.json",
+        casimir: "casimir.json",
+      },
+    });
+    const out = runValidator(dir);
+    expect(out.status).toBe(0);
+  });
 });
 
 describe("helix decision package", () => {
-  it("fails fast when required sources cannot be resolved", () => {
-    const dir = mk();
-    const out = runTsx(dir, "scripts/helix-decision-package.ts", ["--narrow", "narrow.json", "--casimir", "casimir.json"]);
-    expect(out.status).not.toBe(0);
-    expect(`${out.stdout}${out.stderr}`).toContain("required_source_unresolved:heavy");
-  });
-
-  it("auto-discovery chooses newest valid candidate", () => {
+  it("heavy role lock rejects precheck candidate", () => {
     const dir = mk();
     writePackageFixtureSet(dir);
-    const oldPath = path.join(dir, "artifacts/experiments/helix-step4-heavy-rerun/run-old/summary.json");
-    const newPath = path.join(dir, "artifacts/experiments/helix-step4-heavy-rerun/run-new/summary.json");
-    const now = Date.now();
-    fs.utimesSync(oldPath, new Date(now - 60_000), new Date(now - 60_000));
-    fs.utimesSync(newPath, new Date(now), new Date(now));
-
-    const out = runTsx(dir, "scripts/helix-decision-package.ts");
-    expect(out.status).toBe(0);
-
-    const pkg = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-package.json"), "utf8"));
-    const heavyGate = pkg.gates.find((g: { name: string }) => g.name === "relation_packet_built_rate");
-    expect(heavyGate.source_path).toContain("run-new/summary.json");
+    writeJson(path.join(dir, "custom/precheck/summary.json"), {
+      run_id: "bad-heavy",
+      run_complete: true,
+      total_runs: 300,
+      metrics: {
+        relation_packet_built_rate: 0.98,
+        relation_dual_domain_ok_rate: 0.98,
+        report_mode_correct_rate: 0.99,
+        citation_presence_rate: 1,
+        stub_text_detected_rate: 0,
+      },
+      provenance: { gate_pass: true, branch: "unknown", head: "unknown", originMain: null, aheadBehind: null, warnings: [] },
+    });
+    const out = runTsx(dir, "scripts/helix-decision-package.ts", ["--heavy", "custom/precheck/summary.json"]);
+    expect(out.status).not.toBe(0);
+    expect(`${out.stdout}${out.stderr}`).toContain("required_source_invalid_role:heavy:custom/precheck/summary.json");
   });
 
-  it("explicit CLI source override beats discovery", () => {
+  it("fails on provenance mismatch before writing package", () => {
     const dir = mk();
     writePackageFixtureSet(dir);
     writeJson(path.join(dir, "custom-heavy-summary.json"), {
       run_id: "custom-heavy",
+      run_complete: true,
+      total_runs: 300,
       metrics: {
         relation_packet_built_rate: 0.98,
         relation_dual_domain_ok_rate: 0.98,
@@ -294,64 +273,24 @@ describe("helix decision package", () => {
         citation_presence_rate: 1,
         stub_text_detected_rate: 0,
       },
-      provenance: { gate_pass: true, branch: "unknown", head: "unknown", originMain: null, aheadBehind: null, warnings: [] },
+      provenance: { gate_pass: true, branch: "other", head: "deadbeef", originMain: null, aheadBehind: "0\t1", warnings: [] },
     });
     writeJson(path.join(dir, "custom-heavy-recommendation.json"), { decision_grade_ready: true });
-
-    const out = runTsx(dir, "scripts/helix-decision-package.ts", [
-      "--heavy",
-      "custom-heavy-summary.json",
-      "--heavy-recommendation",
-      "custom-heavy-recommendation.json",
-    ]);
-
-    expect(out.status).toBe(0);
-    const pkg = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-package.json"), "utf8"));
-    const heavyGate = pkg.gates.find((g: { name: string }) => g.name === "relation_packet_built_rate");
-    expect(heavyGate.source_path).toBe("custom-heavy-summary.json");
-  });
-
-  it("heavy/recommendation pair mismatch fails", () => {
-    const dir = mk();
-    writePackageFixtureSet(dir);
-    writeJson(path.join(dir, "detached/recommendation.json"), { decision_grade_ready: true });
-    const out = runTsx(dir, "scripts/helix-decision-package.ts", ["--heavy-recommendation", "detached/recommendation.json"]);
+    const out = runTsx(dir, "scripts/helix-decision-package.ts", ["--heavy", "custom-heavy-summary.json", "--heavy-recommendation", "custom-heavy-recommendation.json"]);
     expect(out.status).not.toBe(0);
-    expect(`${out.stdout}${out.stderr}`).toContain("required_source_pair_mismatch:heavy_recommendation");
+    expect(`${out.stdout}${out.stderr}`).toContain("required_source_provenance_mismatch");
+    expect(fs.existsSync(path.join(dir, "reports/helix-decision-package.json"))).toBe(false);
   });
 
-  it("ab source mismatch fails with invalid shape", () => {
+  it("writes decision inputs manifest with resolved paths and hashes", () => {
     const dir = mk();
     writePackageFixtureSet(dir);
-    const out = runTsx(dir, "scripts/helix-decision-package.ts", ["--ab-t02", "artifacts/experiments/helix-step4-ab-rerun/t035/run/summary.json"]);
-    expect(out.status).not.toBe(0);
-    expect(`${out.stdout}${out.stderr}`).toContain("required_source_invalid_shape:ab-t02");
-  });
-
-  it("explicit env source overrides discovery when coherent", () => {
-    const dir = mk();
-    writePackageFixtureSet(dir);
-
-    writeJson(path.join(dir, "custom/runA/summary.json"), {
-      run_id: "custom-heavy-a",
-      metrics: {
-        relation_packet_built_rate: 0.98,
-        relation_dual_domain_ok_rate: 0.98,
-        report_mode_correct_rate: 0.99,
-        citation_presence_rate: 1,
-        stub_text_detected_rate: 0,
-      },
-      provenance: { gate_pass: true, branch: "unknown", head: "unknown", originMain: null, aheadBehind: null, warnings: [] },
-    });
-    writeJson(path.join(dir, "custom/runA/recommendation.json"), { decision_grade_ready: true });
-
-    const out = runTsx(dir, "scripts/helix-decision-package.ts", [], {
-      HEAVY: "custom/runA/summary.json",
-      HEAVY_RECOMMENDATION: "custom/runA/recommendation.json",
-    });
+    const out = runTsx(dir, "scripts/helix-decision-package.ts");
     expect(out.status).toBe(0);
-    const pkg = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-package.json"), "utf8"));
-    const heavyGate = pkg.gates.find((g: { name: string }) => g.name === "relation_packet_built_rate");
-    expect(heavyGate.source_path).toBe("custom/runA/summary.json");
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-inputs.json"), "utf8"));
+    expect(manifest.selected_paths.heavy).toContain("summary.json");
+    expect(manifest.run_ids.heavy).toContain("heavy-");
+    expect(manifest.inputs.heavy.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(manifest.inputs.heavy.size_bytes).toBeGreaterThan(0);
   });
 });

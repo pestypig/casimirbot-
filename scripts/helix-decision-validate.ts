@@ -30,6 +30,32 @@ function isUtilityAbSummary(obj: any): boolean {
   );
 }
 
+function normalizeAheadBehind(raw: any): { ahead: number; behind: number } | null {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    const parts = raw
+      .trim()
+      .split(/\s+/)
+      .map((v) => Number(v));
+    if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+      return { ahead: parts[1], behind: parts[0] };
+    }
+    return null;
+  }
+  if (typeof raw === "object") {
+    const ahead = Number(raw.ahead ?? raw.ahead_count ?? Number.NaN);
+    const behind = Number(raw.behind ?? raw.behind_count ?? Number.NaN);
+    return Number.isFinite(ahead) && Number.isFinite(behind) ? { ahead, behind } : null;
+  }
+  return null;
+}
+
+function equalAheadBehind(a: { ahead: number; behind: number } | null, b: { ahead: number; behind: number } | null): boolean {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return a.ahead === b.ahead && a.behind === b.behind;
+}
+
 const failures: string[] = [];
 let pkg: any = null;
 let schema: any = null;
@@ -94,6 +120,27 @@ if (pkg && schema) {
     }
   }
 
+  const manifestPath = "reports/helix-decision-inputs.json";
+  if (exists(manifestPath)) {
+    try {
+      const manifest = readJson(manifestPath);
+      const selected = manifest?.selected_paths;
+      const fieldChecks: Array<[string, any, any]> = [
+        ["narrow", selected?.narrow ?? null, (pkg.gates ?? []).find((g: any) => g.name === "runtime_fallback_answer")?.source_path ?? null],
+        ["heavy", selected?.heavy ?? null, (pkg.gates ?? []).find((g: any) => g.name === "relation_packet_built_rate")?.source_path ?? null],
+        ["recommendation", selected?.recommendation ?? null, (pkg.gates ?? []).find((g: any) => g.name === "decision_grade_ready")?.source_path ?? null],
+        ["ab_t02", selected?.ab_t02 ?? null, pkg.novelty?.t02?.source_path ?? null],
+        ["ab_t035", selected?.ab_t035 ?? null, pkg.novelty?.t035?.source_path ?? null],
+        ["casimir", selected?.casimir ?? null, pkg.casimir?.source_path ?? null],
+      ];
+      for (const [field, expected, actual] of fieldChecks) {
+        if ((expected ?? null) !== (actual ?? null)) failures.push(`decision_inputs_manifest_mismatch:${field}`);
+      }
+    } catch (err) {
+      failures.push(`decision_inputs_manifest_unreadable:${String(err)}`);
+    }
+  }
+
   if (pkg.evaluation_tier === "decision_grade") {
     if (!(pkg.casimir?.verdict === "PASS" && pkg.casimir?.integrityOk === true)) {
       failures.push("decision_grade_requires_casimir_pass_integrity");
@@ -110,12 +157,11 @@ if (pkg && schema) {
         const mismatch: string[] = [];
         if ((p.branch ?? null) !== (pkg.git.branch ?? null)) mismatch.push("branch");
         if ((p.head ?? null) !== (pkg.git.head ?? null)) mismatch.push("head");
-        if ((p.originMain ?? null) !== (pkg.git.origin_main ?? null)) mismatch.push("origin_main");
-        const ab = p.aheadBehind ?? null;
-        if (
-          (ab?.ahead ?? null) !== (pkg.git.ahead_behind?.ahead ?? null) ||
-          (ab?.behind ?? null) !== (pkg.git.ahead_behind?.behind ?? null)
-        ) {
+        const originMain = (p.originMain ?? p.origin_main ?? null) as string | null;
+        if (originMain !== (pkg.git.origin_main ?? null)) mismatch.push("origin_main");
+        const ab = normalizeAheadBehind(p.aheadBehind ?? p.ahead_behind ?? null);
+        const expectedAb = normalizeAheadBehind(pkg.git.ahead_behind ?? null);
+        if (!equalAheadBehind(ab, expectedAb)) {
           mismatch.push("ahead_behind");
         }
         if (mismatch.length > 0) failures.push(`decision_grade_git_provenance_mismatch:${mismatch.join(",")}`);
