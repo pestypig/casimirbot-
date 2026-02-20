@@ -89,6 +89,49 @@ describe("helix ask versatility diagnostics", () => {
     expect(failures).toContain("runtime_fallback_answer");
     expect(failures).toContain("runtime_tdz_intentStrategy");
   });
+
+  it("classifies runtime fallback and intentProfile TDZ answers as failures", () => {
+    const failures = __testOnlyEvaluateFailures(
+      {
+        family: "repo_technical",
+        prompt: "Where is ask route logic?",
+        expected_report_mode: false,
+      } as any,
+      {
+        status: 200,
+        latency_ms: 31,
+        payload: {
+          text: "Runtime fallback: Cannot access 'intentProfile' before initialization\n\nSources: server/routes/agi.plan.ts",
+          report_mode: false,
+          debug: { report_mode: false },
+        },
+      } as any,
+    );
+
+    expect(failures).toContain("runtime_fallback_answer");
+    expect(failures).toContain("runtime_tdz_intentProfile");
+  });
+
+  it("treats runtime fallback excerpts as failures", () => {
+    const failures = __testOnlyEvaluateFailures(
+      {
+        family: "repo_technical",
+        prompt: "Where is ask route logic?",
+        expected_report_mode: false,
+      } as any,
+      {
+        status: 200,
+        latency_ms: 29,
+        payload: {
+          text: "Observed runtime fallback excerpt in logs.\n\nSources: server/routes/agi.plan.ts",
+          report_mode: false,
+          debug: { report_mode: false },
+        },
+      } as any,
+    );
+
+    expect(failures).toContain("runtime_fallback_answer");
+  });
   it("rolls up pass/fail/unknown counts for required diagnostics", () => {
     const rollup = toDiagnosticRollup([
       {

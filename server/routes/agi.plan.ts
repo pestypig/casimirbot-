@@ -18128,20 +18128,6 @@ const executeHelixAsk = async ({
         "decompose_multi_slot_prompt",
       );
     }
-    const nonReportIntentHardGuard =
-      reportDecision.enabled &&
-      reportDecision.reason !== "explicit_report_request" &&
-      intentProfile.strategy !== "constraint_report";
-    if (nonReportIntentHardGuard) {
-      reportDecision = {
-        ...reportDecision,
-        enabled: false,
-        reason: "non_report_intent_guard",
-        blockCount: 1,
-      };
-      answerPath.push("policy:report_mode_non_report_guard");
-    }
-
     if (debugPayload) {
       debugPayload.report_mode = reportDecision.enabled;
       debugPayload.report_mode_reason = reportDecision.reason;
@@ -19348,6 +19334,19 @@ const executeHelixAsk = async ({
     let intentTier = intentProfile.tier;
     let intentSecondaryTier = intentProfile.secondaryTier;
     let intentStrategy = intentProfile.strategy;
+    const nonReportIntentHardGuard =
+      reportDecision.enabled &&
+      reportDecision.reason !== "explicit_report_request" &&
+      intentStrategy !== "constraint_report";
+    if (nonReportIntentHardGuard) {
+      reportDecision = {
+        ...reportDecision,
+        enabled: false,
+        reason: "non_report_intent_guard",
+        blockCount: 1,
+      };
+      answerPath.push("policy:report_mode_non_report_guard");
+    }
     let formatSpec = resolveHelixAskFormat(baseQuestion, intentProfile, debugEnabled);
     if (hasTwoParagraphContract(baseQuestion)) {
       formatSpec = { format: "compare", stageTags: false };
