@@ -127,28 +127,34 @@ function resolveSources(overrides: Partial<SourceMap>): SourceMap {
     return value;
   };
 
+  const heavy = fromOverride("heavy") ?? newestMatching(
+    ["artifacts/experiments/helix-step4-heavy-rerun", "artifacts/experiments", "artifacts"],
+    (relPath) => relPath.endsWith("/summary.json"),
+    (doc, relPath) => {
+      const lower = relPath.toLowerCase();
+      if (lower.includes("narrow") || lower.includes("precheck") || lower.includes("ab-rerun")) return false;
+      const metrics = doc.metrics as Record<string, unknown> | undefined;
+      const provenance = doc.provenance as Record<string, unknown> | undefined;
+      return typeof metrics?.relation_packet_built_rate === "number" && typeof provenance === "object";
+    },
+  );
+
+  const recommendation = fromOverride("recommendation") ?? (() => {
+    if (!heavy) return null;
+    const sibling = path.posix.join(path.posix.dirname(heavy), "recommendation.json");
+    const siblingDoc = tryReadJson(sibling);
+    if (!siblingDoc || typeof siblingDoc.decision_grade_ready !== "boolean") return null;
+    return sibling;
+  })();
+
   const resolved: SourceMap = {
     narrow: fromOverride("narrow") ?? newestMatching(
       ["reports", "artifacts/experiments", "artifacts"],
       (relPath) => relPath.endsWith("/helix-self-tune-gate-summary.json") || relPath === "reports/helix-self-tune-gate-summary.json" || relPath.toLowerCase().includes("narrow") && relPath.endsWith("/summary.json"),
       (doc) => typeof doc.strict_gates === "object",
     ),
-    heavy: fromOverride("heavy") ?? newestMatching(
-      ["artifacts/experiments/helix-step4-heavy-rerun", "artifacts/experiments", "artifacts"],
-      (relPath) => relPath.endsWith("/summary.json"),
-      (doc, relPath) => {
-        const lower = relPath.toLowerCase();
-        if (lower.includes("narrow") || lower.includes("precheck") || lower.includes("ab-rerun")) return false;
-        const metrics = doc.metrics as Record<string, unknown> | undefined;
-        const provenance = doc.provenance as Record<string, unknown> | undefined;
-        return typeof metrics?.relation_packet_built_rate === "number" && typeof provenance === "object";
-      },
-    ),
-    recommendation: fromOverride("recommendation") ?? newestMatching(
-      ["artifacts/experiments/helix-step4-heavy-rerun", "artifacts/experiments", "artifacts"],
-      (relPath) => relPath.endsWith("/recommendation.json"),
-      (doc) => typeof doc.decision_grade_ready === "boolean",
-    ),
+    heavy,
+    recommendation,
     ab_t02: fromOverride("ab_t02") ?? newestMatching(
       ["artifacts/experiments/helix-step4-ab-rerun", "artifacts/experiments", "artifacts"],
       (relPath) => relPath.endsWith("/summary.json"),
