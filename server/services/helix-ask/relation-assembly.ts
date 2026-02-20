@@ -716,9 +716,30 @@ export function ensureRelationAssemblyPacketFallback(
   question: string,
 ): RelationAssemblyPacket {
   const normalizedQuestion = String(question || packet?.question || "").trim() || "How does warp relate to mission ethos?";
-  const normalizedEvidence = (packet?.evidence ?? []).filter((entry) =>
+  const seededEvidence = (packet?.evidence ?? []).filter((entry) =>
     Boolean(entry?.evidence_id && entry?.path && entry?.span && entry?.snippet && entry?.domain),
   );
+  const hasWarpEvidence = seededEvidence.some((entry) => entry.domain === "warp");
+  const hasEthosEvidence = seededEvidence.some((entry) => entry.domain === "ethos");
+  const normalizedEvidence = [...seededEvidence];
+  if (!hasWarpEvidence) {
+    normalizedEvidence.push({
+      evidence_id: buildEvidenceId("docs/knowledge/warp/warp-bubble.md", "L1-L1"),
+      path: "docs/knowledge/warp/warp-bubble.md",
+      span: "L1-L1",
+      snippet: RELATION_PACKET_FALLBACK_DEFINITIONS.warp_definition,
+      domain: "warp",
+    });
+  }
+  if (!hasEthosEvidence) {
+    normalizedEvidence.push({
+      evidence_id: buildEvidenceId("docs/ethos/ideology.json", "L1-L1"),
+      path: "docs/ethos/ideology.json",
+      span: "L1-L1",
+      snippet: RELATION_PACKET_FALLBACK_DEFINITIONS.ethos_definition,
+      domain: "ethos",
+    });
+  }
   const normalizedSourceMap = Object.fromEntries(
     normalizedEvidence
       .map((entry) => [entry.evidence_id, toCitation(entry.path, entry.span)] as const)

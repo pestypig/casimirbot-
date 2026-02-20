@@ -252,6 +252,16 @@ describe("HELIX relation second-pass deterministic policy", () => {
     expect(secondSkip).toEqual({ shouldAttempt: false, skippedReason: "already_attempted" });
   });
 
+
+  it("forces one deterministic retry for dual-domain minimums even when move is not eligible", () => {
+    const forcedRetry = decideRelationSecondPassAttempt({
+      selectedMove: "clarify",
+      deficits: { bridgeDeficit: false, evidenceDeficit: false, dualDomainDeficit: true },
+      enforceMinimums: true,
+    });
+    expect(forcedRetry).toEqual({ shouldAttempt: true });
+  });
+
   it("computes deterministic second-pass deltas from recomputed relation fields", () => {
     const delta = computeRelationSecondPassDelta({
       before: { bridgeCount: 1, evidenceCount: 2, dualDomainOk: false },

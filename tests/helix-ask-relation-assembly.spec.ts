@@ -231,6 +231,27 @@ describe("relation assembly packet", () => {
     existsSpy.mockRestore();
   });
 
+
+  it("builds deterministic dual-domain fallback evidence when relation fields are missing", () => {
+    const fallback = ensureRelationAssemblyPacketFallback(
+      {
+        question: "",
+        domains: [],
+        definitions: { warp_definition: "", ethos_definition: "" },
+        bridge_claims: [],
+        constraints: [],
+        falsifiability_hooks: [],
+        evidence: [],
+        source_map: {},
+      },
+      "",
+    );
+    expect(fallback.domains).toEqual(["ethos", "warp"]);
+    expect(fallback.evidence.some((entry) => entry.domain === "warp")).toBe(true);
+    expect(fallback.evidence.some((entry) => entry.domain === "ethos")).toBe(true);
+    expect(fallback.bridge_claims.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("injects deterministic dual-domain anchors for relation fallback packets", () => {
     const anchored = ensureRelationFallbackDomainAnchors(
       ensureRelationAssemblyPacketFallback(

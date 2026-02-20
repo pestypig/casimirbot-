@@ -447,15 +447,19 @@ export const decideRelationSecondPassAttempt = (input: {
   selectedMove: HelixAskMove;
   deficits: HelixAskRelationSecondPassDeficits;
   alreadyAttempted?: boolean;
+  enforceMinimums?: boolean;
 }): HelixAskRelationSecondPassDecision => {
   if (input.alreadyAttempted) {
     return { shouldAttempt: false, skippedReason: "already_attempted" };
   }
-  if (input.selectedMove !== "retrieve_more" && input.selectedMove !== "relation_build") {
-    return { shouldAttempt: false, skippedReason: "move_not_eligible" };
-  }
-  if (!input.deficits.bridgeDeficit && !input.deficits.evidenceDeficit && !input.deficits.dualDomainDeficit) {
+  const hasDeficits =
+    input.deficits.bridgeDeficit || input.deficits.evidenceDeficit || input.deficits.dualDomainDeficit;
+  if (!hasDeficits) {
     return { shouldAttempt: false, skippedReason: "no_deficits" };
+  }
+  const moveEligible = input.selectedMove === "retrieve_more" || input.selectedMove === "relation_build";
+  if (!moveEligible && !input.enforceMinimums) {
+    return { shouldAttempt: false, skippedReason: "move_not_eligible" };
   }
   return { shouldAttempt: true };
 };

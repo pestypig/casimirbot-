@@ -27340,6 +27340,7 @@ const executeHelixAsk = async ({
         selectedMove,
         deficits: relationSecondPassDeficits,
         alreadyAttempted: relationSecondPassAttempted,
+        enforceMinimums: relationIntentActiveFinal,
       });
       if (debugPayload) {
         debugPayload.second_pass_attempted = false;
@@ -27852,6 +27853,14 @@ const executeHelixAsk = async ({
           ...extractCitationTokensFromText(evidenceText),
         ])[0] ?? "server/routes/agi.plan.ts";
       cleaned = enforceCitationLinkedClaims(cleaned, fallbackCitationAnchor);
+      const nonReportIntent = !reportDecision.enabled && intentStrategy !== "constraint_report";
+      if (nonReportIntent) {
+        const stripped = stripNonReportScaffolding(cleaned);
+        if (stripped !== cleaned) {
+          answerPath.push("policy:non_report_scaffold_guard");
+        }
+        cleaned = stripped;
+      }
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
         logEvent("Answer cleaned preview", "final", finalCleanedPreview, answerStart);

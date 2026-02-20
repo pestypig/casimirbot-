@@ -828,6 +828,8 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
   return failures;
 };
 
+export const __testOnlyEvaluateFailures = evaluateFailures;
+
 const percentile = (values: number[], p: number): number => {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
