@@ -14989,6 +14989,18 @@ const enforceNonReportModeGuard = (
   return { text, mismatch: hadScaffold && !hasReportScaffolding(text), hadScaffold };
 };
 
+const resolveNonReportGuardContext = (
+  question: string,
+): { reportModeEnabled: boolean; intentStrategy: string } => {
+  const reportDecision = resolveReportModeDecision(question);
+  const intentMatch = matchHelixAskIntent({ question });
+  const intentProfile = intentMatch.profile ?? getDefaultHelixAskIntentProfile();
+  return {
+    reportModeEnabled: reportDecision.enabled,
+    intentStrategy: intentProfile.strategy,
+  };
+};
+
 const buildHelixAskReportAnswer = (
   blocks: HelixAskReportBlockResult[],
   omittedCount: number,
@@ -16190,6 +16202,11 @@ export const __testHelixAskOutputContract = {
   normalizeHelixAskErrorEnvelope,
   buildHelixAskRequestMetadata,
   contractVersion: HELIX_ASK_OUTPUT_CONTRACT_VERSION,
+};
+
+export const __testOnlyNonReportGuard = {
+  enforceNonReportModeGuard,
+  resolveNonReportGuardContext,
 };
 
 type HelixAskExecutionArgs = {
@@ -28138,7 +28155,13 @@ const executeHelixAsk = async ({
       evidenceText: `Runtime fallback: ${message}`,
       allowedCitations: fallbackCitations,
     });
-    const fallbackText = runtimeFallback.rendered.trim();
+    const nonReportGuardContext = resolveNonReportGuardContext(parsed.data.question ?? "");
+    const nonReportGuard = enforceNonReportModeGuard(
+      runtimeFallback.rendered.trim(),
+      nonReportGuardContext.reportModeEnabled,
+      nonReportGuardContext.intentStrategy,
+    );
+    const fallbackText = nonReportGuard.text;
     streamEmitter.finalize(fallbackText);
     logProgress("Fallback", runtimeFallbackReason, undefined, false);
     responder.send(200, {
@@ -28152,6 +28175,8 @@ const executeHelixAsk = async ({
         fallback_reason: runtimeFallbackReason,
         helix_ask_fail_reason: "GENERIC_COLLAPSE",
         helix_ask_fail_class: "infra_fail",
+        report_mode_mismatch: nonReportGuard.mismatch,
+        report_scaffold_guard_triggered: nonReportGuard.hadScaffold,
         answer_final_text: clipAskText(fallbackText, HELIX_ASK_ANSWER_PREVIEW_CHARS),
         answer_after_fallback: clipAskText(fallbackText, HELIX_ASK_ANSWER_PREVIEW_CHARS),
         placeholder_fallback_applied: false,
