@@ -12812,6 +12812,16 @@ const classifyFallbackReason = (args: {
   return "none";
 };
 
+const pickDeterministicVariant = (question: string, variants: readonly string[]): string => {
+  if (variants.length === 0) return "";
+  const input = question.trim().toLowerCase();
+  let acc = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    acc = (acc * 33 + input.charCodeAt(i)) >>> 0;
+  }
+  return variants[acc % variants.length] ?? variants[0] ?? "";
+};
+
 const expandOpenWorldQualityFloor = (args: {
   text: string;
   question: string;
@@ -12856,18 +12866,25 @@ const expandOpenWorldQualityFloor = (args: {
   const claimB =
     claims[1] ??
     `A second grounded claim from ${allowedCitations[1] ?? primarySource} narrows uncertainty and prevents generic fallback text.`;
-  const mechanismSentence = ensureSentence(
-    normalizeContractText(
-      `Mechanism: ${claimA} -> coupled constraints and feedback operators -> observable outcomes tied to ${allowedCitations[1] ?? primarySource}, because feedback loops shape the resulting behavior.`,
-      340,
-    ),
-  );
-  const maturitySentence =
-    "Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached.";
-  const missingEvidenceSentence =
-    allowedCitations.length <= 2
-      ? "Missing evidence: add direct equation-origin anchors and test artifact links to raise maturity beyond exploratory."
-      : "Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity.";
+  const mechanismTemplate = pickDeterministicVariant(args.question, [
+    `Mechanism: ${claimA} -> coupled constraints and feedback operators -> observable outcomes tied to ${allowedCitations[1] ?? primarySource}, because feedback loops shape the resulting behavior.`,
+    `Mechanism: ${claimA} constrains ${claimB} through linked boundary conditions, so outcomes stay coupled to ${allowedCitations[1] ?? primarySource}.`,
+    `Mechanism: evidence in ${primarySource} and ${allowedCitations[1] ?? primarySource} forms a constraint chain where local changes propagate into system-level behavior.`,
+  ]);
+  const mechanismSentence = ensureSentence(normalizeContractText(mechanismTemplate, 340));
+  const maturitySentence = pickDeterministicVariant(args.question, [
+    "Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached.",
+    "Maturity (exploratory): evidence-grounded claims are present, but certification still requires dedicated verification artifacts.",
+  ]);
+  const missingEvidenceSentence = allowedCitations.length <= 2
+    ? pickDeterministicVariant(args.question, [
+        "Missing evidence: add direct equation-origin anchors and test artifact links to raise maturity beyond exploratory.",
+        "Missing evidence: add concrete repo anchors and linked test outputs to move this from exploratory to diagnostic confidence.",
+      ])
+    : pickDeterministicVariant(args.question, [
+        "Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity.",
+        "Missing evidence: add tighter quantitative traces and certificate-backed checks to justify diagnostic/certified maturity.",
+      ]);
   const sections = [
     ensureSentence(normalizeContractText(deterministicContract.summary, 320)) ||
       `Grounded summary derived from ${primarySource}.`,
@@ -12910,10 +12927,17 @@ const enforceCitationLinkedClaims = (text: string, citationToken: string): strin
 const rewriteUnsupportedScaffoldToBoundedUncertainty = (text: string): string => {
   const scaffoldRe = /\bAnswer grounded in retrieved evidence\.?/gi;
   if (!scaffoldRe.test(text)) return text;
-  const rewritten = text.replace(
-    scaffoldRe,
+  let replacementIndex = 0;
+  const replacementVariants = [
     "Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.",
-  );
+    "Retrieved evidence is partial; conclusions are intentionally bounded to currently available artifacts.",
+    "Current retrieval provides incomplete coverage, so claims are constrained to cited artifacts only.",
+  ] as const;
+  const rewritten = text.replace(scaffoldRe, () => {
+    const replacement = replacementVariants[replacementIndex % replacementVariants.length] ?? replacementVariants[0];
+    replacementIndex += 1;
+    return replacement;
+  });
   if (/\bMissing evidence:/i.test(rewritten)) return rewritten;
   return `${rewritten.trim()}\n\nMissing evidence: add directly relevant repo paths or artifact refs to raise confidence.`;
 };
