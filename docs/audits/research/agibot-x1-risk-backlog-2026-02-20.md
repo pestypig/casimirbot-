@@ -24,3 +24,10 @@
 
 - readiness_report: `reports/agibot-x1-helix-integration-readiness-2026-02-20.md`
 - evidence_ledger: `docs/audits/research/agibot-x1-evidence-ledger-2026-02-20.md`
+
+
+## Wave 2 execution update
+
+- Status: runtime fail-closed gates improved, but physical deployment remains blocked.
+- Remaining no-go blockers: repo-wide TS debt, asset availability evidence, and hardware replay completion.
+- Cross-reference: `reports/agibot-x1-helix-wave2-readiness-2026-02-20.md`.

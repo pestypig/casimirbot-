@@ -12,6 +12,7 @@ import {
   trainingTraceSignalSchema,
   trainingTraceSourceSchema,
   trainingTraceCalibrationSchema,
+  trainingTraceHilPacketSchema,
 } from "../../shared/schema.js";
 import { guardTenant, shouldRequireTenant } from "../auth/tenant";
 import {
@@ -47,6 +48,7 @@ const trainingTraceInputSchema = z.object({
   tenantId: z.string().min(1).optional(),
   source: trainingTraceSourceSchema.optional(),
   calibration: trainingTraceCalibrationSchema.optional(),
+  hil_packet: trainingTraceHilPacketSchema.optional(),
   signal: trainingTraceSignalSchema.optional(),
   pass: z.boolean(),
   deltas: z.array(trainingTraceDeltaSchema).optional(),
@@ -227,6 +229,19 @@ trainingTraceRouter.post("/training-trace", (req: Request, res: Response) => {
   }
   const parsed = trainingTraceInputSchema.safeParse(body);
   if (!parsed.success) {
+    const hasCalibrationPacket =
+      Object.prototype.hasOwnProperty.call(body, "calibration") &&
+      body.calibration !== undefined;
+    const calibrationParsed = hasCalibrationPacket
+      ? trainingTraceCalibrationSchema.safeParse((body as { calibration?: unknown }).calibration)
+      : { success: true as const };
+    if (!calibrationParsed.success) {
+      return res.status(400).json({
+        error: "invalid-training-trace",
+        reason: "MALFORMED_CALIBRATION_PACKET",
+        details: calibrationParsed.error.flatten(),
+      });
+    }
     return res.status(400).json({
       error: "invalid-training-trace",
       details: parsed.error.flatten(),

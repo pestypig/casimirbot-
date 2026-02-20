@@ -2362,6 +2362,16 @@ export const trainingTraceCalibrationSchema = z.object({
 });
 export type TrainingTraceCalibration = z.infer<typeof trainingTraceCalibrationSchema>;
 
+export const trainingTraceHilPacketSchema = z.object({
+  run_id: z.string().min(1),
+  hardware_profile: z.string().min(1),
+  preflight_status: z.string().min(1),
+  estop_liveness_result: z.string().min(1),
+  calibration_ref: z.string().min(1),
+  safety_gate_outcome: z.string().min(1),
+});
+export type TrainingTraceHilPacket = z.infer<typeof trainingTraceHilPacketSchema>;
+
 export const policyLadderTierSchema = ladderTierSchema;
 export type PolicyLadderTier = z.infer<typeof policyLadderTierSchema>;
 
@@ -2553,6 +2563,7 @@ export const trainingTraceSchema = z.object({
   tenantId: z.string().optional(),
   source: trainingTraceSourceSchema.optional(),
   calibration: trainingTraceCalibrationSchema.optional(),
+  hil_packet: trainingTraceHilPacketSchema.optional(),
   signal: trainingTraceSignalSchema.optional(),
   pass: z.boolean(),
   deltas: z.array(trainingTraceDeltaSchema),
@@ -2719,6 +2730,7 @@ export const adapterRunRequestSchema = z.object({
   premeditation: adapterPremeditationInputSchema.optional(),
   roboticsSafety: adapterRoboticsSafetySchema.optional(),
   calibration: trainingTraceCalibrationSchema.optional(),
+  hil_packet: trainingTraceHilPacketSchema.optional(),
 });
 export type AdapterRunRequest = z.infer<typeof adapterRunRequestSchema>;
 

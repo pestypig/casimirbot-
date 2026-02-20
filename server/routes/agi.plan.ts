@@ -20,7 +20,7 @@ import {
 } from "@shared/agi-refinery";
 import { Routine, type TRoutine } from "@shared/agi-instructions";
 import { PROMPT_SPEC_SCHEMA_VERSION, type PromptSpec } from "@shared/prompt-spec";
-import { zLocalCallSpec, type LocalCallSpec } from "@shared/local-call-spec";
+import { zLocalCallSpec, zMissionBridgeEnvelope, type LocalCallSpec } from "@shared/local-call-spec";
 import type { AnchorConfig, RetrieveCandidate } from "../../codex/anchors/types";
 import { routeIntent } from "../../codex/anchors/router";
 import { retrieveCandidates } from "../../codex/anchors/retriever";
@@ -314,6 +314,37 @@ import { smallLlmCallSpecTriage } from "../services/small-llm";
 
 const planRouter = Router();
 const MISSION_FORBIDDEN_CONTROL_TERMS = /(torque|pwm|servo\s*gain|joint\s*pid|actuator\s*write|motor\s*current|can\s*write)/i;
+const AGIBOT_PREFLIGHT_BLOCK_ORDER = [
+  "DESKTOP_JOINT_SCOPE_REQUIRED",
+  "CALIBRATION_STATE_INCOMPLETE",
+  "IMU_BASELINE_NOT_CONFIGURED",
+  "ESTOP_NOT_READY",
+] as const;
+
+type AgibotMissionPreflight = {
+  motion_scope?: string;
+  calibration_complete?: boolean;
+  imu_baseline_configured?: boolean;
+  estop_ready?: boolean;
+};
+
+const evaluateAgibotMissionPreflight = (
+  preflight?: AgibotMissionPreflight,
+): { pass: boolean; firstFail: (typeof AGIBOT_PREFLIGHT_BLOCK_ORDER)[number] | null } => {
+  if (!preflight || preflight.motion_scope !== "desktop-joint-test-only") {
+    return { pass: false, firstFail: "DESKTOP_JOINT_SCOPE_REQUIRED" };
+  }
+  if (preflight.calibration_complete !== true) {
+    return { pass: false, firstFail: "CALIBRATION_STATE_INCOMPLETE" };
+  }
+  if (preflight.imu_baseline_configured !== true) {
+    return { pass: false, firstFail: "IMU_BASELINE_NOT_CONFIGURED" };
+  }
+  if (preflight.estop_ready !== true) {
+    return { pass: false, firstFail: "ESTOP_NOT_READY" };
+  }
+  return { pass: true, firstFail: null };
+};
 
 const LOCAL_SPAWN_TOOL_NAME = "llm.local.spawn.generate";
 const HTTP_TOOL_NAME = "llm.http.generate";
@@ -12990,6 +13021,15 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
         packId: z.string().optional(),
       })
       .optional(),
+    mission_bridge: zMissionBridgeEnvelope.optional(),
+    preflight: z
+      .object({
+        motion_scope: z.string().optional(),
+        calibration_complete: z.boolean().optional(),
+        imu_baseline_configured: z.boolean().optional(),
+        estop_ready: z.boolean().optional(),
+      })
+      .optional(),
   })
   .refine((value) => Boolean(value.prompt || value.question), {
     message: "prompt or question required",
@@ -16564,6 +16604,44 @@ const executeHelixAsk = async ({
           text: "Mission interface rejected actuator-level command content.",
         });
         return;
+      }
+      const preflightRunId = `preflight:${crypto
+        .createHash("sha256")
+        .update(`${askTraceId}:${askMode}`)
+        .digest("hex")
+        .slice(0, 12)}`;
+      const preflightResult = evaluateAgibotMissionPreflight(parsed.data.preflight);
+      if (!preflightResult.pass && preflightResult.firstFail) {
+        responder.send(400, {
+          ok: false,
+          mode: askMode,
+          fail_reason: preflightResult.firstFail,
+          fail_class: "preflight_gate",
+          trace_id: askTraceId,
+          run_id: preflightRunId,
+          text: "Mission interface blocked by bring-up preflight gate.",
+        });
+        return;
+      }
+      const missionBridge = parsed.data.mission_bridge;
+      if (missionBridge) {
+        const normalizedChannel = missionBridge.channel ?? "aimrt";
+        const forbiddenArgKey = Object.keys(missionBridge.command.args).find((key) =>
+          /(?:torque|pwm|joint|actuator|motor|can)/i.test(key),
+        );
+        if (forbiddenArgKey) {
+          responder.send(400, {
+            ok: false,
+            mode: askMode,
+            fail_reason: "FORBIDDEN_CONTROL_PATH",
+            fail_class: "mission_bridge_contract",
+            trace_id: askTraceId,
+            run_id: preflightRunId,
+            transport: normalizedChannel,
+            text: "Mission bridge rejected actuator-level argument keys.",
+          });
+          return;
+        }
       }
       await ensureDefaultTools();
       const goalText = question ?? prompt ?? "";
