@@ -1,0 +1,23 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-084-orbital-ephemeris-provenance-lane",
+  "files_changed": [
+    "docs/audits/ticket-results/TOE-084-orbital-ephemeris-provenance-lane.20260220T011753Z.json"
+  ],
+  "tests_run": [
+    "tests/halobank-time-model.spec.ts",
+    "tests/horizons-proxy.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:b57d166b-8288-459b-a145-e05ff748a38c",
+    "run_id": "A2-20260220T011753Z",
+    "certificate_hash": "cdfdcb8fdc56ad14ef8ab79c82924a940c113e3f24f9547dbfe00373b812fcb2",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-086-physics-root-lanes-entropy-information",
+  "files_changed": [
+    "docs/audits/ticket-results/TOE-086-physics-root-lanes-entropy-information.20260220T011753Z.json"
+  ],
+  "tests_run": [
+    "scripts/validate-physics-root-leaf-manifest.ts",
+    "tests/physics-root-leaf-manifest.spec.ts",
+    "tests/physics-root-lane-tree-parity.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:12304a04-c596-41ae-ba90-f5b68d5f1410",
+    "run_id": "A2-20260220T011753Z",
+    "certificate_hash": "346bb717fe0520143307088b91a99fafed44a58597391f55b55e8e226a77a568",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "physics-research-brief",
+    "falsifier-matrix"
+  ],
+  "remaining_gaps": []
+}

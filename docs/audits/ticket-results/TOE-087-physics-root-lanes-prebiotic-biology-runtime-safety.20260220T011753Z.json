@@ -1,0 +1,24 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-087-physics-root-lanes-prebiotic-biology-runtime-safety",
+  "files_changed": [
+    "docs/audits/ticket-results/TOE-087-physics-root-lanes-prebiotic-biology-runtime-safety.20260220T011753Z.json"
+  ],
+  "tests_run": [
+    "scripts/validate-physics-root-leaf-manifest.ts",
+    "tests/physics-root-leaf-first-class-coverage.spec.ts",
+    "tests/physics-root-lane-tree-parity.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:a2966c93-5341-44b6-a72a-2885c643eb13",
+    "run_id": "A2-20260220T011753Z",
+    "certificate_hash": "e1a284b8329f7e2015559337c57a441758cf6565fbaf3b30abd46facce2af857",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}

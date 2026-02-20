@@ -1,0 +1,24 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-089-external-integrations-lane-promotion",
+  "files_changed": [
+    "docs/audits/ticket-results/TOE-089-external-integrations-lane-promotion.20260220T011753Z.json"
+  ],
+  "tests_run": [
+    "tests/startup-config.spec.ts",
+    "tests/external-integrations-contract.spec.ts",
+    "scripts/validate-resolver-owner-coverage.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:c405621d-ea91-46b6-b3c5-949a8cfefd3b",
+    "run_id": "A2-20260220T011753Z",
+    "certificate_hash": "a9950815f42d32f1dd23fc30994c6fca7df14990f1c84d46a491ea87e8b24395",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}

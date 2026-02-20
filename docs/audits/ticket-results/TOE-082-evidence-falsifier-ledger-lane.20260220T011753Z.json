@@ -1,0 +1,24 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-082-evidence-falsifier-ledger-lane",
+  "files_changed": [
+    "docs/audits/ticket-results/TOE-082-evidence-falsifier-ledger-lane.20260220T011753Z.json"
+  ],
+  "tests_run": [
+    "tests/helix-ask-bridge.spec.ts",
+    "tests/helix-ask-graph-resolver.spec.ts",
+    "scripts/toe-agent-preflight.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:e20f7236-96d8-48af-bd9b-08e5b3aae54b",
+    "run_id": "A2-20260220T011753Z",
+    "certificate_hash": "38a05afecb9fda75cf666ad936673e1074a78b846ce6387653c74310223c5437",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}
