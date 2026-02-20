@@ -696,9 +696,16 @@ function applyIdeologyConceptOverride(
     return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
   };
   const lead = ensureSentence(input.answer.trim());
-  const friendlyLead = /^In plain language,?/i.test(lead)
-    ? lead
-    : `In plain language, ${lead}`;
+  const deterministicLeadPrefix = (() => {
+    if (/^In plain language,?/i.test(lead)) return "In plain language,";
+    const variants = ["Practically,", "Bottom line:", "Directly,"] as const;
+    const seed = Array.from(lead).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    return variants[seed % variants.length];
+  })();
+  const friendlyLead =
+    lead.startsWith(`${deterministicLeadPrefix} `) || lead === deterministicLeadPrefix
+      ? lead
+      : `${deterministicLeadPrefix} ${lead}`;
   return {
     answer: appendConceptAppendix(friendlyLead),
     applied: false,

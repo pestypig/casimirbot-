@@ -12594,11 +12594,25 @@ const renderHelixAskAnswerContract = (
     return deduped;
   };
   const wantsPlainLanguage = /\bplain language\b/i.test(question);
+  const deterministicLeadPrefix = (seedText: string): string => {
+    const variants = wantsPlainLanguage
+      ? ["In simple terms:", "Practically:", "Bottom line:"]
+      : ["Directly:", "Bottom line:", "Practically:"];
+    const seed = Array.from(seedText || question || "helix").reduce(
+      (acc, ch) => acc + ch.charCodeAt(0),
+      0,
+    );
+    return variants[seed % variants.length] ?? variants[0]!;
+  };
   const leadSummary = (): string => {
     const summary = ensureSentence(normalizeContractText(contract.summary, 360));
     if (!summary) return "";
     if (wantsPlainLanguage && !/^in plain language[,:\s]/i.test(summary)) {
-      return `In plain language: ${summary}`;
+      const prefix = deterministicLeadPrefix(summary);
+      if (new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(summary)) {
+        return summary;
+      }
+      return `${prefix} ${summary}`;
     }
     return summary;
   };
@@ -18117,7 +18131,7 @@ const executeHelixAsk = async ({
     const nonReportIntentHardGuard =
       reportDecision.enabled &&
       reportDecision.reason !== "explicit_report_request" &&
-      intentStrategy !== "constraint_report";
+      intentProfile.strategy !== "constraint_report";
     if (nonReportIntentHardGuard) {
       reportDecision = {
         ...reportDecision,

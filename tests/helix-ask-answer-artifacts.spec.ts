@@ -138,7 +138,8 @@ describe("Helix Ask semantic claim-citation linkage contract (artifacts)", () =>
     const score = __testScoreDeterministicClaimCitationLinkage(cleaned);
     expect(score.failReasons).toEqual([]);
     expect(score.linkRate).toBe(1);
-describe("Helix Ask semantic linkage contract artifacts", () => {
+  });
+
   it("retained Sources lines satisfy deterministic claim linkage after cleanup", () => {
     const input = [
       "Deterministic fallback answer with retained retrieval evidence.",

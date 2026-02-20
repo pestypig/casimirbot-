@@ -821,6 +821,10 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
     if (toNum(debug?.relation_packet_evidence_count, 0) < 2) failures.push(`evidence_count_low:${toNum(debug?.relation_packet_evidence_count, 0)}`);
   }
   if (STUB_RE.test(text)) failures.push("stub_text_detected");
+  if (/\bRuntime fallback:/i.test(text)) failures.push("runtime_fallback_answer");
+  if (/cannot access ['"]?intentStrategy['"]? before initialization/i.test(text)) {
+    failures.push("runtime_tdz_intentStrategy");
+  }
   if (REPORT_SECTION_RE.test(text)) failures.push("report_scaffold_shape");
   if (text.trim().length < (entry.min_text_chars ?? MIN_TEXT_CHARS)) failures.push(`text_too_short:${text.trim().length}`);
   const hasCitation = /\bSources?:\s+/i.test(text) || /docs\//i.test(text) || /server\//i.test(text);
@@ -1236,15 +1240,26 @@ const main = async () => {
     })),
   };
 
+  const provenanceBlockerReason = !provenanceGatePass
+    ? (!gitProvenance.hasOriginRemote
+      ? "BLOCKER_PROVENANCE_ORIGIN_REMOTE_MISSING"
+      : !gitProvenance.originMain
+        ? "BLOCKER_PROVENANCE_ORIGIN_MAIN_UNAVAILABLE"
+        : !gitProvenance.head
+          ? "BLOCKER_PROVENANCE_HEAD_UNAVAILABLE"
+          : "BLOCKER_PROVENANCE_UNKNOWN")
+    : null;
   const recommendationDecision =
-    !runComplete ||
-    stubRate > 0.02 ||
-    relationPacketBuiltRate < 0.95 ||
-    relationDualDomainRate < 0.95 ||
-    reportModeCorrectRate < 0.98 ||
-    minTextPassRate < 0.9
-      ? (runComplete ? "needs_patch" : "insufficient_run_quality")
-      : "ship";
+    !provenanceGatePass
+      ? "blocked_provenance"
+      : !runComplete ||
+          stubRate > 0.02 ||
+          relationPacketBuiltRate < 0.95 ||
+          relationDualDomainRate < 0.95 ||
+          reportModeCorrectRate < 0.98 ||
+          minTextPassRate < 0.9
+        ? (runComplete ? "needs_patch" : "insufficient_run_quality")
+        : "ship";
   const normalizedDecision = recommendationDecision;
   const decisionGradeReady = runComplete && provenanceGatePass;
   const nextPatches = [
@@ -1280,12 +1295,14 @@ const main = async () => {
     decision: normalizedDecision,
     decision_grade_ready: decisionGradeReady,
     provenance_blocked: !provenanceGatePass,
+    provenance_blocker_reason: provenanceBlockerReason,
     artifact_bundle_paths: runArtifactBundlePaths,
     diagnostics: {
       rollup: toDiagnosticRollup(rawRuns),
     },
     rationale: [
       `provenance_gate_pass=${String(provenanceGatePass)}`,
+      `provenance_blocker_reason=${provenanceBlockerReason ?? "none"}`,
       `decision_grade_ready=${String(decisionGradeReady)}`,
       `git_branch=${gitProvenance.branch ?? "missing"}`,
       `git_head=${gitProvenance.head ?? "missing"}`,
@@ -1305,6 +1322,9 @@ const main = async () => {
       `min_text_length_pass_rate=${minTextPassRate.toFixed(3)}`,
     ],
     next_patches: nextPatches,
+    hard_blockers: provenanceBlockerReason
+      ? [{ kind: "provenance", severity: "HARD", reason: provenanceBlockerReason, blocks_ship: true }]
+      : [],
   };
 
   await fs.writeFile(path.resolve(runOutDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
@@ -1352,6 +1372,8 @@ const main = async () => {
     `- provenance_warnings: ${provenanceWarnings.length ? provenanceWarnings.join(", ") : "none"}`,
     `- decision_grade_ready: ${String(decisionGradeReady)}`,
     `- provenance_blocked: ${String(!provenanceGatePass)}`,
+    `- provenance_hard_blocker_reason: ${provenanceBlockerReason ?? "none"}`,
+    `- ship_recommendation_blocked_by_hard_blocker: ${String(Boolean(provenanceBlockerReason))}`,
     `- run_id: ${runId}`,
     `- base_url: ${BASE_URL}`,
     `- prompts: ${prompts.length}`,
@@ -1367,6 +1389,15 @@ const main = async () => {
     `- resumed_from_latest: ${String(resumedFromLatest)}`,
     `- resumed_runs: ${resumedRuns}`,
     `- output_run_dir: ${runOutDir}`,
+    ...(provenanceBlockerReason
+      ? [
+          "",
+          "## HARD BLOCKER",
+          `- status: BLOCKED`,
+          `- reason: ${provenanceBlockerReason}`,
+          "- effect: ship recommendation is disallowed until provenance gate passes with origin/main + HEAD present.",
+        ]
+      : []),
     "",
     "## Aggregate by Prompt Family",
     "| family | runs | pass_rate | intent_correct_rate | report_mode_correct_rate | stub_rate | latency_p50_ms | latency_p95_ms |",
