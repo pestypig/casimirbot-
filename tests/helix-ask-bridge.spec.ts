@@ -18,6 +18,7 @@ type TreeNode = {
     certifying?: boolean;
   }>;
   validity?: {
+    equation_ref?: string;
     strict_fail_reason?: string;
     maturity_ceiling?: string;
     proxy_semantics?: unknown;
@@ -133,6 +134,51 @@ describe("Helix Ask bridge nodes", () => {
     expect(placeholder?.validity?.maturity_ceiling).toBe("diagnostic");
     expect(placeholder?.validity?.proxy_semantics).toBeTruthy();
     expect(placeholder?.validity?.display_semantics).toBeTruthy();
+  });
+
+  it("keeps strict-routed physics bridge metadata equation/citation complete for targeted bridge nodes", () => {
+    const targets: Array<{
+      file: string;
+      nodeId: string;
+      equationRef: string;
+    }> = [
+      {
+        file: "math-tree.json",
+        nodeId: "bridge-math-maturity-stages-math-evidence-registry",
+        equationRef: "curvature_unit_proxy_contract",
+      },
+      {
+        file: "physics-foundations-tree.json",
+        nodeId: "bridge-field-equations-stack-stress-energy-stack",
+        equationRef: "efe_baseline",
+      },
+      {
+        file: "uncertainty-mechanics-tree.json",
+        nodeId: "bridge-uncertainty-classical-stack-uncertainty-statistical-stack",
+        equationRef: "uncertainty_propagation",
+      },
+      {
+        file: "uncertainty-mechanics-tree.json",
+        nodeId: "bridge-uncertainty-reality-bounds-verification-checklist",
+        equationRef: "runtime_safety_gate",
+      },
+    ];
+
+    for (const target of targets) {
+      const tree = loadTree(join(process.cwd(), "docs", "knowledge", "physics", target.file));
+      const bridge = tree.nodes.find((node) => node.id === target.nodeId);
+
+      expect(bridge, `${target.file} ${target.nodeId} missing`).toBeTruthy();
+      expect(bridge?.validity?.equation_ref, `${target.file} ${target.nodeId} missing equation_ref`).toBe(target.equationRef);
+
+      const evidence = bridge?.evidence ?? [];
+      expect(evidence.length, `${target.file} ${target.nodeId} missing evidence`).toBeGreaterThan(0);
+      for (const entry of evidence) {
+        expect(entry.provenance_class, `${target.file} ${target.nodeId} missing provenance_class`).toBe("proxy");
+        expect(entry.claim_tier, `${target.file} ${target.nodeId} missing claim_tier`).toBe("diagnostic");
+        expect(entry.certifying, `${target.file} ${target.nodeId} missing certifying=false`).toBe(false);
+      }
+    }
   });
 
   it("returns deterministic strict bridge fail_reason when bridge evidence metadata is incomplete", () => {

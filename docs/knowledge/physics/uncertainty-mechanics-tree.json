@@ -2038,7 +2038,8 @@
       "validity": {
         "claim_ids": [
           "curvature_unit_proxy_contract.v1"
-        ]
+        ],
+        "equation_ref": "uncertainty_propagation"
       },
       "deterministic": null,
       "tolerance": null,
@@ -2065,14 +2066,20 @@
           "path": "docs/knowledge/physics/numerical-precision.md",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:06789e573c5ec3537be0db51cb5a97b22cd5d1bc7b651407cd8635c65d06bd32",
-          "scope": "left"
+          "scope": "left",
+          "provenance_class": "proxy",
+          "claim_tier": "diagnostic",
+          "certifying": false
         },
         {
           "type": "doc",
           "path": "docs/knowledge/physics/sampling-time-bounds.md",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:63bfb24d0701cac0d54c8d77d9497e49861142b1b604eb75ac4a55ab1e03f55e",
-          "scope": "right"
+          "scope": "right",
+          "provenance_class": "proxy",
+          "claim_tier": "diagnostic",
+          "certifying": false
         }
       ],
       "slug": "bridge-uncertainty-classical-stack-uncertainty-statistical-stack",
@@ -2130,7 +2137,8 @@
       "validity": {
         "claim_ids": [
           "curvature_unit_proxy_contract.v1"
-        ]
+        ],
+        "equation_ref": "runtime_safety_gate"
       },
       "deterministic": null,
       "tolerance": null,
@@ -2144,13 +2152,21 @@
           "type": "doc",
           "path": "docs/knowledge/ethos/verification-checklist.md",
           "repo_rev": "3e3dd398145c79b00fa89a3df818cf5e08425ba3",
-          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94"
+          "content_hash": "sha256:aa6aef57c137d41bc29ee83805b9f65f7e7514c36d9fada9533309c085265e94",
+          "provenance_class": "proxy",
+          "claim_tier": "diagnostic",
+          "certifying": false,
+          "scope": "right"
         },
         {
           "type": "doc",
           "path": "docs/knowledge/physics/energy-conditions.md",
           "repo_rev": "3e3dd398145c79b00fa89a3df818cf5e08425ba3",
-          "content_hash": "sha256:cfa8949441bef4cec276f2dc2274b7affd811c7feb2d2d8c27341fd96d3e0625"
+          "content_hash": "sha256:cfa8949441bef4cec276f2dc2274b7affd811c7feb2d2d8c27341fd96d3e0625",
+          "provenance_class": "proxy",
+          "claim_tier": "diagnostic",
+          "certifying": false,
+          "scope": "left"
         }
       ],
       "predictability": {

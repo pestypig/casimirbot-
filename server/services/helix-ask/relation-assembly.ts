@@ -322,7 +322,7 @@ const resolveCrossLaneUncertaintyValidation = (): CrossLaneUncertaintyValidation
   }
   const rows = Array.isArray(parsed?.rows) ? parsed.rows : [];
   const scoped = rows.filter(
-    (row: any) => row?.runtime_safety_eligible === true && (row?.cross_lane_bridge === true || row?.provenance_class === "proxy"),
+    (row: any) => row?.runtime_safety_eligible === true && row?.cross_lane_bridge === true,
   );
   if (scoped.length === 0) return { referenced: false, pass: true };
   const missingUncertainty = scoped

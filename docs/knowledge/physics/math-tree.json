@@ -5647,7 +5647,8 @@
       "validity": {
         "claim_ids": [
           "curvature_unit_proxy_contract.v1"
-        ]
+        ],
+        "equation_ref": "curvature_unit_proxy_contract"
       },
       "deterministic": null,
       "tolerance": null,
@@ -5674,14 +5675,20 @@
           "path": "shared/math-stage.ts",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7858bef29c7f0cf50f8e8a700359c35e58b6bf05dd15fa3db3df7f6d414e3639",
-          "scope": "left"
+          "scope": "left",
+          "provenance_class": "proxy",
+          "claim_tier": "diagnostic",
+          "certifying": false
         },
         {
           "type": "doc",
           "path": "math.config.json",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7da27fdc5bea5d3bea9b76976282a89382719bd6cfde2d0f6dd81974ce5abf06",
-          "scope": "right"
+          "scope": "right",
+          "provenance_class": "proxy",
+          "claim_tier": "diagnostic",
+          "certifying": false
         }
       ],
       "slug": "bridge-math-maturity-stages-math-evidence-registry",
