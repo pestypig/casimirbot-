@@ -4388,6 +4388,35 @@ function stripPromptEchoFromAnswer(answer: string, question?: string): string {
   return trimmed;
 }
 
+const stripDeterministicNoiseArtifacts = (value: string): string => {
+  if (!value) return value;
+  let cleaned = value
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/`{1,3}[^`]+`{1,3}/g, " ")
+    .replace(/\b(?:notes?|tags?)\s*:\s*[^\n.]+(?:\.|$)/gi, " ")
+    .replace(/\b\d+\s+symbol=grep\s+file=[^\s,;]+/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  const sentenceParts = cleaned
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (sentenceParts.length >= 2) {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const sentence of sentenceParts) {
+      const key = sentence.toLowerCase().replace(/\s+/g, " ").trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(sentence);
+    }
+    cleaned = out.join(" ").trim();
+  }
+  return cleaned;
+};
+
 function stripEvidencePromptBlock(value: string): string {
   if (!value) return value;
   const lines = value.split(/\r?\n/);
@@ -11826,6 +11855,7 @@ const sanitizeDeterministicContractLine = (value: string): string => {
   const definitionMatch = source.match(/\bDefinition:\s*([\s\S]+)/i);
   let candidate = definitionMatch ? definitionMatch[1] : source;
   candidate = candidate
+    .replace(HELIX_ASK_LABEL_PREFIX_RE, "")
     .replace(/\(see\s+[^\)]*\)/gi, " ")
     .replace(/\b(?:Doc|Title|Heading|Subheading|Section):\s*[^.]+(?:\.)?/gi, " ")
     .replace(/\bSpan:\s*L\d+(?:-L?\d+)?\b/gi, " ")
@@ -11833,10 +11863,17 @@ const sanitizeDeterministicContractLine = (value: string): string => {
       /\b(?:id|slug|label|aliases|scope|intenthints|topictags|mustincludefiles|version|rootid|nodes|children)\s*:\s*[^,;]+/gi,
       " ",
     )
+    .replace(/notes?\s*:\s*[^.]+(?:\.)?/gi, " ")
+    .replace(/tags?\s*:\s*[^.]+(?:\.)?/gi, " ")
     .replace(/(^|\s)---(\s|$)/g, " ")
     .replace(/\{[^{}]*\}/g, " ")
     .replace(/[{}]/g, " ")
+    .replace(/[|]{2,}/g, " ")
+    .replace(/\s\|\s/g, " ")
+    .replace(/`{1,3}[^`]+`{1,3}/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/^(?:Definition|Evidence|Code|Test)\s*:\s*/i, "")
+    .replace(/\bminimal\s+artifact\s*:\s*[^.]+\.?/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
   if (!candidate) return "";
@@ -12022,8 +12059,9 @@ const collectDeterministicEvidenceClaims = (args: {
     .map((line) => sanitizeDeterministicContractLine(line))
     .filter((line) => line.length >= 24)
     .filter((line) => !/^sources?:/i.test(line))
+    .filter((line) => !/\b(?:notes?|tags?|minimal\s+artifact)\s*:/i.test(line))
     .filter((line) => !isDeterministicMetadataNoise(line))
-    .filter((line) => !(args.conceptual && DETERMINISTIC_CODE_LINE_RE.test(line)))
+    .filter((line) => !DETERMINISTIC_CODE_LINE_RE.test(line))
     .map((line) => {
       let score = 0;
       if (DETERMINISTIC_FACTUAL_VERB_RE.test(line)) score += 2;
@@ -26344,6 +26382,7 @@ const executeHelixAsk = async ({
         extractCitationTokensFromText(evidenceText),
       );
       cleaned = stripRunawayAnswerArtifacts(cleaned);
+      cleaned = stripDeterministicNoiseArtifacts(cleaned);
       const repoEvidencePaths = allowedSourcePaths.slice(0, 6);
       if (requiresRepoEvidence && !hasRepoCitations()) {
         if (repoEvidencePaths.length) {

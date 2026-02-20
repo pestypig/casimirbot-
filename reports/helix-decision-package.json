@@ -1,19 +1,22 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-02-20T19:24:11.956Z",
+  "generated_at": "2026-02-20T20:15:09.237Z",
   "evaluation_tier": "decision_grade",
   "git": {
     "branch": "work",
-    "head": "d8b709f",
-    "origin_main": null,
-    "ahead_behind": null
+    "head": "f23bbbd",
+    "origin_main": "f23bbbd",
+    "ahead_behind": {
+      "ahead": 0,
+      "behind": 0
+    }
   },
   "runs": {
-    "narrow": "narrow-1771614878316",
-    "heavy": "versatility-1771613712583",
-    "ab_t02": "2026-02-20T19-06-34-742Z",
-    "ab_t035": "2026-02-20T19-10-24-151Z",
-    "casimir": "546"
+    "narrow": "versatility-1771617772919",
+    "heavy": "versatility-1771617912746",
+    "ab_t02": "2026-02-20T20-09-37-698Z",
+    "ab_t035": "2026-02-20T20-11-36-622Z",
+    "casimir": "1078"
   },
   "gates": [
     {
@@ -22,7 +25,7 @@
       "threshold": 0.95,
       "comparator": ">=",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/summary.json"
+      "source_path": "artifacts/experiments/helix-cloud-closure/heavy/versatility-1771617912746/summary.json"
     },
     {
       "name": "relation_dual_domain_ok_rate",
@@ -30,23 +33,23 @@
       "threshold": 0.95,
       "comparator": ">=",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/summary.json"
+      "source_path": "artifacts/experiments/helix-cloud-closure/heavy/versatility-1771617912746/summary.json"
     },
     {
       "name": "report_mode_correct_rate",
-      "value": 0.9851851851851852,
+      "value": 0.9888888888888889,
       "threshold": 0.98,
       "comparator": ">=",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/summary.json"
+      "source_path": "artifacts/experiments/helix-cloud-closure/heavy/versatility-1771617912746/summary.json"
     },
     {
       "name": "citation_presence_rate",
-      "value": 0.9962962962962963,
+      "value": 1,
       "threshold": 0.99,
       "comparator": ">=",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/summary.json"
+      "source_path": "artifacts/experiments/helix-cloud-closure/heavy/versatility-1771617912746/summary.json"
     },
     {
       "name": "stub_text_detected_rate",
@@ -54,7 +57,7 @@
       "threshold": 0,
       "comparator": "==",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/summary.json"
+      "source_path": "artifacts/experiments/helix-cloud-closure/heavy/versatility-1771617912746/summary.json"
     },
     {
       "name": "runtime_fallback_answer",
@@ -62,7 +65,7 @@
       "threshold": 0,
       "comparator": "==",
       "pass": true,
-      "source_path": "reports/helix-self-tune-gate-summary.json"
+      "source_path": "reports/helix-cloud-closure-gate-summary.json"
     },
     {
       "name": "runtime_tdz_intentStrategy",
@@ -70,7 +73,7 @@
       "threshold": 0,
       "comparator": "==",
       "pass": true,
-      "source_path": "reports/helix-self-tune-gate-summary.json"
+      "source_path": "reports/helix-cloud-closure-gate-summary.json"
     },
     {
       "name": "runtime_tdz_intentProfile",
@@ -78,23 +81,23 @@
       "threshold": 0,
       "comparator": "==",
       "pass": true,
-      "source_path": "reports/helix-self-tune-gate-summary.json"
+      "source_path": "reports/helix-cloud-closure-gate-summary.json"
     },
     {
       "name": "provenance_gate_pass",
-      "value": false,
+      "value": true,
       "threshold": true,
       "comparator": "==",
-      "pass": false,
-      "source_path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/summary.json"
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-cloud-closure/heavy/versatility-1771617912746/summary.json"
     },
     {
       "name": "decision_grade_ready",
-      "value": false,
+      "value": true,
       "threshold": true,
       "comparator": "==",
-      "pass": false,
-      "source_path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/recommendation.json"
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-cloud-closure/heavy/versatility-1771617912746/recommendation.json"
     },
     {
       "name": "casimir_verdict_pass_integrity",
@@ -102,105 +105,100 @@
       "threshold": true,
       "comparator": "==",
       "pass": true,
-      "source_path": "reports/helix-self-tune-casimir.json"
+      "source_path": "reports/helix-cloud-closure-casimir.json"
     }
   ],
   "novelty": {
     "t02": {
-      "overall": 0.6388888888888888,
+      "overall": 0.6666666666666666,
       "by_family": {
         "relation": 0.5833333333333334,
-        "repo_technical": 0.4166666666666667,
+        "repo_technical": 0.5,
         "ambiguous_general": 0.9166666666666666
       },
       "target": 0.82,
       "pass": false,
-      "source_path": "artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json"
+      "source_path": "artifacts/experiments/helix-cloud-closure/ab/t02/helix_cloud_closure_t02/summary.json"
     },
     "t035": {
-      "overall": 0.6388888888888888,
+      "overall": 0.6666666666666666,
       "by_family": {
         "relation": 0.5833333333333334,
-        "repo_technical": 0.4166666666666667,
+        "repo_technical": 0.5,
         "ambiguous_general": 0.9166666666666666
       },
       "target": 0.82,
       "pass": false,
-      "source_path": "artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json"
+      "source_path": "artifacts/experiments/helix-cloud-closure/ab/t035/helix_cloud_closure_t035/summary.json"
     }
   },
   "provenance": {
-    "pass": false,
-    "blocked_reason": "provenance gate failed in heavy summary",
-    "warnings": [
-      "git_origin_remote_missing",
-      "git_origin_main_ref_missing"
-    ]
+    "pass": true,
+    "blocked_reason": null,
+    "warnings": []
   },
   "casimir": {
     "verdict": "PASS",
-    "traceId": "adapter:1879c4f1-3111-498d-b219-fca6f1b846a3",
-    "runId": "546",
+    "traceId": "adapter:c8f02de3-46b1-4238-9361-32c8e0cb0a61",
+    "runId": "1078",
     "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
     "integrityOk": true,
-    "source_path": "reports/helix-self-tune-casimir.json"
+    "source_path": "reports/helix-cloud-closure-casimir.json"
   },
   "artifacts": [
     {
-      "path": "reports/helix-self-tune-gate-summary.json",
+      "path": "reports/helix-cloud-closure-gate-summary.json",
       "exists": true,
-      "sha256": "1d1545d48e1bc5ac1ae797455c0258883ff0a0e358a930336f1a471833335731",
-      "size_bytes": 513,
-      "mtime_iso": "2026-02-20T19:14:38.311Z"
+      "sha256": "77d4c0876218f55d1cc48ab72ccca4a85b54f9132d8b82022b3d5aeda62fe63d",
+      "size_bytes": 778,
+      "mtime_iso": "2026-02-20T20:14:59.182Z"
     },
     {
-      "path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/summary.json",
+      "path": "artifacts/experiments/helix-cloud-closure/heavy/versatility-1771617912746/summary.json",
       "exists": true,
-      "sha256": "827cbe0f27874d52f72d8d71e3803847954188acd36df5795b92cd0445ad9102",
-      "size_bytes": 120941,
-      "mtime_iso": "2026-02-20T19:06:23.275Z"
+      "sha256": "2d291f91102ee1b334826b29348e3b935ed1a2d70940197507594da1305d7d8d",
+      "size_bytes": 123503,
+      "mtime_iso": "2026-02-20T20:09:32.704Z"
     },
     {
-      "path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/recommendation.json",
+      "path": "artifacts/experiments/helix-cloud-closure/heavy/versatility-1771617912746/recommendation.json",
       "exists": true,
-      "sha256": "9ff2b9129c95dba5416f06f5525b51fa602701225e617534f17b9d3c39c6ec30",
-      "size_bytes": 3441,
-      "mtime_iso": "2026-02-20T19:06:23.275Z"
+      "sha256": "26389e3d9d330d48da1495023c4c87877e5aae72f11e5a89d453e96966208810",
+      "size_bytes": 2914,
+      "mtime_iso": "2026-02-20T20:09:32.704Z"
     },
     {
-      "path": "artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json",
+      "path": "artifacts/experiments/helix-cloud-closure/ab/t02/helix_cloud_closure_t02/summary.json",
       "exists": true,
-      "sha256": "eb8b522ce3c6c6da25e29479f333800f0527d5cfa89f82919dd1b023118d7c14",
-      "size_bytes": 1693,
-      "mtime_iso": "2026-02-20T19:10:17.933Z"
+      "sha256": "88209db1b581d358c7c9487a73be03797ad9510845b33be56f740649f754399a",
+      "size_bytes": 1680,
+      "mtime_iso": "2026-02-20T20:11:31.600Z"
     },
     {
-      "path": "artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json",
+      "path": "artifacts/experiments/helix-cloud-closure/ab/t035/helix_cloud_closure_t035/summary.json",
       "exists": true,
-      "sha256": "e6645383688037063b7f45539076fc705abdbc6823bfba1d0084ef40a622ab73",
-      "size_bytes": 1694,
-      "mtime_iso": "2026-02-20T19:14:17.583Z"
+      "sha256": "0b7b984a27d6bc0749717c6422512d490e91a263293687e8700553344418fb19",
+      "size_bytes": 1681,
+      "mtime_iso": "2026-02-20T20:13:33.623Z"
     },
     {
-      "path": "reports/helix-self-tune-casimir.json",
+      "path": "reports/helix-cloud-closure-casimir.json",
       "exists": true,
-      "sha256": "ec73cc2e72e32bba1561be5af10b7d4804becca271b09832048f7be66f83b400",
-      "size_bytes": 271,
-      "mtime_iso": "2026-02-20T19:23:48.313Z"
+      "sha256": "b828ddfd6e53c5a781a0590f27d2883d837c4771d3717d2b4eb637a957ca6066",
+      "size_bytes": 216,
+      "mtime_iso": "2026-02-20T20:14:28.294Z"
     },
     {
       "path": "schemas/helix-decision-package.schema.json",
       "exists": true,
       "sha256": "bdfb8e4c87f5d312da076444b41d2618593b80c6a0ac9a38f49f0cb1d6753649",
       "size_bytes": 5233,
-      "mtime_iso": "2026-02-20T17:30:23.802Z"
+      "mtime_iso": "2026-02-20T18:35:33.925Z"
     }
   ],
   "decision": {
     "value": "NO-GO",
     "hard_blockers": [
-      "provenance_gate_pass failed (false == true)",
-      "decision_grade_ready failed (false == true)",
       "novelty.t02 below target >=0.82",
       "novelty.t035 below target >=0.82"
     ],
