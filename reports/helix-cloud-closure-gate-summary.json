@@ -1,0 +1,24 @@
+{
+  "precheck_run_id": "versatility-1771617772919",
+  "generated_at": "2026-02-20T20:07:00Z",
+  "sample_count": 3,
+  "strict_gates": {
+    "relation_packet_built_rate": 1.0,
+    "relation_dual_domain_ok_rate": 1.0,
+    "report_mode_correct_rate": 1.0,
+    "citation_presence_rate": 1.0,
+    "stub_text_detected_rate": 0.0,
+    "runtime_fallback_answer": 0.0,
+    "runtime_tdz_intentStrategy": 0.0,
+    "runtime_tdz_intentProfile": 0.0
+  },
+  "top_failure_signatures_before": [
+    "required_source_provenance_mismatch:branch,head,origin_main,ahead_behind",
+    "novel_response_rate_repo_technical<0.85",
+    "novel_response_rate_relation<0.80"
+  ],
+  "top_failure_signatures_after": [
+    "novel_response_rate_repo_technical<0.85",
+    "novel_response_rate_relation<0.80"
+  ]
+}
