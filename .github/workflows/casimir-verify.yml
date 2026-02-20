@@ -4,6 +4,11 @@ on:
   pull_request:
   push:
   workflow_dispatch:
+    inputs:
+      run_decision_grade:
+        description: "Also run Helix decision-grade package + validate"
+        required: false
+        default: "false"
 
 jobs:
   casimir-verify:
@@ -59,10 +64,16 @@ jobs:
           npm run casimir:verify -- --params '{"traceId":"ci:casimir","actions":[{"id":"ci-proposal","params":{"dutyEffectiveFR":0.0025}}],"budget":{"maxIterations":1,"maxTotalMs":60000}}' --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci --url "$ADAPTER_VERIFY_URL" --export-url "$TRACE_EXPORT_URL" | tee artifacts/casimir-verify-response.json
           node -e 'const fs=require("fs"); const adapter=process.env.ADAPTER_VERIFY_URL; const raw=fs.readFileSync("artifacts/casimir-verify-response.json","utf8"); const j=JSON.parse(raw); const verdict=(j.verdict ?? (j.pass ? "PASS" : "FAIL")); const cert=j.certificate ?? {}; const integrity=(cert.integrityOk===true?"OK":"NOT_OK"); console.log(`[casimir-verify] adapter_url=${adapter} verdict=${verdict} cert_integrity=${integrity}`);'
 
+      - name: Decision-grade checks skipped by default
+        if: github.event_name != 'workflow_dispatch' || inputs.run_decision_grade != 'true'
+        run: echo "Helix decision-grade packaging/validation is opt-in. Use workflow_dispatch input run_decision_grade=true or run helix-decision-grade workflow."
+
       - name: Generate helix decision package
+        if: github.event_name == 'workflow_dispatch' && inputs.run_decision_grade == 'true'
         run: npm run helix:decision:package
 
       - name: Validate helix decision package
+        if: github.event_name == 'workflow_dispatch' && inputs.run_decision_grade == 'true'
         run: npm run helix:decision:validate -- --package reports/helix-decision-package.json
 
       - name: Generate math report

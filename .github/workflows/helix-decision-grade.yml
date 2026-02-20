@@ -1,0 +1,66 @@
+name: Helix Decision Grade
+
+on:
+  workflow_dispatch:
+    inputs:
+      narrow:
+        description: "Optional path to narrow summary JSON"
+        required: false
+        default: ""
+      heavy:
+        description: "Optional path to heavy summary JSON"
+        required: false
+        default: ""
+      recommendation:
+        description: "Optional path to heavy recommendation JSON"
+        required: false
+        default: ""
+      ab_t02:
+        description: "Optional path to AB t02 summary JSON"
+        required: false
+        default: ""
+      ab_t035:
+        description: "Optional path to AB t035 summary JSON"
+        required: false
+        default: ""
+      casimir:
+        description: "Optional path to Casimir verify JSON"
+        required: false
+        default: ""
+
+jobs:
+  decision-grade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run decision-grade pipeline
+        run: |
+          set -euo pipefail
+          ARGS=()
+          [[ -n "${{ inputs.narrow }}" ]] && ARGS+=(--narrow "${{ inputs.narrow }}")
+          [[ -n "${{ inputs.heavy }}" ]] && ARGS+=(--heavy "${{ inputs.heavy }}")
+          [[ -n "${{ inputs.recommendation }}" ]] && ARGS+=(--recommendation "${{ inputs.recommendation }}")
+          [[ -n "${{ inputs.ab_t02 }}" ]] && ARGS+=(--ab_t02 "${{ inputs.ab_t02 }}")
+          [[ -n "${{ inputs.ab_t035 }}" ]] && ARGS+=(--ab_t035 "${{ inputs.ab_t035 }}")
+          [[ -n "${{ inputs.casimir }}" ]] && ARGS+=(--casimir "${{ inputs.casimir }}")
+          npm run helix:decision:run -- "${ARGS[@]}"
+
+      - name: Upload decision-grade artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: helix-decision-grade
+          path: |
+            reports/helix-decision-package.json
+            reports/helix-decision-package.md
+            reports/helix-decision-inputs.json
+            reports/helix-decision-validate.json
+            reports/helix-decision-run-summary.json
+          if-no-files-found: error
