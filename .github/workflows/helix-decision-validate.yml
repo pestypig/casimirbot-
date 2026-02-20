@@ -1,7 +1,14 @@
 name: helix-decision-validate
 
 on:
+  workflow_dispatch:
+    inputs:
+      run_decision_grade:
+        description: "Set true to run decision-grade package+validate checks"
+        required: false
+        default: "false"
   pull_request:
+    types: [opened, reopened, synchronize, labeled]
     paths:
       - "reports/**"
       - "scripts/**"
@@ -12,8 +19,15 @@ on:
 
 jobs:
   validate:
+    if: >-
+      github.event_name == 'workflow_dispatch' && github.event.inputs.run_decision_grade == 'true'
+      || github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-decision-grade')
     runs-on: ubuntu-latest
     steps:
+      - name: Decision-grade trigger policy
+        run: |
+          echo "Decision-grade checks run only with explicit opt-in."
+          echo "PRs require label: run-decision-grade. workflow_dispatch requires input run_decision_grade=true."
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
