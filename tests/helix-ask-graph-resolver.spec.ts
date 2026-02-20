@@ -764,4 +764,32 @@ describe("atomic stress-energy bridge placeholder rail", () => {
     expect(placeholder).toBeTruthy();
     expect(placeholder?.validity?.strict_fail_reason).toBe("FAIL_NO_ATOMIC_TO_TMU_NU_MAPPING");
   });
+
+  it("keeps atomic proxy bridge equation-bound and claim-linked while unresolved tensor lift remains strict-fail", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+
+    const tree = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "docs/knowledge/physics/atomic-systems-tree.json"), "utf8"),
+    ) as {
+      nodes: Array<{
+        id: string;
+        validity?: {
+          equation_ref?: string;
+          claim_ids?: string[];
+          strict_fail_reason?: string;
+          requires?: { equation_ref?: string };
+        };
+      }>;
+    };
+
+    const bridge = tree.nodes.find((node) => node.id === "bridge-atomic-quantum-route-atomic-classical-route");
+    expect(bridge?.validity?.equation_ref).toBe("atomic_energy_to_energy_density_proxy");
+    expect(bridge?.validity?.claim_ids ?? []).toContain("atomic_energy_to_energy_density_proxy.v1");
+
+    const placeholder = tree.nodes.find((node) => node.id === "atomic-stress-energy-bridge-placeholder");
+    expect(placeholder?.validity?.requires?.equation_ref).toBe("atomic_energy_to_energy_density_proxy");
+    expect(placeholder?.validity?.claim_ids ?? []).toContain("atomic_energy_to_energy_density_proxy.v1");
+    expect(placeholder?.validity?.strict_fail_reason).toBe("FAIL_NO_ATOMIC_TO_TMU_NU_MAPPING");
+  });
 });

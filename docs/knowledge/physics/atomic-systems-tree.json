@@ -462,8 +462,10 @@
       "assumptions": [],
       "validity": {
         "claim_ids": [
-          "curvature_unit_proxy_contract.v1"
-        ]
+          "curvature_unit_proxy_contract.v1",
+          "atomic_energy_to_energy_density_proxy.v1"
+        ],
+        "equation_ref": "atomic_energy_to_energy_density_proxy"
       },
       "deterministic": true,
       "tolerance": null,
@@ -555,8 +557,8 @@
         "routing_policy": "blocked_until_equation_mapping",
         "strict_fail_reason": "FAIL_NO_ATOMIC_TO_TMU_NU_MAPPING",
         "requires": {
-          "equation_ref": "semiclassical_coupling",
-          "uncertainty_model_id": "required",
+          "equation_ref": "atomic_energy_to_energy_density_proxy",
+          "uncertainty_model_id": "atomic_energy_density_proxy_uq_v1",
           "stress_energy_mapping": "required"
         },
         "proxy_semantics": {
@@ -569,7 +571,8 @@
           "label": "Atomic -> Stress-Energy (Blocked: mapping required)"
         },
         "claim_ids": [
-          "curvature_unit_proxy_contract.v1"
+          "curvature_unit_proxy_contract.v1",
+          "atomic_energy_to_energy_density_proxy.v1"
         ]
       },
       "deterministic": true,
