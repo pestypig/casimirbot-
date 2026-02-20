@@ -61,3 +61,48 @@ export const zLocalCallSpec = z.object({
 });
 
 export type ZLocalCallSpec = z.infer<typeof zLocalCallSpec>;
+
+
+export type MissionBridgeCommand = "navigate" | "manipulate" | "diagnose" | "calibrate";
+
+export interface MissionBridgeEnvelope {
+  contract_version: "agibot.x1.runtime.bridge.v1";
+  trace_id: string;
+  run_id?: string;
+  channel?: "aimrt" | "ros2" | "protobuf";
+  command: {
+    name: MissionBridgeCommand;
+    args: Record<string, unknown>;
+    constraints?: {
+      max_duration_ms?: number;
+      workspace_scope?: string;
+      safety_profile?: string;
+    };
+  };
+  policy?: {
+    forbid_actuator_path?: boolean;
+    fail_closed?: boolean;
+  };
+}
+
+export const zMissionBridgeEnvelope = z.object({
+  contract_version: z.literal("agibot.x1.runtime.bridge.v1"),
+  trace_id: z.string().min(1),
+  run_id: z.string().optional(),
+  channel: z.enum(["aimrt", "ros2", "protobuf"]).optional(),
+  command: z.object({
+    name: z.enum(["navigate", "manipulate", "diagnose", "calibrate"]),
+    args: z.record(z.unknown()),
+    constraints: z.object({
+      max_duration_ms: z.number().int().positive().optional(),
+      workspace_scope: z.string().optional(),
+      safety_profile: z.string().optional(),
+    }).optional(),
+  }),
+  policy: z.object({
+    forbid_actuator_path: z.boolean().optional(),
+    fail_closed: z.boolean().optional(),
+  }).optional(),
+});
+
+export type ZMissionBridgeEnvelope = z.infer<typeof zMissionBridgeEnvelope>;

@@ -301,7 +301,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
     });
   }
 
-  const { actions, premeditation, roboticsSafety } = parsed.data;
+  const { actions, premeditation, roboticsSafety, calibration } = parsed.data;
   if (hasForbiddenActuationCommand(actions)) {
     return res.status(400).json({
       error: "controller-boundary-violation",
@@ -327,6 +327,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         tenantId: tenantGuard.tenantId,
         pass: false,
         deltas: safety.deltas,
+        calibration,
         firstFail: safety.firstFail,
         certificate: safety.certificate,
         payload: {
@@ -425,6 +426,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         tenantId: tenantGuard.tenantId,
         pass: result.pass,
         deltas: result.deltas,
+        calibration,
         firstFail: normalizedFirstFail ?? undefined,
         certificate: result.certificate ?? undefined,
         metrics: {
@@ -472,6 +474,7 @@ adapterRouter.post("/run", async (req: Request, res: Response) => {
         tenantId: tenantGuard.tenantId,
         pass: result.pass,
         deltas: result.deltas,
+        calibration,
         firstFail: normalizedFirstFail ?? undefined,
         certificate: result.certificate ?? undefined,
         payload: {

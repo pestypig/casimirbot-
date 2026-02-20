@@ -313,6 +313,8 @@ import { collectPanelSnapshots } from "../services/telemetry/panels";
 import { smallLlmCallSpecTriage } from "../services/small-llm";
 
 const planRouter = Router();
+const MISSION_FORBIDDEN_CONTROL_TERMS = /(torque|pwm|servo\s*gain|joint\s*pid|actuator\s*write|motor\s*current|can\s*write)/i;
+
 const LOCAL_SPAWN_TOOL_NAME = "llm.local.spawn.generate";
 const HTTP_TOOL_NAME = "llm.http.generate";
 const normalizeEnv = (value?: string): string | undefined => {
@@ -16552,6 +16554,17 @@ const executeHelixAsk = async ({
     const askAllowTools = parsed.data.allowTools ?? [];
     const askRequiredEvidence = parsed.data.requiredEvidence ?? [];
     if (askMode === "act" || askMode === "verify" || askMode === "observe") {
+      const missionText = (question ?? prompt ?? "").trim();
+      if (MISSION_FORBIDDEN_CONTROL_TERMS.test(missionText)) {
+        responder.send(400, {
+          ok: false,
+          mode: askMode,
+          fail_reason: "FORBIDDEN_CONTROL_PATH",
+          fail_class: "input_contract",
+          text: "Mission interface rejected actuator-level command content.",
+        });
+        return;
+      }
       await ensureDefaultTools();
       const goalText = question ?? prompt ?? "";
       const manifest = listTools();

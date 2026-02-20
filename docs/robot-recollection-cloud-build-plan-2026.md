@@ -263,3 +263,10 @@ Release candidate exit:
 
 
 Handback report draft: `docs/robot-recollection-cloud-handback-2026-phase0-6.md`
+
+## 8) AGIBOT X1 mission-skill-servo contract alignment
+
+- Canonical contract: `docs/architecture/agibot-x1-helix-control-contract-v1.md`.
+- Helix Ask remains mission-layer only (0.1-2 Hz) and cannot emit actuator-level commands.
+- Skill/servo execution must fail closed when calibration evidence, IMU baseline, or estop readiness is missing.
+- All command/response envelopes must carry `trace_id` and deterministic fail reasons for replay safety.

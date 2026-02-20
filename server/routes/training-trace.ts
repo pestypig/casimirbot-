@@ -11,6 +11,7 @@ import {
   predictionObservationLedgerSchema,
   trainingTraceSignalSchema,
   trainingTraceSourceSchema,
+  trainingTraceCalibrationSchema,
 } from "../../shared/schema.js";
 import { guardTenant, shouldRequireTenant } from "../auth/tenant";
 import {
@@ -45,6 +46,7 @@ const trainingTraceInputSchema = z.object({
   traceId: z.string().min(1).optional(),
   tenantId: z.string().min(1).optional(),
   source: trainingTraceSourceSchema.optional(),
+  calibration: trainingTraceCalibrationSchema.optional(),
   signal: trainingTraceSignalSchema.optional(),
   pass: z.boolean(),
   deltas: z.array(trainingTraceDeltaSchema).optional(),
