@@ -240,3 +240,12 @@ Done criteria:
 6. `Prompt 5`
 7. `Prompt 6`
 8. `Prompt 7`
+
+## Prompt 6 execution mapping notes
+
+For Prompt 6 backlog rows, keep each row implementation-ready with:
+- explicit risk statement
+- owner lane
+- concrete patch target
+- measurable acceptance command/check
+- disconfirmation trigger that invalidates the underlying assumption

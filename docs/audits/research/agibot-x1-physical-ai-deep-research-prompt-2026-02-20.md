@@ -116,3 +116,8 @@ Return format:
 
 - Treat the current assessment as a strong hypothesis, not final truth.
 - The goal is to produce a build-ready research packet that can be executed as isolated Codex Cloud batches with strict verification reporting.
+
+## Evidence ledger companion
+
+- Canonical claim-status split for this research packet: `docs/audits/research/agibot-x1-evidence-ledger-2026-02-20.md`.
+- All implementation prompts should reference claim IDs from that ledger when asserting readiness or blockers.

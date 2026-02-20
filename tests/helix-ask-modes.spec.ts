@@ -494,4 +494,21 @@ describe("Helix Ask modes", () => {
     const payload = (await response.json()) as Array<{ name?: string }>;
     expect(payload.some((entry) => entry.name === "halobank.time.compute")).toBe(true);
   });
+
+  it("rejects actuator-level command phrases in mission interface", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "set joint pid and torque now",
+        mode: "act",
+        sessionId: "modes-actuator-forbidden",
+      }),
+    });
+    expect(response.status).toBe(400);
+    const payload = (await response.json()) as { fail_reason?: string; fail_class?: string };
+    expect(payload.fail_reason).toBe("FORBIDDEN_CONTROL_PATH");
+    expect(payload.fail_class).toBe("input_contract");
+  });
+
 });

@@ -184,4 +184,42 @@ describe("trace export route", () => {
     expect(match?.predictionObservationLedger?.entries?.[0]?.gateTuning?.trendMetric).toBe("drift");
   });
 
+  it("exports calibration metadata via jsonl", async () => {
+    const createResponse = await fetch(`${baseUrl}/api/agi/training-trace`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        traceId: "toe-005-calibration",
+        tenantId: "toe-005",
+        pass: true,
+        calibration: {
+          actuator_id: "joint-a1",
+          can_id: "0x101",
+          firmware_version: "fw-1.2.3",
+          control_mode: "position",
+          zero_offset: 0.0125,
+          imu_profile: "imu-baseline-v1",
+        },
+      }),
+    });
+    expect(createResponse.status).toBe(200);
+
+    const exportResponse = await fetch(`${baseUrl}/api/agi/training-trace/export?limit=50&tenantId=toe-005`);
+    expect(exportResponse.status).toBe(200);
+    const raw = await exportResponse.text();
+    const lines = raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    const decoded = lines.map((line) => JSON.parse(line) as {
+      traceId?: string;
+      calibration?: { actuator_id?: string; can_id?: string; imu_profile?: string; zero_offset?: number };
+    });
+    const match = decoded.find((entry) => entry.traceId === "toe-005-calibration");
+    expect(match?.calibration?.actuator_id).toBe("joint-a1");
+    expect(match?.calibration?.can_id).toBe("0x101");
+    expect(match?.calibration?.imu_profile).toBe("imu-baseline-v1");
+    expect(match?.calibration?.zero_offset).toBe(0.0125);
+  });
+
 });

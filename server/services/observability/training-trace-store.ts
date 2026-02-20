@@ -8,6 +8,7 @@ import {
   type TrainingTraceConstraint,
   type TrainingTraceDelta,
   type TrainingTraceMetrics,
+  type TrainingTraceCalibration,
   type TrainingTracePayload,
   type TrainingTraceRecord,
   type PredictionObservationLedger,
@@ -19,6 +20,7 @@ export type TrainingTraceInput = {
   traceId?: string;
   tenantId?: string;
   source?: TrainingTraceSource;
+  calibration?: TrainingTraceCalibration;
   signal?: TrainingTraceSignal;
   pass: boolean;
   deltas?: TrainingTraceDelta[];
@@ -115,6 +117,7 @@ export function recordTrainingTrace(input: TrainingTraceInput): TrainingTraceRec
     traceId: input.traceId,
     tenantId,
     source: input.source,
+    calibration: input.calibration,
     signal: input.signal,
     pass: input.pass,
     deltas: input.deltas ?? [],
