@@ -146,6 +146,7 @@ type GraphResolverConfig = {
   trees?: GraphResolverTreeConfig[];
   routingPolicy?: {
     equation_binding_rail?: {
+      required_node_types?: string[];
       canonical_backbone_path?: string;
       strict_fail_reason?: string;
     };
@@ -748,13 +749,26 @@ const hasKnownEquationRef = (node: GraphNode, canonicalEquationRefs: Set<string>
   return canonicalEquationRefs.has(equationRef);
 };
 
-const isEquationBindingGuardedNode = (node: GraphNode): boolean => {
-  const nodeType = String(node.nodeType ?? "").trim().toLowerCase();
-  return nodeType === "physics_assertion" || nodeType === "bridge" || nodeType === "derived_metric";
+const resolveEquationBindingGuardedNodeTypes = (config?: GraphResolverConfig | null): Set<string> => {
+  const configured = ensureArray(config?.routingPolicy?.equation_binding_rail?.required_node_types)
+    .map((entry) => String(entry ?? "").trim().toLowerCase())
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right));
+  const fallback = ["physics_assertion", "bridge", "derived_metric"];
+  return new Set(configured.length > 0 ? configured : fallback);
 };
 
-const requiresEquationBindingRail = (node: GraphNode, edgeMeta?: GraphEdgeMeta): boolean => {
-  if (isEquationBindingGuardedNode(node)) return true;
+const isEquationBindingGuardedNode = (node: GraphNode, guardedNodeTypes: Set<string>): boolean => {
+  const nodeType = String(node.nodeType ?? "").trim().toLowerCase();
+  return nodeType.length > 0 && guardedNodeTypes.has(nodeType);
+};
+
+const requiresEquationBindingRail = (
+  node: GraphNode,
+  guardedNodeTypes: Set<string>,
+  edgeMeta?: GraphEdgeMeta,
+): boolean => {
+  if (isEquationBindingGuardedNode(node, guardedNodeTypes)) return true;
   const edgeType = String(edgeMeta?.edgeType ?? "").trim().toLowerCase();
   return edgeType === "proxy_only";
 };
@@ -788,7 +802,9 @@ const loadGraphTree = (
     }
     const raw = fs.readFileSync(fullPath, "utf8");
     const parsed = JSON.parse(raw) as { rootId?: string; nodes?: unknown[] };
-    const canonicalEquationRefs = loadCanonicalEquationRefs(loadGraphResolverConfig());
+    const graphResolverConfig = loadGraphResolverConfig();
+    const guardedEquationBindingNodeTypes = resolveEquationBindingGuardedNodeTypes(graphResolverConfig);
+    const canonicalEquationRefs = loadCanonicalEquationRefs(graphResolverConfig);
     const knownClaimIds = loadKnownClaimIds();
     const nodes = ensureArray(parsed.nodes).map(coerceNode).filter(Boolean) as GraphNode[];
     const nodeById = new Map<string, GraphNode>();
@@ -837,12 +853,15 @@ const loadGraphTree = (
       for (const child of node.children) {
         const meta = node.childMeta?.[child];
         evaluatedEdges += 1;
-        if (requiresEquationBindingRail(node, meta) && !hasKnownEquationRef(node, canonicalEquationRefs)) {
+        if (
+          requiresEquationBindingRail(node, guardedEquationBindingNodeTypes, meta) &&
+          !hasKnownEquationRef(node, canonicalEquationRefs)
+        ) {
           blockedEdges += 1;
           blockedByReason.node_missing_equation_ref += 1;
           continue;
         }
-        if (isEquationBindingGuardedNode(node) && !hasValidClaimLinkage(node, knownClaimIds)) {
+        if (isEquationBindingGuardedNode(node, guardedEquationBindingNodeTypes) && !hasValidClaimLinkage(node, knownClaimIds)) {
           blockedEdges += 1;
           blockedByReason.node_missing_claim_ids += 1;
           continue;
@@ -881,12 +900,15 @@ const loadGraphTree = (
           chartDependency: link.chartDependency ?? null,
         };
         evaluatedEdges += 1;
-        if (requiresEquationBindingRail(node, meta) && !hasKnownEquationRef(node, canonicalEquationRefs)) {
+        if (
+          requiresEquationBindingRail(node, guardedEquationBindingNodeTypes, meta) &&
+          !hasKnownEquationRef(node, canonicalEquationRefs)
+        ) {
           blockedEdges += 1;
           blockedByReason.node_missing_equation_ref += 1;
           continue;
         }
-        if (isEquationBindingGuardedNode(node) && !hasValidClaimLinkage(node, knownClaimIds)) {
+        if (isEquationBindingGuardedNode(node, guardedEquationBindingNodeTypes) && !hasValidClaimLinkage(node, knownClaimIds)) {
           blockedEdges += 1;
           blockedByReason.node_missing_claim_ids += 1;
           continue;
@@ -1948,6 +1970,8 @@ export function resolveHelixAskGraphPack(input: {
   if (!config?.trees?.length) return null;
   const missingEquationRefFailReason =
     config.routingPolicy?.equation_binding_rail?.strict_fail_reason ?? DEFAULT_MISSING_EQUATION_REF_FAIL_REASON;
+  const missingClaimIdsFailReason =
+    config.routingPolicy?.claim_ids_linkage_rail?.strict_fail_reason ?? DEFAULT_MISSING_CLAIM_IDS_FAIL_REASON;
   const packConfig = config.pack ?? {};
   const maxPackTrees = clampNumber(
     Math.floor(coerceNumber(packConfig.maxTrees, DEFAULT_MAX_PACK_TREES)),
