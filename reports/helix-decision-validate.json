@@ -2,7 +2,8 @@
   "ok": false,
   "package_path": "reports/helix-decision-package.json",
   "failures": [
-    "decision_grade_requires_provenance_pass"
+    "decision_grade_requires_provenance_pass",
+    "decision_grade_git_provenance_mismatch:branch,head,origin_main,ahead_behind"
   ],
   "failure_count": 1
 }
