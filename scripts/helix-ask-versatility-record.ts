@@ -821,9 +821,12 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
     if (toNum(debug?.relation_packet_evidence_count, 0) < 2) failures.push(`evidence_count_low:${toNum(debug?.relation_packet_evidence_count, 0)}`);
   }
   if (STUB_RE.test(text)) failures.push("stub_text_detected");
-  if (/\bRuntime fallback:/i.test(text)) failures.push("runtime_fallback_answer");
-  if (/cannot access ['"]?intentStrategy['"]? before initialization/i.test(text)) {
+  if (/\bruntime fallback\b/i.test(text)) failures.push("runtime_fallback_answer");
+  if (/cannot access ['\"]?intentStrategy['\"]? before initialization/i.test(text)) {
     failures.push("runtime_tdz_intentStrategy");
+  }
+  if (/cannot access ['\"]?intentProfile['\"]? before initialization/i.test(text)) {
+    failures.push("runtime_tdz_intentProfile");
   }
   if (REPORT_SECTION_RE.test(text)) failures.push("report_scaffold_shape");
   if (text.trim().length < (entry.min_text_chars ?? MIN_TEXT_CHARS)) failures.push(`text_too_short:${text.trim().length}`);
