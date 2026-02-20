@@ -171,6 +171,8 @@ function mergeArtifactRequirementMaps(
 type SegmentSummary = {
   tickets_total: number;
   tickets_with_evidence: number;
+  verified_pass_tickets: number;
+  verified_pass_progress_pct: number;
   claim_tier_counts: Record<TierKey, number>;
   weighted_score_sum: number;
   toe_progress_pct: number;
@@ -201,6 +203,8 @@ function emptySegmentSummary(): SegmentSummary {
   return {
     tickets_total: 0,
     tickets_with_evidence: 0,
+    verified_pass_tickets: 0,
+    verified_pass_progress_pct: 0,
     claim_tier_counts: {
       diagnostic: 0,
       "reduced-order": 0,
@@ -278,6 +282,7 @@ function main() {
 
   let weightedScoreSum = 0;
   let ticketsWithEvidence = 0;
+  let verifiedPassCount = 0;
   let strictReadyCount = 0;
   let researchGatedTickets = 0;
   let researchArtifactCompleteTickets = 0;
@@ -358,6 +363,15 @@ function main() {
         extensionSummary.tickets_with_evidence += 1;
       }
     }
+    if (verificationOk) {
+      verifiedPassCount += 1;
+      if (coreTicketIdSet.has(ticketId)) {
+        coreSummary.verified_pass_tickets += 1;
+      }
+      if (extensionTicketIdSet.has(ticketId)) {
+        extensionSummary.verified_pass_tickets += 1;
+      }
+    }
     if (isStrictReady) {
       strictReadyCount += 1;
       if (coreTicketIdSet.has(ticketId)) {
@@ -399,22 +413,29 @@ function main() {
   const totalTickets = ticketIds.length;
   const normalizedProgress = totalTickets > 0 ? weightedScoreSum / totalTickets : 0;
   const strictReadyProgress = totalTickets > 0 ? strictReadyCount / totalTickets : 0;
+  const verifiedPassProgress = totalTickets > 0 ? verifiedPassCount / totalTickets : 0;
   const forestOwnerCoverage = computeForestOwnerCoveragePct();
   const strictReadyDeltaTicketCount = Math.max(totalTickets - strictReadyCount, 0);
+  const verifiedPassDeltaTicketCount = Math.max(totalTickets - verifiedPassCount, 0);
   const blockerCounts = {
-    missing_verified_pass: strictReadyDeltaTicketCount,
+    missing_verified_pass: verifiedPassDeltaTicketCount,
     missing_research_artifacts: strictReadyDeltaTargets.filter(
       (target) => target.requires_research_artifact_completion,
     ).length,
     missing_math_congruence: mathCongruenceGatePass ? 0 : strictReadyDeltaTicketCount,
   };
+  const blockedTicketCount = Math.max(
+    blockerCounts.missing_verified_pass,
+    blockerCounts.missing_research_artifacts,
+    blockerCounts.missing_math_congruence,
+  );
   const strictReadyReleaseGate: StrictReadyReleaseGate = {
     status:
-      strictReadyDeltaTicketCount === 0 && mathCongruenceGatePass
+      blockedTicketCount === 0
         ? "ready"
         : "blocked",
     blocked_reasons: [
-      ...(strictReadyDeltaTicketCount > 0 ? (["missing_verified_pass"] as const) : []),
+      ...(blockerCounts.missing_verified_pass > 0 ? (["missing_verified_pass"] as const) : []),
       ...(blockerCounts.missing_research_artifacts > 0
         ? (["missing_research_artifacts"] as const)
         : []),
@@ -422,7 +443,7 @@ function main() {
         ? (["missing_math_congruence"] as const)
         : []),
     ],
-    blocked_ticket_count: strictReadyDeltaTicketCount,
+    blocked_ticket_count: blockedTicketCount,
     ready_ticket_count: strictReadyCount,
     blocker_counts: blockerCounts,
   };
@@ -444,6 +465,14 @@ function main() {
   extensionSummary.strict_ready_progress_pct =
     extensionSummary.tickets_total > 0
       ? toProgressPercent(extensionSummary.strict_ready_progress_pct / extensionSummary.tickets_total)
+      : 0;
+  coreSummary.verified_pass_progress_pct =
+    coreSummary.tickets_total > 0
+      ? toProgressPercent(coreSummary.verified_pass_tickets / coreSummary.tickets_total)
+      : 0;
+  extensionSummary.verified_pass_progress_pct =
+    extensionSummary.tickets_total > 0
+      ? toProgressPercent(extensionSummary.verified_pass_tickets / extensionSummary.tickets_total)
       : 0;
 
   coreSummary.weighted_score_sum = Math.round(coreSummary.weighted_score_sum * 1000) / 1000;
@@ -470,6 +499,8 @@ function main() {
       claim_tier_counts: claimTierCounts,
       weighted_score_sum: Math.round(weightedScoreSum * 1000) / 1000,
       toe_progress_pct: toProgressPercent(normalizedProgress),
+      verified_pass_tickets: verifiedPassCount,
+      verified_pass_progress_pct: toProgressPercent(verifiedPassProgress),
       forest_owner_coverage_pct: toProgressPercent(forestOwnerCoverage),
       strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
       strict_ready_delta_ticket_count: strictReadyDeltaTicketCount,
@@ -498,6 +529,8 @@ function main() {
         claim_tier_counts: claimTierCounts,
         weighted_score_sum: Math.round(weightedScoreSum * 1000) / 1000,
         toe_progress_pct: toProgressPercent(normalizedProgress),
+        verified_pass_tickets: verifiedPassCount,
+        verified_pass_progress_pct: toProgressPercent(verifiedPassProgress),
         strict_ready_progress_pct: toProgressPercent(strictReadyProgress),
         strict_ready_delta_ticket_count: strictReadyDeltaTicketCount,
         strict_ready_release_gate: strictReadyReleaseGate,

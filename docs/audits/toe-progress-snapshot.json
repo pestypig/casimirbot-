@@ -1,6 +1,6 @@
 {
   "schema_version": "toe_progress_snapshot/1",
-  "generated_at": "2026-02-20T00:15:03.032Z",
+  "generated_at": "2026-02-20T01:09:37.169Z",
   "source": {
     "backlog": "docs/audits/toe-cloud-agent-ticket-backlog-2026-02-17.json",
     "extension_backlog": "docs/audits/toe-coverage-extension-backlog-2026-02-18.json",
@@ -22,6 +22,8 @@
     },
     "weighted_score_sum": 25.55,
     "toe_progress_pct": 25.6,
+    "verified_pass_tickets": 91,
+    "verified_pass_progress_pct": 91,
     "forest_owner_coverage_pct": 100,
     "strict_ready_progress_pct": 8,
     "strict_ready_delta_ticket_count": 92,
@@ -30,10 +32,10 @@
       "blocked_reasons": [
         "missing_verified_pass"
       ],
-      "blocked_ticket_count": 92,
+      "blocked_ticket_count": 9,
       "ready_ticket_count": 8,
       "blocker_counts": {
-        "missing_verified_pass": 92,
+        "missing_verified_pass": 9,
         "missing_research_artifacts": 0,
         "missing_math_congruence": 0
       }
@@ -49,6 +51,8 @@
     "core": {
       "tickets_total": 10,
       "tickets_with_evidence": 10,
+      "verified_pass_tickets": 10,
+      "verified_pass_progress_pct": 100,
       "claim_tier_counts": {
         "diagnostic": 9,
         "reduced-order": 1,
@@ -63,6 +67,8 @@
     "extension": {
       "tickets_total": 90,
       "tickets_with_evidence": 81,
+      "verified_pass_tickets": 81,
+      "verified_pass_progress_pct": 90,
       "claim_tier_counts": {
         "diagnostic": 74,
         "reduced-order": 7,
@@ -84,6 +90,8 @@
       },
       "weighted_score_sum": 25.55,
       "toe_progress_pct": 25.6,
+      "verified_pass_tickets": 91,
+      "verified_pass_progress_pct": 91,
       "strict_ready_progress_pct": 8,
       "strict_ready_delta_ticket_count": 92,
       "strict_ready_release_gate": {
@@ -91,10 +99,10 @@
         "blocked_reasons": [
           "missing_verified_pass"
         ],
-        "blocked_ticket_count": 92,
+        "blocked_ticket_count": 9,
         "ready_ticket_count": 8,
         "blocker_counts": {
-          "missing_verified_pass": 92,
+          "missing_verified_pass": 9,
           "missing_research_artifacts": 0,
           "missing_math_congruence": 0
         }
