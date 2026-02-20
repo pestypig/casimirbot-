@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 type SourceKey = "narrow" | "heavy" | "recommendation" | "ab_t02" | "ab_t035" | "casimir";
 
@@ -297,7 +298,17 @@ function main(): void {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isEntrypoint = (() => {
+  const entryArg = process.argv[1];
+  if (!entryArg) return false;
+  try {
+    return import.meta.url === pathToFileURL(path.resolve(entryArg)).href;
+  } catch {
+    return false;
+  }
+})();
+
+if (isEntrypoint) {
   try {
     main();
   } catch (error) {
