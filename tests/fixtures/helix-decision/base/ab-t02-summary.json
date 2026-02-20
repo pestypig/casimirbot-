@@ -1,0 +1,9 @@
+{
+  "summary_schema_version": 2,
+  "novel_response_rate": 0.9,
+  "novel_response_rate_by_family": {
+    "relation": 0.9,
+    "repo_technical": 0.9,
+    "ambiguous_general": 0.9
+  }
+}

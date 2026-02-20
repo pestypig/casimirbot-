@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "schemas/helix-decision-package.schema.json",
+  "title": "Helix Decision Package",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "generated_at",
+    "evaluation_tier",
+    "git",
+    "runs",
+    "gates",
+    "novelty",
+    "provenance",
+    "casimir",
+    "artifacts",
+    "decision",
+    "report_paths"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "evaluation_tier": { "type": "string", "enum": ["exploratory", "decision_grade"] },
+    "git": {
+      "type": "object",
+      "required": ["branch", "head", "origin_main", "ahead_behind"],
+      "properties": {
+        "branch": { "type": "string" },
+        "head": { "type": "string" },
+        "origin_main": { "type": ["string", "null"] },
+        "ahead_behind": {
+          "type": ["object", "null"],
+          "properties": {
+            "ahead": { "type": "number" },
+            "behind": { "type": "number" }
+          },
+          "required": ["ahead", "behind"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "runs": {
+      "type": "object",
+      "required": ["narrow", "heavy", "ab_t02", "ab_t035", "casimir"],
+      "properties": {
+        "narrow": { "type": ["string", "null"] },
+        "heavy": { "type": ["string", "null"] },
+        "ab_t02": { "type": ["string", "null"] },
+        "ab_t035": { "type": ["string", "null"] },
+        "casimir": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "value", "threshold", "comparator", "pass", "source_path"],
+        "properties": {
+          "name": { "type": "string" },
+          "value": { "type": ["number", "boolean", "string", "null"] },
+          "threshold": { "type": ["number", "boolean"] },
+          "comparator": { "type": "string" },
+          "pass": { "type": "boolean" },
+          "source_path": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "novelty": {
+      "type": "object",
+      "required": ["t02", "t035"],
+      "properties": {
+        "t02": { "$ref": "#/definitions/noveltyGate" },
+        "t035": { "$ref": "#/definitions/noveltyGate" }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["pass", "blocked_reason", "warnings"],
+      "properties": {
+        "pass": { "type": "boolean" },
+        "blocked_reason": { "type": ["string", "null"] },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "casimir": {
+      "type": "object",
+      "required": ["verdict", "traceId", "runId", "certificateHash", "integrityOk", "source_path"],
+      "properties": {
+        "verdict": { "type": "string" },
+        "traceId": { "type": ["string", "null"] },
+        "runId": { "type": ["string", "null"] },
+        "certificateHash": { "type": ["string", "null"] },
+        "integrityOk": { "type": "boolean" },
+        "source_path": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "exists", "sha256", "size_bytes", "mtime_iso"],
+        "properties": {
+          "path": { "type": "string" },
+          "exists": { "type": "boolean" },
+          "sha256": { "type": ["string", "null"] },
+          "size_bytes": { "type": ["number", "null"] },
+          "mtime_iso": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": ["value", "hard_blockers", "reasoning"],
+      "properties": {
+        "value": { "type": "string", "enum": ["GO", "NO-GO"] },
+        "hard_blockers": { "type": "array", "items": { "type": "string" } },
+        "reasoning": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "report_paths": {
+      "type": "object",
+      "required": ["json", "markdown"],
+      "properties": {
+        "json": { "type": "string" },
+        "markdown": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "noveltyGate": {
+      "type": "object",
+      "required": ["overall", "by_family", "target", "pass", "source_path"],
+      "properties": {
+        "overall": { "type": "number" },
+        "by_family": {
+          "type": "object",
+          "required": ["relation", "repo_technical", "ambiguous_general"],
+          "properties": {
+            "relation": { "type": "number" },
+            "repo_technical": { "type": "number" },
+            "ambiguous_general": { "type": "number" }
+          },
+          "additionalProperties": true
+        },
+        "target": { "type": "number" },
+        "pass": { "type": "boolean" },
+        "source_path": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
