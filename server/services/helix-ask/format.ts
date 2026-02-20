@@ -134,6 +134,13 @@ export function collapseEvidenceBullets(text: string): string {
 const REPORT_SCAFFOLD_LINE_RE =
   /^\s*(?:executive\s+summary|coverage\s+map|slot\s+coverage|report\s+blocks?|block\s+\d+(?:\s*[-–—:]\s*|\s*:)|diagnostic\s+report)\s*/i;
 
+export function hasReportScaffolding(answer: string): boolean {
+  if (!answer) return false;
+  return answer
+    .split(/\r?\n/)
+    .some((line) => REPORT_SCAFFOLD_LINE_RE.test(line.trim()));
+}
+
 export function stripNonReportScaffolding(answer: string): string {
   if (!answer) return "";
   const lines = answer.split(/\r?\n/);

@@ -133,6 +133,8 @@ const buildIdeologyNodeMatchers = (): RegExp[] => {
 
 const IDEOLOGY_NODE_MATCHERS = buildIdeologyNodeMatchers();
 
+const WARP_ETHOS_RELATION_COUPLED_RE = /\b(warp|warp bubble|warp drive|alcubierre|natario)\b[\s\S]{0,120}\b(mission ethos|ethos|ideology)\b|\b(mission ethos|ethos|ideology)\b[\s\S]{0,120}\b(warp|warp bubble|warp drive|alcubierre|natario)\b/i;
+
 const INTENT_PROFILES: HelixAskIntentProfile[] = [
   {
     id: "general.conceptual_define_compare",
@@ -549,6 +551,10 @@ export function matchHelixAskIntent(input: HelixAskIntentMatchInput): HelixAskIn
   }
   let best: HelixAskIntentMatch | null = null;
   const normalized = question.toLowerCase();
+  const relationProfile = INTENT_PROFILES.find((profile) => profile.id === "hybrid.warp_ethos_relation");
+  if (relationProfile && WARP_ETHOS_RELATION_COUPLED_RE.test(normalized)) {
+    best = { profile: relationProfile, score: 999, reason: "warp_ethos_coupled" };
+  }
   for (const profile of INTENT_PROFILES) {
     const matches = countMatches(profile.matchers, normalized);
     if (matches <= 0) continue;
