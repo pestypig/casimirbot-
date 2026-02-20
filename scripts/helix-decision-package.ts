@@ -18,6 +18,7 @@ const ROOT = process.cwd();
 const REPORT_JSON = "reports/helix-decision-package.json";
 const REPORT_MD = "reports/helix-decision-package.md";
 const INPUTS_MANIFEST_JSON = "reports/helix-decision-inputs.json";
+const OUTPUT_FILES = [REPORT_JSON, REPORT_MD, INPUTS_MANIFEST_JSON] as const;
 
 const args = new Map<string, string>();
 for (let i = 2; i < process.argv.length; i += 1) {
@@ -32,9 +33,28 @@ function opt(name: string, fallback?: string): string {
   return args.get(name) ?? process.env[name.toUpperCase().replace(/-/g, "_")] ?? fallback ?? "";
 }
 
+function clearOutputs(): void {
+  for (const filePath of OUTPUT_FILES) {
+    const abs = path.resolve(ROOT, filePath);
+    try {
+      if (fs.existsSync(abs)) fs.rmSync(abs, { force: true });
+    } catch {
+      // best effort: keep failure path machine-readable
+    }
+  }
+}
+
 function fail(reason: string, details?: Record<string, unknown>): never {
+  clearOutputs();
   console.log(JSON.stringify({ ok: false, error: reason, ...(details ?? {}) }, null, 2));
   process.exit(1);
+}
+
+function atomicWrite(filePath: string, contents: string): void {
+  const abs = path.resolve(ROOT, filePath);
+  const temp = `${abs}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temp, contents);
+  fs.renameSync(temp, abs);
 }
 
 function readJson(filePath: string): JsonRecord {
@@ -186,11 +206,13 @@ function isHeavySummary(doc: JsonRecord): boolean {
 function isHeavyRole(doc: JsonRecord, relPath: string): boolean {
   if (!isHeavySummary(doc)) return false;
   const pathLower = relPath.toLowerCase();
-  if (/(^|\/)(narrow|precheck|smoke)(\/|$)/.test(pathLower)) return false;
+  if (/(^|[\/_.-])(narrow|precheck|smoke)([\/_.-]|$)/.test(pathLower)) return false;
   if (doc.run_complete !== true) return false;
   const totalRuns = asNumber(doc.total_runs) ?? asNumber(doc.runs_total) ?? asNumber((doc.summary as JsonRecord | undefined)?.total_runs);
   return (totalRuns ?? -1) >= 270;
 }
+
+try {
 
 function isRecommendation(doc: JsonRecord): boolean {
   return typeof doc.decision_grade_ready === "boolean";
@@ -518,7 +540,11 @@ const resolvedInputs = {
     casimir: fileMeta(casimirPath),
   },
 };
-fs.writeFileSync(path.resolve(ROOT, INPUTS_MANIFEST_JSON), `${JSON.stringify(resolvedInputs, null, 2)}\n`);
-fs.writeFileSync(path.resolve(ROOT, REPORT_JSON), `${JSON.stringify(pkg, null, 2)}\n`);
-fs.writeFileSync(path.resolve(ROOT, REPORT_MD), `${md}\n`);
+atomicWrite(INPUTS_MANIFEST_JSON, `${JSON.stringify(resolvedInputs, null, 2)}\n`);
+atomicWrite(REPORT_JSON, `${JSON.stringify(pkg, null, 2)}\n`);
+atomicWrite(REPORT_MD, `${md}\n`);
 console.log(JSON.stringify({ ok: true, output: REPORT_JSON, decision: pkg.decision.value, blockers: pkg.decision.hard_blockers }, null, 2));
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  fail("package_generation_failed", { message });
+}
