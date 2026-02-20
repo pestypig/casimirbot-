@@ -1,6 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  __testOnlyEvaluateFailures,
   buildRunDiagnostics,
   createArtifactBundlePaths,
   toDiagnosticRollup,
@@ -31,6 +32,38 @@ describe("helix ask versatility diagnostics", () => {
       relation_packet_built: null,
       relation_dual_domain_ok: null,
     });
+  });
+
+
+  it("emits known failure signatures for report/relation floor regressions", () => {
+    const failures = __testOnlyEvaluateFailures(
+      {
+        family: "relation",
+        prompt: "How does warp connect to mission ethos?",
+        expected_report_mode: false,
+      } as any,
+      {
+        status: 200,
+        latency_ms: 42,
+        payload: {
+          text: "Executive summary: stub",
+          report_mode: true,
+          debug: {
+            report_mode: true,
+            relation_packet_built: false,
+            relation_dual_domain_ok: false,
+            relation_packet_bridge_count: 0,
+            relation_packet_evidence_count: 0,
+          },
+        },
+      } as any,
+    );
+
+    expect(failures.some((entry) => entry.startsWith("report_mode_mismatch"))).toBe(true);
+    expect(failures.some((entry) => entry.startsWith("relation_packet_built"))).toBe(true);
+    expect(failures.some((entry) => entry.startsWith("relation_dual_domain"))).toBe(true);
+    expect(failures.some((entry) => entry.startsWith("bridge_count_low"))).toBe(true);
+    expect(failures.some((entry) => entry.startsWith("evidence_count_low"))).toBe(true);
   });
 
   it("rolls up pass/fail/unknown counts for required diagnostics", () => {
