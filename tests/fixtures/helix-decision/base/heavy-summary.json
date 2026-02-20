@@ -1,0 +1,10 @@
+{
+  "provenance": {
+    "branch": "main",
+    "head": "abc123",
+    "originMain": "abc123",
+    "aheadBehind": { "ahead": 0, "behind": 0 },
+    "gate_pass": true,
+    "warnings": []
+  }
+}
