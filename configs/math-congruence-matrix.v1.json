@@ -41,8 +41,14 @@
       },
       "falsifier": {
         "condition": "runtime_gate_false_negative_rate > 0.01 OR qi_bound_ok = false",
-        "evidence": "runtime_guardrail_regression"
-      }
+        "evidence": "runtime_guardrail_regression",
+        "uncertainty_model": "runtime_gate_thresholds(determinism_min=0.98,citation_min=0.96,non_200_max=0.02,latency_p95_max_ms=1200)"
+      },
+      "runtime_safety_eligible": true,
+      "cross_lane_bridge": true,
+      "provenance_class": "proxy",
+      "claim_tier": "diagnostic",
+      "uncertainty_model_id": "runtime_gate_thresholds_v1"
     },
     {
       "id": "physics_information_dynamics__uncertainty_propagation",
@@ -136,8 +142,14 @@
       },
       "falsifier": {
         "condition": "runtime_gate_false_negative_rate > 0.01 OR qi_bound_ok = false",
-        "evidence": "runtime_guardrail_regression"
-      }
+        "evidence": "runtime_guardrail_regression",
+        "uncertainty_model": "runtime_gate_thresholds(determinism_min=0.98,citation_min=0.96,non_200_max=0.02,latency_p95_max_ms=1200)"
+      },
+      "runtime_safety_eligible": true,
+      "cross_lane_bridge": true,
+      "provenance_class": "proxy",
+      "claim_tier": "diagnostic",
+      "uncertainty_model_id": "runtime_gate_thresholds_v1"
     },
     {
       "id": "physics_spacetime_gr__efe_baseline",
