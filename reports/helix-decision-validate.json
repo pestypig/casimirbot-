@@ -1,6 +1,8 @@
 {
-  "ok": true,
+  "ok": false,
   "package_path": "reports/helix-decision-package.json",
-  "failures": [],
-  "failure_count": 0
+  "failures": [
+    "decision_grade_requires_provenance_pass"
+  ],
+  "failure_count": 1
 }
