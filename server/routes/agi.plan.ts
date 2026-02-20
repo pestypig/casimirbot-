@@ -129,6 +129,7 @@ import {
   enforceHelixAskAnswerFormat,
   collapseEvidenceBullets,
   resolveHelixAskFormat,
+  hasReportScaffolding,
   stripNonReportScaffolding,
   type HelixAskFormat,
 } from "../services/helix-ask/format";
@@ -14093,7 +14094,7 @@ type HelixAskReportModeDecision = {
 };
 
 const REPORT_MODE_INTENT_RE =
-  /\b(report|point[- ]by[- ]point|line by line|go through (each|every)|analyze each)\b/i;
+  /\b(?:as\s+a\s+report|report\s+format|generate\s+(?:a\s+)?report|produce\s+(?:a\s+)?report|write\s+(?:a\s+)?report|point[- ]by[- ]point|line by line|go through (each|every)|analyze each)\b/i;
 const REPORT_MODE_HEADING_RE = /^#{1,6}\s+(.+)$/;
 const REPORT_MODE_BULLET_RE = /^\s*(?:[-*+]|[0-9]+[.)]|[a-zA-Z][.)])\s+(.+)$/;
 const REPORT_MODE_SECTION_RE = /^(?:Q:|Question:|Requirement:|Issue:|Task:)\s*(.+)$/i;
@@ -14959,6 +14960,19 @@ const resolveReportModeDecision = (question: string): HelixAskReportModeDecision
   // slot coverage logic so evaluation families do not drift into report mode based
   // only on prompt length.
   return { enabled: false, tokenCount, charCount, blockCount };
+};
+
+const enforceNonReportModeGuard = (
+  answer: string,
+  reportModeEnabled: boolean,
+  intentStrategy: string,
+): { text: string; mismatch: boolean; hadScaffold: boolean } => {
+  if (reportModeEnabled || intentStrategy === "constraint_report") {
+    return { text: answer, mismatch: false, hadScaffold: false };
+  }
+  const hadScaffold = hasReportScaffolding(answer);
+  const text = stripNonReportScaffolding(answer);
+  return { text, mismatch: hadScaffold && !hasReportScaffolding(text), hadScaffold };
 };
 
 const buildHelixAskReportAnswer = (
@@ -18100,6 +18114,20 @@ const executeHelixAsk = async ({
         "decompose_multi_slot_prompt",
       );
     }
+    const nonReportIntentHardGuard =
+      reportDecision.enabled &&
+      reportDecision.reason !== "explicit_report_request" &&
+      intentStrategy !== "constraint_report";
+    if (nonReportIntentHardGuard) {
+      reportDecision = {
+        ...reportDecision,
+        enabled: false,
+        reason: "non_report_intent_guard",
+        blockCount: 1,
+      };
+      answerPath.push("policy:report_mode_non_report_guard");
+    }
+
     if (debugPayload) {
       debugPayload.report_mode = reportDecision.enabled;
       debugPayload.report_mode_reason = reportDecision.reason;
@@ -24218,8 +24246,7 @@ const executeHelixAsk = async ({
         relationTopology.dualDomainAnchors ||
         (relationSlotDomainSignal.hasWarp && relationSlotDomainSignal.hasEthos) ||
         (relationContextDomainSignal.hasWarp && relationContextDomainSignal.hasEthos);
-      const relationPacketActivationOk =
-        relationQuery && (relationTopology.crossDomainBridge || relationDualDomainOk);
+      const relationPacketActivationOk = relationQuery;
       const relationSeedFiles = Array.from(
         new Set([
           ...contextFiles,
@@ -24251,7 +24278,7 @@ const executeHelixAsk = async ({
             if (debugPayload) {
               debugPayload.helix_ask_fail_reason = relationRetryFailures[0] ?? "relation_packet_built";
             }
-            relationPacket = null;
+            relationPacket = ensureRelationAssemblyPacketFallback(attemptPacket, baseQuestion);
             break;
           }
           relationSeedFiles.push(...attemptPacket.evidence.map((entry) => entry.path));
@@ -24282,9 +24309,19 @@ const executeHelixAsk = async ({
           debugPayload.relation_packet_retry_failures = relationRetryFailures;
         }
       } else if (debugPayload && relationQuery) {
-        debugPayload.relation_packet_built = false;
+        relationPacket = ensureRelationAssemblyPacketFallback(relationPacket, baseQuestion);
+        relationPacketFloorCheck = evaluateRelationPacketFloors(relationPacket, {
+          minBridges: HELIX_ASK_RELATION_PACKET_MIN_BRIDGES,
+          minEvidence: HELIX_ASK_RELATION_PACKET_MIN_EVIDENCE,
+        });
+        relationDualDomainOk =
+          relationDualDomainOk ||
+          (relationPacket.domains.includes("warp") && relationPacket.domains.includes("ethos"));
+        debugPayload.relation_packet_built = true;
         debugPayload.relation_dual_domain_ok = relationDualDomainOk;
         debugPayload.relation_missing_anchor_files = relationTopology.missingAnchors;
+        debugPayload.relation_packet_bridge_count = relationPacket.bridge_claims.length;
+        debugPayload.relation_packet_evidence_count = relationPacket.evidence.length;
       }
       const relationAnchorMissing = relationAnchorsRequired && !relationDualDomainOk;
       const relationCoverageWeak =
@@ -25939,9 +25976,15 @@ const executeHelixAsk = async ({
       if (enforceFormat) {
         cleaned = enforceHelixAskAnswerFormat(cleaned, formatSpec.format, baseQuestion);
       }
-      const nonReportOutput = !reportDecision.enabled && intentStrategy !== "constraint_report";
-      if (nonReportOutput) {
-        cleaned = stripNonReportScaffolding(cleaned);
+      const nonReportGuard = enforceNonReportModeGuard(
+        cleaned,
+        reportDecision.enabled,
+        intentStrategy,
+      );
+      cleaned = nonReportGuard.text;
+      if (debugPayload && !reportDecision.enabled && intentStrategy !== "constraint_report") {
+        debugPayload.report_mode_mismatch = nonReportGuard.mismatch;
+        debugPayload.report_scaffold_guard_triggered = nonReportGuard.hadScaffold;
       }
       cleaned = stripTruncationMarkers(cleaned);
       if (!cleaned.trim()) {
@@ -27360,7 +27403,7 @@ const executeHelixAsk = async ({
             new Set([...contextFiles, ...secondPassRetrieval.candidates.map((entry) => entry.path).filter(Boolean)]),
           );
         }
-        const secondPassPacket = ensureRelationAssemblyPacketFallback(
+        const secondPassPacket = ensureRelationFallbackDomainAnchors(ensureRelationAssemblyPacketFallback(
           buildRelationAssemblyPacket({
             question: baseQuestion,
             contextFiles: Array.from(
@@ -27375,7 +27418,7 @@ const executeHelixAsk = async ({
             graphPack,
           }),
           baseQuestion,
-        );
+        ));
         relationPacket = secondPassPacket;
         relationPacketFloorCheck = evaluateRelationPacketFloors(secondPassPacket, {
           minBridges: HELIX_ASK_RELATION_PACKET_MIN_BRIDGES,
@@ -27853,13 +27896,19 @@ const executeHelixAsk = async ({
           ...extractCitationTokensFromText(evidenceText),
         ])[0] ?? "server/routes/agi.plan.ts";
       cleaned = enforceCitationLinkedClaims(cleaned, fallbackCitationAnchor);
-      const nonReportIntent = !reportDecision.enabled && intentStrategy !== "constraint_report";
-      if (nonReportIntent) {
-        const stripped = stripNonReportScaffolding(cleaned);
-        if (stripped !== cleaned) {
-          answerPath.push("policy:non_report_scaffold_guard");
-        }
-        cleaned = stripped;
+      const finalNonReportGuard = enforceNonReportModeGuard(
+        cleaned,
+        reportDecision.enabled,
+        intentStrategy,
+      );
+      if (finalNonReportGuard.text !== cleaned) {
+        answerPath.push("policy:non_report_scaffold_guard");
+      }
+      cleaned = finalNonReportGuard.text;
+      if (debugPayload && !reportDecision.enabled && intentStrategy !== "constraint_report") {
+        debugPayload.report_mode_mismatch = finalNonReportGuard.mismatch;
+        debugPayload.report_scaffold_guard_triggered =
+          Boolean(debugPayload.report_scaffold_guard_triggered) || finalNonReportGuard.hadScaffold;
       }
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
@@ -28160,6 +28209,20 @@ planRouter.post("/ask", async (req, res) => {
         typedDebug.strict_fail_reason_histogram_artifact = strictFailLedger.histogram_artifact;
       }
     }
+    if (status < 400 && payload && typeof payload === "object") {
+      const typedPayload = payload as Record<string, unknown>;
+      if (typeof typedPayload.report_mode !== "boolean") {
+        typedPayload.report_mode = false;
+      }
+      const typedDebug =
+        typedPayload.debug && typeof typedPayload.debug === "object"
+          ? (typedPayload.debug as Record<string, unknown>)
+          : null;
+      if (typedDebug && typeof typedDebug.report_mode !== "boolean") {
+        typedDebug.report_mode = Boolean(typedPayload.report_mode);
+      }
+    }
+
     const normalizedPayload = status >= 400
       ? normalizeHelixAskErrorEnvelope(status, payload, requestMetadata, askStartedAtMs)
       : payload;

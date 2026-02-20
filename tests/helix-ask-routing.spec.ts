@@ -135,6 +135,15 @@ const cases: IntentCase[] = [
     expectStageTags: false,
   },
   {
+    question: "Could warp bubble progress violate mission ethos, and how is that prevented?",
+    hasRepoHints: false,
+    hasFilePathHints: false,
+    expectedId: "hybrid.warp_ethos_relation",
+    expectedDomain: "hybrid",
+    expectedFormat: "compare",
+    expectStageTags: false,
+  },
+  {
     question: "What is the Casimir effect?",
     hasRepoHints: false,
     hasFilePathHints: false,

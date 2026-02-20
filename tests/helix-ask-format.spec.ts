@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enforceHelixAskAnswerFormat, stripNonReportScaffolding } from "../server/services/helix-ask/format";
+import { enforceHelixAskAnswerFormat, hasReportScaffolding, stripNonReportScaffolding } from "../server/services/helix-ask/format";
 
 describe("Helix Ask format compliance", () => {
   it("collapses bullet-only answers into paragraphs for compare", () => {
@@ -40,6 +40,13 @@ describe("Helix Ask format compliance", () => {
     expect(formatted).toContain("Definition:");
     expect(formatted).toContain("In practice");
     expect(formatted).not.toMatch(/^\s*[-*]\s+/m);
+  });
+
+
+  it("detects report scaffolding markers before stripping", () => {
+    const raw = ["Executive summary:", "Coverage map: warp, ethos", "Body line."].join("\n");
+    expect(hasReportScaffolding(raw)).toBe(true);
+    expect(hasReportScaffolding("Body line only.")).toBe(false);
   });
 
   it("strips report scaffolding markers from non-report outputs", () => {

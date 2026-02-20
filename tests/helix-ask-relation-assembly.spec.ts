@@ -330,6 +330,14 @@ describe("relation assembly packet", () => {
     expect(fallback.bridge_claims.length).toBeGreaterThanOrEqual(2);
   });
 
+
+  it("ensures fallback packet satisfies minimum relation floors deterministically", () => {
+    const packet = ensureRelationAssemblyPacketFallback(null, "How does warp relate to mission ethos?");
+    const floor = evaluateRelationPacketFloors(packet, { minBridges: 2, minEvidence: 2 });
+    expect(floor.ok).toBe(true);
+    expect(packet.domains).toEqual(["ethos", "warp"]);
+  });
+
   it("injects deterministic dual-domain anchors for relation fallback packets", () => {
     const anchored = ensureRelationFallbackDomainAnchors(
       ensureRelationAssemblyPacketFallback(
