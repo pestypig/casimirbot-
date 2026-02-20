@@ -17997,6 +17997,12 @@ const executeHelixAsk = async ({
       intentId: "repo.ideology_reference",
     });
     const isIdeologyNarrativeQuery = HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE.test(initialReportQuestion);
+    const initialRepoCueDetected =
+      HELIX_ASK_REPO_FORCE.test(initialReportQuestion) ||
+      HELIX_ASK_REPO_EXPECTS.test(initialReportQuestion) ||
+      HELIX_ASK_REPO_HINT.test(initialReportQuestion) ||
+      HELIX_ASK_FILE_HINT.test(initialReportQuestion) ||
+      /helix(?:[-\s]+)ask|\/api\/agi\/ask|codebase|repository|repo|arbiter|evidence gate|constraint|live events?|routing/i.test(initialReportQuestion);
     let reportDecision = resolveReportModeDecision(initialReportQuestion);
     const ideologyConversationalSeed = shouldUseIdeologyConversationalMode(
       initialReportQuestion,
@@ -18038,6 +18044,7 @@ const executeHelixAsk = async ({
       !isIdeologyConversationalCandidate &&
       !isIdeologyNarrativeQuery &&
       !warpEthosRelationReportQuery &&
+      !initialRepoCueDetected &&
       !reportDecision.enabled &&
       slotPreview.coverageSlots.length >= 2
     ) {
@@ -18128,6 +18135,7 @@ const executeHelixAsk = async ({
       !isIdeologyConversationalCandidate &&
       !isIdeologyNarrativeQuery &&
       !warpEthosRelationReportQuery &&
+      !initialRepoCueDetected &&
       !reportDecision.enabled &&
       slotPreview.coverageSlots.length >= 2
     ) {
@@ -18214,7 +18222,7 @@ const executeHelixAsk = async ({
       const reportRepoContext =
         reportExplicitRepo ||
         HELIX_ASK_REPO_HINT.test(rawQuestion) ||
-        /helix ask|codebase|repository|repo|arbiter|evidence gate|constraint/i.test(rawQuestion);
+        /helix(?:[-\s]+)ask|\/api\/agi\/ask|codebase|repository|repo|arbiter|evidence gate|constraint|live events?|routing/i.test(rawQuestion);
       const helixAskAnchorFiles = reportRepoContext && /helix ask/i.test(rawQuestion)
         ? [
             "server/routes/agi.plan.ts",
@@ -19351,6 +19359,22 @@ const executeHelixAsk = async ({
     let intentTier = intentProfile.tier;
     let intentSecondaryTier = intentProfile.secondaryTier;
     let intentStrategy = intentProfile.strategy;
+    const repoQueryReportGuard =
+      reportDecision.enabled &&
+      reportDecision.reason !== "explicit_report_request" &&
+      (initialRepoCueDetected ||
+        requiresRepoEvidence ||
+        repoExpectationLevel !== "low" ||
+        /helix(?:[-\s]+)ask|\/api\/agi\/ask|live events?|routing/i.test(baseQuestion));
+    if (repoQueryReportGuard) {
+      reportDecision = {
+        ...reportDecision,
+        enabled: false,
+        reason: "repo_query_mode",
+        blockCount: 1,
+      };
+      answerPath.push("policy:report_mode_repo_query_guard");
+    }
     const nonReportIntentHardGuard =
       reportDecision.enabled &&
       reportDecision.reason !== "explicit_report_request" &&
