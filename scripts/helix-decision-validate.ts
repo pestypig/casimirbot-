@@ -1,11 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
+import Ajv from "ajv";
 
 const ROOT = process.cwd();
 const packagePath = process.argv.includes("--package")
   ? process.argv[process.argv.indexOf("--package") + 1]
   : "reports/helix-decision-package.json";
 const reportPath = "reports/helix-decision-validate.json";
+const schemaPath = "schemas/helix-decision-package.schema.json";
 
 function readJson(filePath: string): any {
   return JSON.parse(fs.readFileSync(path.resolve(ROOT, filePath), "utf8"));
@@ -30,28 +32,30 @@ function isUtilityAbSummary(obj: any): boolean {
 
 const failures: string[] = [];
 let pkg: any = null;
+let schema: any = null;
+
+try {
+  schema = readJson(schemaPath);
+} catch (err) {
+  failures.push(`schema_unreadable:${String(err)}`);
+}
+
 try {
   pkg = readJson(packagePath);
 } catch (err) {
   failures.push(`package_unreadable:${String(err)}`);
 }
 
-if (pkg) {
-  const requiredTop = [
-    "schema_version",
-    "generated_at",
-    "evaluation_tier",
-    "git",
-    "runs",
-    "gates",
-    "novelty",
-    "provenance",
-    "casimir",
-    "artifacts",
-    "decision",
-  ];
-  for (const key of requiredTop) {
-    if (!(key in pkg)) failures.push(`missing_field:${key}`);
+if (pkg && schema) {
+  const ajv = new Ajv({ allErrors: true, jsonPointers: true });
+  const validate = ajv.compile(schema);
+  const valid = validate(pkg);
+  if (!valid) {
+    failures.push("schema_validation_failed");
+    for (const err of validate.errors ?? []) {
+      const pathLabel = err.instancePath || "/";
+      failures.push(`schema_error:${pathLabel}:${err.message ?? "unknown"}`);
+    }
   }
 
   if (!Array.isArray(pkg.gates)) {

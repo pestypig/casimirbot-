@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-02-20T07:04:44.495Z",
+  "generated_at": "2026-02-20T07:18:41.971Z",
   "evaluation_tier": "decision_grade",
   "git": {
     "branch": "work",
-    "head": "2b260ab",
+    "head": "d566fa8",
     "origin_main": null,
     "ahead_behind": null
   },
@@ -151,49 +151,49 @@
       "exists": true,
       "sha256": "f5aed845e255716f654513b921311b23156776f116b8690637b1bb1f9e49675f",
       "size_bytes": 736,
-      "mtime_iso": "2026-02-20T07:01:29.141Z"
+      "mtime_iso": "2026-02-20T07:14:42.691Z"
     },
     {
       "path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/summary.json",
       "exists": true,
       "sha256": "63661efc7cb3fc7f603ae413c8bed09e9104b121510314388782490024ca7e2a",
       "size_bytes": 119933,
-      "mtime_iso": "2026-02-20T04:30:19.120Z"
+      "mtime_iso": "2026-02-20T04:39:21.239Z"
     },
     {
       "path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/recommendation.json",
       "exists": true,
       "sha256": "a07b17607aedb260569cb5630c49050b3eaa32be5ededb887f3759c1942ce951",
       "size_bytes": 3031,
-      "mtime_iso": "2026-02-20T04:30:19.120Z"
+      "mtime_iso": "2026-02-20T04:39:21.239Z"
     },
     {
       "path": "artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json",
       "exists": true,
       "sha256": "4ea1bb03e0098b334450fbb37060a076db5a4933db1ccfde91c2dc1497770962",
       "size_bytes": 1665,
-      "mtime_iso": "2026-02-20T04:30:19.116Z"
+      "mtime_iso": "2026-02-20T04:39:21.235Z"
     },
     {
       "path": "artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json",
       "exists": true,
       "sha256": "e8264bc85cf72cd53522be86853ebd0c06d9f4717e95762b34b671cf2a02a21a",
       "size_bytes": 1666,
-      "mtime_iso": "2026-02-20T04:30:19.116Z"
+      "mtime_iso": "2026-02-20T04:39:21.235Z"
     },
     {
       "path": "reports/helix-self-tune-casimir.json",
       "exists": true,
       "sha256": "ec73cc2e72e32bba1561be5af10b7d4804becca271b09832048f7be66f83b400",
       "size_bytes": 271,
-      "mtime_iso": "2026-02-20T07:01:29.141Z"
+      "mtime_iso": "2026-02-20T07:14:42.691Z"
     },
     {
       "path": "schemas/helix-decision-package.schema.json",
       "exists": true,
       "sha256": "bdfb8e4c87f5d312da076444b41d2618593b80c6a0ac9a38f49f0cb1d6753649",
       "size_bytes": 5233,
-      "mtime_iso": "2026-02-20T07:02:34.330Z"
+      "mtime_iso": "2026-02-20T07:14:42.695Z"
     }
   ],
   "decision": {

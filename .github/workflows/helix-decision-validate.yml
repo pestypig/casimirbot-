@@ -5,6 +5,8 @@ on:
     paths:
       - "reports/**"
       - "scripts/**"
+      - "schemas/**"
+      - "tests/helix-decision-validate.spec.ts"
       - "server/services/helix-ask/**"
       - "artifacts/**"
 
@@ -18,4 +20,5 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run helix:decision:validate
+      - run: npm run helix:decision:package
+      - run: npm run helix:decision:validate -- --package reports/helix-decision-package.json
