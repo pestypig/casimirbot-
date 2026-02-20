@@ -560,6 +560,62 @@ describe("helix ask graph resolver congruence overrides", () => {
     expect(missing?.bridgeNodes).toContain("bridge-noise-spectrum-to-collapse-proxy");
   });
 
+  it("keeps broad life/cosmology/consciousness missing-evidence routing deterministic with explicit fallback reason", () => {
+    const question = "How do cosmology, life emergence, and consciousness relate in open-world science?";
+    const first = __testOnlyResolveBridgeMissingEvidencePath({
+      question,
+      availableNodeIds: ["uncertainty-mechanics"],
+      bridgeNodeIds: ["bridge-orch-or-to-stellar-coherence"],
+    });
+    const second = __testOnlyResolveBridgeMissingEvidencePath({
+      question,
+      availableNodeIds: ["uncertainty-mechanics"],
+      bridgeNodeIds: ["bridge-orch-or-to-stellar-coherence"],
+    });
+
+    expect(first).toEqual(second);
+    expect(first?.family).toBe("life_cosmology_consciousness");
+    expect(first?.missingAnchors).toEqual(
+      expect.arrayContaining([
+        "no-feasibility-claims",
+        "sampling-time-bounds",
+        "qi-diagnostics-schema",
+      ]),
+    );
+
+    const pack = resolveHelixAskGraphPack({
+      question,
+      topicTags: ["physics", "star"],
+      lockedTreeIds: ["stellar-ps1-bridges"],
+    });
+    const framework = pack?.frameworks.find((entry) => entry.treeId === "stellar-ps1-bridges");
+    expect(framework?.pathFallbackReason).toBe("stellar_bridge_contract_invalid");
+  });
+
+  it("keeps positive broad-family contracted bridge routing intact with no silent fallback", () => {
+    const pack = resolveHelixAskGraphPack({
+      question: "Explain open-world consciousness and cosmology through the life-emergence bridge with citations.",
+      topicTags: ["physics", "star"],
+      lockedTreeIds: ["stellar-ps1-bridges"],
+      pathMode: "root_to_anchor",
+    });
+
+    const framework = pack?.frameworks.find((entry) => entry.treeId === "stellar-ps1-bridges");
+    expect(framework).toBeTruthy();
+    expect(framework?.pathFallbackReason).toBe("stellar_bridge_contract_invalid");
+    const candidates = [...(framework?.path ?? []), ...(framework?.anchors ?? [])];
+    const bridge = candidates.find((entry) => entry.id === "bridge-orch-or-to-stellar-coherence");
+    expect(bridge?.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "docs/knowledge/bridges/life-cosmology-consciousness-bridge.json",
+          provenance_class: "measured",
+          claim_tier: "reduced-order",
+        }),
+      ]),
+    );
+  });
+
   it("registers evidence falsifier ledger lane and routes evidence schema prompts deterministically", () => {
     const question = "validate evidence schema provenance claim tier consistency";
     const first = resolveHelixAskGraphPack({

@@ -231,6 +231,84 @@ describe("relation assembly packet", () => {
     existsSpy.mockRestore();
   });
 
+  it("fails deterministically for broad open-world science prompt when proxy metadata is insufficient", async () => {
+    const fs = await import("node:fs");
+    const existsSpy = vi.spyOn(fs.default ?? fs, "existsSync").mockReturnValue(true);
+    const readSpy = vi.spyOn(fs.default ?? fs, "readFileSync").mockReturnValue(
+      JSON.stringify({
+        rows: [
+          {
+            id: "runtime_broad_science_proxy_missing_metadata",
+            runtime_safety_eligible: true,
+            cross_lane_bridge: true,
+            provenance_class: "proxy",
+            equation_id: "",
+            claim_tier: "diagnostic",
+            uncertainty_model_id: "broad_proxy_uq_v1",
+            falsifier: {
+              uncertainty_model: "proxy_bridge_uncertainty(broad_proxy_uq_v1)",
+              evidence: "",
+            },
+          },
+        ],
+      }) as any,
+    );
+
+    const packet = buildRelationAssemblyPacket({
+      question: "How do consciousness, cosmology, and life interact in open-world settings?",
+      contextFiles: ["docs/knowledge/warp/warp-bubble.md", "docs/ethos/ideology.json"],
+      contextText: "broad science bridge synthesis",
+      docBlocks: [
+        { path: "docs/knowledge/warp/warp-bubble.md", block: "Warp runtime safety rail." },
+        { path: "docs/ethos/ideology.json", block: "Ethos runtime stewardship rail." },
+      ],
+      graphPack: null,
+    });
+
+    expect(packet.fail_reason).toBe("FAIL_MISSING_PROXY_METADATA");
+    expect(
+      packet.falsifiability_hooks.some((entry) =>
+        entry.includes("cross_lane_uncertainty=missing_citation_or_equation_metadata:runtime_broad_science_proxy_missing_metadata"),
+      ),
+    ).toBe(true);
+
+    readSpy.mockRestore();
+    existsSpy.mockRestore();
+  });
+
+  it("keeps contracted positive route for broad science prompts when uncertainty/citation/equation metadata is complete", async () => {
+    const fs = await import("node:fs");
+    const existsSpy = vi.spyOn(fs.default ?? fs, "existsSync").mockReturnValue(true);
+    const readSpy = vi.spyOn(fs.default ?? fs, "readFileSync").mockReturnValue(
+      JSON.stringify({
+        rows: [
+          {
+            id: "runtime_broad_science_proxy_complete",
+            runtime_safety_eligible: true,
+            cross_lane_bridge: true,
+            provenance_class: "proxy",
+            equation_id: "eq_broad_science_1",
+            claim_tier: "diagnostic",
+            uncertainty_model_id: "broad_proxy_uq_v1",
+            falsifier: {
+              uncertainty_model: "proxy_bridge_uncertainty(broad_proxy_uq_v1)",
+              evidence: "docs/knowledge/bridges/life-cosmology-consciousness-bridge.json#falsifier",
+            },
+          },
+        ],
+      }) as any,
+    );
+
+    const result = __testOnlyResolveCrossLaneUncertaintyValidation();
+    expect(result.referenced).toBe(true);
+    expect(result.pass).toBe(true);
+    expect(result.failReason).toBeUndefined();
+    expect(result.summary).toContain("cross_lane_uncertainty=ok:runtime_broad_science_proxy_complete");
+
+    readSpy.mockRestore();
+    existsSpy.mockRestore();
+  });
+
 
   it("builds deterministic dual-domain fallback evidence when relation fields are missing", () => {
     const fallback = ensureRelationAssemblyPacketFallback(
