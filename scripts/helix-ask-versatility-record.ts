@@ -68,6 +68,26 @@ type RawRun = {
     error?: string;
     message?: string;
   }>;
+  diagnostics?: {
+    report_mode_correct: boolean | null;
+    relation_packet_built: boolean | null;
+    relation_dual_domain_ok: boolean | null;
+  };
+  artifact_bundle_paths?: ArtifactBundlePaths;
+};
+
+type ArtifactBundlePaths = {
+  output_root_dir: string;
+  output_run_dir: string;
+  summary: string;
+  recommendation: string;
+  failures: string;
+  checkpoint: string;
+  prompts: string;
+  raw_dir: string;
+  raw_record?: string;
+  ab_outputs: string[];
+  trace_export: string | null;
 };
 
 type FailureRecord = {
@@ -132,10 +152,54 @@ const GLOBAL_COOLDOWN_CAP_MS = Math.max(
 );
 const STUB_RE = /llm\.local stub result/i;
 const REPORT_SECTION_RE = /(Executive summary:|Coverage map:|Point-by-point:|Report covers)/i;
+const TRACE_EXPORT_PATH = process.env.HELIX_ASK_TRACE_EXPORT_PATH?.trim() || null;
+const AB_OUTPUT_PATHS = (process.env.HELIX_ASK_AB_OUTPUT_PATHS ?? "")
+  .split(",")
+  .map((entry) => entry.trim())
+  .filter(Boolean);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const runCaseKey = (promptId: string, seed: number, temperature: number): string =>
   `${promptId}::s${seed}::t${temperature}`;
+
+export const createArtifactBundlePaths = (args: {
+  outRootDir: string;
+  runOutDir: string;
+  rawRecordPath?: string;
+  traceExportPath?: string | null;
+  abOutputPaths?: string[];
+}): ArtifactBundlePaths => {
+  const summary = path.resolve(args.runOutDir, "summary.json");
+  const recommendation = path.resolve(args.runOutDir, "recommendation.json");
+  const failures = path.resolve(args.runOutDir, "failures.json");
+  const checkpoint = path.resolve(args.runOutDir, "checkpoint.json");
+  const prompts = path.resolve(args.runOutDir, "prompts.jsonl");
+  const raw_dir = path.resolve(args.runOutDir, "raw");
+  return {
+    output_root_dir: path.resolve(args.outRootDir),
+    output_run_dir: path.resolve(args.runOutDir),
+    summary,
+    recommendation,
+    failures,
+    checkpoint,
+    prompts,
+    raw_dir,
+    ...(args.rawRecordPath ? { raw_record: path.resolve(args.rawRecordPath) } : {}),
+    ab_outputs: (args.abOutputPaths ?? []).map((entry) => path.resolve(entry)),
+    trace_export: args.traceExportPath ? path.resolve(args.traceExportPath) : null,
+  };
+};
+
+export const buildRunDiagnostics = (row: Pick<RawRun, "expected_report_mode" | "family" | "debug">): NonNullable<RawRun["diagnostics"]> => ({
+  report_mode_correct:
+    typeof row.expected_report_mode === "boolean" && typeof row.debug?.report_mode === "boolean"
+      ? row.debug.report_mode === row.expected_report_mode
+      : null,
+  relation_packet_built:
+    row.family === "relation" ? (row.debug?.relation_packet_built === true) : null,
+  relation_dual_domain_ok:
+    row.family === "relation" ? (row.debug?.relation_dual_domain_ok === true) : null,
+});
 const execGit = async (args: string[]): Promise<string | null> =>
   new Promise((resolve) => {
     execFile("git", args, { cwd: process.cwd(), timeout: 3000 }, (error, stdout) => {
@@ -386,6 +450,29 @@ const writeCheckpoint = async (outDir: string, runId: string, rows: RawRun[]) =>
     }, {}),
   };
   await fs.writeFile(path.resolve(outDir, "checkpoint.json"), `${JSON.stringify(checkpoint, null, 2)}\n`, "utf8");
+};
+
+export const toDiagnosticRollup = (rows: RawRun[]) => {
+  const reportModeRows = rows.filter((row) => row.diagnostics?.report_mode_correct !== null);
+  const relationPacketRows = rows.filter((row) => row.diagnostics?.relation_packet_built !== null);
+  const relationDualRows = rows.filter((row) => row.diagnostics?.relation_dual_domain_ok !== null);
+  return {
+    report_mode_correct: {
+      pass: reportModeRows.filter((row) => row.diagnostics?.report_mode_correct === true).length,
+      fail: reportModeRows.filter((row) => row.diagnostics?.report_mode_correct === false).length,
+      unknown: rows.length - reportModeRows.length,
+    },
+    relation_packet_built: {
+      pass: relationPacketRows.filter((row) => row.diagnostics?.relation_packet_built === true).length,
+      fail: relationPacketRows.filter((row) => row.diagnostics?.relation_packet_built === false).length,
+      unknown: rows.length - relationPacketRows.length,
+    },
+    relation_dual_domain_ok: {
+      pass: relationDualRows.filter((row) => row.diagnostics?.relation_dual_domain_ok === true).length,
+      fail: relationDualRows.filter((row) => row.diagnostics?.relation_dual_domain_ok === false).length,
+      unknown: rows.length - relationDualRows.length,
+    },
+  };
 };
 
 const circuitRetryAfterFromRawRun = (row: RawRun): number => {
@@ -770,6 +857,12 @@ const main = async () => {
 
   let resumedFromLatest = false;
   let resumedRuns = 0;
+  const runArtifactBundlePaths = createArtifactBundlePaths({
+    outRootDir,
+    runOutDir,
+    traceExportPath: TRACE_EXPORT_PATH,
+    abOutputPaths: AB_OUTPUT_PATHS,
+  });
   if (ISOLATE_RUN_DIR && RESUME_FROM_LATEST) {
     const latest = await readJsonFile<{ run_id?: string; output_run_dir?: string }>(
       path.resolve(outRootDir, "latest.json"),
@@ -867,6 +960,8 @@ const main = async () => {
             break outer;
           }
           const failures = evaluateFailures(entry, response);
+          const fileName = `${runId}-${entry.id}-s${seed}-t${String(temperature).replace(".", "p")}.json`;
+          const rawRecordPath = path.resolve(runOutDir, "raw", fileName);
           const raw: RawRun = {
             run_id: runId,
             prompt_id: entry.id,
@@ -885,6 +980,18 @@ const main = async () => {
             attempts,
             stop_reason: stopReason,
             attempt_trace: attemptTrace,
+            diagnostics: buildRunDiagnostics({
+              expected_report_mode: entry.expected_report_mode,
+              family: entry.family,
+              debug: response.payload.debug ?? null,
+            }),
+            artifact_bundle_paths: createArtifactBundlePaths({
+              outRootDir,
+              runOutDir,
+              rawRecordPath,
+              traceExportPath: TRACE_EXPORT_PATH,
+              abOutputPaths: AB_OUTPUT_PATHS,
+            }),
           };
           rawRunByKey.set(caseKey, raw);
           if (
@@ -899,8 +1006,7 @@ const main = async () => {
               }
             }
           }
-          const fileName = `${runId}-${entry.id}-s${seed}-t${String(temperature).replace(".", "p")}.json`;
-          await fs.writeFile(path.resolve(runOutDir, "raw", fileName), `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+          await fs.writeFile(rawRecordPath, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
           if (rawRunByKey.size % CHECKPOINT_EVERY === 0) {
             const checkpointRows = Array.from(rawRunByKey.values());
             await writeCheckpoint(runOutDir, runId, checkpointRows);
@@ -1061,6 +1167,19 @@ const main = async () => {
       gate_pass: provenanceGatePass,
       warnings: provenanceWarnings,
     },
+    artifact_bundle_paths: runArtifactBundlePaths,
+    diagnostics: {
+      per_run: rawRuns.map((row) => ({
+        prompt_id: row.prompt_id,
+        family: row.family,
+        seed: row.seed,
+        temperature: row.temperature,
+        report_mode_correct: row.diagnostics?.report_mode_correct ?? null,
+        relation_packet_built: row.diagnostics?.relation_packet_built ?? null,
+        relation_dual_domain_ok: row.diagnostics?.relation_dual_domain_ok ?? null,
+      })),
+      rollup: toDiagnosticRollup(rawRuns),
+    },
     family_summary: familySummary,
     metrics: {
       attempts: {
@@ -1092,6 +1211,10 @@ const main = async () => {
     expected_runs: expectedRuns,
     total_runs: rawRuns.length,
     run_complete: runComplete,
+    artifact_bundle_paths: runArtifactBundlePaths,
+    diagnostics: {
+      rollup: toDiagnosticRollup(rawRuns),
+    },
     top_failure_signatures: topFailures,
     failed_runs: rawRuns.filter((row) => row.failures.length > 0).map((row) => ({
       prompt_id: row.prompt_id,
@@ -1102,6 +1225,12 @@ const main = async () => {
       intent_id: row.debug?.intent_id,
       report_mode: row.debug?.report_mode,
       latency_ms: row.latency_ms,
+      diagnostics: {
+        report_mode_correct: row.diagnostics?.report_mode_correct ?? null,
+        relation_packet_built: row.diagnostics?.relation_packet_built ?? null,
+        relation_dual_domain_ok: row.diagnostics?.relation_dual_domain_ok ?? null,
+      },
+      artifact_bundle_paths: row.artifact_bundle_paths ?? runArtifactBundlePaths,
     })),
   };
 
@@ -1149,6 +1278,10 @@ const main = async () => {
     decision: normalizedDecision,
     decision_grade_ready: decisionGradeReady,
     provenance_blocked: !provenanceGatePass,
+    artifact_bundle_paths: runArtifactBundlePaths,
+    diagnostics: {
+      rollup: toDiagnosticRollup(rawRuns),
+    },
     rationale: [
       `provenance_gate_pass=${String(provenanceGatePass)}`,
       `decision_grade_ready=${String(decisionGradeReady)}`,
@@ -1289,7 +1422,11 @@ const main = async () => {
   }
 };
 
-main().catch((error) => {
-  console.error("[versatility] failed", error);
-  process.exit(1);
-});
+const isDirectRun = process.argv[1] ? path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname) : false;
+
+if (isDirectRun) {
+  main().catch((error) => {
+    console.error("[versatility] failed", error);
+    process.exit(1);
+  });
+}
