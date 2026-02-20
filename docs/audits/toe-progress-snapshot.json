@@ -49,6 +49,8 @@
     "core": {
       "tickets_total": 10,
       "tickets_with_evidence": 10,
+      "verified_pass_tickets": 10,
+      "verified_pass_progress_pct": 100,
       "claim_tier_counts": {
         "diagnostic": 0,
         "reduced-order": 10,
@@ -63,6 +65,8 @@
     "extension": {
       "tickets_total": 90,
       "tickets_with_evidence": 81,
+      "verified_pass_tickets": 81,
+      "verified_pass_progress_pct": 90,
       "claim_tier_counts": {
         "diagnostic": 57,
         "reduced-order": 24,
