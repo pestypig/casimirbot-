@@ -100,6 +100,24 @@ For these bridge claims, the checker enforces:
 
 Missing required bridge claims or missing bridge citation/domain/maturity metadata is an ERROR.
 
+### Proxy node and cross-lane strict rail requirements
+
+For physics/bridge/proxy-emitting nodes (`nodeType` in `physics_assertion | bridge | derived_metric`) in
+`docs/knowledge/physics/*.json`, strict citation congruence additionally requires:
+
+1. `validity.claim_ids` with known claim IDs.
+2. Equation linkage metadata via `validity.equation_ref` or `validity.requires.equation_ref` for proxy-emitting nodes.
+3. For runtime-eligible cross-lane proxy rows in `configs/math-congruence-matrix.v1.json`, all of:
+   - `uncertainty_model_id`
+   - `falsifier.uncertainty_model`
+   - `equation_id`
+   - `falsifier.evidence` (citation linkage)
+   - `claim_tier`
+
+Missing (1)-(2) fails `math:congruence:check:strict`. Missing (3) is surfaced by relation assembly as
+`FAIL_MISSING_PROXY_METADATA` with deterministic hook text
+`cross_lane_uncertainty=missing_citation_or_equation_metadata:<row_ids>`.
+
 ## CI Gate Semantics
 
 Default checker behavior:

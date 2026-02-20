@@ -25,6 +25,7 @@ export type RelationAssemblyPacket = {
     | "RUNTIME_SAFETY_GATE_MISSING_DATA"
     | "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS"
     | "FAIL_MISSING_UNCERTAINTY_MODEL"
+    | "FAIL_MISSING_PROXY_METADATA"
     | "FAIL_MATURITY_CEILING_VIOLATION";
   definitions: {
     warp_definition: string;
@@ -42,6 +43,7 @@ type RuntimeSafetyGateValidation = {
   pass: boolean;
   failReason?: "RUNTIME_SAFETY_GATE_MISSING_DATA" | "RUNTIME_SAFETY_GATE_OUT_OF_BOUNDS"
     | "FAIL_MISSING_UNCERTAINTY_MODEL"
+    | "FAIL_MISSING_PROXY_METADATA"
     | "FAIL_MATURITY_CEILING_VIOLATION";
   summary?: string;
 };
@@ -301,7 +303,7 @@ export const __testOnlyResolveRuntimeSafetyGateValidation = resolveRuntimeSafety
 type CrossLaneUncertaintyValidation = {
   referenced: boolean;
   pass: boolean;
-  failReason?: "FAIL_MISSING_UNCERTAINTY_MODEL";
+  failReason?: "FAIL_MISSING_UNCERTAINTY_MODEL" | "FAIL_MISSING_PROXY_METADATA";
   summary?: string;
 };
 
@@ -323,7 +325,7 @@ const resolveCrossLaneUncertaintyValidation = (): CrossLaneUncertaintyValidation
     (row: any) => row?.runtime_safety_eligible === true && (row?.cross_lane_bridge === true || row?.provenance_class === "proxy"),
   );
   if (scoped.length === 0) return { referenced: false, pass: true };
-  const missing = scoped
+  const missingUncertainty = scoped
     .filter(
       (row: any) =>
         typeof row?.uncertainty_model_id !== "string" ||
@@ -332,14 +334,37 @@ const resolveCrossLaneUncertaintyValidation = (): CrossLaneUncertaintyValidation
         !row.falsifier.uncertainty_model.trim(),
     )
     .map((row: any) => String(row?.id ?? "unknown"));
-  if (missing.length > 0) {
+  if (missingUncertainty.length > 0) {
     return {
       referenced: true,
       pass: false,
       failReason: "FAIL_MISSING_UNCERTAINTY_MODEL",
-      summary: `cross_lane_uncertainty=missing_uncertainty_metadata:${missing.sort((a,b)=>a.localeCompare(b)).join(",")}`,
+      summary: `cross_lane_uncertainty=missing_uncertainty_metadata:${missingUncertainty.sort((a,b)=>a.localeCompare(b)).join(",")}`,
     };
   }
+
+  const missingProxyMetadata = scoped
+    .filter(
+      (row: any) =>
+        typeof row?.equation_id !== "string" ||
+        !row.equation_id.trim() ||
+        typeof row?.falsifier?.evidence !== "string" ||
+        !row.falsifier.evidence.trim() ||
+        typeof row?.claim_tier !== "string" ||
+        !row.claim_tier.trim(),
+    )
+    .map((row: any) => String(row?.id ?? "unknown"));
+  if (missingProxyMetadata.length > 0) {
+    return {
+      referenced: true,
+      pass: false,
+      failReason: "FAIL_MISSING_PROXY_METADATA",
+      summary: `cross_lane_uncertainty=missing_citation_or_equation_metadata:${missingProxyMetadata
+        .sort((a,b)=>a.localeCompare(b))
+        .join(",")}`,
+    };
+  }
+
   return {
     referenced: true,
     pass: true,
