@@ -1,0 +1,24 @@
+{
+  "precheck_run_id": "versatility-1771564256224",
+  "strict_gates": {
+    "relation_packet_built_rate": 1.0,
+    "relation_dual_domain_ok_rate": 1.0,
+    "report_mode_correct_rate": 0.9555555555555556,
+    "citation_presence_rate": 1.0,
+    "stub_text_detected_rate": 0.0,
+    "runtime_fallback_answer": 0.0,
+    "runtime_tdz_intentStrategy": 0.0,
+    "runtime_tdz_intentProfile": 0.0
+  },
+  "novelty": {
+    "temp_0_2": null,
+    "temp_0_35": null,
+    "reason": "Not executed because strict narrow precheck gate did not pass within 3 iterations."
+  },
+  "top_failure_signatures_before": [
+    {"key": "report_mode_mismatch", "count": 6}
+  ],
+  "top_failure_signatures_after": [
+    {"key": "report_mode_mismatch", "count": 6}
+  ]
+}

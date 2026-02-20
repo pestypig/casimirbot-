@@ -280,6 +280,33 @@ describe("Helix Ask live events", () => {
     expect(payload.text).toMatch(/Sources:/i);
   }, 45000);
 
+
+  it("keeps repo technical prompts out of auto report-mode fanout", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "Show pipeline stages captured in debug live events for Helix Ask.",
+        debug: true,
+        sessionId: "test-repo-tech-no-report-fanout",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text?: string;
+      debug?: {
+        report_mode?: boolean;
+        report_mode_reason?: string;
+        intent_id?: string;
+      };
+    };
+    expect(payload.debug?.intent_id).toBe("hybrid.concept_plus_system_mapping");
+    expect(payload.debug?.report_mode).toBe(false);
+    expect(payload.debug?.report_mode_reason).not.toBe("multi_slot");
+    expect(payload.debug?.report_mode_reason).not.toBe("slot_plan");
+    expect(payload.text ?? "").not.toMatch(/Executive summary:/i);
+    expect(payload.text ?? "").toMatch(/Sources:/i);
+  }, 45000);
   it("routes implicit warp-in-ideology phrasing to relation intent", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",
