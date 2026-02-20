@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { buildMathCongruenceMatrix, type MathCongruenceMatrix } from "./build-math-congruence-matrix";
 
@@ -165,7 +166,10 @@ export function validateMathCongruenceMatrix(options?: {
   return { ok: errors.length === 0, errors };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
+) {
   const result = validateMathCongruenceMatrix();
   if (!result.ok) {
     console.error("math congruence matrix validation FAILED");

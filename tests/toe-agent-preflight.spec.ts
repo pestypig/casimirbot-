@@ -25,6 +25,7 @@ function setupFakeWorkspace(failingStageId?: string) {
     "validate-physics-equation-backbone.ts",
     "validate-physics-root-leaf-manifest.ts",
     "validate-resolver-owner-coverage.ts",
+    "validate-math-congruence-matrix.ts",
     "compute-toe-progress.ts",
   ];
 
@@ -38,6 +39,33 @@ function setupFakeWorkspace(failingStageId?: string) {
         : 'console.log("ok"); process.exit(0);\n',
     );
   }
+
+  writeJson(path.join(tempDir, "docs", "knowledge", "evidence-falsifier-ledger-tree.json"), {
+    rootId: "ledger-root",
+    nodes: [],
+  });
+  writeJson(path.join(tempDir, "docs", "knowledge", "tool-plan-contracts-tree.json"), {
+    rootId: "tool-root",
+    nodes: [],
+  });
+  writeJson(path.join(tempDir, "configs", "graph-resolvers.json"), {
+    trees: [
+      {
+        id: "evidence-falsifier-ledger",
+        path: "docs/knowledge/evidence-falsifier-ledger-tree.json",
+      },
+      {
+        id: "tool-plan-contracts",
+        path: "docs/knowledge/tool-plan-contracts-tree.json",
+      },
+    ],
+  });
+  writeJson(path.join(tempDir, "configs", "resolver-owner-coverage-manifest.v1.json"), {
+    schema_version: "resolver_owner_coverage_manifest/1",
+    owners: {
+      "evidence-falsifier-ledger": { status: "covered_core" },
+    },
+  });
 
   return tempDir;
 }
@@ -77,6 +105,9 @@ describe("toe-agent-preflight", () => {
     expect(statuses["validate-physics-equation-backbone"]).toBe("pass");
     expect(statuses["validate-physics-root-leaf-manifest"]).toBe("pass");
     expect(statuses["validate-resolver-owner-coverage"]).toBe("pass");
+    expect(statuses["validate-math-congruence-matrix"]).toBe("pass");
+    expect(statuses["validate-evidence-falsifier-ledger"]).toBe("pass");
+    expect(statuses["validate-tool-plan-contracts"]).toBe("pass");
     expect(statuses["validate-toe-research-gate-policy"]).toBe("skipped");
     expect(statuses["compute-toe-progress"]).toBe("pass");
   });

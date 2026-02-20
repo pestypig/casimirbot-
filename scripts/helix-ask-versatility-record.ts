@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn, execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { precheckHelixAskAvailability } from "./helix-ask-availability-precheck";
 
 type PromptFamily = "relation" | "repo_technical" | "ambiguous_general";
@@ -1458,7 +1459,9 @@ const main = async () => {
   }
 };
 
-const isDirectRun = process.argv[1] ? path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname) : false;
+const isDirectRun =
+  Boolean(process.argv[1]) &&
+  path.resolve(process.argv[1] as string) === path.resolve(fileURLToPath(import.meta.url));
 
 if (isDirectRun) {
   main().catch((error) => {

@@ -200,6 +200,11 @@ describe("TOE progress tooling", () => {
       blocked_reasons: ["missing_verified_pass", "missing_research_artifacts"],
       blocked_ticket_count: 2,
       ready_ticket_count: 1,
+      blocker_counts: {
+        missing_verified_pass: 1,
+        missing_research_artifacts: 1,
+        missing_math_congruence: 0,
+      },
     });
     expect(snapshot.segments.combined.strict_ready_delta_ticket_count).toBe(2);
     expect(snapshot.segments.combined.strict_ready_release_gate).toEqual({
@@ -207,21 +212,26 @@ describe("TOE progress tooling", () => {
       blocked_reasons: ["missing_verified_pass", "missing_research_artifacts"],
       blocked_ticket_count: 2,
       ready_ticket_count: 1,
+      blocker_counts: {
+        missing_verified_pass: 1,
+        missing_research_artifacts: 1,
+        missing_math_congruence: 0,
+      },
     });
     expect(snapshot.strict_ready_delta_targets).toEqual(
       expect.arrayContaining([
-        {
+        expect.objectContaining({
           ticket_id: "TOE-TEST-002",
           next_strict_ready_claim_tier: "reduced-order",
           requires_verified_pass: true,
           requires_research_artifact_completion: true,
-        },
-        {
+        }),
+        expect.objectContaining({
           ticket_id: "TOE-TEST-003",
           next_strict_ready_claim_tier: "certified",
           requires_verified_pass: true,
           requires_research_artifact_completion: false,
-        },
+        }),
       ]),
     );
   });

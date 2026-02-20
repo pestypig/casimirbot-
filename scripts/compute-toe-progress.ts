@@ -290,6 +290,8 @@ function main() {
   let coreResearchArtifactCompleteTickets = 0;
   let extensionResearchGatedTickets = 0;
   let extensionResearchArtifactCompleteTickets = 0;
+  const missingVerifiedPassTicketIds = new Set<string>();
+  const missingResearchArtifactTicketIds = new Set<string>();
   const strictReadyDeltaTargets: StrictReadyDeltaTarget[] = [];
   const mathCongruenceValidation = validateMathCongruenceMatrix({ repoRoot: process.cwd() });
   const mathCongruenceGatePass = mathCongruenceValidation.ok;
@@ -371,6 +373,11 @@ function main() {
       if (extensionTicketIdSet.has(ticketId)) {
         extensionSummary.verified_pass_tickets += 1;
       }
+    } else {
+      missingVerifiedPassTicketIds.add(ticketId);
+    }
+    if (isResearchGated && !researchArtifactComplete) {
+      missingResearchArtifactTicketIds.add(ticketId);
     }
     if (isStrictReady) {
       strictReadyCount += 1;
@@ -416,19 +423,21 @@ function main() {
   const verifiedPassProgress = totalTickets > 0 ? verifiedPassCount / totalTickets : 0;
   const forestOwnerCoverage = computeForestOwnerCoveragePct();
   const strictReadyDeltaTicketCount = Math.max(totalTickets - strictReadyCount, 0);
-  const verifiedPassDeltaTicketCount = Math.max(totalTickets - verifiedPassCount, 0);
+  const missingMathCongruenceTicketIds = mathCongruenceGatePass
+    ? new Set<string>()
+    : new Set(ticketIds);
+  const blockedTicketIds = new Set<string>([
+    ...missingVerifiedPassTicketIds,
+    ...missingResearchArtifactTicketIds,
+    ...missingMathCongruenceTicketIds,
+  ]);
   const blockerCounts = {
-    missing_verified_pass: verifiedPassDeltaTicketCount,
-    missing_research_artifacts: strictReadyDeltaTargets.filter(
-      (target) => target.requires_research_artifact_completion,
-    ).length,
-    missing_math_congruence: mathCongruenceGatePass ? 0 : strictReadyDeltaTicketCount,
+    missing_verified_pass: missingVerifiedPassTicketIds.size,
+    missing_research_artifacts: missingResearchArtifactTicketIds.size,
+    missing_math_congruence: missingMathCongruenceTicketIds.size,
   };
-  const blockedTicketCount = Math.max(
-    blockerCounts.missing_verified_pass,
-    blockerCounts.missing_research_artifacts,
-    blockerCounts.missing_math_congruence,
-  );
+  const blockedTicketCount = blockedTicketIds.size;
+  const readyTicketCount = Math.max(totalTickets - blockedTicketCount, 0);
   const strictReadyReleaseGate: StrictReadyReleaseGate = {
     status:
       blockedTicketCount === 0
@@ -444,7 +453,7 @@ function main() {
         : []),
     ],
     blocked_ticket_count: blockedTicketCount,
-    ready_ticket_count: strictReadyCount,
+    ready_ticket_count: readyTicketCount,
     blocker_counts: blockerCounts,
   };
 

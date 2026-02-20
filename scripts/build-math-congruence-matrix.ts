@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 type Equation = {
   id?: unknown;
@@ -27,7 +28,13 @@ type MatrixRow = {
   falsifier: {
     condition: string;
     evidence: string;
+    uncertainty_model?: string;
   };
+  runtime_safety_eligible?: boolean;
+  cross_lane_bridge?: boolean;
+  provenance_class?: "measured" | "proxy" | "inferred";
+  claim_tier?: "diagnostic" | "reduced-order" | "certified";
+  uncertainty_model_id?: string;
 };
 
 export type MathCongruenceMatrix = {
@@ -64,7 +71,17 @@ const DEFAULT_BY_EQUATION: Record<string, Omit<MatrixRow, "id" | "root_id" | "eq
   runtime_safety_gate: {
     binding: { operator: "bounded_by", lhs: "abs(delta_T00 / max(abs(T00_ref), eps))", rhs: "rho_delta_max" },
     residual: { metric: "runtime_gate_false_negative_rate", comparator: "<=", threshold: "0.01" },
-    falsifier: { condition: "runtime_gate_false_negative_rate > 0.01 OR qi_bound_ok = false", evidence: "runtime_guardrail_regression" },
+    falsifier: {
+      condition: "runtime_gate_false_negative_rate > 0.01 OR qi_bound_ok = false",
+      evidence: "runtime_guardrail_regression",
+      uncertainty_model:
+        "runtime_gate_thresholds(determinism_min=0.98,citation_min=0.96,non_200_max=0.02,latency_p95_max_ms=1200)",
+    },
+    runtime_safety_eligible: true,
+    cross_lane_bridge: true,
+    provenance_class: "proxy",
+    claim_tier: "diagnostic",
+    uncertainty_model_id: "runtime_gate_thresholds_v1",
   },
 };
 
@@ -135,7 +152,10 @@ export function buildMathCongruenceMatrix(options?: { repoRoot?: string }): Math
   };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
+) {
   const repoRoot = path.resolve(process.cwd());
   const outPath = path.join(repoRoot, "configs", "math-congruence-matrix.v1.json");
   const matrix = buildMathCongruenceMatrix({ repoRoot });
