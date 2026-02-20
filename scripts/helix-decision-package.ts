@@ -99,13 +99,14 @@ function walkFiles(root: string, maxDepth = 6): string[] {
 
 function newestMatching(
   roots: string[],
-  filename: string,
+  fileMatcher: string | ((relPath: string) => boolean),
   validator: (doc: JsonRecord, relPath: string) => boolean,
 ): string | null {
   const candidates: Array<{ relPath: string; mtime: number }> = [];
+  const matches = typeof fileMatcher === "string" ? (relPath: string) => relPath.endsWith(`/${fileMatcher}`) || relPath === fileMatcher : fileMatcher;
   for (const root of roots) {
     for (const relPath of walkFiles(root)) {
-      if (!relPath.endsWith(`/${filename}`) && relPath !== filename) continue;
+      if (!matches(relPath)) continue;
       const doc = tryReadJson(relPath);
       if (!doc || !validator(doc, relPath)) continue;
       const mtime = fs.statSync(path.resolve(ROOT, relPath)).mtimeMs;
@@ -119,11 +120,16 @@ function newestMatching(
 function resolveSource(
   name: string,
   cliOrEnv: string,
+  validator: (doc: JsonRecord, relPath: string) => boolean,
   discover: () => string | null,
 ): string {
   if (cliOrEnv) {
     if (!fs.existsSync(path.resolve(ROOT, cliOrEnv))) {
       fail(`required_source_missing:${name}`, { path: cliOrEnv });
+    }
+    const doc = tryReadJson(cliOrEnv);
+    if (!doc || !validator(doc, cliOrEnv)) {
+      fail(`required_source_invalid_shape:${name}:${cliOrEnv}`);
     }
     return cliOrEnv;
   }
@@ -138,38 +144,115 @@ const evaluationTier = (opt("evaluation-tier", "decision_grade") === "explorator
   | "exploratory"
   | "decision_grade";
 
-const narrowPath = resolveSource("narrow", opt("narrow", "reports/helix-self-tune-gate-summary.json"), () => {
-  const rel = "reports/helix-self-tune-gate-summary.json";
-  return fs.existsSync(path.resolve(ROOT, rel)) ? rel : null;
-});
+function hasMetricsObject(doc: JsonRecord): boolean {
+  const candidate = (doc.metrics ?? doc.quality_rollup) as unknown;
+  return !!candidate && typeof candidate === "object";
+}
 
-const heavyPath = resolveSource("heavy", opt("heavy"), () =>
-  newestMatching(["artifacts/experiments/helix-ask-versatility-research", "artifacts/experiments/helix-step4-heavy-rerun"], "summary.json", (d) =>
-    typeof d.run_id === "string" && typeof (d.metrics ?? (d.quality_rollup as unknown)) === "object",
-  ),
+function isHeavySummary(doc: JsonRecord): boolean {
+  return typeof doc.run_id === "string" && hasMetricsObject(doc);
+}
+
+function isRecommendation(doc: JsonRecord): boolean {
+  return typeof doc.decision_grade_ready === "boolean";
+}
+
+function isAbSummary(doc: JsonRecord): boolean {
+  const byFamily = (doc.novel_response_rate_by_family ?? {}) as JsonRecord;
+  return (
+    doc.summary_schema_version === 2 &&
+    typeof doc.novel_response_rate === "number" &&
+    typeof byFamily.relation === "number" &&
+    typeof byFamily.repo_technical === "number" &&
+    typeof byFamily.ambiguous_general === "number"
+  );
+}
+
+function isNarrowSummary(doc: JsonRecord): boolean {
+  return !!doc.strict_gates && typeof doc.strict_gates === "object";
+}
+
+function isCasimirSummary(doc: JsonRecord): boolean {
+  return typeof doc.verdict === "string" && typeof doc.integrityOk === "boolean";
+}
+
+function tempSourceValidator(expectedTemp: "t02" | "t035") {
+  return (doc: JsonRecord, relPath: string) => {
+    if (!isAbSummary(doc)) return false;
+    const normalizedPath = relPath.toLowerCase();
+    const variant = String(doc.variant ?? "").toLowerCase();
+    return normalizedPath.includes(`/${expectedTemp}/`) && (variant.length === 0 || variant.includes(expectedTemp));
+  };
+}
+
+const modernExperimentRoots = [
+  "artifacts/experiments/helix-ask-versatility-research",
+  "artifacts/experiments/helix-step4-heavy-rerun",
+  "artifacts/experiments",
+  "artifacts",
+  "reports",
+];
+
+const narrowDiscoveryMatcher = (relPath: string) => {
+  const base = path.basename(relPath).toLowerCase();
+  return base === "helix-self-tune-gate-summary.json" || (base === "summary.json" && relPath.toLowerCase().includes("narrow"));
+};
+
+const casimirDiscoveryMatcher = (relPath: string) => {
+  const base = path.basename(relPath).toLowerCase();
+  return base === "helix-self-tune-casimir.json" || base.includes("casimir");
+};
+
+const narrowPath = resolveSource(
+  "narrow",
+  opt("narrow"),
+  isNarrowSummary,
+  () => newestMatching(modernExperimentRoots, narrowDiscoveryMatcher, isNarrowSummary),
 );
 
-const heavyRecommendationPath = resolveSource("heavy-recommendation", opt("heavy-recommendation"), () => {
+const heavyPath = resolveSource(
+  "heavy",
+  opt("heavy"),
+  isHeavySummary,
+  () => newestMatching(modernExperimentRoots, "summary.json", isHeavySummary),
+);
+
+const heavyRecommendationPath = resolveSource("heavy-recommendation", opt("heavy-recommendation"), isRecommendation, () => {
   const sibling = path.join(path.dirname(heavyPath), "recommendation.json").replace(/\\/g, "/");
   if (fs.existsSync(path.resolve(ROOT, sibling))) {
     const doc = tryReadJson(sibling);
-    if (doc && typeof doc.decision_grade_ready === "boolean") return sibling;
+    if (doc && isRecommendation(doc)) return sibling;
   }
-  return newestMatching([path.dirname(heavyPath)], "recommendation.json", (d) => typeof d.decision_grade_ready === "boolean");
+  return newestMatching(modernExperimentRoots, "recommendation.json", isRecommendation);
 });
 
-const abT02Path = resolveSource("ab-t02", opt("ab-t02"), () =>
-  newestMatching(["artifacts/experiments/helix-step4-ab-rerun/t02"], "summary.json", (d) => d.summary_schema_version === 2),
+if (path.dirname(heavyRecommendationPath) !== path.dirname(heavyPath)) {
+  fail("required_source_pair_mismatch:heavy_recommendation", {
+    heavy: heavyPath,
+    heavy_recommendation: heavyRecommendationPath,
+  });
+}
+
+const abT02Path = resolveSource(
+  "ab-t02",
+  opt("ab-t02"),
+  tempSourceValidator("t02"),
+  () => newestMatching(["artifacts/experiments/helix-step4-ab-rerun", "artifacts/experiments", "artifacts"], "summary.json", tempSourceValidator("t02")),
 );
 
-const abT035Path = resolveSource("ab-t035", opt("ab-t035"), () =>
-  newestMatching(["artifacts/experiments/helix-step4-ab-rerun/t035"], "summary.json", (d) => d.summary_schema_version === 2),
+const abT035Path = resolveSource(
+  "ab-t035",
+  opt("ab-t035"),
+  tempSourceValidator("t035"),
+  () => newestMatching(["artifacts/experiments/helix-step4-ab-rerun", "artifacts/experiments", "artifacts"], "summary.json", tempSourceValidator("t035")),
 );
 
-const casimirPath = resolveSource("casimir", opt("casimir", "reports/helix-self-tune-casimir.json"), () => {
-  const rel = "reports/helix-self-tune-casimir.json";
-  return fs.existsSync(path.resolve(ROOT, rel)) ? rel : null;
-});
+const casimirPath = resolveSource(
+  "casimir",
+  opt("casimir"),
+  isCasimirSummary,
+  () => newestMatching(modernExperimentRoots, casimirDiscoveryMatcher, isCasimirSummary),
+);
 
 const narrow = readJson(narrowPath);
 const heavy = readJson(heavyPath);

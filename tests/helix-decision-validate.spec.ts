@@ -26,6 +26,11 @@ function mk(): string {
   return dir;
 }
 
+function writeJson(filePath: string, value: Record<string, unknown>) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
+}
+
 function basePackage() {
   return {
     schema_version: "1.0.0",
@@ -79,10 +84,11 @@ function basePackage() {
   };
 }
 
-function runTsx(cwd: string, scriptRel: string, args: string[] = []): SpawnSyncReturns<string> {
+function runTsx(cwd: string, scriptRel: string, args: string[] = [], env: NodeJS.ProcessEnv = {}): SpawnSyncReturns<string> {
   const out = spawnSync(process.execPath, [tsxCli, path.join(repoRoot, scriptRel), ...args], {
     cwd,
     encoding: "utf8",
+    env: { ...process.env, ...env },
   });
   if (out.error) {
     throw new Error(`failed_to_start_child:${scriptRel}:${out.error.message}\nstdout:${out.stdout}\nstderr:${out.stderr}`);
@@ -92,6 +98,87 @@ function runTsx(cwd: string, scriptRel: string, args: string[] = []): SpawnSyncR
 
 function runValidator(cwd: string) {
   return runTsx(cwd, "scripts/helix-decision-validate.ts", ["--package", "pkg.json"]);
+}
+
+function writePackageFixtureSet(root: string) {
+  writeJson(path.join(root, "reports/helix-self-tune-gate-summary.json"), {
+    precheck_run_id: "narrow-run",
+    strict_gates: {
+      runtime_fallback_answer: 0,
+      runtime_tdz_intentStrategy: 0,
+      runtime_tdz_intentProfile: 0,
+    },
+  });
+
+  writeJson(path.join(root, "reports/helix-self-tune-casimir.json"), {
+    verdict: "PASS",
+    integrityOk: true,
+    traceId: "trace-1",
+    runId: "run-1",
+    certificateHash: "hash-1",
+  });
+
+  writeJson(path.join(root, "artifacts/experiments/helix-step4-heavy-rerun/run-new/summary.json"), {
+    run_id: "heavy-run-new",
+    metrics: {
+      relation_packet_built_rate: 0.98,
+      relation_dual_domain_ok_rate: 0.98,
+      report_mode_correct_rate: 0.99,
+      citation_presence_rate: 1,
+      stub_text_detected_rate: 0,
+    },
+    provenance: {
+      gate_pass: true,
+      branch: "unknown",
+      head: "unknown",
+      originMain: null,
+      aheadBehind: null,
+      warnings: [],
+    },
+  });
+
+  writeJson(path.join(root, "artifacts/experiments/helix-step4-heavy-rerun/run-new/recommendation.json"), {
+    decision_grade_ready: true,
+  });
+
+  writeJson(path.join(root, "artifacts/experiments/helix-step4-heavy-rerun/run-old/summary.json"), {
+    run_id: "heavy-run-old",
+    metrics: {
+      relation_packet_built_rate: 0.98,
+      relation_dual_domain_ok_rate: 0.98,
+      report_mode_correct_rate: 0.99,
+      citation_presence_rate: 1,
+      stub_text_detected_rate: 0,
+    },
+    provenance: {
+      gate_pass: true,
+      branch: "unknown",
+      head: "unknown",
+      originMain: null,
+      aheadBehind: null,
+      warnings: [],
+    },
+  });
+
+  writeJson(path.join(root, "artifacts/experiments/helix-step4-heavy-rerun/run-old/recommendation.json"), {
+    decision_grade_ready: true,
+  });
+
+  writeJson(path.join(root, "artifacts/experiments/helix-step4-ab-rerun/t02/run/summary.json"), {
+    summary_schema_version: 2,
+    variant: "helix_t02_run",
+    run_id: "ab-t02-run",
+    novel_response_rate: 0.9,
+    novel_response_rate_by_family: { relation: 0.9, repo_technical: 0.9, ambiguous_general: 0.9 },
+  });
+
+  writeJson(path.join(root, "artifacts/experiments/helix-step4-ab-rerun/t035/run/summary.json"), {
+    summary_schema_version: 2,
+    variant: "helix_t035_run",
+    run_id: "ab-t035-run",
+    novel_response_rate: 0.9,
+    novel_response_rate_by_family: { relation: 0.9, repo_technical: 0.9, ambiguous_general: 0.9 },
+  });
 }
 
 afterEach(() => {
@@ -176,5 +263,95 @@ describe("helix decision package", () => {
     const out = runTsx(dir, "scripts/helix-decision-package.ts", ["--narrow", "narrow.json", "--casimir", "casimir.json"]);
     expect(out.status).not.toBe(0);
     expect(`${out.stdout}${out.stderr}`).toContain("required_source_unresolved:heavy");
+  });
+
+  it("auto-discovery chooses newest valid candidate", () => {
+    const dir = mk();
+    writePackageFixtureSet(dir);
+    const oldPath = path.join(dir, "artifacts/experiments/helix-step4-heavy-rerun/run-old/summary.json");
+    const newPath = path.join(dir, "artifacts/experiments/helix-step4-heavy-rerun/run-new/summary.json");
+    const now = Date.now();
+    fs.utimesSync(oldPath, new Date(now - 60_000), new Date(now - 60_000));
+    fs.utimesSync(newPath, new Date(now), new Date(now));
+
+    const out = runTsx(dir, "scripts/helix-decision-package.ts");
+    expect(out.status).toBe(0);
+
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-package.json"), "utf8"));
+    const heavyGate = pkg.gates.find((g: { name: string }) => g.name === "relation_packet_built_rate");
+    expect(heavyGate.source_path).toContain("run-new/summary.json");
+  });
+
+  it("explicit CLI source override beats discovery", () => {
+    const dir = mk();
+    writePackageFixtureSet(dir);
+    writeJson(path.join(dir, "custom-heavy-summary.json"), {
+      run_id: "custom-heavy",
+      metrics: {
+        relation_packet_built_rate: 0.98,
+        relation_dual_domain_ok_rate: 0.98,
+        report_mode_correct_rate: 0.99,
+        citation_presence_rate: 1,
+        stub_text_detected_rate: 0,
+      },
+      provenance: { gate_pass: true, branch: "unknown", head: "unknown", originMain: null, aheadBehind: null, warnings: [] },
+    });
+    writeJson(path.join(dir, "custom-heavy-recommendation.json"), { decision_grade_ready: true });
+
+    const out = runTsx(dir, "scripts/helix-decision-package.ts", [
+      "--heavy",
+      "custom-heavy-summary.json",
+      "--heavy-recommendation",
+      "custom-heavy-recommendation.json",
+    ]);
+
+    expect(out.status).toBe(0);
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-package.json"), "utf8"));
+    const heavyGate = pkg.gates.find((g: { name: string }) => g.name === "relation_packet_built_rate");
+    expect(heavyGate.source_path).toBe("custom-heavy-summary.json");
+  });
+
+  it("heavy/recommendation pair mismatch fails", () => {
+    const dir = mk();
+    writePackageFixtureSet(dir);
+    writeJson(path.join(dir, "detached/recommendation.json"), { decision_grade_ready: true });
+    const out = runTsx(dir, "scripts/helix-decision-package.ts", ["--heavy-recommendation", "detached/recommendation.json"]);
+    expect(out.status).not.toBe(0);
+    expect(`${out.stdout}${out.stderr}`).toContain("required_source_pair_mismatch:heavy_recommendation");
+  });
+
+  it("ab source mismatch fails with invalid shape", () => {
+    const dir = mk();
+    writePackageFixtureSet(dir);
+    const out = runTsx(dir, "scripts/helix-decision-package.ts", ["--ab-t02", "artifacts/experiments/helix-step4-ab-rerun/t035/run/summary.json"]);
+    expect(out.status).not.toBe(0);
+    expect(`${out.stdout}${out.stderr}`).toContain("required_source_invalid_shape:ab-t02");
+  });
+
+  it("explicit env source overrides discovery when coherent", () => {
+    const dir = mk();
+    writePackageFixtureSet(dir);
+
+    writeJson(path.join(dir, "custom/runA/summary.json"), {
+      run_id: "custom-heavy-a",
+      metrics: {
+        relation_packet_built_rate: 0.98,
+        relation_dual_domain_ok_rate: 0.98,
+        report_mode_correct_rate: 0.99,
+        citation_presence_rate: 1,
+        stub_text_detected_rate: 0,
+      },
+      provenance: { gate_pass: true, branch: "unknown", head: "unknown", originMain: null, aheadBehind: null, warnings: [] },
+    });
+    writeJson(path.join(dir, "custom/runA/recommendation.json"), { decision_grade_ready: true });
+
+    const out = runTsx(dir, "scripts/helix-decision-package.ts", [], {
+      HEAVY: "custom/runA/summary.json",
+      HEAVY_RECOMMENDATION: "custom/runA/recommendation.json",
+    });
+    expect(out.status).toBe(0);
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-package.json"), "utf8"));
+    const heavyGate = pkg.gates.find((g: { name: string }) => g.name === "relation_packet_built_rate");
+    expect(heavyGate.source_path).toBe("custom/runA/summary.json");
   });
 });
