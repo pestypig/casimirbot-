@@ -60,6 +60,22 @@ type ClaimRegistry = {
   claims?: ClaimRecord[];
 };
 
+type PhysicsTreeNode = {
+  id?: string;
+  nodeType?: string;
+  outputs?: Array<{ name?: string; value?: string }>;
+  validity?: {
+    claim_ids?: string[];
+    equation_ref?: string;
+    requires?: {
+      equation_ref?: string;
+    };
+    proxy_semantics?: {
+      mode?: string;
+    };
+  };
+};
+
 const cwd = process.cwd();
 const strictMode = process.argv.includes("--strict");
 const jsonOutput = process.argv.includes("--json");
@@ -722,7 +738,7 @@ async function runPhysicsClaimLinkageChecks(knownClaimIds: Set<string>): Promise
     const relPath = `${files.physicsDir}/${entry}`;
     const text = await readTextFile(relPath);
     if (!text) continue;
-    const doc = parseJsonText<{ nodes?: Array<Record<string, unknown>> }>(text, relPath);
+    const doc = parseJsonText<{ nodes?: PhysicsTreeNode[] }>(text, relPath);
     if (!doc || !Array.isArray(doc.nodes)) continue;
 
     for (const [index, node] of doc.nodes.entries()) {
@@ -746,6 +762,39 @@ async function runPhysicsClaimLinkageChecks(knownClaimIds: Set<string>): Promise
             nodePrefix,
           );
         }
+      }
+
+      const outputs = Array.isArray(node?.outputs) ? node.outputs : [];
+      const emitsProxyOutput = outputs.some((output) => {
+        const name = String(output?.name ?? "").toLowerCase();
+        const value = String(output?.value ?? "").toLowerCase();
+        return name.includes("proxy") || value.includes("proxy");
+      });
+      const hasProxySemantics = Boolean(validity?.proxy_semantics);
+      if (!emitsProxyOutput && !hasProxySemantics) continue;
+
+      if (claimIds.length === 0) {
+        addIssue(
+          "error",
+          "proxy_node_claim_ids_missing",
+          "Proxy-emitting node must define validity.claim_ids",
+          nodePrefix,
+        );
+      }
+
+      const equationRef =
+        typeof validity?.equation_ref === "string" && validity.equation_ref.trim()
+          ? validity.equation_ref.trim()
+          : typeof validity?.requires?.equation_ref === "string" && validity.requires.equation_ref.trim()
+            ? validity.requires.equation_ref.trim()
+            : "";
+      if (!equationRef) {
+        addIssue(
+          "error",
+          "proxy_node_equation_linkage_missing",
+          "Proxy-emitting node must declare validity.equation_ref or validity.requires.equation_ref",
+          nodePrefix,
+        );
       }
     }
   }
@@ -801,4 +850,3 @@ async function main(): Promise<void> {
 }
 
 void main();
-

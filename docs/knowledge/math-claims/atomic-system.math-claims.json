@@ -3,7 +3,7 @@
   "schemaVersion": "1.0.0",
   "registryId": "atomic-system-core",
   "domain": "atomic-simulation",
-  "updatedAt": "2026-02-19",
+  "updatedAt": "2026-02-20",
   "claims": [
     {
       "claimId": "atomic.hydrogenic.energy.nonrel.approx",
@@ -221,7 +221,8 @@
         "constraints": [
           "experimental maturity label",
           "residual threshold required",
-          "uncertainty-model declaration required for runtime-eligible cross-lane use"
+          "uncertainty-model declaration required for runtime-eligible cross-lane use",
+          "cross-lane proxy payload must include claim_ids, equation_ref/equation_id, falsifier.evidence citation linkage, and uncertainty_model_id"
         ]
       },
       "sources": [
@@ -235,6 +236,12 @@
           "kind": "repo-code",
           "citation": "configs/math-congruence-matrix.v1.json",
           "note": "Congruence matrix row binds equation id and runtime uncertainty rail metadata."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/services/helix-ask/relation-assembly.ts",
+          "equation": "equation_id -> claim linkage plus falsifier.evidence citation contract for proxy cross-lane rows",
+          "note": "Relation assembly enforces deterministic fail reasons when citation/equation/uncertainty metadata is missing."
         }
       ],
       "repoBindings": [

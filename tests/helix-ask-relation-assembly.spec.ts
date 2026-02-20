@@ -145,6 +145,92 @@ describe("relation assembly packet", () => {
     existsSpy.mockRestore();
   });
 
+
+  it("fails deterministically when runtime cross-lane proxy rows miss citation/equation metadata", async () => {
+    const fs = await import("node:fs");
+    const existsSpy = vi.spyOn(fs.default ?? fs, "existsSync").mockReturnValue(true);
+    const readSpy = vi.spyOn(fs.default ?? fs, "readFileSync").mockReturnValue(
+      JSON.stringify({
+        rows: [
+          {
+            id: "runtime_cross_lane_proxy_missing_citation",
+            runtime_safety_eligible: true,
+            cross_lane_bridge: true,
+            provenance_class: "proxy",
+            equation_id: "",
+            claim_tier: "diagnostic",
+            uncertainty_model_id: "proxy_uq_v1",
+            falsifier: {
+              uncertainty_model: "proxy_bridge_uncertainty(proxy_uq_v1)",
+              evidence: "",
+            },
+          },
+        ],
+      }) as any,
+    );
+
+    const result = __testOnlyResolveCrossLaneUncertaintyValidation();
+    expect(result.referenced).toBe(true);
+    expect(result.pass).toBe(false);
+    expect(result.failReason).toBe("FAIL_MISSING_PROXY_METADATA");
+    expect(result.summary).toContain("cross_lane_uncertainty=missing_citation_or_equation_metadata:runtime_cross_lane_proxy_missing_citation");
+
+    readSpy.mockRestore();
+    existsSpy.mockRestore();
+  });
+
+  it("sets explicit packet fail_reason when cross-lane citation/equation metadata is missing", async () => {
+    const fs = await import("node:fs");
+    const fsMod = fs.default ?? fs;
+    const realExistsSync = fsMod.existsSync.bind(fsMod);
+    const realReadFileSync = fsMod.readFileSync.bind(fsMod);
+    const existsSpy = vi.spyOn(fsMod, "existsSync").mockImplementation((target: any) => {
+      const normalized = normalizePathForMatch(target);
+      if (normalized.endsWith("configs/math-congruence-matrix.v1.json")) return true;
+      return realExistsSync(target);
+    });
+    const readSpy = vi.spyOn(fsMod, "readFileSync").mockImplementation((target: any, ...args: any[]) => {
+      const normalized = normalizePathForMatch(target);
+      if (normalized.endsWith("configs/math-congruence-matrix.v1.json")) {
+        return JSON.stringify({
+          rows: [
+            {
+              id: "runtime_cross_lane_proxy_missing_metadata",
+              runtime_safety_eligible: true,
+              cross_lane_bridge: true,
+              provenance_class: "proxy",
+              equation_id: "",
+              claim_tier: "diagnostic",
+              uncertainty_model_id: "proxy_v1",
+              falsifier: {
+                uncertainty_model: "proxy_bridge_uncertainty(proxy_v1)",
+                evidence: "",
+              },
+            },
+          ],
+        }) as any;
+      }
+      return realReadFileSync(target, ...(args as [any]));
+    });
+
+    const packet = buildRelationAssemblyPacket({
+      question: "How does runtime safety handle proxy bridge evidence?",
+      contextFiles: ["docs/knowledge/warp/warp-bubble.md", "docs/ethos/ideology.json"],
+      contextText: "runtime safety assembly",
+      docBlocks: [
+        { path: "docs/knowledge/warp/warp-bubble.md", block: "Warp runtime safety rail." },
+        { path: "docs/ethos/ideology.json", block: "Ethos runtime stewardship rail." },
+      ],
+      graphPack: null,
+    });
+
+    expect(packet.fail_reason).toBe("FAIL_MISSING_PROXY_METADATA");
+    expect(packet.falsifiability_hooks.some((entry) => entry.includes("cross_lane_uncertainty=missing_citation_or_equation_metadata:runtime_cross_lane_proxy_missing_metadata"))).toBe(true);
+
+    readSpy.mockRestore();
+    existsSpy.mockRestore();
+  });
+
   it("injects deterministic dual-domain anchors for relation fallback packets", () => {
     const anchored = ensureRelationFallbackDomainAnchors(
       ensureRelationAssemblyPacketFallback(
