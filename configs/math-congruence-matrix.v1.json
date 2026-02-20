@@ -121,31 +121,6 @@
       }
     },
     {
-      "id": "physics_quantum_semiclassical__atomic_energy_to_energy_density_proxy",
-      "root_id": "physics_quantum_semiclassical",
-      "equation_id": "atomic_energy_to_energy_density_proxy",
-      "binding": {
-        "operator": "equals",
-        "lhs": "rho_atomic_proxy",
-        "rhs": "E_atomic / V_proxy"
-      },
-      "residual": {
-        "metric": "atomic_energy_density_proxy_residual",
-        "comparator": "<=",
-        "threshold": "0.15"
-      },
-      "falsifier": {
-        "condition": "atomic_energy_density_proxy_residual > 0.15",
-        "evidence": "atomic_energy_density_proxy_trace",
-        "uncertainty_model": "atomic_proxy_uncertainty(atomic_energy_density_proxy_uq_v1)"
-      },
-      "maturity_label": "experimental",
-      "claim_tier": "diagnostic",
-      "uncertainty_model_id": "atomic_energy_density_proxy_uq_v1",
-      "cross_lane_bridge": true,
-      "runtime_safety_eligible": false
-    },
-    {
       "id": "physics_runtime_safety_control__runtime_safety_gate",
       "root_id": "physics_runtime_safety_control",
       "equation_id": "runtime_safety_gate",
@@ -163,31 +138,6 @@
         "condition": "runtime_gate_false_negative_rate > 0.01 OR qi_bound_ok = false",
         "evidence": "runtime_guardrail_regression"
       }
-    },
-    {
-      "id": "physics_spacetime_gr__curvature_unit_proxy_contract",
-      "root_id": "physics_spacetime_gr",
-      "equation_id": "curvature_unit_proxy_contract",
-      "binding": {
-        "operator": "equals",
-        "lhs": "kappa_proxy",
-        "rhs": "map_units(curvature_signal, scale_assumptions)"
-      },
-      "residual": {
-        "metric": "curvature_unit_proxy_residual",
-        "comparator": "<=",
-        "threshold": "0.05"
-      },
-      "falsifier": {
-        "condition": "curvature_unit_proxy_residual > 0.05",
-        "evidence": "curvature_unit_proxy_diagnostic_trace",
-        "uncertainty_model": "proxy_bridge_uncertainty(curvature_proxy_uncertainty_v1)"
-      },
-      "maturity_label": "experimental",
-      "claim_tier": "diagnostic",
-      "uncertainty_model_id": "curvature_proxy_uncertainty_v1",
-      "cross_lane_bridge": true,
-      "runtime_safety_eligible": true
     },
     {
       "id": "physics_spacetime_gr__efe_baseline",
