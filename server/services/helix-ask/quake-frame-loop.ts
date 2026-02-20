@@ -101,9 +101,9 @@ const MOVE_TIE_BREAK_ORDER: HelixAskMove[] = [
 ];
 
 const PROFILE_WEIGHTS: Record<HelixAskMovePolicyProfile, HelixAskProfileWeights> = {
-  balanced: { goal: 1, evidenceGain: 1, latencyCost: 1, risk: 1, budgetPressure: 1 },
-  evidence_first: { goal: 1, evidenceGain: 1.35, latencyCost: 0.85, risk: 1, budgetPressure: 0.9 },
-  latency_first: { goal: 1, evidenceGain: 0.8, latencyCost: 1.35, risk: 1, budgetPressure: 1.2 },
+  balanced: { goal: 0.99, evidenceGain: 1.06, latencyCost: 0.89, risk: 1, budgetPressure: 0.88 },
+  evidence_first: { goal: 0.99, evidenceGain: 1.45, latencyCost: 0.7, risk: 1, budgetPressure: 0.84 },
+  latency_first: { goal: 0.93, evidenceGain: 0.96, latencyCost: 1.28, risk: 1, budgetPressure: 1.1 },
 };
 
 const PROFILE_WEIGHT_KEYS: Array<keyof HelixAskProfileWeights> = [
