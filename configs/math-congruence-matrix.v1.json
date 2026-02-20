@@ -121,6 +121,31 @@
       }
     },
     {
+      "id": "physics_quantum_semiclassical__atomic_energy_to_energy_density_proxy",
+      "root_id": "physics_quantum_semiclassical",
+      "equation_id": "atomic_energy_to_energy_density_proxy",
+      "binding": {
+        "operator": "equals",
+        "lhs": "rho_atomic_proxy",
+        "rhs": "E_atomic / V_proxy"
+      },
+      "residual": {
+        "metric": "atomic_energy_density_proxy_residual",
+        "comparator": "<=",
+        "threshold": "0.15"
+      },
+      "falsifier": {
+        "condition": "atomic_energy_density_proxy_residual > 0.15",
+        "evidence": "atomic_energy_density_proxy_trace",
+        "uncertainty_model": "atomic_proxy_uncertainty(atomic_energy_density_proxy_uq_v1)"
+      },
+      "maturity_label": "experimental",
+      "claim_tier": "diagnostic",
+      "uncertainty_model_id": "atomic_energy_density_proxy_uq_v1",
+      "cross_lane_bridge": true,
+      "runtime_safety_eligible": false
+    },
+    {
       "id": "physics_runtime_safety_control__runtime_safety_gate",
       "root_id": "physics_runtime_safety_control",
       "equation_id": "runtime_safety_gate",

@@ -98,6 +98,35 @@ describe("validateMathCongruenceMatrix", () => {
     expect(curvatureRow?.falsifier?.evidence).toBe("curvature_unit_proxy_diagnostic_trace");
   });
 
+  it("binds atomic energy-density proxy equation with residual, falsifier, and uncertainty model metadata", () => {
+    const repoRoot = process.cwd();
+    const matrix = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "configs", "math-congruence-matrix.v1.json"), "utf8"),
+    ) as {
+      rows: Array<{
+        id: string;
+        equation_id: string;
+        root_id: string;
+        residual?: { metric?: string; threshold?: string };
+        falsifier?: { evidence?: string };
+        uncertainty_model_id?: string;
+      }>;
+    };
+
+    const row = matrix.rows.find(
+      (entry) =>
+        entry.id === "physics_quantum_semiclassical__atomic_energy_to_energy_density_proxy" &&
+        entry.root_id === "physics_quantum_semiclassical" &&
+        entry.equation_id === "atomic_energy_to_energy_density_proxy",
+    );
+
+    expect(row).toBeDefined();
+    expect(row?.residual?.metric).toBe("atomic_energy_density_proxy_residual");
+    expect(row?.residual?.threshold).toBe("0.15");
+    expect(row?.falsifier?.evidence).toBe("atomic_energy_density_proxy_trace");
+    expect(row?.uncertainty_model_id).toBe("atomic_energy_density_proxy_uq_v1");
+  });
+
   it("passes for deterministic matrix with full root/equation coverage", () => {
     const repoRoot = fixtureRepoRoot();
     const result = validateMathCongruenceMatrix({ repoRoot });

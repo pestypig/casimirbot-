@@ -139,6 +139,24 @@ describe("validatePhysicsEquationBackbone", () => {
     expect(combined).toContain("equation stress_energy_conservation missing required unit: 1/m");
   });
 
+
+
+  it("registers canonical atomic energy-density proxy equation in repo backbone", () => {
+    const repoRoot = process.cwd();
+    const backbone = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "configs", "physics-equation-backbone.v1.json"), "utf8"),
+    ) as {
+      equations: Array<{ id: string; claim_tier?: string; symbols?: Array<{ symbol?: string; units?: string }> }>;
+    };
+
+    const equation = backbone.equations.find((entry) => entry.id === "atomic_energy_to_energy_density_proxy");
+    expect(equation).toBeDefined();
+    expect(equation?.claim_tier).toBe("diagnostic");
+    expect(equation?.symbols?.some((entry) => entry.symbol === "rho_atomic_proxy" && entry.units === "J/m^3")).toBe(true);
+    expect(equation?.symbols?.some((entry) => entry.symbol === "E_atomic" && entry.units === "J")).toBe(true);
+    expect(equation?.symbols?.some((entry) => entry.symbol === "V_proxy" && entry.units === "m^3")).toBe(true);
+  });
+
   it("fails when manifest/equation claim tier is invalid", () => {
     const repoRoot = makeFixture((manifest) => {
       manifest.claim_tier = "exploratory";

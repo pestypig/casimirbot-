@@ -196,6 +196,42 @@
         "calibration_window_traceable"
       ],
       "root_lane": "physics_spacetime_gr"
+    },
+    {
+      "id": "atomic_energy_to_energy_density_proxy",
+      "name": "Atomic energy to energy-density proxy",
+      "category": "atomic_proxy_bridge",
+      "expression": "rho_atomic_proxy = E_atomic / V_proxy",
+      "claim_tier": "diagnostic",
+      "maturity_label": "experimental",
+      "symbols": [
+        {
+          "symbol": "rho_atomic_proxy",
+          "quantity": "atomic energy-density proxy",
+          "units": "J/m^3"
+        },
+        {
+          "symbol": "E_atomic",
+          "quantity": "atomic energy estimate",
+          "units": "J"
+        },
+        {
+          "symbol": "V_proxy",
+          "quantity": "effective proxy volume",
+          "units": "m^3"
+        }
+      ],
+      "residual_contract": {
+        "metric": "atomic_energy_density_proxy_residual",
+        "definition": "abs(rho_atomic_proxy - rho_reference_proxy)/max(abs(rho_reference_proxy), eps)",
+        "threshold": "<= 0.15"
+      },
+      "uncertainty_assumptions": [
+        "atomic_energy_estimate_traceable",
+        "proxy_volume_model_declared",
+        "diagnostic_proxy_not_tensor_lift"
+      ],
+      "root_lane": "physics_quantum_semiclassical"
     }
   ]
 }
