@@ -23,6 +23,66 @@ function writeJson(root: string, relPath: string, value: Record<string, unknown>
   fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
 }
 
+function createNpmShim(
+  binDir: string,
+  rootDir: string,
+  options: { packageStatus?: number; validateStatus?: number; writePackage?: boolean; writeValidate?: boolean } = {},
+): void {
+  const shimScriptPath = path.join(binDir, "npm-shim.js");
+  const shimScript = [
+    '#!/usr/bin/env node',
+    'const fs = require("node:fs");',
+    'const path = require("node:path");',
+    'const args = process.argv.slice(2).join(" ");',
+    `const rootDir = ${JSON.stringify(rootDir)};`,
+    'const logPath = path.join(rootDir, "npm-invocations.log");',
+    'fs.appendFileSync(logPath, `${args}\n`);',
+    `const packageStatus = ${options.packageStatus ?? 0};`,
+    `const validateStatus = ${options.validateStatus ?? 0};`,
+    `const writePackage = ${options.writePackage ?? true};`,
+    `const writeValidate = ${options.writeValidate ?? true};`,
+    'if (args.includes("helix:decision:package")) {',
+    '  if (writePackage) {',
+    '    const reportsDir = path.join(rootDir, "reports");',
+    '    fs.mkdirSync(reportsDir, { recursive: true });',
+    '    fs.writeFileSync(path.join(reportsDir, "helix-decision-package.json"), JSON.stringify({ decision: { value: "GO", hard_blockers: [] } }));',
+    '  }',
+    '  process.exit(packageStatus);',
+    '}',
+    'if (args.includes("helix:decision:validate")) {',
+    '  if (writeValidate) {',
+    '    const reportsDir = path.join(rootDir, "reports");',
+    '    fs.mkdirSync(reportsDir, { recursive: true });',
+    '    fs.writeFileSync(path.join(reportsDir, "helix-decision-validate.json"), JSON.stringify({ ok: true }));',
+    '  }',
+    '  process.exit(validateStatus);',
+    '}',
+    'process.exit(0);',
+    '',
+  ].join("\n");
+
+  fs.writeFileSync(shimScriptPath, shimScript, { mode: 0o755 });
+
+  if (process.platform === "win32") {
+    const cmdPath = path.join(binDir, "npm.cmd");
+    const cmd = `@echo off
+"${process.execPath}" "${shimScriptPath}" %*
+`;
+    fs.writeFileSync(cmdPath, cmd);
+    return;
+  }
+
+  const shimPath = path.join(binDir, "npm");
+  const launcher = `#!/usr/bin/env sh
+"${process.execPath}" "${shimScriptPath}" "$@"
+`;
+  fs.writeFileSync(shimPath, launcher, { mode: 0o755 });
+}
+
+function pathWithShim(binDir: string): string {
+  return `${binDir}${path.delimiter}${process.env.PATH ?? ""}`;
+}
+
 afterEach(() => {
   delete process.env.HELIX_DECISION_ROOT;
   while (tempDirs.length > 0) {
@@ -31,6 +91,39 @@ afterEach(() => {
 });
 
 describe("helix decision run source resolution", () => {
+  it("resolves recommendation from the same run dir as heavy", () => {
+    const dir = mkDir();
+    process.env.HELIX_DECISION_ROOT = dir;
+
+    writeJson(dir, "reports/helix-self-tune-gate-summary.json", { strict_gates: { runtime_fallback_answer: 0 } });
+    writeJson(dir, "reports/helix-self-tune-casimir.json", { verdict: "PASS", integrityOk: true });
+
+    writeJson(dir, "artifacts/experiments/helix-step4-heavy-rerun/run-a/summary.json", {
+      metrics: { relation_packet_built_rate: 0.97 },
+      provenance: { gate_pass: true },
+    });
+    writeJson(dir, "artifacts/experiments/helix-step4-heavy-rerun/run-a/recommendation.json", { decision_grade_ready: true });
+
+    writeJson(dir, "artifacts/experiments/helix-step4-heavy-rerun/run-b/recommendation.json", { decision_grade_ready: true });
+
+    writeJson(dir, "artifacts/experiments/helix-step4-ab-rerun/t02/run/summary.json", {
+      summary_schema_version: 2,
+      variant: "helix_t02_run",
+    });
+    writeJson(dir, "artifacts/experiments/helix-step4-ab-rerun/t035/run/summary.json", {
+      summary_schema_version: 2,
+      variant: "helix_t035_run",
+    });
+
+    const runBReco = path.join(dir, "artifacts/experiments/helix-step4-heavy-rerun/run-b/recommendation.json");
+    const newer = new Date(Date.now() + 1000);
+    fs.utimesSync(runBReco, newer, newer);
+
+    const resolved = resolveSourcesForTest({});
+    expect(resolved.heavy).toContain("helix-step4-heavy-rerun/run-a/summary.json");
+    expect(resolved.recommendation).toContain("helix-step4-heavy-rerun/run-a/recommendation.json");
+  });
+
   it("resolves newest discovered artifacts when overrides are absent", () => {
     const dir = mkDir();
     process.env.HELIX_DECISION_ROOT = dir;
@@ -142,26 +235,7 @@ describe("helix decision run summary", () => {
     const dir = mkDir();
     const binDir = path.join(dir, "bin");
     fs.mkdirSync(binDir, { recursive: true });
-
-    const npmShim = `#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\n' "$*" >> "${path.join(dir, "npm-invocations.log")}" 
-if [[ "$*" == *"helix:decision:package"* ]]; then
-  mkdir -p "${path.join(dir, "reports")}";
-  cat > "${path.join(dir, "reports/helix-decision-package.json")}" <<'JSON'
-{"decision":{"value":"GO","hard_blockers":[]}}
-JSON
-  exit 0
-fi
-if [[ "$*" == *"helix:decision:validate"* ]]; then
-  cat > "${path.join(dir, "reports/helix-decision-validate.json")}" <<'JSON'
-{"ok":true}
-JSON
-  exit 0
-fi
-exit 0
-`;
-    fs.writeFileSync(path.join(binDir, "npm"), npmShim, { mode: 0o755 });
+    createNpmShim(binDir, dir);
 
     writeJson(dir, "custom/narrow.json", { strict_gates: { runtime_fallback_answer: 0 } });
     writeJson(dir, "custom/heavy/summary.json", { metrics: { relation_packet_built_rate: 0.99 }, provenance: { gate_pass: true } });
@@ -196,7 +270,7 @@ exit 0
         env: {
           ...process.env,
           HELIX_DECISION_ROOT: dir,
-          PATH: `${binDir}:${process.env.PATH ?? ""}`,
+          PATH: pathWithShim(binDir),
         },
       },
     );
@@ -219,19 +293,7 @@ exit 0
     const dir = mkDir();
     const binDir = path.join(dir, "bin");
     fs.mkdirSync(binDir, { recursive: true });
-
-    const npmShim = `#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\n' "$*" >> "${path.join(dir, "npm-invocations.log")}" 
-if [[ "$*" == *"helix:decision:package"* ]]; then
-  exit 11
-fi
-if [[ "$*" == *"helix:decision:validate"* ]]; then
-  exit 99
-fi
-exit 0
-`;
-    fs.writeFileSync(path.join(binDir, "npm"), npmShim, { mode: 0o755 });
+    createNpmShim(binDir, dir, { packageStatus: 11, validateStatus: 99, writePackage: false, writeValidate: false });
 
     writeJson(dir, "custom/narrow.json", { strict_gates: { runtime_fallback_answer: 0 } });
     writeJson(dir, "custom/heavy/summary.json", { metrics: { relation_packet_built_rate: 0.99 }, provenance: { gate_pass: true } });
@@ -266,7 +328,7 @@ exit 0
         env: {
           ...process.env,
           HELIX_DECISION_ROOT: dir,
-          PATH: `${binDir}:${process.env.PATH ?? ""}`,
+          PATH: pathWithShim(binDir),
         },
       },
     );
