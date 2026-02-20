@@ -1,0 +1,25 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-080-life-answer-quality-threshold-pack",
+  "files_changed": [
+    "docs/audits/ticket-results/TOE-080-life-answer-quality-threshold-pack.20260220T011753Z.json"
+  ],
+  "tests_run": [
+    "tests/helix-ask-focused-utility-hardening.spec.ts",
+    "tests/helix-ask-mechanism-maturity-contract.spec.ts",
+    "tests/helix-ask-ps2-runtime-report.spec.ts",
+    "tests/casimir-verify-ps2.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:68e7a158-66d1-4491-9b51-aa3c1564fd95",
+    "run_id": "A2-20260220T011753Z",
+    "certificate_hash": "20eb7fc8c8b1261aab2f08ca8945e99afe0c3af3dfddceec924a77954743bb36",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}

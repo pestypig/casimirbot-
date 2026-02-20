@@ -1,0 +1,26 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-085-physics-root-lanes-spacetime-semiclassical",
+  "files_changed": [
+    "docs/audits/ticket-results/TOE-085-physics-root-lanes-spacetime-semiclassical.20260220T011753Z.json"
+  ],
+  "tests_run": [
+    "scripts/validate-physics-root-leaf-manifest.ts",
+    "scripts/validate-physics-equation-backbone.ts",
+    "tests/physics-root-leaf-first-class-coverage.spec.ts",
+    "tests/physics-root-lane-tree-parity.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:4f0560c9-1984-4bbb-80af-f3c7d3a72847",
+    "run_id": "A2-20260220T011753Z",
+    "certificate_hash": "5a05d106dc8e31757538e049420746fb08fa7bc41d862983c3b22f4088a941ae",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "physics-research-brief",
+    "falsifier-matrix"
+  ],
+  "remaining_gaps": []
+}

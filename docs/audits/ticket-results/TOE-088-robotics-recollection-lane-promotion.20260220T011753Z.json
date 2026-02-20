@@ -1,0 +1,23 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-088-robotics-recollection-lane-promotion",
+  "files_changed": [
+    "docs/audits/ticket-results/TOE-088-robotics-recollection-lane-promotion.20260220T011753Z.json"
+  ],
+  "tests_run": [
+    "tests/robotics-recollection.spec.ts",
+    "server/__tests__/agi.adapter.test.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:56f3aba0-e718-4e19-99ca-825357683abb",
+    "run_id": "A2-20260220T011753Z",
+    "certificate_hash": "f9ea27eab58ecdfedd119da8331a0e586d82a8795c86fbbb2a591e9f0aef52b8",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}

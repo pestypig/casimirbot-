@@ -1,0 +1,23 @@
+{
+  "schema_version": "toe_agent_ticket_result/1",
+  "ticket_id": "TOE-083-tool-plan-tool-execution-contracts-lane",
+  "files_changed": [
+    "docs/audits/ticket-results/TOE-083-tool-plan-tool-execution-contracts-lane.20260220T011753Z.json"
+  ],
+  "tests_run": [
+    "tests/tool-contracts-replay.spec.ts",
+    "tests/helix-ask-modes.spec.ts"
+  ],
+  "claim_tier": "diagnostic",
+  "casimir": {
+    "verdict": "PASS",
+    "trace_id": "adapter:2cab1773-6cdf-4d4c-8ebb-9fdf642b0b33",
+    "run_id": "A2-20260220T011753Z",
+    "certificate_hash": "7290ac03e86b324483331c665ebb9b451bcb885c22f40e8fd1905818ee4066f6",
+    "integrity_ok": true
+  },
+  "research_artifacts": [
+    "runtime-contract-audit"
+  ],
+  "remaining_gaps": []
+}
