@@ -1,0 +1,32 @@
+{
+  "ok": false,
+  "decision": "NO-GO",
+  "blockers": [
+    "provenance_gate_pass failed (false == true)",
+    "decision_grade_ready failed (false == true)",
+    "novelty.t02 below target >=0.82",
+    "novelty.t035 below target >=0.82"
+  ],
+  "package_path": "reports/helix-decision-package.json",
+  "validate_path": "reports/helix-decision-validate.json",
+  "selected_sources": {
+    "narrow": "reports/helix-self-tune-gate-summary.json",
+    "heavy": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/summary.json",
+    "recommendation": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/recommendation.json",
+    "ab_t02": "artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json",
+    "ab_t035": "artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json",
+    "casimir": "reports/helix-self-tune-casimir.json"
+  },
+  "commands": [
+    {
+      "name": "decision:package",
+      "cmd": "npm run helix:decision:package -- --narrow reports/helix-self-tune-gate-summary.json --heavy artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/summary.json --heavy-recommendation artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/recommendation.json --ab-t02 artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json --ab-t035 artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json --casimir reports/helix-self-tune-casimir.json",
+      "status": 0
+    },
+    {
+      "name": "decision:validate",
+      "cmd": "npm run helix:decision:validate -- --package reports/helix-decision-package.json",
+      "status": 1
+    }
+  ]
+}

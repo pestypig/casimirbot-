@@ -1,0 +1,69 @@
+{
+  "generated_at": "2026-02-20T19:24:11.958Z",
+  "git": {
+    "branch": "work",
+    "head": "d8b709f",
+    "origin_main": null,
+    "ahead_behind": null
+  },
+  "selected_paths": {
+    "narrow": "reports/helix-self-tune-gate-summary.json",
+    "heavy": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/summary.json",
+    "recommendation": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/recommendation.json",
+    "ab_t02": "artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json",
+    "ab_t035": "artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json",
+    "casimir": "reports/helix-self-tune-casimir.json"
+  },
+  "run_ids": {
+    "narrow": "narrow-1771614878316",
+    "heavy": "versatility-1771613712583",
+    "recommendation": "versatility-1771613712583",
+    "ab_t02": "2026-02-20T19-06-34-742Z",
+    "ab_t035": "2026-02-20T19-10-24-151Z",
+    "casimir": "546"
+  },
+  "inputs": {
+    "narrow": {
+      "path": "reports/helix-self-tune-gate-summary.json",
+      "exists": true,
+      "sha256": "1d1545d48e1bc5ac1ae797455c0258883ff0a0e358a930336f1a471833335731",
+      "size_bytes": 513,
+      "mtime_iso": "2026-02-20T19:14:38.311Z"
+    },
+    "heavy": {
+      "path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/summary.json",
+      "exists": true,
+      "sha256": "827cbe0f27874d52f72d8d71e3803847954188acd36df5795b92cd0445ad9102",
+      "size_bytes": 120941,
+      "mtime_iso": "2026-02-20T19:06:23.275Z"
+    },
+    "recommendation": {
+      "path": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771613712583/recommendation.json",
+      "exists": true,
+      "sha256": "9ff2b9129c95dba5416f06f5525b51fa602701225e617534f17b9d3c39c6ec30",
+      "size_bytes": 3441,
+      "mtime_iso": "2026-02-20T19:06:23.275Z"
+    },
+    "ab_t02": {
+      "path": "artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json",
+      "exists": true,
+      "sha256": "eb8b522ce3c6c6da25e29479f333800f0527d5cfa89f82919dd1b023118d7c14",
+      "size_bytes": 1693,
+      "mtime_iso": "2026-02-20T19:10:17.933Z"
+    },
+    "ab_t035": {
+      "path": "artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json",
+      "exists": true,
+      "sha256": "e6645383688037063b7f45539076fc705abdbc6823bfba1d0084ef40a622ab73",
+      "size_bytes": 1694,
+      "mtime_iso": "2026-02-20T19:14:17.583Z"
+    },
+    "casimir": {
+      "path": "reports/helix-self-tune-casimir.json",
+      "exists": true,
+      "sha256": "ec73cc2e72e32bba1561be5af10b7d4804becca271b09832048f7be66f83b400",
+      "size_bytes": 271,
+      "mtime_iso": "2026-02-20T19:23:48.313Z"
+    }
+  }
+}
