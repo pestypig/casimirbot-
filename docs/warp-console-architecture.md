@@ -420,3 +420,7 @@ marginRaw = |lhs| / |bound| -> fordRomanCompliance, zeta (policy clamp for repor
 ```
 
 If a ready-to-paste investigative prompt that only inventories factors is needed, the existing "Whole-System QI/Curvature Audit" template remains fit for purpose. A compact parameter sweep grid (JSON snippets for `--params`) focused on physics-first levers can be added on request to see how `marginRaw` responds run-to-run.
+
+## Sector-control planning lane (diagnostic only)
+
+Helix Ask now exposes `physics.warp.sector_control.plan` for sector-strobing control planning. This lane is **diagnostic maturity** by default and is not a viability certificate. Operators should treat outputs as scheduling guidance bounded by guardrails and proof metadata.

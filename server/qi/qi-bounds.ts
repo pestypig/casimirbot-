@@ -247,3 +247,13 @@ function clampNegative(value: number, fallback?: number): number {
   const mag = Math.max(Math.abs(value) || 0, floorAbs, fallbackMag);
   return -mag;
 }
+
+
+export function isQiBoundMonotoneByTau(samples: number[]): boolean {
+  for (let i = 1; i < samples.length; i += 1) {
+    if (samples[i] < samples[i - 1]) {
+      return false;
+    }
+  }
+  return true;
+}

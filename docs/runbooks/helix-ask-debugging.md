@@ -123,3 +123,12 @@ curl -sS "$BASE/api/agi/tools/logs?tool=helix.ask.event&limit=250&sessionId=$SID
   | sort_by(.durationMs) | reverse | .[:10]
   | .[] | "\(.durationMs)ms | \(.text // "no-text")"'
 ```
+
+## Troubleshooting sector-control `firstFail`
+
+- `FordRomanQI`: tighten duty/concurrency, review tau sampler and QI bounds.
+- `TS_ratio_min`: increase tauLC/tauPulse margin before planning output promotion.
+- `ThetaAudit`: re-check metric adapter divergence and calibration limits.
+- `grConstraintGate`: verify GR gate diagnostics and hard-threshold bundle.
+
+Reminder: sector-control planning output is not a viability certificate.

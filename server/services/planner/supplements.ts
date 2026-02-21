@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const SUPPLEMENT_KINDS = ["warp", "repo", "logs", "metrics"] as const;
+export const SUPPLEMENT_KINDS = ["warp", "repo", "logs", "metrics", "sector-control"] as const;
 export type SupplementKind = (typeof SUPPLEMENT_KINDS)[number];
 
 export interface Supplement {

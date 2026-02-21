@@ -84,6 +84,7 @@ import { readmeHandler, readmeSpec } from "../skills/docs.readme";
 import { essenceMixHandler, essenceMixSpec } from "../skills/essence.mix";
 import { warpAskHandler, warpAskSpec } from "../skills/physics.warp.ask";
 import { warpViabilityHandler, warpViabilitySpec } from "../skills/physics.warp.viability";
+import { sectorControlPlanHandler, sectorControlPlanSpec } from "../skills/physics.warp.sector-control.plan";
 import { grGroundingHandler, grGroundingSpec } from "../skills/physics.gr.grounding";
 import { grAssistantHandler, grAssistantSpec } from "../skills/physics.gr.assistant";
 import { debateRunHandler, debateRunSpec } from "../skills/debate.run";
@@ -2492,6 +2493,9 @@ function selectToolForGoal(goal: string, manifest: ToolManifestEntry[]): string 
   }
   if (hasTool("physics.curvature.result.get") && contains(normalized, /(curvature).*(result|get)/)) {
     return "physics.curvature.result.get";
+  }
+  if (hasTool(sectorControlPlanSpec.name) && contains(normalized, /(sector|strob(e|ing)|control\s*plan)/)) {
+    return sectorControlPlanSpec.name;
   }
   if (hasTool(sttWhisperSpec.name) && contains(normalized, /\b(audio|transcribe|speech|voice|recording)\b/)) {
     return sttWhisperSpec.name;
@@ -15757,6 +15761,9 @@ async function ensureDefaultTools(): Promise<void> {
   }
   if (!getTool(warpViabilitySpec.name)) {
     registerTool({ ...warpViabilitySpec, handler: warpViabilityHandler });
+  }
+  if (!getTool(sectorControlPlanSpec.name)) {
+    registerTool({ ...sectorControlPlanSpec, handler: sectorControlPlanHandler });
   }
   if (!getTool(grGroundingSpec.name)) {
     registerTool({ ...grGroundingSpec, handler: grGroundingHandler });
