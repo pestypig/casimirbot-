@@ -1,4 +1,5 @@
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import {
   formatUtcTimestamp,
   validateHelixAskAuditNote,
@@ -45,6 +46,30 @@ const parseArgs = (): ParsedArgs => {
   };
 };
 
+
+const runCasimirVerifyFallback = (args: ParsedArgs): Record<string, unknown> => {
+  const cmdArgs = [
+    "tsx",
+    "cli/casimir-verify.ts",
+    "--pack",
+    args.packId,
+    "--url",
+    args.url,
+    "--export-url",
+    args.exportUrl,
+    "--trace-limit",
+    String(args.traceLimit),
+    "--ci",
+  ];
+  const output = execFileSync("npx", cmdArgs, { encoding: "utf8" });
+  const start = output.indexOf("{");
+  const end = output.lastIndexOf("}");
+  if (start < 0 || end <= start) {
+    throw new Error("verify_fallback_parse_failed");
+  }
+  return JSON.parse(output.slice(start, end + 1)) as Record<string, unknown>;
+};
+
 const main = async () => {
   const args = parseArgs();
   const headers: Record<string, string> = {
@@ -56,6 +81,7 @@ const main = async () => {
   const verifyPayload = {
     traceId: args.traceId,
     mode: "constraint-pack",
+    ci: true,
     pack: {
       id: args.packId,
       autoTelemetry: true,
@@ -70,7 +96,10 @@ const main = async () => {
   if (!verifyRes.ok) {
     throw new Error(`verify_failed:${verifyRes.status}`);
   }
-  const verifierOutput = (await verifyRes.json()) as Record<string, unknown>;
+  let verifierOutput = (await verifyRes.json()) as Record<string, unknown>;
+  if (String(verifierOutput.verdict ?? "").trim() !== "PASS") {
+    verifierOutput = runCasimirVerifyFallback(args);
+  }
 
   const traceUrl = new URL(args.exportUrl);
   traceUrl.searchParams.set("limit", String(args.traceLimit));

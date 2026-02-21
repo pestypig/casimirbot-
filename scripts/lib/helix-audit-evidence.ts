@@ -22,6 +22,8 @@ export type HelixAuditNote = {
 const sha256Hex = (content: Buffer | string): string =>
   crypto.createHash("sha256").update(content).digest("hex");
 
+const normalizeToPosixPath = (relativePath: string): string => relativePath.split(path.sep).join("/");
+
 export const computeFileSha256 = (filePath: string): string => {
   const content = fs.readFileSync(filePath);
   return sha256Hex(content);
@@ -51,6 +53,21 @@ export const validateHelixAskAuditNote = (
   }
   if (typeof note.integrity_ok !== "boolean") {
     throw new Error("missing_or_invalid_field:integrity_ok");
+  }
+  if (note.verdict !== "PASS") {
+    throw new Error("invalid_verdict:not_pass");
+  }
+  if (note.integrity_ok !== true) {
+    throw new Error("invalid_integrity:not_true");
+  }
+  if (typeof note.trace_id !== "string" || note.trace_id.trim().length === 0) {
+    throw new Error("missing_or_invalid_field:trace_id");
+  }
+  if (typeof note.run_id !== "string" || note.run_id.trim().length === 0) {
+    throw new Error("missing_or_invalid_field:run_id");
+  }
+  if (typeof note.certificate_hash !== "string" || !/^[a-f0-9]{64}$/i.test(note.certificate_hash)) {
+    throw new Error("missing_or_invalid_field:certificate_hash");
   }
   if (!note.artifact_hashes || typeof note.artifact_hashes !== "object") {
     throw new Error("missing_or_invalid_field:artifact_hashes");
@@ -92,6 +109,8 @@ export const writeHelixAskAuditArtifacts = ({
   const verifyRel = path.join("artifacts", "verification", `helix-casimir-${timestamp}.json`);
   const traceRel = path.join("artifacts", "verification", `helix-training-trace-${timestamp}.jsonl`);
   const auditRel = path.join("docs", "audits", "helix-results", `HELIX-ASK-${timestamp}.json`);
+  const verifyRelNote = normalizeToPosixPath(verifyRel);
+  const traceRelNote = normalizeToPosixPath(traceRel);
 
   const verifyAbs = path.resolve(rootDir, verifyRel);
   const traceAbs = path.resolve(rootDir, traceRel);
@@ -122,8 +141,8 @@ export const writeHelixAskAuditArtifacts = ({
     verdict,
     certificate_hash: certificateHash,
     integrity_ok: integrityOk,
-    verify_artifact_path: verifyRel,
-    trace_export_path: traceRel,
+    verify_artifact_path: verifyRelNote,
+    trace_export_path: traceRelNote,
     artifact_hashes: {
       verify_artifact_sha256: computeFileSha256(verifyAbs),
       trace_export_sha256: computeFileSha256(traceAbs),

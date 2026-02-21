@@ -1,0 +1,19 @@
+{
+  "ticket": "HELIX-ASK",
+  "created_at": "2026-02-21T17:40:44.693Z",
+  "trace_id": "adapter:cd7b230e-a307-4174-893f-279d2ad5b2d9",
+  "run_id": "52",
+  "verdict": "PASS",
+  "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+  "integrity_ok": true,
+  "verify_artifact_path": "artifacts/verification/helix-casimir-20260221T174044Z.json",
+  "trace_export_path": "artifacts/verification/helix-training-trace-20260221T174044Z.jsonl",
+  "artifact_hashes": {
+    "verify_artifact_sha256": "6058d77143299809a89dc025665cd374034a2ecf2d0c7a6a5cb0abb55d862906",
+    "trace_export_sha256": "4e5220c357226acd508da8c6fc41452dd3f86caa11fc20f00c1dac256e56ccb2"
+  },
+  "commands": [
+    "POST http://127.0.0.1:5173/api/agi/adapter/run",
+    "GET http://127.0.0.1:5173/api/agi/training-trace/export?limit=200"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "traceId": "adapter:cd7b230e-a307-4174-893f-279d2ad5b2d9",
+  "runId": "52",
+  "verdict": "PASS",
+  "pass": true,
+  "firstFail": null,
+  "failReason": "NONE",
+  "deltas": [],
+  "certificate": {
+    "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificateId": "constraint-pack:repo-convergence:6e84f965957f",
+    "integrityOk": true,
+    "status": "GREEN"
+  },
+  "artifacts": [
+    {
+      "kind": "constraint-pack",
+      "ref": "repo-convergence"
+    },
+    {
+      "kind": "training-trace-id",
+      "ref": "52"
+    },
+    {
+      "kind": "training-trace-url",
+      "ref": "/api/agi/training-trace/52"
+    },
+    {
+      "kind": "training-trace-export",
+      "ref": "/api/agi/training-trace/export"
+    },
+    {
+      "kind": "constraint-pack-certificate-hash",
+      "ref": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45"
+    },
+    {
+      "kind": "constraint-pack-certificate-id",
+      "ref": "constraint-pack:repo-convergence:6e84f965957f"
+    }
+  ]
+}
