@@ -8,6 +8,7 @@ type CliArgs = {
   outJson: string;
   outMd: string;
   writeMd: boolean;
+  fixedTime: string | null;
 };
 
 type ModePlanCase = {
@@ -54,6 +55,7 @@ const parseArgs = (): CliArgs => {
     outJson: map.get("--out-json") ?? DEFAULT_OUT_JSON,
     outMd: map.get("--out-md") ?? DEFAULT_OUT_MD,
     writeMd: map.get("--no-md") !== "1",
+    fixedTime: map.get("--fixed-time") ?? null,
   };
 };
 
@@ -185,7 +187,9 @@ const main = () => {
   const canonicalPayload = {
     version: 1,
     plannerTool: "physics.warp.sector_control.plan",
-    matrix: modePlans.map((entry) => ({
+    matrix: [...modePlans]
+      .sort((a, b) => a.mode.localeCompare(b.mode))
+      .map((entry) => ({
       mode: entry.mode,
       request: {
         timing: entry.request.timing ?? {},
@@ -206,8 +210,10 @@ const main = () => {
     .update(canonicalText)
     .digest("hex");
 
+  const generatedAt = args.fixedTime ?? new Date().toISOString();
+
   const summary = {
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     canonicalHash,
     canonicalPayload,
   };
@@ -219,7 +225,7 @@ const main = () => {
     const md = buildPromptBatchMarkdown({
       canonicalHash,
       outJson: args.outJson,
-      modePlans: modePlans.map((entry) => ({
+      modePlans: [...modePlans].sort((a, b) => a.mode.localeCompare(b.mode)).map((entry) => ({
         mode: entry.mode,
         firstFail: entry.firstFail,
         constraints: entry.constraints,

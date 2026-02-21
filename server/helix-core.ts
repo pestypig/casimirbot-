@@ -118,6 +118,7 @@ import {
   grRegionStatsSchema,
   casimirTileSummarySchema,
   experimentalSchema,
+  sectorControlLiveEventSchema,
 } from "../shared/schema.js";
 import { kappa_drive_from_power } from "../shared/curvature-proxy.js";
 import { mathStageRegistry, type MathStage } from "../shared/math-stage.js";
@@ -2682,8 +2683,28 @@ export async function switchOperationalMode(req: Request, res: Response) {
           ? requestedMode
           : preflight.fallbackMode ?? requestedMode;
       const next = await switchMode(curr, appliedMode);
+      const sectorControlLiveEvent = sectorControlLiveEventSchema.parse({
+        ts: Date.now(),
+        requestedMode,
+        appliedMode,
+        fallbackApplied: preflight.fallbackApplied,
+        plannerMode: preflight.plannerMode,
+        firstFail: preflight.plannerResult.firstFail ?? null,
+        constraints: preflight.plannerResult.plan.constraints,
+        observerGrid: preflight.plannerResult.plan.observerGrid
+          ? {
+              overflowCount: preflight.plannerResult.plan.observerGrid.overflowCount,
+              paybackGain: preflight.plannerResult.plan.observerGrid.paybackGain,
+            }
+          : null,
+      });
+      next.latestSectorControlLiveEvent = {
+        ...sectorControlLiveEvent,
+        source: "server",
+        updatedAt: Date.now(),
+      };
       setGlobalPipelineState(next);
-      return { next, preflight, appliedMode };
+      return { next, preflight, appliedMode, sectorControlLiveEvent };
     });
     const newState = transition.next;
 
@@ -2712,9 +2733,9 @@ export async function switchOperationalMode(req: Request, res: Response) {
         required: transition.preflight.required,
         plannerMode: transition.preflight.plannerMode,
         ok: transition.preflight.plannerResult.ok,
-        firstFail: transition.preflight.plannerResult.firstFail,
-        constraints: transition.preflight.plannerResult.plan.constraints,
-        observerGrid: transition.preflight.plannerResult.plan.observerGrid ?? null,
+        firstFail: transition.sectorControlLiveEvent.firstFail,
+        constraints: transition.sectorControlLiveEvent.constraints ?? null,
+        observerGrid: transition.sectorControlLiveEvent.observerGrid ?? null,
         fallbackMode: transition.preflight.fallbackMode,
       },
       state: newState,
@@ -2723,6 +2744,19 @@ export async function switchOperationalMode(req: Request, res: Response) {
   } catch (error) {
     res.status(400).json({ error: "Failed to switch mode", details: error instanceof Error ? error.message : "Unknown error" });
   }
+}
+
+export function getSectorControlLiveEvent(_req: Request, res: Response) {
+  const state = getGlobalPipelineState();
+  const authoritative = sectorControlLiveEventSchema.safeParse(state.latestSectorControlLiveEvent);
+  res.json({
+    event: authoritative.success ? authoritative.data : null,
+    meta: {
+      source: "server",
+      hasEvent: authoritative.success,
+      now: Date.now(),
+    },
+  });
 }
 
 // Get HELIX metrics (alias for compatibility)

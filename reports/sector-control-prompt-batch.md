@@ -10,8 +10,8 @@ For each step:
 2) Record `constraints`, `firstFail`, and observer overflow values.
 3) If `firstFail` is non-null, mark step `degraded` and continue.
 4) Emit an execution ledger row and include canonical hash verification.
-Canonical replay hash: 689e7ca35557a2e5ab30b882fb17eb0dff622055acf36b73c3f9ee3d4f1ae9d6
-Reference summary artifact: artifacts/experiments/sector-control-repro/latest/summary.json
+Canonical replay hash: c7228280a6b3f334915306d4d8b7f442a847488f961bd0558d9bbcb032a4ca47
+Reference summary artifact: artifacts/experiments/sector-control-repro/baseline-summary.json
 ```
 
 ## Prompt Steps
@@ -48,36 +48,6 @@ Reference summary artifact: artifacts/experiments/sector-control-repro/latest/su
 
 ### Prompt 1
 
-- mode: `stability_scan`
-- expected firstFail: `null`
-- expected constraints: `{"FordRomanQI":"pass","ThetaAudit":"pass","TS_ratio_min":"pass","VdB_band":"unknown","grConstraintGate":"pass"}`
-
-```json
-{
-  "mode": "stability_scan",
-  "overrides": {
-    "timing": {
-      "strobeHz": 140,
-      "TS_ratio": 1.9,
-      "tauLC_ms": 9,
-      "tauPulse_ms": 1.8
-    },
-    "allocation": {
-      "sectorCount": 24,
-      "concurrentSectors": 4,
-      "negativeFraction": 0.22
-    },
-    "duty": {
-      "dutyCycle": 0.42,
-      "dutyBurst": 0.24,
-      "dutyShip": 0.16
-    }
-  }
-}
-```
-
-### Prompt 2
-
 - mode: `qi_conservative`
 - expected firstFail: `null`
 - expected constraints: `{"FordRomanQI":"pass","ThetaAudit":"pass","TS_ratio_min":"pass","VdB_band":"unknown","grConstraintGate":"pass"}`
@@ -101,6 +71,36 @@ Reference summary artifact: artifacts/experiments/sector-control-repro/latest/su
       "dutyCycle": 0.35,
       "dutyBurst": 0.16,
       "dutyShip": 0.1
+    }
+  }
+}
+```
+
+### Prompt 2
+
+- mode: `stability_scan`
+- expected firstFail: `null`
+- expected constraints: `{"FordRomanQI":"pass","ThetaAudit":"pass","TS_ratio_min":"pass","VdB_band":"unknown","grConstraintGate":"pass"}`
+
+```json
+{
+  "mode": "stability_scan",
+  "overrides": {
+    "timing": {
+      "strobeHz": 140,
+      "TS_ratio": 1.9,
+      "tauLC_ms": 9,
+      "tauPulse_ms": 1.8
+    },
+    "allocation": {
+      "sectorCount": 24,
+      "concurrentSectors": 4,
+      "negativeFraction": 0.22
+    },
+    "duty": {
+      "dutyCycle": 0.42,
+      "dutyBurst": 0.24,
+      "dutyShip": 0.16
     }
   }
 }

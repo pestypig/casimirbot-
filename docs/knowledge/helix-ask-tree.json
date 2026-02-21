@@ -18,7 +18,8 @@
         "helix-ask-core",
         "helix-ask-evidence",
         "helix-ask-graph",
-        "bridge-helix-ask-docs-helix-ask-core"
+        "bridge-helix-ask-docs-helix-ask-core",
+        "helix-ask-sector-control-runtime-lane"
       ],
       "links": [],
       "summary": "Helix Ask routing, scaffolds, and evidence gates.",
@@ -474,6 +475,67 @@
       ],
       "slug": "bridge-helix-ask-docs-helix-ask-core",
       "summary": "Bridge between Helix Ask Docs and Helix Ask Core."
+    },
+    {
+      "id": "helix-ask-sector-control-runtime-lane",
+      "slug": "helix-ask-sector-control-runtime-lane",
+      "title": "Sector-control runtime lane",
+      "excerpt": "Routes sector-strobe/time-dilation prompts to sector-control-runtime tree with reproducibility evidence.",
+      "bodyMD": "Binds Helix Ask sector-strobe/time-dilation prompts to docs/knowledge/sector-control-runtime-tree.json and reproducibility scripts lane.",
+      "tags": [
+        "helix_ask",
+        "sector_control",
+        "time_dilation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "helix-ask-tree"
+        }
+      ],
+      "summary": "Sector-control lane with runtime live-event and repro evidence.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/sector-control-runtime-tree.json"
+        },
+        {
+          "type": "code",
+          "path": "scripts/sector-control-repro.ts"
+        },
+        {
+          "type": "code",
+          "path": "scripts/sector-control-repro-check.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/helix-ask-graph-resolver.spec.ts"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "helix-ask-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     }
   ],
   "schema": {

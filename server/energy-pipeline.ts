@@ -34,6 +34,7 @@ import { computeClocking, type ClockingSnapshot } from "../shared/clocking.js";
 import type { StressEnergyStats } from "./stress-energy-brick";
 import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.js";
 import type { CongruenceMeta } from "../types/pipeline";
+import type { SectorControlLiveEvent } from "../shared/schema.js";
 
 // Keep tau_LC (wall / c) aligned with modulation dwell unless overridden
 const DEFAULT_MODULATION_FREQ_GHZ = 15;
@@ -1328,6 +1329,11 @@ export interface EnergyPipelineState {
   __hullAreaSource?: "override" | "ellipsoid";
   __hullAreaEllipsoid_m2?: number;
   __hullAreaPerSectorSource?: "override" | "ellipsoid" | "uniform";
+
+  latestSectorControlLiveEvent?: SectorControlLiveEvent & {
+    source: "server";
+    updatedAt: number;
+  };
 
   // Sector management
   tilesPerSector: number;   // Tiles per sector
