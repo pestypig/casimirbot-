@@ -23,6 +23,11 @@ Require deterministic guardrail evidence fields: guardrailStatus, maturity, trac
 Do not represent this lane as a viability certificate; certifying=false unless admissible certificate evidence exists.
 `.trim();
 
+
+export type ProposalPressureContext = {
+  activePressures?: string[];
+};
+
 const PATCH_PROMPT_FRAMEWORK = `
 You are designing a Needle Hull Warp Bubble with a live energy pipeline that must feed a stable, adaptive field around a spacecraft.
 Brainstorm detailed approaches to:
@@ -110,6 +115,7 @@ const collectCallpoints = (proposal: EssenceProposal, limit = 8): Callpoint[] =>
 export async function buildPatchPromptPresets(
   proposal: EssenceProposal,
   limit = 3,
+  options?: { pressureContext?: ProposalPressureContext },
 ): Promise<ProposalPromptPreset[]> {
   if (proposal.patchKind !== "code-diff") {
     return [];
@@ -119,11 +125,15 @@ export async function buildPatchPromptPresets(
     ? callpoints.map((cp) => `- ${cp.path} (${cp.updatedAt}): ${cp.snippet}`).join("\n")
     : "No recent physics/warp call points detected; focus on telemetry, pipeline stability, and repo experiments.";
   const targetPaths = collectTargetPaths(proposal);
-  const basePrompt = proposal.kind === "sector-control"
-    ? `${PATCH_PROMPT_FRAMEWORK}
+  const activePressures = options?.pressureContext?.activePressures?.filter(Boolean) ?? [];
+  const pressureContextBlock =
+    proposal.kind === "knowledge" && activePressures.length > 0
+      ? `\n\nIdeology pressure context (diagnostic only):\n- Active external pressures: ${activePressures.join(", ")}\n- Apply verification-first guidance; system advises, user decides.\n- Do not treat pressure inference as certifying evidence.`
+      : "";
 
-${SECTOR_CONTROL_PROMPT}`
-    : PATCH_PROMPT_FRAMEWORK;
+  const basePrompt = proposal.kind === "sector-control"
+    ? `${PATCH_PROMPT_FRAMEWORK}\n\n${SECTOR_CONTROL_PROMPT}`
+    : `${PATCH_PROMPT_FRAMEWORK}${pressureContextBlock}`;
 
   const { presets } = await smallLlmPatchPromptPresets({
     basePrompt,

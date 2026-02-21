@@ -24,6 +24,17 @@ const formatMetric = (value: number | null | undefined, digits = 3) =>
   Number.isFinite(value) ? (value as number).toFixed(digits) : "--";
 
 const CITIZENS_ARC_ID = "citizens-arc";
+const PRESSURE_CONTROLS: Array<{
+  key: "flattery" | "urgency" | "secrecy" | "financial" | "authority";
+  label: string;
+}> = [
+  { key: "flattery", label: "Flattery" },
+  { key: "urgency", label: "Urgency" },
+  { key: "secrecy", label: "Secrecy" },
+  { key: "financial", label: "Financial ask" },
+  { key: "authority", label: "Authority claim" },
+];
+
 
 export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
   const { data, isLoading, error, childrenOf, resolve } = useIdeology();
@@ -704,6 +715,85 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
             </>
           )}
         </Card>
+        <Card className="p-4 bg-slate-950/60 border-white/10">
+          <div className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-300">
+            Pressure guidance
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            {guidanceData?.invariant ?? "System advises, user decides."}
+          </p>
+          <div className="mt-3 space-y-2">
+            {PRESSURE_CONTROLS.map((control) => (
+              <label key={control.key} className="flex items-center justify-between rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-slate-200">
+                <span>{control.label}</span>
+                <Switch
+                  checked={pressureState[control.key]}
+                  onCheckedChange={(checked) =>
+                    setPressureState((prev) => ({ ...prev, [control.key]: checked }))
+                  }
+                />
+              </label>
+            ))}
+          </div>
+          {activePressures.length === 0 ? (
+            <p className="mt-3 text-xs text-slate-500">Enable one or more pressure signals to get guidance.</p>
+          ) : (
+            <div className="mt-3 space-y-3 text-xs">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.3em] text-slate-400">Anchor now</div>
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-300">
+                  {(guidanceData?.recommendedNodeIds ?? []).length === 0 ? (
+                    <li className="text-slate-500">No immediate anchors returned.</li>
+                  ) : (
+                    (guidanceData?.recommendedNodeIds ?? []).map((id) => <li key={`anchor-${id}`}>{id}</li>)
+                  )}
+                </ul>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.3em] text-slate-400">Avoid / escalate later</div>
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-300">
+                  {(guidanceData?.warnings ?? []).length === 0 ? (
+                    <li className="text-slate-500">No escalation warnings triggered.</li>
+                  ) : (
+                    (guidanceData?.warnings ?? []).map((warning, index) => (
+                      <li key={`warning-${index}`}>{warning}</li>
+                    ))
+                  )}
+                </ul>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.3em] text-slate-400">Verification steps</div>
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-300">
+                  {(guidanceData?.suggestedVerificationSteps ?? []).map((step, index) => (
+                    <li key={`verify-${index}`}>{step}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.3em] text-slate-400">Related artifacts</div>
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-300">
+                  {(guidanceData?.recommendedArtifacts ?? []).length === 0 ? (
+                    <li className="text-slate-500">No related artifacts suggested.</li>
+                  ) : (
+                    (guidanceData?.recommendedArtifacts ?? []).map((artifactId) => (
+                      <li key={`related-${artifactId}`}>
+                        <a
+                          className="text-sky-400 underline underline-offset-2 hover:text-sky-300"
+                          href={`/api/ethos/artifacts/${encodeURIComponent(artifactId)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {artifactId}
+                        </a>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+            </div>
+          )}
+        </Card>
+
         <Card className="p-4 bg-slate-950/60 border-white/10">
           <div className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-300">
             Artifacts

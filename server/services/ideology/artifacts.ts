@@ -93,7 +93,7 @@ export const searchIdeologyArtifacts = (
   const items = pagedItems.map(withKnowledgeProvenance);
   const strictMissingProvenance =
     params.strictProvenance === true &&
-    pagedItems.some(
+    filtered.some(
       (item) =>
         isZenSocietyArtifact(item) &&
         (!hasCompleteKnowledgeProvenance(item as Partial<IdeologyArtifactWithProvenance>) || !hasEvidenceProvenance(item)),

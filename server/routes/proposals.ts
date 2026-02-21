@@ -31,6 +31,22 @@ proposalsRouter.get("/", async (req, res) => {
   res.json({ day: dayParam, proposals });
 });
 
+const parseIdeologyPressures = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((entry) => String(entry).split(","))
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
 proposalsRouter.get("/:id/prompts", async (req, res) => {
   const proposal = await fetchProposal(req.params.id);
   if (!proposal) {
@@ -44,7 +60,10 @@ proposalsRouter.get("/:id/prompts", async (req, res) => {
     return res.json({ presets: [] });
   }
   try {
-    const presets = await buildPatchPromptPresets(proposal, 3);
+    const ideologyPressures = parseIdeologyPressures(req.query.ideologyPressures);
+    const presets = await buildPatchPromptPresets(proposal, 3, {
+      pressureContext: ideologyPressures.length > 0 ? { activePressures: ideologyPressures } : undefined,
+    });
     res.json({ presets, evidenceHints: ["guardrailStatus", "maturity", "traceRef", "runRef"] });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

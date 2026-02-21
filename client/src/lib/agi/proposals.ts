@@ -161,8 +161,16 @@ export async function synthesizeNightlyProposals(params?: {
   return Array.isArray(payload?.proposals) ? payload.proposals.filter(Boolean) : [];
 }
 
-export async function fetchProposalPrompts(id: string): Promise<ProposalPromptPreset[]> {
-  const res = await fetch(`/api/proposals/${encodeURIComponent(id)}/prompts`, {
+export async function fetchProposalPrompts(
+  id: string,
+  options?: { ideologyPressures?: string[] },
+): Promise<ProposalPromptPreset[]> {
+  const params = new URLSearchParams();
+  if (options?.ideologyPressures?.length) {
+    params.set("ideologyPressures", options.ideologyPressures.join(","));
+  }
+  const query = params.toString();
+  const res = await fetch(`/api/proposals/${encodeURIComponent(id)}/prompts${query ? `?${query}` : ""}`, {
     headers: { Accept: "application/json" },
   });
   if (!res.ok) {
