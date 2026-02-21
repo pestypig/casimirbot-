@@ -1484,6 +1484,7 @@ export const grConstraintContractSchema = z.object({
   sources: z.object({
     grDiagnostics: z.enum(["gr-evolve-brick", "pipeline", "missing"]),
     certificate: z.enum(["physics.warp.viability", "missing"]),
+    plannerTool: z.literal("physics.warp.sector_control.plan").optional(),
   }),
   grid: z
     .object({
