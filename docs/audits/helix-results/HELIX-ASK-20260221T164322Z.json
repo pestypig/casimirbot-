@@ -1,0 +1,19 @@
+{
+  "ticket": "HELIX-ASK",
+  "created_at": "2026-02-21T16:43:22.152Z",
+  "trace_id": "adapter:95126f0d-c569-496e-9caa-e44deef42f67",
+  "run_id": "12",
+  "verdict": "PASS",
+  "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+  "integrity_ok": true,
+  "verify_artifact_path": "artifacts/verification/helix-casimir-20260221T164322Z.json",
+  "trace_export_path": "artifacts/verification/helix-training-trace-20260221T164322Z.jsonl",
+  "artifact_hashes": {
+    "verify_artifact_sha256": "1fd7613584ed488db2fd13fc82d073177512c8f7b48c75c2f10592787a8f0338",
+    "trace_export_sha256": "a4b03c3556f6e971c7d5dcf73c9406c4e234e7f849678d385bf7168477335837"
+  },
+  "commands": [
+    "npx tsx cli/casimir-verify.ts --pack repo-convergence --url http://127.0.0.1:5173/api/agi/adapter/run --export-url http://127.0.0.1:5173/api/agi/training-trace/export --trace-out artifacts/verification/helix-training-trace-latest.jsonl --trace-limit 200 --ci",
+    "GET http://127.0.0.1:5173/api/agi/training-trace/export?limit=200"
+  ]
+}

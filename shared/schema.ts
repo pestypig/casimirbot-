@@ -2874,6 +2874,67 @@ export type ConstraintPackPolicyProfileInput = z.infer<
   typeof constraintPackPolicyProfileInputSchema
 >;
 
+
+
+export const sectorControlModeSchema = z.enum([
+  "diagnostic",
+  "stability_scan",
+  "qi_conservative",
+  "theta_balanced",
+]);
+export type SectorControlMode = z.infer<typeof sectorControlModeSchema>;
+
+export const sectorControlTimingSchema = z.object({
+  strobeHz: z.number().positive(),
+  sectorPeriod_ms: z.number().positive(),
+  TS_ratio: z.number().positive(),
+  tauLC_ms: z.number().positive(),
+  tauPulse_ms: z.number().positive(),
+});
+
+export const sectorControlAllocationSchema = z.object({
+  sectorCount: z.number().int().positive(),
+  concurrentSectors: z.number().int().positive(),
+  negativeFraction: z.number().min(0).max(1),
+  negSectors: z.number().int().nonnegative(),
+  posSectors: z.number().int().nonnegative(),
+});
+
+export const sectorControlDutySchema = z.object({
+  dutyCycle: z.number().min(0).max(1),
+  dutyBurst: z.number().min(0).max(1),
+  dutyEffective_FR: z.number().min(0).max(1),
+  dutyShip: z.number().min(0).max(1),
+});
+
+export const sectorControlConstraintsSchema = z.object({
+  FordRomanQI: z.enum(["pass", "fail", "unknown"]),
+  ThetaAudit: z.enum(["pass", "fail", "unknown"]),
+  TS_ratio_min: z.enum(["pass", "fail", "unknown"]),
+  VdB_band: z.enum(["pass", "fail", "unknown"]),
+  grConstraintGate: z.enum(["pass", "fail", "unknown"]),
+});
+
+export const sectorControlPlanSchema = z.object({
+  mode: sectorControlModeSchema,
+  timing: sectorControlTimingSchema,
+  allocation: sectorControlAllocationSchema,
+  duty: sectorControlDutySchema,
+  constraints: sectorControlConstraintsSchema,
+  objective: z.string().min(1),
+  maturity: z.enum(["exploratory", "reduced-order", "diagnostic", "certified"]),
+  notes: z.array(z.string()).default([]),
+});
+export type SectorControlPlan = z.infer<typeof sectorControlPlanSchema>;
+
+export const sectorControlRationaleSchema = z.object({
+  equations: z.array(z.string()).default([]),
+  risks: z.array(z.string()).default([]),
+  citations: z.array(z.string()).default([]),
+  summary: z.string().optional(),
+});
+export type SectorControlRationale = z.infer<typeof sectorControlRationaleSchema>;
+
 export const constraintPackConstraintResultSchema = z.object({
   id: z.string(),
   severity: z.enum(["HARD", "SOFT"]).optional(),

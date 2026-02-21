@@ -73,3 +73,13 @@ Derived from:
 - A prompt-batch implementation pack is present and path-bounded.
 - Every prompt in the pack requires Casimir verify with PASS and certificate integrity OK.
 - Final report clearly separates diagnostic implementation from physical viability claims.
+
+## Operator note (Prompt 7)
+
+The sector-control planning lane is implemented as diagnostic tooling for scheduling and guardrail visibility. It must not be interpreted as physical admissibility/certification without explicit viability certificate evidence and integrity checks.
+
+## Readiness closure (Prompt 9)
+
+- Prompt wave completed with Casimir PASS across all prompt commits and certificate integrity OK.
+- Prompt 4 remained partial-blocked on legacy Helix ask mode regression tests; mitigation tracked in readiness report.
+- Outcome remains diagnostic maturity; no physical viability claim is promoted from planning outputs.

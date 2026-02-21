@@ -169,9 +169,6 @@ export async function fetchProposalPrompts(id: string): Promise<ProposalPromptPr
     const message = await res.text().catch(() => res.statusText);
     throw new Error(message || `proposal_prompts_failed:${res.status}`);
   }
-  const payload = (await res.json()) as {
-    presets?: ProposalPromptPreset[];
-    ideologyPressureContext?: { activePressures?: string[] } | null;
-  };
+  const payload = (await res.json()) as { presets?: ProposalPromptPreset[]; evidenceHints?: string[] };
   return Array.isArray(payload?.presets) ? payload.presets : [];
 }

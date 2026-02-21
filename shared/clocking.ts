@@ -133,3 +133,15 @@ export function computeClocking(
     burst_ms: burst_ms ?? null,
   };
 }
+
+
+export function evaluateTsRatioGate(tsRatio: number | null | undefined, min = 1.5) {
+  const value = Number(tsRatio);
+  if (!Number.isFinite(value) || value <= 0) {
+    return { pass: false, status: "fail" as const, detail: "TS ratio missing or non-positive" };
+  }
+  if (value < min) {
+    return { pass: false, status: "fail" as const, detail: `TS ratio ${value.toFixed(3)} < ${min}` };
+  }
+  return { pass: true, status: "pass" as const, detail: `TS ratio ${value.toFixed(3)} >= ${min}` };
+}

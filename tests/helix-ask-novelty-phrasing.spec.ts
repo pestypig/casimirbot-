@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyHelixAskDetailsVariant,
+  applyHelixAskSummaryVariant,
   buildHelixAskMechanismSentence,
   buildHelixAskRelationDetailBlock,
+  getHelixAskCompareLabels,
   getHelixAskSectionOrder,
   reduceHelixAskScaffoldRepeats,
   resolveHelixAskNoveltyFamily,
@@ -185,4 +188,61 @@ describe("helix ask novelty phrasing", () => {
       }),
     ).toBe("other");
   });
+  it("applies deterministic summary/detail variation for targeted families", () => {
+    const context = {
+      family: "repo_technical" as const,
+      prompt: "Explain route guards",
+      seed: 7,
+      temperature: 0.2,
+      intentStrategy: "repo_walk",
+      topCitationTokenHash: "abc",
+      answerPathKey: "answer:llm|rendered",
+    };
+    const summary = "The route applies strict gates before returning an answer.";
+    const details = "Validators enforce section contracts and citation hygiene.";
+    expect(applyHelixAskSummaryVariant(summary, context)).toBe(
+      applyHelixAskSummaryVariant(summary, context),
+    );
+    expect(applyHelixAskDetailsVariant(details, context)).toBe(
+      applyHelixAskDetailsVariant(details, context),
+    );
+    const changed = applyHelixAskSummaryVariant(summary, { ...context, seed: 11 });
+    expect(changed).not.toBe(applyHelixAskSummaryVariant(summary, context));
+  });
+
+  it("keeps compare labels deterministic and variant across key changes", () => {
+    const context = {
+      family: "relation" as const,
+      prompt: "How does warp relate to ethos?",
+      seed: 7,
+      temperature: 0.2,
+      relationPacketSignal: "2:3:1",
+      answerPathKey: "answer:llm",
+    };
+    const a = getHelixAskCompareLabels(context);
+    const b = getHelixAskCompareLabels(context);
+    expect(a).toEqual(b);
+    const c = getHelixAskCompareLabels({ ...context, seed: 13, temperature: 0.35 });
+    expect(`${c.what}|${c.why}|${c.constraint}`).not.toBe(`${a.what}|${a.why}|${a.constraint}`);
+  });
+
+  it("preserves required section lines after dedupe compaction", () => {
+    const lines = [
+      "Mechanism: A -> B",
+      "Mechanism: A -> B",
+      "Maturity (exploratory): staged evidence only.",
+      "Maturity (exploratory): staged evidence only.",
+      "Missing evidence: add linked repo artifacts.",
+      "Missing evidence: add linked repo artifacts.",
+    ];
+    const compact = reduceHelixAskScaffoldRepeats(lines, {
+      family: "relation",
+      prompt: "relation prompt",
+      seed: 7,
+    });
+    expect(compact.some((line) => line.startsWith("Mechanism:"))).toBe(true);
+    expect(compact.some((line) => /^Maturity\b/.test(line))).toBe(true);
+    expect(compact.some((line) => /^Missing evidence\b/.test(line))).toBe(true);
+  });
+
 });

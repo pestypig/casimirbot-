@@ -8339,6 +8339,7 @@ export async function getGrConstraintContract(req: Request, res: Response) {
       sources: {
         grDiagnostics: grSource,
         certificate: certAvailable ? "physics.warp.viability" : "missing",
+        plannerTool: "physics.warp.sector_control.plan",
       },
       ...(grid ? { grid } : {}),
       ...(diagnostics ? { diagnostics } : {}),
@@ -8369,6 +8370,7 @@ export async function getGrConstraintContract(req: Request, res: Response) {
         sources: {
           grDiagnostics: gr ? "pipeline" : "missing",
           certificate: certAvailable ? "physics.warp.viability" : "missing",
+        plannerTool: "physics.warp.sector_control.plan",
         },
         guardrails,
         constraints,

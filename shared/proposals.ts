@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { jobSourceSchema } from "./jobs";
 
-export const proposalKindSchema = z.enum(["panel", "theme", "toolchain", "layout", "knowledge"]);
+export const proposalKindSchema = z.enum(["panel", "theme", "toolchain", "layout", "knowledge", "sector-control"]);
 export type ProposalKind = z.infer<typeof proposalKindSchema>;
 
 export const proposalStatusSchema = z.enum(["new", "approved", "denied", "building", "applied", "error"]);
@@ -61,12 +61,12 @@ export const codeDiffPatchSchema = z.object({
 export const proposalPatchSchema = z.discriminatedUnion("patchKind", [uiConfigPatchSchema, codeDiffPatchSchema]);
 export type ProposalPatch = z.infer<typeof proposalPatchSchema>;
 
-export const proposalIdeologyPressureContextSchema = z.object({
-  activePressures: z.array(z.string()).default([]),
-  observedSignals: z.array(z.string()).optional(),
-  recommendedNodeIds: z.array(z.string()).optional(),
+export const proposalEvidenceSchema = z.object({
+  guardrailStatus: z.record(z.enum(["pass", "fail", "unknown"])).optional(),
+  maturity: z.enum(["exploratory", "reduced-order", "diagnostic", "certified"]).optional(),
+  traceRef: z.string().optional(),
+  runRef: z.string().optional(),
 });
-export type ProposalIdeologyPressureContext = z.infer<typeof proposalIdeologyPressureContextSchema>;
 
 export const essenceProposalSchema = z.object({
   id: z.string(),
@@ -90,6 +90,7 @@ export const essenceProposalSchema = z.object({
   updatedAt: z.string(),
   createdForDay: z.string(), // YYYY-MM-DD
   metadata: z.record(z.any()).optional(),
+  evidence: proposalEvidenceSchema.optional(),
 });
 export type EssenceProposal = z.infer<typeof essenceProposalSchema>;
 

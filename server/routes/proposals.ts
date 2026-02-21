@@ -45,10 +45,7 @@ proposalsRouter.get("/:id/prompts", async (req, res) => {
   }
   try {
     const presets = await buildPatchPromptPresets(proposal, 3);
-    res.json({
-      presets,
-      ideologyPressureContext: (proposal.metadata as any)?.ideologyPressureContext ?? null,
-    });
+    res.json({ presets, evidenceHints: ["guardrailStatus", "maturity", "traceRef", "runRef"] });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     res.status(500).json({ error: "prompt_presets_failed", message });

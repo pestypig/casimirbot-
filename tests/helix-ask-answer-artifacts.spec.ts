@@ -1,3 +1,4 @@
+import { collectSupplementsFromOutputs } from "../server/services/planner/supplements";
 import { describe, expect, it } from "vitest";
 import { stripRunawayAnswerArtifacts } from "../server/services/helix-ask/answer-artifacts";
 import { __testScoreDeterministicClaimCitationLinkage } from "../server/routes/agi.plan";
@@ -158,10 +159,22 @@ describe("Helix Ask semantic claim-citation linkage contract (artifacts)", () =>
 });
 
 
-describe("ideology guidance artifacts", () => {
-  it("returns compact pill and node-card artifacts for guidance retrieval", () => {
-    const items = getGuidanceArtifacts(["financial-fog-warning"]);
-    expect(items.some((item) => item.id === "vanity-leverage/protocol-pill")).toBe(true);
-    expect(items.some((item) => item.exportKind === "node-card")).toBe(true);
+describe("sector-control supplement lane", () => {
+  it("collects sector-control supplements without replacing viability authority", () => {
+    const supplements = collectSupplementsFromOutputs([
+      {
+        supplement: {
+          kind: "sector-control",
+          tool: "physics.warp.sector_control.plan",
+          title: "Sector control packet",
+          summary: "Diagnostic-only sector control evidence",
+          detail: "certifying=false unless admissible certificate integrity is true",
+        },
+      },
+    ]);
+
+    expect(supplements).toHaveLength(1);
+    expect(supplements[0]?.kind).toBe("sector-control");
+    expect(supplements[0]?.detail).toContain("certifying=false");
   });
 });

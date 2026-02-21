@@ -217,3 +217,40 @@ describe("pipeline ts/qi autoscale integration", () => {
     }
   });
 });
+
+
+describe("sector-control adapter hooks", () => {
+  it("tracks monotonic QI behavior vs tau", async () => {
+    const { fordRomanBound, isQiBoundMonotoneByTau } = await import("../server/qi/qi-bounds");
+    const bounds = [2, 4, 8].map((tau) => fordRomanBound({ tau_s_ms: tau, sampler: "lorentzian" }));
+    const magnitudes = bounds.map((bound) => Math.abs(bound));
+    expect(isQiBoundMonotoneByTau(magnitudes)).toBe(true);
+  });
+
+  it("maps scheduler roles and fail-closes planner on hard QI constraints", async () => {
+    const { computeSectorPhaseOffsets, buildSectorRoleAssignment } = await import("../server/energy/phase-scheduler");
+    const { buildSectorControlPlan } = await import("../server/control/sectorControlPlanner");
+
+    const schedule = computeSectorPhaseOffsets({
+      N: 8,
+      sectorPeriod_ms: 8,
+      phase01: 0.25,
+      tau_s_ms: 2,
+      sampler: "gaussian",
+      negativeFraction: 0.25,
+    });
+    const roles = buildSectorRoleAssignment(schedule);
+    expect(Array.from(roles.neg).length).toBeGreaterThan(0);
+    expect(Array.from(roles.pos).length).toBeGreaterThan(0);
+
+    const plan = buildSectorControlPlan({
+      mode: "diagnostic",
+      timing: { strobeHz: 125, sectorPeriod_ms: 8, TS_ratio: 1.4, tauLC_ms: 8, tauPulse_ms: 6 },
+      constraints: { FordRomanQI: "fail" },
+    });
+    expect(plan.ok).toBe(false);
+    if (!plan.ok) {
+      expect(plan.firstFail).toBe("FordRomanQI");
+    }
+  });
+});
