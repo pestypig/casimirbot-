@@ -136,6 +136,12 @@ import {
 import { buildHelixAskEnvelope } from "../services/helix-ask/envelope";
 import { extractFilePathsFromText } from "../services/helix-ask/paths";
 import {
+  buildHelixAskMechanismSentence,
+  getHelixAskSectionOrder,
+  resolveHelixAskNoveltyFamily,
+  type HelixAskNoveltyContext,
+} from "../services/helix-ask/novelty-phrasing";
+import {
   readDocSectionIndex,
   selectDocSectionMatch,
   type DocSection,
@@ -12561,6 +12567,7 @@ const evaluateHelixAskAnswerContractGate = (
 const sanitizeHelixAskAnswerContract = (
   contract: HelixAskAnswerContract,
   allowedCitations: string[],
+  noveltyContext?: HelixAskNoveltyContext,
 ): HelixAskAnswerContract => {
   const lookup = buildAllowedCitationLookup(allowedCitations);
   const fallbackSummary = "Answer grounded in retrieved evidence.";
@@ -12598,12 +12605,15 @@ const sanitizeHelixAskAnswerContract = (
   if (!mechanismSeed && claims.length > 0) {
     const first = claims[0].text;
     const second = claims[1]?.text ?? claims[0].text;
+    const mechanismLine = buildHelixAskMechanismSentence({
+      claimA: first,
+      claimB: second,
+      evidenceTarget: allowedCitations[1] ?? allowedCitations[0] ?? "retrieved evidence",
+      context: noveltyContext ?? { family: "other", prompt: contract.summary ?? "" },
+    });
     claims.push({
       text: ensureSentence(
-        normalizeContractText(
-          `Mechanism: ${first} -> constrained interaction dynamics -> ${second}, because linked constraints amplify or dampen outcomes over time`,
-          320,
-        ),
+        normalizeContractText(mechanismLine, 340),
       ),
       evidence: claims[0].evidence,
     });
@@ -12640,6 +12650,7 @@ const renderHelixAskAnswerContract = (
   contract: HelixAskAnswerContract,
   format: HelixAskFormat,
   question: string,
+  noveltyContext?: HelixAskNoveltyContext,
 ): string => {
   const isNoisyRenderedContractSentence = (value: string): boolean => {
     const trimmed = value.trim();
@@ -12699,6 +12710,10 @@ const renderHelixAskAnswerContract = (
   const mechanismClaims = claimSentences.filter((claim) =>
     /^mechanism\b/i.test(claim.trim()),
   );
+  const maturityClaims = claimSentences.filter((claim) => /^maturity\b/i.test(claim.trim()));
+  const missingEvidenceClaims = claimSentences.filter((claim) =>
+    /^missing evidence\b/i.test(claim.trim()),
+  );
   const practiceCandidate =
     contract.uncertainty ||
     semanticClaims.find((claim) => claim.toLowerCase() !== summarySeed.toLowerCase()) ||
@@ -12717,17 +12732,23 @@ const renderHelixAskAnswerContract = (
   const practiceLine = practiceText
     ? `In practice, ${practiceText.replace(/^in practice[,:\s]*/i, "")}`
     : "";
-  const sections: string[] = [];
+  const sectionsByType: Record<string, string[]> = {
+    summary: [],
+    details: [],
+    mechanism: [],
+    maturity: [],
+    missing: [],
+  };
   const summaryLine = leadSummary();
-  if (summaryLine) sections.push(summaryLine);
+  if (summaryLine) sectionsByType.summary.push(summaryLine);
   if (format === "steps") {
     const steps = (contract.steps ?? claimSentences).slice(0, 6);
     if (steps.length > 0) {
       const renderedSteps = steps.map((step, index) => `${index + 1}. ${ensureSentence(step)}`);
-      sections.push(renderedSteps.join("\n"));
+      sectionsByType.details.push(renderedSteps.join("\n"));
     }
     if (practiceLine) {
-      sections.push(practiceLine);
+      sectionsByType.details.push(practiceLine);
     }
   } else if (format === "compare") {
     const explicitCompareLines = (contract.comparisons ?? [])
@@ -12753,21 +12774,33 @@ const renderHelixAskAnswerContract = (
             if (index === 1) return `- ${ensureSentence(`Why it matters: ${claim}`)}`;
             return `- ${ensureSentence(`Constraint: ${claim}`)}`;
           });
-    if (compareLines.length > 0) sections.push(compareLines.join("\n"));
-    if (practiceLine) sections.push(practiceLine);
+    if (compareLines.length > 0) sectionsByType.details.push(compareLines.join("\n"));
+    if (practiceLine) sectionsByType.details.push(practiceLine);
   } else {
     const details = claimSentences
       .filter((claim) => claim.toLowerCase() !== contract.summary.toLowerCase())
       .slice(0, 3);
     if (details.length > 0) {
-      sections.push(details.join(" "));
+      sectionsByType.details.push(details.join(" "));
     }
-    if (practiceLine) sections.push(practiceLine);
+    if (practiceLine) sectionsByType.details.push(practiceLine);
   }
+  if (mechanismClaims[0]) sectionsByType.mechanism.push(mechanismClaims[0]);
+  if (maturityClaims[0]) sectionsByType.maturity.push(maturityClaims[0]);
   if (contract.uncertainty) {
     const missing = ensureSentence(normalizeContractText(contract.uncertainty, 260));
-    if (missing) sections.push(`Missing evidence: ${missing.replace(/^missing evidence:\s*/i, "")}`);
+    if (missing) sectionsByType.missing.push(`Missing evidence: ${missing.replace(/^missing evidence:\s*/i, "")}`);
+  } else if (missingEvidenceClaims[0]) {
+    sectionsByType.missing.push(missingEvidenceClaims[0]);
+  } else {
+    sectionsByType.missing.push(
+      "Missing evidence: add directly relevant repo paths or artifact refs to raise confidence.",
+    );
   }
+  const orderedSectionTypes = getHelixAskSectionOrder(
+    noveltyContext ?? { family: "other", prompt: question },
+  );
+  const sections = orderedSectionTypes.flatMap((key) => sectionsByType[key] ?? []);
   let text = sections.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
   if ((contract.sources?.length ?? 0) > 0) {
     text = `${text}\n\nSources: ${(contract.sources ?? []).join(", ")}`.trim();
@@ -26019,10 +26052,20 @@ const executeHelixAsk = async ({
             recordOverflow("answer_contract_fill", fillOverflow);
             const filledContract = parseHelixAskAnswerContractPayload(fillResult.text ?? "");
             if (filledContract) {
-              sanitizedContract = sanitizeHelixAskAnswerContract(
-                filledContract,
-                allowedContractCitations,
-              );
+          sanitizedContract = sanitizeHelixAskAnswerContract(
+            filledContract,
+            allowedContractCitations,
+            {
+              family: resolveHelixAskNoveltyFamily({
+                intentProfileId: intentProfile.id,
+                intentDomain,
+                question: baseQuestion,
+              }),
+              prompt: baseQuestion,
+              seed: parsed.data.seed ?? null,
+              temperature: parsed.data.temperature ?? null,
+            },
+          );
               if ((sanitizedContract.sources?.length ?? 0) === 0) {
                 const fallbackSources = deriveFallbackContractSources(
                   sanitizedContract,
@@ -26094,6 +26137,12 @@ const executeHelixAsk = async ({
           const relationContract = sanitizeHelixAskAnswerContract(
             buildRelationModeContractFromPacket(relationPacket),
             allowedContractCitations,
+            {
+              family: "relation",
+              prompt: baseQuestion,
+              seed: parsed.data.seed ?? null,
+              temperature: parsed.data.temperature ?? null,
+            },
           );
           sanitizedContract = relationContract;
           answerContractSource = "relation_packet";
@@ -26129,7 +26178,16 @@ const executeHelixAsk = async ({
           answerStart,
         );
         if (!answerContractGate.hardFail) {
-          cleaned = renderHelixAskAnswerContract(sanitizedContract, formatSpec.format, baseQuestion);
+          cleaned = renderHelixAskAnswerContract(sanitizedContract, formatSpec.format, baseQuestion, {
+            family: resolveHelixAskNoveltyFamily({
+              intentProfileId: intentProfile.id,
+              intentDomain,
+              question: baseQuestion,
+            }),
+            prompt: baseQuestion,
+            seed: parsed.data.seed ?? null,
+            temperature: parsed.data.temperature ?? null,
+          });
           answerContract = sanitizedContract;
           answerContractApplied = true;
           answerPath.push("answerContract:rendered");
