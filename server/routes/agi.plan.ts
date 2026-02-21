@@ -136,8 +136,11 @@ import {
 import { buildHelixAskEnvelope } from "../services/helix-ask/envelope";
 import { extractFilePathsFromText } from "../services/helix-ask/paths";
 import {
+  applyHelixAskDetailsVariant,
+  applyHelixAskSummaryVariant,
   buildHelixAskMechanismSentence,
   buildHelixAskRelationDetailBlock,
+  getHelixAskCompareLabels,
   getHelixAskSectionOrder,
   reduceHelixAskScaffoldRepeats,
   resolveHelixAskNoveltyFamily,
@@ -12742,7 +12745,10 @@ const renderHelixAskAnswerContract = (
     missing: [],
   };
   const summaryLine = leadSummary();
-  if (summaryLine) sectionsByType.summary.push(summaryLine);
+  const variedSummaryLine = noveltyContext
+    ? applyHelixAskSummaryVariant(summaryLine, noveltyContext)
+    : summaryLine;
+  if (variedSummaryLine) sectionsByType.summary.push(variedSummaryLine);
   if (format === "steps") {
     const steps = (contract.steps ?? claimSentences).slice(0, 6);
     if (steps.length > 0) {
@@ -12768,13 +12774,16 @@ const renderHelixAskAnswerContract = (
         return `- ${ensureSentence(`${label}: ${detail}`)}`;
       })
       .filter(Boolean);
+    const compareLabels = noveltyContext
+      ? getHelixAskCompareLabels(noveltyContext)
+      : { what: "What it is", why: "Why it matters", constraint: "Constraint" };
     const compareLines =
       explicitCompareLines.length > 0
         ? explicitCompareLines
         : semanticClaims.slice(0, 3).map((claim, index) => {
-            if (index === 0) return `- ${ensureSentence(`What it is: ${claim}`)}`;
-            if (index === 1) return `- ${ensureSentence(`Why it matters: ${claim}`)}`;
-            return `- ${ensureSentence(`Constraint: ${claim}`)}`;
+            if (index === 0) return `- ${ensureSentence(`${compareLabels.what}: ${claim}`)}`;
+            if (index === 1) return `- ${ensureSentence(`${compareLabels.why}: ${claim}`)}`;
+            return `- ${ensureSentence(`${compareLabels.constraint}: ${claim}`)}`;
           });
     if (compareLines.length > 0) sectionsByType.details.push(compareLines.join("\n"));
     if (practiceLine) sectionsByType.details.push(practiceLine);
@@ -12783,7 +12792,10 @@ const renderHelixAskAnswerContract = (
       .filter((claim) => claim.toLowerCase() !== contract.summary.toLowerCase())
       .slice(0, 3);
     if (details.length > 0) {
-      sectionsByType.details.push(details.join(" "));
+      const detailLine = details.join(" ");
+      sectionsByType.details.push(
+        noveltyContext ? applyHelixAskDetailsVariant(detailLine, noveltyContext) : detailLine,
+      );
     }
     if (practiceLine) sectionsByType.details.push(practiceLine);
   }
