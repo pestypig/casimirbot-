@@ -16,6 +16,9 @@ export type HelixAskNoveltyContext = {
 
 const pickDeterministic = (count: number, ctx: HelixAskNoveltyContext, slot: string): number => {
   if (count <= 1) return 0;
+  const targetedFamily = ctx.family === "relation" || ctx.family === "repo_technical";
+  const promptFingerprint =
+    ctx.promptFingerprint ?? crypto.createHash("sha1").update(ctx.prompt).digest("hex").slice(0, 16);
   const hash = crypto
     .createHash("sha256")
     .update(
@@ -25,10 +28,10 @@ const pickDeterministic = (count: number, ctx: HelixAskNoveltyContext, slot: str
         prompt: ctx.prompt,
         seed: Number.isFinite(ctx.seed as number) ? ctx.seed : null,
         temperature: Number.isFinite(ctx.temperature as number) ? ctx.temperature : null,
-        promptFingerprint: ctx.promptFingerprint ?? null,
-        intentStrategy: ctx.family === "relation" ? ctx.intentStrategy ?? null : null,
-        topCitationTokenHash: ctx.family === "relation" ? ctx.topCitationTokenHash ?? null : null,
-        answerPathKey: ctx.family === "relation" ? ctx.answerPathKey ?? null : null,
+        promptFingerprint,
+        intentStrategy: targetedFamily ? ctx.intentStrategy ?? null : null,
+        topCitationTokenHash: targetedFamily ? ctx.topCitationTokenHash ?? null : null,
+        answerPathKey: targetedFamily ? ctx.answerPathKey ?? null : null,
         relationPacketSignal: ctx.family === "relation" ? ctx.relationPacketSignal ?? null : null,
       }),
     )
@@ -64,6 +67,8 @@ export const buildHelixAskMechanismSentence = (args: {
       `Mechanism: ${args.claimA} -> warp-model limits are filtered through ethos veto/approval pathways -> ${args.claimB}, because policy discipline changes which physics-adjacent actions remain valid near ${args.evidenceTarget}.`,
       `Mechanism: ${args.claimA} -> admissibility constraints and ideology governance cross-check each decision edge -> ${args.claimB}, because mission risk controls must stay synchronized with evidence in ${args.evidenceTarget}.`,
       `Mechanism: ${args.claimA} -> safety posture translates field-level uncertainty into governance stop/go signals -> ${args.claimB}, because relation packets tie policy authority to citations from ${args.evidenceTarget}.`,
+      `Mechanism: ${args.claimA} -> ideology tree traversal constrains which warp assertions can be promoted -> ${args.claimB}, because root-to-leaf guards require evidence-linked stewardship checks in ${args.evidenceTarget}.`,
+      `Mechanism: ${args.claimA} -> relation packet bridge claims mediate between field limits and doctrine intent -> ${args.claimB}, because answer-path gates keep policy and physics traces synchronized against ${args.evidenceTarget}.`,
     ], args.context, "relation_mechanism");
   }
   if (args.context.family === "repo_technical") {
@@ -71,6 +76,8 @@ export const buildHelixAskMechanismSentence = (args: {
       `Mechanism: ${args.claimA} -> file-level control flow and validators constrain execution paths -> ${args.claimB}, because module boundaries and contracts in ${args.evidenceTarget} govern runtime behavior.`,
       `Mechanism: ${args.claimA} -> repository wiring (routes, services, and gates) propagates state transitions -> ${args.claimB}, because path-scoped checks in ${args.evidenceTarget} enforce the observed outcome.`,
       `Mechanism: ${args.claimA} -> call-chain handoff across cited files applies deterministic guards -> ${args.claimB}, because implementation contracts in ${args.evidenceTarget} bound what the system can emit.`,
+      `Mechanism: ${args.claimA} -> deterministic adapter + validator sequencing controls what leaves the route -> ${args.claimB}, because citation-gated branches in ${args.evidenceTarget} narrow admissible render outputs.`,
+      `Mechanism: ${args.claimA} -> answer-contract assembly stitches repo evidence into stable section slots -> ${args.claimB}, because synthesis formatting in ${args.evidenceTarget} enforces grounded, replay-safe responses.`,
     ], args.context, "repo_mechanism");
   }
   return `Mechanism: ${args.claimA} -> constrained interaction dynamics -> ${args.claimB}, because linked constraints amplify or dampen outcomes over time.`;
@@ -111,9 +118,35 @@ export const buildHelixAskRelationDetailBlock = (args: {
       `Relation detail: governance review is not narrative-only; it acts as an execution gate that accepts or blocks field proposals based on cited safety constraints in ${args.evidenceTarget}.`,
       `Relation detail: safety linkage runs both directions-physics uncertainty increases governance caution, while mission policy narrows technically legal moves documented in ${args.evidenceTarget}.`,
       `Relation detail: bridge semantics stay dual-domain by mapping each mission claim to a bounded physics condition and each physics option to a stewardship rule sourced from ${args.evidenceTarget}.`,
+      `Relation detail: root ideology branches to leaf practices so each policy sentence can be traced back to a governing axiom and forward to a warp constraint in ${args.evidenceTarget}.`,
+      `Relation detail: answer-path guards require the relation packet to keep ethics and feasibility claims paired, preventing unsupported cross-domain leaps beyond ${args.evidenceTarget}.`,
     ],
     args.context,
     "relation_detail_variant",
   );
   return { placement, line };
+};
+
+const normalizeScaffoldLine = (line: string): string =>
+  line
+    .replace(/\s+/g, " ")
+    .replace(/[,:;.!?()\[\]{}]/g, "")
+    .trim()
+    .toLowerCase();
+
+export const reduceHelixAskScaffoldRepeats = (
+  lines: string[],
+  ctx: HelixAskNoveltyContext,
+): string[] => {
+  if (ctx.family !== "relation" && ctx.family !== "repo_technical") return lines;
+  const seen = new Set<string>();
+  const compact: string[] = [];
+  for (const line of lines) {
+    const key = normalizeScaffoldLine(line);
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    compact.push(line);
+  }
+  return compact.length > 0 ? compact : lines;
 };
