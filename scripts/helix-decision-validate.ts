@@ -34,10 +34,17 @@ const timelineContext = resolveTimelineContext();
 const runId = timelineContext.runId;
 const timelinePath = timelineContext.timelinePath;
 
+function atomicWrite(filePath: string, contents: string): void {
+  const abs = path.resolve(ROOT, filePath);
+  const temp = `${abs}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temp, contents);
+  fs.renameSync(temp, abs);
+}
+
 if (timelineContext.standaloneMode) {
   fs.mkdirSync(path.resolve(ROOT, "reports"), { recursive: true });
   const pointerPayload = { run_id: runId, timeline_path: timelinePath, source: "standalone_validate" };
-  fs.writeFileSync(path.resolve(ROOT, timelinePointerPath), `${JSON.stringify(pointerPayload, null, 2)}\n`);
+  atomicWrite(timelinePointerPath, `${JSON.stringify(pointerPayload, null, 2)}\n`);
 }
 
 type TimelineEvent = {
