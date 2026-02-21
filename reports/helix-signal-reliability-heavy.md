@@ -2,16 +2,16 @@
 
 - summary_schema_version: 2
 - git_branch: work
-- git_head: c24cef2
-- git_origin_main: c24cef2
-- git_ahead_behind: 0	0
-- provenance_gate_pass: true
-- provenance_warnings: none
-- decision_grade_ready: true
-- provenance_blocked: false
-- provenance_hard_blocker_reason: none
-- ship_recommendation_blocked_by_hard_blocker: false
-- run_id: versatility-1771623826796
+- git_head: 42273e9
+- git_origin_main: missing
+- git_ahead_behind: missing
+- provenance_gate_pass: false
+- provenance_warnings: git_origin_main_ref_missing
+- decision_grade_ready: false
+- provenance_blocked: true
+- provenance_hard_blocker_reason: BLOCKER_PROVENANCE_ORIGIN_MAIN_UNAVAILABLE
+- ship_recommendation_blocked_by_hard_blocker: true
+- run_id: versatility-1771699850957
 - base_url: http://127.0.0.1:5173
 - prompts: 90
 - seeds: 7,11,13
@@ -20,19 +20,24 @@
 - total_runs: 270
 - run_complete: true
 - completion_rate: 100.00%
-- run_duration_ms: 250501
+- run_duration_ms: 184382
 - terminated_early_reason: none
 - global_cooldown_applied_ms: 0
 - resumed_from_latest: false
 - resumed_runs: 0
-- output_run_dir: /workspace/casimirbot-/artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796
+- output_run_dir: /workspace/casimirbot-/artifacts/experiments/helix-signal-reliability/heavy/versatility-1771699850957
+
+## HARD BLOCKER
+- status: BLOCKED
+- reason: BLOCKER_PROVENANCE_ORIGIN_MAIN_UNAVAILABLE
+- effect: ship recommendation is disallowed until provenance gate passes with origin/main + HEAD present.
 
 ## Aggregate by Prompt Family
 | family | runs | pass_rate | intent_correct_rate | report_mode_correct_rate | stub_rate | latency_p50_ms | latency_p95_ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| relation | 90 | 96.7% | 96.7% | 100.0% | 0.0% | 487 | 1323 |
-| repo_technical | 90 | 100.0% | 0.0% | 100.0% | 0.0% | 980 | 2096 |
-| ambiguous_general | 90 | 96.7% | 0.0% | 96.7% | 0.0% | 880 | 1665 |
+| relation | 90 | 96.7% | 96.7% | 100.0% | 0.0% | 374 | 999 |
+| repo_technical | 90 | 100.0% | 0.0% | 100.0% | 0.0% | 585 | 1544 |
+| ambiguous_general | 90 | 96.7% | 0.0% | 96.7% | 0.0% | 667 | 1240 |
 
 ## Core Metrics
 - intent_id_correct_rate: 96.67%
@@ -47,12 +52,12 @@
 - citation_repair_rate: 0.00%
 - citation_presence_rate: 100.00%
 - min_text_length_pass_rate: 100.00%
-- latency_total_p50_ms: 788
-- latency_total_p95_ms: 1991
-- latency_retrieval_p50_ms: 215 (samples=257)
-- latency_retrieval_p95_ms: 419 (samples=257)
+- latency_total_p50_ms: 585
+- latency_total_p95_ms: 1434
+- latency_retrieval_p50_ms: 163 (samples=260)
+- latency_retrieval_p95_ms: 323 (samples=260)
 - latency_synthesis_p50_ms: 1 (samples=270)
-- latency_synthesis_p95_ms: 7 (samples=270)
+- latency_synthesis_p95_ms: 41 (samples=270)
 
 ## Top Failure Signatures
 - intent_mismatch: 3
@@ -89,34 +94,22 @@ The warp vessel is a vow to return radiance to the Sun, pairing physics with com
 - debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=true relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-Interpretation: "stability" is treated as stability-timestep. [docs/knowledge/physics/stability-timestep.md] Interpretation: "stability" is treated as stability-timestep. [docs/knowledge/physics/stability-timestep.md] How is the timestep chosen and which limits are enforced? [docs/knowledge/physics/stability-timestep.md] Mechanism: Interpretation: "stability" is treated as stability-timestep. [docs/knowledge/physics/stability-timestep.md] -> coupled constraints and feedback operators -> observable outcomes tied to server/gr/evolution/solver.ts, because feedback loops shape the resulting behavior. Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached. [docs/knowledge/physics/stability-timestep.md] Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity. [docs/knowledge/physics/stability-timestep.md] Sources: docs/knowledge/physics/stability-timestep.md, server/gr/evolution/solver.ts, docs/stellar-consciousness-orch-or-review.md, docs/knowledge/trees/stellar-restoration-tree.md, docs/stellar-consciousness-ii.md, docs/stellar-fact-check.md, docs/papers.md, docs/knowledge/stellar-restoration-tree.json
+Interpretation: "stability" is treated as stability-timestep. [docs/knowledge/physics/stability-timestep.md] - Evidence: How is the timestep chosen and which limits are enforced? [docs/knowledge/physics/stability-timestep.md] - Constraint: Stability constraints determine how small time steps must be to avoid numerical blow-up. [docs/knowledge/physics/stability-timestep.md] In practice, How is the timestep chosen and which limits are enforced? [docs/knowledge/physics/stability-timestep.md] Mechanism: Interpretation: "stability" is treated as stability-timestep. [docs/knowledge/physics/stability-timestep.md] -> constrained interaction dynamics -> How is the timestep chosen and which limits are enforced?, because linked constraints amplify or dampen outcomes over time. [docs/knowledge/physics/stability-timestep.md] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/physics/stability-timestep.md] Missing evidence: add directly relevant repo paths or artifact refs to raise confidence. [docs/knowledge/physics/stability-timestep.md] Sources: docs/knowledge/physics/stability-timestep.md, docs/stellar-consciousness-orch-or-review.md, docs/knowledge/trees/stellar-restoration-tree.md, docs/stellar-consciousness-ii.md, docs/stellar-fact-check.md, docs/papers.md, docs/knowledge/stellar-restoration-tree.json, docs/knowledge/dag-node-schema.md
 ```
 
-### Worst #3: repo_tech_30_describe-the-interaction-between-relation-query-detection-and-graph-reso
+### Worst #3: repo_tech_12_where-is-relation-topology-dual-domain-detection-implemented
 - family: repo_technical
-- question: Describe the interaction between relation query detection and graph resolver.
+- question: Where is relation topology dual-domain detection implemented?
 - failures: none
 - likely_root_cause: mixed
 - patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=false relation_packet_built=true relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=true relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-what_is_warp_bubble: client/src/lib/agi/api.ts export type DebateStreamHandlers = ; score=17.000 | symbol=DebateStreamHandlers | file=client/src/lib/agi/api.ts client/src/pages/desktop.tsx export default function DesktopPage() const = useDes. 1. what_is_mission_ethos: client/src/lib/agi/api.ts export type DebateStreamHandlers = ; score=17.000 | symbol=DebateStreamHandlers | file=client/src/lib/agi/api.ts client/src/pages/desktop.tsx export default function DesktopPage() const = useDes. 2. how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [docs/knowledge/analysis-loops.md] Warp viability certificates enable ethos commitments by binding claims to reproducible evidence. [docs/knowledge/analysis-loops.md] Verification hooks translate design ambition into. [docs/knowledge/analysis-loops.md] 3. constraints_and_falsifiability: Physics bounds: Ford-Roman QI, theta calibration, and GR constraint gates must pass before viability claims. [docs/knowledge/analysis-loops.md] Policy bounds: mission ethos requires stewardship, non-harm, and traceable evidence for operational decisions. [docs/knowledge/analysis-loops.md] Re-run /. 4. Mechanism: what_is_mission_ethos: client/src/lib/agi/api.ts export type DebateStreamHandlers = ; score=17.000 | symbol=DebateStreamHandlers | file=client/src/lib/agi/api.ts client/src/pages/desktop.tsx export default function DesktopPage() const = useDes. -> c. 5. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/analysis-loops.md] In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity. [docs/knowledge/analysis-loops.md] Missing evidence: add stronger repo citatio
+what_is_warp_bubble: docs/knowledge/warp/warp-bubble.md. 1. what_is_mission_ethos: docs/ethos/ideology.json. 2. how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [shared/schema.ts] Warp viability certificates enable ethos commitments by binding claims to reproducible evidence. [shared/schema.ts] Verification hooks translate design ambition into. [shared/schema.ts] 3. constraints_and_falsifiability: Physics bounds: Ford-Roman QI, theta calibration, and GR constraint gates must pass before viability claims. [shared/schema.ts] Policy bounds: mission ethos requires stewardship, non-harm, and traceable evidence for operational decisions. [shared/schema.ts] Re-run /. 4. Mechanism: what_is_mission_ethos: docs/ethos/ideology.json. -> constrained interaction dynamics -> how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [shared/schema.ts] Warp viability certificates enable ethos commit. [shared/schema.ts] 5. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [shared/schema.ts] In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity. [shared/schema.ts] Mechanism: what_is_mission_ethos: docs/ethos/ideology.json. -> constrained interaction dynamics -> how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [shared/schema.ts] Warp viability certificates enable ethos commit. [shared/schema.ts] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [shared/schema.ts] Missing evidence: add stronger repo citations and linked test artifac
 ```
 
-### Worst #4: repo_tech_16_where-are-citation-allowlists-normalized-before-sanitizesourcesline
-- family: repo_technical
-- question: Where are citation allowlists normalized before sanitizeSourcesLine?
-- failures: none
-- likely_root_cause: mixed
-- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-const DOCS_PREFIX = "/docs"; const DOC_VIEWER_INTENT_KEY = "helix:doc-viewer:intent";. [server/services/knowledge/citations.ts] const DOC_VIEWER_INTENT_KEY = "helix:doc-viewer:intent";. [server/services/knowledge/citations.ts] if (!input) return fallback;. [server/services/knowledge/citations.ts] const DOCS_PREFIX = "/docs";. [server/services/knowledge/citations.ts] In practice, const DOC_VIEWER_INTENT_KEY = "helix:doc-viewer:intent";. [server/services/knowledge/citations.ts] Sources: client/src/components/driveguardspanel.ts, server/services/knowledge/citations.ts, shared/agi-specialists.ts, modules/warp/natario-warp.ts, server/security/hull-guard.ts, server/specialists/solvers/index.ts, client/src/lib/docs/docviewer.ts, server/modules/qi/qi-controller.ts
-```
-
-### Worst #5: repo_tech_29_what-checks-enforce-presence-of-citations-in-repo-hybrid-responses
+### Worst #4: repo_tech_29_what-checks-enforce-presence-of-citations-in-repo-hybrid-responses
 - family: repo_technical
 - question: What checks enforce presence of citations in repo/hybrid responses?
 - failures: none
@@ -125,26 +118,22 @@ const DOCS_PREFIX = "/docs"; const DOC_VIEWER_INTENT_KEY = "helix:doc-viewer:int
 - debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/ops-deployment-tree.json] Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/ops-deployment-tree.json] -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. [docs/knowledge/ops-deployment-tree.json] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/ops-deployment-tree.json] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/ops-deployment-tree.json] Sources: docs/knowledge/ops-deployment-tree.json, tests/theory-checks.spec.ts, client/src/lib/hud-adapter.ts, server/services/knowledge/citations.ts, shared/agi-specialists.ts, modules/dynamic/dynamic-casimir.ts, .github/workflows/casimir-verify.yml, server/skills/stt.whisper.ts
-
-Missing evidence: add directly relevant repo paths or artifact refs to raise confidence.
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/ops-deployment-tree.json] Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/ops-deployment-tree.json] -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. [docs/knowledge/ops-deployment-tree.json] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/ops-deployment-tree.json] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/ops-deployment-tree.json] Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/ops-deployment-tree.json] -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. [docs/knowledge/ops-deployment-tree.json] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/ops-deployment-tree.json] Missing evidence: add directly relevant repo paths or artifact refs to raise confidence. [docs/knowledge/ops-deployment-tree.json] Sources: docs/knowledge/ops-deployment-tree.json, tests/theory-checks.spec.ts, client/src/lib/hud-adapter.ts, server/services/knowledge/citations.ts, shared/agi-specialists.ts, modules/dynamic/dynamic-casimir.ts, .github/workflows/casimir-verify.yml, 
 ```
 
-### Worst #6: repo_tech_07_how-are-ambiguity-gates-triggered-and-what-clarify-output-is-produced
+### Worst #5: repo_tech_13_how-does-goal-zone-harness-evaluate-pass-fail-across-seeds
 - family: repo_technical
-- question: How are ambiguity gates triggered and what clarify output is produced?
+- question: How does goal-zone harness evaluate pass/fail across seeds?
 - failures: none
 - likely_root_cause: mixed
 - patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
 - debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/ui-components-tree.json] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/ui-components-tree.json] Sources: docs/knowledge/ui-components-tree.json, client/src/hooks/use-energy-pipeline.ts, shared/schema.ts, server/helix-core.ts, modules/dynamic/gates/index.ts, tests/hull-tools.spec.ts, modules/core/module-registry.ts, server/specialists/solvers/philo.synthesis.ts
-
-Missing evidence: add directly relevant repo paths or artifact refs to raise confidence.
+Mechanism: score=11.000 symbol=handleProposalJobEvaluated file=server/services/proposals/engine.ts modules/warp/natario-warp.ts export interface NatarioWarpResult // Geometric amplification geometricBlueshiftFactor: numb... Mechanism: score=11.000 symbol=handleProposalJobEvaluated file=server/services/proposals/engine.ts modules/warp/natario-warp.ts export interface NatarioWarpResult // Geometric amplification geometricBlueshiftFactor: numb... In practice, score=2.000 symbol=NatarioWarpResult file=modules/warp/natario-warp.ts modules/dynamic/gates/index.ts export interface GateEvaluationOptions score=2.824 symbol=GateEvaluationOptions file=modules/dynamic/gate... Mechanism: Mechanism: score=11.000 symbol=handleProposalJobEvaluated file=server/services/proposals/engine.ts modules/warp/natario-warp.ts export interface NatarioWarpResult // Geometric amplification geometricBlueshiftFactor: numb... -> coupled constraints and feedback operators -> observable outcomes tied to modules/warp/natario-warp.ts. Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached. [server/services/proposals/engine.ts] Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity. [server/services/proposals/engine.ts] Sources: server/services/proposals/engine.ts, modules/warp/natario-warp.ts, modules/dynamic/gates/index.ts, modules/warp/warp-module.ts, server/energy-pipeline.ts, client/src/hooks/use-energy-pipeline.ts, client/src/lib/whispers/seedWhispers.ts, client/src/components/AlcubierrePanel.tsx
 ```
 
-### Worst #7: ambiguous_20_how-do-i-triage-failures-quickly
+### Worst #6: ambiguous_20_how-do-i-triage-failures-quickly
 - family: ambiguous_general
 - question: How do I triage failures quickly?
 - failures: none
@@ -153,36 +142,10 @@ Missing evidence: add directly relevant repo paths or artifact refs to raise con
 - debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [shared/schema.ts] 1. Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [shared/schema.ts] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [shared/schema.ts] Sources: shared/schema.ts, server/routes/agi.plan.ts, modules/dynamic/dynamic-casimir.ts, temp_prev.ts, scripts/helix-ask-utility-ab.ts, reports/helix-signal-reliability-narrow.md, tools/tokamak-added-value-report.ts, tests/warpfield-lattice.integration.spec.ts
-
-Missing evidence: add directly relevant repo paths or artifact refs to raise confidence.
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [shared/schema.ts] 1. Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [shared/schema.ts] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [shared/schema.ts] Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [shared/schema.ts] -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. [shared/schema.ts] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [shared/schema.ts] Missing evidence: add directly relevant repo paths or artifact refs to raise confidence. [shared/schema.ts] Sources: shared/schema.ts, server/routes/agi.plan.ts, modules/dynamic/dynamic-casimir.ts, temp_prev.ts, scripts/helix-ask-utility-ab.ts, reports/helix-novelty-patch-localcheck-narrow.md, tools/tokamak-added-value-report.ts, tests/warpfield-lattice.integration.spec.ts
 ```
 
-### Worst #8: repo_tech_21_explain-relation-assembly-fallback-rendering-shape-and-intended-usage
-- family: repo_technical
-- question: Explain relation-assembly fallback rendering shape and intended usage.
-- failures: none
-- likely_root_cause: mixed
-- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=true relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-Constraint: The current implementation is a no-op skeleton with a soft software-mix fallback. [client/src/physics/alcubierre.ts] Constraint: The current implementation is a no-op skeleton with a soft software-mix fallback. [client/src/physics/alcubierre.ts] In practice, score=11.500 symbol=validateQuantumInequality file=modules/warp/natario-warp.ts server/services/planner/chat-b.ts export type ResonantPlanCandidate =; score=11.000 symbol=ResonantPlanCandidate file=server/se... Mechanism: Constraint: The current implementation is a no-op skeleton with a soft software-mix fallback. [client/src/physics/alcubierre.ts] -> coupled constraints and feedback operators -> observable outcomes tied to modules/warp/natario-warp.ts, because feedback loops shape the resulting behavior. Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached. [client/src/physics/alcubierre.ts] Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity. [client/src/physics/alcubierre.ts] Sources: client/src/physics/alcubierre.ts, modules/warp/natario-warp.ts, server/services/planner/chat-b.ts, server/skills/llm.http.ts, shared/skills.ts, modules/dynamic/dynamic-casimir.ts, server/instruments/pump-multitone.ts, server/db/agi.ts
-```
-
-### Worst #9: ambiguous_30_what-s-the-difference-between-routing-and-assembly
-- family: ambiguous_general
-- question: What's the difference between routing and assembly?
-- failures: none
-- likely_root_cause: mixed
-- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-(see docs/knowledge/trees/helix-ask-tree.md... In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/trees/helix-ask-tree.md] Sources: docs/knowledge/trees/helix-ask-tree.md, server/skills/docs.readme.ts, shared/skills.ts, client/src/lib/agi/api.ts, server/services/planner/chat-b.ts, tests/hull-tools.spec.ts, modules/core/module-registry.ts, shared/math-stage.ts
-```
-
-### Worst #10: repo_tech_03_where-are-relation-packet-fields-built-and-surfaced-in-debug-payload
+### Worst #7: repo_tech_03_where-are-relation-packet-fields-built-and-surfaced-in-debug-payload
 - family: repo_technical
 - question: Where are relation packet fields built and surfaced in debug payload?
 - failures: none
@@ -194,16 +157,52 @@ Constraint: The current implementation is a no-op skeleton with a soft software-
 what_is_warp_bubble: client/src/hooks/use-energy-pipeline.ts export interface GreensPayload kind: GreensKind; m: number; // mass parameter for Helmholtz (0 ⇒ Poisson limit) normalize: boolean; phi: Float32Array; // normalized or raw potentia. 1. what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [modules/dynamic/dynamic-casimir.ts] 2. how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [modules/dynamic/dynamic-casimir.ts] Warp viability certificates enable ethos commitments by binding claims to reproducible evidence. [modules/dynamic/dynamic-casimir.ts] Verification hooks translate design ambition into. [modules/dynamic/dynamic-casimir.ts] 3. constraints_and_falsifiability: Physics bounds: Ford-Roman QI, theta calibration, and GR constraint gates must pass before viability claims. [modules/dynamic/dynamic-casimir.ts] Policy bounds: mission ethos requires stewardship, non-harm, and traceable evidence for operational decisions. [modules/dynamic/dynamic-casimir.ts] Re-run /. 4. Mechanism: what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [modules/dynamic/dynamic-casimir.ts] -> constrained interaction dynamics -> how_they_connect: Mission ethos constrains warp development to measured. [modules/dynamic/dynamic-casimir.ts] 5. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [modules/dynamic/dynamic-casimir.ts] In practice, what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [modules/dynamic/dyna
 ```
 
-### Worst #11: repo_tech_12_where-is-relation-topology-dual-domain-detection-implemented
+### Worst #8: repo_tech_07_how-are-ambiguity-gates-triggered-and-what-clarify-output-is-produced
 - family: repo_technical
-- question: Where is relation topology dual-domain detection implemented?
+- question: How are ambiguity gates triggered and what clarify output is produced?
 - failures: none
 - likely_root_cause: mixed
 - patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=true relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-what_is_warp_bubble: docs/knowledge/warp/warp-bubble.md. 1. what_is_mission_ethos: docs/ethos/ideology.json. 2. how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [shared/schema.ts] Warp viability certificates enable ethos commitments by binding claims to reproducible evidence. [shared/schema.ts] Verification hooks translate design ambition into. [shared/schema.ts] 3. constraints_and_falsifiability: Physics bounds: Ford-Roman QI, theta calibration, and GR constraint gates must pass before viability claims. [shared/schema.ts] Policy bounds: mission ethos requires stewardship, non-harm, and traceable evidence for operational decisions. [shared/schema.ts] Re-run /. 4. Mechanism: what_is_mission_ethos: docs/ethos/ideology.json. -> constrained interaction dynamics -> how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [shared/schema.ts] Warp viability certificates enable ethos commit. [shared/schema.ts] 5. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [shared/schema.ts] In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity. [shared/schema.ts] Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity. [shared/schema.ts] Sources: docs/ethos/ideology.json, docs/knowledge/warp/warp-bubble.md
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/ui-components-tree.json] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/ui-components-tree.json] Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/ui-components-tree.json] -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. [docs/knowledge/ui-components-tree.json] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/ui-components-tree.json] Missing evidence: add directly relevant repo paths or artifact refs to raise confidence. [docs/knowledge/ui-components-tree.json] Sources: docs/knowledge/ui-components-tree.json, client/src/hooks/use-energy-pipeline.ts, shared/schema.ts, server/helix-core.ts, modules/dynamic/gates/index.ts, tests/hull-tools.spec.ts, modules/core/module-registry.ts, server/specialists/solvers/philo.synthesis.ts
+```
+
+### Worst #9: repo_tech_21_explain-relation-assembly-fallback-rendering-shape-and-intended-usage
+- family: repo_technical
+- question: Explain relation-assembly fallback rendering shape and intended usage.
+- failures: none
+- likely_root_cause: mixed
+- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=true relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+what_is_warp_bubble: client/src/constants/VIS.ts tsRatioFallback = 4102.7 score=11.000 | symbol=tsRatioFallback | file=client/src/constants/VIS.ts server/skills/llm.http.ts llmHttpHandler: ToolHandler = async (input: any, ctx: any) => const. - What it is: what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [client/src/physics/alcubierre.ts] - Why it matters: how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [client/src/physics/alcubierre.ts] Warp viability certificates enable ethos commitments by binding claims to reproducible evidence. [client/src/physics/alcubierre.ts] Verification hooks translate design ambition into. [client/src/physics/alcubierre.ts] - Constraint: constraints_and_falsifiability: Physics bounds: Ford-Roman QI, theta calibration, and GR constraint gates must pass before viability claims. [client/src/physics/alcubierre.ts] Policy bounds: mission ethos requires stewardship, non-harm, and traceable evidence for operational decisions. [client/src/physics/alcubierre.ts] Re-run /. In practice, what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [client/src/physics/alcubierre.ts] Mechanism: what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [client/src/physics/alcubierre.ts] -> constrained interaction dynamics -> how_they_connect: Mission ethos constrains warp development to measured. [client/src/physics/alcubierre.ts] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [client/s
+```
+
+### Worst #10: ambiguous_30_what-s-the-difference-between-routing-and-assembly
+- family: ambiguous_general
+- question: What's the difference between routing and assembly?
+- failures: none
+- likely_root_cause: mixed
+- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+(see docs/knowledge/trees/helix-ask-tree.md... In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/trees/helix-ask-tree.md] Mechanism: (see docs/knowledge/trees/helix-ask-tree.md... -> constrained interaction dynamics -> (see docs/knowledge/trees/helix-ask-tree.md..., because linked constraints amplify or dampen outcomes over time. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/trees/helix-ask-tree.md] Missing evidence: add directly relevant repo paths or artifact refs to raise confidence. [docs/knowledge/trees/helix-ask-tree.md] Sources: docs/knowledge/trees/helix-ask-tree.md
+```
+
+### Worst #11: relation_03_warp-bubble-ideology-relation-what-is-the-bridge
+- family: relation
+- question: Warp bubble ↔ ideology relation: what is the bridge?
+- failures: none
+- likely_root_cause: mixed
+- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
+- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=true relation_dual_domain_ok=true deterministic_fallback_used_relation=true contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. [docs/knowledge/warp/warp-bubble.md] - Evidence: Which bubble model is used and where are its constraints checked? [docs/knowledge/warp/warp-bubble.md] See modules/warp/warp-m... - Constraint: Which bubble model is used and where are its constraints checked? [docs/knowledge/warp/warp-bubble.md] In practice, Which bubble model is used and where are its constraints checked? [docs/knowledge/warp/warp-bubble.md] See modules/warp/warp-m... Mechanism: In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. [docs/knowledge/warp/warp-bubble.md] -> constrained interaction dynamics -> Which bubble model is used and where are its constraints checked? [docs/knowledge/warp/warp-bubble.md] See modules/warp/warp-m...,. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/warp/warp-bubble.md] Missing evidence: add directly relevant repo paths or artifact refs to raise confidence. [docs/knowledge/warp/warp-bubble.md] Sources: docs/knowledge/warp/warp-bubble.md, modules/warp/warp-module.ts, modules/warp/natario-warp.ts, client/src/lib/warp-uniforms-gate.ts, server/energy-pipeline.ts, client/src/components/ideologypanel.ts, server/routes/ethos.ts, client/src/hooks/use-ideology.ts
 ```
 
 ### Worst #12: repo_tech_08_what-does-api-agi-adapter-run-return-for-pass-fail-and-certificate-data
@@ -215,22 +214,10 @@ what_is_warp_bubble: docs/knowledge/warp/warp-bubble.md. 1. what_is_mission_etho
 - debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-Measurement must not become coercion; data collection stays minimal and accountable. [docs/knowledge/ethos/data-dignity.md] Mechanism: Measurement must not become coercion; data collection stays minimal and accountable. [docs/knowledge/ethos/data-dignity.md] -> constrained interaction dynamics -> Measurement must not become coercion; data collection stays minimal and accountable., because linked constraints amplify or d. [docs/knowledge/ethos/data-dignity.md] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/ethos/data-dignity.md] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/ethos/data-dignity.md] Sources: docs/ethos/ideology.json, docs/knowledge/ethos/data-dignity.md, docs/ethos/why.md, shared/schema.ts, server/routes/agi.plan.ts, modules/dynamic/dynamic-casimir.ts, temp_prev.ts, reports/helix-tuner-narrow-rerun.md
+Measurement must not become coercion; data collection stays minimal and accountable. [docs/knowledge/ethos/data-dignity.md] Mechanism: Measurement must not become coercion; data collection stays minimal and accountable. [docs/knowledge/ethos/data-dignity.md] -> constrained interaction dynamics -> Measurement must not become coercion; data collection stays minimal and accountable., because linked constraints amplify or d. [docs/knowledge/ethos/data-dignity.md] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/ethos/data-dignity.md] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/ethos/data-dignity.md] Mechanism: Measurement must not become coercion; data collection stays minimal and accountable. [docs/knowledge/ethos/data-dignity.md] -> constrained interaction dynamics -> Measurement must not become coercion; data collection stays minimal and accountable., because linked constraints amplify or d. [docs/knowledge/ethos/data-dignity.md] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/ethos/data-dignity.md] Missing evidence: add directly relevant repo paths or artifact refs to raise confidence. [docs/knowledge/ethos/data-dignity.md] Sources: docs/ethos/ideology.json, docs/knowledge/ethos/data-dignity.md, docs/ethos/why.md, shared/schema.ts, server/routes/agi.plan.ts, modules/dynamic/dynamic-casimir.ts, temp_prev.ts, reports/helix-tuner-narrow-rerun.md
 ```
 
-### Worst #13: ambiguous_28_how-can-i-identify-high-impact-failure-categories
-- family: ambiguous_general
-- question: How can I identify high-impact failure categories?
-- failures: none
-- likely_root_cause: mixed
-- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-score=1.000 symbol=buildSnapshot file=client/src/lib/code-index/snapshot.ts Minimal, strict-scientific REAL renderer. score=4.000 symbol=WarpBubbleCompare. [client/src/lib/gl/capabilities.ts] score=1.000 symbol=WarpBubbleResult file=modules/warp/warp-modul... score=1.000 symbol=buildSnapshot file=client/src/lib/code-index/snapshot.ts Minimal, strict-scientific REAL renderer. score=4.000 symbol=WarpBubbleCompare. [client/src/lib/gl/capabilities.ts] score=1.000 symbol=WarpBubbleResult file=modules/warp/warp-modul... score=11.000 symbol=sizeCanvasSafe file=client/src/lib/gl/capabilities.ts modules/warp/warp-module.ts export interface WarpBubbleResult extends NatarioWarpResult // Module-specific additions moduleVersion: string; calcul... Mechanism: score=1.000 symbol=buildSnapshot file=client/src/lib/code-index/snapshot.ts Minimal, strict-scientific REAL renderer. score=4.000 symbol=WarpBubbleCompare. [client/src/lib/gl/capabilities.ts] score=1.000 symbol=WarpBubbleResult file=modules/warp/warp-modul... -> coupled constraints and feedback operators -> observable outcomes tied to modules/warp/warp-module.ts,. Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached. [client/src/lib/gl/capabilities.ts] Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity. [client/src/lib/gl/capabilities.ts] Sources: client/src/lib/gl/capabilities.ts, modules/warp/warp-module.ts, client/src/lib/code-index/snapshot.ts, server/services/planner/chat-b.ts, server/db/essence.ts, server/routes/agi.debate.ts, server/helix-core.ts, client/src/workers/fractional-scan.ts
-```
-
-### Worst #14: ambiguous_12_what-s-a-clean-way-to-structure-a-short-answer
+### Worst #13: ambiguous_12_what-s-a-clean-way-to-structure-a-short-answer
 - family: ambiguous_general
 - question: What's a clean way to structure a short answer?
 - failures: none
@@ -239,27 +226,36 @@ score=1.000 symbol=buildSnapshot file=client/src/lib/code-index/snapshot.ts Mini
 - debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/trees/panel-concepts-tree.md] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/trees/panel-concepts-tree.md] Sources: docs/knowledge/trees/panel-concepts-tree.md, docs/knowledge/trees/panel-registry-tree.md, docs/knowledge/trees/stellar-restoration-tree.md
-
-Missing evidence: add directly relevant repo paths or artifact refs to raise confidence.
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/trees/panel-concepts-tree.md] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/trees/panel-concepts-tree.md] Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/trees/panel-concepts-tree.md] -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. [docs/knowledge/trees/panel-concepts-tree.md] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/trees/panel-concepts-tree.md] Missing evidence: add directly relevant repo paths or artifact refs to raise confidence. [docs/knowledge/trees/panel-concepts-tree.md] Sources: docs/knowledge/trees/panel-concepts-tree.md, docs/knowledge/trees/panel-registry-tree.md, docs/knowledge/trees/stellar-restoration-tree.md
 ```
 
-### Worst #15: ambiguous_08_what-s-a-good-way-to-summarize-evidence
+### Worst #14: ambiguous_28_how-can-i-identify-high-impact-failure-categories
 - family: ambiguous_general
-- question: What's a good way to summarize evidence?
+- question: How can I identify high-impact failure categories?
 - failures: none
 - likely_root_cause: mixed
 - patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. [docs/knowledge/trees/certainty-framework-tree.md] In practice, coupled constraints and feedback loops determine how outcomes evolve over time. [docs/knowledge/trees/certainty-framework-tree.md] Sources: docs/knowledge/trees/certainty-framework-tree.md, client/src/components/warprenderinspector.ts, server/instruments/pump-multitone.ts, modules/dynamic/natario-metric.ts, shared/essence-themes.ts, server/services/console-telemetry/summarize.ts, server/qi/qi-monitor.ts, server/routes/orchestrator.ts
+what_is_warp_bubble: server/services/planner/chat-b.ts export type ExecutionResultFailure = ExecutionResultBase & ; score=11.000 | symbol=ExecutionResultFailure | file=server/services/planner/chat-b.ts client/src/lib/gl/capabilities.ts expor. what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [client/src/lib/gl/capabilities.ts] how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [client/src/lib/gl/capabilities.ts] Warp viability certificates enable ethos commitments by binding claims to reproducible evidence. [client/src/lib/gl/capabilities.ts] Verification hooks translate design ambition into. [client/src/lib/gl/capabilities.ts] constraints_and_falsifiability: Physics bounds: Ford-Roman QI, theta calibration, and GR constraint gates must pass before viability claims. [client/src/lib/gl/capabilities.ts] Policy bounds: mission ethos requires stewardship, non-harm, and traceable evidence for operational decisions. [client/src/lib/gl/capabilities.ts] Re-run /. In practice, what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [client/src/lib/gl/capabilities.ts] Mechanism: what_is_mission_ethos: Mission ethos is the stewardship policy layer that constrains capability claims to verified, non-harmful operation. [client/src/lib/gl/capabilities.ts] -> constrained interaction dynamics -> how_they_connect: Mission ethos constrains warp development to measured. [client/src/lib/gl/capabilities.ts] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [client/src/lib/gl/capabilities.ts] Missing e
+```
 
-Missing evidence: add directly relevant repo paths or artifact refs to raise confidence.
+### Worst #15: relation_22_which-shared-constraints-bind-warp-bubble-engineering-to-ideology-values
+- family: relation
+- question: Which shared constraints bind warp bubble engineering to ideology values?
+- failures: none
+- likely_root_cause: mixed
+- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
+- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=true relation_dual_domain_ok=true deterministic_fallback_used_relation=true contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. [docs/knowledge/warp/warp-bubble.md] - Evidence: Which bubble model is used and where are its constraints checked? [docs/knowledge/warp/warp-bubble.md] - Constraint: repo-specific definition of a warp bubble model. [docs/knowledge/warp/warp-bubble.md] In practice, Which bubble model is used and where are its constraints checked? [docs/knowledge/warp/warp-bubble.md] Mechanism: In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. [docs/knowledge/warp/warp-bubble.md] -> constrained interaction dynamics -> Which bubble model is used and where are its constraints checked?, because linked constraints. [docs/knowledge/warp/warp-bubble.md] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/warp/warp-bubble.md] Missing evidence: add directly relevant repo paths or artifact refs to raise confidence. [docs/knowledge/warp/warp-bubble.md] Sources: docs/knowledge/warp/warp-mechanics-tree.json, modules/warp/warp-module.ts, modules/warp/natario-warp.ts, client/src/lib/warp-uniforms-gate.ts, server/energy-pipeline.ts, client/src/components/ideologypanel.ts, server/routes/ethos.ts, client/src/hooks/use-ideology.ts
 ```
 
 ## Recommendation
-- decision: ship
+- decision: blocked_provenance
+- [0] Validation provenance gate: Require origin/main + HEAD provenance in reports before accepting decision-grade outcomes.
 - [1] Relation-mode fallback hardening: Increase deterministic fallback usage when relation intent is selected but generated answer omits warp/ethos linkage signals.
 - [2] Citation persistence guard: Guarantee hybrid/repo responses keep at least one valid Sources line after final cleanup and repairs.
 - [3] Stub environment policy split: Separate decision-grade campaigns from stub-mode smoke runs to avoid polluted quality metrics.
