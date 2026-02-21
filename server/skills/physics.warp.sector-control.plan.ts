@@ -23,6 +23,22 @@ const inputSchema = z.object({
           negativeFraction: z.number().min(0).max(1).optional(),
         })
         .optional(),
+      observerGrid: z
+        .object({
+          paybackGain: z.number().positive().optional(),
+          observers: z
+            .array(
+              z.object({
+                observerId: z.string().min(1),
+                rho_Jm3: z.number().optional(),
+                debt_Jm3s: z.number().nonnegative().optional(),
+                maxDebt_Jm3s: z.number().positive().optional(),
+                dt_ms: z.number().positive().optional(),
+              }),
+            )
+            .optional(),
+        })
+        .optional(),
     })
     .optional(),
 });
@@ -45,6 +61,7 @@ export const sectorControlPlanHandler: ToolHandler = async (rawInput) => {
     mode: input.mode,
     timing: input.overrides?.timing,
     allocation: input.overrides?.allocation,
+    observerGrid: input.overrides?.observerGrid,
   });
 
   if (!plan.ok) {

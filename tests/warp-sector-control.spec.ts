@@ -8,6 +8,7 @@ describe("warp sector-control integration", () => {
     expect(output.mode).toBe("diagnostic");
     expect(output.maturity).toBe("diagnostic");
     expect(output.constraints.FordRomanQI).toBe("pass");
+    expect(output.observerGrid?.observers.length).toBeGreaterThan(0);
   });
 
   it("fail-closes on QI hard violation", () => {

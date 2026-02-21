@@ -2908,6 +2908,31 @@ export const sectorControlDutySchema = z.object({
   dutyShip: z.number().min(0).max(1),
 });
 
+export const sectorControlObserverStatusSchema = z.enum(["pass", "fail", "unknown"]);
+
+export const sectorControlObserverDebtSchema = z.object({
+  observerId: z.string().min(1),
+  rho_Jm3: z.number(),
+  dt_ms: z.number().positive(),
+  debtBefore_Jm3s: z.number().nonnegative(),
+  debtAfter_Jm3s: z.number().nonnegative(),
+  maxDebt_Jm3s: z.number().positive(),
+  requiredPayback_Jm3s: z.number().nonnegative(),
+  paybackApplied_Jm3s: z.number().nonnegative(),
+  paybackRatio: z.number().nonnegative(),
+  status: sectorControlObserverStatusSchema,
+  note: z.string().optional(),
+});
+export type SectorControlObserverDebt = z.infer<typeof sectorControlObserverDebtSchema>;
+
+export const sectorControlObserverGridSchema = z.object({
+  paybackGain: z.number().positive(),
+  paybackBudget_Jm3s: z.number().nonnegative(),
+  overflowCount: z.number().int().nonnegative(),
+  observers: z.array(sectorControlObserverDebtSchema),
+});
+export type SectorControlObserverGrid = z.infer<typeof sectorControlObserverGridSchema>;
+
 export const sectorControlConstraintsSchema = z.object({
   FordRomanQI: z.enum(["pass", "fail", "unknown"]),
   ThetaAudit: z.enum(["pass", "fail", "unknown"]),
@@ -2921,6 +2946,7 @@ export const sectorControlPlanSchema = z.object({
   timing: sectorControlTimingSchema,
   allocation: sectorControlAllocationSchema,
   duty: sectorControlDutySchema,
+  observerGrid: sectorControlObserverGridSchema.optional(),
   constraints: sectorControlConstraintsSchema,
   objective: z.string().min(1),
   maturity: z.enum(["exploratory", "reduced-order", "diagnostic", "certified"]),

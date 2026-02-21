@@ -51,3 +51,30 @@ it("respects concurrency caps and deterministic firstFail under hard violations"
     expect(result.firstFail).toBe("FordRomanQI");
   }
 });
+
+it("tracks observer-grid debt and fail-closes FordRomanQI on overflow", () => {
+  const result = buildSectorControlPlan({
+    mode: "diagnostic",
+    constraints: { FordRomanQI: "pass", ThetaAudit: "pass", grConstraintGate: "pass" },
+    observerGrid: {
+      paybackGain: 1.5,
+      observers: [
+        {
+          observerId: "hull_band",
+          rho_Jm3: -5e3,
+          debt_Jm3s: 0.3,
+          maxDebt_Jm3s: 0.1,
+          dt_ms: 2,
+        },
+      ],
+    },
+  });
+
+  expect(result.plan.observerGrid?.observers.length).toBeGreaterThan(0);
+  expect(result.plan.observerGrid?.overflowCount).toBeGreaterThan(0);
+  expect(result.plan.constraints.FordRomanQI).toBe("fail");
+  expect(result.ok).toBe(false);
+  if (!result.ok) {
+    expect(result.firstFail).toBe("FordRomanQI");
+  }
+});

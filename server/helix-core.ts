@@ -154,6 +154,7 @@ import { getSpectrumSnapshots, postSpectrum } from "./metrics/spectrum.js";
 import type { SpectrumSnapshot } from "./metrics/spectrum.js";
 import { slewPump } from "./instruments/pump.js";
 import { recordTrainingTrace } from "./services/observability/training-trace-store.js";
+import { runModeTransitionSectorPreflight } from "./control/sectorControlPreflight.js";
 
 /**
  * Monotonic sequence for pipeline snapshots served via GET /api/helix/pipeline.
@@ -2672,12 +2673,19 @@ export async function switchOperationalMode(req: Request, res: Response) {
     if (!['hover','taxi','nearzero','cruise','emergency','standby'].includes(mode)) {
       return res.status(400).json({ error: "Invalid mode" });
     }
-    const newState = await pipeMutex.lock(async () => {
+    const requestedMode = mode as EnergyPipelineState["currentMode"];
+    const transition = await pipeMutex.lock(async () => {
       const curr = getGlobalPipelineState();
-      const next = await switchMode(curr, mode as EnergyPipelineState['currentMode']);
+      const preflight = runModeTransitionSectorPreflight(curr, requestedMode);
+      const appliedMode =
+        preflight.plannerResult.ok
+          ? requestedMode
+          : preflight.fallbackMode ?? requestedMode;
+      const next = await switchMode(curr, appliedMode);
       setGlobalPipelineState(next);
-      return next;
+      return { next, preflight, appliedMode };
     });
+    const newState = transition.next;
 
     // Write calibration for phase diagram integration  
     await writePhaseCalibration({
@@ -2688,9 +2696,30 @@ export async function switchOperationalMode(req: Request, res: Response) {
       zeta_target: 0.5
     }, 'mode_change');
 
-    publish("warp:reload", { reason: "mode-change", mode, ts: Date.now() });
+    publish("warp:reload", {
+      reason: transition.preflight.fallbackApplied ? "mode-change-preflight-fallback" : "mode-change",
+      mode: transition.appliedMode,
+      requestedMode,
+      ts: Date.now(),
+    });
 
-    res.json({ success: true, mode, state: newState, config: MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS] });
+    res.json({
+      success: true,
+      mode: transition.appliedMode,
+      requestedMode,
+      fallbackApplied: transition.preflight.fallbackApplied,
+      preflight: {
+        required: transition.preflight.required,
+        plannerMode: transition.preflight.plannerMode,
+        ok: transition.preflight.plannerResult.ok,
+        firstFail: transition.preflight.plannerResult.firstFail,
+        constraints: transition.preflight.plannerResult.plan.constraints,
+        observerGrid: transition.preflight.plannerResult.plan.observerGrid ?? null,
+        fallbackMode: transition.preflight.fallbackMode,
+      },
+      state: newState,
+      config: MODE_CONFIGS[transition.appliedMode as keyof typeof MODE_CONFIGS],
+    });
   } catch (error) {
     res.status(400).json({ error: "Failed to switch mode", details: error instanceof Error ? error.message : "Unknown error" });
   }

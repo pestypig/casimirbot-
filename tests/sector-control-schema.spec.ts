@@ -8,6 +8,25 @@ describe("sectorControlPlanSchema", () => {
       timing: { strobeHz: 120, sectorPeriod_ms: 8.33, TS_ratio: 1.6, tauLC_ms: 10, tauPulse_ms: 2 },
       allocation: { sectorCount: 12, concurrentSectors: 3, negativeFraction: 0.25, negSectors: 3, posSectors: 9 },
       duty: { dutyCycle: 0.5, dutyBurst: 0.3, dutyEffective_FR: 0.075, dutyShip: 0.18 },
+      observerGrid: {
+        paybackGain: 1.1,
+        paybackBudget_Jm3s: 0.01,
+        overflowCount: 0,
+        observers: [
+          {
+            observerId: "hull_band",
+            rho_Jm3: -0.5,
+            dt_ms: 2,
+            debtBefore_Jm3s: 0.01,
+            debtAfter_Jm3s: 0.02,
+            maxDebt_Jm3s: 0.2,
+            requiredPayback_Jm3s: 0.02,
+            paybackApplied_Jm3s: 0.03,
+            paybackRatio: 1.5,
+            status: "pass",
+          },
+        ],
+      },
       constraints: {
         FordRomanQI: "pass",
         ThetaAudit: "pass",
@@ -22,6 +41,7 @@ describe("sectorControlPlanSchema", () => {
 
     expect(parsed.maturity).toBe("diagnostic");
     expect(parsed.duty.dutyEffective_FR).toBeCloseTo(0.075, 8);
+    expect(parsed.observerGrid?.observers[0]?.observerId).toBe("hull_band");
   });
 
   it("rejects invalid duty bounds", () => {
