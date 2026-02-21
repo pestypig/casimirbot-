@@ -1,0 +1,45 @@
+
+> rest-express@1.0.0 casimir:verify
+> tsx cli/casimir-verify.ts --pack repo-convergence --url http://127.0.0.1:5173/api/agi/adapter/run --export-url http://127.0.0.1:5173/api/agi/training-trace/export --trace-out artifacts/experiments/helix-signal-reliability/training-trace-export.jsonl --trace-limit 400 --ci
+
+{
+  "traceId": "adapter:6dd5cec5-888c-44b0-9e62-07a78b13c323",
+  "runId": "1404",
+  "verdict": "PASS",
+  "pass": true,
+  "firstFail": null,
+  "failReason": "NONE",
+  "deltas": [],
+  "certificate": {
+    "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificateId": "constraint-pack:repo-convergence:6e84f965957f",
+    "integrityOk": true,
+    "status": "GREEN"
+  },
+  "artifacts": [
+    {
+      "kind": "constraint-pack",
+      "ref": "repo-convergence"
+    },
+    {
+      "kind": "training-trace-id",
+      "ref": "1404"
+    },
+    {
+      "kind": "training-trace-url",
+      "ref": "/api/agi/training-trace/1404"
+    },
+    {
+      "kind": "training-trace-export",
+      "ref": "/api/agi/training-trace/export"
+    },
+    {
+      "kind": "constraint-pack-certificate-hash",
+      "ref": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45"
+    },
+    {
+      "kind": "constraint-pack-certificate-id",
+      "ref": "constraint-pack:repo-convergence:6e84f965957f"
+    }
+  ]
+}

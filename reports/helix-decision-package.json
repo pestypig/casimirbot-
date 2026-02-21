@@ -1,0 +1,214 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-02-20T21:52:59.217Z",
+  "evaluation_tier": "decision_grade",
+  "git": {
+    "branch": "work",
+    "head": "c24cef2",
+    "origin_main": "c24cef2",
+    "ahead_behind": {
+      "ahead": 0,
+      "behind": 0
+    }
+  },
+  "runs": {
+    "narrow": "versatility-1771623685987",
+    "heavy": "versatility-1771623826796",
+    "ab_t02": "2026-02-20T21-48-02-900Z",
+    "ab_t035": "2026-02-20T21-50-00-140Z",
+    "casimir": "1406"
+  },
+  "gates": [
+    {
+      "name": "relation_packet_built_rate",
+      "value": 0.9666666666666667,
+      "threshold": 0.95,
+      "comparator": ">=",
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+    },
+    {
+      "name": "relation_dual_domain_ok_rate",
+      "value": 0.9666666666666667,
+      "threshold": 0.95,
+      "comparator": ">=",
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+    },
+    {
+      "name": "report_mode_correct_rate",
+      "value": 0.9888888888888889,
+      "threshold": 0.98,
+      "comparator": ">=",
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+    },
+    {
+      "name": "citation_presence_rate",
+      "value": 1,
+      "threshold": 0.99,
+      "comparator": ">=",
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+    },
+    {
+      "name": "stub_text_detected_rate",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+    },
+    {
+      "name": "runtime_fallback_answer",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-signal-reliability/narrow/versatility-1771623685987/summary.json"
+    },
+    {
+      "name": "runtime_tdz_intentStrategy",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-signal-reliability/narrow/versatility-1771623685987/summary.json"
+    },
+    {
+      "name": "runtime_tdz_intentProfile",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-signal-reliability/narrow/versatility-1771623685987/summary.json"
+    },
+    {
+      "name": "provenance_gate_pass",
+      "value": true,
+      "threshold": true,
+      "comparator": "==",
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+    },
+    {
+      "name": "decision_grade_ready",
+      "value": true,
+      "threshold": true,
+      "comparator": "==",
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/recommendation.json"
+    },
+    {
+      "name": "casimir_verdict_pass_integrity",
+      "value": true,
+      "threshold": true,
+      "comparator": "==",
+      "pass": true,
+      "source_path": "artifacts/experiments/helix-signal-reliability/casimir-fresh-normalized.json"
+    }
+  ],
+  "novelty": {
+    "t02": {
+      "overall": 0.6666666666666666,
+      "by_family": {
+        "relation": 0.5833333333333334,
+        "repo_technical": 0.5,
+        "ambiguous_general": 0.9166666666666666
+      },
+      "target": 0.82,
+      "pass": false,
+      "source_path": "artifacts/experiments/helix-signal-reliability/ab/t02/helix_signal_reliability_t02/summary.json"
+    },
+    "t035": {
+      "overall": 0.6666666666666666,
+      "by_family": {
+        "relation": 0.5833333333333334,
+        "repo_technical": 0.5,
+        "ambiguous_general": 0.9166666666666666
+      },
+      "target": 0.82,
+      "pass": false,
+      "source_path": "artifacts/experiments/helix-signal-reliability/ab/t035/helix_signal_reliability_t035/summary.json"
+    }
+  },
+  "provenance": {
+    "pass": true,
+    "blocked_reason": null,
+    "warnings": []
+  },
+  "casimir": {
+    "verdict": "PASS",
+    "traceId": "adapter:7158c961-9e71-4b25-a247-c3c32f04fb0f",
+    "runId": "1406",
+    "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrityOk": true,
+    "source_path": "artifacts/experiments/helix-signal-reliability/casimir-fresh-normalized.json"
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/experiments/helix-signal-reliability/narrow/versatility-1771623685987/summary.json",
+      "exists": true,
+      "sha256": "dccb463d17c4298ce345412f06b9c7ab78cf5fe84ec8cbfa16e290d660d03283",
+      "size_bytes": 79795,
+      "mtime_iso": "2026-02-20T21:43:41.964Z"
+    },
+    {
+      "path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json",
+      "exists": true,
+      "sha256": "da3962f017afc3138137ab69e80c99a92d4f3633d0b7d44d05a3a8641f25b6fb",
+      "size_bytes": 123610,
+      "mtime_iso": "2026-02-20T21:47:57.182Z"
+    },
+    {
+      "path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/recommendation.json",
+      "exists": true,
+      "sha256": "72124367c07317a316f5073b0874c4b5497d0b56c1416592986e4e1d9359303f",
+      "size_bytes": 2954,
+      "mtime_iso": "2026-02-20T21:47:57.182Z"
+    },
+    {
+      "path": "artifacts/experiments/helix-signal-reliability/ab/t02/helix_signal_reliability_t02/summary.json",
+      "exists": true,
+      "sha256": "badd010ed6f2a05d537eb4856b8e08a74c7affc1269b0576ef097cf81959c77e",
+      "size_bytes": 1685,
+      "mtime_iso": "2026-02-20T21:49:55.336Z"
+    },
+    {
+      "path": "artifacts/experiments/helix-signal-reliability/ab/t035/helix_signal_reliability_t035/summary.json",
+      "exists": true,
+      "sha256": "97ba417830e1a751c2c9c7a3e9a75972bb0a3dbf671112d02f12f1f19ad1de09",
+      "size_bytes": 1686,
+      "mtime_iso": "2026-02-20T21:51:51.450Z"
+    },
+    {
+      "path": "artifacts/experiments/helix-signal-reliability/casimir-fresh-normalized.json",
+      "exists": true,
+      "sha256": "d09de29b14d04dcd20a8a0287bcf9fec1d7fd9f2dc662e78bcee4443d7d7a853",
+      "size_bytes": 1148,
+      "mtime_iso": "2026-02-20T21:52:53.985Z"
+    },
+    {
+      "path": "schemas/helix-decision-package.schema.json",
+      "exists": true,
+      "sha256": "bdfb8e4c87f5d312da076444b41d2618593b80c6a0ac9a38f49f0cb1d6753649",
+      "size_bytes": 5233,
+      "mtime_iso": "2026-02-20T19:40:15.338Z"
+    }
+  ],
+  "decision": {
+    "value": "NO-GO",
+    "hard_blockers": [
+      "novelty.t02 below target >=0.82",
+      "novelty.t035 below target >=0.82"
+    ],
+    "reasoning": [
+      "All metrics are sourced from machine JSON artifacts.",
+      "Markdown report is rendered from this package JSON."
+    ]
+  },
+  "report_paths": {
+    "json": "reports/helix-decision-package.json",
+    "markdown": "reports/helix-decision-package.md"
+  }
+}

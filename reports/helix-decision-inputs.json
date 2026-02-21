@@ -1,0 +1,72 @@
+{
+  "generated_at": "2026-02-20T21:52:59.218Z",
+  "git": {
+    "branch": "work",
+    "head": "c24cef2",
+    "origin_main": "c24cef2",
+    "ahead_behind": {
+      "ahead": 0,
+      "behind": 0
+    }
+  },
+  "selected_paths": {
+    "narrow": "artifacts/experiments/helix-signal-reliability/narrow/versatility-1771623685987/summary.json",
+    "heavy": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json",
+    "recommendation": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/recommendation.json",
+    "ab_t02": "artifacts/experiments/helix-signal-reliability/ab/t02/helix_signal_reliability_t02/summary.json",
+    "ab_t035": "artifacts/experiments/helix-signal-reliability/ab/t035/helix_signal_reliability_t035/summary.json",
+    "casimir": "artifacts/experiments/helix-signal-reliability/casimir-fresh-normalized.json"
+  },
+  "run_ids": {
+    "narrow": "versatility-1771623685987",
+    "heavy": "versatility-1771623826796",
+    "recommendation": "versatility-1771623826796",
+    "ab_t02": "2026-02-20T21-48-02-900Z",
+    "ab_t035": "2026-02-20T21-50-00-140Z",
+    "casimir": "1406"
+  },
+  "inputs": {
+    "narrow": {
+      "path": "artifacts/experiments/helix-signal-reliability/narrow/versatility-1771623685987/summary.json",
+      "exists": true,
+      "sha256": "dccb463d17c4298ce345412f06b9c7ab78cf5fe84ec8cbfa16e290d660d03283",
+      "size_bytes": 79795,
+      "mtime_iso": "2026-02-20T21:43:41.964Z"
+    },
+    "heavy": {
+      "path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json",
+      "exists": true,
+      "sha256": "da3962f017afc3138137ab69e80c99a92d4f3633d0b7d44d05a3a8641f25b6fb",
+      "size_bytes": 123610,
+      "mtime_iso": "2026-02-20T21:47:57.182Z"
+    },
+    "recommendation": {
+      "path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/recommendation.json",
+      "exists": true,
+      "sha256": "72124367c07317a316f5073b0874c4b5497d0b56c1416592986e4e1d9359303f",
+      "size_bytes": 2954,
+      "mtime_iso": "2026-02-20T21:47:57.182Z"
+    },
+    "ab_t02": {
+      "path": "artifacts/experiments/helix-signal-reliability/ab/t02/helix_signal_reliability_t02/summary.json",
+      "exists": true,
+      "sha256": "badd010ed6f2a05d537eb4856b8e08a74c7affc1269b0576ef097cf81959c77e",
+      "size_bytes": 1685,
+      "mtime_iso": "2026-02-20T21:49:55.336Z"
+    },
+    "ab_t035": {
+      "path": "artifacts/experiments/helix-signal-reliability/ab/t035/helix_signal_reliability_t035/summary.json",
+      "exists": true,
+      "sha256": "97ba417830e1a751c2c9c7a3e9a75972bb0a3dbf671112d02f12f1f19ad1de09",
+      "size_bytes": 1686,
+      "mtime_iso": "2026-02-20T21:51:51.450Z"
+    },
+    "casimir": {
+      "path": "artifacts/experiments/helix-signal-reliability/casimir-fresh-normalized.json",
+      "exists": true,
+      "sha256": "d09de29b14d04dcd20a8a0287bcf9fec1d7fd9f2dc662e78bcee4443d7d7a853",
+      "size_bytes": 1148,
+      "mtime_iso": "2026-02-20T21:52:53.985Z"
+    }
+  }
+}
