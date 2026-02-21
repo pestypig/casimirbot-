@@ -1,22 +1,19 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-02-20T21:52:59.217Z",
+  "generated_at": "2026-02-21T18:34:15.192Z",
   "evaluation_tier": "decision_grade",
   "git": {
     "branch": "work",
-    "head": "c24cef2",
-    "origin_main": "c24cef2",
-    "ahead_behind": {
-      "ahead": 0,
-      "behind": 0
-    }
+    "head": "2621e93",
+    "origin_main": null,
+    "ahead_behind": null
   },
   "runs": {
-    "narrow": "versatility-1771623685987",
-    "heavy": "versatility-1771623826796",
-    "ab_t02": "2026-02-20T21-48-02-900Z",
-    "ab_t035": "2026-02-20T21-50-00-140Z",
-    "casimir": "1406"
+    "narrow": "versatility-1771698182971",
+    "heavy": "versatility-1771698358004",
+    "ab_t02": "2026-02-21T18-29-59-151Z",
+    "ab_t035": "2026-02-21T18-31-55-657Z",
+    "casimir": "632"
   },
   "gates": [
     {
@@ -25,7 +22,7 @@
       "threshold": 0.95,
       "comparator": ">=",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/heavy/versatility-1771698358004/summary.json"
     },
     {
       "name": "relation_dual_domain_ok_rate",
@@ -33,7 +30,7 @@
       "threshold": 0.95,
       "comparator": ">=",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/heavy/versatility-1771698358004/summary.json"
     },
     {
       "name": "report_mode_correct_rate",
@@ -41,7 +38,7 @@
       "threshold": 0.98,
       "comparator": ">=",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/heavy/versatility-1771698358004/summary.json"
     },
     {
       "name": "citation_presence_rate",
@@ -49,7 +46,7 @@
       "threshold": 0.99,
       "comparator": ">=",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/heavy/versatility-1771698358004/summary.json"
     },
     {
       "name": "stub_text_detected_rate",
@@ -57,7 +54,7 @@
       "threshold": 0,
       "comparator": "==",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/heavy/versatility-1771698358004/summary.json"
     },
     {
       "name": "runtime_fallback_answer",
@@ -65,7 +62,7 @@
       "threshold": 0,
       "comparator": "==",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-signal-reliability/narrow/versatility-1771623685987/summary.json"
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/narrow/versatility-1771698182971/summary.json"
     },
     {
       "name": "runtime_tdz_intentStrategy",
@@ -73,7 +70,7 @@
       "threshold": 0,
       "comparator": "==",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-signal-reliability/narrow/versatility-1771623685987/summary.json"
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/narrow/versatility-1771698182971/summary.json"
     },
     {
       "name": "runtime_tdz_intentProfile",
@@ -81,23 +78,23 @@
       "threshold": 0,
       "comparator": "==",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-signal-reliability/narrow/versatility-1771623685987/summary.json"
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/narrow/versatility-1771698182971/summary.json"
     },
     {
       "name": "provenance_gate_pass",
-      "value": true,
+      "value": false,
       "threshold": true,
       "comparator": "==",
-      "pass": true,
-      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json"
+      "pass": false,
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/heavy/versatility-1771698358004/summary.json"
     },
     {
       "name": "decision_grade_ready",
-      "value": true,
+      "value": false,
       "threshold": true,
       "comparator": "==",
-      "pass": true,
-      "source_path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/recommendation.json"
+      "pass": false,
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/heavy/versatility-1771698358004/recommendation.json"
     },
     {
       "name": "casimir_verdict_pass_integrity",
@@ -105,100 +102,104 @@
       "threshold": true,
       "comparator": "==",
       "pass": true,
-      "source_path": "artifacts/experiments/helix-signal-reliability/casimir-fresh-normalized.json"
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/casimir-verify-normalized.json"
     }
   ],
   "novelty": {
     "t02": {
-      "overall": 0.6666666666666666,
+      "overall": 0.25,
       "by_family": {
-        "relation": 0.5833333333333334,
-        "repo_technical": 0.5,
-        "ambiguous_general": 0.9166666666666666
+        "relation": 0.25,
+        "repo_technical": 0.16666666666666666,
+        "ambiguous_general": 0.3333333333333333
       },
       "target": 0.82,
       "pass": false,
-      "source_path": "artifacts/experiments/helix-signal-reliability/ab/t02/helix_signal_reliability_t02/summary.json"
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/ab/t02/helix_release_readiness_cloud_v2_t02/summary.json"
     },
     "t035": {
-      "overall": 0.6666666666666666,
+      "overall": 0.25,
       "by_family": {
-        "relation": 0.5833333333333334,
-        "repo_technical": 0.5,
-        "ambiguous_general": 0.9166666666666666
+        "relation": 0.25,
+        "repo_technical": 0.16666666666666666,
+        "ambiguous_general": 0.3333333333333333
       },
       "target": 0.82,
       "pass": false,
-      "source_path": "artifacts/experiments/helix-signal-reliability/ab/t035/helix_signal_reliability_t035/summary.json"
+      "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/ab/t035/helix_release_readiness_cloud_v2_t035/summary.json"
     }
   },
   "provenance": {
-    "pass": true,
-    "blocked_reason": null,
-    "warnings": []
+    "pass": false,
+    "blocked_reason": "provenance gate failed in heavy summary",
+    "warnings": [
+      "git_origin_main_ref_missing"
+    ]
   },
   "casimir": {
     "verdict": "PASS",
-    "traceId": "adapter:7158c961-9e71-4b25-a247-c3c32f04fb0f",
-    "runId": "1406",
+    "traceId": "adapter:41e1cbf9-9ea2-42af-b080-83174b2a6992",
+    "runId": "632",
     "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
     "integrityOk": true,
-    "source_path": "artifacts/experiments/helix-signal-reliability/casimir-fresh-normalized.json"
+    "source_path": "artifacts/experiments/helix-release-readiness-cloud-v2/casimir-verify-normalized.json"
   },
   "artifacts": [
     {
-      "path": "artifacts/experiments/helix-signal-reliability/narrow/versatility-1771623685987/summary.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v2/narrow/versatility-1771698182971/summary.json",
       "exists": true,
-      "sha256": "dccb463d17c4298ce345412f06b9c7ab78cf5fe84ec8cbfa16e290d660d03283",
-      "size_bytes": 79795,
-      "mtime_iso": "2026-02-20T21:43:41.964Z"
+      "sha256": "2e73cc72126d1a037c420430ef298b090091972c0b93373e657b8532aaaf9bf3",
+      "size_bytes": 86957,
+      "mtime_iso": "2026-02-21T18:25:10.316Z"
     },
     {
-      "path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/summary.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v2/heavy/versatility-1771698358004/summary.json",
       "exists": true,
-      "sha256": "da3962f017afc3138137ab69e80c99a92d4f3633d0b7d44d05a3a8641f25b6fb",
-      "size_bytes": 123610,
-      "mtime_iso": "2026-02-20T21:47:57.182Z"
+      "sha256": "9d9bceb81f6c4a1adbcebda277af28d7980d3d3e34b11ff69cb00fabdaf75c02",
+      "size_bytes": 129517,
+      "mtime_iso": "2026-02-21T18:29:57.879Z"
     },
     {
-      "path": "artifacts/experiments/helix-signal-reliability/heavy/versatility-1771623826796/recommendation.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v2/heavy/versatility-1771698358004/recommendation.json",
       "exists": true,
-      "sha256": "72124367c07317a316f5073b0874c4b5497d0b56c1416592986e4e1d9359303f",
-      "size_bytes": 2954,
-      "mtime_iso": "2026-02-20T21:47:57.182Z"
+      "sha256": "2969d122c43f830a7c6a1de61c2ecc43956f118b5636cc823e7523064247f8d0",
+      "size_bytes": 3454,
+      "mtime_iso": "2026-02-21T18:29:57.879Z"
     },
     {
-      "path": "artifacts/experiments/helix-signal-reliability/ab/t02/helix_signal_reliability_t02/summary.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v2/ab/t02/helix_release_readiness_cloud_v2_t02/summary.json",
       "exists": true,
-      "sha256": "badd010ed6f2a05d537eb4856b8e08a74c7affc1269b0576ef097cf81959c77e",
-      "size_bytes": 1685,
-      "mtime_iso": "2026-02-20T21:49:55.336Z"
+      "sha256": "3554b28afcdee82cef8a28a5280feb379f0a69709e38ac6bb2bc12e4fad74e15",
+      "size_bytes": 1739,
+      "mtime_iso": "2026-02-21T18:31:54.491Z"
     },
     {
-      "path": "artifacts/experiments/helix-signal-reliability/ab/t035/helix_signal_reliability_t035/summary.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v2/ab/t035/helix_release_readiness_cloud_v2_t035/summary.json",
       "exists": true,
-      "sha256": "97ba417830e1a751c2c9c7a3e9a75972bb0a3dbf671112d02f12f1f19ad1de09",
-      "size_bytes": 1686,
-      "mtime_iso": "2026-02-20T21:51:51.450Z"
+      "sha256": "7becc01a61a79ae41609b6a108b390bc450bb80914550d67f830515054c6b79a",
+      "size_bytes": 1740,
+      "mtime_iso": "2026-02-21T18:33:49.063Z"
     },
     {
-      "path": "artifacts/experiments/helix-signal-reliability/casimir-fresh-normalized.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v2/casimir-verify-normalized.json",
       "exists": true,
-      "sha256": "d09de29b14d04dcd20a8a0287bcf9fec1d7fd9f2dc662e78bcee4443d7d7a853",
-      "size_bytes": 1148,
-      "mtime_iso": "2026-02-20T21:52:53.985Z"
+      "sha256": "a5c07a677c6cb9d4321ef512753c8e0fd68f69b36ad0596f09f04e78f6893188",
+      "size_bytes": 215,
+      "mtime_iso": "2026-02-21T18:34:14.187Z"
     },
     {
       "path": "schemas/helix-decision-package.schema.json",
       "exists": true,
       "sha256": "bdfb8e4c87f5d312da076444b41d2618593b80c6a0ac9a38f49f0cb1d6753649",
       "size_bytes": 5233,
-      "mtime_iso": "2026-02-20T19:40:15.338Z"
+      "mtime_iso": "2026-02-21T16:16:01.532Z"
     }
   ],
   "decision": {
     "value": "NO-GO",
     "hard_blockers": [
+      "provenance_gate_pass failed (false == true)",
+      "decision_grade_ready failed (false == true)",
       "novelty.t02 below target >=0.82",
       "novelty.t035 below target >=0.82"
     ],
