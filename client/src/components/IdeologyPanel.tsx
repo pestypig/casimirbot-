@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { IdeologyNode } from "@/lib/ideology-types";
 import type { IdeologyArtifact } from "@shared/ideology/ideology-artifacts";
 import { useIdeology } from "@/hooks/use-ideology";
-import { useIdeologyBeliefGraph } from "@/hooks/use-ideology-belief-graph";
+import { useIdeologyBeliefGraph, useIdeologyGuidance } from "@/hooks/use-ideology-belief-graph";
 import { useIdeologyArtifacts } from "@/hooks/use-ideology-artifacts";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +84,24 @@ export function IdeologyPanel({ initialId, className }: IdeologyPanelProps) {
   const artifactItems = artifactsData?.items ?? [];
   const artifactTotal = artifactsData?.total ?? 0;
   const artifactSearchItems = artifactSearchData?.items ?? [];
+
+  const [pressureState, setPressureState] = useState({
+    flattery: false,
+    urgency: false,
+    secrecy: false,
+    financial: false,
+    authority: false,
+  });
+  const activePressures = useMemo(() => {
+    const list: string[] = [];
+    if (pressureState.flattery) list.push("flattery_grooming");
+    if (pressureState.urgency) list.push("urgency_scarcity");
+    if (pressureState.secrecy) list.push("isolation_secrecy");
+    if (pressureState.financial) list.push("financial_ask");
+    if (pressureState.authority) list.push("authority_claim");
+    return list;
+  }, [pressureState]);
+  const { data: guidanceData } = useIdeologyGuidance({ activePressures, topK: 5 });
 
   usePanelTelemetryPublisher(
     "mission-ethos",

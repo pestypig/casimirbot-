@@ -3,6 +3,7 @@ import { stripRunawayAnswerArtifacts } from "../server/services/helix-ask/answer
 import { __testScoreDeterministicClaimCitationLinkage } from "../server/routes/agi.plan";
 import { buildQualityBaselineContract } from "../scripts/helix-ask-sweep";
 import { evaluateClaimCitationLinkage } from "../server/services/helix-ask/query";
+import { getGuidanceArtifacts } from "../server/services/ideology/artifacts";
 
 describe("stripRunawayAnswerArtifacts", () => {
   it("removes leaked instruction preamble and trailing debug sections", () => {
@@ -153,5 +154,14 @@ describe("Helix Ask semantic claim-citation linkage contract (artifacts)", () =>
     const linkage = evaluateClaimCitationLinkage(cleaned);
     expect(linkage.ok).toBe(true);
     expect(linkage.failReason).toBeUndefined();
+  });
+});
+
+
+describe("ideology guidance artifacts", () => {
+  it("returns compact pill and node-card artifacts for guidance retrieval", () => {
+    const items = getGuidanceArtifacts(["financial-fog-warning"]);
+    expect(items.some((item) => item.id === "vanity-leverage/protocol-pill")).toBe(true);
+    expect(items.some((item) => item.exportKind === "node-card")).toBe(true);
   });
 });

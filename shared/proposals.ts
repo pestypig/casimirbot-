@@ -61,6 +61,13 @@ export const codeDiffPatchSchema = z.object({
 export const proposalPatchSchema = z.discriminatedUnion("patchKind", [uiConfigPatchSchema, codeDiffPatchSchema]);
 export type ProposalPatch = z.infer<typeof proposalPatchSchema>;
 
+export const proposalIdeologyPressureContextSchema = z.object({
+  activePressures: z.array(z.string()).default([]),
+  observedSignals: z.array(z.string()).optional(),
+  recommendedNodeIds: z.array(z.string()).optional(),
+});
+export type ProposalIdeologyPressureContext = z.infer<typeof proposalIdeologyPressureContextSchema>;
+
 export const essenceProposalSchema = z.object({
   id: z.string(),
   kind: proposalKindSchema,

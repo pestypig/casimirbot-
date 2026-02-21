@@ -12,8 +12,10 @@ import { getConsoleTelemetry, saveConsoleTelemetry } from "../services/console-t
 import { buildIdeologyPanelTelemetry } from "@shared/ideology-telemetry";
 import {
   DEFAULT_IDEOLOGY_ACTION_GATE_POLICY,
+  evaluatePressureBundleGate,
   type IdeologyActionGatePolicy,
 } from "../services/ideology/action-gates.js";
+import { resolveIdeologyGuidance } from "../services/ideology/guidance.js";
 
 export const ethosRouter = Router();
 
@@ -417,12 +419,17 @@ ethosRouter.get("/artifacts/:id(*)/render", async (req, res) => {
   }
 });
 
-ethosRouter.get("/ideology/action-gates", async (_req, res) => {
+ethosRouter.get("/ideology/action-gates", async (req, res) => {
   try {
     const policy = await getIdeologyActionGatePolicy();
+    const activePressures = typeof req.query.pressures === "string"
+      ? req.query.pressures.split(",").map((entry) => entry.trim()).filter(Boolean)
+      : [];
+    const pressureDecision = evaluatePressureBundleGate(activePressures);
     res.json({
       claim_tier: policy.claim_tier ?? "diagnostic",
       actionGatePolicy: policy,
+      pressureGate: pressureDecision,
     });
   } catch (err) {
     res.status(500).json({
@@ -552,3 +559,26 @@ const handleBeliefGraphRequest = async (req: any, res: any) => {
 
 ethosRouter.get("/ideology/belief-graph", handleBeliefGraphRequest);
 ethosRouter.post("/ideology/belief-graph", handleBeliefGraphRequest);
+
+
+ethosRouter.post("/ideology/guidance", async (req, res) => {
+  try {
+    const payload = req.body ?? {};
+    const activePressures = Array.isArray(payload.activePressures) ? payload.activePressures : [];
+    const observedSignals = Array.isArray(payload.observedSignals) ? payload.observedSignals : [];
+    const topK = typeof payload.topK === "number" ? payload.topK : undefined;
+
+    const guidance = resolveIdeologyGuidance({
+      activePressures,
+      observedSignals,
+      topK,
+    });
+
+    res.json(guidance);
+  } catch (error) {
+    res.status(500).json({
+      error: "ideology-guidance-failed",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});

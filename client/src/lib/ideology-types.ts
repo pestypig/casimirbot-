@@ -1,3 +1,5 @@
+import type { ExternalPressure, ExternalPressureBundle, ExternalPressureInput } from "@shared/ideology/external-pressures";
+
 export type IdeologyRef =
   | { kind: "doc"; title: string; path: string }
   | { kind: "panel"; title: string; panelId: string; params?: Record<string, unknown> }
@@ -112,4 +114,16 @@ export type IdeologyBeliefGraphResponse = {
     nodes: IdeologyBeliefGraphNode[];
     edges: IdeologyBeliefGraphEdge[];
   };
+};
+
+
+export type { ExternalPressure, ExternalPressureBundle, ExternalPressureInput };
+
+export type IdeologyGuidanceResponse = {
+  invariant: "system advises, user decides.";
+  detectedBundles: string[];
+  recommendedNodeIds: string[];
+  warnings: string[];
+  recommendedArtifacts: string[];
+  suggestedVerificationSteps: string[];
 };

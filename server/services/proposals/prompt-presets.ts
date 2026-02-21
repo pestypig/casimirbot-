@@ -17,6 +17,17 @@ export const GLOB_PATTERNS = [
 
 export const IGNORE = ["**/node_modules/**", "**/dist/**", "**/.git/**", "**/.cal/**", "**/.local/**"];
 
+export const IDEOLOGY_PROMPT_FRAMEWORK = `
+You are generating a knowledge/policy implementation prompt for ideology-pressure guidance.
+Keep maturity diagnostic/reduced-order, preserve agency, and require verification-first language.
+Translate active pressure context into:
+1. anchor-now guidance,
+2. avoid/escalate-later steps,
+3. verification checklist outputs, and
+4. artifact-oriented deliverables that can be reviewed without coercion.
+Always include: system advises, user decides.
+`.trim();
+
 export const PATCH_PROMPT_FRAMEWORK = `
 You are designing a Needle Hull Warp Bubble with a live energy pipeline that must feed a stable, adaptive field around a spacecraft.
 Brainstorm detailed approaches to:
@@ -113,8 +124,13 @@ export async function buildPatchPromptPresets(
     ? callpoints.map((cp) => `- ${cp.path} (${cp.updatedAt}): ${cp.snippet}`).join("\n")
     : "No recent physics/warp call points detected; focus on telemetry, pipeline stability, and repo experiments.";
   const targetPaths = collectTargetPaths(proposal);
+  const ideologyContext = (proposal.metadata as any)?.ideologyPressureContext;
+  const basePrompt = proposal.kind === "knowledge"
+    ? `${IDEOLOGY_PROMPT_FRAMEWORK}\nContext: ${JSON.stringify(ideologyContext ?? {}, null, 0)}`
+    : PATCH_PROMPT_FRAMEWORK;
+
   const { presets } = await smallLlmPatchPromptPresets({
-    basePrompt: PATCH_PROMPT_FRAMEWORK,
+    basePrompt,
     proposalTitle: proposal.title,
     repoContext,
     targetPaths,

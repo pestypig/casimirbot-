@@ -1524,6 +1524,14 @@
         {
           "rel": "see-also",
           "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "vanity-hazard"
+        },
+        {
+          "rel": "see-also",
+          "to": "financial-fog-warning"
         }
       ],
       "summary": "Design so capture is hard; predation is a systems bug, not a personnel issue.",
@@ -2740,7 +2748,7 @@
       "slug": "bodhisattva-craft",
       "title": "Bodhisattva Craft",
       "excerpt": "Logistics of compassion: move fuel from distant novae back to Sol to keep balance.",
-      "bodyMD": "Transport is our meditation. Every convoy is a mudra aligning engineering, attention, and relief.\n\nLedger discipline matters: duty, TS, and curvature budgets — each metric is a moral accounting entry.",
+      "bodyMD": "Transport is our meditation. Every convoy is a mudra aligning engineering, attention, and relief.\n\nLedger discipline matters: duty, TS, and curvature budgets \u2014 each metric is a moral accounting entry.",
       "tags": [
         "logistics",
         "ledger"
@@ -2856,7 +2864,7 @@
       "slug": "stewardship-ledger",
       "title": "Stewardship Ledger",
       "excerpt": "Duty stays green; TS stays high; compare kappa_drive vs kappa_body to prove average safety.",
-      "bodyMD": "Hold zeta ≤ 1 to keep curvature from cracking the hull or the vow.\n\nLight-crossing cadence (TS ≥ 1) is how relativity hears the average promise rather than the spikes.",
+      "bodyMD": "Hold zeta \u2264 1 to keep curvature from cracking the hull or the vow.\n\nLight-crossing cadence (TS \u2265 1) is how relativity hears the average promise rather than the spikes.",
       "tags": [
         "metrics",
         "discipline"
@@ -2972,7 +2980,7 @@
       "slug": "beginners-mind",
       "title": "Beginner's Mind",
       "excerpt": "Shoshin resists stagnation; we tune geometry so the vacuum keeps breathing cleanly.",
-      "bodyMD": "Gamma_geo ≥ 20 with a_eff near 0.984 nm: not just math, but a breathing space for attention.\n\nPort polishing, Q preservation, and healthy duty cycles are the same as protecting wonder.",
+      "bodyMD": "Gamma_geo \u2265 20 with a_eff near 0.984 nm: not just math, but a breathing space for attention.\n\nPort polishing, Q preservation, and healthy duty cycles are the same as protecting wonder.",
       "tags": [
         "shoshin",
         "geometry"
@@ -3092,7 +3100,7 @@
       "id": "inner-spark",
       "slug": "inner-spark",
       "title": "Inner Spark",
-      "excerpt": "Preserve wonder so real partnership — between humans or with spacetime — is possible.",
+      "excerpt": "Preserve wonder so real partnership \u2014 between humans or with spacetime \u2014 is possible.",
       "bodyMD": "A child's drive to stay whole mirrors our need to keep the warp bubble coherent.\n\nPresence is an engineering control loop: if you cannot stabilize your own signal, you cannot stabilize spacetime.",
       "tags": [
         "presence",
@@ -3134,7 +3142,7 @@
           }
         }
       ],
-      "summary": "Preserve wonder so real partnership — between humans or with spacetime — is possible.",
+      "summary": "Preserve wonder so real partnership \u2014 between humans or with spacetime \u2014 is possible.",
       "nodeType": "concept",
       "inputs": [],
       "outputs": [],
@@ -3428,7 +3436,7 @@
       "slug": "devotion-course",
       "title": "Devotion as Course Plotting",
       "excerpt": "Navigation is devotional math: the course is set by what we choose to protect.",
-      "bodyMD": "Project the pledge onto the stars — keep them shining and wonder unbroken.\n\nZen and spacetime meet when physics is wielded as compassion instead of conquest.",
+      "bodyMD": "Project the pledge onto the stars \u2014 keep them shining and wonder unbroken.\n\nZen and spacetime meet when physics is wielded as compassion instead of conquest.",
       "tags": [
         "navigation",
         "devotion"
@@ -3537,7 +3545,7 @@
       "id": "worldview-integrity",
       "slug": "worldview-integrity",
       "title": "Worldview Integrity",
-      "excerpt": "When evidence breaks the story, let the story break — not the people.",
+      "excerpt": "When evidence breaks the story, let the story break \u2014 not the people.",
       "bodyMD": "Self-deception is a private apocalypse: the world remains, but the map is gone.\n\nWe refuse to protect a worldview by sacrificing compassion or by manipulating others. If a model requires coercion to survive, it is already failing.\n\nOur method is simple: make claims that can be tested, keep the ledger, and revise without shame.\n\nSee [[node:stewardship-ledger]] for the operational guardrails and [[node:beginners-mind]] for the discipline of clean attention.",
       "tags": [
         "truth",
@@ -3588,7 +3596,7 @@
           }
         }
       ],
-      "summary": "When evidence breaks the story, let the story break — not the people.",
+      "summary": "When evidence breaks the story, let the story break \u2014 not the people.",
       "nodeType": "concept",
       "inputs": [],
       "outputs": [],
@@ -3685,6 +3693,14 @@
         {
           "rel": "see-also",
           "to": "integrity-protocols"
+        },
+        {
+          "rel": "see-also",
+          "to": "vanity-as-medium"
+        },
+        {
+          "rel": "see-also",
+          "to": "vanity-hazard"
         }
       ],
       "references": [
@@ -4013,7 +4029,7 @@
     {
       "id": "liveness-or-it-didnt-happen",
       "slug": "liveness-or-it-didnt-happen",
-      "title": "Liveness or It Didn’t Happen",
+      "title": "Liveness or It Didn\u2019t Happen",
       "excerpt": "No cached myths: prove liveness or mark stale.",
       "bodyMD": "A value that cannot be shown to update is not evidence.\n\nStability is good (noise dies out). Staleness is dangerous (myths look stable). So we always track **age** and label **stale** explicitly.\n\nThis is how we break generational feedback loops: we do not pass forward unlabeled snapshots.\n\nNext: [[node:voice-integrity]].",
       "tags": [
@@ -4127,6 +4143,14 @@
         {
           "rel": "parent",
           "to": "integrity-protocols"
+        },
+        {
+          "rel": "see-also",
+          "to": "reform-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "flattery-laundering-detection"
         }
       ],
       "references": [
@@ -4806,8 +4830,8 @@
       "id": "reciprocity-contract",
       "slug": "reciprocity-contract",
       "title": "Reciprocity Contract",
-      "excerpt": "Timing honesty: if burst < τLC, the average claim is not earned.",
-      "bodyMD": "Reciprocity is timing honesty.\n\n- If **burst ≥ τLC**, we can treat the cycle-average as meaningful.\n- If **burst < τLC**, we are sampling faster than the light-crossing time and the average claim is not earned.\n\nThis is not moralizing about speed. It is a guardrail against self-deception.\n\nSee [[node:stewardship-ledger]] and [[node:liveness-or-it-didnt-happen]].",
+      "excerpt": "Timing honesty: if burst < \u03c4LC, the average claim is not earned.",
+      "bodyMD": "Reciprocity is timing honesty.\n\n- If **burst \u2265 \u03c4LC**, we can treat the cycle-average as meaningful.\n- If **burst < \u03c4LC**, we are sampling faster than the light-crossing time and the average claim is not earned.\n\nThis is not moralizing about speed. It is a guardrail against self-deception.\n\nSee [[node:stewardship-ledger]] and [[node:liveness-or-it-didnt-happen]].",
       "tags": [
         "reciprocity",
         "timing",
@@ -4843,7 +4867,7 @@
           }
         }
       ],
-      "summary": "Timing honesty: if burst < τLC, the average claim is not earned.",
+      "summary": "Timing honesty: if burst < \u03c4LC, the average claim is not earned.",
       "nodeType": "concept",
       "inputs": [],
       "outputs": [],
@@ -4918,7 +4942,7 @@
       "slug": "phoenix-averaging",
       "title": "Phoenix Averaging",
       "excerpt": "Step back: choose the right window to see the real signal.",
-      "bodyMD": "Solitude in a system is a windowed average.\n\nInstant readings are useful, but easy to manipulate and easy to misread. The cure is to step back to the correct window: instant, τLC, burst, or one-sector.\n\nInnovation stays constructive when the window matches the claim.\n\nSee [[node:beginners-mind]] and [[node:stewardship-ledger]].",
+      "bodyMD": "Solitude in a system is a windowed average.\n\nInstant readings are useful, but easy to manipulate and easy to misread. The cure is to step back to the correct window: instant, \u03c4LC, burst, or one-sector.\n\nInnovation stays constructive when the window matches the claim.\n\nSee [[node:beginners-mind]] and [[node:stewardship-ledger]].",
       "tags": [
         "averaging",
         "signal",
@@ -6434,6 +6458,344 @@
           "path": "docs/ethos/ideology-telemetry-schema.json",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "vanity-as-medium",
+      "slug": "vanity-as-medium",
+      "title": "Vanity as Medium",
+      "excerpt": "Use surface signals as communication media, not as identity verdicts.",
+      "bodyMD": "Appearance can carry information without defining worth. Treat style as a medium for context, not as a claim about human value.\n\nProtocol: use surface, anchor vow. Verify actions against values before reacting to praise or criticism.\n\nSee [[node:values-over-images]], [[node:voice-integrity]], and [[node:vanity-hazard]].",
+      "tags": [
+        "ideology",
+        "vanity",
+        "verification-first"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "values-over-images"
+        },
+        {
+          "rel": "see-also",
+          "to": "voice-integrity"
+        },
+        {
+          "rel": "see-also",
+          "to": "vanity-hazard"
+        },
+        {
+          "rel": "see-also",
+          "to": "reform-loop"
+        }
+      ],
+      "summary": "Use surface signals as communication media, not as identity verdicts.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "values-over-images"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "contains": "vanity-as-medium"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "vanity-hazard",
+      "slug": "vanity-hazard",
+      "title": "Vanity Hazard",
+      "excerpt": "When image pressure outruns evidence, manipulation risk rises.",
+      "bodyMD": "Vanity pressure can be exploited through flattery, urgency, and status competition. Treat these as signals to slow down and verify.\n\nNonviolent response: pause, set boundaries, and request verifiable facts.\n\nSee [[node:capture-resistance]], [[node:flattery-laundering-detection]], and [[node:financial-fog-warning]].",
+      "tags": [
+        "ideology",
+        "hazard",
+        "capture-resistance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "capture-resistance"
+        },
+        {
+          "rel": "see-also",
+          "to": "values-over-images"
+        },
+        {
+          "rel": "see-also",
+          "to": "flattery-laundering-detection"
+        },
+        {
+          "rel": "see-also",
+          "to": "financial-fog-warning"
+        }
+      ],
+      "summary": "When image pressure outruns evidence, manipulation risk rises.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "capture-resistance"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "contains": "vanity-hazard"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "reform-loop",
+      "slug": "reform-loop",
+      "title": "Reform Loop",
+      "excerpt": "Iterate with verification, not reactivity.",
+      "bodyMD": "Reform is a repeatable loop: observe pressure, choose a boundary, verify evidence, and update behavior.\n\nThe loop protects agency by keeping decisions explicit and reviewable over time.\n\nSee [[node:verification-checklist]], [[node:voice-integrity]], and [[node:vanity-as-medium]].",
+      "tags": [
+        "ideology",
+        "reform",
+        "loop"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "voice-integrity"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "vanity-as-medium"
+        }
+      ],
+      "summary": "Iterate with verification, not reactivity.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "voice-integrity"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "contains": "reform-loop"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "flattery-laundering-detection",
+      "slug": "flattery-laundering-detection",
+      "title": "Flattery Laundering Detection",
+      "excerpt": "Compliments can be sincere or can launder pressure into compliance.",
+      "bodyMD": "Detect laundering patterns: rapid praise, urgency, isolation prompts, and asks that bypass verification.\n\nGuidance stays advisory: system advises, user decides.\n\nSee [[node:voice-integrity]], [[node:capture-resistance]], and [[node:financial-fog-warning]].",
+      "tags": [
+        "ideology",
+        "flattery",
+        "verification-first"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "voice-integrity"
+        },
+        {
+          "rel": "see-also",
+          "to": "capture-resistance"
+        },
+        {
+          "rel": "see-also",
+          "to": "financial-fog-warning"
+        }
+      ],
+      "summary": "Compliments can be sincere or can launder pressure into compliance.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "voice-integrity"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "contains": "flattery-laundering-detection"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "financial-fog-warning",
+      "slug": "financial-fog-warning",
+      "title": "Financial Fog Warning",
+      "excerpt": "High-pressure money asks require a fail-closed verification path.",
+      "bodyMD": "When financial asks arrive with secrecy, urgency, or romance pressure, default to verification-first guidance.\n\nNever treat attention momentum as due diligence. Preserve agency by requiring independent checks before any action.\n\nSee [[node:verification-checklist]], [[node:capture-resistance]], and [[node:flattery-laundering-detection]].",
+      "tags": [
+        "ideology",
+        "finance",
+        "warning"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "capture-resistance"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "flattery-laundering-detection"
+        }
+      ],
+      "summary": "High-pressure money asks require a fail-closed verification path.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "capture-resistance"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "contains": "financial-fog-warning"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json"
         }
       ],
       "predictability": {

@@ -36,6 +36,30 @@ export type IdeologyArtifactSearchResponse = {
 
 export const IDEOLOGY_ARTIFACTS: IdeologyArtifact[] = [
   {
+    id: "vanity-leverage/protocol-pill",
+    title: "Use surface, anchor vow",
+    summary: "A compact reminder: treat image as medium, then verify before acting.",
+    body: "Pause, name pressure, and route decisions through verification-first checks.",
+    tags: ["vanity", "guidance", "protocol", "guidance-endpoint"],
+    panelId: "mission-ethos",
+    nodeId: "vanity-as-medium",
+    exportKind: "pill",
+    exportTargetId: "vanity-protocol-pill",
+    formats: ["png", "svg"]
+  },
+  {
+    id: "vanity-leverage/financial-fog-node-card",
+    title: "Financial fog warning",
+    summary: "Node card for high-pressure money asks with secrecy or urgency.",
+    body: "If attention momentum is steering the decision, stop and require independent verification.",
+    tags: ["vanity", "finance", "guidance", "guidance-endpoint"],
+    panelId: "mission-ethos",
+    nodeId: "financial-fog-warning",
+    exportKind: "node-card",
+    exportTargetId: "financial-fog-warning-card",
+    formats: ["png", "svg", "md"]
+  },
+  {
     id: "citizens-arc/societal-view",
     title: "Societal view",
     summary:
