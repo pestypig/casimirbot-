@@ -1,0 +1,16 @@
+{
+  "variant": "helix_relation_recovery_stabilized_t02",
+  "commit": "8b119ac",
+  "run_id": "2026-02-21T15-30-30-831Z",
+  "result_type": "needs_quality_patch",
+  "blockers": [
+    "novel_response_rate 0.250 < 0.820",
+    "novel_response_rate_relation 0.250 < 0.800",
+    "novel_response_rate_repo_technical 0.167 < 0.850",
+    "novel_response_rate_ambiguous_general 0.333 < 0.750"
+  ],
+  "recommendations": [
+    "Patch citation persistence and minimum answer length handling.",
+    "Re-run utility A/B and compare deltas on citation and length pass rates."
+  ]
+}

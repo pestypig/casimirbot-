@@ -1,0 +1,90 @@
+{
+  "summary_schema_version": 2,
+  "run_id": "versatility-1771688085174",
+  "decision": "blocked_provenance",
+  "decision_grade_ready": false,
+  "provenance_blocked": true,
+  "provenance_blocker_reason": "BLOCKER_PROVENANCE_ORIGIN_REMOTE_MISSING",
+  "artifact_bundle_paths": {
+    "output_root_dir": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow",
+    "output_run_dir": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174",
+    "summary": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/summary.json",
+    "recommendation": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/recommendation.json",
+    "failures": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/failures.json",
+    "checkpoint": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/checkpoint.json",
+    "prompts": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/prompts.jsonl",
+    "raw_dir": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/raw",
+    "ab_outputs": [],
+    "trace_export": null
+  },
+  "diagnostics": {
+    "rollup": {
+      "report_mode_correct": {
+        "pass": 135,
+        "fail": 0,
+        "unknown": 0
+      },
+      "relation_packet_built": {
+        "pass": 45,
+        "fail": 0,
+        "unknown": 90
+      },
+      "relation_dual_domain_ok": {
+        "pass": 45,
+        "fail": 0,
+        "unknown": 90
+      }
+    }
+  },
+  "rationale": [
+    "provenance_gate_pass=false",
+    "provenance_blocker_reason=BLOCKER_PROVENANCE_ORIGIN_REMOTE_MISSING",
+    "decision_grade_ready=false",
+    "git_branch=work",
+    "git_head=8b119ac",
+    "git_origin_main=missing",
+    "git_ahead_behind=missing",
+    "run_complete=true",
+    "expected_runs=135",
+    "total_runs=135",
+    "terminated_early_reason=none",
+    "global_cooldown_applied_ms=0",
+    "resumed_from_latest=false",
+    "resumed_runs=0",
+    "stub_text_detected_rate=0.000",
+    "relation_packet_built_rate=1.000",
+    "relation_dual_domain_ok_rate=1.000",
+    "report_mode_correct_rate=1.000",
+    "min_text_length_pass_rate=1.000"
+  ],
+  "next_patches": [
+    {
+      "order": 0,
+      "title": "Validation provenance gate",
+      "why": "Require origin/main + HEAD provenance in reports before accepting decision-grade outcomes."
+    },
+    {
+      "order": 1,
+      "title": "Relation-mode fallback hardening",
+      "why": "Increase deterministic fallback usage when relation intent is selected but generated answer omits warp/ethos linkage signals."
+    },
+    {
+      "order": 2,
+      "title": "Citation persistence guard",
+      "why": "Guarantee hybrid/repo responses keep at least one valid Sources line after final cleanup and repairs."
+    },
+    {
+      "order": 3,
+      "title": "Stub environment policy split",
+      "why": "Separate decision-grade campaigns from stub-mode smoke runs to avoid polluted quality metrics."
+    }
+  ],
+  "hard_blockers": [
+    {
+      "kind": "provenance",
+      "severity": "HARD",
+      "reason": "BLOCKER_PROVENANCE_ORIGIN_REMOTE_MISSING",
+      "blocks_ship": true
+    }
+  ]
+}
