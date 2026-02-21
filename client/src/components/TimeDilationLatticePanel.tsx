@@ -12,6 +12,7 @@ import { useCasimirTileSummary } from "@/hooks/useCasimirTileSummary";
 import { useGrConstraintContract } from "@/hooks/useGrConstraintContract";
 import { useProofPack } from "@/hooks/useProofPack";
 import { useLapseBrick } from "@/hooks/useLapseBrick";
+import { useSectorControlLive } from "@/hooks/use-sector-control-live";
 import { computeTimeDilationRenderPlan, type TimeDilationRenderUiToggles } from "@/lib/time-dilation-render-policy";
 import { getProofValue, readProofNumber, readProofString } from "@/lib/proof-pack";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
@@ -23,7 +24,7 @@ import { parseActivateContract } from "@/lib/time-dilation-activate-contract";
 import { buildGrAssistantSummary } from "@/lib/gr-assistant-summary";
 import { C } from "@/lib/physics-const";
 import { kappaDriveFromPower } from "@/physics/curvature";
-import type { GrRegionStats, HullPreviewPayload, ProofPack, TimeDilationRenderPlan } from "@shared/schema";
+import type { GrRegionStats, HullPreviewPayload, ProofPack, SectorControlLiveEvent, TimeDilationRenderPlan } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -208,25 +209,7 @@ type TimeDilationLatticePanelProps = {
   showDebug?: boolean;
 };
 
-type SectorControlLiveConstraints = Partial<
-  Record<"FordRomanQI" | "ThetaAudit" | "TS_ratio_min" | "VdB_band" | "grConstraintGate", "pass" | "fail" | "unknown">
->;
-
-type SectorControlLiveObserverGrid = {
-  overflowCount?: number;
-  paybackGain?: number;
-};
-
-type SectorControlLiveEvent = {
-  ts: number;
-  requestedMode?: string;
-  appliedMode?: string;
-  fallbackApplied?: boolean;
-  plannerMode?: string | null;
-  firstFail?: string | null;
-  constraints?: SectorControlLiveConstraints | null;
-  observerGrid?: SectorControlLiveObserverGrid | null;
-};
+type SectorControlLiveEventEnvelope = SectorControlLiveEvent & { source: "local" | "server" };
 
 type ActivationErrorState = {
   raw: string;
@@ -876,11 +859,11 @@ const normalizeSectorControlLiveEvent = (payload: unknown): SectorControlLiveEve
   const ts = parseFiniteNumber(raw.ts) ?? Date.now();
   const constraints =
     raw.constraints && typeof raw.constraints === "object"
-      ? (raw.constraints as SectorControlLiveConstraints)
+      ? (raw.constraints as SectorControlLiveEvent["constraints"])
       : null;
   const observerGrid =
     raw.observerGrid && typeof raw.observerGrid === "object"
-      ? (raw.observerGrid as SectorControlLiveObserverGrid)
+      ? (raw.observerGrid as SectorControlLiveEvent["observerGrid"])
       : null;
   return {
     ts,
@@ -2895,7 +2878,9 @@ function TimeDilationLatticePanelInner({
   const [casimirGammaVdB, setCasimirGammaVdB] = useState(0);
   const [casimirQSpoil, setCasimirQSpoil] = useState(1);
   const [visualTuning, setVisualTuning] = useState(DEFAULT_VISUAL_TUNING);
-  const [sectorControlLiveEvent, setSectorControlLiveEvent] = useState<SectorControlLiveEvent | null>(null);
+  const [localSectorControlLiveEvent, setLocalSectorControlLiveEvent] = useState<SectorControlLiveEvent | null>(null);
+  const [liveNowTs, setLiveNowTs] = useState(() => Date.now());
+  const sectorControlLiveQuery = useSectorControlLive(3000);
   const [lastReloadEvent, setLastReloadEvent] = useState<{ reason: string; ts: number } | null>(null);
   useEffect(() => {
     const handlerIds: string[] = [];
@@ -2903,7 +2888,7 @@ function TimeDilationLatticePanelInner({
       subscribe("warp:sector-control:plan", (payload: unknown) => {
         const next = normalizeSectorControlLiveEvent(payload);
         if (!next) return;
-        setSectorControlLiveEvent((prev) => (next.ts >= (prev?.ts ?? -1) ? next : prev));
+        setLocalSectorControlLiveEvent((prev) => (next.ts >= (prev?.ts ?? -1) ? next : prev));
       }),
     );
     handlerIds.push(
@@ -2924,7 +2909,7 @@ function TimeDilationLatticePanelInner({
               })
             : null;
         if (preflight) {
-          setSectorControlLiveEvent((prev) =>
+          setLocalSectorControlLiveEvent((prev) =>
             preflight.ts >= (prev?.ts ?? -1) ? preflight : prev,
           );
         }
@@ -2934,6 +2919,29 @@ function TimeDilationLatticePanelInner({
       handlerIds.forEach((id) => unsubscribe(id));
     };
   }, []);
+  useEffect(() => {
+    const timer = window.setInterval(() => setLiveNowTs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const serverSectorControlLiveEvent = useMemo(() => {
+    const event = sectorControlLiveQuery.data?.event;
+    if (!event) return null;
+    return normalizeSectorControlLiveEvent(event);
+  }, [sectorControlLiveQuery.data]);
+
+  const sectorControlLiveEvent = useMemo<SectorControlLiveEventEnvelope | null>(() => {
+    const localTs = localSectorControlLiveEvent?.ts ?? -1;
+    const serverTs = serverSectorControlLiveEvent?.ts ?? -1;
+    if (serverTs >= localTs && serverSectorControlLiveEvent) {
+      return { ...serverSectorControlLiveEvent, source: "server" };
+    }
+    if (localSectorControlLiveEvent) {
+      return { ...localSectorControlLiveEvent, source: "local" };
+    }
+    return null;
+  }, [localSectorControlLiveEvent, serverSectorControlLiveEvent]);
+
   useEffect(() => {
     setGrEnabled(true);
   }, []);
@@ -4153,6 +4161,13 @@ function TimeDilationLatticePanelInner({
     if (!lastReloadEvent) return null;
     return `reload ${lastReloadEvent.reason} @ ${formatEventTime(lastReloadEvent.ts)}`;
   }, [lastReloadEvent]);
+  const liveSourceLine = useMemo(() => {
+    if (!sectorControlLiveEvent) return null;
+    const ageMs = Math.max(0, liveNowTs - (sectorControlLiveEvent.ts ?? liveNowTs));
+    const ageS = Math.floor(ageMs / 1000);
+    const stale = ageMs > 15_000 ? "stale" : "fresh";
+    return `source=${sectorControlLiveEvent.source} age=${ageS}s ${stale}`;
+  }, [liveNowTs, sectorControlLiveEvent]);
 
   const hasHull = useMemo(() => {
     const nonDefault = !isDefaultHullAxes(hullBounds.axes);
@@ -6680,13 +6695,14 @@ function TimeDilationLatticePanelInner({
             <div>{telemetryTauLine}</div>
             {telemetryNoteLine ? <div>{telemetryNoteLine}</div> : null}
           </div>
-          {liveModeLine || liveGuardrailLine || liveObserverLine || liveReloadLine ? (
+          {liveModeLine || liveGuardrailLine || liveObserverLine || liveReloadLine || liveSourceLine ? (
             <div className="rounded border border-cyan-500/30 bg-cyan-950/20 px-2 py-[2px] text-right text-cyan-100">
               <div className="text-[9px] uppercase tracking-[0.2em] text-cyan-300">live events</div>
               {liveModeLine ? <div>{liveModeLine}</div> : null}
               {liveGuardrailLine ? <div>{liveGuardrailLine}</div> : null}
               {liveObserverLine ? <div>{liveObserverLine}</div> : null}
               {liveReloadLine ? <div>{liveReloadLine}</div> : null}
+              {liveSourceLine ? <div>{liveSourceLine}</div> : null}
             </div>
           ) : null}
           {tsMetricReason ? (

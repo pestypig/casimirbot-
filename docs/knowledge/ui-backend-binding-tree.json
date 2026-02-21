@@ -23,7 +23,8 @@
         "binding-hardware-telemetry",
         "binding-knowledge-docs",
         "binding-proof-verification",
-        "bridge-binding-energy-pipeline-binding-curvature-bricks"
+        "bridge-binding-energy-pipeline-binding-curvature-bricks",
+        "binding-time-dilation-live-events"
       ],
       "links": [],
       "summary": "Backend-to-UI dataflow for physics surfaces and verification panels.",
@@ -707,6 +708,63 @@
       ],
       "slug": "bridge-binding-energy-pipeline-binding-curvature-bricks",
       "summary": "Bridge between Energy Pipeline Binding and Curvature and GR Bricks."
+    },
+    {
+      "id": "binding-time-dilation-live-events",
+      "slug": "binding-time-dilation-live-events",
+      "title": "Time Dilation live-event binding",
+      "excerpt": "Server-authoritative sector-control live events merged with local bus events in Time Dilation panel.",
+      "bodyMD": "GET /api/helix/sector-control/live feeds client/src/hooks/use-sector-control-live.ts and is merged in client/src/components/TimeDilationLatticePanel.tsx.",
+      "tags": [
+        "ui",
+        "time_dilation",
+        "sector_control"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ui-backend-binding-tree"
+        }
+      ],
+      "summary": "Authoritative+local live event merge binding.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/helix-core.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-sector-control-live.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/TimeDilationLatticePanel.tsx"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "ui-backend-binding-tree"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
     }
   ],
   "schema": {

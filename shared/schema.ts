@@ -2941,6 +2941,21 @@ export const sectorControlConstraintsSchema = z.object({
   grConstraintGate: z.enum(["pass", "fail", "unknown"]),
 });
 
+export const sectorControlLiveEventSchema = z.object({
+  ts: z.number().nonnegative(),
+  requestedMode: z.string().optional(),
+  appliedMode: z.string().optional(),
+  fallbackApplied: z.boolean().optional(),
+  plannerMode: z.string().nullable().optional(),
+  firstFail: z.string().nullable().optional(),
+  constraints: sectorControlConstraintsSchema.partial().nullable().optional(),
+  observerGrid: sectorControlObserverGridSchema
+    .pick({ overflowCount: true, paybackGain: true })
+    .nullable()
+    .optional(),
+});
+export type SectorControlLiveEvent = z.infer<typeof sectorControlLiveEventSchema>;
+
 export const sectorControlPlanSchema = z.object({
   mode: sectorControlModeSchema,
   timing: sectorControlTimingSchema,

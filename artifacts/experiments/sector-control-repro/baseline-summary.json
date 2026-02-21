@@ -1,0 +1,614 @@
+{
+  "generatedAt": "2025-01-01T00:00:00.000Z",
+  "canonicalHash": "c7228280a6b3f334915306d4d8b7f442a847488f961bd0558d9bbcb032a4ca47",
+  "canonicalPayload": {
+    "version": 1,
+    "plannerTool": "physics.warp.sector_control.plan",
+    "matrix": [
+      {
+        "mode": "diagnostic",
+        "request": {
+          "timing": {
+            "strobeHz": 120,
+            "TS_ratio": 1.7,
+            "tauLC_ms": 10,
+            "tauPulse_ms": 2
+          },
+          "allocation": {
+            "sectorCount": 16,
+            "concurrentSectors": 3,
+            "negativeFraction": 0.25
+          },
+          "duty": {
+            "dutyCycle": 0.45,
+            "dutyBurst": 0.28,
+            "dutyShip": 0.18
+          }
+        },
+        "ok": true,
+        "firstFail": null,
+        "constraints": {
+          "FordRomanQI": "pass",
+          "ThetaAudit": "pass",
+          "TS_ratio_min": "pass",
+          "VdB_band": "unknown",
+          "grConstraintGate": "pass"
+        },
+        "observerGrid": {
+          "paybackGain": 1.1,
+          "paybackBudget_Jm3s": 0.0003543750000000001,
+          "overflowCount": 0,
+          "observers": [
+            {
+              "observerId": "hull_band",
+              "rho_Jm3": -0.23625000000000007,
+              "dt_ms": 2,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0.00016537500000000016,
+              "maxDebt_Jm3s": 0.35,
+              "requiredPayback_Jm3s": 0.0005197500000000002,
+              "paybackApplied_Jm3s": 0.0003543750000000001,
+              "paybackRatio": 0.6818181818181817,
+              "status": "pass"
+            },
+            {
+              "observerId": "ship_core",
+              "rho_Jm3": -0.10631250000000003,
+              "dt_ms": 2,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0,
+              "maxDebt_Jm3s": 0.2,
+              "requiredPayback_Jm3s": 0.0002338875000000001,
+              "paybackApplied_Jm3s": 0.00040753125000000007,
+              "paybackRatio": 1.742424242424242,
+              "status": "pass"
+            },
+            {
+              "observerId": "far_field",
+              "rho_Jm3": 0.047250000000000014,
+              "dt_ms": 2,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0,
+              "maxDebt_Jm3s": 0.45,
+              "requiredPayback_Jm3s": 0,
+              "paybackApplied_Jm3s": 0.0005551875000000001,
+              "paybackRatio": 1,
+              "status": "pass"
+            }
+          ]
+        },
+        "plan": {
+          "mode": "diagnostic",
+          "timing": {
+            "strobeHz": 120,
+            "sectorPeriod_ms": 8.333,
+            "TS_ratio": 1.7,
+            "tauLC_ms": 10,
+            "tauPulse_ms": 2
+          },
+          "allocation": {
+            "sectorCount": 16,
+            "concurrentSectors": 3,
+            "negativeFraction": 0.25,
+            "negSectors": 4,
+            "posSectors": 12
+          },
+          "duty": {
+            "dutyCycle": 0.45,
+            "dutyBurst": 0.28,
+            "dutyEffective_FR": 0.023625000000000007,
+            "dutyShip": 0.18
+          },
+          "observerGrid": {
+            "paybackGain": 1.1,
+            "paybackBudget_Jm3s": 0.0003543750000000001,
+            "overflowCount": 0,
+            "observers": [
+              {
+                "observerId": "hull_band",
+                "rho_Jm3": -0.23625000000000007,
+                "dt_ms": 2,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0.00016537500000000016,
+                "maxDebt_Jm3s": 0.35,
+                "requiredPayback_Jm3s": 0.0005197500000000002,
+                "paybackApplied_Jm3s": 0.0003543750000000001,
+                "paybackRatio": 0.6818181818181817,
+                "status": "pass"
+              },
+              {
+                "observerId": "ship_core",
+                "rho_Jm3": -0.10631250000000003,
+                "dt_ms": 2,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0,
+                "maxDebt_Jm3s": 0.2,
+                "requiredPayback_Jm3s": 0.0002338875000000001,
+                "paybackApplied_Jm3s": 0.00040753125000000007,
+                "paybackRatio": 1.742424242424242,
+                "status": "pass"
+              },
+              {
+                "observerId": "far_field",
+                "rho_Jm3": 0.047250000000000014,
+                "dt_ms": 2,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0,
+                "maxDebt_Jm3s": 0.45,
+                "requiredPayback_Jm3s": 0,
+                "paybackApplied_Jm3s": 0.0005551875000000001,
+                "paybackRatio": 1,
+                "status": "pass"
+              }
+            ]
+          },
+          "constraints": {
+            "FordRomanQI": "pass",
+            "ThetaAudit": "pass",
+            "TS_ratio_min": "pass",
+            "VdB_band": "unknown",
+            "grConstraintGate": "pass"
+          },
+          "objective": "Baseline diagnostic planner replay for sector-strobed Natario/Casimir mapping.",
+          "maturity": "diagnostic",
+          "notes": [
+            "Non-certifying planner output."
+          ]
+        }
+      },
+      {
+        "mode": "qi_conservative",
+        "request": {
+          "timing": {
+            "strobeHz": 180,
+            "TS_ratio": 2.2,
+            "tauLC_ms": 8,
+            "tauPulse_ms": 1.2
+          },
+          "allocation": {
+            "sectorCount": 24,
+            "concurrentSectors": 2,
+            "negativeFraction": 0.15
+          },
+          "duty": {
+            "dutyCycle": 0.35,
+            "dutyBurst": 0.16,
+            "dutyShip": 0.1
+          }
+        },
+        "ok": true,
+        "firstFail": null,
+        "constraints": {
+          "FordRomanQI": "pass",
+          "ThetaAudit": "pass",
+          "TS_ratio_min": "pass",
+          "VdB_band": "unknown",
+          "grConstraintGate": "pass"
+        },
+        "observerGrid": {
+          "paybackGain": 1.1,
+          "paybackBudget_Jm3s": 0.000046666666666666665,
+          "overflowCount": 0,
+          "observers": [
+            {
+              "observerId": "hull_band",
+              "rho_Jm3": -0.04666666666666666,
+              "dt_ms": 1.2,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0.000014933333333333328,
+              "maxDebt_Jm3s": 0.35,
+              "requiredPayback_Jm3s": 0.00006159999999999999,
+              "paybackApplied_Jm3s": 0.000046666666666666665,
+              "paybackRatio": 0.7575757575757577,
+              "status": "pass"
+            },
+            {
+              "observerId": "ship_core",
+              "rho_Jm3": -0.020999999999999998,
+              "dt_ms": 1.2,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0,
+              "maxDebt_Jm3s": 0.2,
+              "requiredPayback_Jm3s": 0.00002772,
+              "paybackApplied_Jm3s": 0.00005366666666666666,
+              "paybackRatio": 1.9360269360269358,
+              "status": "pass"
+            },
+            {
+              "observerId": "far_field",
+              "rho_Jm3": 0.009333333333333332,
+              "dt_ms": 1.2,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0,
+              "maxDebt_Jm3s": 0.45,
+              "requiredPayback_Jm3s": 0,
+              "paybackApplied_Jm3s": 0.00007186666666666666,
+              "paybackRatio": 1,
+              "status": "pass"
+            }
+          ]
+        },
+        "plan": {
+          "mode": "qi_conservative",
+          "timing": {
+            "strobeHz": 180,
+            "sectorPeriod_ms": 8.333,
+            "TS_ratio": 2.2,
+            "tauLC_ms": 8,
+            "tauPulse_ms": 1.2
+          },
+          "allocation": {
+            "sectorCount": 24,
+            "concurrentSectors": 2,
+            "negativeFraction": 0.15,
+            "negSectors": 4,
+            "posSectors": 20
+          },
+          "duty": {
+            "dutyCycle": 0.35,
+            "dutyBurst": 0.16,
+            "dutyEffective_FR": 0.004666666666666666,
+            "dutyShip": 0.1
+          },
+          "observerGrid": {
+            "paybackGain": 1.1,
+            "paybackBudget_Jm3s": 0.000046666666666666665,
+            "overflowCount": 0,
+            "observers": [
+              {
+                "observerId": "hull_band",
+                "rho_Jm3": -0.04666666666666666,
+                "dt_ms": 1.2,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0.000014933333333333328,
+                "maxDebt_Jm3s": 0.35,
+                "requiredPayback_Jm3s": 0.00006159999999999999,
+                "paybackApplied_Jm3s": 0.000046666666666666665,
+                "paybackRatio": 0.7575757575757577,
+                "status": "pass"
+              },
+              {
+                "observerId": "ship_core",
+                "rho_Jm3": -0.020999999999999998,
+                "dt_ms": 1.2,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0,
+                "maxDebt_Jm3s": 0.2,
+                "requiredPayback_Jm3s": 0.00002772,
+                "paybackApplied_Jm3s": 0.00005366666666666666,
+                "paybackRatio": 1.9360269360269358,
+                "status": "pass"
+              },
+              {
+                "observerId": "far_field",
+                "rho_Jm3": 0.009333333333333332,
+                "dt_ms": 1.2,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0,
+                "maxDebt_Jm3s": 0.45,
+                "requiredPayback_Jm3s": 0,
+                "paybackApplied_Jm3s": 0.00007186666666666666,
+                "paybackRatio": 1,
+                "status": "pass"
+              }
+            ]
+          },
+          "constraints": {
+            "FordRomanQI": "pass",
+            "ThetaAudit": "pass",
+            "TS_ratio_min": "pass",
+            "VdB_band": "unknown",
+            "grConstraintGate": "pass"
+          },
+          "objective": "QI-first conservative profile with tighter negative fraction and shorter pulse windows.",
+          "maturity": "diagnostic",
+          "notes": [
+            "Non-certifying planner output."
+          ]
+        }
+      },
+      {
+        "mode": "stability_scan",
+        "request": {
+          "timing": {
+            "strobeHz": 140,
+            "TS_ratio": 1.9,
+            "tauLC_ms": 9,
+            "tauPulse_ms": 1.8
+          },
+          "allocation": {
+            "sectorCount": 24,
+            "concurrentSectors": 4,
+            "negativeFraction": 0.22
+          },
+          "duty": {
+            "dutyCycle": 0.42,
+            "dutyBurst": 0.24,
+            "dutyShip": 0.16
+          }
+        },
+        "ok": true,
+        "firstFail": null,
+        "constraints": {
+          "FordRomanQI": "pass",
+          "ThetaAudit": "pass",
+          "TS_ratio_min": "pass",
+          "VdB_band": "unknown",
+          "grConstraintGate": "pass"
+        },
+        "observerGrid": {
+          "paybackGain": 1.1,
+          "paybackBudget_Jm3s": 0.0002393999999999999,
+          "overflowCount": 0,
+          "observers": [
+            {
+              "observerId": "hull_band",
+              "rho_Jm3": -0.16799999999999995,
+              "dt_ms": 1.8,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0.00009324000000000002,
+              "maxDebt_Jm3s": 0.35,
+              "requiredPayback_Jm3s": 0.00033263999999999993,
+              "paybackApplied_Jm3s": 0.0002393999999999999,
+              "paybackRatio": 0.7196969696969696,
+              "status": "pass"
+            },
+            {
+              "observerId": "ship_core",
+              "rho_Jm3": -0.07559999999999999,
+              "dt_ms": 1.8,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0,
+              "maxDebt_Jm3s": 0.2,
+              "requiredPayback_Jm3s": 0.000149688,
+              "paybackApplied_Jm3s": 0.00027530999999999986,
+              "paybackRatio": 1.8392255892255882,
+              "status": "pass"
+            },
+            {
+              "observerId": "far_field",
+              "rho_Jm3": 0.03359999999999999,
+              "dt_ms": 1.8,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0,
+              "maxDebt_Jm3s": 0.45,
+              "requiredPayback_Jm3s": 0,
+              "paybackApplied_Jm3s": 0.0003716999999999999,
+              "paybackRatio": 1,
+              "status": "pass"
+            }
+          ]
+        },
+        "plan": {
+          "mode": "stability_scan",
+          "timing": {
+            "strobeHz": 140,
+            "sectorPeriod_ms": 8.333,
+            "TS_ratio": 1.9,
+            "tauLC_ms": 9,
+            "tauPulse_ms": 1.8
+          },
+          "allocation": {
+            "sectorCount": 24,
+            "concurrentSectors": 4,
+            "negativeFraction": 0.22,
+            "negSectors": 5,
+            "posSectors": 19
+          },
+          "duty": {
+            "dutyCycle": 0.42,
+            "dutyBurst": 0.24,
+            "dutyEffective_FR": 0.016799999999999995,
+            "dutyShip": 0.16
+          },
+          "observerGrid": {
+            "paybackGain": 1.1,
+            "paybackBudget_Jm3s": 0.0002393999999999999,
+            "overflowCount": 0,
+            "observers": [
+              {
+                "observerId": "hull_band",
+                "rho_Jm3": -0.16799999999999995,
+                "dt_ms": 1.8,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0.00009324000000000002,
+                "maxDebt_Jm3s": 0.35,
+                "requiredPayback_Jm3s": 0.00033263999999999993,
+                "paybackApplied_Jm3s": 0.0002393999999999999,
+                "paybackRatio": 0.7196969696969696,
+                "status": "pass"
+              },
+              {
+                "observerId": "ship_core",
+                "rho_Jm3": -0.07559999999999999,
+                "dt_ms": 1.8,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0,
+                "maxDebt_Jm3s": 0.2,
+                "requiredPayback_Jm3s": 0.000149688,
+                "paybackApplied_Jm3s": 0.00027530999999999986,
+                "paybackRatio": 1.8392255892255882,
+                "status": "pass"
+              },
+              {
+                "observerId": "far_field",
+                "rho_Jm3": 0.03359999999999999,
+                "dt_ms": 1.8,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0,
+                "maxDebt_Jm3s": 0.45,
+                "requiredPayback_Jm3s": 0,
+                "paybackApplied_Jm3s": 0.0003716999999999999,
+                "paybackRatio": 1,
+                "status": "pass"
+              }
+            ]
+          },
+          "constraints": {
+            "FordRomanQI": "pass",
+            "ThetaAudit": "pass",
+            "TS_ratio_min": "pass",
+            "VdB_band": "unknown",
+            "grConstraintGate": "pass"
+          },
+          "objective": "Stability sweep envelope with moderate concurrency and conservative duty dynamics.",
+          "maturity": "diagnostic",
+          "notes": [
+            "Non-certifying planner output."
+          ]
+        }
+      },
+      {
+        "mode": "theta_balanced",
+        "request": {
+          "timing": {
+            "strobeHz": 150,
+            "TS_ratio": 1.8,
+            "tauLC_ms": 9,
+            "tauPulse_ms": 1.6
+          },
+          "allocation": {
+            "sectorCount": 24,
+            "concurrentSectors": 5,
+            "negativeFraction": 0.3
+          },
+          "duty": {
+            "dutyCycle": 0.52,
+            "dutyBurst": 0.32,
+            "dutyShip": 0.22
+          }
+        },
+        "ok": true,
+        "firstFail": null,
+        "constraints": {
+          "FordRomanQI": "pass",
+          "ThetaAudit": "pass",
+          "TS_ratio_min": "pass",
+          "VdB_band": "unknown",
+          "grConstraintGate": "pass"
+        },
+        "observerGrid": {
+          "paybackGain": 1.1,
+          "paybackBudget_Jm3s": 0.000392888888888889,
+          "overflowCount": 0,
+          "observers": [
+            {
+              "observerId": "hull_band",
+              "rho_Jm3": -0.34666666666666673,
+              "dt_ms": 1.6,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0.00021724444444444458,
+              "maxDebt_Jm3s": 0.35,
+              "requiredPayback_Jm3s": 0.0006101333333333336,
+              "paybackApplied_Jm3s": 0.000392888888888889,
+              "paybackRatio": 0.6439393939393939,
+              "status": "pass"
+            },
+            {
+              "observerId": "ship_core",
+              "rho_Jm3": -0.15600000000000003,
+              "dt_ms": 1.6,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0,
+              "maxDebt_Jm3s": 0.2,
+              "requiredPayback_Jm3s": 0.0002745600000000001,
+              "paybackApplied_Jm3s": 0.00045182222222222234,
+              "paybackRatio": 1.6456228956228955,
+              "status": "pass"
+            },
+            {
+              "observerId": "far_field",
+              "rho_Jm3": 0.06933333333333334,
+              "dt_ms": 1.6,
+              "debtBefore_Jm3s": 0,
+              "debtAfter_Jm3s": 0,
+              "maxDebt_Jm3s": 0.45,
+              "requiredPayback_Jm3s": 0,
+              "paybackApplied_Jm3s": 0.0006216888888888892,
+              "paybackRatio": 1,
+              "status": "pass"
+            }
+          ]
+        },
+        "plan": {
+          "mode": "theta_balanced",
+          "timing": {
+            "strobeHz": 150,
+            "sectorPeriod_ms": 8.333,
+            "TS_ratio": 1.8,
+            "tauLC_ms": 9,
+            "tauPulse_ms": 1.6
+          },
+          "allocation": {
+            "sectorCount": 24,
+            "concurrentSectors": 5,
+            "negativeFraction": 0.3,
+            "negSectors": 7,
+            "posSectors": 17
+          },
+          "duty": {
+            "dutyCycle": 0.52,
+            "dutyBurst": 0.32,
+            "dutyEffective_FR": 0.03466666666666667,
+            "dutyShip": 0.22
+          },
+          "observerGrid": {
+            "paybackGain": 1.1,
+            "paybackBudget_Jm3s": 0.000392888888888889,
+            "overflowCount": 0,
+            "observers": [
+              {
+                "observerId": "hull_band",
+                "rho_Jm3": -0.34666666666666673,
+                "dt_ms": 1.6,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0.00021724444444444458,
+                "maxDebt_Jm3s": 0.35,
+                "requiredPayback_Jm3s": 0.0006101333333333336,
+                "paybackApplied_Jm3s": 0.000392888888888889,
+                "paybackRatio": 0.6439393939393939,
+                "status": "pass"
+              },
+              {
+                "observerId": "ship_core",
+                "rho_Jm3": -0.15600000000000003,
+                "dt_ms": 1.6,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0,
+                "maxDebt_Jm3s": 0.2,
+                "requiredPayback_Jm3s": 0.0002745600000000001,
+                "paybackApplied_Jm3s": 0.00045182222222222234,
+                "paybackRatio": 1.6456228956228955,
+                "status": "pass"
+              },
+              {
+                "observerId": "far_field",
+                "rho_Jm3": 0.06933333333333334,
+                "dt_ms": 1.6,
+                "debtBefore_Jm3s": 0,
+                "debtAfter_Jm3s": 0,
+                "maxDebt_Jm3s": 0.45,
+                "requiredPayback_Jm3s": 0,
+                "paybackApplied_Jm3s": 0.0006216888888888892,
+                "paybackRatio": 1,
+                "status": "pass"
+              }
+            ]
+          },
+          "constraints": {
+            "FordRomanQI": "pass",
+            "ThetaAudit": "pass",
+            "TS_ratio_min": "pass",
+            "VdB_band": "unknown",
+            "grConstraintGate": "pass"
+          },
+          "objective": "Theta-balanced control profile for stronger tracking under explicit guardrail checks.",
+          "maturity": "diagnostic",
+          "notes": [
+            "Non-certifying planner output."
+          ]
+        }
+      }
+    ]
+  }
+}

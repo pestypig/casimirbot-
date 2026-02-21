@@ -770,6 +770,21 @@ describe("sector-control runtime graph tree routing", () => {
     expect((framework?.scaffoldText ?? "").toLowerCase()).toContain("sector");
     expect((framework?.scaffoldText ?? "").toLowerCase()).toContain("time");
   });
+  it("includes lane-specific evidence references for sector-control runtime scaffolds", () => {
+    const pack = resolveHelixAskGraphPack({
+      question: "Show sector-control runtime lane evidence for time-dilation live event binding and repro script checks",
+      topicTags: ["warp", "physics", "helix_ask"],
+      lockedTreeIds: ["sector-control-runtime"],
+    });
+
+    const framework = pack?.frameworks.find((entry) => entry.treeId === "sector-control-runtime");
+    expect(framework).toBeTruthy();
+    const scaffold = (framework?.scaffoldText ?? "").toLowerCase();
+    expect(scaffold).toContain("sector-control");
+    expect(scaffold).toContain("time");
+    expect(framework?.sourcePath).toContain("sector-control-runtime-tree.json");
+  });
+
 });
 
 describe("runtime safety gate validator", () => {

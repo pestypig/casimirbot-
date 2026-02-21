@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sectorControlPlanSchema, sectorControlRationaleSchema } from "../shared/schema";
+import { sectorControlLiveEventSchema, sectorControlPlanSchema, sectorControlRationaleSchema } from "../shared/schema";
 
 describe("sectorControlPlanSchema", () => {
   it("accepts complete sector-control plans", () => {
@@ -76,5 +76,24 @@ describe("sectorControlRationaleSchema", () => {
     });
 
     expect(payload.citations).toHaveLength(1);
+  });
+});
+
+
+describe("sectorControlLiveEventSchema", () => {
+  it("accepts server-authoritative live event payloads", () => {
+    const parsed = sectorControlLiveEventSchema.parse({
+      ts: 1735689600000,
+      requestedMode: "cruise",
+      appliedMode: "nearzero",
+      fallbackApplied: true,
+      plannerMode: "qi_conservative",
+      firstFail: "FordRomanQI",
+      constraints: { FordRomanQI: "fail", ThetaAudit: "pass" },
+      observerGrid: { overflowCount: 2, paybackGain: 1.25 },
+    });
+
+    expect(parsed.observerGrid?.overflowCount).toBe(2);
+    expect(parsed.constraints?.FordRomanQI).toBe("fail");
   });
 });

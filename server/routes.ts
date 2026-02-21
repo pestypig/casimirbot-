@@ -1096,6 +1096,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     ingestHardwareQiSample,
     cancelVacuumGapSweep,
     switchOperationalMode,
+    getSectorControlLiveEvent,
     getEnergySnapshot,
     getCurvatureBrick,
     getStressEnergyBrick,
@@ -1337,6 +1338,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.post("/api/helix/pipeline/mode", switchOperationalMode);
   // Alias for HelixCasimirAmplifier component mode switching
   app.post("/api/helix/mode", switchOperationalMode);
+  app.get("/api/helix/sector-control/live", getSectorControlLiveEvent);
   app.get("/api/helix/curvature-brick", getCurvatureBrick);
   app.post("/api/helix/curvature-brick", getCurvatureBrick);
   app.get("/api/helix/stress-energy-brick", getStressEnergyBrick);
