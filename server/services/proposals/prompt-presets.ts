@@ -126,7 +126,7 @@ ${SECTOR_CONTROL_PROMPT}`
     : PATCH_PROMPT_FRAMEWORK;
 
   const { presets } = await smallLlmPatchPromptPresets({
-    basePrompt: PATCH_PROMPT_FRAMEWORK,
+    basePrompt,
     proposalTitle: proposal.title,
     repoContext,
     targetPaths,

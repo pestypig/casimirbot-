@@ -33,13 +33,14 @@ export const sectorControlPlanSpec: ToolSpecShape = {
   inputSchema,
   outputSchema: sectorControlPlanSchema,
   deterministic: true,
+  rateLimit: { rpm: 60 },
+  safety: { risks: [] },
   risk: { writesFiles: false, touchesNetwork: false, privileged: false },
   health: "ok",
 };
 
-export const sectorControlPlanHandler: ToolHandler<typeof inputSchema, typeof sectorControlPlanSchema> = async (
-  input,
-) => {
+export const sectorControlPlanHandler: ToolHandler = async (rawInput) => {
+  const input = inputSchema.parse(rawInput);
   const plan = buildSectorControlPlan({
     mode: input.mode,
     timing: input.overrides?.timing,
@@ -49,5 +50,5 @@ export const sectorControlPlanHandler: ToolHandler<typeof inputSchema, typeof se
   if (!plan.ok) {
     throw new Error(`tool_not_allowed:firstFail=${plan.firstFail}`);
   }
-  return plan.plan;
+  return sectorControlPlanSchema.parse(plan.plan);
 };

@@ -13,7 +13,7 @@
 | 6 | `a19e395` | done | planner/integration regression tests |
 | 7 | `f8e6234` | done | operator docs + troubleshooting |
 | 8 | `ea1d739` | done | proposal kind/preset/evidence hints wiring |
-| 9 | `TBD` | done | readiness synthesis + ledger closeout |
+| 9 | `5d94f07` | done | readiness synthesis + ledger closeout |
 
 ## Runtime-enforced guarantees
 

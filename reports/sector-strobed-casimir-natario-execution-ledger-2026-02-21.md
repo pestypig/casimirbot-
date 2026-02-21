@@ -24,7 +24,7 @@ Replay-auditable batch tracker for Prompt 0..9 implementation.
 | 6 | lane_validation | done | a19e395 | vitest touched test sweep; casimir:verify | PASS | null | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | adapter:03641003-a947-41f5-8ca4-53b62a99c7d2 | 7 |
 | 7 | lane_validation | done | f8e6234 | casimir:verify | PASS | null | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | adapter:bc33381a-819d-48c6-9c0c-c3ee1a4496c4 | 8 |
 | 8 | lane_schema_contract | done | ea1d739 | vitest proposal-job-runner; casimir:verify | PASS | null | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | adapter:4fdc3a46-0eda-49e9-a290-966362b9cf39 | 9 |
-| 9 | lane_validation | done | TBD | casimir:verify | PASS | null | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | adapter:8beb6edb-aa94-48a3-817e-c2642e311f03 | 10 |
+| 9 | lane_validation | done | 5d94f07 | casimir:verify | PASS | null | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | adapter:8beb6edb-aa94-48a3-817e-c2642e311f03 | 10 |
 
 ## Deterministic done checklist (per prompt)
 
