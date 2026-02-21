@@ -79,7 +79,7 @@ Initialize execution tracking for this batch and lock deterministic sequencing.
 
 Allowed paths:
 - docs/audits/research/vanity-reform-destiny-codex-cloud-autorun-batch-prompt-pack-2026-02-21.md
-- reports/vanity-reform-destiny-execution-ledger-2026-02-21.md (new)
+- reports/vanity-reform-destiny-execution-ledger-2026-02-21.md
 
 Requirements:
 1) Create ledger rows for Prompt 0..9 with status, commit hash, artifacts, Casimir fields.
@@ -377,3 +377,5 @@ Done criteria:
 8. `Prompt 7`
 9. `Prompt 8`
 10. `Prompt 9`
+
+Execution note (2026-02-21): Prompt 0 through Prompt 9 executed with one commit per prompt scope and Casimir PASS recorded per step.

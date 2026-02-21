@@ -7,6 +7,7 @@ import {
 import { saveConsoleTelemetry } from "../server/services/console-telemetry/store";
 import { collectPanelSnapshots } from "../server/services/telemetry/panels";
 import { ZEN_SOCIETY_STRICT_FAIL_REASON, searchIdeologyArtifacts } from "../server/services/ideology/artifacts";
+import { resolveIdeologyGuidance } from "../server/services/ideology/guidance";
 
 describe("ideology telemetry", () => {
   it("schema has core metrics and flags", () => {
@@ -55,6 +56,20 @@ describe("ideology telemetry", () => {
 
     const strict = searchIdeologyArtifacts({ limit: 1, strictProvenance: true });
     expect(strict.fail_reason).toBe(ZEN_SOCIETY_STRICT_FAIL_REASON);
+  });
+
+  it("resolves pressure bundles into deterministic ideology guidance", () => {
+    const result = resolveIdeologyGuidance({
+      activePressures: ["flattery_grooming", "financial_ask", "urgency_scarcity"],
+      observedSignals: ["rush", "private-chat"],
+      topK: 3,
+    });
+
+    expect(result.invariant).toBe("system advises, user decides.");
+    expect(result.detectedBundles).toContain("flattery-financial-urgency");
+    expect(result.recommendedNodeIds.length).toBeLessThanOrEqual(3);
+    expect(result.recommendedNodeIds).toContain("financial-fog-warning");
+    expect(result.suggestedVerificationSteps.length).toBeGreaterThan(0);
   });
 
 });

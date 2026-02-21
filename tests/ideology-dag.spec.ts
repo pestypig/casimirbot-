@@ -5,6 +5,7 @@ import {
   getIdeologyArtifactById,
   searchIdeologyArtifacts,
 } from "../server/services/ideology/artifacts";
+import { evaluatePressureBundleGate, IDEOLOGY_PRESSURE_REASON_CODES } from "../server/services/ideology/action-gates";
 
 const ideology = JSON.parse(readFileSync("docs/ethos/ideology.json", "utf-8"));
 const telemetryPath = "docs/ethos/ideology-telemetry-schema.json";
@@ -80,6 +81,21 @@ describe("ideology DAG evidence", () => {
     expect(byId?.provenance_class).toBe("inferred");
     expect(byId?.claim_tier).toBe("diagnostic");
     expect(byId?.certifying).toBe(false);
+  });
+
+  it("fails closed for high-risk pressure bundles with deterministic reason codes", () => {
+    const decision = evaluatePressureBundleGate([
+      "sexualized_attention",
+      "financial_ask",
+      "urgency_scarcity",
+    ]);
+    expect(decision.blocked).toBe(true);
+    expect(decision.warned).toBe(true);
+    expect(decision.reasonCodes).toContain(IDEOLOGY_PRESSURE_REASON_CODES.romanceInvestmentUrgency);
+
+    const baseline = evaluatePressureBundleGate(["status_competition"]);
+    expect(baseline.blocked).toBe(false);
+    expect(baseline.reasonCodes).toHaveLength(0);
   });
 
 });

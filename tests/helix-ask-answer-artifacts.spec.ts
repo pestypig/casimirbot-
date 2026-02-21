@@ -4,6 +4,7 @@ import { stripRunawayAnswerArtifacts } from "../server/services/helix-ask/answer
 import { __testScoreDeterministicClaimCitationLinkage } from "../server/routes/agi.plan";
 import { buildQualityBaselineContract } from "../scripts/helix-ask-sweep";
 import { evaluateClaimCitationLinkage } from "../server/services/helix-ask/query";
+import { getGuidanceArtifacts } from "../server/services/ideology/artifacts";
 
 describe("stripRunawayAnswerArtifacts", () => {
   it("removes leaked instruction preamble and trailing debug sections", () => {

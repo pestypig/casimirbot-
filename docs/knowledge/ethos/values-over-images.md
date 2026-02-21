@@ -9,3 +9,4 @@ mustIncludeFiles: ["docs/ethos/ideology.json", "docs/product-narrative.md"]
 ---
 Definition: Enduring values anchor the vow while images adapt to the moment.
 Notes: Tags: values, image, self, zen, constraints, adaptation.
+Cross-links: vanity-as-medium, vanity-hazard, reform-loop.

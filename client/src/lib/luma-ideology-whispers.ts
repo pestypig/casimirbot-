@@ -116,6 +116,18 @@ const PANEL_IDEOLOGY_MAP: Record<string, PanelWhisper> = {
     text: "Taskbar: anchor your workspace; keep the vow visible.",
     mood: "friend",
   },
+  "fashion-route": {
+    node: "values-over-images",
+    text: "Style is a language; keep consent and integrity visible while creating looks.",
+    mood: "friend",
+    tags: ["fashion", "integrity"],
+  },
+  "vanity-protocol": {
+    node: "vanity-as-medium",
+    text: "Use surface, anchor vow: style can signal context, but verification decides action.",
+    mood: "question",
+    tags: ["vanity", "protocol"],
+  },
 };
 
 export function resolvePanelIdeologyWhisper(panelId: string | undefined, title?: string) {

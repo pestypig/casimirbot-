@@ -179,6 +179,39 @@ export const extractIdeologyHardFailFromPremeditationResult = (
   return extractIdeologyHardFailIdFromRationaleTags(result.rationaleTags);
 };
 
+
+export const IDEOLOGY_PRESSURE_REASON_CODES = {
+  romanceInvestmentUrgency: "IDEOLOGY_PRESSURE_ROMANCE_INVESTMENT_URGENCY",
+  secrecyAuthorityFinancial: "IDEOLOGY_PRESSURE_SECRECY_AUTHORITY_FINANCIAL",
+} as const;
+
+export type IdeologyPressureReasonCode =
+  (typeof IDEOLOGY_PRESSURE_REASON_CODES)[keyof typeof IDEOLOGY_PRESSURE_REASON_CODES];
+
+export type IdeologyPressureGateDecision = {
+  blocked: boolean;
+  warned: boolean;
+  reasonCodes: IdeologyPressureReasonCode[];
+};
+
+export const evaluatePressureBundleGate = (activePressures: string[] | undefined): IdeologyPressureGateDecision => {
+  const set = normalizeTagSet(activePressures);
+  const hasRomanceInvestmentUrgency =
+    set.has("sexualized_attention") && set.has("financial_ask") && set.has("urgency_scarcity");
+  const hasSecrecyAuthorityFinancial =
+    set.has("isolation_secrecy") && set.has("authority_claim") && set.has("financial_ask");
+
+  const reasonCodes: IdeologyPressureReasonCode[] = [];
+  if (hasRomanceInvestmentUrgency) reasonCodes.push(IDEOLOGY_PRESSURE_REASON_CODES.romanceInvestmentUrgency);
+  if (hasSecrecyAuthorityFinancial) reasonCodes.push(IDEOLOGY_PRESSURE_REASON_CODES.secrecyAuthorityFinancial);
+
+  return {
+    blocked: reasonCodes.length > 0,
+    warned: reasonCodes.length > 0,
+    reasonCodes,
+  };
+};
+
 export const toIdeologyHardFailConstraint = (
   firstFailId: IdeologyHardFailId,
 ): TrainingTraceConstraint => ({

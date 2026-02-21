@@ -56,6 +56,26 @@ const readFromUri = async (uri: string): Promise<Buffer> => {
   return fs.readFile(uri);
 };
 
+const ATTENTION_ONLY_PATTERNS = [/attention-only/i, /go viral/i, /maximize thirst/i];
+
+const buildFashionGuardrails = (styleHint: string, tags: string[]) => {
+  const highRisk = ATTENTION_ONLY_PATTERNS.some((pattern) => pattern.test(styleHint)) ||
+    tags.some((tag) => /viral|seduce|thirst|status/.test(tag.toLowerCase()));
+  return {
+    invariant: "system advises, user decides.",
+    reminders: [
+      "Values over images: use presentation as expression, not identity proof.",
+      "Consent and integrity checks come before amplification goals.",
+    ],
+    highRisk,
+  };
+};
+
+const sanitizeStyleHint = (styleHint: string) =>
+  ATTENTION_ONLY_PATTERNS.some((pattern) => pattern.test(styleHint))
+    ? "integrity-aware styling request"
+    : styleHint;
+
 const readImageInput = async (req: Request): Promise<Buffer> => {
   const file = (req as any).file as Express.Multer.File | undefined;
   if (file?.buffer) {
@@ -130,11 +150,12 @@ fashionRouter.post("/pieces/:piece/looks", upload.single("image"), async (req, r
     const styleHint = typeof req.body?.style_hint === "string" ? req.body.style_hint.trim() : "";
     const tags = parseTags(req.body?.tags);
     const previous = typeof req.body?.essence_id === "string" ? req.body.essence_id.trim() : null;
+    const guardrails = buildFashionGuardrails(styleHint, tags);
     const { looks, template } = await generatePieceLooks({
       piece,
       templateId,
       image,
-      styleHint,
+      styleHint: sanitizeStyleHint(styleHint),
       tags,
       creatorId: (req.body?.creator_id as string) ?? "persona:unknown",
       license: (req.body?.license as string) ?? "CC-BY-4.0",
@@ -143,6 +164,7 @@ fashionRouter.post("/pieces/:piece/looks", upload.single("image"), async (req, r
     res.json({
       piece,
       template_id: template.id,
+      guardrails,
       looks: looks.map((l) => ({
         essence_id: l.env.header.id,
         uri: l.uri,

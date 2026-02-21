@@ -112,3 +112,9 @@ export const getIdeologyArtifactById = (id: string): IdeologyArtifactWithProvena
   const artifact = IDEOLOGY_ARTIFACTS.find((entry) => entry.id === id);
   return artifact ? withKnowledgeProvenance(artifact) : null;
 };
+
+
+export const getGuidanceArtifacts = (nodeIds: string[]) =>
+  IDEOLOGY_ARTIFACTS.filter((artifact) =>
+    artifact.tags?.includes("guidance-endpoint") || (artifact.nodeId ? nodeIds.includes(artifact.nodeId) : false),
+  ).map(withKnowledgeProvenance);

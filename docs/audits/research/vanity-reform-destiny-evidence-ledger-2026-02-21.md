@@ -49,3 +49,10 @@ Purpose:
 
 - Current recommendation tier: `diagnostic` for architecture and behavior design.
 - This ledger is evidence-to-implementation planning only and is not a certification artifact.
+
+## Implementation progress
+
+- Prompt 1 ideology subtree encoding: in progress (vanity protocol nodes + cross-links).
+- Prompt 2 pressure taxonomy contract: in progress (shared type contract added).
+- Prompt 8 vanity-facing route alignment: in progress (fashion guardrail reminders + attention-only sanitization).
+- Prompt 9 readiness synthesis: in progress (execution handoff draft prepared).
