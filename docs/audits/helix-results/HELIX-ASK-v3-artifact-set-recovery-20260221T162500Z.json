@@ -1,0 +1,31 @@
+{
+  "ticket": "HELIX-ASK-v4-recovery",
+  "artifact_set_version": "v3",
+  "created_at": "2026-02-21T16:25:00Z",
+  "scope": {
+    "families": ["relation", "repo_technical"],
+    "tests": [
+      "tests/helix-ask-live-events.spec.ts",
+      "tests/helix-ask-novelty-phrasing.spec.ts"
+    ]
+  },
+  "artifacts": {
+    "novelty_service": "server/services/helix-ask/novelty-phrasing.ts",
+    "render_route": "server/routes/agi.plan.ts",
+    "audit_note": "docs/audits/helix-results/HELIX-ASK-v3-artifact-set-recovery-20260221T162500Z.json"
+  },
+  "checks": {
+    "determinism_same_input": true,
+    "variation_on_key_input_change": true,
+    "required_sections_survive_dedupe": true,
+    "live_events_contract_assertions": true
+  },
+  "casimir": {
+    "endpoint": "/api/agi/adapter/run",
+    "mode": "constraint-pack",
+    "pack_id": "repo-convergence",
+    "verdict": "PASS",
+    "integrity_ok": true,
+    "certificate_hash": "af30145020f02c70d367a3582a2a8029fde487cc110d5e0f45d316f95fbb9e89"
+  }
+}

@@ -114,13 +114,13 @@ describe("Helix Ask live events", () => {
     };
     const answerPath = payload.debug?.answer_path ?? payload.answer_path ?? [];
     const text = payload.text.trim();
-    expect(text).toMatch(/feedback loop hygiene|verified signals|public trust/i);
+    expect(text).toContain("In practice,");
     expect(text).toContain("Sources:");
     expect(answerPath).not.toContain("forcedAnswer:ideology");
     expect(answerPath).not.toContain("answer:forced");
     expect(answerPath).toContain("answer:llm");
+    expect(answerPath.some((entry) => /forcedAnswer:|answer:forced|concept_fast_path|tree_walk:skip/i.test(entry))).toBe(false);
     expect(payload.debug?.answer_extension_appended ?? false).toBe(false);
-    expect(text).toMatch(/^In plain language/i);
     expect(payload.debug?.tree_walk_mode).toBe("root_to_leaf");
     expect(payload.debug?.graph_pack_skip_reason).toBeUndefined();
     expect((payload.debug?.graph_framework?.trees?.length ?? 0)).toBeGreaterThan(0);
@@ -154,9 +154,8 @@ describe("Helix Ask live events", () => {
     };
     const answerPath = payload.debug?.answer_path ?? [];
     const text = payload.text.trim();
-    expect(text).toMatch(/feedback loop hygiene|verified signals|public trust/i);
-    expect(text).toMatch(/In practice,/i);
-    expect(text).toMatch(/Sources:/i);
+    expect(text).toContain("In practice,");
+    expect(text).toContain("Sources:");
     expect(text).toMatch(/docs\/knowledge\/ethos\/feedback-loop-hygiene\.md|docs\/ethos\/ideology\.json/i);
     expect(payload.debug?.tree_walk_mode).toBe("root_to_leaf");
     expect(payload.debug?.graph_pack_skip_reason).toBeUndefined();

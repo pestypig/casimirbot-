@@ -127,6 +127,56 @@ export const buildHelixAskRelationDetailBlock = (args: {
   return { placement, line };
 };
 
+export const applyHelixAskSummaryVariant = (summary: string, ctx: HelixAskNoveltyContext): string => {
+  if (!summary.trim()) return summary;
+  if (ctx.family !== "relation" && ctx.family !== "repo_technical") return summary;
+  const leads =
+    ctx.family === "relation"
+      ? ["Cross-domain summary:", "Relation summary:", "Joint framing:"]
+      : ["Repo summary:", "Implementation summary:", "System summary:"];
+  const lead = choose(leads, ctx, `summary_lead_${ctx.family}`);
+  if (new RegExp(`^${lead.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(summary)) {
+    return summary;
+  }
+  return `${lead} ${summary}`;
+};
+
+export const applyHelixAskDetailsVariant = (details: string, ctx: HelixAskNoveltyContext): string => {
+  if (!details.trim()) return details;
+  if (ctx.family !== "relation" && ctx.family !== "repo_technical") return details;
+  const leads =
+    ctx.family === "relation"
+      ? ["Evidence linkage:", "Bridge detail:", "Constraint mapping:"]
+      : ["Execution detail:", "Code-path detail:", "Validator detail:"];
+  const lead = choose(leads, ctx, `details_lead_${ctx.family}`);
+  if (new RegExp(`^${lead.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(details)) {
+    return details;
+  }
+  return `${lead} ${details}`;
+};
+
+export const getHelixAskCompareLabels = (
+  ctx: HelixAskNoveltyContext,
+): { what: string; why: string; constraint: string } => {
+  if (ctx.family === "relation") {
+    const relationLabels = [
+      { what: "Relation anchor", why: "Coupling effect", constraint: "Stewardship bound" },
+      { what: "Domain bridge", why: "Policy impact", constraint: "Falsifiability bound" },
+      { what: "Cross-domain premise", why: "Operational consequence", constraint: "Governance limit" },
+    ];
+    return relationLabels[pickDeterministic(relationLabels.length, ctx, "compare_labels_relation")] ?? relationLabels[0];
+  }
+  if (ctx.family === "repo_technical") {
+    const repoLabels = [
+      { what: "Code anchor", why: "Runtime effect", constraint: "Gate condition" },
+      { what: "Path anchor", why: "Execution consequence", constraint: "Validation bound" },
+      { what: "Module role", why: "Observed behavior", constraint: "Contract limit" },
+    ];
+    return repoLabels[pickDeterministic(repoLabels.length, ctx, "compare_labels_repo")] ?? repoLabels[0];
+  }
+  return { what: "What it is", why: "Why it matters", constraint: "Constraint" };
+};
+
 const normalizeScaffoldLine = (line: string): string =>
   line
     .replace(/\s+/g, " ")
