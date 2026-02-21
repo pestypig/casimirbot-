@@ -99,6 +99,15 @@ function runValidator(cwd: string) {
   return runTsx(cwd, "scripts/helix-decision-validate.ts", ["--package", "pkg.json"]);
 }
 
+function readTimelineNdjson(filePath: string): Array<{ run_id: string; phase: string; event: string; details: Record<string, unknown>; ts_iso: string; path: string | null }> {
+  const raw = fs.readFileSync(filePath, "utf8").trim();
+  if (!raw) return [];
+  return raw
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as { run_id: string; phase: string; event: string; details: Record<string, unknown>; ts_iso: string; path: string | null });
+}
+
 function writePackageFixtureSet(root: string) {
   writeJson(path.join(root, "reports/helix-self-tune-gate-summary.json"), {
     precheck_run_id: "narrow-run",
@@ -245,10 +254,8 @@ describe("helix decision validate", () => {
     expect(out.status).not.toBe(0);
     expect(`${out.stdout}${out.stderr}`).toContain("artifact_exists_true_but_missing:ghost.json");
 
-    const timeline = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-timeline.json"), "utf8")) as {
-      events: Array<{ phase: string; event: string; details: Record<string, unknown> }>;
-    };
-    const blocker = timeline.events.find((event) => event.event === "validator_first_blocker");
+    const timeline = readTimelineNdjson(path.join(dir, "reports/helix-decision-timeline-standalone.jsonl"));
+    const blocker = timeline.find((event) => event.event === "validator_first_blocker");
     expect(blocker?.phase).toBe("decision_validate");
     expect(String(blocker?.details?.blocker ?? "")).toContain("artifact_exists_true_but_missing");
   });
@@ -288,10 +295,8 @@ describe("helix decision package", () => {
     for (const name of ["helix-decision-package.json", "helix-decision-package.md", "helix-decision-inputs.json"]) {
       expect(fs.existsSync(path.join(dir, "reports", name))).toBe(false);
     }
-    const timeline = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-timeline.json"), "utf8")) as {
-      events: Array<{ event: string }>;
-    };
-    expect(timeline.events.some((event) => event.event === "fail_path_cleanup_complete")).toBe(true);
+    const timeline = readTimelineNdjson(path.join(dir, "reports/helix-decision-timeline-standalone.jsonl"));
+    expect(timeline.some((event) => event.event === "fail_path_cleanup_complete")).toBe(true);
   });
 
   it("fails when source snapshot changes before write", () => {
@@ -343,15 +348,42 @@ describe("helix decision package", () => {
     expect(manifest.inputs.heavy.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(manifest.inputs.heavy.size_bytes).toBeGreaterThan(0);
 
-    const timeline = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-timeline.json"), "utf8")) as {
-      events: Array<{ event: string; ts_iso: string; path: string | null }>;
-    };
-    expect(timeline.events.some((event) => event.event === "source_selected_before_read")).toBe(true);
-    expect(timeline.events.some((event) => event.event === "source_read_parse_complete")).toBe(true);
-    expect(timeline.events.some((event) => event.event === "artifact_metadata_captured")).toBe(true);
-    expect(timeline.events.some((event) => event.event === "before_write")).toBe(true);
-    expect(timeline.events.some((event) => event.event === "after_write")).toBe(true);
-    expect(typeof timeline.events[0]?.ts_iso).toBe("string");
+    const timeline = readTimelineNdjson(path.join(dir, "reports/helix-decision-timeline-standalone.jsonl"));
+    expect(timeline.some((event) => event.event === "package_start")).toBe(true);
+    expect(timeline.some((event) => event.event === "source_selected_before_read")).toBe(true);
+    expect(timeline.some((event) => event.event === "source_read_parse_complete")).toBe(true);
+    expect(timeline.some((event) => event.event === "artifact_metadata_captured")).toBe(true);
+    expect(timeline.some((event) => event.event === "before_write")).toBe(true);
+    expect(timeline.some((event) => event.event === "after_write")).toBe(true);
+    expect(timeline.some((event) => event.event === "package_end")).toBe(true);
+    expect(typeof timeline[0]?.ts_iso).toBe("string");
+  });
+
+  it("append-only shared timeline keeps package+validate events without loss", () => {
+    const dir = mk();
+    writePackageFixtureSet(dir);
+    const runId = "run-concurrency-check";
+    const timelinePath = "reports/helix-decision-timeline-run-concurrency-check.jsonl";
+
+    const packageOut = runTsx(dir, "scripts/helix-decision-package.ts", [], {
+      HELIX_DECISION_RUN_ID: runId,
+      HELIX_DECISION_TIMELINE_PATH: timelinePath,
+    });
+    expect(packageOut.status).toBe(0);
+
+    const validateOut = runTsx(dir, "scripts/helix-decision-validate.ts", ["--package", "reports/helix-decision-package.json"], {
+      HELIX_DECISION_RUN_ID: runId,
+      HELIX_DECISION_TIMELINE_PATH: timelinePath,
+    });
+    expect(validateOut.status).toBe(0);
+
+    const timeline = readTimelineNdjson(path.join(dir, timelinePath));
+    expect(timeline.length).toBeGreaterThanOrEqual(12);
+    expect(timeline.every((event) => event.run_id === runId)).toBe(true);
+    expect(timeline.some((event) => event.phase === "decision_package" && event.event === "package_start")).toBe(true);
+    expect(timeline.some((event) => event.phase === "decision_package" && event.event === "package_end")).toBe(true);
+    expect(timeline.some((event) => event.phase === "decision_validate" && event.event === "validate_start")).toBe(true);
+    expect(timeline.some((event) => event.phase === "decision_validate" && event.event === "validate_end")).toBe(true);
   });
 });
 

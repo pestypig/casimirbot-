@@ -18,13 +18,16 @@ const ROOT = process.cwd();
 const REPORT_JSON = "reports/helix-decision-package.json";
 const REPORT_MD = "reports/helix-decision-package.md";
 const INPUTS_MANIFEST_JSON = "reports/helix-decision-inputs.json";
-const TIMELINE_JSON = "reports/helix-decision-timeline.json";
+const RUN_ID = process.env.HELIX_DECISION_RUN_ID ?? "standalone";
+const TIMELINE_JSON = process.env.HELIX_DECISION_TIMELINE_PATH ?? "reports/helix-decision-timeline-standalone.jsonl";
 const OUTPUT_FILES = [REPORT_JSON, REPORT_MD, INPUTS_MANIFEST_JSON] as const;
 
 type TimelineEvent = {
+  run_id: string;
   ts_iso: string;
   phase: string;
   event: string;
+  pid: number;
   path: string | null;
   exists: boolean | null;
   size_bytes: number | null;
@@ -61,9 +64,11 @@ function appendTimeline(phase: string, event: string, options: { path?: string |
   const timelinePath = path.resolve(ROOT, TIMELINE_JSON);
   const meta = options.path ? fileMeta(options.path) : { exists: null, size_bytes: null, mtime_iso: null, sha256: null };
   const nextEvent: TimelineEvent = {
+    run_id: RUN_ID,
     ts_iso: new Date().toISOString(),
     phase,
     event,
+    pid: process.pid,
     path: options.path ?? null,
     exists: meta.exists,
     size_bytes: meta.size_bytes,
@@ -71,16 +76,8 @@ function appendTimeline(phase: string, event: string, options: { path?: string |
     sha256: meta.sha256,
     details: options.details ?? {},
   };
-  let events: TimelineEvent[] = [];
-  try {
-    const existing = JSON.parse(fs.readFileSync(timelinePath, "utf8")) as { events?: TimelineEvent[] };
-    if (Array.isArray(existing.events)) events = existing.events;
-  } catch {
-    // initialize new timeline on first write
-  }
-  events.push(nextEvent);
   fs.mkdirSync(path.resolve(ROOT, "reports"), { recursive: true });
-  atomicWrite(TIMELINE_JSON, `${JSON.stringify({ generated_at: new Date().toISOString(), events }, null, 2)}\n`);
+  fs.appendFileSync(timelinePath, `${JSON.stringify(nextEvent)}\n`);
 }
 
 function fail(reason: string, details?: Record<string, unknown>): never {
@@ -91,6 +88,7 @@ function fail(reason: string, details?: Record<string, unknown>): never {
       cleared: OUTPUT_FILES.map((filePath) => ({ file: filePath, exists: fs.existsSync(path.resolve(ROOT, filePath)) })),
     },
   });
+  appendTimeline("decision_package", "package_end", { details: { ok: false, reason } });
   console.log(JSON.stringify({ ok: false, error: reason, ...(details ?? {}) }, null, 2));
   process.exit(1);
 }
@@ -257,8 +255,6 @@ function isHeavyRole(doc: JsonRecord, relPath: string): boolean {
   return (totalRuns ?? -1) >= 270;
 }
 
-try {
-
 function isRecommendation(doc: JsonRecord): boolean {
   return typeof doc.decision_grade_ready === "boolean";
 }
@@ -317,6 +313,9 @@ const casimirDiscoveryMatcher = (relPath: string) => {
   const base = path.basename(relPath).toLowerCase();
   return base === "helix-self-tune-casimir.json" || base.includes("casimir");
 };
+
+try {
+appendTimeline("decision_package", "package_start");
 
 const narrowPath = resolveSource(
   "narrow",
@@ -643,6 +642,7 @@ appendTimeline("decision_package", "after_write", {
     outputs: OUTPUT_FILES.map((filePath) => fileMeta(filePath)),
   },
 });
+appendTimeline("decision_package", "package_end", { details: { ok: true } });
 console.log(JSON.stringify({ ok: true, output: REPORT_JSON, decision: pkg.decision.value, blockers: pkg.decision.hard_blockers }, null, 2));
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);

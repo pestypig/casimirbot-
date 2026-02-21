@@ -83,6 +83,15 @@ function pathWithShim(binDir: string): string {
   return `${binDir}${path.delimiter}${process.env.PATH ?? ""}`;
 }
 
+function readTimelineNdjson(filePath: string): Array<{ run_id: string; phase: string; event: string; details: Record<string, unknown>; ts_iso: string; pid: number }> {
+  const raw = fs.readFileSync(filePath, "utf8").trim();
+  if (!raw) return [];
+  return raw
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as { run_id: string; phase: string; event: string; details: Record<string, unknown>; ts_iso: string; pid: number });
+}
+
 afterEach(() => {
   delete process.env.HELIX_DECISION_ROOT;
   while (tempDirs.length > 0) {
@@ -290,18 +299,24 @@ describe("helix decision run summary", () => {
     expect(summary.commands.some((command) => command.name === "decision:package")).toBe(true);
     expect(summary.commands.some((command) => command.name === "decision:validate")).toBe(true);
 
-    const timelinePath = path.join(dir, "reports/helix-decision-timeline.json");
+    const pointerPath = path.join(dir, "reports/helix-decision-timeline.latest.json");
+    expect(fs.existsSync(pointerPath)).toBe(true);
+    const pointer = JSON.parse(fs.readFileSync(pointerPath, "utf8")) as { run_id: string; timeline_path: string };
+    expect(pointer.timeline_path).toContain(`helix-decision-timeline-${pointer.run_id}.jsonl`);
+
+    const timelinePath = path.join(dir, pointer.timeline_path);
     expect(fs.existsSync(timelinePath)).toBe(true);
-    const timeline = JSON.parse(fs.readFileSync(timelinePath, "utf8")) as {
-      events: Array<{ phase: string; event: string; details: Record<string, unknown> }>;
-    };
-    const phaseEvents = timeline.events.map((event) => `${event.phase}:${event.event}`);
+    const timeline = readTimelineNdjson(timelinePath);
+    expect(timeline.length).toBeGreaterThanOrEqual(10);
+    const phaseEvents = timeline.map((event) => `${event.phase}:${event.event}`);
+    expect(phaseEvents).toContain("decision_run:run_start");
     expect(phaseEvents).toContain("resolve_sources:resolve_sources_start");
     expect(phaseEvents).toContain("resolve_sources:resolve_sources_end");
     expect(phaseEvents).toContain("decision_package:decision_package_start");
     expect(phaseEvents).toContain("decision_package:decision_package_end");
     expect(phaseEvents).toContain("decision_validate:decision_validate_start");
     expect(phaseEvents).toContain("decision_validate:decision_validate_end");
+    expect(phaseEvents).toContain("decision_run:run_end");
 
     const packageCmd = summary.commands.find((command) => command.name === "decision:package")?.cmd ?? "";
     expect(packageCmd).toContain(summary.selected_sources.narrow);

@@ -19,12 +19,14 @@ type RunSummary = {
 };
 
 const SUMMARY_PATH = "reports/helix-decision-run-summary.json";
-const TIMELINE_PATH = "reports/helix-decision-timeline.json";
+const TIMELINE_POINTER_PATH = "reports/helix-decision-timeline.latest.json";
 
 type TimelineEvent = {
+  run_id: string;
   ts_iso: string;
   phase: string;
   event: string;
+  pid: number;
   path: string | null;
   exists: boolean | null;
   size_bytes: number | null;
@@ -32,6 +34,24 @@ type TimelineEvent = {
   sha256: string | null;
   details: Record<string, unknown>;
 };
+
+function makeRunId(): string {
+  const ts = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+  const short = crypto.randomUUID().split("-")[0];
+  return `${ts}-${short}`;
+}
+
+function timelinePathForRun(runId: string): string {
+  return `reports/helix-decision-timeline-${runId}.jsonl`;
+}
+
+function writeTimelinePointer(runId: string, timelinePath: string): void {
+  fs.mkdirSync(path.resolve(rootDir(), "reports"), { recursive: true });
+  fs.writeFileSync(
+    path.resolve(rootDir(), TIMELINE_POINTER_PATH),
+    `${JSON.stringify({ run_id: runId, timeline_path: timelinePath }, null, 2)}\n`,
+  );
+}
 
 function rootDir(): string {
   return process.env.HELIX_DECISION_ROOT ?? process.cwd();
@@ -62,37 +82,46 @@ function fileMeta(relPath: string): { exists: boolean; size_bytes: number | null
   };
 }
 
-function appendTimeline(phase: string, event: string, options: { path?: string | null; details?: Record<string, unknown> } = {}): void {
-  const timelineAbs = path.resolve(rootDir(), TIMELINE_PATH);
-  let events: TimelineEvent[] = [];
-  try {
-    const existing = JSON.parse(fs.readFileSync(timelineAbs, "utf8")) as { events?: TimelineEvent[] };
-    if (Array.isArray(existing.events)) events = existing.events;
-  } catch {
-    // initialize
-  }
+function appendTimeline(
+  runId: string,
+  timelinePath: string,
+  phase: string,
+  event: string,
+  options: { path?: string | null; details?: Record<string, unknown> } = {},
+): void {
+  const timelineAbs = path.resolve(rootDir(), timelinePath);
   const meta = options.path ? fileMeta(options.path) : { exists: null, size_bytes: null, mtime_iso: null, sha256: null };
-  events.push({
+  const row: TimelineEvent = {
+    run_id: runId,
     ts_iso: new Date().toISOString(),
     phase,
     event,
+    pid: process.pid,
     path: options.path ?? null,
     exists: meta.exists,
     size_bytes: meta.size_bytes,
     mtime_iso: meta.mtime_iso,
     sha256: meta.sha256,
     details: options.details ?? {},
-  });
+  };
   fs.mkdirSync(path.resolve(rootDir(), "reports"), { recursive: true });
-  fs.writeFileSync(timelineAbs, `${JSON.stringify({ generated_at: new Date().toISOString(), events }, null, 2)}\n`);
+  fs.appendFileSync(timelineAbs, `${JSON.stringify(row)}\n`);
 }
 
-function runCommand(name: string, cmd: string, options: { allowFail?: boolean } = {}): { status: number; stdout: string; stderr: string } {
+function runCommand(
+  name: string,
+  cmd: string,
+  options: { allowFail?: boolean; env?: Record<string, string> } = {},
+): { status: number; stdout: string; stderr: string } {
   const child = spawnSync(cmd, {
     cwd: rootDir(),
     shell: true,
     encoding: "utf8",
     stdio: ["inherit", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      ...(options.env ?? {}),
+    },
   });
   if (child.stdout) process.stdout.write(child.stdout);
   if (child.stderr) process.stderr.write(child.stderr);
@@ -268,6 +297,15 @@ function main(): void {
   };
 
   const commands: Array<{ name: string; cmd: string; status: number }> = [];
+  const runId = process.env.HELIX_DECISION_RUN_ID ?? makeRunId();
+  const timelinePath = process.env.HELIX_DECISION_TIMELINE_PATH ?? timelinePathForRun(runId);
+  writeTimelinePointer(runId, timelinePath);
+  appendTimeline(runId, timelinePath, "decision_run", "run_start", { details: { fresh_enabled: freshEnabled } });
+
+  const timelineEnv = {
+    HELIX_DECISION_RUN_ID: runId,
+    HELIX_DECISION_TIMELINE_PATH: timelinePath,
+  };
 
   if (freshEnabled) {
     const needsNarrow = !overrides.narrow;
@@ -300,11 +338,11 @@ function main(): void {
     }
   }
 
-  appendTimeline("resolve_sources", "resolve_sources_start", { details: { overrides } });
+  appendTimeline(runId, timelinePath, "resolve_sources", "resolve_sources_start", { details: { overrides } });
   const sources = resolveSources(overrides);
-  appendTimeline("resolve_sources", "resolve_sources_end", { details: { selected_sources: sources } });
+  appendTimeline(runId, timelinePath, "resolve_sources", "resolve_sources_end", { details: { selected_sources: sources } });
   for (const [name, src] of Object.entries(sources)) {
-    appendTimeline("resolve_sources", "source_selected", { path: src, details: { source_name: name } });
+    appendTimeline(runId, timelinePath, "resolve_sources", "source_selected", { path: src, details: { source_name: name } });
   }
   const packageCmd = [
     "npm run helix:decision:package --",
@@ -315,9 +353,9 @@ function main(): void {
     `--ab-t035 ${sources.ab_t035}`,
     `--casimir ${sources.casimir}`,
   ].join(" ");
-  appendTimeline("decision_package", "decision_package_start", { details: { cmd: packageCmd } });
-  const packageRes = runCommand("decision:package", packageCmd, { allowFail: true });
-  appendTimeline("decision_package", "decision_package_end", { details: { status: packageRes.status } });
+  appendTimeline(runId, timelinePath, "decision_package", "decision_package_start", { details: { cmd: packageCmd } });
+  const packageRes = runCommand("decision:package", packageCmd, { allowFail: true, env: timelineEnv });
+  appendTimeline(runId, timelinePath, "decision_package", "decision_package_end", { details: { status: packageRes.status } });
   commands.push({ name: "decision:package", cmd: packageCmd, status: packageRes.status });
 
   if (packageRes.status !== 0) {
@@ -331,14 +369,15 @@ function main(): void {
     });
     fs.mkdirSync(path.resolve(rootDir(), "reports"), { recursive: true });
     fs.writeFileSync(path.resolve(rootDir(), SUMMARY_PATH), `${JSON.stringify(summary, null, 2)}\n`);
+    appendTimeline(runId, timelinePath, "decision_run", "run_end", { details: { ok: false, status: 1 } });
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
     process.exit(1);
   }
 
   const validateCmd = "npm run helix:decision:validate -- --package reports/helix-decision-package.json";
-  appendTimeline("decision_validate", "decision_validate_start", { details: { cmd: validateCmd } });
-  const validateRes = runCommand("decision:validate", validateCmd, { allowFail: true });
-  appendTimeline("decision_validate", "decision_validate_end", { details: { status: validateRes.status } });
+  appendTimeline(runId, timelinePath, "decision_validate", "decision_validate_start", { details: { cmd: validateCmd } });
+  const validateRes = runCommand("decision:validate", validateCmd, { allowFail: true, env: timelineEnv });
+  appendTimeline(runId, timelinePath, "decision_validate", "decision_validate_end", { details: { status: validateRes.status } });
   commands.push({ name: "decision:validate", cmd: validateCmd, status: validateRes.status });
 
   const pkg = tryReadJson("reports/helix-decision-package.json") ?? {};
@@ -358,6 +397,7 @@ function main(): void {
 
   fs.mkdirSync(path.resolve(rootDir(), "reports"), { recursive: true });
   fs.writeFileSync(path.resolve(rootDir(), SUMMARY_PATH), `${JSON.stringify(summary, null, 2)}\n`);
+  appendTimeline(runId, timelinePath, "decision_run", "run_end", { details: { ok: summary.ok, status: summary.ok ? 0 : 1 } });
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 
   if (!summary.ok) {
