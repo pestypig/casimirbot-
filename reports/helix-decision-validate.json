@@ -1,27 +1,6 @@
 {
-  "ok": false,
+  "ok": true,
   "package_path": "reports/helix-decision-package.json",
-  "failures": [
-    "source_path_missing:relation_packet_built_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json",
-    "source_path_missing:relation_dual_domain_ok_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json",
-    "source_path_missing:report_mode_correct_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json",
-    "source_path_missing:citation_presence_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json",
-    "source_path_missing:stub_text_detected_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json",
-    "source_path_missing:runtime_fallback_answer:artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json",
-    "source_path_missing:runtime_tdz_intentStrategy:artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json",
-    "source_path_missing:runtime_tdz_intentProfile:artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json",
-    "source_path_missing:provenance_gate_pass:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json",
-    "source_path_missing:decision_grade_ready:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/recommendation.json",
-    "source_path_missing:casimir_verdict_pass_integrity:artifacts/experiments/helix-release-readiness-cloud-v4/casimir-verify-normalized.json",
-    "novelty_source_missing:t02:artifacts/experiments/helix-release-readiness-cloud-v4/ab/t02/helix_release_readiness_cloud_v4_t02/summary.json",
-    "novelty_source_missing:t035:artifacts/experiments/helix-release-readiness-cloud-v4/ab/t035/helix_release_readiness_cloud_v4_t035/summary.json",
-    "artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json",
-    "artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json",
-    "artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/recommendation.json",
-    "artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/ab/t02/helix_release_readiness_cloud_v4_t02/summary.json",
-    "artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/ab/t035/helix_release_readiness_cloud_v4_t035/summary.json",
-    "artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/casimir-verify-normalized.json",
-    "decision_grade_requires_provenance_pass"
-  ],
-  "failure_count": 20
+  "failures": [],
+  "failure_count": 0
 }

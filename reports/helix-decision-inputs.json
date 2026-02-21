@@ -1,69 +1,72 @@
 {
-  "generated_at": "2026-02-21T19:56:43.843Z",
+  "generated_at": "2026-02-21T20:51:18.479Z",
   "git": {
-    "branch": "work",
-    "head": "2680f58",
-    "origin_main": null,
-    "ahead_behind": null
+    "branch": "main",
+    "head": "057c58b",
+    "origin_main": "057c58b",
+    "ahead_behind": {
+      "ahead": 0,
+      "behind": 0
+    }
   },
   "selected_paths": {
-    "narrow": "artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json",
-    "heavy": "artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json",
-    "recommendation": "artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/recommendation.json",
-    "ab_t02": "artifacts/experiments/helix-release-readiness-cloud-v4/ab/t02/helix_release_readiness_cloud_v4_t02/summary.json",
-    "ab_t035": "artifacts/experiments/helix-release-readiness-cloud-v4/ab/t035/helix_release_readiness_cloud_v4_t035/summary.json",
-    "casimir": "artifacts/experiments/helix-release-readiness-cloud-v4/casimir-verify-normalized.json"
+    "narrow": "artifacts/experiments/helix-release-readiness-cloud-v5/narrow/versatility-1771706457518/summary.json",
+    "heavy": "artifacts/experiments/helix-release-readiness-cloud-v5/heavy/versatility-1771706597298/summary.json",
+    "recommendation": "artifacts/experiments/helix-release-readiness-cloud-v5/heavy/versatility-1771706597298/recommendation.json",
+    "ab_t02": "artifacts/experiments/helix-release-readiness-cloud-v5/ab/t02/helix_release_readiness_cloud_v5_t02/summary.json",
+    "ab_t035": "artifacts/experiments/helix-release-readiness-cloud-v5/ab/t035/helix_release_readiness_cloud_v5_t035/summary.json",
+    "casimir": "artifacts/experiments/helix-release-readiness-cloud-v5/casimir-verify-normalized.json"
   },
   "run_ids": {
-    "narrow": "versatility-1771703151463",
-    "heavy": "versatility-1771703288538",
-    "recommendation": "versatility-1771703288538",
-    "ab_t02": "2026-02-21T19-52-21-198Z",
-    "ab_t035": "2026-02-21T19-54-15-323Z",
-    "casimir": "632"
+    "narrow": "versatility-1771706457518",
+    "heavy": "versatility-1771706597298",
+    "recommendation": "versatility-1771706597298",
+    "ab_t02": "2026-02-21T20-47-22-677Z",
+    "ab_t035": "2026-02-21T20-49-18-043Z",
+    "casimir": "624"
   },
   "inputs": {
     "narrow": {
-      "path": "artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v5/narrow/versatility-1771706457518/summary.json",
       "exists": true,
-      "sha256": "63610c98dec9d87232b3cabb6b0c1a10da8fadb0bc0f1e8dc863fe7c23b6acbb",
-      "size_bytes": 86905,
-      "mtime_iso": "2026-02-21T19:48:07.465Z"
+      "sha256": "dd375f7f5d42f73cc9feec40d4bdf474723795f157a85791b22600d5329902e9",
+      "size_bytes": 86579,
+      "mtime_iso": "2026-02-21T20:43:16.241Z"
     },
     "heavy": {
-      "path": "artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v5/heavy/versatility-1771706597298/summary.json",
       "exists": true,
-      "sha256": "e4b2eca3e27875f1f059a4f42e8a3fc86e6e3f141c34c20a3e43ac6492d7ff51",
-      "size_bytes": 129044,
-      "mtime_iso": "2026-02-21T19:52:19.929Z"
+      "sha256": "238bdfd648b6b4ca0eb9eda5ced1a33b7de3ddf8c89e272aa25db2c24cb76dda",
+      "size_bytes": 128445,
+      "mtime_iso": "2026-02-21T20:47:21.318Z"
     },
     "recommendation": {
-      "path": "artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/recommendation.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v5/heavy/versatility-1771706597298/recommendation.json",
       "exists": true,
-      "sha256": "7151bdb6b089cbfc20acaa7f956f762e49f75cc2fef9c210d6d03cdee6545831",
-      "size_bytes": 3454,
-      "mtime_iso": "2026-02-21T19:52:19.929Z"
+      "sha256": "fa180e6a6d88bf371cc94514f4a35d2abb9213fb0d810186f20666138da09ace",
+      "size_bytes": 3018,
+      "mtime_iso": "2026-02-21T20:47:21.338Z"
     },
     "ab_t02": {
-      "path": "artifacts/experiments/helix-release-readiness-cloud-v4/ab/t02/helix_release_readiness_cloud_v4_t02/summary.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v5/ab/t02/helix_release_readiness_cloud_v5_t02/summary.json",
       "exists": true,
-      "sha256": "f8fa6dbca3d91e61cdc99bf9fe565343e18eebebac6290e4c7deb1ba4b94d1e0",
+      "sha256": "b873096fcfbc39ba78d5ca9de3e7673a1dac3d1d6481da2ab406c7df3fe2c58b",
       "size_bytes": 1739,
-      "mtime_iso": "2026-02-21T19:54:14.105Z"
+      "mtime_iso": "2026-02-21T20:49:16.862Z"
     },
     "ab_t035": {
-      "path": "artifacts/experiments/helix-release-readiness-cloud-v4/ab/t035/helix_release_readiness_cloud_v4_t035/summary.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v5/ab/t035/helix_release_readiness_cloud_v5_t035/summary.json",
       "exists": true,
-      "sha256": "9fd835eade5bbf6f16b01b6b0b548b597bce493367f214a5a21f03b5625b8fa7",
+      "sha256": "4b7acb4d8ae457b03def8c33e58100f2bcfcd36ac01b5c4db0927c903c26f5bf",
       "size_bytes": 1740,
-      "mtime_iso": "2026-02-21T19:56:13.377Z"
+      "mtime_iso": "2026-02-21T20:51:08.875Z"
     },
     "casimir": {
-      "path": "artifacts/experiments/helix-release-readiness-cloud-v4/casimir-verify-normalized.json",
+      "path": "artifacts/experiments/helix-release-readiness-cloud-v5/casimir-verify-normalized.json",
       "exists": true,
-      "sha256": "2331f883155c84c5dba1f4319689dd664f1cf854e9bc65d70257e922f8d1a224",
+      "sha256": "760f16233a7a18b5d07a34876828f381e02deed77ac0dc5b59242ad73a4fe9c0",
       "size_bytes": 215,
-      "mtime_iso": "2026-02-21T19:56:15.109Z"
+      "mtime_iso": "2026-02-21T20:51:10.643Z"
     }
   }
 }
