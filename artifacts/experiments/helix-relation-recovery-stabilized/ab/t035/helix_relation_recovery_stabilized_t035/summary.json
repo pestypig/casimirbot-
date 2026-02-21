@@ -1,0 +1,58 @@
+{
+  "summary_schema_version": 2,
+  "variant": "helix_relation_recovery_stabilized_t035",
+  "commit": "8b119ac",
+  "run_id": "2026-02-21T15-32-46-293Z",
+  "base_url": "http://127.0.0.1:5173",
+  "prompt_count": 36,
+  "run_count": 108,
+  "usable_run_count": 108,
+  "avg_utility": 0.8996111111111107,
+  "answer_directness_rate": 1,
+  "min_length_rate": 1,
+  "citation_presence_rate": 1,
+  "clarification_quality_rate": 0.6666666666666666,
+  "novel_response_rate": 0.25,
+  "novel_response_rate_by_family": {
+    "relation": 0.25,
+    "repo_technical": 0.16666666666666666,
+    "ambiguous_general": 0.3333333333333333
+  },
+  "status_ok_rate": 1,
+  "http_status_ok_rate": 1,
+  "invalid_error_rate": 0,
+  "avg_attempts": 1,
+  "noisy_avg_utility": 0.8918333333333336,
+  "retry_reason_counts": {
+    "none": 108
+  },
+  "failure_counts": {
+    "request_failed": 0,
+    "citation_missing": 0,
+    "text_too_short": 0,
+    "low_directness": 0,
+    "novelty_failed": 81
+  },
+  "result_type": "needs_quality_patch",
+  "run_quality_pass": true,
+  "quality_pass": true,
+  "novelty_pass": false,
+  "decision_thresholds": {
+    "min_status_ok_rate": 0.9,
+    "max_invalid_rate": 0.1,
+    "min_answer_directness_rate": 0.85,
+    "min_length_rate": 0.9,
+    "min_citation_presence_rate": 0.9,
+    "min_novel_response_rate_overall": 0.82,
+    "min_novel_response_rate_relation": 0.8,
+    "min_novel_response_rate_repo_technical": 0.85,
+    "min_novel_response_rate_ambiguous_general": 0.75
+  },
+  "blockers": [
+    "novel_response_rate 0.250 < 0.820",
+    "novel_response_rate_relation 0.250 < 0.800",
+    "novel_response_rate_repo_technical 0.167 < 0.850",
+    "novel_response_rate_ambiguous_general 0.333 < 0.750"
+  ],
+  "timestamp": "2026-02-21T15:34:38.639Z"
+}

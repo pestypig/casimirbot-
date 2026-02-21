@@ -1,0 +1,39 @@
+{
+  "run_id": "versatility-1771688085174",
+  "expected_runs": 135,
+  "total_runs": 135,
+  "run_complete": true,
+  "artifact_bundle_paths": {
+    "output_root_dir": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow",
+    "output_run_dir": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174",
+    "summary": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/summary.json",
+    "recommendation": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/recommendation.json",
+    "failures": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/failures.json",
+    "checkpoint": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/checkpoint.json",
+    "prompts": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/prompts.jsonl",
+    "raw_dir": "/workspace/casimirbot-/artifacts/experiments/helix-relation-recovery-stabilized/narrow/versatility-1771688085174/raw",
+    "ab_outputs": [],
+    "trace_export": null
+  },
+  "diagnostics": {
+    "rollup": {
+      "report_mode_correct": {
+        "pass": 135,
+        "fail": 0,
+        "unknown": 0
+      },
+      "relation_packet_built": {
+        "pass": 45,
+        "fail": 0,
+        "unknown": 90
+      },
+      "relation_dual_domain_ok": {
+        "pass": 45,
+        "fail": 0,
+        "unknown": 90
+      }
+    }
+  },
+  "top_failure_signatures": [],
+  "failed_runs": []
+}

@@ -109,7 +109,7 @@ export const buildHelixAskRelationDetailBlock = (args: {
     [
       `Relation detail: constraint budgets bound which warp options can be argued as ethical, so admissibility limits are paired with policy obligations from ${args.evidenceTarget}.`,
       `Relation detail: governance review is not narrative-only; it acts as an execution gate that accepts or blocks field proposals based on cited safety constraints in ${args.evidenceTarget}.`,
-      `Relation detail: safety linkage runs both directions—physics uncertainty increases governance caution, while mission policy narrows technically legal moves documented in ${args.evidenceTarget}.`,
+      `Relation detail: safety linkage runs both directions-physics uncertainty increases governance caution, while mission policy narrows technically legal moves documented in ${args.evidenceTarget}.`,
       `Relation detail: bridge semantics stay dual-domain by mapping each mission claim to a bounded physics condition and each physics option to a stewardship rule sourced from ${args.evidenceTarget}.`,
     ],
     args.context,

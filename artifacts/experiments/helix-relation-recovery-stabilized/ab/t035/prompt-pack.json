@@ -1,0 +1,221 @@
+{
+  "count": 36,
+  "prompts": [
+    {
+      "id": "relation_01",
+      "family": "relation",
+      "question": "How does warp bubble viability relate to mission ethos constraints in this repo?",
+      "noisy": false
+    },
+    {
+      "id": "relation_02",
+      "family": "relation",
+      "question": "Map warp bubble evidence to ideology accountability and falsifiability checks.",
+      "noisy": false
+    },
+    {
+      "id": "relation_03",
+      "family": "relation",
+      "question": "Explain warp bubble ↔ mission ethos relation without report scaffolding.",
+      "noisy": false
+    },
+    {
+      "id": "relation_04",
+      "family": "relation",
+      "question": "How do Casimir verification gates connect to ideology non-harm commitments?",
+      "noisy": false
+    },
+    {
+      "id": "relation_05",
+      "family": "relation",
+      "question": "What ties warp-bubble claims to the ideology tree branches?",
+      "noisy": false
+    },
+    {
+      "id": "relation_06",
+      "family": "relation",
+      "question": "Relate Natario constraints to mission ethics and decision guardrails.",
+      "noisy": false
+    },
+    {
+      "id": "relation_07",
+      "family": "relation",
+      "question": "How do warp constraints and falsifiability policy reinforce each other?",
+      "noisy": false
+    },
+    {
+      "id": "relation_08",
+      "family": "relation",
+      "question": "Give a concise relation chain: warp physics -> constraints -> ethos -> action limits.",
+      "noisy": false
+    },
+    {
+      "id": "relation_09",
+      "family": "relation",
+      "question": "Could a technically strong warp result still fail ethos requirements? explain.",
+      "noisy": false
+    },
+    {
+      "id": "relation_10",
+      "family": "relation",
+      "question": "How does certificate integrity affect ideology-grounded trust in warp outputs?",
+      "noisy": false
+    },
+    {
+      "id": "relation_11",
+      "family": "relation",
+      "question": "warp buble relashun to ethos n falsifiability?",
+      "noisy": true
+    },
+    {
+      "id": "relation_12",
+      "family": "relation",
+      "question": "quick relation plz: warp bubble + mission ethos + hard constraints?",
+      "noisy": true
+    },
+    {
+      "id": "repo_technical_01",
+      "family": "repo_technical",
+      "question": "Where is /api/agi/ask route logic that decides report_mode?",
+      "noisy": false
+    },
+    {
+      "id": "repo_technical_02",
+      "family": "repo_technical",
+      "question": "How does /api/agi/adapter/run encode verdict, firstFail, and certificate fields?",
+      "noisy": false
+    },
+    {
+      "id": "repo_technical_03",
+      "family": "repo_technical",
+      "question": "Where are evidence cards assembled for Helix Ask responses?",
+      "noisy": false
+    },
+    {
+      "id": "repo_technical_04",
+      "family": "repo_technical",
+      "question": "Which code path applies citation fallback/min-length quality floor?",
+      "noisy": false
+    },
+    {
+      "id": "repo_technical_05",
+      "family": "repo_technical",
+      "question": "How are debug live events emitted and returned to clients?",
+      "noisy": false
+    },
+    {
+      "id": "repo_technical_06",
+      "family": "repo_technical",
+      "question": "What determines relation_packet_bridge_count and relation_packet_evidence_count?",
+      "noisy": false
+    },
+    {
+      "id": "repo_technical_07",
+      "family": "repo_technical",
+      "question": "Where are ambiguous asks redirected into clarification behavior?",
+      "noisy": false
+    },
+    {
+      "id": "repo_technical_08",
+      "family": "repo_technical",
+      "question": "How is intent routing done between relation/repo/general asks?",
+      "noisy": false
+    },
+    {
+      "id": "repo_technical_09",
+      "family": "repo_technical",
+      "question": "What does report-mode suppression do for relation prompts?",
+      "noisy": false
+    },
+    {
+      "id": "repo_technical_10",
+      "family": "repo_technical",
+      "question": "How is training-trace export exposed and what payload form does it use?",
+      "noisy": false
+    },
+    {
+      "id": "repo_technical_11",
+      "family": "repo_technical",
+      "question": "whre adapter run endpoint checks cert hash integirty?",
+      "noisy": true
+    },
+    {
+      "id": "repo_technical_12",
+      "family": "repo_technical",
+      "question": "repo tech: hw does ask route chooze intent + assemble final ans?",
+      "noisy": true
+    },
+    {
+      "id": "ambiguous_general_01",
+      "family": "ambiguous_general",
+      "question": "Define falsifiability in plain terms.",
+      "noisy": false
+    },
+    {
+      "id": "ambiguous_general_02",
+      "family": "ambiguous_general",
+      "question": "What is a good short answer format for technical users?",
+      "noisy": false
+    },
+    {
+      "id": "ambiguous_general_03",
+      "family": "ambiguous_general",
+      "question": "When should an assistant ask clarifying questions?",
+      "noisy": false
+    },
+    {
+      "id": "ambiguous_general_04",
+      "family": "ambiguous_general",
+      "question": "Difference between hypothesis and verified claim?",
+      "noisy": false
+    },
+    {
+      "id": "ambiguous_general_05",
+      "family": "ambiguous_general",
+      "question": "How do I quickly triage failures?",
+      "noisy": false
+    },
+    {
+      "id": "ambiguous_general_06",
+      "family": "ambiguous_general",
+      "question": "What makes a citation useful?",
+      "noisy": false
+    },
+    {
+      "id": "ambiguous_general_07",
+      "family": "ambiguous_general",
+      "question": "Give me a concise explanation of verification.",
+      "noisy": false
+    },
+    {
+      "id": "ambiguous_general_08",
+      "family": "ambiguous_general",
+      "question": "How can ambiguous prompts be improved?",
+      "noisy": false
+    },
+    {
+      "id": "ambiguous_general_09",
+      "family": "ambiguous_general",
+      "question": "What is model drift?",
+      "noisy": false
+    },
+    {
+      "id": "ambiguous_general_10",
+      "family": "ambiguous_general",
+      "question": "How should I read latency percentiles?",
+      "noisy": false
+    },
+    {
+      "id": "ambiguous_general_11",
+      "family": "ambiguous_general",
+      "question": "wht iz verifcation?",
+      "noisy": true
+    },
+    {
+      "id": "ambiguous_general_12",
+      "family": "ambiguous_general",
+      "question": "need short ans: cite or no cite??",
+      "noisy": true
+    }
+  ]
+}
