@@ -121,3 +121,12 @@ function makeKernel(kind: SamplingKind, tau_s_ms: number, dt_ms: number): Kernel
     tau_s_ms,
   };
 }
+
+
+export function evaluateQiGuardrail(args: { avg: number; bound: number }) {
+  const margin = args.avg - args.bound;
+  return {
+    pass: Number.isFinite(margin) && margin >= 0,
+    margin,
+  };
+}

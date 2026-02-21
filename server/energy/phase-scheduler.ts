@@ -102,3 +102,10 @@ export function applyPhaseScheduleToPulses(
     };
   });
 }
+
+
+export function buildSectorRoleAssignment(schedule: Pick<PhaseSchedule, "negSectors" | "posSectors">) {
+  const neg = new Set<number>([...schedule.negSectors].sort((a, b) => a - b));
+  const pos = new Set<number>([...schedule.posSectors].sort((a, b) => a - b));
+  return { neg, pos };
+}

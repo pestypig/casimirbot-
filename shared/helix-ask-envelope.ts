@@ -21,6 +21,7 @@ export type HelixAskProofGate = {
 };
 
 export type HelixAskProofEnvelope = {
+  sectorControlEvidence?: HelixAskSectorControlEvidence;
   gate?: HelixAskProofGate;
   evidence?: Array<{ path: string }>;
   trace_ids?: string[];
@@ -34,6 +35,7 @@ export type HelixAskAnswerExtension = {
 };
 
 export type HelixAskResponseEnvelope = {
+  sectorControl?: HelixAskSectorControlPayload;
   mode: HelixAskEnvelopeMode;
   tier: HelixAskEnvelopeTier;
   secondaryTier?: HelixAskEnvelopeTier;
@@ -41,4 +43,19 @@ export type HelixAskResponseEnvelope = {
   sections?: HelixAskEnvelopeSection[];
   proof?: HelixAskProofEnvelope;
   extension?: HelixAskAnswerExtension;
+};
+
+
+export type HelixAskSectorControlPayload = {
+  plan?: import("./schema").SectorControlPlan;
+  rationale?: import("./schema").SectorControlRationale;
+};
+
+
+export type HelixAskSectorControlEvidence = {
+  TS_ratio?: number;
+  qiMarginRatio?: number;
+  guardrailStatus?: Record<string, "pass" | "fail" | "unknown">;
+  firstFail?: string | null;
+  certifying?: boolean;
 };

@@ -2060,6 +2060,27 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     gammaGeo.proxy,
   );
 
+
+  const sectorGuardrails = (state as any).sectorControl?.constraints as Record<string, unknown> | undefined;
+  values.sector_control_ts_ratio = makeValue(
+    resolveNumber([{ value: (state as any).sectorControl?.timing?.TS_ratio, source: "pipeline.sectorControl.timing.TS_ratio" }]),
+    "1",
+  );
+  values.sector_control_qi_margin_ratio = makeValue(
+    resolveNumber([{ value: (state as any).qiGuardrail?.marginRatio, source: "pipeline.qiGuardrail.marginRatio" }]),
+    "1",
+  );
+  values.sector_control_guardrails = makeStringValue(
+    sectorGuardrails ? JSON.stringify(sectorGuardrails) : null,
+    "pipeline.sectorControl.constraints",
+    !sectorGuardrails,
+  );
+  values.sector_control_first_fail = makeStringValue(
+    typeof (state as any).sectorControl?.firstFail === "string" ? (state as any).sectorControl.firstFail : null,
+    "pipeline.sectorControl.firstFail",
+    typeof (state as any).sectorControl?.firstFail !== "string",
+  );
+
   values.overall_status = {
     value: state.overallStatus ?? null,
     source: "pipeline.overallStatus",

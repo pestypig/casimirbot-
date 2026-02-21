@@ -65,3 +65,21 @@ describe("proposal job runner", () => {
     expect(applied?.safetyScore).toBe(1);
   });
 });
+
+
+it("sector-control proposals validate evidence payload shape", async () => {
+  const { essenceProposalSchema } = await import("../shared/proposals");
+  const seeded = {
+    ...buildProposal("proposal-runner-sector-control"),
+    kind: "sector-control" as const,
+    evidence: {
+      guardrailStatus: { FordRomanQI: "pass", ThetaAudit: "pass" },
+      maturity: "diagnostic" as const,
+      traceRef: "adapter:sector-trace",
+      runRef: "run:sector-1",
+    },
+  };
+  const parsed = essenceProposalSchema.parse(seeded);
+  expect(parsed.kind).toBe("sector-control");
+  expect(parsed.evidence?.maturity).toBe("diagnostic");
+});

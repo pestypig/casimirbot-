@@ -72,3 +72,10 @@ This note locks in how the warp/physics LLM pieces are supposed to behave and ho
 - Proponent: argue viability only if status=ADMISSIBLE and HARD constraints pass with margin; cite ≥1 HARD constraint + 2–3 snapshot numbers; if NOT_CERTIFIED/INADMISSIBLE, state you cannot claim viability.
 - Skeptic: emphasize failing/thin evidence—HARD failures, near-zero margins, missing cert/snapshot; cite ≥1 constraint and relevant snapshot values.
 - Referee: summarize certificate (status, failing key constraint, certificate hash); lean proponent only when cert solid (ADMISSIBLE, HARD pass); otherwise lean skeptic; never contradict certificate status.
+
+## Tool contract: `physics.warp.sector_control.plan`
+
+- Input: `mode` with optional timing/allocation overrides.
+- Output: `sectorControlPlanSchema` packet with timing/allocation/duty/constraints/objective/maturity.
+- Guardrail expectations: report deterministic `firstFail` categories (QI, TS_ratio, ThetaAudit, GR gate).
+- Certification posture: planning outputs are non-certifying unless a separate viability certificate is admissible with integrity `true`.

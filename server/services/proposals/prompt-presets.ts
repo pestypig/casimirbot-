@@ -17,7 +17,13 @@ export const GLOB_PATTERNS = [
 
 export const IGNORE = ["**/node_modules/**", "**/dist/**", "**/.git/**", "**/.cal/**", "**/.local/**"];
 
-export const PATCH_PROMPT_FRAMEWORK = `
+export const SECTOR_CONTROL_PROMPT = `
+Implement sector-strobed control planning for Natario diagnostic workflows.
+Require deterministic guardrail evidence fields: guardrailStatus, maturity, traceRef, runRef.
+Do not represent this lane as a viability certificate; certifying=false unless admissible certificate evidence exists.
+`.trim();
+
+const PATCH_PROMPT_FRAMEWORK = `
 You are designing a Needle Hull Warp Bubble with a live energy pipeline that must feed a stable, adaptive field around a spacecraft.
 Brainstorm detailed approaches to:
 1. sourcing and buffering energy (fusion/antimatter staging, capacitors, superfluid reservoirs),
@@ -113,6 +119,12 @@ export async function buildPatchPromptPresets(
     ? callpoints.map((cp) => `- ${cp.path} (${cp.updatedAt}): ${cp.snippet}`).join("\n")
     : "No recent physics/warp call points detected; focus on telemetry, pipeline stability, and repo experiments.";
   const targetPaths = collectTargetPaths(proposal);
+  const basePrompt = proposal.kind === "sector-control"
+    ? `${PATCH_PROMPT_FRAMEWORK}
+
+${SECTOR_CONTROL_PROMPT}`
+    : PATCH_PROMPT_FRAMEWORK;
+
   const { presets } = await smallLlmPatchPromptPresets({
     basePrompt: PATCH_PROMPT_FRAMEWORK,
     proposalTitle: proposal.title,

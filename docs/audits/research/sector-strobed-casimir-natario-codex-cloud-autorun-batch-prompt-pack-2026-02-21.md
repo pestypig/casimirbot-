@@ -6,6 +6,9 @@ Derived from:
 
 Use this pack to implement proposal structures in bounded, replay-safe patches.
 
+Execution ledger for this batch:
+- `reports/sector-strobed-casimir-natario-execution-ledger-2026-02-21.md`
+
 ## Shared guardrails (apply to every prompt)
 
 ```text
