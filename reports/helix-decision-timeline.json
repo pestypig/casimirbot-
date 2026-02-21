@@ -1,0 +1,541 @@
+{
+  "generated_at": "2026-02-21T19:08:22.031Z",
+  "events": [
+    {
+      "ts_iso": "2026-02-21T19:08:08.993Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "artifacts/experiments/helix-release-readiness/narrow/versatility-1771696975238/summary.json",
+      "exists": true,
+      "size_bytes": 81531,
+      "mtime_iso": "2026-02-21T18:04:26.887Z",
+      "sha256": "19f184f1c078cdc1291104cfd87997fb37afc7a4f6e6aae62f34d30325957249",
+      "details": {
+        "source_name": "narrow"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:08.995Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/summary.json",
+      "exists": true,
+      "size_bytes": 125862,
+      "mtime_iso": "2026-02-21T18:07:08.680Z",
+      "sha256": "5f6561c50499847c40dc15c79975b0f7ca7e5ed8bb4d892835152c6ba7e60eee",
+      "details": {
+        "source_name": "heavy"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:08.997Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/recommendation.json",
+      "exists": true,
+      "size_bytes": 3977,
+      "mtime_iso": "2026-02-21T18:07:08.680Z",
+      "sha256": "cd212b9e4eba87afcd20827fadfb500887ed098eef023c282ba5df67821d8718",
+      "details": {
+        "source_name": "recommendation"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:08.999Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t02/helix_relation_recovery_stabilized_t02/summary.json",
+      "exists": true,
+      "size_bytes": 1800,
+      "mtime_iso": "2026-02-21T15:42:18.391Z",
+      "sha256": "9faa7d75bd60df3a21d051beb75c1416a41c6e24adb776ddc4bfd00c502cd9d4",
+      "details": {
+        "source_name": "ab_t02"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:09.000Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t035/helix_relation_recovery_stabilized_t035/summary.json",
+      "exists": true,
+      "size_bytes": 1801,
+      "mtime_iso": "2026-02-21T15:42:18.397Z",
+      "sha256": "3f4ab72aa63179f5a3e8905f163664a81545920ea3cb9eacd334001f203d9048",
+      "details": {
+        "source_name": "ab_t035"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:09.002Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "reports/helix-cloud-closure-casimir.json",
+      "exists": true,
+      "size_bytes": 223,
+      "mtime_iso": "2026-02-20T20:32:09.320Z",
+      "sha256": "38ba3b0a03073d6640051147e5e07c86b8a568d177b508e9b8b27e44898fa69e",
+      "details": {
+        "source_name": "casimir"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:09.005Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "artifacts/experiments/helix-release-readiness/narrow/versatility-1771696975238/summary.json",
+      "exists": true,
+      "size_bytes": 81531,
+      "mtime_iso": "2026-02-21T18:04:26.887Z",
+      "sha256": "19f184f1c078cdc1291104cfd87997fb37afc7a4f6e6aae62f34d30325957249",
+      "details": {
+        "source_name": "narrow"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:09.006Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/summary.json",
+      "exists": true,
+      "size_bytes": 125862,
+      "mtime_iso": "2026-02-21T18:07:08.680Z",
+      "sha256": "5f6561c50499847c40dc15c79975b0f7ca7e5ed8bb4d892835152c6ba7e60eee",
+      "details": {
+        "source_name": "heavy"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:09.007Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/recommendation.json",
+      "exists": true,
+      "size_bytes": 3977,
+      "mtime_iso": "2026-02-21T18:07:08.680Z",
+      "sha256": "cd212b9e4eba87afcd20827fadfb500887ed098eef023c282ba5df67821d8718",
+      "details": {
+        "source_name": "recommendation"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:09.009Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t02/helix_relation_recovery_stabilized_t02/summary.json",
+      "exists": true,
+      "size_bytes": 1800,
+      "mtime_iso": "2026-02-21T15:42:18.391Z",
+      "sha256": "9faa7d75bd60df3a21d051beb75c1416a41c6e24adb776ddc4bfd00c502cd9d4",
+      "details": {
+        "source_name": "ab_t02"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:09.010Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t035/helix_relation_recovery_stabilized_t035/summary.json",
+      "exists": true,
+      "size_bytes": 1801,
+      "mtime_iso": "2026-02-21T15:42:18.397Z",
+      "sha256": "3f4ab72aa63179f5a3e8905f163664a81545920ea3cb9eacd334001f203d9048",
+      "details": {
+        "source_name": "ab_t035"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:09.012Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "reports/helix-cloud-closure-casimir.json",
+      "exists": true,
+      "size_bytes": 223,
+      "mtime_iso": "2026-02-20T20:32:09.320Z",
+      "sha256": "38ba3b0a03073d6640051147e5e07c86b8a568d177b508e9b8b27e44898fa69e",
+      "details": {
+        "source_name": "casimir"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:09.178Z",
+      "phase": "decision_package",
+      "event": "fail_path_before_clear_outputs",
+      "path": null,
+      "exists": null,
+      "size_bytes": null,
+      "mtime_iso": null,
+      "sha256": null,
+      "details": {
+        "reason": "required_source_provenance_mismatch:head,origin_main",
+        "heavy": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/summary.json"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:09.180Z",
+      "phase": "decision_package",
+      "event": "fail_path_cleanup_complete",
+      "path": null,
+      "exists": null,
+      "size_bytes": null,
+      "mtime_iso": null,
+      "sha256": null,
+      "details": {
+        "cleared": [
+          {
+            "file": "reports/helix-decision-package.json",
+            "exists": false
+          },
+          {
+            "file": "reports/helix-decision-package.md",
+            "exists": false
+          },
+          {
+            "file": "reports/helix-decision-inputs.json",
+            "exists": false
+          }
+        ]
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:20.695Z",
+      "phase": "resolve_sources",
+      "event": "resolve_sources_start",
+      "path": null,
+      "exists": null,
+      "size_bytes": null,
+      "mtime_iso": null,
+      "sha256": null,
+      "details": {
+        "overrides": {
+          "narrow": null,
+          "heavy": null,
+          "recommendation": null,
+          "ab_t02": null,
+          "ab_t035": null,
+          "casimir": null
+        }
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.267Z",
+      "phase": "resolve_sources",
+      "event": "resolve_sources_end",
+      "path": null,
+      "exists": null,
+      "size_bytes": null,
+      "mtime_iso": null,
+      "sha256": null,
+      "details": {
+        "selected_sources": {
+          "narrow": "artifacts/experiments/helix-release-readiness/narrow/versatility-1771696975238/summary.json",
+          "heavy": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/summary.json",
+          "recommendation": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/recommendation.json",
+          "ab_t02": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t02/helix_relation_recovery_stabilized_t02/summary.json",
+          "ab_t035": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t035/helix_relation_recovery_stabilized_t035/summary.json",
+          "casimir": "reports/helix-cloud-closure-casimir.json"
+        }
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.268Z",
+      "phase": "resolve_sources",
+      "event": "source_selected",
+      "path": "artifacts/experiments/helix-release-readiness/narrow/versatility-1771696975238/summary.json",
+      "exists": true,
+      "size_bytes": 81531,
+      "mtime_iso": "2026-02-21T18:04:26.887Z",
+      "sha256": "19f184f1c078cdc1291104cfd87997fb37afc7a4f6e6aae62f34d30325957249",
+      "details": {
+        "source_name": "narrow"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.269Z",
+      "phase": "resolve_sources",
+      "event": "source_selected",
+      "path": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/summary.json",
+      "exists": true,
+      "size_bytes": 125862,
+      "mtime_iso": "2026-02-21T18:07:08.680Z",
+      "sha256": "5f6561c50499847c40dc15c79975b0f7ca7e5ed8bb4d892835152c6ba7e60eee",
+      "details": {
+        "source_name": "heavy"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.270Z",
+      "phase": "resolve_sources",
+      "event": "source_selected",
+      "path": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/recommendation.json",
+      "exists": true,
+      "size_bytes": 3977,
+      "mtime_iso": "2026-02-21T18:07:08.680Z",
+      "sha256": "cd212b9e4eba87afcd20827fadfb500887ed098eef023c282ba5df67821d8718",
+      "details": {
+        "source_name": "recommendation"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.271Z",
+      "phase": "resolve_sources",
+      "event": "source_selected",
+      "path": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t02/helix_relation_recovery_stabilized_t02/summary.json",
+      "exists": true,
+      "size_bytes": 1800,
+      "mtime_iso": "2026-02-21T15:42:18.391Z",
+      "sha256": "9faa7d75bd60df3a21d051beb75c1416a41c6e24adb776ddc4bfd00c502cd9d4",
+      "details": {
+        "source_name": "ab_t02"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.271Z",
+      "phase": "resolve_sources",
+      "event": "source_selected",
+      "path": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t035/helix_relation_recovery_stabilized_t035/summary.json",
+      "exists": true,
+      "size_bytes": 1801,
+      "mtime_iso": "2026-02-21T15:42:18.397Z",
+      "sha256": "3f4ab72aa63179f5a3e8905f163664a81545920ea3cb9eacd334001f203d9048",
+      "details": {
+        "source_name": "ab_t035"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.272Z",
+      "phase": "resolve_sources",
+      "event": "source_selected",
+      "path": "reports/helix-cloud-closure-casimir.json",
+      "exists": true,
+      "size_bytes": 223,
+      "mtime_iso": "2026-02-20T20:32:09.320Z",
+      "sha256": "38ba3b0a03073d6640051147e5e07c86b8a568d177b508e9b8b27e44898fa69e",
+      "details": {
+        "source_name": "casimir"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.273Z",
+      "phase": "decision_package",
+      "event": "decision_package_start",
+      "path": null,
+      "exists": null,
+      "size_bytes": null,
+      "mtime_iso": null,
+      "sha256": null,
+      "details": {
+        "cmd": "npm run helix:decision:package -- --narrow artifacts/experiments/helix-release-readiness/narrow/versatility-1771696975238/summary.json --heavy artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/summary.json --heavy-recommendation artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/recommendation.json --ab-t02 artifacts/experiments/helix-relation-recovery-stabilized/ab/t02/helix_relation_recovery_stabilized_t02/summary.json --ab-t035 artifacts/experiments/helix-relation-recovery-stabilized/ab/t035/helix_relation_recovery_stabilized_t035/summary.json --casimir reports/helix-cloud-closure-casimir.json"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.814Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "artifacts/experiments/helix-release-readiness/narrow/versatility-1771696975238/summary.json",
+      "exists": true,
+      "size_bytes": 81531,
+      "mtime_iso": "2026-02-21T18:04:26.887Z",
+      "sha256": "19f184f1c078cdc1291104cfd87997fb37afc7a4f6e6aae62f34d30325957249",
+      "details": {
+        "source_name": "narrow"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.817Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/summary.json",
+      "exists": true,
+      "size_bytes": 125862,
+      "mtime_iso": "2026-02-21T18:07:08.680Z",
+      "sha256": "5f6561c50499847c40dc15c79975b0f7ca7e5ed8bb4d892835152c6ba7e60eee",
+      "details": {
+        "source_name": "heavy"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.819Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/recommendation.json",
+      "exists": true,
+      "size_bytes": 3977,
+      "mtime_iso": "2026-02-21T18:07:08.680Z",
+      "sha256": "cd212b9e4eba87afcd20827fadfb500887ed098eef023c282ba5df67821d8718",
+      "details": {
+        "source_name": "recommendation"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.820Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t02/helix_relation_recovery_stabilized_t02/summary.json",
+      "exists": true,
+      "size_bytes": 1800,
+      "mtime_iso": "2026-02-21T15:42:18.391Z",
+      "sha256": "9faa7d75bd60df3a21d051beb75c1416a41c6e24adb776ddc4bfd00c502cd9d4",
+      "details": {
+        "source_name": "ab_t02"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.822Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t035/helix_relation_recovery_stabilized_t035/summary.json",
+      "exists": true,
+      "size_bytes": 1801,
+      "mtime_iso": "2026-02-21T15:42:18.397Z",
+      "sha256": "3f4ab72aa63179f5a3e8905f163664a81545920ea3cb9eacd334001f203d9048",
+      "details": {
+        "source_name": "ab_t035"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.824Z",
+      "phase": "decision_package",
+      "event": "source_selected_before_read",
+      "path": "reports/helix-cloud-closure-casimir.json",
+      "exists": true,
+      "size_bytes": 223,
+      "mtime_iso": "2026-02-20T20:32:09.320Z",
+      "sha256": "38ba3b0a03073d6640051147e5e07c86b8a568d177b508e9b8b27e44898fa69e",
+      "details": {
+        "source_name": "casimir"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.827Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "artifacts/experiments/helix-release-readiness/narrow/versatility-1771696975238/summary.json",
+      "exists": true,
+      "size_bytes": 81531,
+      "mtime_iso": "2026-02-21T18:04:26.887Z",
+      "sha256": "19f184f1c078cdc1291104cfd87997fb37afc7a4f6e6aae62f34d30325957249",
+      "details": {
+        "source_name": "narrow"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.828Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/summary.json",
+      "exists": true,
+      "size_bytes": 125862,
+      "mtime_iso": "2026-02-21T18:07:08.680Z",
+      "sha256": "5f6561c50499847c40dc15c79975b0f7ca7e5ed8bb4d892835152c6ba7e60eee",
+      "details": {
+        "source_name": "heavy"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.830Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/recommendation.json",
+      "exists": true,
+      "size_bytes": 3977,
+      "mtime_iso": "2026-02-21T18:07:08.680Z",
+      "sha256": "cd212b9e4eba87afcd20827fadfb500887ed098eef023c282ba5df67821d8718",
+      "details": {
+        "source_name": "recommendation"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.831Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t02/helix_relation_recovery_stabilized_t02/summary.json",
+      "exists": true,
+      "size_bytes": 1800,
+      "mtime_iso": "2026-02-21T15:42:18.391Z",
+      "sha256": "9faa7d75bd60df3a21d051beb75c1416a41c6e24adb776ddc4bfd00c502cd9d4",
+      "details": {
+        "source_name": "ab_t02"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.832Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t035/helix_relation_recovery_stabilized_t035/summary.json",
+      "exists": true,
+      "size_bytes": 1801,
+      "mtime_iso": "2026-02-21T15:42:18.397Z",
+      "sha256": "3f4ab72aa63179f5a3e8905f163664a81545920ea3cb9eacd334001f203d9048",
+      "details": {
+        "source_name": "ab_t035"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.834Z",
+      "phase": "decision_package",
+      "event": "source_read_parse_complete",
+      "path": "reports/helix-cloud-closure-casimir.json",
+      "exists": true,
+      "size_bytes": 223,
+      "mtime_iso": "2026-02-20T20:32:09.320Z",
+      "sha256": "38ba3b0a03073d6640051147e5e07c86b8a568d177b508e9b8b27e44898fa69e",
+      "details": {
+        "source_name": "casimir"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.996Z",
+      "phase": "decision_package",
+      "event": "fail_path_before_clear_outputs",
+      "path": null,
+      "exists": null,
+      "size_bytes": null,
+      "mtime_iso": null,
+      "sha256": null,
+      "details": {
+        "reason": "required_source_provenance_mismatch:head,origin_main",
+        "heavy": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/summary.json"
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:21.998Z",
+      "phase": "decision_package",
+      "event": "fail_path_cleanup_complete",
+      "path": null,
+      "exists": null,
+      "size_bytes": null,
+      "mtime_iso": null,
+      "sha256": null,
+      "details": {
+        "cleared": [
+          {
+            "file": "reports/helix-decision-package.json",
+            "exists": false
+          },
+          {
+            "file": "reports/helix-decision-package.md",
+            "exists": false
+          },
+          {
+            "file": "reports/helix-decision-inputs.json",
+            "exists": false
+          }
+        ]
+      }
+    },
+    {
+      "ts_iso": "2026-02-21T19:08:22.031Z",
+      "phase": "decision_package",
+      "event": "decision_package_end",
+      "path": null,
+      "exists": null,
+      "size_bytes": null,
+      "mtime_iso": null,
+      "sha256": null,
+      "details": {
+        "status": 1
+      }
+    }
+  ]
+}

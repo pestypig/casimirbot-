@@ -8,42 +8,17 @@
   "package_path": "reports/helix-decision-package.json",
   "validate_path": "reports/helix-decision-validate.json",
   "selected_sources": {
-    "narrow": "reports/helix-self-tune-gate-summary.json",
-    "heavy": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/summary.json",
-    "recommendation": "artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/recommendation.json",
-    "ab_t02": "artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json",
-    "ab_t035": "artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json",
+    "narrow": "artifacts/experiments/helix-release-readiness/narrow/versatility-1771696975238/summary.json",
+    "heavy": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/summary.json",
+    "recommendation": "artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/recommendation.json",
+    "ab_t02": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t02/helix_relation_recovery_stabilized_t02/summary.json",
+    "ab_t035": "artifacts/experiments/helix-relation-recovery-stabilized/ab/t035/helix_relation_recovery_stabilized_t035/summary.json",
     "casimir": "reports/helix-cloud-closure-casimir.json"
   },
   "commands": [
     {
-      "name": "fresh:narrow",
-      "cmd": "npm run helix:decision:eval:narrow --if-present",
-      "status": 0
-    },
-    {
-      "name": "fresh:heavy",
-      "cmd": "npm run helix:decision:eval:heavy --if-present",
-      "status": 0
-    },
-    {
-      "name": "fresh:ab_t02",
-      "cmd": "npm run helix:decision:eval:ab:t02 --if-present",
-      "status": 0
-    },
-    {
-      "name": "fresh:ab_t035",
-      "cmd": "npm run helix:decision:eval:ab:t035 --if-present",
-      "status": 0
-    },
-    {
-      "name": "fresh:casimir",
-      "cmd": "npm run helix:decision:eval:casimir --if-present",
-      "status": 0
-    },
-    {
       "name": "decision:package",
-      "cmd": "npm run helix:decision:package -- --narrow reports/helix-self-tune-gate-summary.json --heavy artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/summary.json --heavy-recommendation artifacts/experiments/helix-step4-heavy-rerun/versatility-1771558290390/recommendation.json --ab-t02 artifacts/experiments/helix-step4-ab-rerun/t02/helix_step4_rerun_t02/summary.json --ab-t035 artifacts/experiments/helix-step4-ab-rerun/t035/helix_step4_rerun_t035/summary.json --casimir reports/helix-cloud-closure-casimir.json",
+      "cmd": "npm run helix:decision:package -- --narrow artifacts/experiments/helix-release-readiness/narrow/versatility-1771696975238/summary.json --heavy artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/summary.json --heavy-recommendation artifacts/experiments/helix-release-readiness/heavy/versatility-1771697074234/recommendation.json --ab-t02 artifacts/experiments/helix-relation-recovery-stabilized/ab/t02/helix_relation_recovery_stabilized_t02/summary.json --ab-t035 artifacts/experiments/helix-relation-recovery-stabilized/ab/t035/helix_relation_recovery_stabilized_t035/summary.json --casimir reports/helix-cloud-closure-casimir.json",
       "status": 1
     }
   ]
