@@ -137,6 +137,7 @@ import { buildHelixAskEnvelope } from "../services/helix-ask/envelope";
 import { extractFilePathsFromText } from "../services/helix-ask/paths";
 import {
   buildHelixAskMechanismSentence,
+  buildHelixAskRelationDetailBlock,
   getHelixAskSectionOrder,
   resolveHelixAskNoveltyFamily,
   type HelixAskNoveltyContext,
@@ -12785,7 +12786,23 @@ const renderHelixAskAnswerContract = (
     }
     if (practiceLine) sectionsByType.details.push(practiceLine);
   }
-  if (mechanismClaims[0]) sectionsByType.mechanism.push(mechanismClaims[0]);
+  if (mechanismClaims[0]) {
+    if (noveltyContext?.family === "relation") {
+      const relationDetail = buildHelixAskRelationDetailBlock({
+        context: noveltyContext,
+        evidenceTarget: contract.sources?.[0] ?? "retrieved evidence",
+      });
+      if (relationDetail.placement === "before_mechanism") {
+        sectionsByType.mechanism.push(relationDetail.line);
+        sectionsByType.mechanism.push(mechanismClaims[0]);
+      } else {
+        sectionsByType.mechanism.push(mechanismClaims[0]);
+        sectionsByType.mechanism.push(relationDetail.line);
+      }
+    } else {
+      sectionsByType.mechanism.push(mechanismClaims[0]);
+    }
+  }
   if (maturityClaims[0]) sectionsByType.maturity.push(maturityClaims[0]);
   if (contract.uncertainty) {
     const missing = ensureSentence(normalizeContractText(contract.uncertainty, 260));
@@ -26178,15 +26195,30 @@ const executeHelixAsk = async ({
           answerStart,
         );
         if (!answerContractGate.hardFail) {
+          const noveltyFamily = resolveHelixAskNoveltyFamily({
+            intentProfileId: intentProfile.id,
+            intentDomain,
+            question: baseQuestion,
+          });
+          const topCitation = sanitizedContract.sources?.[0] ?? "";
           cleaned = renderHelixAskAnswerContract(sanitizedContract, formatSpec.format, baseQuestion, {
-            family: resolveHelixAskNoveltyFamily({
-              intentProfileId: intentProfile.id,
-              intentDomain,
-              question: baseQuestion,
-            }),
+            family: noveltyFamily,
             prompt: baseQuestion,
             seed: parsed.data.seed ?? null,
             temperature: parsed.data.temperature ?? null,
+            promptFingerprint: crypto
+              .createHash("sha1")
+              .update(baseQuestion)
+              .digest("hex")
+              .slice(0, 16),
+            intentStrategy,
+            topCitationTokenHash: topCitation
+              ? crypto.createHash("sha1").update(topCitation).digest("hex").slice(0, 16)
+              : null,
+            answerPathKey: answerPath.slice(-6).join("|"),
+            relationPacketSignal: relationPacket
+              ? `${relationPacket.bridge_claims.length}:${relationPacket.evidence.length}:${relationDualDomainOk ? 1 : 0}`
+              : null,
           });
           answerContract = sanitizedContract;
           answerContractApplied = true;
