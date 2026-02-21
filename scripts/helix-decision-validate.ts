@@ -9,12 +9,15 @@ const packagePath = process.argv.includes("--package")
   : "reports/helix-decision-package.json";
 const reportPath = "reports/helix-decision-validate.json";
 const schemaPath = "schemas/helix-decision-package.schema.json";
-const timelinePath = "reports/helix-decision-timeline.json";
+const runId = process.env.HELIX_DECISION_RUN_ID ?? "standalone";
+const timelinePath = process.env.HELIX_DECISION_TIMELINE_PATH ?? "reports/helix-decision-timeline-standalone.jsonl";
 
 type TimelineEvent = {
+  run_id: string;
   ts_iso: string;
   phase: string;
   event: string;
+  pid: number;
   path: string | null;
   exists: boolean | null;
   size_bytes: number | null;
@@ -46,27 +49,22 @@ function fileMeta(filePath: string): { exists: boolean; size_bytes: number | nul
 
 function appendTimeline(phase: string, event: string, options: { path?: string | null; details?: Record<string, unknown> } = {}): void {
   const abs = path.resolve(ROOT, timelinePath);
-  let events: TimelineEvent[] = [];
-  try {
-    const current = JSON.parse(fs.readFileSync(abs, "utf8")) as { events?: TimelineEvent[] };
-    if (Array.isArray(current.events)) events = current.events;
-  } catch {
-    // initialize
-  }
   const meta = options.path ? fileMeta(options.path) : { exists: null, size_bytes: null, mtime_iso: null, sha256: null };
-  events.push({
+  const eventRow: TimelineEvent = {
+    run_id: runId,
     ts_iso: new Date().toISOString(),
     phase,
     event,
+    pid: process.pid,
     path: options.path ?? null,
     exists: meta.exists,
     size_bytes: meta.size_bytes,
     mtime_iso: meta.mtime_iso,
     sha256: meta.sha256,
     details: options.details ?? {},
-  });
+  };
   fs.mkdirSync(path.resolve(ROOT, "reports"), { recursive: true });
-  fs.writeFileSync(abs, `${JSON.stringify({ generated_at: new Date().toISOString(), events }, null, 2)}\n`);
+  fs.appendFileSync(abs, `${JSON.stringify(eventRow)}\n`);
 }
 
 function isUtilityAbSummary(obj: any): boolean {
@@ -109,6 +107,7 @@ function equalAheadBehind(a: { ahead: number; behind: number } | null, b: { ahea
 }
 
 const failures: string[] = [];
+appendTimeline("decision_validate", "validate_start", { path: packagePath });
 let pkg: any = null;
 let schema: any = null;
 
@@ -235,8 +234,10 @@ if (!out.ok) {
     path: packagePath,
     details: { blocker: failures[0] ?? "unknown" },
   });
+  appendTimeline("decision_validate", "validate_end", { path: packagePath, details: { ok: false, failure_count: failures.length } });
   console.log(JSON.stringify(out, null, 2));
   process.exit(1);
 }
 appendTimeline("decision_validate", "validator_pass", { path: packagePath, details: { failure_count: 0 } });
+appendTimeline("decision_validate", "validate_end", { path: packagePath, details: { ok: true, failure_count: 0 } });
 console.log(JSON.stringify(out, null, 2));
