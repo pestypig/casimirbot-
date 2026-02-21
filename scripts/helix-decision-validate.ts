@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Ajv from "ajv";
+import crypto from "node:crypto";
 
 const ROOT = process.cwd();
 const packagePath = process.argv.includes("--package")
@@ -8,6 +9,19 @@ const packagePath = process.argv.includes("--package")
   : "reports/helix-decision-package.json";
 const reportPath = "reports/helix-decision-validate.json";
 const schemaPath = "schemas/helix-decision-package.schema.json";
+const timelinePath = "reports/helix-decision-timeline.json";
+
+type TimelineEvent = {
+  ts_iso: string;
+  phase: string;
+  event: string;
+  path: string | null;
+  exists: boolean | null;
+  size_bytes: number | null;
+  mtime_iso: string | null;
+  sha256: string | null;
+  details: Record<string, unknown>;
+};
 
 function readJson(filePath: string): any {
   return JSON.parse(fs.readFileSync(path.resolve(ROOT, filePath), "utf8"));
@@ -15,6 +29,44 @@ function readJson(filePath: string): any {
 
 function exists(filePath: string): boolean {
   return fs.existsSync(path.resolve(ROOT, filePath));
+}
+
+function fileMeta(filePath: string): { exists: boolean; size_bytes: number | null; mtime_iso: string | null; sha256: string | null } {
+  const abs = path.resolve(ROOT, filePath);
+  if (!fs.existsSync(abs)) return { exists: false, size_bytes: null, mtime_iso: null, sha256: null };
+  const stat = fs.statSync(abs);
+  const buf = fs.readFileSync(abs);
+  return {
+    exists: true,
+    size_bytes: stat.size,
+    mtime_iso: stat.mtime.toISOString(),
+    sha256: crypto.createHash("sha256").update(buf).digest("hex"),
+  };
+}
+
+function appendTimeline(phase: string, event: string, options: { path?: string | null; details?: Record<string, unknown> } = {}): void {
+  const abs = path.resolve(ROOT, timelinePath);
+  let events: TimelineEvent[] = [];
+  try {
+    const current = JSON.parse(fs.readFileSync(abs, "utf8")) as { events?: TimelineEvent[] };
+    if (Array.isArray(current.events)) events = current.events;
+  } catch {
+    // initialize
+  }
+  const meta = options.path ? fileMeta(options.path) : { exists: null, size_bytes: null, mtime_iso: null, sha256: null };
+  events.push({
+    ts_iso: new Date().toISOString(),
+    phase,
+    event,
+    path: options.path ?? null,
+    exists: meta.exists,
+    size_bytes: meta.size_bytes,
+    mtime_iso: meta.mtime_iso,
+    sha256: meta.sha256,
+    details: options.details ?? {},
+  });
+  fs.mkdirSync(path.resolve(ROOT, "reports"), { recursive: true });
+  fs.writeFileSync(abs, `${JSON.stringify({ generated_at: new Date().toISOString(), events }, null, 2)}\n`);
 }
 
 function isUtilityAbSummary(obj: any): boolean {
@@ -179,7 +231,12 @@ const out = {
 fs.mkdirSync(path.resolve(ROOT, "reports"), { recursive: true });
 fs.writeFileSync(path.resolve(ROOT, reportPath), `${JSON.stringify(out, null, 2)}\n`);
 if (!out.ok) {
+  appendTimeline("decision_validate", "validator_first_blocker", {
+    path: packagePath,
+    details: { blocker: failures[0] ?? "unknown" },
+  });
   console.log(JSON.stringify(out, null, 2));
   process.exit(1);
 }
+appendTimeline("decision_validate", "validator_pass", { path: packagePath, details: { failure_count: 0 } });
 console.log(JSON.stringify(out, null, 2));

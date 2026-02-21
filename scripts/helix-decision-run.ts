@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import crypto from "node:crypto";
 
 type SourceKey = "narrow" | "heavy" | "recommendation" | "ab_t02" | "ab_t035" | "casimir";
 
@@ -18,6 +19,19 @@ type RunSummary = {
 };
 
 const SUMMARY_PATH = "reports/helix-decision-run-summary.json";
+const TIMELINE_PATH = "reports/helix-decision-timeline.json";
+
+type TimelineEvent = {
+  ts_iso: string;
+  phase: string;
+  event: string;
+  path: string | null;
+  exists: boolean | null;
+  size_bytes: number | null;
+  mtime_iso: string | null;
+  sha256: string | null;
+  details: Record<string, unknown>;
+};
 
 function rootDir(): string {
   return process.env.HELIX_DECISION_ROOT ?? process.cwd();
@@ -33,6 +47,44 @@ function parseArgs(argv: string[]): Map<string, string> {
     args.set(key, value);
   }
   return args;
+}
+
+function fileMeta(relPath: string): { exists: boolean; size_bytes: number | null; mtime_iso: string | null; sha256: string | null } {
+  const abs = path.resolve(rootDir(), relPath);
+  if (!fs.existsSync(abs)) return { exists: false, size_bytes: null, mtime_iso: null, sha256: null };
+  const st = fs.statSync(abs);
+  const buf = fs.readFileSync(abs);
+  return {
+    exists: true,
+    size_bytes: st.size,
+    mtime_iso: st.mtime.toISOString(),
+    sha256: crypto.createHash("sha256").update(buf).digest("hex"),
+  };
+}
+
+function appendTimeline(phase: string, event: string, options: { path?: string | null; details?: Record<string, unknown> } = {}): void {
+  const timelineAbs = path.resolve(rootDir(), TIMELINE_PATH);
+  let events: TimelineEvent[] = [];
+  try {
+    const existing = JSON.parse(fs.readFileSync(timelineAbs, "utf8")) as { events?: TimelineEvent[] };
+    if (Array.isArray(existing.events)) events = existing.events;
+  } catch {
+    // initialize
+  }
+  const meta = options.path ? fileMeta(options.path) : { exists: null, size_bytes: null, mtime_iso: null, sha256: null };
+  events.push({
+    ts_iso: new Date().toISOString(),
+    phase,
+    event,
+    path: options.path ?? null,
+    exists: meta.exists,
+    size_bytes: meta.size_bytes,
+    mtime_iso: meta.mtime_iso,
+    sha256: meta.sha256,
+    details: options.details ?? {},
+  });
+  fs.mkdirSync(path.resolve(rootDir(), "reports"), { recursive: true });
+  fs.writeFileSync(timelineAbs, `${JSON.stringify({ generated_at: new Date().toISOString(), events }, null, 2)}\n`);
 }
 
 function runCommand(name: string, cmd: string, options: { allowFail?: boolean } = {}): { status: number; stdout: string; stderr: string } {
@@ -248,7 +300,12 @@ function main(): void {
     }
   }
 
+  appendTimeline("resolve_sources", "resolve_sources_start", { details: { overrides } });
   const sources = resolveSources(overrides);
+  appendTimeline("resolve_sources", "resolve_sources_end", { details: { selected_sources: sources } });
+  for (const [name, src] of Object.entries(sources)) {
+    appendTimeline("resolve_sources", "source_selected", { path: src, details: { source_name: name } });
+  }
   const packageCmd = [
     "npm run helix:decision:package --",
     `--narrow ${sources.narrow}`,
@@ -258,7 +315,9 @@ function main(): void {
     `--ab-t035 ${sources.ab_t035}`,
     `--casimir ${sources.casimir}`,
   ].join(" ");
+  appendTimeline("decision_package", "decision_package_start", { details: { cmd: packageCmd } });
   const packageRes = runCommand("decision:package", packageCmd, { allowFail: true });
+  appendTimeline("decision_package", "decision_package_end", { details: { status: packageRes.status } });
   commands.push({ name: "decision:package", cmd: packageCmd, status: packageRes.status });
 
   if (packageRes.status !== 0) {
@@ -277,7 +336,9 @@ function main(): void {
   }
 
   const validateCmd = "npm run helix:decision:validate -- --package reports/helix-decision-package.json";
+  appendTimeline("decision_validate", "decision_validate_start", { details: { cmd: validateCmd } });
   const validateRes = runCommand("decision:validate", validateCmd, { allowFail: true });
+  appendTimeline("decision_validate", "decision_validate_end", { details: { status: validateRes.status } });
   commands.push({ name: "decision:validate", cmd: validateCmd, status: validateRes.status });
 
   const pkg = tryReadJson("reports/helix-decision-package.json") ?? {};

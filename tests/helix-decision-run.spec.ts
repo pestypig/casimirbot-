@@ -282,12 +282,34 @@ describe("helix decision run summary", () => {
     const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8")) as {
       ok: boolean;
       decision: string;
-      commands: Array<{ name: string }>;
+      commands: Array<{ name: string; cmd: string }>;
+      selected_sources: Record<string, string>;
     };
     expect(summary.ok).toBe(true);
     expect(summary.decision).toBe("GO");
     expect(summary.commands.some((command) => command.name === "decision:package")).toBe(true);
     expect(summary.commands.some((command) => command.name === "decision:validate")).toBe(true);
+
+    const timelinePath = path.join(dir, "reports/helix-decision-timeline.json");
+    expect(fs.existsSync(timelinePath)).toBe(true);
+    const timeline = JSON.parse(fs.readFileSync(timelinePath, "utf8")) as {
+      events: Array<{ phase: string; event: string; details: Record<string, unknown> }>;
+    };
+    const phaseEvents = timeline.events.map((event) => `${event.phase}:${event.event}`);
+    expect(phaseEvents).toContain("resolve_sources:resolve_sources_start");
+    expect(phaseEvents).toContain("resolve_sources:resolve_sources_end");
+    expect(phaseEvents).toContain("decision_package:decision_package_start");
+    expect(phaseEvents).toContain("decision_package:decision_package_end");
+    expect(phaseEvents).toContain("decision_validate:decision_validate_start");
+    expect(phaseEvents).toContain("decision_validate:decision_validate_end");
+
+    const packageCmd = summary.commands.find((command) => command.name === "decision:package")?.cmd ?? "";
+    expect(packageCmd).toContain(summary.selected_sources.narrow);
+    expect(packageCmd).toContain(summary.selected_sources.heavy);
+    expect(packageCmd).toContain(summary.selected_sources.recommendation);
+    expect(packageCmd).toContain(summary.selected_sources.ab_t02);
+    expect(packageCmd).toContain(summary.selected_sources.ab_t035);
+    expect(packageCmd).toContain(summary.selected_sources.casimir);
   });
   it("stops on package failure with machine-readable blocker and no validate fallback", () => {
     const dir = mkDir();

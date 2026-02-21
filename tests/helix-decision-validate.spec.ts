@@ -235,6 +235,23 @@ describe("helix decision validate", () => {
     const out = runValidator(dir);
     expect(out.status).toBe(0);
   });
+
+  it("validator rejects artifact exists=true when file is missing", () => {
+    const dir = mk();
+    const pkg = basePackage();
+    pkg.artifacts = [{ path: "ghost.json", exists: true, sha256: "x", size_bytes: 1, mtime_iso: new Date().toISOString() }];
+    fs.writeFileSync(path.join(dir, "pkg.json"), JSON.stringify(pkg, null, 2));
+    const out = runValidator(dir);
+    expect(out.status).not.toBe(0);
+    expect(`${out.stdout}${out.stderr}`).toContain("artifact_exists_true_but_missing:ghost.json");
+
+    const timeline = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-timeline.json"), "utf8")) as {
+      events: Array<{ phase: string; event: string; details: Record<string, unknown> }>;
+    };
+    const blocker = timeline.events.find((event) => event.event === "validator_first_blocker");
+    expect(blocker?.phase).toBe("decision_validate");
+    expect(String(blocker?.details?.blocker ?? "")).toContain("artifact_exists_true_but_missing");
+  });
 });
 
 describe("helix decision package", () => {
@@ -271,6 +288,23 @@ describe("helix decision package", () => {
     for (const name of ["helix-decision-package.json", "helix-decision-package.md", "helix-decision-inputs.json"]) {
       expect(fs.existsSync(path.join(dir, "reports", name))).toBe(false);
     }
+    const timeline = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-timeline.json"), "utf8")) as {
+      events: Array<{ event: string }>;
+    };
+    expect(timeline.events.some((event) => event.event === "fail_path_cleanup_complete")).toBe(true);
+  });
+
+  it("fails when source snapshot changes before write", () => {
+    const dir = mk();
+    writePackageFixtureSet(dir);
+    const out = runTsx(dir, "scripts/helix-decision-package.ts", [], {
+      HELIX_DECISION_TEST_DELETE_SOURCE_BEFORE_WRITE: "heavy",
+    });
+    expect(out.status).not.toBe(0);
+    expect(`${out.stdout}${out.stderr}`).toContain("source_snapshot_mismatch:heavy");
+    expect(fs.existsSync(path.join(dir, "reports/helix-decision-package.json"))).toBe(false);
+    expect(fs.existsSync(path.join(dir, "reports/helix-decision-package.md"))).toBe(false);
+    expect(fs.existsSync(path.join(dir, "reports/helix-decision-inputs.json"))).toBe(false);
   });
 
   it("fails on provenance mismatch before writing package", () => {
@@ -308,6 +342,16 @@ describe("helix decision package", () => {
     expect(manifest.run_ids.heavy).toContain("heavy-");
     expect(manifest.inputs.heavy.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(manifest.inputs.heavy.size_bytes).toBeGreaterThan(0);
+
+    const timeline = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-timeline.json"), "utf8")) as {
+      events: Array<{ event: string; ts_iso: string; path: string | null }>;
+    };
+    expect(timeline.events.some((event) => event.event === "source_selected_before_read")).toBe(true);
+    expect(timeline.events.some((event) => event.event === "source_read_parse_complete")).toBe(true);
+    expect(timeline.events.some((event) => event.event === "artifact_metadata_captured")).toBe(true);
+    expect(timeline.events.some((event) => event.event === "before_write")).toBe(true);
+    expect(timeline.events.some((event) => event.event === "after_write")).toBe(true);
+    expect(typeof timeline.events[0]?.ts_iso).toBe("string");
   });
 });
 
