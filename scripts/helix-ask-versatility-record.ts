@@ -1061,6 +1061,9 @@ const main = async () => {
   const citationRate = rawRuns.filter((row) => !row.failures.some((f) => f.startsWith("citation_missing"))).length / Math.max(1, rawRuns.length);
   const minTextPassRate = rawRuns.filter((row) => !row.failures.some((f) => f.startsWith("text_too_short"))).length / Math.max(1, rawRuns.length);
   const stubRate = rawRuns.filter((row) => row.failures.includes("stub_text_detected")).length / Math.max(1, rawRuns.length);
+  const runtimeFallbackRate = rawRuns.filter((row) => row.failures.includes("runtime_fallback_answer")).length / Math.max(1, rawRuns.length);
+  const runtimeTdzIntentStrategyRate = rawRuns.filter((row) => row.failures.includes("runtime_tdz_intentStrategy")).length / Math.max(1, rawRuns.length);
+  const runtimeTdzIntentProfileRate = rawRuns.filter((row) => row.failures.includes("runtime_tdz_intentProfile")).length / Math.max(1, rawRuns.length);
 
   const relationFallbackRate = relationRows.filter((row) => row.debug?.deterministic_fallback_used_relation === true).length / Math.max(1, relationRows.length);
   const parseFailRelationRate = relationRows.filter((row) => toNum(row.debug?.contract_parse_fail_rate_relation, 0) > 0).length / Math.max(1, relationRows.length);
@@ -1206,11 +1209,24 @@ const main = async () => {
       citation_repair_rate: repairRate,
       citation_presence_rate: citationRate,
       min_text_length_pass_rate: minTextPassRate,
+      runtime_fallback_answer: runtimeFallbackRate,
+      runtime_tdz_intentStrategy: runtimeTdzIntentStrategyRate,
+      runtime_tdz_intentProfile: runtimeTdzIntentProfileRate,
       latency_ms: {
         total: { p50: percentile(totalLatencies, 50), p95: percentile(totalLatencies, 95) },
         retrieval: { p50: percentile(retrievalLatencies, 50), p95: percentile(retrievalLatencies, 95), samples: retrievalLatencies.length },
         synthesis: { p50: percentile(synthesisLatencies, 50), p95: percentile(synthesisLatencies, 95), samples: synthesisLatencies.length },
       },
+    },
+    strict_gates: {
+      relation_packet_built_rate: relationPacketBuiltRate,
+      relation_dual_domain_ok_rate: relationDualDomainRate,
+      report_mode_correct_rate: reportModeCorrectRate,
+      citation_presence_rate: citationRate,
+      stub_text_detected_rate: stubRate,
+      runtime_fallback_answer: runtimeFallbackRate,
+      runtime_tdz_intentStrategy: runtimeTdzIntentStrategyRate,
+      runtime_tdz_intentProfile: runtimeTdzIntentProfileRate,
     },
     top_failure_signatures: topFailures,
     worst_examples: worst,
