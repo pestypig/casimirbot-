@@ -200,6 +200,48 @@ describe("helix ask audit evidence", () => {
     expect(() => validateHelixAskAuditNote(notePath, root)).toThrow(/missing_artifact/);
   });
 
+
+
+  it("validates CRLF artifact bytes against LF-canonical hashes", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "helix-audit-crlf-"));
+    const verifyRel = "artifacts/verification/helix-casimir-20260221T170007Z.json";
+    const traceRel = "artifacts/verification/helix-training-trace-20260221T170007Z.jsonl";
+    const notePath = path.join(root, "docs/audits/helix-results/HELIX-ASK-20260221T170007Z.json");
+    fs.mkdirSync(path.dirname(notePath), { recursive: true });
+    fs.mkdirSync(path.join(root, "artifacts/verification"), { recursive: true });
+
+    const verifyLf = '{"verdict":"PASS"}\n';
+    const traceLf = '{"trace":"t-1"}\n{"trace":"t-2"}\n';
+    fs.writeFileSync(path.join(root, verifyRel), Buffer.from(verifyLf.replace(/\n/g, "\r\n"), "utf8"));
+    fs.writeFileSync(path.join(root, traceRel), Buffer.from(traceLf.replace(/\n/g, "\r\n"), "utf8"));
+
+    fs.writeFileSync(
+      notePath,
+      JSON.stringify(
+        {
+          ticket: "HELIX-ASK",
+          created_at: new Date().toISOString(),
+          trace_id: "t",
+          run_id: "r",
+          verdict: "PASS",
+          certificate_hash: "f".repeat(64),
+          integrity_ok: true,
+          verify_artifact_path: verifyRel,
+          trace_export_path: traceRel,
+          artifact_hashes: {
+            verify_artifact_sha256: sha256(verifyLf),
+            trace_export_sha256: sha256(traceLf),
+          },
+          commands: [],
+        },
+        null,
+        2,
+      ),
+    );
+
+    expect(() => validateHelixAskAuditNote(notePath, root)).not.toThrow();
+  });
+
   it("fails when referenced artifact hashes mismatch", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "helix-audit-hash-"));
     const verifyRel = "artifacts/verification/helix-casimir-20260221T170006Z.json";

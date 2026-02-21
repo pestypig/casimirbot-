@@ -24,9 +24,24 @@ const sha256Hex = (content: Buffer | string): string =>
 
 const normalizeToPosixPath = (relativePath: string): string => relativePath.split(path.sep).join("/");
 
+const isCanonicalTextArtifact = (filePath: string): boolean => {
+  const ext = path.extname(filePath).toLowerCase();
+  return ext === ".json" || ext === ".jsonl";
+};
+
+const canonicalizeTextEol = (content: string): string => content.replace(/\r\n/g, "\n");
+
 export const computeFileSha256 = (filePath: string): string => {
   const content = fs.readFileSync(filePath);
   return sha256Hex(content);
+};
+
+export const computeAuditArtifactSha256 = (filePath: string): string => {
+  const content = fs.readFileSync(filePath);
+  if (!isCanonicalTextArtifact(filePath)) {
+    return sha256Hex(content);
+  }
+  return sha256Hex(canonicalizeTextEol(content.toString("utf8")));
 };
 
 export const formatUtcTimestamp = (date = new Date()): string =>
@@ -80,8 +95,8 @@ export const validateHelixAskAuditNote = (
   if (!fs.existsSync(traceAbs)) {
     throw new Error("missing_artifact:trace_export_path");
   }
-  const verifyHash = computeFileSha256(verifyAbs);
-  const traceHash = computeFileSha256(traceAbs);
+  const verifyHash = computeAuditArtifactSha256(verifyAbs);
+  const traceHash = computeAuditArtifactSha256(traceAbs);
   if (note.artifact_hashes.verify_artifact_sha256 !== verifyHash) {
     throw new Error("artifact_hash_mismatch:verify_artifact_sha256");
   }
@@ -144,8 +159,8 @@ export const writeHelixAskAuditArtifacts = ({
     verify_artifact_path: verifyRelNote,
     trace_export_path: traceRelNote,
     artifact_hashes: {
-      verify_artifact_sha256: computeFileSha256(verifyAbs),
-      trace_export_sha256: computeFileSha256(traceAbs),
+      verify_artifact_sha256: computeAuditArtifactSha256(verifyAbs),
+      trace_export_sha256: computeAuditArtifactSha256(traceAbs),
     },
     commands,
   };

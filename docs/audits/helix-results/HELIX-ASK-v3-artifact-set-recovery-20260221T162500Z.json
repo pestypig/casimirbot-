@@ -15,8 +15,8 @@
   "artifacts": {
     "novelty_service": "server/services/helix-ask/novelty-phrasing.ts",
     "render_route": "server/routes/agi.plan.ts",
-    "verify_artifact": "artifacts/verification/helix-casimir-20260221T174044Z.json",
-    "trace_export": "artifacts/verification/helix-training-trace-20260221T174044Z.jsonl"
+    "verify_artifact": "artifacts/verification/helix-casimir-20260221T175342Z.json",
+    "trace_export": "artifacts/verification/helix-training-trace-20260221T175342Z.jsonl"
   },
   "checks": {
     "determinism_same_input": true,
