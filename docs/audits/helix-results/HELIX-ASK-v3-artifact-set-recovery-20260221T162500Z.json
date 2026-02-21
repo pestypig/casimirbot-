@@ -3,7 +3,10 @@
   "artifact_set_version": "v3",
   "created_at": "2026-02-21T16:25:00Z",
   "scope": {
-    "families": ["relation", "repo_technical"],
+    "families": [
+      "relation",
+      "repo_technical"
+    ],
     "tests": [
       "tests/helix-ask-live-events.spec.ts",
       "tests/helix-ask-novelty-phrasing.spec.ts"
@@ -12,7 +15,8 @@
   "artifacts": {
     "novelty_service": "server/services/helix-ask/novelty-phrasing.ts",
     "render_route": "server/routes/agi.plan.ts",
-    "audit_note": "docs/audits/helix-results/HELIX-ASK-v3-artifact-set-recovery-20260221T162500Z.json"
+    "verify_artifact": "artifacts/verification/helix-casimir-20260221T164322Z.json",
+    "trace_export": "artifacts/verification/helix-training-trace-20260221T164322Z.jsonl"
   },
   "checks": {
     "determinism_same_input": true,

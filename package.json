@@ -99,7 +99,8 @@
     "helix:decision:package": "tsx scripts/helix-decision-package.ts",
     "helix:decision:validate": "tsx scripts/helix-decision-validate.ts",
     "helix:decision:run": "tsx scripts/helix-decision-run.ts",
-    "validate:agibot:assets": "tsx scripts/validate-agibot-asset-manifest.ts"
+    "validate:agibot:assets": "tsx scripts/validate-agibot-asset-manifest.ts",
+    "helix:ask:audit:write": "tsx scripts/helix-ask-audit-write.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",
