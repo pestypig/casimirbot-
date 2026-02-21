@@ -108,6 +108,14 @@ function readTimelineNdjson(filePath: string): Array<{ run_id: string; phase: st
     .map((line) => JSON.parse(line) as { run_id: string; phase: string; event: string; details: Record<string, unknown>; ts_iso: string; path: string | null });
 }
 
+function readTimelinePointer(root: string): { run_id: string; timeline_path: string; source: string } {
+  return JSON.parse(fs.readFileSync(path.join(root, "reports/helix-decision-timeline.latest.json"), "utf8")) as {
+    run_id: string;
+    timeline_path: string;
+    source: string;
+  };
+}
+
 function writePackageFixtureSet(root: string) {
   writeJson(path.join(root, "reports/helix-self-tune-gate-summary.json"), {
     precheck_run_id: "narrow-run",
@@ -254,7 +262,8 @@ describe("helix decision validate", () => {
     expect(out.status).not.toBe(0);
     expect(`${out.stdout}${out.stderr}`).toContain("artifact_exists_true_but_missing:ghost.json");
 
-    const timeline = readTimelineNdjson(path.join(dir, "reports/helix-decision-timeline-standalone.jsonl"));
+    const pointer = readTimelinePointer(dir);
+    const timeline = readTimelineNdjson(path.join(dir, pointer.timeline_path));
     const blocker = timeline.find((event) => event.event === "validator_first_blocker");
     expect(blocker?.phase).toBe("decision_validate");
     expect(String(blocker?.details?.blocker ?? "")).toContain("artifact_exists_true_but_missing");
@@ -295,7 +304,8 @@ describe("helix decision package", () => {
     for (const name of ["helix-decision-package.json", "helix-decision-package.md", "helix-decision-inputs.json"]) {
       expect(fs.existsSync(path.join(dir, "reports", name))).toBe(false);
     }
-    const timeline = readTimelineNdjson(path.join(dir, "reports/helix-decision-timeline-standalone.jsonl"));
+    const pointer = readTimelinePointer(dir);
+    const timeline = readTimelineNdjson(path.join(dir, pointer.timeline_path));
     expect(timeline.some((event) => event.event === "fail_path_cleanup_complete")).toBe(true);
   });
 
@@ -348,7 +358,8 @@ describe("helix decision package", () => {
     expect(manifest.inputs.heavy.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(manifest.inputs.heavy.size_bytes).toBeGreaterThan(0);
 
-    const timeline = readTimelineNdjson(path.join(dir, "reports/helix-decision-timeline-standalone.jsonl"));
+    const pointer = readTimelinePointer(dir);
+    const timeline = readTimelineNdjson(path.join(dir, pointer.timeline_path));
     expect(timeline.some((event) => event.event === "package_start")).toBe(true);
     expect(timeline.some((event) => event.event === "source_selected_before_read")).toBe(true);
     expect(timeline.some((event) => event.event === "source_read_parse_complete")).toBe(true);
@@ -357,6 +368,57 @@ describe("helix decision package", () => {
     expect(timeline.some((event) => event.event === "after_write")).toBe(true);
     expect(timeline.some((event) => event.event === "package_end")).toBe(true);
     expect(typeof timeline[0]?.ts_iso).toBe("string");
+  });
+
+  it("standalone package creates run-scoped timeline and pointer", () => {
+    const dir = mk();
+    writePackageFixtureSet(dir);
+    const out = runTsx(dir, "scripts/helix-decision-package.ts");
+    expect(out.status).toBe(0);
+
+    const pointer = readTimelinePointer(dir);
+    expect(pointer.source).toBe("standalone_package");
+    expect(pointer.run_id).not.toBe("standalone");
+    expect(pointer.timeline_path).toContain(`helix-decision-timeline-${pointer.run_id}.jsonl`);
+    expect(pointer.timeline_path).not.toContain("standalone");
+    expect(fs.existsSync(path.join(dir, pointer.timeline_path))).toBe(true);
+  });
+
+  it("standalone validate creates run-scoped timeline and pointer", () => {
+    const dir = mk();
+    fs.writeFileSync(path.join(dir, "pkg.json"), JSON.stringify(basePackage(), null, 2));
+    const out = runValidator(dir);
+    expect(out.status).toBe(0);
+
+    const pointer = readTimelinePointer(dir);
+    expect(pointer.source).toBe("standalone_validate");
+    expect(pointer.run_id).not.toBe("standalone");
+    expect(pointer.timeline_path).toContain(`helix-decision-timeline-${pointer.run_id}.jsonl`);
+    expect(pointer.timeline_path).not.toContain("standalone");
+    expect(fs.existsSync(path.join(dir, pointer.timeline_path))).toBe(true);
+  });
+
+  it("env-provided run id and timeline path are honored exactly", () => {
+    const dir = mk();
+    writePackageFixtureSet(dir);
+    const runId = "run-explicit";
+    const timelinePath = "reports/helix-decision-timeline-explicit.jsonl";
+
+    const packageOut = runTsx(dir, "scripts/helix-decision-package.ts", [], {
+      HELIX_DECISION_RUN_ID: runId,
+      HELIX_DECISION_TIMELINE_PATH: timelinePath,
+    });
+    expect(packageOut.status).toBe(0);
+
+    const validateOut = runTsx(dir, "scripts/helix-decision-validate.ts", ["--package", "reports/helix-decision-package.json"], {
+      HELIX_DECISION_RUN_ID: runId,
+      HELIX_DECISION_TIMELINE_PATH: timelinePath,
+    });
+    expect(validateOut.status).toBe(0);
+
+    const timeline = readTimelineNdjson(path.join(dir, timelinePath));
+    expect(timeline.length).toBeGreaterThan(0);
+    expect(timeline.every((event) => event.run_id === runId)).toBe(true);
   });
 
   it("append-only shared timeline keeps package+validate events without loss", () => {

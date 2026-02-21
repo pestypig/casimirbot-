@@ -9,8 +9,36 @@ const packagePath = process.argv.includes("--package")
   : "reports/helix-decision-package.json";
 const reportPath = "reports/helix-decision-validate.json";
 const schemaPath = "schemas/helix-decision-package.schema.json";
-const runId = process.env.HELIX_DECISION_RUN_ID ?? "standalone";
-const timelinePath = process.env.HELIX_DECISION_TIMELINE_PATH ?? "reports/helix-decision-timeline-standalone.jsonl";
+const timelinePointerPath = "reports/helix-decision-timeline.latest.json";
+
+function compactUtcTimestamp(now = new Date()): string {
+  return now.toISOString().replace(/[-:.TZ]/g, "");
+}
+
+function createStandaloneRunId(): string {
+  return `${compactUtcTimestamp()}-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+function resolveTimelineContext(): { runId: string; timelinePath: string; standaloneMode: boolean } {
+  const envRunId = process.env.HELIX_DECISION_RUN_ID;
+  const envTimelinePath = process.env.HELIX_DECISION_TIMELINE_PATH;
+  if (envRunId && envTimelinePath) {
+    return { runId: envRunId, timelinePath: envTimelinePath, standaloneMode: false };
+  }
+  const runId = envRunId ?? createStandaloneRunId();
+  const timelinePath = envTimelinePath ?? `reports/helix-decision-timeline-${runId}.jsonl`;
+  return { runId, timelinePath, standaloneMode: true };
+}
+
+const timelineContext = resolveTimelineContext();
+const runId = timelineContext.runId;
+const timelinePath = timelineContext.timelinePath;
+
+if (timelineContext.standaloneMode) {
+  fs.mkdirSync(path.resolve(ROOT, "reports"), { recursive: true });
+  const pointerPayload = { run_id: runId, timeline_path: timelinePath, source: "standalone_validate" };
+  fs.writeFileSync(path.resolve(ROOT, timelinePointerPath), `${JSON.stringify(pointerPayload, null, 2)}\n`);
+}
 
 type TimelineEvent = {
   run_id: string;
