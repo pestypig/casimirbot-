@@ -4,6 +4,7 @@ import {
   type ExternalPressure,
   type ExternalPressureInput,
 } from "@shared/ideology/external-pressures";
+import { getGuidanceArtifacts } from "./artifacts";
 
 export type IdeologyGuidanceRequest = ExternalPressureInput & {
   topK?: number;
@@ -56,12 +57,14 @@ export const resolveIdeologyGuidance = (req: IdeologyGuidanceRequest): IdeologyG
   const topK = req.topK ?? 5;
   const recommendedNodeIds = scores.filter((entry) => entry.score >= 0).slice(0, topK).map((entry) => entry.id);
 
+  const recommendedArtifacts = getGuidanceArtifacts(recommendedNodeIds).map((artifact) => artifact.id);
+
   return {
     invariant: "system advises, user decides.",
     detectedBundles: detected.map((bundle) => bundle.id),
     recommendedNodeIds,
     warnings: Array.from(new Set(detected.flatMap((bundle) => bundle.warnings ?? []))),
-    recommendedArtifacts: recommendedNodeIds.map((id) => `artifact:${id}`),
+    recommendedArtifacts,
     suggestedVerificationSteps: [
       "Pause and document the active pressure pattern.",
       "Request independent verification before any irreversible action.",
