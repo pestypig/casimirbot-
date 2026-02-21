@@ -4,23 +4,30 @@
 
 **NO-GO**
 
+## Method (git-only, replayable)
+
+- Package input: `reports/helix-decision-package.json`.
+- Validation input: `reports/helix-decision-validate.json` (freshly regenerated from `scripts/helix-decision-validate.ts`).
+- Artifact existence checks use `git cat-file -e <ref>:<path>` only (no filesystem checks).
+- Baseline ref for comparison: N/A.
+
 ## Evidence table
 
-| Path | origin/main (`git cat-file -e origin/main:<path>`) | HEAD (`git cat-file -e HEAD:<path>`) | Note |
+| Path | Baseline (N/A) | HEAD (`git cat-file -e HEAD:<path>`) | Note |
 |---|---|---|---|
-| `artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json` | **MISSING** | **MISSING** | fatal: invalid object name 'origin/main'. |
-| `artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json` | **MISSING** | **MISSING** | fatal: invalid object name 'origin/main'. |
-| `artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/recommendation.json` | **MISSING** | **MISSING** | fatal: invalid object name 'origin/main'. |
-| `artifacts/experiments/helix-release-readiness-cloud-v4/casimir-verify-normalized.json` | **MISSING** | **MISSING** | fatal: invalid object name 'origin/main'. |
-| `artifacts/experiments/helix-release-readiness-cloud-v4/ab/t02/helix_release_readiness_cloud_v4_t02/summary.json` | **MISSING** | **MISSING** | fatal: invalid object name 'origin/main'. |
-| `artifacts/experiments/helix-release-readiness-cloud-v4/ab/t035/helix_release_readiness_cloud_v4_t035/summary.json` | **MISSING** | **MISSING** | fatal: invalid object name 'origin/main'. |
-| `schemas/helix-decision-package.schema.json` | **MISSING** | **EXISTS** | fatal: invalid object name 'origin/main'. |
+| `artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json` | N/A | **MISSING** | no baseline ref (`origin/HEAD`, `origin/main`, `main`) available in this clone |
+| `artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json` | N/A | **MISSING** | no baseline ref (`origin/HEAD`, `origin/main`, `main`) available in this clone |
+| `artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/recommendation.json` | N/A | **MISSING** | no baseline ref (`origin/HEAD`, `origin/main`, `main`) available in this clone |
+| `artifacts/experiments/helix-release-readiness-cloud-v4/ab/t02/helix_release_readiness_cloud_v4_t02/summary.json` | N/A | **MISSING** | no baseline ref (`origin/HEAD`, `origin/main`, `main`) available in this clone |
+| `artifacts/experiments/helix-release-readiness-cloud-v4/ab/t035/helix_release_readiness_cloud_v4_t035/summary.json` | N/A | **MISSING** | no baseline ref (`origin/HEAD`, `origin/main`, `main`) available in this clone |
+| `artifacts/experiments/helix-release-readiness-cloud-v4/casimir-verify-normalized.json` | N/A | **MISSING** | no baseline ref (`origin/HEAD`, `origin/main`, `main`) available in this clone |
+| `schemas/helix-decision-package.schema.json` | N/A | **EXISTS** | no baseline ref (`origin/HEAD`, `origin/main`, `main`) available in this clone |
 
 ## Drift findings
 
-- Committed validate `ok`: `False`, rerun `ok`: `False`.
-- Committed `failure_count`: `20`, rerun `failure_count`: `20`.
-- **No drift detected**: rerun failures exactly match committed validation report.
+- Committed validate `ok`: false.
+- Committed `failure_count`: 20.
+- Validation failures captured below are sourced from `reports/helix-decision-validate.json` and are reproducible via: `npx tsx scripts/helix-decision-validate.ts --package reports/helix-decision-package.json`.
 
 ## Blocker list (ordered)
 1. `source_path_missing:relation_packet_built_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
@@ -44,50 +51,13 @@
 19. `artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/casimir-verify-normalized.json`
 20. `decision_grade_requires_provenance_pass`
 
-## Root cause classification
-
-### Signal integrity
-- `source_path_missing:relation_packet_built_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
-- `source_path_missing:relation_dual_domain_ok_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
-- `source_path_missing:report_mode_correct_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
-- `source_path_missing:citation_presence_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
-- `source_path_missing:stub_text_detected_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
-- `source_path_missing:runtime_fallback_answer:artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json`
-- `source_path_missing:runtime_tdz_intentStrategy:artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json`
-- `source_path_missing:runtime_tdz_intentProfile:artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json`
-- `source_path_missing:provenance_gate_pass:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
-- `source_path_missing:decision_grade_ready:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/recommendation.json`
-- `source_path_missing:casimir_verdict_pass_integrity:artifacts/experiments/helix-release-readiness-cloud-v4/casimir-verify-normalized.json`
-- `artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/narrow/versatility-1771703151463/summary.json`
-- `artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
-- `artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/recommendation.json`
-- `artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/ab/t02/helix_release_readiness_cloud_v4_t02/summary.json`
-- `artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/ab/t035/helix_release_readiness_cloud_v4_t035/summary.json`
-- `artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/casimir-verify-normalized.json`
-
-### Provenance
-- `source_path_missing:provenance_gate_pass:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
-- `source_path_missing:casimir_verdict_pass_integrity:artifacts/experiments/helix-release-readiness-cloud-v4/casimir-verify-normalized.json`
-- `artifact_exists_true_but_missing:artifacts/experiments/helix-release-readiness-cloud-v4/casimir-verify-normalized.json`
-- `decision_grade_requires_provenance_pass`
-
-### Novelty
-- `novelty_source_missing:t02:artifacts/experiments/helix-release-readiness-cloud-v4/ab/t02/helix_release_readiness_cloud_v4_t02/summary.json`
-- `novelty_source_missing:t035:artifacts/experiments/helix-release-readiness-cloud-v4/ab/t035/helix_release_readiness_cloud_v4_t035/summary.json`
-
-## Recommended fix order (minimal trustworthy path)
-1. **Artifact/source parity fix**: regenerate decision package with artifact `exists` flags computed from files actually committed, or commit referenced artifacts under `artifacts/experiments/helix-release-readiness-cloud-v4/**`.
-2. **Validator/package consistency fix**: rerun `npm run helix:decision:validate -- --package reports/helix-decision-package.json` and commit updated `reports/helix-decision-validate.json` in same changeset as package updates.
-3. **Provenance gate closure path**: rerun Casimir verification and ensure package points to a committed `casimir-verify-normalized.json` with pass+integrity evidence; then recompute decision recommendation to satisfy provenance gate.
-
-## Top 3 concrete fixes
-- **Artifact/source parity fix**: ensure every `source_path` and `artifacts[].path` exists in repo tree before packaging (preflight `git cat-file -e HEAD:<path>`).
-- **Validator/package consistency fix**: add CI check that blocks if `reports/helix-decision-validate.json` differs from a fresh rerun against committed package.
-- **Provenance gate closure path**: require decision-grade package to include committed Casimir pass artifact + certificate hash/integrity, then enforce `decision_grade_requires_provenance_pass` as hard gate.
+## Top 3 concrete fixes (from first failing blockers)
+1. `source_path_missing:relation_packet_built_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
+2. `source_path_missing:relation_dual_domain_ok_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
+3. `source_path_missing:report_mode_correct_rate:artifacts/experiments/helix-release-readiness-cloud-v4/heavy/versatility-1771703288538/summary.json`
 
 ## Command log
-- ❌ `git fetch --prune` (no `origin` remote configured in this clone).
-- ✅ `git checkout work`
-- ❌ `git pull --ff-only` (branch has no upstream tracking remote).
-- ✅ `npm ci`
-- ❌ `npm run helix:decision:validate -- --package reports/helix-decision-package.json` (expected non-zero because validation failed with blockers).
+- ⚠️ `git fetch --all --prune` (failed: no `origin` remote in this clone).
+- ⚠️ `git remote show origin` (failed: no `origin` remote in this clone).
+- ✅ `npx tsx scripts/helix-decision-validate.ts --package reports/helix-decision-package.json > reports/helix-decision-validate.json` (non-zero validator exit expected for NO-GO; JSON output captured).
+- ✅ `tsx scripts/helix-no-go-closure-audit.ts`
