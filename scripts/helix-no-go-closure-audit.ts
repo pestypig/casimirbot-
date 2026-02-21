@@ -1,7 +1,14 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+const tsxCliPath = join(dirname(require.resolve('tsx')), 'cli.mjs');
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const validateScriptPath = resolve(scriptDir, 'helix-decision-validate.ts');
 
 function git(args: string[]): string {
   return execFileSync('git', args, { encoding: 'utf8' }).trim();
@@ -12,6 +19,7 @@ type CommandResult = {
   status: number | null;
   stdout: string;
   stderr: string;
+  error: string;
 };
 
 type ValidateResult = {
@@ -27,18 +35,37 @@ function runCommand(command: string, args: string[]): CommandResult {
     status: result.status,
     stdout: (result.stdout ?? '').trim(),
     stderr: (result.stderr ?? '').trim(),
+    error: result.error ? String(result.error.message ?? result.error) : '',
   };
 }
 
 function snippet(value: string, max = 220): string {
-  if (!value) return '(none)';
-  return value.length > max ? `${value.slice(0, max)}…` : value;
+  const compact = value.replace(/\s+/g, ' ').trim();
+  if (!compact) return '(none)';
+  return compact.length > max ? `${compact.slice(0, max)}...` : compact;
 }
 
 function formatCommandStatus(result: CommandResult): string {
-  if (result.status === 0) return '✅';
-  if (result.status === null) return '⚠️';
-  return '❌';
+  if (result.status === 0) return '[OK]';
+  if (result.status === null) return '[WARN]';
+  return '[FAIL]';
+}
+
+function parseValidateResult(raw: string): ValidateResult | null {
+  if (!raw.trim()) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<ValidateResult>;
+    if (typeof parsed.ok !== 'boolean') return null;
+    if (typeof parsed.failure_count !== 'number') return null;
+    if (!Array.isArray(parsed.failures)) return null;
+    return {
+      ok: parsed.ok,
+      failure_count: parsed.failure_count,
+      failures: parsed.failures.map((value) => String(value)),
+    };
+  } catch {
+    return null;
+  }
 }
 
 type PathState =
@@ -81,14 +108,20 @@ const commandResults: CommandResult[] = [
 ];
 
 const tempValidatePath = join(tmpdir(), `helix-decision-validate-${Date.now()}.json`);
-const validatorRun = runCommand('npx', ['tsx', 'scripts/helix-decision-validate.ts', '--package', pkgPath]);
-if (!validatorRun.stdout) {
-  throw new Error('Validator produced no stdout; cannot build drift comparison.');
+const validatorRun = runCommand(process.execPath, [tsxCliPath, validateScriptPath, '--package', pkgPath]);
+const freshValidateFromStdout = parseValidateResult(validatorRun.stdout);
+const freshValidateFromFile = existsSync(validatePath)
+  ? parseValidateResult(readFileSync(validatePath, 'utf8'))
+  : null;
+const freshValidate = freshValidateFromStdout ?? freshValidateFromFile;
+if (!freshValidate) {
+  throw new Error(
+    `Validator output unavailable (status=${validatorRun.status ?? 'signal'}). stdout=${snippet(validatorRun.stdout)} stderr=${snippet(validatorRun.stderr)} error=${snippet(validatorRun.error)}`,
+  );
 }
-writeFileSync(tempValidatePath, `${validatorRun.stdout.trim()}\n`);
+const freshValidateSource = freshValidateFromStdout ? 'validator_stdout' : validatePath;
+writeFileSync(tempValidatePath, `${JSON.stringify(freshValidate, null, 2)}\n`);
 commandResults.push(validatorRun);
-
-const freshValidate = JSON.parse(readFileSync(tempValidatePath, 'utf8')) as ValidateResult;
 
 const evidencePaths = Array.from(
   new Set([
@@ -127,21 +160,30 @@ if (committedValidate.ok !== freshValidate.ok) {
 if (committedValidate.failure_count !== freshValidate.failure_count) {
   driftPieces.push(`failure_count: ${committedValidate.failure_count} -> ${freshValidate.failure_count}`);
 }
-const committedTop3 = committedValidate.failures.slice(0, 3);
-const freshTop3 = freshValidate.failures.slice(0, 3);
+const committedFailures = Array.isArray(committedValidate.failures)
+  ? committedValidate.failures.map((value) => String(value))
+  : [];
+const freshFailures = Array.isArray(freshValidate.failures)
+  ? freshValidate.failures.map((value) => String(value))
+  : [];
+const committedTop3 = committedFailures.slice(0, 3);
+const freshTop3 = freshFailures.slice(0, 3);
 if (JSON.stringify(committedTop3) !== JSON.stringify(freshTop3)) {
   driftPieces.push('first_3_failures changed');
+}
+if (JSON.stringify(committedFailures) !== JSON.stringify(freshFailures)) {
+  driftPieces.push('failure_list_changed');
 }
 const driftStatus = driftPieces.length === 0 ? 'NO-DRIFT' : `DRIFT (${driftPieces.join('; ')})`;
 
 const commandLog = commandResults
   .map((result) => {
     const icon = formatCommandStatus(result);
-    return `- ${icon} \`${result.command}\` (status: ${result.status ?? 'signal'}, stdout: \`${snippet(result.stdout)}\`, stderr: \`${snippet(result.stderr)}\`)`;
+    return `- ${icon} \`${result.command}\` (status: ${result.status ?? 'signal'}, stdout: \`${snippet(result.stdout)}\`, stderr: \`${snippet(result.stderr)}\`, error: \`${snippet(result.error)}\`)`;
   })
   .join('\n');
 
-const report = `# Helix NO-GO Closure Audit\n\n## Verdict\n\n**NO-GO**\n\n## Method (git-only, replayable)\n\n- Package input: \`${pkgPath}\`.\n- Validation input: committed \`${validatePath}\` and fresh validator replay to temp output.\n- Fresh validation capture: \`${tempValidatePath}\` (generated during this audit run).\n- Artifact existence checks use \`git cat-file -e <ref>:<path>\` only (no filesystem checks).\n- Baseline ref for comparison: ${baselineLabel}.\n\n## Evidence table\n\n| Path | Baseline (${baselineLabel}) | HEAD (\`git cat-file -e HEAD:<path>\`) | Note |\n|---|---|---|---|\n${evidenceRows.join('\n')}\n\n## Drift findings\n\n- Drift status: **${driftStatus}**.\n- Committed validate snapshot: \`ok=${committedValidate.ok}\`, \`failure_count=${committedValidate.failure_count}\`, first3=${JSON.stringify(committedTop3)}.\n- Fresh validate snapshot: \`ok=${freshValidate.ok}\`, \`failure_count=${freshValidate.failure_count}\`, first3=${JSON.stringify(freshTop3)}.\n- Validation failures captured below are sourced from fresh replay output and are reproducible via: \`npx tsx scripts/helix-decision-validate.ts --package ${pkgPath}\`.\n\n## Blocker list (ordered)\n${blockers}\n\n## Top 3 concrete fixes (from first failing blockers)\n${topFixes}\n\n## Command log\n${commandLog}\n`;
+const report = `# Helix NO-GO Closure Audit\n\n## Verdict\n\n**NO-GO**\n\n## Method (git-only, replayable)\n\n- Package input: \`${pkgPath}\`.\n- Validation input: committed \`${validatePath}\` and fresh validator replay to temp output.\n- Fresh validation capture: \`${tempValidatePath}\` (generated during this audit run; source=${freshValidateSource}).\n- Artifact existence checks use \`git cat-file -e <ref>:<path>\` only (no filesystem checks).\n- Baseline ref for comparison: ${baselineLabel}.\n\n## Evidence table\n\n| Path | Baseline (${baselineLabel}) | HEAD (\`git cat-file -e HEAD:<path>\`) | Note |\n|---|---|---|---|\n${evidenceRows.join('\n')}\n\n## Drift findings\n\n- Drift status: **${driftStatus}**.\n- Committed validate snapshot: \`ok=${committedValidate.ok}\`, \`failure_count=${committedValidate.failure_count}\`, first3=${JSON.stringify(committedTop3)}.\n- Fresh validate snapshot: \`ok=${freshValidate.ok}\`, \`failure_count=${freshValidate.failure_count}\`, first3=${JSON.stringify(freshTop3)}.\n- Validation failures captured below are sourced from fresh replay output and are reproducible via: \`node ${tsxCliPath} ${validateScriptPath} --package ${pkgPath}\`.\n\n## Blocker list (ordered)\n${blockers}\n\n## Top 3 concrete fixes (from first failing blockers)\n${topFixes}\n\n## Command log\n${commandLog}\n`;
 
 writeFileSync(outPath, report);
 console.log(`Wrote ${outPath}`);
