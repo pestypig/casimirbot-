@@ -399,6 +399,39 @@
       "weight": 1.1
     },
     {
+      "id": "sector-control-runtime",
+      "label": "Sector Control Runtime Walk",
+      "path": "docs/knowledge/sector-control-runtime-tree.json",
+      "pathMode": "root_to_leaf",
+      "topicTags": [
+        "warp",
+        "physics",
+        "helix_ask"
+      ],
+      "matchers": [
+        "sector control",
+        "sector strobing",
+        "casimir tile blanket",
+        "natario canonical",
+        "observer grid",
+        "ford roman qi",
+        "time dilation panel",
+        "live events",
+        "physics.warp.sector_control.plan"
+      ],
+      "maxAnchors": 4,
+      "maxDepth": 3,
+      "maxNodes": 10,
+      "minAnchorScore": 2,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.2
+    },
+    {
       "id": "gr-solver",
       "label": "GR Solver Walk",
       "path": "docs/knowledge/physics/gr-solver-tree.json",

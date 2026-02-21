@@ -1626,7 +1626,42 @@ export function useSwitchMode() {
         });
         await requireOk(resUpdate, 'Mode knob sync');
       }
-      publish("warp:reload", { reason: "mode-switch-local", mode, ts: Date.now() });
+      const sectorEvent = {
+        ts: Date.now(),
+        requestedMode: mode,
+        appliedMode:
+          typeof (data as any)?.mode === "string" ? ((data as any).mode as string) : mode,
+        fallbackApplied: Boolean((data as any)?.fallbackApplied),
+        plannerMode:
+          typeof (data as any)?.preflight?.plannerMode === "string"
+            ? ((data as any).preflight.plannerMode as string)
+            : null,
+        firstFail:
+          typeof (data as any)?.preflight?.firstFail === "string"
+            ? ((data as any).preflight.firstFail as string)
+            : null,
+        constraints:
+          (data as any)?.preflight?.constraints && typeof (data as any).preflight.constraints === "object"
+            ? (data as any).preflight.constraints
+            : null,
+        observerGrid:
+          (data as any)?.preflight?.observerGrid && typeof (data as any).preflight.observerGrid === "object"
+            ? (data as any).preflight.observerGrid
+            : null,
+      };
+      publish("warp:sector-control:plan", sectorEvent);
+      publish("warp:reload", {
+        reason: "mode-switch-local",
+        mode,
+        requestedMode: sectorEvent.requestedMode,
+        appliedMode: sectorEvent.appliedMode,
+        preflight: {
+          plannerMode: sectorEvent.plannerMode,
+          firstFail: sectorEvent.firstFail,
+          fallbackApplied: sectorEvent.fallbackApplied,
+        },
+        ts: Date.now(),
+      });
       return data;
     },
     onSuccess: (data, mode) => {

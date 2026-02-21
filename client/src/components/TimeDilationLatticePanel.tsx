@@ -14,6 +14,7 @@ import { useProofPack } from "@/hooks/useProofPack";
 import { useLapseBrick } from "@/hooks/useLapseBrick";
 import { computeTimeDilationRenderPlan, type TimeDilationRenderUiToggles } from "@/lib/time-dilation-render-policy";
 import { getProofValue, readProofNumber, readProofString } from "@/lib/proof-pack";
+import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import type { CurvatureQuality } from "@/lib/curvature-brick";
 import type { GrEvolveBrickChannel, GrEvolveBrickDecoded } from "@/lib/gr-evolve-brick";
 import type { LapseBrickChannel, LapseBrickDecoded } from "@/lib/lapse-brick";
@@ -205,6 +206,26 @@ type TimeDilationLatticePanelProps = {
   pipeline?: EnergyPipelineState | null;
   kappaTuning?: Partial<KappaTuning>;
   showDebug?: boolean;
+};
+
+type SectorControlLiveConstraints = Partial<
+  Record<"FordRomanQI" | "ThetaAudit" | "TS_ratio_min" | "VdB_band" | "grConstraintGate", "pass" | "fail" | "unknown">
+>;
+
+type SectorControlLiveObserverGrid = {
+  overflowCount?: number;
+  paybackGain?: number;
+};
+
+type SectorControlLiveEvent = {
+  ts: number;
+  requestedMode?: string;
+  appliedMode?: string;
+  fallbackApplied?: boolean;
+  plannerMode?: string | null;
+  firstFail?: string | null;
+  constraints?: SectorControlLiveConstraints | null;
+  observerGrid?: SectorControlLiveObserverGrid | null;
 };
 
 type ActivationErrorState = {
@@ -837,6 +858,41 @@ const formatPipelineValue = (value: string, source?: string, proxy?: boolean) =>
 };
 const formatCount = (value: number | null | undefined) =>
   Number.isFinite(value as number) ? Math.round(value as number).toLocaleString("en-US") : "n/a";
+const parseFiniteNumber = (value: unknown): number | null => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+const formatEventTime = (value: number | null | undefined) => {
+  if (!Number.isFinite(value as number)) return "n/a";
+  try {
+    return new Date(value as number).toLocaleTimeString("en-US", { hour12: false });
+  } catch {
+    return "n/a";
+  }
+};
+const normalizeSectorControlLiveEvent = (payload: unknown): SectorControlLiveEvent | null => {
+  if (!payload || typeof payload !== "object") return null;
+  const raw = payload as Record<string, unknown>;
+  const ts = parseFiniteNumber(raw.ts) ?? Date.now();
+  const constraints =
+    raw.constraints && typeof raw.constraints === "object"
+      ? (raw.constraints as SectorControlLiveConstraints)
+      : null;
+  const observerGrid =
+    raw.observerGrid && typeof raw.observerGrid === "object"
+      ? (raw.observerGrid as SectorControlLiveObserverGrid)
+      : null;
+  return {
+    ts,
+    requestedMode: typeof raw.requestedMode === "string" ? raw.requestedMode : undefined,
+    appliedMode: typeof raw.appliedMode === "string" ? raw.appliedMode : undefined,
+    fallbackApplied: typeof raw.fallbackApplied === "boolean" ? raw.fallbackApplied : undefined,
+    plannerMode: typeof raw.plannerMode === "string" ? raw.plannerMode : null,
+    firstFail: typeof raw.firstFail === "string" ? raw.firstFail : null,
+    constraints,
+    observerGrid,
+  };
+};
 const formatBytes = (value: number | null | undefined) => {
   if (!Number.isFinite(value as number)) return "n/a";
   const bytes = Math.max(0, value as number);
@@ -2839,6 +2895,45 @@ function TimeDilationLatticePanelInner({
   const [casimirGammaVdB, setCasimirGammaVdB] = useState(0);
   const [casimirQSpoil, setCasimirQSpoil] = useState(1);
   const [visualTuning, setVisualTuning] = useState(DEFAULT_VISUAL_TUNING);
+  const [sectorControlLiveEvent, setSectorControlLiveEvent] = useState<SectorControlLiveEvent | null>(null);
+  const [lastReloadEvent, setLastReloadEvent] = useState<{ reason: string; ts: number } | null>(null);
+  useEffect(() => {
+    const handlerIds: string[] = [];
+    handlerIds.push(
+      subscribe("warp:sector-control:plan", (payload: unknown) => {
+        const next = normalizeSectorControlLiveEvent(payload);
+        if (!next) return;
+        setSectorControlLiveEvent((prev) => (next.ts >= (prev?.ts ?? -1) ? next : prev));
+      }),
+    );
+    handlerIds.push(
+      subscribe("warp:reload", (payload: unknown) => {
+        if (!payload || typeof payload !== "object") return;
+        const raw = payload as Record<string, unknown>;
+        const reason = typeof raw.reason === "string" ? raw.reason : "unknown";
+        const ts = parseFiniteNumber(raw.ts) ?? Date.now();
+        setLastReloadEvent({ reason, ts });
+        const preflight =
+          raw.preflight && typeof raw.preflight === "object"
+            ? normalizeSectorControlLiveEvent({
+                ...(raw.preflight as Record<string, unknown>),
+                requestedMode:
+                  typeof raw.requestedMode === "string" ? raw.requestedMode : undefined,
+                appliedMode: typeof raw.appliedMode === "string" ? raw.appliedMode : undefined,
+                ts,
+              })
+            : null;
+        if (preflight) {
+          setSectorControlLiveEvent((prev) =>
+            preflight.ts >= (prev?.ts ?? -1) ? preflight : prev,
+          );
+        }
+      }),
+    );
+    return () => {
+      handlerIds.forEach((id) => unsubscribe(id));
+    };
+  }, []);
   useEffect(() => {
     setGrEnabled(true);
   }, []);
@@ -4030,6 +4125,34 @@ function TimeDilationLatticePanelInner({
   const telemetryNoteLine = mechNote
     ? formatProxyValue(`mech ${truncateText(mechNote, 60)}`, proofProxyFrom(["mechanical_note"]))
     : null;
+  const liveModeLine = useMemo(() => {
+    if (!sectorControlLiveEvent) return null;
+    const requested = sectorControlLiveEvent.requestedMode ?? "n/a";
+    const applied = sectorControlLiveEvent.appliedMode ?? requested;
+    const planner = sectorControlLiveEvent.plannerMode ?? "n/a";
+    const firstFail = sectorControlLiveEvent.firstFail ?? "none";
+    const fallback = sectorControlLiveEvent.fallbackApplied ? "yes" : "no";
+    return `${requested} -> ${applied} planner=${planner} fail=${firstFail} fallback=${fallback}`;
+  }, [sectorControlLiveEvent]);
+  const liveGuardrailLine = useMemo(() => {
+    const constraints = sectorControlLiveEvent?.constraints;
+    if (!constraints) return null;
+    return `FR=${constraints.FordRomanQI ?? "n/a"} TH=${constraints.ThetaAudit ?? "n/a"} TS=${
+      constraints.TS_ratio_min ?? "n/a"
+    } VdB=${constraints.VdB_band ?? "n/a"} GR=${constraints.grConstraintGate ?? "n/a"}`;
+  }, [sectorControlLiveEvent]);
+  const liveObserverLine = useMemo(() => {
+    const overflowCount = parseFiniteNumber(sectorControlLiveEvent?.observerGrid?.overflowCount);
+    if (overflowCount == null) return null;
+    return `observer overflow=${formatCount(overflowCount)} paybackGain=${formatFixed(
+      parseFiniteNumber(sectorControlLiveEvent?.observerGrid?.paybackGain),
+      2,
+    )}`;
+  }, [sectorControlLiveEvent]);
+  const liveReloadLine = useMemo(() => {
+    if (!lastReloadEvent) return null;
+    return `reload ${lastReloadEvent.reason} @ ${formatEventTime(lastReloadEvent.ts)}`;
+  }, [lastReloadEvent]);
 
   const hasHull = useMemo(() => {
     const nonDefault = !isDefaultHullAxes(hullBounds.axes);
@@ -6557,6 +6680,15 @@ function TimeDilationLatticePanelInner({
             <div>{telemetryTauLine}</div>
             {telemetryNoteLine ? <div>{telemetryNoteLine}</div> : null}
           </div>
+          {liveModeLine || liveGuardrailLine || liveObserverLine || liveReloadLine ? (
+            <div className="rounded border border-cyan-500/30 bg-cyan-950/20 px-2 py-[2px] text-right text-cyan-100">
+              <div className="text-[9px] uppercase tracking-[0.2em] text-cyan-300">live events</div>
+              {liveModeLine ? <div>{liveModeLine}</div> : null}
+              {liveGuardrailLine ? <div>{liveGuardrailLine}</div> : null}
+              {liveObserverLine ? <div>{liveObserverLine}</div> : null}
+              {liveReloadLine ? <div>{liveReloadLine}</div> : null}
+            </div>
+          ) : null}
           {tsMetricReason ? (
             <div className="rounded border border-slate-700 bg-slate-950/80 px-2 py-[2px] text-right text-slate-300">
               {tsMetricReason}

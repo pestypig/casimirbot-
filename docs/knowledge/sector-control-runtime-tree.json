@@ -1,0 +1,264 @@
+{
+  "version": 1,
+  "rootId": "sector-control-runtime-tree",
+  "nodes": [
+    {
+      "id": "sector-control-runtime-tree",
+      "slug": "sector-control-runtime-tree",
+      "title": "Sector Control Runtime Tree",
+      "excerpt": "Sector-strobed Casimir runtime planning, guardrails, Helix Ask routing, and live UI bindings.",
+      "bodyMD": "Root map for sector-control planning, tree/DAG interpretation, and live surface rendering.\n\nMinimal artifact: planner + preflight + panel flow.",
+      "tags": [
+        "warp",
+        "sector-control",
+        "helix_ask",
+        "time-dilation"
+      ],
+      "children": [
+        "sector-control-planner-tooling",
+        "sector-control-mode-preflight",
+        "sector-control-helix-ask-tree-dag",
+        "time-dilation-live-events",
+        "sector-control-reproducibility-lane",
+        "bridge-sector-control-planner-to-time-dilation"
+      ],
+      "links": [],
+      "summary": "Runtime map for sector-control planner, guardrails, and live event reflection.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "sector-control-planner-tooling",
+      "slug": "sector-control-planner-tooling",
+      "title": "Sector Control Planner Tooling",
+      "excerpt": "Deterministic planner and tool contract for sector schedules.",
+      "bodyMD": "Planner core and tool schema live in server/control/sectorControlPlanner.ts, server/skills/physics.warp.sector-control.plan.ts, and shared/schema.ts.\n\nMinimal artifact: deterministic sector plan contract.",
+      "tags": [
+        "warp",
+        "sector-control",
+        "planner",
+        "tooling"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sector-control-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "sector-control-mode-preflight"
+        }
+      ],
+      "summary": "Planner and tool contract for deterministic sector-control plans.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/control/sectorControlPlanner.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/skills/physics.warp.sector-control.plan.ts"
+        },
+        {
+          "type": "code",
+          "path": "shared/schema.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/warp-sector-control.spec.ts"
+        }
+      ]
+    },
+    {
+      "id": "sector-control-mode-preflight",
+      "slug": "sector-control-mode-preflight",
+      "title": "Mode Preflight And Fallback",
+      "excerpt": "Operational mode switches run sector-control preflight and fail closed.",
+      "bodyMD": "Mode transitions run sector preflight and fallback ordering in server/control/sectorControlPreflight.ts and server/helix-core.ts.\n\nMinimal artifact: first-fail + fallback contract.",
+      "tags": [
+        "warp",
+        "guardrail",
+        "preflight",
+        "fallback"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sector-control-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "sector-control-planner-tooling"
+        }
+      ],
+      "summary": "Guardrail preflight for mode transitions with deterministic fallback.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/control/sectorControlPreflight.ts"
+        },
+        {
+          "type": "code",
+          "path": "server/helix-core.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/sector-control-mode-preflight.spec.ts"
+        },
+        {
+          "type": "test",
+          "path": "tests/helix-mode-preflight.spec.ts"
+        }
+      ]
+    },
+    {
+      "id": "sector-control-helix-ask-tree-dag",
+      "slug": "sector-control-helix-ask-tree-dag",
+      "title": "Helix Ask Tree DAG Routing",
+      "excerpt": "Tree/DAG graph resolver path for sector-control interpretation.",
+      "bodyMD": "Graph routing for sector-control interpretation is configured through configs/graph-resolvers.json and resolved in server/services/helix-ask/graph-resolver.ts.\n\nMinimal artifact: resolver scaffold and selected tree IDs.",
+      "tags": [
+        "helix_ask",
+        "tree",
+        "dag",
+        "routing"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sector-control-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "sector-control-planner-tooling"
+        }
+      ],
+      "summary": "Resolver lane that maps sector-control prompts into tree/DAG scaffolds.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/services/helix-ask/graph-resolver.ts"
+        },
+        {
+          "type": "code",
+          "path": "configs/graph-resolvers.json"
+        },
+        {
+          "type": "test",
+          "path": "tests/helix-ask-graph-resolver.spec.ts"
+        }
+      ]
+    },
+    {
+      "id": "time-dilation-live-events",
+      "slug": "time-dilation-live-events",
+      "title": "Time Dilation Live Events",
+      "excerpt": "Mode preflight sector-control events reflected live in Time Dilation panel telemetry.",
+      "bodyMD": "Live event publication and panel reflection are implemented in client/src/hooks/use-energy-pipeline.ts and client/src/components/TimeDilationLatticePanel.tsx.\n\nMinimal artifact: live event panel telemetry block.",
+      "tags": [
+        "ui",
+        "time-dilation",
+        "events",
+        "sector-control"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sector-control-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "sector-control-mode-preflight"
+        }
+      ],
+      "summary": "Live event rendering of sector-control preflight and reload activity.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-energy-pipeline.ts"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/TimeDilationLatticePanel.tsx"
+        }
+      ]
+    },
+    {
+      "id": "sector-control-reproducibility-lane",
+      "slug": "sector-control-reproducibility-lane",
+      "title": "Sector Control Reproducibility Lane",
+      "excerpt": "Deterministic batch generation for scientific replay and prompt packs.",
+      "bodyMD": "Reproducibility runner emits deterministic mode batches and prompt markdown using scripts/sector-control-repro.ts.\n\nMinimal artifact: reproducibility summary hash and prompt batch markdown.",
+      "tags": [
+        "reproducibility",
+        "science",
+        "batch",
+        "sector-control"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sector-control-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "sector-control-planner-tooling"
+        }
+      ],
+      "summary": "Deterministic replay lane for sector-control plans and prompt batches.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "scripts/sector-control-repro.ts"
+        }
+      ]
+    },
+    {
+      "id": "bridge-sector-control-planner-to-time-dilation",
+      "slug": "bridge-sector-control-planner-to-time-dilation",
+      "title": "Planner To Time Dilation Bridge",
+      "excerpt": "Bridge linking planner outputs to live Time Dilation panel interpretation.",
+      "bodyMD": "Cross-reference between planner output semantics and panel live events.\n\nMinimal artifact: event payload -> panel telemetry mapping.",
+      "tags": [
+        "bridge",
+        "sector-control",
+        "time-dilation",
+        "events"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "sector-control-runtime-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "sector-control-planner-tooling"
+        },
+        {
+          "rel": "see-also",
+          "to": "time-dilation-live-events"
+        }
+      ],
+      "bridge": {
+        "left": "sector-control-planner-tooling",
+        "right": "time-dilation-live-events",
+        "relation": "Planner preflight payload is published as live event telemetry in the Time Dilation panel."
+      },
+      "summary": "Bridge linking sector planner outputs to live UI events."
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

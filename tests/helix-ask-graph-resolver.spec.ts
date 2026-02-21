@@ -749,6 +749,29 @@ describe("helix ask graph resolver congruence overrides", () => {
   });
 });
 
+describe("sector-control runtime graph tree routing", () => {
+  it("selects the sector-control-runtime tree for sector-strobe and time-dilation prompts", () => {
+    const pack = resolveHelixAskGraphPack({
+      question:
+        "Map sector strobing Casimir tile control into Natario canonical mode and show time dilation panel live events",
+      topicTags: ["warp", "physics", "helix_ask"],
+      lockedTreeIds: ["sector-control-runtime"],
+    });
+
+    const framework = pack?.frameworks.find((entry) => entry.treeId === "sector-control-runtime");
+    expect(framework).toBeTruthy();
+    expect(framework?.sourcePath).toBe("docs/knowledge/sector-control-runtime-tree.json");
+    const coveredNodeIds = new Set([...(framework?.anchors ?? []), ...(framework?.path ?? [])].map((node) => node.id));
+    expect(
+      coveredNodeIds.has("sector-control-planner-tooling") ||
+        coveredNodeIds.has("time-dilation-live-events") ||
+        coveredNodeIds.has("sector-control-runtime-tree"),
+    ).toBe(true);
+    expect((framework?.scaffoldText ?? "").toLowerCase()).toContain("sector");
+    expect((framework?.scaffoldText ?? "").toLowerCase()).toContain("time");
+  });
+});
+
 describe("runtime safety gate validator", () => {
   it("emits deterministic residual summary when runtime gate is referenced", () => {
     const result = __testOnlyResolveRuntimeSafetyGateValidation(["configs/physics-root-leaf-manifest.v1.json"]);

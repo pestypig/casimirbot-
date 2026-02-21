@@ -40,6 +40,7 @@
     "casimir:collect": "tsx cli/casimir-collect.ts",
     "casimir:verify": "tsx cli/casimir-verify.ts",
     "casimir:verify:ci": "npm run reports:repo-telemetry && npm run casimir:verify -- --ci --trace-out artifacts/training-trace.jsonl",
+    "sector-control:repro": "tsx scripts/sector-control-repro.ts",
     "verify:local": "tsx scripts/verify-local.ts",
     "audit:agent-context:check": "tsx scripts/validate-agent-context-checklist.ts",
     "audit:toe:preflight": "tsx scripts/toe-agent-preflight.ts",
