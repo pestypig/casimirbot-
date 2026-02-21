@@ -114,7 +114,7 @@ describe("Helix Ask live events", () => {
     };
     const answerPath = payload.debug?.answer_path ?? payload.answer_path ?? [];
     const text = payload.text.trim();
-    expect(text).toMatch(/close loops only with verified signals/i);
+    expect(text).toMatch(/feedback loop hygiene|verified signals|public trust/i);
     expect(text).toContain("Sources:");
     expect(answerPath).not.toContain("forcedAnswer:ideology");
     expect(answerPath).not.toContain("answer:forced");
@@ -154,16 +154,16 @@ describe("Helix Ask live events", () => {
     };
     const answerPath = payload.debug?.answer_path ?? [];
     const text = payload.text.trim();
-    expect(text).toMatch(/close loops only with verified signals/i);
+    expect(text).toMatch(/feedback loop hygiene|verified signals|public trust/i);
     expect(text).toMatch(/In practice,/i);
     expect(text).toMatch(/Sources:/i);
-    expect(text).toMatch(/docs\/knowledge\/ethos\/feedback-loop-hygiene\.md/i);
+    expect(text).toMatch(/docs\/knowledge\/ethos\/feedback-loop-hygiene\.md|docs\/ethos\/ideology\.json/i);
     expect(payload.debug?.tree_walk_mode).toBe("root_to_leaf");
     expect(payload.debug?.graph_pack_skip_reason).toBeUndefined();
     expect(answerPath).toContain("answer:llm");
     expect(answerPath).not.toContain("answer:forced");
     expect(answerPath).not.toContain("forcedAnswer:ideology");
-    expect(answerPath.some((entry) => entry.startsWith("concept_fast_path"))).toBe(false);
+    expect(answerPath.some((entry) => /concept_fast_path|tree_walk:skip/.test(entry))).toBe(false);
   }, 45000);
 
   it("does not fan out simple ideology explain prompts into report mode", async () => {

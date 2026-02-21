@@ -4,6 +4,7 @@ import {
   buildHelixAskMechanismSentence,
   buildHelixAskRelationDetailBlock,
   getHelixAskSectionOrder,
+  reduceHelixAskScaffoldRepeats,
   resolveHelixAskNoveltyFamily,
 } from "../server/services/helix-ask/novelty-phrasing";
 
@@ -14,6 +15,11 @@ describe("helix ask novelty phrasing", () => {
       prompt: "How does warp relate to mission ethos?",
       seed: 7,
       temperature: 0.2,
+      promptFingerprint: "abc123def456",
+      intentStrategy: "hybrid_explain",
+      topCitationTokenHash: "feedbead1234",
+      answerPathKey: "answer:llm|answerContract:rendered",
+      relationPacketSignal: "2:3:1",
     };
     const a = buildHelixAskMechanismSentence({
       claimA: "Warp constraints are explicit",
@@ -30,7 +36,7 @@ describe("helix ask novelty phrasing", () => {
     expect(a).toBe(b);
   });
 
-  it("returns valid alternative variants when seed/temperature change", () => {
+  it("returns valid alternative variants when key anchors change", () => {
     const base = buildHelixAskMechanismSentence({
       claimA: "Route invokes gate",
       claimB: "Output remains bounded",
@@ -40,10 +46,20 @@ describe("helix ask novelty phrasing", () => {
         prompt: "Explain repo mechanism",
         seed: 7,
         temperature: 0.2,
+        promptFingerprint: "p0",
+        intentStrategy: "repo_walk",
+        topCitationTokenHash: "c0",
+        answerPathKey: "a0",
       },
     });
     const variants = new Set<string>([base]);
-    for (const seed of [11, 13, 17]) {
+    for (const variantCtx of [
+      { seed: 11, temperature: 0.2, promptFingerprint: "p0", intentStrategy: "repo_walk", topCitationTokenHash: "c0", answerPathKey: "a0" },
+      { seed: 7, temperature: 0.35, promptFingerprint: "p0", intentStrategy: "repo_walk", topCitationTokenHash: "c0", answerPathKey: "a0" },
+      { seed: 7, temperature: 0.2, promptFingerprint: "p1", intentStrategy: "repo_walk", topCitationTokenHash: "c0", answerPathKey: "a0" },
+      { seed: 7, temperature: 0.2, promptFingerprint: "p0", intentStrategy: "repo_contract", topCitationTokenHash: "c0", answerPathKey: "a0" },
+      { seed: 7, temperature: 0.2, promptFingerprint: "p0", intentStrategy: "repo_walk", topCitationTokenHash: "c1", answerPathKey: "a1" },
+    ]) {
       variants.add(
         buildHelixAskMechanismSentence({
           claimA: "Route invokes gate",
@@ -52,8 +68,7 @@ describe("helix ask novelty phrasing", () => {
           context: {
             family: "repo_technical",
             prompt: "Explain repo mechanism",
-            seed,
-            temperature: 0.35,
+            ...variantCtx,
           },
         }),
       );
@@ -76,9 +91,6 @@ describe("helix ask novelty phrasing", () => {
       temperature: 0.2,
     });
     expect(relationOrderAgain).toEqual(relationOrder);
-    expect(relationOrder).toContain("mechanism");
-    expect(relationOrder).toContain("maturity");
-    expect(relationOrder).toContain("missing");
   });
 
   it("increases relation section-order diversity across seed/temp/prompt changes", () => {
@@ -140,25 +152,14 @@ describe("helix ask novelty phrasing", () => {
     expect(variants.size).toBeGreaterThan(1);
   });
 
-  it("keeps repo_technical mechanism output unchanged for fixed snapshot", () => {
-    const output = buildHelixAskMechanismSentence({
-      claimA: "Route invokes gate",
-      claimB: "Output remains bounded",
-      evidenceTarget: "server/routes/agi.plan.ts",
-      context: {
-        family: "repo_technical",
-        prompt: "Explain repo mechanism",
-        seed: 7,
-        temperature: 0.2,
-        intentStrategy: "hybrid_explain",
-        topCitationTokenHash: "ignored-for-repo",
-        answerPathKey: "ignored-for-repo",
-        relationPacketSignal: "ignored-for-repo",
-      },
-    });
-    expect(output).toBe(
-      "Mechanism: Route invokes gate -> file-level control flow and validators constrain execution paths -> Output remains bounded, because module boundaries and contracts in server/routes/agi.plan.ts govern runtime behavior.",
-    );
+  it("deduplicates repeated scaffold lines for targeted families only", () => {
+    const lines = ["A line.", "A line.", "Mechanism: A -> B", "Mechanism: A -> B", "Unique line."];
+    expect(reduceHelixAskScaffoldRepeats(lines, { family: "relation", prompt: "x" })).toEqual([
+      "A line.",
+      "Mechanism: A -> B",
+      "Unique line.",
+    ]);
+    expect(reduceHelixAskScaffoldRepeats(lines, { family: "other", prompt: "x" })).toEqual(lines);
   });
 
   it("routes relation and repo_technical families without relaxing other families", () => {

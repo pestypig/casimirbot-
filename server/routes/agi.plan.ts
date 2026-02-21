@@ -139,6 +139,7 @@ import {
   buildHelixAskMechanismSentence,
   buildHelixAskRelationDetailBlock,
   getHelixAskSectionOrder,
+  reduceHelixAskScaffoldRepeats,
   resolveHelixAskNoveltyFamily,
   type HelixAskNoveltyContext,
 } from "../services/helix-ask/novelty-phrasing";
@@ -12818,7 +12819,11 @@ const renderHelixAskAnswerContract = (
     noveltyContext ?? { family: "other", prompt: question },
   );
   const sections = orderedSectionTypes.flatMap((key) => sectionsByType[key] ?? []);
-  let text = sections.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+  const compactSections = reduceHelixAskScaffoldRepeats(
+    sections,
+    noveltyContext ?? { family: "other", prompt: question },
+  );
+  let text = compactSections.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
   if ((contract.sources?.length ?? 0) > 0) {
     text = `${text}\n\nSources: ${(contract.sources ?? []).join(", ")}`.trim();
   }
