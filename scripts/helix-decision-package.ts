@@ -18,7 +18,20 @@ const ROOT = process.cwd();
 const REPORT_JSON = "reports/helix-decision-package.json";
 const REPORT_MD = "reports/helix-decision-package.md";
 const INPUTS_MANIFEST_JSON = "reports/helix-decision-inputs.json";
+const TIMELINE_JSON = "reports/helix-decision-timeline.json";
 const OUTPUT_FILES = [REPORT_JSON, REPORT_MD, INPUTS_MANIFEST_JSON] as const;
+
+type TimelineEvent = {
+  ts_iso: string;
+  phase: string;
+  event: string;
+  path: string | null;
+  exists: boolean | null;
+  size_bytes: number | null;
+  mtime_iso: string | null;
+  sha256: string | null;
+  details: Record<string, unknown>;
+};
 
 const args = new Map<string, string>();
 for (let i = 2; i < process.argv.length; i += 1) {
@@ -44,8 +57,40 @@ function clearOutputs(): void {
   }
 }
 
+function appendTimeline(phase: string, event: string, options: { path?: string | null; details?: Record<string, unknown> } = {}): void {
+  const timelinePath = path.resolve(ROOT, TIMELINE_JSON);
+  const meta = options.path ? fileMeta(options.path) : { exists: null, size_bytes: null, mtime_iso: null, sha256: null };
+  const nextEvent: TimelineEvent = {
+    ts_iso: new Date().toISOString(),
+    phase,
+    event,
+    path: options.path ?? null,
+    exists: meta.exists,
+    size_bytes: meta.size_bytes,
+    mtime_iso: meta.mtime_iso,
+    sha256: meta.sha256,
+    details: options.details ?? {},
+  };
+  let events: TimelineEvent[] = [];
+  try {
+    const existing = JSON.parse(fs.readFileSync(timelinePath, "utf8")) as { events?: TimelineEvent[] };
+    if (Array.isArray(existing.events)) events = existing.events;
+  } catch {
+    // initialize new timeline on first write
+  }
+  events.push(nextEvent);
+  fs.mkdirSync(path.resolve(ROOT, "reports"), { recursive: true });
+  atomicWrite(TIMELINE_JSON, `${JSON.stringify({ generated_at: new Date().toISOString(), events }, null, 2)}\n`);
+}
+
 function fail(reason: string, details?: Record<string, unknown>): never {
+  appendTimeline("decision_package", "fail_path_before_clear_outputs", { details: { reason, ...(details ?? {}) } });
   clearOutputs();
+  appendTimeline("decision_package", "fail_path_cleanup_complete", {
+    details: {
+      cleared: OUTPUT_FILES.map((filePath) => ({ file: filePath, exists: fs.existsSync(path.resolve(ROOT, filePath)) })),
+    },
+  });
   console.log(JSON.stringify({ ok: false, error: reason, ...(details ?? {}) }, null, 2));
   process.exit(1);
 }
@@ -329,12 +374,31 @@ const casimirPath = resolveSource(
   () => newestMatching(modernExperimentRoots, casimirDiscoveryMatcher, isCasimirSummary),
 );
 
+const selectedSources = {
+  narrow: narrowPath,
+  heavy: heavyPath,
+  recommendation: heavyRecommendationPath,
+  ab_t02: abT02Path,
+  ab_t035: abT035Path,
+  casimir: casimirPath,
+} as const;
+
+const sourceSnapshots = Object.fromEntries(
+  Object.entries(selectedSources).map(([name, filePath]) => {
+    appendTimeline("decision_package", "source_selected_before_read", { path: filePath, details: { source_name: name } });
+    return [name, fileMeta(filePath)];
+  }),
+) as Record<string, ReturnType<typeof fileMeta>>;
+
 const narrow = readJson(narrowPath);
 const heavy = readJson(heavyPath);
 const heavyRec = readJson(heavyRecommendationPath);
 const abT02 = readJson(abT02Path);
 const abT035 = readJson(abT035Path);
 const casimir = readJson(casimirPath);
+for (const [name, filePath] of Object.entries(selectedSources)) {
+  appendTimeline("decision_package", "source_read_parse_complete", { path: filePath, details: { source_name: name } });
+}
 
 const strictGates = (narrow.strict_gates ?? {}) as JsonRecord;
 const heavyQuality = ((heavy.quality_rollup ?? heavy.metrics) ?? {}) as JsonRecord;
@@ -431,6 +495,9 @@ const allArtifacts = [
 ];
 
 const artifacts = allArtifacts.map(fileMeta);
+for (const artifact of artifacts) {
+  appendTimeline("decision_package", "artifact_metadata_captured", { path: artifact.path });
+}
 const hardBlockers = [
   ...gates.filter((g) => !g.pass).map((g) => `${g.name} failed (${String(g.value)} ${g.comparator} ${String(g.threshold)})`),
   ...(novelty.t02.pass ? [] : ["novelty.t02 below target >=0.82"]),
@@ -507,6 +574,34 @@ const md = [
 ].join("\n");
 
 fs.mkdirSync(path.resolve(ROOT, "reports"), { recursive: true });
+
+const testDeleteSource = process.env.HELIX_DECISION_TEST_DELETE_SOURCE_BEFORE_WRITE;
+if (testDeleteSource && selectedSources[testDeleteSource as keyof typeof selectedSources]) {
+  const toDelete = selectedSources[testDeleteSource as keyof typeof selectedSources];
+  try {
+    fs.rmSync(path.resolve(ROOT, toDelete), { force: true });
+  } catch {
+    // test-only best effort
+  }
+  appendTimeline("decision_package", "source_deleted_for_test", {
+    path: toDelete,
+    details: { source_name: testDeleteSource },
+  });
+}
+
+for (const [name, filePath] of Object.entries(selectedSources)) {
+  const atWrite = fileMeta(filePath);
+  const atSelect = sourceSnapshots[name];
+  const mismatch =
+    atWrite.exists !== atSelect.exists ||
+    atWrite.size_bytes !== atSelect.size_bytes ||
+    atWrite.mtime_iso !== atSelect.mtime_iso ||
+    atWrite.sha256 !== atSelect.sha256;
+  if (mismatch) {
+    fail(`source_snapshot_mismatch:${name}`, { selected: atSelect, current: atWrite });
+  }
+}
+appendTimeline("decision_package", "before_write", { details: { outputs: OUTPUT_FILES } });
 const resolvedInputs = {
   generated_at: new Date().toISOString(),
   git: {
@@ -543,6 +638,11 @@ const resolvedInputs = {
 atomicWrite(INPUTS_MANIFEST_JSON, `${JSON.stringify(resolvedInputs, null, 2)}\n`);
 atomicWrite(REPORT_JSON, `${JSON.stringify(pkg, null, 2)}\n`);
 atomicWrite(REPORT_MD, `${md}\n`);
+appendTimeline("decision_package", "after_write", {
+  details: {
+    outputs: OUTPUT_FILES.map((filePath) => fileMeta(filePath)),
+  },
+});
 console.log(JSON.stringify({ ok: true, output: REPORT_JSON, decision: pkg.decision.value, blockers: pkg.decision.hard_blockers }, null, 2));
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
