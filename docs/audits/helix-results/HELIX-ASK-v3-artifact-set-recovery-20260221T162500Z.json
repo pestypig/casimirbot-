@@ -15,8 +15,8 @@
   "artifacts": {
     "novelty_service": "server/services/helix-ask/novelty-phrasing.ts",
     "render_route": "server/routes/agi.plan.ts",
-    "verify_artifact": "artifacts/verification/helix-casimir-20260221T164322Z.json",
-    "trace_export": "artifacts/verification/helix-training-trace-20260221T164322Z.jsonl"
+    "verify_artifact": "artifacts/verification/helix-casimir-20260221T174044Z.json",
+    "trace_export": "artifacts/verification/helix-training-trace-20260221T174044Z.jsonl"
   },
   "checks": {
     "determinism_same_input": true,
@@ -30,6 +30,6 @@
     "pack_id": "repo-convergence",
     "verdict": "PASS",
     "integrity_ok": true,
-    "certificate_hash": "af30145020f02c70d367a3582a2a8029fde487cc110d5e0f45d316f95fbb9e89"
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45"
   }
 }
