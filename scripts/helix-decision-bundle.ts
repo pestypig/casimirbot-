@@ -82,6 +82,7 @@ function main(): void {
     values.set(key, value);
   }
 
+  const evaluationTier = args.get("evaluation-tier");
   const packageCmd = [
     "npm run helix:decision:package --",
     `--narrow ${values.get("narrow")}`,
@@ -90,6 +91,7 @@ function main(): void {
     `--ab-t02 ${values.get("ab-t02")}`,
     `--ab-t035 ${values.get("ab-t035")}`,
     `--casimir ${values.get("casimir")}`,
+    ...(evaluationTier ? [`--evaluation-tier ${evaluationTier}`] : []),
   ].join(" ");
 
   const run = spawnSync(packageCmd, { shell: true, cwd: ROOT, stdio: "inherit" });
