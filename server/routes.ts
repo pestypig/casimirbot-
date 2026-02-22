@@ -22,6 +22,8 @@ import { hullStatusRouter } from "./routes/hull.status";
 import { ethosRouter } from "./routes/ethos";
 import { searchRouter } from "./routes/search";
 import { devTerminalRouter } from "./routes/dev-terminal";
+import { voiceRouter } from "./routes/voice";
+import { missionBoardRouter } from "./routes/mission-board";
 import { helixQiRouter } from "./routes/helix/qi";
 import { helixMathRouter } from "./routes/helix/math";
 import { helixAuditTreeRouter } from "./routes/helix/audit-tree";
@@ -155,6 +157,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/ethos", ethosRouter);
   app.use("/api/search", searchRouter);
   app.use("/api/dev-terminal", devTerminalRouter);
+  app.use("/api/voice", voiceRouter);
+  app.use("/api/mission-board", missionBoardRouter);
 
   if (!fastBoot) {
     const { knowledgeRouter } = await import("./routes/knowledge");

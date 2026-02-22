@@ -1,4 +1,317 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
+import { z } from "zod";
 
-// Prompt 3 partial scaffold: mission board route implementation deferred.
-export const missionBoardRouter = Router();
+type MissionPhase =
+  | "observe"
+  | "plan"
+  | "retrieve"
+  | "gate"
+  | "synthesize"
+  | "verify"
+  | "execute"
+  | "debrief";
+type MissionStatus = "active" | "degraded" | "blocked" | "complete" | "aborted";
+type EventType = "state_change" | "threat_update" | "timer_update" | "action_required" | "debrief";
+type EventClass = "info" | "warn" | "critical" | "action";
+
+type MissionBoardEvent = {
+  eventId: string;
+  missionId: string;
+  type: EventType;
+  classification: EventClass;
+  text: string;
+  ts: string;
+  fromState?: string;
+  toState?: string;
+  evidenceRefs: string[];
+};
+
+type MissionBoardSnapshot = {
+  missionId: string;
+  phase: MissionPhase;
+  status: MissionStatus;
+  updatedAt: string;
+  unresolvedCritical: number;
+};
+
+const missionBoardRouter = Router();
+const boardEvents = new Map<string, MissionBoardEvent[]>();
+
+const eventClassSchema = z.enum(["info", "warn", "critical", "action"]);
+const eventTypeSchema = z.enum(["state_change", "threat_update", "timer_update", "action_required", "debrief"]);
+const actionTypeSchema = z.enum([
+  "clarify",
+  "retrieve",
+  "verify",
+  "execute",
+  "escalate",
+  "abort",
+  "ACK_AND_CONTINUE",
+  "VERIFY_WITH_SENSOR",
+  "NAVIGATE_TO",
+  "ESCALATE_TO_COMMAND",
+  "PAUSE_MISSION",
+  "HOLD",
+  "START_TIMER",
+  "CANCEL_TIMER",
+  "MARK_RISK_MITIGATED",
+  "MARK_FALSE_ALARM",
+]);
+
+const actionSchema = z.object({
+  actionId: z.string().trim().min(1).max(200).optional(),
+  type: actionTypeSchema,
+  status: z.enum(["pending", "accepted", "rejected", "completed"]).default("pending"),
+  requestedBy: z.string().trim().max(200).optional(),
+  requestedAt: z.string().datetime().optional(),
+  evidenceRefs: z.array(z.string().trim().min(1).max(500)).max(32).default([]),
+  payload: z.record(z.unknown()).optional(),
+});
+
+const ackSchema = z.object({
+  eventId: z.string().trim().min(1).max(200),
+  actorId: z.string().trim().max(200).optional(),
+  note: z.string().trim().max(600).optional(),
+  ts: z.string().datetime().optional(),
+});
+
+const setCors = (res: Response) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Tenant-Id, X-Customer-Id");
+};
+
+const errorEnvelope = (
+  res: Response,
+  status: number,
+  error: string,
+  message: string,
+  details?: Record<string, unknown>,
+) => {
+  return res.status(status).json({
+    error,
+    message,
+    ...(details ? { details } : {}),
+  });
+};
+
+const missionIdFromReq = (req: Request): string => req.params.missionId?.trim();
+
+const parseLimit = (value: unknown, fallback: number): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(200, Math.max(1, Math.floor(parsed)));
+};
+
+const getMissionEvents = (missionId: string): MissionBoardEvent[] => {
+  const existing = boardEvents.get(missionId);
+  if (existing) return existing;
+  const created: MissionBoardEvent[] = [];
+  boardEvents.set(missionId, created);
+  return created;
+};
+
+const foldMissionSnapshot = (events: MissionBoardEvent[], missionId: string): MissionBoardSnapshot => {
+  let phase: MissionPhase = "observe";
+  let status: MissionStatus = "active";
+  let unresolvedCritical = 0;
+  let updatedAt = new Date().toISOString();
+
+  for (const event of events) {
+    updatedAt = event.ts;
+    if (event.classification === "critical") {
+      unresolvedCritical += 1;
+      if (status === "active") status = "degraded";
+    }
+
+    if (event.type === "state_change" && event.toState) {
+      const next = event.toState as MissionPhase | MissionStatus;
+      if (
+        next === "observe" ||
+        next === "plan" ||
+        next === "retrieve" ||
+        next === "gate" ||
+        next === "synthesize" ||
+        next === "verify" ||
+        next === "execute" ||
+        next === "debrief"
+      ) {
+        phase = next;
+      } else if (
+        next === "active" ||
+        next === "degraded" ||
+        next === "blocked" ||
+        next === "complete" ||
+        next === "aborted"
+      ) {
+        status = next;
+      }
+    }
+
+    if (event.type === "debrief") {
+      phase = "debrief";
+    }
+  }
+
+  return {
+    missionId,
+    phase,
+    status,
+    updatedAt,
+    unresolvedCritical,
+  };
+};
+
+const appendEvent = (missionId: string, event: MissionBoardEvent) => {
+  const events = getMissionEvents(missionId);
+  if (events.some((entry) => entry.eventId === event.eventId)) return;
+  events.push(event);
+  events.sort((a, b) => {
+    const tsDiff = Date.parse(a.ts) - Date.parse(b.ts);
+    return tsDiff !== 0 ? tsDiff : a.eventId.localeCompare(b.eventId);
+  });
+};
+
+const nowIso = () => new Date().toISOString();
+
+missionBoardRouter.options("/:missionId", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+missionBoardRouter.options("/:missionId/events", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+missionBoardRouter.options("/:missionId/actions", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+missionBoardRouter.options("/:missionId/ack", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+missionBoardRouter.get("/:missionId", (req, res) => {
+  setCors(res);
+  const missionId = missionIdFromReq(req);
+  if (!missionId) {
+    return errorEnvelope(res, 400, "mission_board_invalid_request", "missionId is required.");
+  }
+  const snapshot = foldMissionSnapshot(getMissionEvents(missionId), missionId);
+  return res.json({ snapshot });
+});
+
+missionBoardRouter.get("/:missionId/events", (req, res) => {
+  setCors(res);
+  const missionId = missionIdFromReq(req);
+  if (!missionId) {
+    return errorEnvelope(res, 400, "mission_board_invalid_request", "missionId is required.");
+  }
+
+  const limit = parseLimit(req.query.limit, 50);
+  const cursorRaw = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+  const cursor = cursorRaw ? Number(cursorRaw) : 0;
+  const offset = Number.isFinite(cursor) ? Math.max(0, Math.floor(cursor)) : 0;
+
+  const events = getMissionEvents(missionId);
+  const slice = events.slice(offset, offset + limit);
+  const nextCursor = offset + slice.length < events.length ? offset + slice.length : null;
+
+  return res.json({
+    missionId,
+    events: slice,
+    cursor: offset,
+    nextCursor,
+  });
+});
+
+missionBoardRouter.post("/:missionId/actions", (req, res) => {
+  setCors(res);
+  const missionId = missionIdFromReq(req);
+  if (!missionId) {
+    return errorEnvelope(res, 400, "mission_board_invalid_request", "missionId is required.");
+  }
+
+  const parsed = actionSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return errorEnvelope(
+      res,
+      400,
+      "mission_board_invalid_request",
+      "Invalid mission action payload.",
+      { issues: parsed.error.flatten() },
+    );
+  }
+
+  const payload = parsed.data;
+  const actionId = payload.actionId?.trim() || `action:${missionId}:${Date.now()}`;
+  const ts = payload.requestedAt ?? nowIso();
+
+  appendEvent(missionId, {
+    eventId: actionId,
+    missionId,
+    type: "action_required",
+    classification: payload.type.includes("ESCALATE") || payload.type.includes("abort") ? "critical" : "action",
+    text: `Action ${payload.type} (${payload.status})`,
+    ts,
+    evidenceRefs: payload.evidenceRefs,
+  });
+
+  const snapshot = foldMissionSnapshot(getMissionEvents(missionId), missionId);
+  return res.status(200).json({
+    receipt: { actionId, missionId, ts, status: payload.status },
+    snapshot,
+  });
+});
+
+missionBoardRouter.post("/:missionId/ack", (req, res) => {
+  setCors(res);
+  const missionId = missionIdFromReq(req);
+  if (!missionId) {
+    return errorEnvelope(res, 400, "mission_board_invalid_request", "missionId is required.");
+  }
+
+  const parsed = ackSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return errorEnvelope(
+      res,
+      400,
+      "mission_board_invalid_request",
+      "Invalid mission acknowledgment payload.",
+      { issues: parsed.error.flatten() },
+    );
+  }
+
+  const payload = parsed.data;
+  const ts = payload.ts ?? nowIso();
+  appendEvent(missionId, {
+    eventId: `ack:${payload.eventId}:${Date.parse(ts) || Date.now()}`,
+    missionId,
+    type: "state_change",
+    classification: eventClassSchema.parse("info"),
+    text: payload.note?.trim() || `Acknowledged ${payload.eventId}`,
+    ts,
+    fromState: "pending",
+    toState: "active",
+    evidenceRefs: [payload.eventId],
+  });
+
+  const snapshot = foldMissionSnapshot(getMissionEvents(missionId), missionId);
+  return res.status(200).json({
+    receipt: {
+      missionId,
+      eventId: payload.eventId,
+      actorId: payload.actorId ?? null,
+      ts,
+    },
+    snapshot,
+  });
+});
+
+export {
+  missionBoardRouter,
+  foldMissionSnapshot,
+  eventTypeSchema,
+  eventClassSchema,
+};

@@ -23,6 +23,7 @@ import { migration021 } from "./migrations/021_simulations";
 import { migration022 } from "./migrations/022_noisegen_store";
 import { migration023 } from "./migrations/023_chat_sessions";
 import { migration024 } from "./migrations/024_helix_ask_jobs";
+import { migration025 } from "./migrations/025_mission_board";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -50,6 +51,7 @@ const MIGRATIONS = [
   migration022,
   migration023,
   migration024,
+  migration025,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {
