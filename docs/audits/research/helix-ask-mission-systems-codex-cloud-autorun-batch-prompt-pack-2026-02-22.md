@@ -455,3 +455,7 @@ Done criteria:
    - certificateHash present
    - integrityOk true
 ```
+
+## Batch execution note
+
+Execution started via Codex AUTORUN on 2026-02-22 with per-prompt commit sequencing tracked in `reports/helix-ask-mission-systems-execution-ledger-2026-02-22.md`.
