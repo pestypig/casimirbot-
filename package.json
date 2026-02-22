@@ -102,7 +102,9 @@
     "helix:decision:run": "tsx scripts/helix-decision-run.ts",
     "validate:agibot:assets": "tsx scripts/validate-agibot-asset-manifest.ts",
     "helix:ask:audit:write": "tsx scripts/helix-ask-audit-write.ts",
-    "sector-control:repro:check": "tsx scripts/sector-control-repro-check.ts"
+    "sector-control:repro:check": "tsx scripts/sector-control-repro-check.ts",
+    "helix:decision:bundle": "tsx scripts/helix-decision-bundle.ts",
+    "helix:decision:bundle:verify": "tsx scripts/helix-decision-bundle-verify.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",

@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://casimirbot/schemas/helix-decision-bundle.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "git",
+    "policy",
+    "evidence",
+    "gates",
+    "novelty",
+    "provenance",
+    "casimir",
+    "decision",
+    "replay"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 2 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "git": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["branch", "head", "origin_main", "ahead_behind"],
+      "properties": {
+        "branch": { "type": ["string", "null"] },
+        "head": { "type": ["string", "null"] },
+        "origin_main": { "type": ["string", "null"] },
+        "ahead_behind": {
+          "type": ["object", "null"],
+          "required": ["ahead", "behind"],
+          "properties": {
+            "ahead": { "type": "number" },
+            "behind": { "type": "number" }
+          }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "hash"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": ["string", "number"] },
+        "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "digest", "size_bytes", "media_type", "locator"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "digest": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sha256"],
+            "properties": {
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            }
+          },
+          "size_bytes": { "type": "integer", "minimum": 0 },
+          "media_type": { "type": "string", "minLength": 1 },
+          "locator": { "type": "string", "minLength": 1 },
+          "source_path": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "gates": { "type": ["array", "object"] },
+    "novelty": { "type": "object" },
+    "provenance": { "type": "object" },
+    "casimir": { "type": "object" },
+    "decision": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["value", "hard_blockers", "decision_hash", "normalized_payload"],
+      "properties": {
+        "value": { "type": "string" },
+        "hard_blockers": { "type": "array", "items": { "type": "string" } },
+        "decision_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "normalized_payload": { "type": "object" }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "expected_decision_hash"],
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "expected_decision_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

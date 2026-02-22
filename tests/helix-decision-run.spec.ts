@@ -382,4 +382,24 @@ describe("helix decision run summary", () => {
     expect(calls).toContain("run helix:decision:package --");
     expect(calls).not.toContain("run helix:decision:validate -- --package reports/helix-decision-package.json");
   });
+
+  it("bundle mode rejects mtime discovery fallback without explicit sources", () => {
+    const dir = mkDir();
+    const out = spawnSync(process.execPath, [tsxCli, path.join(repoRoot, "scripts/helix-decision-run.ts"), "--bundle-mode", "true", "--fresh", "false"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        HELIX_DECISION_ROOT: dir,
+      },
+    });
+
+    expect(out.status).toBe(1);
+    const summary = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-run-summary.json"), "utf8")) as {
+      mode_used: string;
+      first_blocker: string;
+    };
+    expect(summary.mode_used).toBe("legacy");
+    expect(summary.first_blocker).toContain("bundle_mode_requires_explicit_source");
+  });
 });
