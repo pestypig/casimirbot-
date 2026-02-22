@@ -38,3 +38,38 @@ When evidence is partial or missing, responses must still be scientific:
 - Reasoned connections (grounded-only)
 - Hypotheses (only if enabled)
 - Next evidence (concrete file/section/symbol targets)
+
+## Voice and mission-callout contract (Dot mode)
+
+Voice output is an action channel, not a style channel. Any voice layer that
+uses Helix Ask state must follow these rules:
+
+- Certainty parity: voice certainty must never exceed text certainty.
+- Evidence parity: voice claims attributed to repo/system state require the same
+  proof posture as text claims.
+- Salience-first: call out only meaningful state transitions, failures, or
+  operator-required actions.
+- Deterministic fail language: emit stable failure labels when available
+  (for replay and operator trust).
+
+### Callout classes
+- `progress`: stage transition updates (low frequency).
+- `risk`: warnings and degraded states (always eligible to speak).
+- `action`: explicit next action required from operator.
+- `debrief`: short run summary after completion or abort.
+
+### Always-call conditions
+- circuit breaker entered
+- fallback mode entered
+- verification/arbiter fail with typed reason
+- missing evidence for high-stakes claim
+- timeout or cancellation with unresolved critical objectives
+
+### Suppress conditions
+- duplicate event text within cooldown window
+- low-information updates without state change
+- repeated progress updates in the same stage unless severity increased
+
+### Policy note
+When voice is unavailable, the same callout payload must be renderable as text
+without changing policy semantics.

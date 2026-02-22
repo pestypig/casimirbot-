@@ -48,3 +48,18 @@ not replace training data checks or guarantee future patches remain valid.
 When a user asks for ideology references, anchor to the base of the ideology tree
 (`docs/ethos/ideology.json`) and use the relevant branches to relate wisdom to
 the scenario presented for advice.
+
+## Mission-control context pack (voice + Go Board work)
+When touching mission-overwatch, voice-callout, or Go Board workflows, read these
+files before proposing changes:
+- `docs/BUSINESS_MODEL.md`
+- `docs/helix-ask-flow.md`
+- `docs/helix-ask-agent-policy.md`
+- `docs/architecture/voice-service-contract.md`
+- `docs/architecture/mission-go-board-spec.md`
+
+Agent expectations for this surface:
+- Keep voice certainty no stronger than text certainty.
+- Favor event-driven low-noise callouts over long narration.
+- Preserve deterministic error/fail reasons for replay and operator trust.
+- Keep local-first ownership assumptions explicit when discussing deployment.
