@@ -5,8 +5,8 @@ import { pathToFileURL } from "node:url";
 import crypto from "node:crypto";
 
 type SourceKey = "narrow" | "heavy" | "recommendation" | "ab_t02" | "ab_t035" | "casimir";
-
 type SourceMap = Record<SourceKey, string | null>;
+type ModeUsed = "legacy" | "bundle";
 
 type RunSummary = {
   ok: boolean;
@@ -16,6 +16,9 @@ type RunSummary = {
   validate_path: string;
   selected_sources: SourceMap;
   commands: Array<{ name: string; cmd: string; status: number }>;
+  mode_used: ModeUsed;
+  first_blocker: string | null;
+  verifier_ok: boolean;
 };
 
 const SUMMARY_PATH = "reports/helix-decision-run-summary.json";
@@ -40,21 +43,12 @@ function makeRunId(): string {
   const short = crypto.randomUUID().split("-")[0];
   return `${ts}-${short}`;
 }
-
-function timelinePathForRun(runId: string): string {
-  return `reports/helix-decision-timeline-${runId}.jsonl`;
-}
+const timelinePathForRun = (runId: string): string => `reports/helix-decision-timeline-${runId}.jsonl`;
+const rootDir = (): string => process.env.HELIX_DECISION_ROOT ?? process.cwd();
 
 function writeTimelinePointer(runId: string, timelinePath: string): void {
   fs.mkdirSync(path.resolve(rootDir(), "reports"), { recursive: true });
-  fs.writeFileSync(
-    path.resolve(rootDir(), TIMELINE_POINTER_PATH),
-    `${JSON.stringify({ run_id: runId, timeline_path: timelinePath }, null, 2)}\n`,
-  );
-}
-
-function rootDir(): string {
-  return process.env.HELIX_DECISION_ROOT ?? process.cwd();
+  fs.writeFileSync(path.resolve(rootDir(), TIMELINE_POINTER_PATH), `${JSON.stringify({ run_id: runId, timeline_path: timelinePath }, null, 2)}\n`);
 }
 
 function parseArgs(argv: string[]): Map<string, string> {
@@ -74,21 +68,10 @@ function fileMeta(relPath: string): { exists: boolean; size_bytes: number | null
   if (!fs.existsSync(abs)) return { exists: false, size_bytes: null, mtime_iso: null, sha256: null };
   const st = fs.statSync(abs);
   const buf = fs.readFileSync(abs);
-  return {
-    exists: true,
-    size_bytes: st.size,
-    mtime_iso: st.mtime.toISOString(),
-    sha256: crypto.createHash("sha256").update(buf).digest("hex"),
-  };
+  return { exists: true, size_bytes: st.size, mtime_iso: st.mtime.toISOString(), sha256: crypto.createHash("sha256").update(buf).digest("hex") };
 }
 
-function appendTimeline(
-  runId: string,
-  timelinePath: string,
-  phase: string,
-  event: string,
-  options: { path?: string | null; details?: Record<string, unknown> } = {},
-): void {
+function appendTimeline(runId: string, timelinePath: string, phase: string, event: string, options: { path?: string | null; details?: Record<string, unknown> } = {}): void {
   const timelineAbs = path.resolve(rootDir(), timelinePath);
   const meta = options.path ? fileMeta(options.path) : { exists: null, size_bytes: null, mtime_iso: null, sha256: null };
   const row: TimelineEvent = {
@@ -108,36 +91,19 @@ function appendTimeline(
   fs.appendFileSync(timelineAbs, `${JSON.stringify(row)}\n`);
 }
 
-function runCommand(
-  name: string,
-  cmd: string,
-  options: { allowFail?: boolean; env?: Record<string, string> } = {},
-): { status: number; stdout: string; stderr: string } {
+function runCommand(name: string, cmd: string, options: { allowFail?: boolean; env?: Record<string, string> } = {}): { status: number; stdout: string; stderr: string } {
   const child = spawnSync(cmd, {
-    cwd: rootDir(),
-    shell: true,
-    encoding: "utf8",
-    stdio: ["inherit", "pipe", "pipe"],
-    env: {
-      ...process.env,
-      ...(options.env ?? {}),
-    },
+    cwd: rootDir(), shell: true, encoding: "utf8", stdio: ["inherit", "pipe", "pipe"], env: { ...process.env, ...(options.env ?? {}) },
   });
   if (child.stdout) process.stdout.write(child.stdout);
   if (child.stderr) process.stderr.write(child.stderr);
   const status = child.status ?? 1;
-  if (status !== 0 && !options.allowFail) {
-    throw new Error(`command_failed:${name}:${status}`);
-  }
+  if (status !== 0 && !options.allowFail) throw new Error(`command_failed:${name}:${status}`);
   return { status, stdout: child.stdout ?? "", stderr: child.stderr ?? "" };
 }
 
 function tryReadJson(filePath: string): Record<string, unknown> | null {
-  try {
-    return JSON.parse(fs.readFileSync(path.resolve(rootDir(), filePath), "utf8"));
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(fs.readFileSync(path.resolve(rootDir(), filePath), "utf8")); } catch { return null; }
 }
 
 function walkFiles(rootRel: string, maxDepth = 7): string[] {
@@ -156,19 +122,14 @@ function walkFiles(rootRel: string, maxDepth = 7): string[] {
   return out;
 }
 
-function newestMatching(
-  roots: string[],
-  matcher: (relPath: string) => boolean,
-  validator: (doc: Record<string, unknown>, relPath: string) => boolean,
-): string | null {
+function newestMatching(roots: string[], matcher: (relPath: string) => boolean, validator: (doc: Record<string, unknown>, relPath: string) => boolean): string | null {
   const candidates: Array<{ relPath: string; mtimeMs: number }> = [];
   for (const root of roots) {
     for (const relPath of walkFiles(root)) {
       if (!matcher(relPath)) continue;
       const doc = tryReadJson(relPath);
       if (!doc || !validator(doc, relPath)) continue;
-      const stat = fs.statSync(path.resolve(rootDir(), relPath));
-      candidates.push({ relPath, mtimeMs: stat.mtimeMs });
+      candidates.push({ relPath, mtimeMs: fs.statSync(path.resolve(rootDir(), relPath)).mtimeMs });
     }
   }
   candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
@@ -184,79 +145,59 @@ function isABTempSource(doc: Record<string, unknown>, relPath: string, expected:
 }
 
 function validateResolvedSources(resolved: SourceMap): void {
-  if (path.dirname(resolved.heavy!) !== path.dirname(resolved.recommendation!)) {
-    throw new Error(`source_pair_mismatch:heavy_recommendation:${resolved.heavy}:${resolved.recommendation}`);
-  }
-
+  if (path.dirname(resolved.heavy!) !== path.dirname(resolved.recommendation!)) throw new Error(`source_pair_mismatch:heavy_recommendation:${resolved.heavy}:${resolved.recommendation}`);
   const abT02 = tryReadJson(resolved.ab_t02!);
   const abT035 = tryReadJson(resolved.ab_t035!);
-  if (!abT02 || !isABTempSource(abT02, resolved.ab_t02!, "t02")) {
-    throw new Error(`source_invalid_role:ab_t02:${resolved.ab_t02}`);
-  }
-  if (!abT035 || !isABTempSource(abT035, resolved.ab_t035!, "t035")) {
-    throw new Error(`source_invalid_role:ab_t035:${resolved.ab_t035}`);
-  }
+  if (!abT02 || !isABTempSource(abT02, resolved.ab_t02!, "t02")) throw new Error(`source_invalid_role:ab_t02:${resolved.ab_t02}`);
+  if (!abT035 || !isABTempSource(abT035, resolved.ab_t035!, "t035")) throw new Error(`source_invalid_role:ab_t035:${resolved.ab_t035}`);
 }
 
-function resolveSources(overrides: Partial<SourceMap>): SourceMap {
+function resolveSources(overrides: Partial<SourceMap>, allowDiscovery: boolean): SourceMap {
   const fromOverride = (key: SourceKey): string | null => {
     const value = overrides[key] ?? null;
     if (!value) return null;
-    if (!fs.existsSync(path.resolve(rootDir(), value))) {
-      throw new Error(`source_missing:${key}:${value}`);
-    }
+    if (!fs.existsSync(path.resolve(rootDir(), value))) throw new Error(`source_missing:${key}:${value}`);
     return value;
   };
 
-  const heavy = fromOverride("heavy") ?? newestMatching(
-    ["artifacts/experiments/helix-step4-heavy-rerun", "artifacts/experiments", "artifacts"],
-    (relPath) => relPath.endsWith("/summary.json"),
-    (doc, relPath) => {
-      const lower = relPath.toLowerCase();
-      if (lower.includes("narrow") || lower.includes("precheck") || lower.includes("ab-rerun")) return false;
-      const metrics = doc.metrics as Record<string, unknown> | undefined;
-      const provenance = doc.provenance as Record<string, unknown> | undefined;
-      return typeof metrics?.relation_packet_built_rate === "number" && typeof provenance === "object";
-    },
-  );
-
-  const recommendation = fromOverride("recommendation") ?? (() => {
-    if (!heavy) return null;
-    const sibling = path.posix.join(path.posix.dirname(heavy), "recommendation.json");
-    const siblingDoc = tryReadJson(sibling);
-    if (!siblingDoc || typeof siblingDoc.decision_grade_ready !== "boolean") return null;
-    return sibling;
-  })();
-
-  const resolved: SourceMap = {
-    narrow: fromOverride("narrow") ?? newestMatching(
-      ["reports", "artifacts/experiments", "artifacts"],
-      (relPath) => relPath.endsWith("/helix-self-tune-gate-summary.json") || relPath === "reports/helix-self-tune-gate-summary.json" || relPath.toLowerCase().includes("narrow") && relPath.endsWith("/summary.json"),
-      (doc) => typeof doc.strict_gates === "object",
-    ),
-    heavy,
-    recommendation,
-    ab_t02: fromOverride("ab_t02") ?? newestMatching(
-      ["artifacts/experiments/helix-step4-ab-rerun", "artifacts/experiments", "artifacts"],
-      (relPath) => relPath.endsWith("/summary.json"),
-      (doc, relPath) => isABTempSource(doc, relPath, "t02"),
-    ),
-    ab_t035: fromOverride("ab_t035") ?? newestMatching(
-      ["artifacts/experiments/helix-step4-ab-rerun", "artifacts/experiments", "artifacts"],
-      (relPath) => relPath.endsWith("/summary.json"),
-      (doc, relPath) => isABTempSource(doc, relPath, "t035"),
-    ),
-    casimir: fromOverride("casimir") ?? newestMatching(
-      ["reports", "artifacts/experiments", "artifacts"],
-      (relPath) => relPath.endsWith("casimir.json"),
-      (doc) => typeof doc.verdict === "string",
-    ),
+  const requireExplicit = (key: SourceKey): string => {
+    const value = fromOverride(key);
+    if (!value) throw new Error(`bundle_mode_requires_explicit_source:${key}`);
+    return value;
   };
+
+  const resolved: SourceMap = allowDiscovery
+    ? {
+        narrow: fromOverride("narrow") ?? newestMatching(["reports", "artifacts/experiments", "artifacts"], (relPath) => relPath.endsWith("/helix-self-tune-gate-summary.json") || relPath === "reports/helix-self-tune-gate-summary.json" || relPath.toLowerCase().includes("narrow") && relPath.endsWith("/summary.json"), (doc) => typeof doc.strict_gates === "object"),
+        heavy: fromOverride("heavy") ?? newestMatching(["artifacts/experiments/helix-step4-heavy-rerun", "artifacts/experiments", "artifacts"], (relPath) => relPath.endsWith("/summary.json"), (doc, relPath) => {
+          const lower = relPath.toLowerCase();
+          if (lower.includes("narrow") || lower.includes("precheck") || lower.includes("ab-rerun")) return false;
+          const metrics = doc.metrics as Record<string, unknown> | undefined;
+          return typeof metrics?.relation_packet_built_rate === "number" && typeof doc.provenance === "object";
+        }),
+        recommendation: fromOverride("recommendation") ?? null,
+        ab_t02: fromOverride("ab_t02") ?? newestMatching(["artifacts/experiments/helix-step4-ab-rerun", "artifacts/experiments", "artifacts"], (relPath) => relPath.endsWith("/summary.json"), (doc, relPath) => isABTempSource(doc, relPath, "t02")),
+        ab_t035: fromOverride("ab_t035") ?? newestMatching(["artifacts/experiments/helix-step4-ab-rerun", "artifacts/experiments", "artifacts"], (relPath) => relPath.endsWith("/summary.json"), (doc, relPath) => isABTempSource(doc, relPath, "t035")),
+        casimir: fromOverride("casimir") ?? newestMatching(["reports", "artifacts/experiments", "artifacts"], (relPath) => relPath.endsWith("casimir.json"), (doc) => typeof doc.verdict === "string"),
+      }
+    : {
+        narrow: requireExplicit("narrow"),
+        heavy: requireExplicit("heavy"),
+        recommendation: requireExplicit("recommendation"),
+        ab_t02: requireExplicit("ab_t02"),
+        ab_t035: requireExplicit("ab_t035"),
+        casimir: requireExplicit("casimir"),
+      };
+
+  if (allowDiscovery && !resolved.recommendation && resolved.heavy) {
+    const sibling = path.posix.join(path.posix.dirname(resolved.heavy), "recommendation.json");
+    const siblingDoc = tryReadJson(sibling);
+    if (siblingDoc && typeof siblingDoc.decision_grade_ready === "boolean") resolved.recommendation = sibling;
+  }
 
   for (const [key, value] of Object.entries(resolved) as Array<[SourceKey, string | null]>) {
     if (!value) throw new Error(`source_unresolved:${key}`);
   }
-
   validateResolvedSources(resolved);
   return resolved;
 }
@@ -268,25 +209,23 @@ export function buildSummaryShape(input: Partial<RunSummary>): RunSummary {
     blockers: input.blockers ?? [],
     package_path: input.package_path ?? "reports/helix-decision-package.json",
     validate_path: input.validate_path ?? "reports/helix-decision-validate.json",
-    selected_sources: input.selected_sources ?? {
-      narrow: null,
-      heavy: null,
-      recommendation: null,
-      ab_t02: null,
-      ab_t035: null,
-      casimir: null,
-    },
+    selected_sources: input.selected_sources ?? { narrow: null, heavy: null, recommendation: null, ab_t02: null, ab_t035: null, casimir: null },
     commands: input.commands ?? [],
+    mode_used: input.mode_used ?? "legacy",
+    first_blocker: input.first_blocker ?? null,
+    verifier_ok: input.verifier_ok ?? false,
   };
 }
 
-export function resolveSourcesForTest(overrides: Partial<SourceMap>): SourceMap {
-  return resolveSources(overrides);
+export function resolveSourcesForTest(overrides: Partial<SourceMap>, allowDiscovery = true): SourceMap {
+  return resolveSources(overrides, allowDiscovery);
 }
 
 function main(): void {
   const args = parseArgs(process.argv);
   const freshEnabled = (args.get("fresh") ?? "true") !== "false";
+  const bundleMode = (args.get("bundle-mode") ?? "false") === "true";
+  const bundlePath = args.get("bundle") ?? null;
   const overrides: Partial<SourceMap> = {
     narrow: args.get("narrow") ?? null,
     heavy: args.get("heavy") ?? null,
@@ -300,129 +239,107 @@ function main(): void {
   const runId = process.env.HELIX_DECISION_RUN_ID ?? makeRunId();
   const timelinePath = process.env.HELIX_DECISION_TIMELINE_PATH ?? timelinePathForRun(runId);
   writeTimelinePointer(runId, timelinePath);
-  appendTimeline(runId, timelinePath, "decision_run", "run_start", { details: { fresh_enabled: freshEnabled } });
+  appendTimeline(runId, timelinePath, "decision_run", "run_start", { details: { fresh_enabled: freshEnabled, bundle_mode: bundleMode } });
 
-  const timelineEnv = {
-    HELIX_DECISION_RUN_ID: runId,
-    HELIX_DECISION_TIMELINE_PATH: timelinePath,
-  };
+  const timelineEnv = { HELIX_DECISION_RUN_ID: runId, HELIX_DECISION_TIMELINE_PATH: timelinePath };
 
-  if (freshEnabled) {
+  if (!bundleMode && freshEnabled) {
     const needsNarrow = !overrides.narrow;
     const needsHeavy = !overrides.heavy || !overrides.recommendation;
     const needsAB = !overrides.ab_t02 || !overrides.ab_t035;
     const needsCasimir = !overrides.casimir;
-
-    if (needsNarrow) {
-      const cmd = "npm run helix:decision:eval:narrow --if-present";
-      const res = runCommand("fresh:narrow", cmd, { allowFail: true });
-      commands.push({ name: "fresh:narrow", cmd, status: res.status });
-    }
-    if (needsHeavy) {
-      const cmd = "npm run helix:decision:eval:heavy --if-present";
-      const res = runCommand("fresh:heavy", cmd, { allowFail: true });
-      commands.push({ name: "fresh:heavy", cmd, status: res.status });
-    }
+    if (needsNarrow) commands.push({ name: "fresh:narrow", cmd: "npm run helix:decision:eval:narrow --if-present", status: runCommand("fresh:narrow", "npm run helix:decision:eval:narrow --if-present", { allowFail: true }).status });
+    if (needsHeavy) commands.push({ name: "fresh:heavy", cmd: "npm run helix:decision:eval:heavy --if-present", status: runCommand("fresh:heavy", "npm run helix:decision:eval:heavy --if-present", { allowFail: true }).status });
     if (needsAB) {
-      const cmdT02 = "npm run helix:decision:eval:ab:t02 --if-present";
-      const resT02 = runCommand("fresh:ab_t02", cmdT02, { allowFail: true });
-      commands.push({ name: "fresh:ab_t02", cmd: cmdT02, status: resT02.status });
-      const cmdT035 = "npm run helix:decision:eval:ab:t035 --if-present";
-      const resT035 = runCommand("fresh:ab_t035", cmdT035, { allowFail: true });
-      commands.push({ name: "fresh:ab_t035", cmd: cmdT035, status: resT035.status });
+      commands.push({ name: "fresh:ab_t02", cmd: "npm run helix:decision:eval:ab:t02 --if-present", status: runCommand("fresh:ab_t02", "npm run helix:decision:eval:ab:t02 --if-present", { allowFail: true }).status });
+      commands.push({ name: "fresh:ab_t035", cmd: "npm run helix:decision:eval:ab:t035 --if-present", status: runCommand("fresh:ab_t035", "npm run helix:decision:eval:ab:t035 --if-present", { allowFail: true }).status });
     }
-    if (needsCasimir) {
-      const cmd = "npm run helix:decision:eval:casimir --if-present";
-      const res = runCommand("fresh:casimir", cmd, { allowFail: true });
-      commands.push({ name: "fresh:casimir", cmd, status: res.status });
-    }
+    if (needsCasimir) commands.push({ name: "fresh:casimir", cmd: "npm run helix:decision:eval:casimir --if-present", status: runCommand("fresh:casimir", "npm run helix:decision:eval:casimir --if-present", { allowFail: true }).status });
   }
 
-  appendTimeline(runId, timelinePath, "resolve_sources", "resolve_sources_start", { details: { overrides } });
-  const sources = resolveSources(overrides);
-  appendTimeline(runId, timelinePath, "resolve_sources", "resolve_sources_end", { details: { selected_sources: sources } });
-  for (const [name, src] of Object.entries(sources)) {
-    appendTimeline(runId, timelinePath, "resolve_sources", "source_selected", { path: src, details: { source_name: name } });
-  }
-  const packageCmd = [
-    "npm run helix:decision:package --",
-    `--narrow ${sources.narrow}`,
-    `--heavy ${sources.heavy}`,
-    `--heavy-recommendation ${sources.recommendation}`,
-    `--ab-t02 ${sources.ab_t02}`,
-    `--ab-t035 ${sources.ab_t035}`,
-    `--casimir ${sources.casimir}`,
-  ].join(" ");
-  appendTimeline(runId, timelinePath, "decision_package", "decision_package_start", { details: { cmd: packageCmd } });
-  const packageRes = runCommand("decision:package", packageCmd, { allowFail: true, env: timelineEnv });
-  appendTimeline(runId, timelinePath, "decision_package", "decision_package_end", { details: { status: packageRes.status } });
-  commands.push({ name: "decision:package", cmd: packageCmd, status: packageRes.status });
-
-  if (packageRes.status !== 0) {
-    const summary = buildSummaryShape({
-      ok: false,
-      blockers: ["decision_package_blocker:package_generation_failed", `command_failed:decision:package:${packageRes.status}`],
-      package_path: "reports/helix-decision-package.json",
-      validate_path: "reports/helix-decision-validate.json",
-      selected_sources: sources,
+  let summary: RunSummary;
+  if (bundleMode) {
+    if (bundlePath && Object.values(overrides).some(Boolean)) throw new Error("bundle_mode_conflict:provide_bundle_or_explicit_sources");
+    let selected: SourceMap = { narrow: null, heavy: null, recommendation: null, ab_t02: null, ab_t035: null, casimir: null };
+    let targetBundle = bundlePath ?? "reports/helix-decision-bundle.json";
+    if (!bundlePath) {
+      selected = resolveSources(overrides, false);
+      const bundleCmd = ["npm run helix:decision:bundle --", `--narrow ${selected.narrow}`, `--heavy ${selected.heavy}`, `--heavy-recommendation ${selected.recommendation}`, `--ab-t02 ${selected.ab_t02}`, `--ab-t035 ${selected.ab_t035}`, `--casimir ${selected.casimir}`].join(" ");
+      const b = runCommand("decision:bundle", bundleCmd, { allowFail: true, env: timelineEnv });
+      commands.push({ name: "decision:bundle", cmd: bundleCmd, status: b.status });
+      if (b.status !== 0) throw new Error(`command_failed:decision:bundle:${b.status}`);
+    }
+    const verifyCmd = `npm run helix:decision:bundle:verify -- --bundle ${targetBundle}`;
+    const v = runCommand("decision:bundle:verify", verifyCmd, { allowFail: true, env: timelineEnv });
+    commands.push({ name: "decision:bundle:verify", cmd: verifyCmd, status: v.status });
+    const bundleDoc = tryReadJson(targetBundle) ?? {};
+    const verifyDoc = tryReadJson("reports/helix-decision-bundle-verify.json") ?? {};
+    const blockers = v.status === 0 ? [] : [String((verifyDoc as any).first_blocker ?? "bundle_verifier_failed")];
+    summary = buildSummaryShape({
+      ok: v.status === 0,
+      decision: String((bundleDoc as any)?.decision?.value ?? "UNKNOWN") as any,
+      blockers,
+      package_path: targetBundle,
+      validate_path: "reports/helix-decision-bundle-verify.json",
+      selected_sources: selected,
       commands,
+      mode_used: "bundle",
+      first_blocker: blockers[0] ?? null,
+      verifier_ok: v.status === 0,
     });
-    fs.mkdirSync(path.resolve(rootDir(), "reports"), { recursive: true });
-    fs.writeFileSync(path.resolve(rootDir(), SUMMARY_PATH), `${JSON.stringify(summary, null, 2)}\n`);
-    appendTimeline(runId, timelinePath, "decision_run", "run_end", { details: { ok: false, status: 1 } });
-    process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
-    process.exit(1);
+  } else {
+    appendTimeline(runId, timelinePath, "resolve_sources", "resolve_sources_start", { details: { overrides, legacy: true } });
+    const sources = resolveSources(overrides, true);
+    appendTimeline(runId, timelinePath, "resolve_sources", "resolve_sources_end", { details: { selected_sources: sources } });
+    for (const [name, src] of Object.entries(sources)) {
+      appendTimeline(runId, timelinePath, "resolve_sources", "source_selected", { path: src, details: { source_name: name } });
+    }
+    const packageCmd = ["npm run helix:decision:package --", `--narrow ${sources.narrow}`, `--heavy ${sources.heavy}`, `--heavy-recommendation ${sources.recommendation}`, `--ab-t02 ${sources.ab_t02}`, `--ab-t035 ${sources.ab_t035}`, `--casimir ${sources.casimir}`].join(" ");
+    appendTimeline(runId, timelinePath, "decision_package", "decision_package_start", { details: { cmd: packageCmd } });
+    const packageRes = runCommand("decision:package", packageCmd, { allowFail: true, env: timelineEnv });
+    appendTimeline(runId, timelinePath, "decision_package", "decision_package_end", { details: { status: packageRes.status } });
+    commands.push({ name: "decision:package", cmd: packageCmd, status: packageRes.status });
+
+    if (packageRes.status !== 0) {
+      summary = buildSummaryShape({ ok: false, blockers: ["decision_package_blocker:package_generation_failed", `command_failed:decision:package:${packageRes.status}`], selected_sources: sources, commands, mode_used: "legacy", first_blocker: "decision_package_blocker:package_generation_failed", verifier_ok: false });
+    } else {
+      const validateCmd = "npm run helix:decision:validate -- --package reports/helix-decision-package.json";
+      appendTimeline(runId, timelinePath, "decision_validate", "decision_validate_start", { details: { cmd: validateCmd } });
+      const validateRes = runCommand("decision:validate", validateCmd, { allowFail: true, env: timelineEnv });
+      appendTimeline(runId, timelinePath, "decision_validate", "decision_validate_end", { details: { status: validateRes.status } });
+      commands.push({ name: "decision:validate", cmd: validateCmd, status: validateRes.status });
+      const pkg = tryReadJson("reports/helix-decision-package.json") ?? {};
+      const blockers = Array.isArray((pkg as any)?.decision?.hard_blockers) ? (pkg as any).decision.hard_blockers : [];
+      summary = buildSummaryShape({
+        ok: validateRes.status === 0,
+        decision: ["GO", "NO-GO"].includes(String((pkg as any)?.decision?.value ?? "UNKNOWN")) ? (pkg as any).decision.value : "UNKNOWN",
+        blockers,
+        selected_sources: sources,
+        commands,
+        mode_used: "legacy",
+        first_blocker: validateRes.status === 0 ? null : blockers[0] ?? "legacy_validator_failed",
+        verifier_ok: validateRes.status === 0,
+      });
+    }
   }
-
-  const validateCmd = "npm run helix:decision:validate -- --package reports/helix-decision-package.json";
-  appendTimeline(runId, timelinePath, "decision_validate", "decision_validate_start", { details: { cmd: validateCmd } });
-  const validateRes = runCommand("decision:validate", validateCmd, { allowFail: true, env: timelineEnv });
-  appendTimeline(runId, timelinePath, "decision_validate", "decision_validate_end", { details: { status: validateRes.status } });
-  commands.push({ name: "decision:validate", cmd: validateCmd, status: validateRes.status });
-
-  const pkg = tryReadJson("reports/helix-decision-package.json") ?? {};
-  const blockers = Array.isArray((pkg as Record<string, unknown>).decision && ((pkg as any).decision.hard_blockers))
-    ? ((pkg as any).decision.hard_blockers as string[])
-    : [];
-  const decisionValue = String((pkg as any)?.decision?.value ?? "UNKNOWN");
-  const summary = buildSummaryShape({
-    ok: validateRes.status === 0,
-    decision: decisionValue === "GO" || decisionValue === "NO-GO" ? decisionValue : "UNKNOWN",
-    blockers,
-    package_path: "reports/helix-decision-package.json",
-    validate_path: "reports/helix-decision-validate.json",
-    selected_sources: sources,
-    commands,
-  });
 
   fs.mkdirSync(path.resolve(rootDir(), "reports"), { recursive: true });
   fs.writeFileSync(path.resolve(rootDir(), SUMMARY_PATH), `${JSON.stringify(summary, null, 2)}\n`);
-  appendTimeline(runId, timelinePath, "decision_run", "run_end", { details: { ok: summary.ok, status: summary.ok ? 0 : 1 } });
+  appendTimeline(runId, timelinePath, "decision_run", "run_end", { details: { ok: summary.ok, mode_used: summary.mode_used } });
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
-
-  if (!summary.ok) {
-    process.exit(1);
-  }
+  if (!summary.ok) process.exit(1);
 }
 
 const isEntrypoint = (() => {
   const entryArg = process.argv[1];
   if (!entryArg) return false;
-  try {
-    return import.meta.url === pathToFileURL(path.resolve(entryArg)).href;
-  } catch {
-    return false;
-  }
+  try { return import.meta.url === pathToFileURL(path.resolve(entryArg)).href; } catch { return false; }
 })();
 
 if (isEntrypoint) {
-  try {
-    main();
-  } catch (error) {
-    const summary = buildSummaryShape({
-      ok: false,
-      blockers: [error instanceof Error ? error.message : String(error)],
-    });
+  try { main(); }
+  catch (error) {
+    const summary = buildSummaryShape({ ok: false, blockers: [error instanceof Error ? error.message : String(error)], first_blocker: error instanceof Error ? error.message : String(error) });
     fs.mkdirSync(path.resolve(rootDir(), "reports"), { recursive: true });
     fs.writeFileSync(path.resolve(rootDir(), SUMMARY_PATH), `${JSON.stringify(summary, null, 2)}\n`);
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);

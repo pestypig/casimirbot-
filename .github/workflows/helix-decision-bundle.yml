@@ -1,0 +1,36 @@
+name: helix-decision-bundle
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  bundle-fixture:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Generate v2 decision bundle (fixture)
+        run: >-
+          npm run helix:decision:bundle --
+          --narrow tests/fixtures/helix-decision-bundle/narrow.json
+          --heavy tests/fixtures/helix-decision-bundle/heavy-summary.json
+          --heavy-recommendation tests/fixtures/helix-decision-bundle/heavy-recommendation.json
+          --ab-t02 tests/fixtures/helix-decision-bundle/ab-t02.json
+          --ab-t035 tests/fixtures/helix-decision-bundle/ab-t035.json
+          --casimir tests/fixtures/helix-decision-bundle/casimir.json
+      - name: Verify v2 decision bundle
+        run: npm run helix:decision:bundle:verify -- --bundle reports/helix-decision-bundle.json
+      - name: Upload bundle artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: helix-decision-bundle-artifacts
+          path: |
+            reports/helix-decision-bundle.json
+            reports/helix-decision-bundle.md
+            reports/helix-decision-bundle-verify.json
