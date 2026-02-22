@@ -122,3 +122,12 @@ All endpoints should return deterministic envelopes:
 - Critical events appear on board within one update cycle.
 - Board item confidence labels match source evidence posture.
 - Voice layer can consume board deltas without extra inference.
+
+## Mission trace linkage note (2026-02-22)
+
+For prompt-batch replay safety, mission-overwatch callouts and operator actions should carry stable linkage fields:
+- `mission_id`
+- `event_id`
+- `trace_id`
+
+Derived micro-debrief events should reference the originating source event IDs to preserve deterministic replay provenance.
