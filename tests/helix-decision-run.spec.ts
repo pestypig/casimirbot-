@@ -399,7 +399,7 @@ describe("helix decision run summary", () => {
       mode_used: string;
       first_blocker: string;
     };
-    expect(summary.mode_used).toBe("legacy");
+    expect(summary.mode_used).toBe("bundle");
     expect(summary.first_blocker).toContain("bundle_mode_requires_explicit_source");
   });
 });

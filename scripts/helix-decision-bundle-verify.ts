@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import Ajv from "ajv";
-import { computeDecisionHash } from "./lib/helix-decision-bundle";
+import { computeDecisionHash, stableStringify } from "./lib/helix-decision-bundle";
 
 const ROOT = process.cwd();
 const DEFAULT_BUNDLE = "reports/helix-decision-bundle.json";
@@ -32,6 +32,19 @@ function resolveLocator(locator: string): string {
 
 function sha256(absPath: string): string {
   return crypto.createHash("sha256").update(fs.readFileSync(absPath)).digest("hex");
+}
+
+
+function collectPayloadParityMismatches(bundle: any): string[] {
+  const keys = ["gates", "novelty", "provenance", "casimir"] as const;
+  const mismatches: string[] = [];
+  const payload = bundle?.decision?.normalized_payload ?? {};
+  for (const key of keys) {
+    const top = stableStringify(bundle?.[key] ?? null);
+    const nested = stableStringify(payload?.[key] ?? null);
+    if (top !== nested) mismatches.push(`payload_section_mismatch:${key}`);
+  }
+  return mismatches;
 }
 
 function writeOut(out: Record<string, unknown>): void {
@@ -93,6 +106,7 @@ function main(): void {
     const recomputed = computeDecisionHash(payload);
     if (bundle.decision?.decision_hash !== recomputed) failures.push("decision_hash_mismatch");
     if (bundle.replay?.expected_decision_hash !== recomputed) failures.push("replay_expected_decision_hash_mismatch");
+    failures.push(...collectPayloadParityMismatches(bundle));
   }
 
   const out = {

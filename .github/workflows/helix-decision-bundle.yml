@@ -7,7 +7,6 @@ on:
 jobs:
   bundle-fixture:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,6 +26,8 @@ jobs:
       - name: Verify v2 decision bundle
         run: npm run helix:decision:bundle:verify -- --bundle reports/helix-decision-bundle.json
       - name: Upload bundle artifacts
+        if: ${{ always() }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: helix-decision-bundle-artifacts

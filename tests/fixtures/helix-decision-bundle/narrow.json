@@ -1,1 +1,1 @@
-{"strict_gates":{"runtime_fallback_answer":0.01,"evidence_card_coverage":0.97,"open_questions_rate":0.05}}
+{"strict_gates":{"runtime_fallback_answer":0.01,"evidence_card_coverage":0.97,"open_questions_rate":0.05,"runtime_tdz_intentStrategy":0.98,"runtime_tdz_intentProfile":0.97}}
