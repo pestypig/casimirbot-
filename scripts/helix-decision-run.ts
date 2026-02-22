@@ -339,7 +339,9 @@ const isEntrypoint = (() => {
 if (isEntrypoint) {
   try { main(); }
   catch (error) {
-    const summary = buildSummaryShape({ ok: false, blockers: [error instanceof Error ? error.message : String(error)], first_blocker: error instanceof Error ? error.message : String(error) });
+    const args = parseArgs(process.argv);
+    const mode_used: ModeUsed = (args.get("bundle-mode") ?? "false") === "true" ? "bundle" : "legacy";
+    const summary = buildSummaryShape({ ok: false, blockers: [error instanceof Error ? error.message : String(error)], first_blocker: error instanceof Error ? error.message : String(error), mode_used });
     fs.mkdirSync(path.resolve(rootDir(), "reports"), { recursive: true });
     fs.writeFileSync(path.resolve(rootDir(), SUMMARY_PATH), `${JSON.stringify(summary, null, 2)}\n`);
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);

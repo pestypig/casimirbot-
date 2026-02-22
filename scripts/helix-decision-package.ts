@@ -320,7 +320,9 @@ function tempSourceValidator(expectedTemp: "t02" | "t035") {
     const normalizedPath = relPath.toLowerCase();
     const variant = String(doc.variant ?? "").toLowerCase();
     const otherTemp = expectedTemp === "t02" ? "t035" : "t02";
-    const pathMatch = normalizedPath.includes(`/${expectedTemp}/`) && !normalizedPath.includes(`/${otherTemp}/`);
+    const pathHasExpected = normalizedPath.includes(`/${expectedTemp}/`);
+    const pathHasOther = normalizedPath.includes(`/${otherTemp}/`);
+    const pathMatch = pathHasExpected ? !pathHasOther : true;
     const variantMatch = variant.length > 0 && variant.includes(expectedTemp) && !variant.includes(otherTemp);
     return pathMatch && variantMatch;
   };

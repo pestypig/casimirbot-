@@ -1,0 +1,5 @@
+{
+  "id": "helix-decision-policy",
+  "version": "decision_grade",
+  "description": "Committed policy artifact for helix decision bundle hashing."
+}

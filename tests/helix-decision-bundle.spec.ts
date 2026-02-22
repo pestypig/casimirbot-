@@ -25,6 +25,8 @@ function cpFixture(dir: string): void {
   }
   fs.mkdirSync(path.join(dir, "schemas"), { recursive: true });
   fs.copyFileSync(path.join(repoRoot, "schemas/helix-decision-bundle.schema.json"), path.join(dir, "schemas/helix-decision-bundle.schema.json"));
+  fs.mkdirSync(path.join(dir, "configs"), { recursive: true });
+  fs.copyFileSync(path.join(repoRoot, "configs/helix-decision-policy.v1.json"), path.join(dir, "configs/helix-decision-policy.v1.json"));
 }
 
 function writeNpmShim(dir: string): void {
@@ -76,6 +78,30 @@ describe("helix decision bundle", () => {
     const report = JSON.parse(fs.readFileSync(path.join(dir, "reports/helix-decision-bundle-verify.json"), "utf8"));
     expect(report.ok).toBe(true);
   });
+  it("runs real npm integration path against committed fixtures", () => {
+    const gen = spawnSync("npm", [
+      "run",
+      "helix:decision:bundle",
+      "--",
+      "--narrow",
+      "tests/fixtures/helix-decision-bundle/narrow.json",
+      "--heavy",
+      "tests/fixtures/helix-decision-bundle/heavy-summary.json",
+      "--heavy-recommendation",
+      "tests/fixtures/helix-decision-bundle/heavy-recommendation.json",
+      "--ab-t02",
+      "tests/fixtures/helix-decision-bundle/ab-t02.json",
+      "--ab-t035",
+      "tests/fixtures/helix-decision-bundle/ab-t035.json",
+      "--casimir",
+      "tests/fixtures/helix-decision-bundle/casimir.json",
+    ], { cwd: repoRoot, encoding: "utf8" });
+    expect(gen.status).toBe(0);
+
+    const verify = spawnSync("npm", ["run", "helix:decision:bundle:verify", "--", "--bundle", "reports/helix-decision-bundle.json"], { cwd: repoRoot, encoding: "utf8" });
+    expect(verify.status).toBe(0);
+  });
+
 
   it("fails on digest mismatch", () => {
     const dir = mkDir();
@@ -111,6 +137,21 @@ describe("helix decision bundle", () => {
     const verify = run(dir, "scripts/helix-decision-bundle-verify.ts", ["--bundle", "reports/helix-decision-bundle.json"]);
     expect(verify.status).toBe(1);
     expect(verify.stdout).toContain("decision_hash_mismatch");
+  });
+
+
+  it("fails when top-level sections diverge from normalized payload", () => {
+    const dir = mkDir();
+    cpFixture(dir);
+    writeNpmShim(dir);
+    run(dir, "scripts/helix-decision-bundle.ts", ["--narrow", "inputs/narrow.json", "--heavy", "inputs/heavy-summary.json", "--heavy-recommendation", "inputs/heavy-recommendation.json", "--ab-t02", "inputs/ab-t02.json", "--ab-t035", "inputs/ab-t035.json", "--casimir", "inputs/casimir.json"]);
+    const bundlePath = path.join(dir, "reports/helix-decision-bundle.json");
+    const bundle = JSON.parse(fs.readFileSync(bundlePath, "utf8"));
+    bundle.provenance.branch = "tampered";
+    fs.writeFileSync(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+    const verify = run(dir, "scripts/helix-decision-bundle-verify.ts", ["--bundle", "reports/helix-decision-bundle.json"]);
+    expect(verify.status).toBe(1);
+    expect(verify.stdout).toContain("payload_section_mismatch:provenance");
   });
 
   it("hash is deterministic", () => {

@@ -10,6 +10,7 @@ const ROOT = process.cwd();
 const PACKAGE_JSON = "reports/helix-decision-package.json";
 const BUNDLE_JSON = "reports/helix-decision-bundle.json";
 const BUNDLE_MD = "reports/helix-decision-bundle.md";
+const DEFAULT_POLICY_FILE = "configs/helix-decision-policy.v1.json";
 const requiredKeys: CliKey[] = ["narrow", "heavy", "heavy-recommendation", "ab-t02", "ab-t035", "casimir"];
 
 function parseArgs(): Map<string, string> {
@@ -53,8 +54,26 @@ function mediaTypeFor(relPath: string): string {
   return "application/octet-stream";
 }
 
+function readPolicyArtifact(relPath: string): { hash: string; version: string } {
+  const abs = path.resolve(ROOT, relPath);
+  if (!fs.existsSync(abs)) fail("policy_file_missing", { path: relPath });
+  try {
+    const bytes = fs.readFileSync(abs);
+    const parsed = JSON.parse(bytes.toString("utf8")) as Record<string, unknown>;
+    const version = typeof parsed.version === "string" ? parsed.version : "decision_grade";
+    return {
+      hash: crypto.createHash("sha256").update(bytes).digest("hex"),
+      version,
+    };
+  } catch (error) {
+    fail("policy_file_unreadable", { path: relPath, reason: String(error) });
+  }
+}
+
 function main(): void {
   const args = parseArgs();
+  const policyFile = args.get("policy-file") ?? DEFAULT_POLICY_FILE;
+  const policyArtifact = readPolicyArtifact(policyFile);
   const values = new Map<CliKey, string>();
   for (const key of requiredKeys) {
     const value = args.get(key);
@@ -107,8 +126,8 @@ function main(): void {
     git: pkg.git,
     policy: {
       id: "helix-decision-policy",
-      version: String((pkg as any).evaluation_tier ?? "decision_grade"),
-      hash: crypto.createHash("sha256").update(JSON.stringify((pkg as any).thresholds ?? {})).digest("hex"),
+      version: policyArtifact.version,
+      hash: policyArtifact.hash,
     },
     evidence,
     gates: pkg.gates,
