@@ -9,6 +9,7 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 AUDIO_PATH="${AUDIO_PATH:-data/knowledge_audio_source/auntie_dottie.flac}"
 SOURCE_DIR="${SOURCE_DIR:-$(dirname "${AUDIO_PATH}")}"
 REQ_FILE="${REQ_FILE:-external/audiocraft/requirements.train-py312.txt}"
+INSTALL_AUDIOCRAFT_EDITABLE="${INSTALL_AUDIOCRAFT_EDITABLE:-auto}"
 RUN_PREPARE="${RUN_PREPARE:-1}"
 RUN_TRAIN="${RUN_TRAIN:-1}"
 
@@ -35,7 +36,16 @@ PY
 ${PYTHON_BIN} -m pip install -U pip setuptools wheel
 ${PYTHON_BIN} -m pip uninstall -y audiocraft || true
 ${PYTHON_BIN} -m pip install -r "${REQ_FILE}"
-${PYTHON_BIN} -m pip install -e external/audiocraft --no-deps
+
+if [[ "${INSTALL_AUDIOCRAFT_EDITABLE}" == "1" ]]; then
+  ${PYTHON_BIN} -m pip install -e external/audiocraft --no-deps --no-build-isolation
+elif [[ "${INSTALL_AUDIOCRAFT_EDITABLE}" == "auto" ]]; then
+  if ! ${PYTHON_BIN} -m pip install -e external/audiocraft --no-deps --no-build-isolation; then
+    echo "[bootstrap] editable install failed; using PYTHONPATH source import fallback"
+  fi
+else
+  echo "[bootstrap] skipping editable install (INSTALL_AUDIOCRAFT_EDITABLE=${INSTALL_AUDIOCRAFT_EDITABLE})"
+fi
 
 export PYTHONPATH="${ROOT_DIR}/external/audiocraft:${PYTHONPATH:-}"
 export EFFICIENT_ATTENTION_BACKEND="${EFFICIENT_ATTENTION_BACKEND:-torch}"

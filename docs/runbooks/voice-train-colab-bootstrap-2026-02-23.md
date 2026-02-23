@@ -38,6 +38,9 @@ python scripts/voice/run_colab_train.py
   prepare so source discovery cannot drift from shell defaults.
 - `KNOWLEDGE_AUDIO_DIR=external/audiocraft/data/knowledge_audio` sets the staged
   dataset output path and is validated before training starts.
+- `INSTALL_AUDIOCRAFT_EDITABLE=auto` (default) attempts editable install with
+  `--no-build-isolation`; on failure, bootstrap falls back to source import via
+  `PYTHONPATH` instead of aborting.
 
 ## Required input
 
