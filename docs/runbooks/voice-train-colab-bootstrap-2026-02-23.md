@@ -10,6 +10,8 @@ This runbook is the reproducible path for Python 3.12 Colab sessions where
   dependency set for training.
 - `scripts/voice/bootstrap_colab_train.sh` installs deps, validates audio,
   and runs prepare/train using torch attention backend.
+- `scripts/voice/run_colab_train.py` orchestrates bootstrap + artifact checks
+  and always emits a deterministic final `=== COLAB TRAIN REPORT ===` block.
 
 ## Colab usage
 
@@ -20,8 +22,14 @@ cd casimirbot-
 git fetch origin main
 git checkout main
 git pull --rebase origin main
-bash scripts/voice/bootstrap_colab_train.sh
+python scripts/voice/run_colab_train.py
 ```
+
+## Optional flags/env
+
+- `RUN_GIT_SYNC=1` to force in-script `git fetch/checkout/pull`.
+- `EFFICIENT_ATTENTION_BACKEND=torch` is the expected default.
+- `RUN_PREPARE=0` or `RUN_TRAIN=0` are passed through to bootstrap when needed.
 
 ## Required input
 
