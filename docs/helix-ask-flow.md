@@ -93,3 +93,15 @@ Tier 1 callouts and ingestion are disabled unless the session is `active`.
 - server/routes/agi.plan.ts
 - docs/architecture/voice-service-contract.md
 - docs/architecture/mission-go-board-spec.md
+
+
+## Evolution governance flow (additive)
+
+A complementary governance loop now exists for patch lifecycle checks:
+1) Ingest patch metadata via `/api/evolution/patches/ingest`.
+2) Compute deterministic momentum/checklist artifacts.
+3) Run congruence gate under `/api/evolution/gate/run` in report-only mode by default.
+4) Persist additive governance records so `/api/agi/training-trace/export` remains replay-safe JSONL.
+5) Query rolling trajectory with `/api/evolution/trajectory/:id`.
+
+This loop does not replace Helix Ask answering flow and does not bypass Casimir verification requirements.

@@ -36,6 +36,7 @@ const setCors = (res: Response) => {
 const listQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).optional(),
   tenantId: z.string().min(1).optional(),
+  source: z.string().min(1).optional(),
 });
 
 const exportQuerySchema = z.object({
@@ -187,8 +188,9 @@ trainingTraceRouter.get("/training-trace", (req: Request, res: Response) => {
   if (!tenantGuard.ok) {
     return res.status(tenantGuard.status).json({ error: tenantGuard.error });
   }
-  const { limit } = parsed.data;
-  const traces = getTrainingTraces({ limit, tenantId: tenantGuard.tenantId });
+  const { limit, source } = parsed.data;
+  const traces = getTrainingTraces({ limit, tenantId: tenantGuard.tenantId })
+    .filter((trace) => !source || trace.notes?.includes(`source=${source}`));
   return res.json({ traces, limit });
 });
 

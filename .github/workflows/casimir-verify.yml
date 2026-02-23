@@ -9,6 +9,10 @@ on:
         description: "Also run Helix decision-grade package + validate"
         required: false
         default: "false"
+      run_evolution_report_only:
+        description: "Run optional report-only evolution gate artifact step"
+        required: false
+        default: "false"
 
 jobs:
   casimir-verify:
@@ -64,6 +68,16 @@ jobs:
           npm run casimir:verify -- --params '{"traceId":"ci:casimir","actions":[{"id":"ci-proposal","params":{"dutyEffectiveFR":0.0025}}],"budget":{"maxIterations":1,"maxTotalMs":60000}}' --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci --url "$ADAPTER_VERIFY_URL" --export-url "$TRACE_EXPORT_URL" | tee artifacts/casimir-verify-response.json
           node -e 'const fs=require("fs"); const adapter=process.env.ADAPTER_VERIFY_URL; const raw=fs.readFileSync("artifacts/casimir-verify-response.json","utf8"); const j=JSON.parse(raw); const verdict=(j.verdict ?? (j.pass ? "PASS" : "FAIL")); const cert=j.certificate ?? {}; const integrity=(cert.integrityOk===true?"OK":"NOT_OK"); console.log(`[casimir-verify] adapter_url=${adapter} verdict=${verdict} cert_integrity=${integrity}`);'
 
+
+      - name: Evolution report-only gate (optional)
+        if: github.event_name == 'workflow_dispatch' && inputs.run_evolution_report_only == 'true'
+        run: |
+          mkdir -p artifacts
+          curl -sS -X POST http://localhost:5173/api/evolution/gate/run \
+            -H 'content-type: application/json' \
+            -d '{"reportOnly":true,"indicators":{"I":0.9,"A":0.9,"P":0.9,"E":1,"debt":0.1}}' \
+            | tee artifacts/evolution-gate-report.json
+
       - name: Decision-grade checks skipped by default
         if: github.event_name != 'workflow_dispatch' || inputs.run_decision_grade != 'true'
         run: echo "Helix decision-grade packaging/validation is opt-in. Use workflow_dispatch input run_decision_grade=true or run helix-decision-grade workflow."
@@ -90,6 +104,14 @@ jobs:
         with:
           name: training-trace
           path: artifacts/training-trace.jsonl
+          if-no-files-found: warn
+
+      - name: Upload evolution report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evolution-gate-report
+          path: artifacts/evolution-gate-report.json
           if-no-files-found: warn
 
       - name: Upload math report
