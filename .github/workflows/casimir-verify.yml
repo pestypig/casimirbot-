@@ -79,6 +79,13 @@ jobs:
             | tee artifacts/evolution-gate-report.json
 
 
+
+      - name: Public claim disclaimer check
+        run: npm run claims:disclaimer:check
+
+      - name: Evidence pack determinism test
+        run: npx vitest run tests/warp-evidence-pack.spec.ts
+
       - name: Evolution hardening contract checks (optional)
         if: github.event_name == 'workflow_dispatch' && inputs.run_evolution_report_only == 'true'
         run: npx vitest run tests/evolution.gate.spec.ts tests/evolution.training-trace.spec.ts

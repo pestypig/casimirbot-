@@ -1,0 +1,8 @@
+{
+  "convention": {
+    "theta_relation": "theta = -alpha * TrK",
+    "sign": "Eulerian density uses repo sign convention"
+  },
+  "alcubierre": { "alpha": 1, "theta": 2.5, "trK": -2.5, "t00": -1.0 },
+  "natario": { "alpha": 1, "theta": 0.0, "trK": 0.0, "t00": -0.2 }
+}

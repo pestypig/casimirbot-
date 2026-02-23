@@ -9,6 +9,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
 import { useRegisterWhisperContext } from "@/lib/whispers/contextRegistry";
 import { usePanelHashFocus } from "@/lib/whispers/usePanelHashFocus";
+import { formatDerivationLabel, type AudienceMode } from "@/lib/audience-mode";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -75,6 +76,8 @@ export function LiveEnergyPipeline({
   const claimTier = String(claimTierRaw || "unknown").toLowerCase();
   const provenanceClass = ((P as any)?.provenance_class ?? (P as any)?.provenanceClass ?? "unknown") as string;
   const maturityLanguage = claimTier === "diagnostic" ? "Diagnostic evidence" : claimTier === "certified" ? "Certified evidence" : `${claimTierRaw} evidence`;
+
+  const [audienceMode, setAudienceMode] = React.useState<AudienceMode>("public");
 
   const live = {
     currentMode: (P.currentMode ?? selectedMode ?? "hover") as "standby"|"hover"|"nearzero"|"cruise"|"emergency",
@@ -209,6 +212,12 @@ export function LiveEnergyPipeline({
   ].filter(Boolean) as string[];
   const qiBadgeTitle = qiBadgeTitleParts.join(" | ");
   const hasQi = Boolean(qiStats);
+
+  const qiDerivationLabel = formatDerivationLabel({
+    mode: audienceMode,
+    metricDerived: (P as any)?.qiGuardrail?.metricDerived === true,
+    sourceLabel: (P as any)?.qiGuardrail?.metricDerivedSource,
+  });
 
 
   // Harden formatting
@@ -713,7 +722,7 @@ export function LiveEnergyPipeline({
                 {Number.isFinite(qiMargin) ? qiMargin.toPrecision(3) : "N/A"}
                 {hasQi ? (
                   <Badge variant={qiBadgeVariant} title={qiBadgeTitle || undefined}>
-                    {qiBadgeLabel}
+                    {qiBadgeLabel} · {qiDerivationLabel}
                   </Badge>
                 ) : null}
               </div>

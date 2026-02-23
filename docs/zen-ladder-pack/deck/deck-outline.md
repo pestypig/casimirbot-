@@ -49,3 +49,6 @@
 - Registry + validator
 - R0-R2 pilot with receipts
 - Expand to R3-R6
+
+
+> This material reports diagnostic/reduced-order readiness signals and governance guardrails. It does not claim warp propulsion feasibility or near-term deployment.

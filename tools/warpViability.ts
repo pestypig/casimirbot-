@@ -17,6 +17,7 @@ import type {
 import type { PipelineSnapshot } from "../types/pipeline";
 import { findWarpConstraint, loadWarpAgentsConfig, resolveConstraintSeverity } from "../modules/physics/warpAgents";
 import { SI_TO_GEOM_STRESS } from "../shared/gr-units";
+import { WARP_TS_RATIO_MIN } from "../shared/clocking";
 
 export type { ConstraintResult, ConstraintSeverity, ViabilityResult, ViabilityStatus, WarpConfig };
 
@@ -26,8 +27,8 @@ const parseEnvNumber = (value: string | undefined, fallback: number) => {
 };
 
 const CM2_TO_M2 = 1e-4;
-const DEFAULT_TS_MIN = 100;
-const TS_IDLE_JITTER_MIN = 99.5; // certificate-side buffer for rounding jitter when idle
+const DEFAULT_TS_MIN = WARP_TS_RATIO_MIN;
+const TS_IDLE_JITTER_MIN = Math.max(WARP_TS_RATIO_MIN - 0.01, 0); // certificate-side buffer for rounding jitter when idle
 const DEFAULT_THETA_MAX = 1e12;
 const DEFAULT_MASS_TOL = 0.1; // +/-10% band
 const DEFAULT_CL3_RHO_DELTA_MAX = parseEnvNumber(process.env.WARP_CL3_RHO_DELTA_MAX, 0.1);
@@ -114,6 +115,25 @@ type MetricT00GeomRef = {
   contractOk?: boolean;
 };
 
+const hasStrictNatarioContractMetadata = (args: {
+  chart?: string;
+  chartContractStatus?: string;
+  observer?: string;
+  normalization?: string;
+  unitSystem?: string;
+}): boolean => {
+  const chartOk = args.chart != null && args.chart !== "" && args.chart !== "unspecified";
+  return (
+    chartOk &&
+    args.chartContractStatus === "ok" &&
+    args.observer != null &&
+    args.observer !== "" &&
+    args.normalization != null &&
+    args.normalization !== "" &&
+    args.unitSystem === "SI"
+  );
+};
+
 const resolveMetricT00GeomFromPipeline = (
   pipeline: EnergyPipelineState,
 ): MetricT00GeomRef => {
@@ -175,12 +195,17 @@ const resolveMetricT00GeomFromPipeline = (
     typeof warpContractReasonRaw === "string" && warpContractReasonRaw.length > 0
       ? String(warpContractReasonRaw)
       : undefined;
-  const warpContractOk =
-    warpContractStatus === "ok" &&
-    warpChart !== "unspecified" &&
-    warpObserver != null &&
-    warpNormalization != null &&
-    warpUnitSystem === "SI";
+  const warpChartContractStatus =
+    typeof warpAdapter?.chart?.contractStatus === "string" && warpAdapter.chart.contractStatus.length > 0
+      ? String(warpAdapter.chart.contractStatus)
+      : "unknown";
+  const warpContractOk = hasStrictNatarioContractMetadata({
+    chart: warpChart,
+    chartContractStatus: warpChartContractStatus,
+    observer: warpObserver,
+    normalization: warpNormalization,
+    unitSystem: warpUnitSystem,
+  }) && warpContractStatus === "ok";
   if (warpMetricSource === "metric" && warpMetricT00 != null) {
     return {
       value: warpMetricT00 * SI_TO_GEOM_STRESS,
@@ -235,12 +260,13 @@ const resolveMetricT00GeomFromPipeline = (
     (pipeline as any).natario.metricT00ContractReason.length > 0
       ? String((pipeline as any).natario.metricT00ContractReason)
       : undefined;
-  const natarioContractOk =
-    natarioContractStatus === "ok" &&
-    (natarioChart ?? warpChart) !== "unspecified" &&
-    natarioObserver != null &&
-    natarioNormalization != null &&
-    natarioUnitSystem === "SI";
+  const natarioContractOk = hasStrictNatarioContractMetadata({
+    chart: natarioChart ?? warpChart,
+    chartContractStatus: warpChartContractStatus,
+    observer: natarioObserver,
+    normalization: natarioNormalization,
+    unitSystem: natarioUnitSystem,
+  }) && natarioContractStatus === "ok";
   if (natarioMetricSource === "metric" && natarioMetricT00 != null) {
     return {
       value: natarioMetricT00 * SI_TO_GEOM_STRESS,
@@ -415,6 +441,7 @@ const resolvePromotionDecision = (args: {
   thetaMetricDerived: boolean;
   tsMetricDerived: boolean;
   qiMetricDerived: boolean;
+  qiApplicabilityStatus?: string;
 }): PromotionDecision => {
   if (args.warpMechanicsProvenanceClass !== "measured") {
     return { tier: "diagnostic", reason: "insufficient_provenance" };
@@ -429,6 +456,10 @@ const resolvePromotionDecision = (args: {
     return { tier: "reduced-order", reason: "status_non_admissible" };
   }
   if (!args.thetaMetricDerived || !args.tsMetricDerived || !args.qiMetricDerived) {
+    return { tier: "reduced-order", reason: "strict_signal_missing" };
+  }
+
+  if (args.qiApplicabilityStatus == null || String(args.qiApplicabilityStatus).toUpperCase() !== "PASS") {
     return { tier: "reduced-order", reason: "strict_signal_missing" };
   }
 
@@ -908,6 +939,7 @@ export async function evaluateWarpViability(
     thetaMetricDerived,
     tsMetricDerived,
     qiMetricDerived: qiSourceIsMetric(qiGuard?.rhoSource),
+    qiApplicabilityStatus: qiGuard?.applicabilityStatus,
   });
   const warpMechanicsClaimTier = promotionDecision.tier;
 
@@ -948,6 +980,7 @@ export async function evaluateWarpViability(
     theta_confidence_band: thetaConfidenceBand,
     zeta: (pipeline as any).zeta,
     qiGuardrail: qiGuard?.marginRatio,
+    qi_applicability_status: qiGuard?.applicabilityStatus,
     qi_provenance_class: qiProvenanceClass,
     qi_confidence_band: qiConfidenceBand,
     warp_mechanics_provenance_class: warpMechanicsProvenanceClass,
