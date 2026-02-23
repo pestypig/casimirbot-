@@ -78,6 +78,11 @@ jobs:
             -d '{"reportOnly":true,"indicators":{"I":0.9,"A":0.9,"P":0.9,"E":1,"debt":0.1}}' \
             | tee artifacts/evolution-gate-report.json
 
+
+      - name: Evolution hardening contract checks (optional)
+        if: github.event_name == 'workflow_dispatch' && inputs.run_evolution_report_only == 'true'
+        run: npx vitest run tests/evolution.gate.spec.ts tests/evolution.training-trace.spec.ts
+
       - name: Decision-grade checks skipped by default
         if: github.event_name != 'workflow_dispatch' || inputs.run_decision_grade != 'true'
         run: echo "Helix decision-grade packaging/validation is opt-in. Use workflow_dispatch input run_decision_grade=true or run helix-decision-grade workflow."

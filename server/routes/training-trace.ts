@@ -190,7 +190,17 @@ trainingTraceRouter.get("/training-trace", (req: Request, res: Response) => {
   }
   const { limit, source } = parsed.data;
   const traces = getTrainingTraces({ limit, tenantId: tenantGuard.tenantId })
-    .filter((trace) => !source || trace.notes?.includes(`source=${source}`));
+    .filter((trace) => {
+      if (!source) return true;
+      if (
+        trace.source?.tool === source ||
+        trace.source?.component === source ||
+        trace.source?.system === source
+      ) {
+        return true;
+      }
+      return trace.notes?.includes(`source=${source}`) ?? false;
+    });
   return res.json({ traces, limit });
 });
 

@@ -29,3 +29,12 @@ Baseline Casimir verify remains required.
 - If evolution gate fails due to HARD taxonomy, treat as governance signal and record artifact.
 - If Casimir fails, fix first failing HARD constraint and rerun until PASS.
 
+
+
+## Evolution hardening regression checks
+
+Optional report-only contract checks in CI now include:
+- `npx vitest run tests/evolution.gate.spec.ts tests/evolution.training-trace.spec.ts`
+- `POST /api/evolution/gate/run` with `reportOnly=true` artifact capture.
+
+These checks are additive and do not replace mandatory Casimir verification.

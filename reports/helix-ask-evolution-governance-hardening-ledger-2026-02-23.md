@@ -79,3 +79,39 @@ If blocked on a prompt:
 - casimir_runId: `pending`
 - commit_sha: `pending`
 - status: `pending`
+
+### Batch execution update (prompts 1..10 consolidated)
+
+- prompt_id: `1..10 (consolidated batch)`
+- files_changed:
+  - `shared/evolution-schema.ts`
+  - `server/services/evolution/congruence-gate.ts`
+  - `server/services/observability/training-trace-store.ts`
+  - `server/routes/training-trace.ts`
+  - `server/routes/evolution.ts`
+  - `server/routes.ts`
+  - `server/services/evolution/patch-store.ts`
+  - `server/services/evolution/trajectory.ts`
+  - `tests/evolution.gate.spec.ts`
+  - `tests/evolution.training-trace.spec.ts`
+  - `tests/training-trace.list.spec.ts`
+  - `tests/evolution.routes.ingest.spec.ts`
+  - `tests/evolution.routes.auth.spec.ts`
+  - `tests/evolution.trajectory.spec.ts`
+  - `.github/workflows/casimir-verify.yml`
+  - `docs/architecture/evolution-governance-contract.md`
+  - `docs/helix-ask-runtime-limitations.md`
+  - `docs/runbooks/evolution-governance-operations-2026-02-23.md`
+  - `reports/helix-ask-evolution-governance-hardening-readiness-2026-02-23.md`
+- behavior_delta: Contract parity hardening, schema-safe firstFail mapping, read-after-write consistency, source filtering, enforce-mode Casimir semantics, production route boundary controls, retention/trajectory durability, optional CI checks, and readiness closeout evidence.
+- tests_or_checks_run:
+  - `npx vitest run tests/evolution.gate.spec.ts tests/evolution.training-trace.spec.ts tests/training-trace.list.spec.ts tests/evolution.routes.ingest.spec.ts tests/evolution.routes.auth.spec.ts tests/evolution.trajectory.spec.ts`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5173/api/agi/adapter/run --export-url http://127.0.0.1:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci`
+- casimir_verdict: `PASS`
+- casimir_firstFail: `null`
+- casimir_certificateHash: `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
+- casimir_integrityOk: `true`
+- casimir_traceId: `adapter:9cb4e1df-b951-40ab-8745-d1250bcb8ac3`
+- casimir_runId: `1`
+- commit_sha: `pending`
+- status: `partial-blocked` (procedural: single consolidated batch commit instead of one commit per prompt)

@@ -160,6 +160,30 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/dev-terminal", devTerminalRouter);
   app.use("/api/voice", voiceRouter);
   app.use("/api/mission-board", missionBoardRouter);
+  const evolutionAuthEnabled = flagEnabled(
+    process.env.ENABLE_AGI_AUTH ?? process.env.ENABLE_AUTH,
+    false,
+  );
+  if (evolutionAuthEnabled) {
+    app.use("/api/evolution", (req, res, next) =>
+      requireJwtMiddleware(req, res, next),
+    );
+  }
+  const evolutionRateMax = toPositiveInt(process.env.EVOLUTION_RATE_LIMIT_MAX, 60);
+  const evolutionRateWindowMs = toPositiveInt(
+    process.env.EVOLUTION_RATE_LIMIT_WINDOW_MS,
+    60_000,
+  );
+  if (evolutionRateMax > 0) {
+    app.use(
+      "/api/evolution",
+      createRateLimiter({
+        windowMs: evolutionRateWindowMs,
+        max: evolutionRateMax,
+        skip: (req) => req.method === "OPTIONS" || req.method === "GET",
+      }),
+    );
+  }
   app.use("/api/evolution", evolutionRouter);
 
   if (!fastBoot) {
