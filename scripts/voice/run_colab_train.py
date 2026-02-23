@@ -115,7 +115,13 @@ def main() -> int:
         # Start from clean outputs by default to avoid stale report artifacts.
         if os.environ.get("CLEAR_PREVIOUS_ARTIFACTS", "1") == "1":
             report["first_failed_step"] = "reset_outputs"
-            for path in (MANIFEST_PATH, STATUS_PATH, CKPT_PATH):
+            for path in (
+                MANIFEST_PATH,
+                STATUS_PATH,
+                CKPT_PATH,
+                AUX_ARTIFACTS_DIR / "colab_bootstrap_stdout.log",
+                AUX_ARTIFACTS_DIR / "colab_bootstrap_stderr.log",
+            ):
                 if path.exists():
                     path.unlink()
 

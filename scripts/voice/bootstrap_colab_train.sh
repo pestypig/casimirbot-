@@ -9,6 +9,7 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 AUDIO_PATH="${AUDIO_PATH:-data/knowledge_audio_source/auntie_dottie.flac}"
 SOURCE_DIR="${SOURCE_DIR:-$(dirname "${AUDIO_PATH}")}"
 REQ_FILE="${REQ_FILE:-external/audiocraft/requirements.train-py312.txt}"
+PIP_BOOTSTRAP_URL="${PIP_BOOTSTRAP_URL:-https://bootstrap.pypa.io/get-pip.py}"
 INSTALL_AUDIOCRAFT_EDITABLE="${INSTALL_AUDIOCRAFT_EDITABLE:-auto}"
 RUN_PREPARE="${RUN_PREPARE:-1}"
 RUN_TRAIN="${RUN_TRAIN:-1}"
@@ -16,6 +17,39 @@ RESET_TRAIN_OUTPUTS="${RESET_TRAIN_OUTPUTS:-1}"
 
 echo "[bootstrap] root=${ROOT_DIR}"
 echo "[bootstrap] python=$(${PYTHON_BIN} -V 2>&1)"
+
+ensure_python_pip() {
+  if "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "[bootstrap] pip module missing for ${PYTHON_BIN}; attempting ensurepip"
+  if "${PYTHON_BIN}" -m ensurepip --upgrade >/dev/null 2>&1; then
+    if "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+
+  echo "[bootstrap] ensurepip unavailable; bootstrapping pip from ${PIP_BOOTSTRAP_URL}"
+  mkdir -p artifacts
+  local get_pip_script="artifacts/get-pip.py"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "${PIP_BOOTSTRAP_URL}" -o "${get_pip_script}"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "${get_pip_script}" "${PIP_BOOTSTRAP_URL}"
+  else
+    echo "[bootstrap] missing curl/wget; cannot bootstrap pip" >&2
+    return 1
+  fi
+
+  "${PYTHON_BIN}" "${get_pip_script}"
+  "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1
+}
+
+pip_run() {
+  echo "[bootstrap] pip $*"
+  "${PYTHON_BIN}" -m pip "$@"
+}
 
 if [[ ! -f "${AUDIO_PATH}" ]]; then
   echo "[bootstrap] missing audio: ${AUDIO_PATH}" >&2
@@ -34,14 +68,15 @@ if b"git-lfs.github.com/spec/v1" in head:
     raise SystemExit("[bootstrap] audio path points to a git-lfs pointer, not real audio")
 PY
 
-${PYTHON_BIN} -m pip install -U pip setuptools wheel
-${PYTHON_BIN} -m pip uninstall -y audiocraft || true
-${PYTHON_BIN} -m pip install -r "${REQ_FILE}"
+ensure_python_pip
+pip_run install -U pip setuptools wheel
+pip_run uninstall -y audiocraft || true
+pip_run install -r "${REQ_FILE}"
 
 if [[ "${INSTALL_AUDIOCRAFT_EDITABLE}" == "1" ]]; then
-  ${PYTHON_BIN} -m pip install -e external/audiocraft --no-deps --no-build-isolation
+  pip_run install -e external/audiocraft --no-deps --no-build-isolation
 elif [[ "${INSTALL_AUDIOCRAFT_EDITABLE}" == "auto" ]]; then
-  if ! ${PYTHON_BIN} -m pip install -e external/audiocraft --no-deps --no-build-isolation; then
+  if ! pip_run install -e external/audiocraft --no-deps --no-build-isolation; then
     echo "[bootstrap] editable install failed; using PYTHONPATH source import fallback"
   fi
 else

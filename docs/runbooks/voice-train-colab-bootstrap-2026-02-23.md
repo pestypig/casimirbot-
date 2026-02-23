@@ -43,6 +43,8 @@ python scripts/voice/run_colab_train.py
 - `INSTALL_AUDIOCRAFT_EDITABLE=auto` (default) attempts editable install with
   `--no-build-isolation`; on failure, bootstrap falls back to source import via
   `PYTHONPATH` instead of aborting.
+- If `python -m pip` is missing in a runtime image, bootstrap auto-recovers via
+  `ensurepip` and then `get-pip.py` fallback (`PIP_BOOTSTRAP_URL` overrideable).
 - On wrapper failures, full bootstrap logs are written to:
   - `artifacts/colab_bootstrap_stdout.log`
   - `artifacts/colab_bootstrap_stderr.log`
