@@ -253,6 +253,10 @@ missionBoardRouter.options("/:missionId/ack", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
+missionBoardRouter.options("/:missionId/context-events", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
 
 missionBoardRouter.get("/:missionId", async (req, res) => {
   setCors(res);
@@ -341,6 +345,7 @@ missionBoardRouter.post("/:missionId/actions", async (req, res) => {
 
 
 missionBoardRouter.post("/:missionId/context-events", async (req, res) => {
+  setCors(res);
   const missionId = missionIdFromReq(req);
   if (!missionId) {
     return errorEnvelope(res, 400, "mission_board_invalid_request", "Mission id is required.");

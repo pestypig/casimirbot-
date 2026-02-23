@@ -18,6 +18,8 @@ describe("mission context session lifecycle", () => {
 
     const next = await startDesktopTier1ScreenSession((event) => events.push(event));
     expect(next).toBe(stream);
+    expect(events[0]?.eventType).toBe("context_session_requesting");
+    expect(events[0]?.sessionState).toBe("requesting");
     expect(events.some((entry) => entry.eventType === "context_session_started")).toBe(true);
 
     stopDesktopTier1ScreenSession(stream, (event) => events.push(event));

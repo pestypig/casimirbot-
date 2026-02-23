@@ -218,6 +218,7 @@ export function shouldEmitContextCallout(options: {
 export type ContextSessionState = "idle" | "requesting" | "active" | "stopping" | "error";
 
 export type ContextLifecycleEventType =
+  | "context_session_requesting"
   | "context_session_started"
   | "context_session_stopped"
   | "context_session_error";
@@ -234,7 +235,7 @@ export async function startDesktopTier1ScreenSession(
   emit: (event: ContextLifecycleEvent) => void,
 ): Promise<MediaStream | null> {
   emit({
-    eventType: "context_session_error",
+    eventType: "context_session_requesting",
     tier: "tier1",
     sessionState: "requesting",
     ts: new Date().toISOString(),

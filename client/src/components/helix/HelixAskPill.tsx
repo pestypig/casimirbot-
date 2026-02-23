@@ -28,8 +28,12 @@ import { LUMA_MOOD_ORDER, resolveMoodAsset, type LumaMood } from "@/lib/luma-moo
 import { broadcastLumaMood } from "@/lib/luma-mood-theme";
 import { reportClientError } from "@/lib/observability/client-error";
 import {
+  canStartContextSession,
   readMissionContextControls,
+  startDesktopTier1ScreenSession,
+  stopDesktopTier1ScreenSession,
   writeMissionContextControls,
+  type ContextLifecycleEvent,
   type MissionContextControls,
   type MissionContextTier,
   type MissionVoiceMode,
@@ -1198,6 +1202,8 @@ export function HelixAskPill({
   const [contextSessionState, setContextSessionState] = useState<
     "idle" | "requesting" | "active" | "stopping" | "error"
   >("idle");
+  const contextSessionStreamRef = useRef<MediaStream | null>(null);
+  const contextSessionStartInFlightRef = useRef(false);
 
   const getHelixAskSessionId = useCallback(() => {
     if (helixAskSessionRef.current) return helixAskSessionRef.current;
@@ -2189,14 +2195,74 @@ export function HelixAskPill({
   const inputPlaceholder = placeholder ?? "Ask anything about this system";
   const currentPlaceholder = askBusy ? "Add another question..." : inputPlaceholder;
 
+  const emitContextLifecycle = useCallback((event: ContextLifecycleEvent) => {
+    setContextSessionState(event.sessionState);
+  }, []);
+
+  const startContextSession = useCallback(async () => {
+    if (contextSessionStartInFlightRef.current) return;
+    if (!canStartContextSession({ tier: missionContextControls.tier, sessionState: contextSessionState })) return;
+    contextSessionStartInFlightRef.current = true;
+    const stream = await startDesktopTier1ScreenSession(emitContextLifecycle);
+    contextSessionStartInFlightRef.current = false;
+    if (!stream) {
+      contextSessionStreamRef.current = null;
+      return;
+    }
+    contextSessionStreamRef.current = stream;
+    for (const track of stream.getTracks()) {
+      track.addEventListener(
+        "ended",
+        () => {
+          if (contextSessionStreamRef.current === stream) {
+            contextSessionStreamRef.current = null;
+            setContextSessionState("idle");
+          }
+        },
+        { once: true },
+      );
+    }
+  }, [contextSessionState, emitContextLifecycle, missionContextControls.tier]);
+
+  const stopContextSession = useCallback(() => {
+    const stream = contextSessionStreamRef.current;
+    if (!stream && contextSessionState === "idle") return;
+    stopDesktopTier1ScreenSession(stream, emitContextLifecycle);
+    contextSessionStreamRef.current = null;
+    contextSessionStartInFlightRef.current = false;
+  }, [contextSessionState, emitContextLifecycle]);
+
   useEffect(() => {
     writeMissionContextControls(missionContextControls);
-    setContextSessionState((prev) => {
-      if (missionContextControls.tier === "tier0") return "idle";
-      if (prev === "error" || prev === "stopping") return prev;
-      return "active";
-    });
   }, [missionContextControls]);
+
+  useEffect(() => {
+    if (missionContextControls.tier !== "tier0") return;
+    stopContextSession();
+    setContextSessionState("idle");
+  }, [missionContextControls.tier, stopContextSession]);
+
+  useEffect(() => {
+    return () => {
+      const stream = contextSessionStreamRef.current;
+      contextSessionStreamRef.current = null;
+      for (const track of stream?.getTracks?.() ?? []) {
+        track.stop();
+      }
+      contextSessionStartInFlightRef.current = false;
+    };
+  }, []);
+
+  const contextSessionBadge =
+    contextSessionState === "active"
+      ? "LIVE"
+      : contextSessionState === "requesting"
+        ? "REQUESTING"
+        : contextSessionState === "stopping"
+          ? "STOPPING"
+          : contextSessionState === "error"
+            ? "ERROR"
+            : "IDLE";
 
   const queuePreview = useMemo(() => {
     const preview = askQueue.slice(0, 3).map((entry) => clipText(entry, 80));
@@ -2304,7 +2370,7 @@ export function HelixAskPill({
                   {missionContextControls.tier === "tier1" ? "Tier 1" : "Tier 0"}
                 </span>
                 <span className="rounded-full border border-white/10 px-2 py-0.5">
-                  {contextSessionState === "active" ? "LIVE" : contextSessionState === "error" ? "ERROR" : "IDLE"}
+                  {contextSessionBadge}
                 </span>
                 {missionContextControls.tier === "tier1" ? (
                   <span className="rounded-full border border-cyan-300/30 px-2 py-0.5 text-cyan-200">screen</span>
@@ -2356,9 +2422,16 @@ export function HelixAskPill({
                 <button
                   type="button"
                   className="rounded border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-300"
-                  onClick={() => setContextSessionState("idle")}
+                  onClick={() => {
+                    if (contextSessionState === "active" || contextSessionState === "requesting") {
+                      stopContextSession();
+                      return;
+                    }
+                    void startContextSession();
+                  }}
+                  disabled={missionContextControls.tier !== "tier1" || contextSessionState === "stopping"}
                 >
-                  stop
+                  {contextSessionState === "active" || contextSessionState === "requesting" ? "stop" : "start"}
                 </button>
               </div>
             </div>
