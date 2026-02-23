@@ -77,6 +77,7 @@ Primary margin levers:
 - event salience policy (speak less, higher value per utterance)
 - queue/concurrency controls
 - adaptive output budgets under load
+- deterministic per-tenant/per-mission voice budget guards
 - local-first deployment for customers with strict data constraints
 
 ## Differentiators

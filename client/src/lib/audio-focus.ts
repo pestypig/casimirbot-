@@ -17,3 +17,12 @@ export const releaseAudioFocus = (id: string) => {
     activeHandle = null;
   }
 };
+
+
+let typingMuted = false;
+
+export const setTypingMuted = (next: boolean) => {
+  typingMuted = next;
+};
+
+export const isTypingMuted = () => typingMuted;

@@ -19,9 +19,32 @@ const requestSchema = z.object({
   eventId: z.string().trim().max(200).optional(),
   referenceAudioHash: z.string().trim().max(256).nullable().optional(),
   dedupe_key: z.string().trim().max(240).optional(),
+  provider: z.string().trim().min(1).max(120).optional(),
+  durationMs: z.number().int().nonnegative().max(600000).optional(),
 });
 
 type VoiceRequest = z.infer<typeof requestSchema>;
+
+
+type VoiceProviderMode = "local_only" | "allow_remote";
+
+type ProviderGovernance = {
+  providerMode: VoiceProviderMode;
+  providerAllowlist: string[];
+  commercialMode: boolean;
+};
+
+const resolveProviderGovernance = (): ProviderGovernance => {
+  const providerMode = process.env.VOICE_PROVIDER_MODE?.trim().toLowerCase() === "local_only" ? "local_only" : "allow_remote";
+  const providerAllowlist = (process.env.VOICE_PROVIDER_ALLOWLIST ?? "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+  const commercialMode = ["1", "true"].includes((process.env.VOICE_COMMERCIAL_MODE ?? "0").trim().toLowerCase());
+  return { providerMode, providerAllowlist, commercialMode };
+};
+
+const isLocalProvider = (provider: string): boolean => provider.toLowerCase().startsWith("local");
 
 const COOLDOWN_SECONDS: Record<VoicePriority, number> = {
   info: 60,
@@ -32,6 +55,99 @@ const COOLDOWN_SECONDS: Record<VoicePriority, number> = {
 
 const dedupeUntil = new Map<string, number>();
 const missionWindow = new Map<string, number[]>();
+
+const missionBudgetWindow = new Map<string, number[]>();
+const tenantBudgetDaily = new Map<string, { day: string; count: number }>();
+
+const parseIntEnv = (value: string | undefined, fallback: number): number => {
+  const parsed = Number.parseInt((value ?? "").trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const resolveBudgetConfig = () => ({
+  missionWindowMs: parseIntEnv(process.env.VOICE_BUDGET_MISSION_WINDOW_MS, 60_000),
+  missionMaxRequests: parseIntEnv(process.env.VOICE_BUDGET_MISSION_MAX_REQUESTS, 12),
+  tenantDailyMaxRequests: parseIntEnv(process.env.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS, 500),
+});
+
+const currentDayKey = (): string => new Date().toISOString().slice(0, 10);
+
+type BudgetRejection = {
+  scope: "mission_window" | "tenant_day";
+  limit: number;
+  windowMs?: number;
+  tenantId: string;
+};
+
+const checkAndRecordBudget = (missionId: string | undefined, tenantId: string): BudgetRejection | null => {
+  const cfg = resolveBudgetConfig();
+
+  if (missionId) {
+    const now = Date.now();
+    const windowStart = now - cfg.missionWindowMs;
+    const existing = missionBudgetWindow.get(missionId) ?? [];
+    const next = existing.filter((ts) => ts >= windowStart);
+    if (next.length >= cfg.missionMaxRequests) {
+      missionBudgetWindow.set(missionId, next);
+      return {
+        scope: "mission_window",
+        limit: cfg.missionMaxRequests,
+        windowMs: cfg.missionWindowMs,
+        tenantId,
+      };
+    }
+    next.push(now);
+    missionBudgetWindow.set(missionId, next);
+  }
+
+  const day = currentDayKey();
+  const tenantState = tenantBudgetDaily.get(tenantId);
+  const nextTenant = !tenantState || tenantState.day !== day ? { day, count: 0 } : tenantState;
+  if (nextTenant.count >= cfg.tenantDailyMaxRequests) {
+    tenantBudgetDaily.set(tenantId, nextTenant);
+    return {
+      scope: "tenant_day",
+      limit: cfg.tenantDailyMaxRequests,
+      tenantId,
+    };
+  }
+  nextTenant.count += 1;
+  tenantBudgetDaily.set(tenantId, nextTenant);
+  return null;
+};
+
+
+type CircuitBreakerState = {
+  openedUntil: number;
+  recentFailures: number[];
+};
+
+const circuitBreaker: CircuitBreakerState = {
+  openedUntil: 0,
+  recentFailures: [],
+};
+
+const BREAKER_FAILURE_WINDOW_MS = 60_000;
+const BREAKER_FAILURE_THRESHOLD = 3;
+const BREAKER_OPEN_MS = 30_000;
+
+const isCircuitBreakerOpen = (): boolean => circuitBreaker.openedUntil > Date.now();
+
+const recordBackendFailure = (): void => {
+  const now = Date.now();
+  const windowStart = now - BREAKER_FAILURE_WINDOW_MS;
+  const next = circuitBreaker.recentFailures.filter((ts) => ts >= windowStart);
+  next.push(now);
+  circuitBreaker.recentFailures = next;
+  if (next.length >= BREAKER_FAILURE_THRESHOLD) {
+    circuitBreaker.openedUntil = now + BREAKER_OPEN_MS;
+  }
+};
+
+const recordBackendSuccess = (): void => {
+  circuitBreaker.recentFailures = [];
+  circuitBreaker.openedUntil = 0;
+};
 
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -103,6 +219,16 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
 
   const payload = parsed.data;
   const traceId = payload.traceId?.trim() || undefined;
+  const tenantId =
+    (req.header("x-tenant-id") ?? req.header("x-customer-id") ?? "single-tenant").trim().toLowerCase() ||
+    "single-tenant";
+  const metering = {
+    requestCount: 1,
+    charCount: payload.text.length,
+    durationMs: payload.durationMs,
+    tenantId,
+    missionId: payload.missionId,
+  };
 
   const usesReferenceAudio = Boolean(payload.referenceAudioHash && payload.referenceAudioHash.trim());
   if (usesReferenceAudio && payload.consent_asserted !== true) {
@@ -112,6 +238,50 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
       "voice_consent_required",
       "consent_asserted must be true when reference audio is provided.",
       { referenceAudioHash: true },
+      traceId,
+    );
+  }
+
+  const provider = payload.provider?.trim() || "local-chatterbox";
+  const governance = resolveProviderGovernance();
+
+  if (governance.providerMode === "local_only" && !isLocalProvider(provider)) {
+    return errorEnvelope(
+      res,
+      403,
+      "voice_provider_not_allowed",
+      "Remote voice providers are disabled by runtime policy.",
+      { provider, providerMode: governance.providerMode },
+      traceId,
+    );
+  }
+
+  if (
+    governance.commercialMode &&
+    governance.providerAllowlist.length > 0 &&
+    !governance.providerAllowlist.includes(provider.toLowerCase())
+  ) {
+    return errorEnvelope(
+      res,
+      403,
+      "voice_provider_not_allowed",
+      "Voice provider is not allowed for commercial mode.",
+      { provider, commercialMode: true },
+      traceId,
+    );
+  }
+
+  const budgetRejection = checkAndRecordBudget(payload.missionId, tenantId);
+  if (budgetRejection) {
+    return errorEnvelope(
+      res,
+      429,
+      "voice_budget_exceeded",
+      "Voice budget exceeded for current policy window.",
+      {
+        ...budgetRejection,
+        metering,
+      },
       traceId,
     );
   }
@@ -147,6 +317,10 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
       dryRun: true,
       provider: "dry-run",
       voiceProfile: payload.voiceProfile ?? "default",
+      metering: {
+        ...metering,
+        durationMs: payload.durationMs ?? Math.max(250, payload.text.length * 45),
+      },
       traceId,
     });
   }
@@ -158,6 +332,21 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
       "voice_unavailable",
       "Voice service is not configured.",
       { providerConfigured: false },
+      traceId,
+    );
+  }
+
+  if (isCircuitBreakerOpen()) {
+    const retryAfterMs = Math.max(0, circuitBreaker.openedUntil - Date.now());
+    return errorEnvelope(
+      res,
+      503,
+      "voice_backend_error",
+      "Voice backend temporarily unavailable due to repeated failures.",
+      {
+        circuitBreakerOpen: true,
+        retryAfterMs,
+      },
       traceId,
     );
   }
@@ -175,6 +364,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     });
 
     if (!upstream.ok) {
+      recordBackendFailure();
       const responseText = await upstream.text().catch(() => "");
       return errorEnvelope(
         res,
@@ -188,14 +378,22 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
 
     const contentType = upstream.headers.get("content-type") ?? "application/octet-stream";
     const buffer = Buffer.from(await upstream.arrayBuffer());
+    recordBackendSuccess();
     res.setHeader("content-type", contentType);
     res.setHeader("x-voice-provider", "proxy");
     res.setHeader("x-voice-profile", payload.voiceProfile ?? "default");
     if (payload.watermark_mode) {
       res.setHeader("x-watermark-mode", payload.watermark_mode);
     }
+    const durationHeader = upstream.headers.get("x-audio-duration-ms") ?? (payload.durationMs ? String(payload.durationMs) : "");
+    res.setHeader("x-voice-meter-request-count", String(metering.requestCount));
+    res.setHeader("x-voice-meter-char-count", String(metering.charCount));
+    if (durationHeader) {
+      res.setHeader("x-voice-meter-duration-ms", durationHeader);
+    }
     return res.status(200).send(buffer);
   } catch (error) {
+    recordBackendFailure();
     const aborted = error instanceof Error && error.name === "AbortError";
     return errorEnvelope(
       res,
@@ -210,4 +408,13 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 });
 
-export { voiceRouter };
+const resetVoiceRouteState = () => {
+  dedupeUntil.clear();
+  missionWindow.clear();
+  missionBudgetWindow.clear();
+  tenantBudgetDaily.clear();
+  circuitBreaker.openedUntil = 0;
+  circuitBreaker.recentFailures = [];
+};
+
+export { voiceRouter, resetVoiceRouteState };

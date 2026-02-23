@@ -1,3 +1,9 @@
+export type VoiceGovernanceConfig = {
+  providerMode: "local_only" | "allow_remote";
+  providerAllowlist: string[];
+  commercialMode: boolean;
+};
+
 export type StartupConfig = {
   port: number;
   host: string;
@@ -5,6 +11,27 @@ export type StartupConfig = {
   fallbackPort: number;
   sourcePort: string | undefined;
   sourceHost: string | undefined;
+  voiceGovernance: VoiceGovernanceConfig;
+};
+
+
+const parseProviderMode = (value: string | undefined): "local_only" | "allow_remote" => {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "local_only") return "local_only";
+  return "allow_remote";
+};
+
+const parseCsvAllowlist = (value: string | undefined): string[] => {
+  if (!value?.trim()) return [];
+  return value
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+};
+
+const parseCommercialMode = (value: string | undefined): boolean => {
+  const normalized = value?.trim();
+  return normalized === "1" || normalized === "true";
 };
 
 const parsePositivePort = (value: string | undefined): number | null => {
@@ -32,5 +59,10 @@ export const resolveStartupConfig = (env: NodeJS.ProcessEnv, appEnv: string): St
     fallbackPort,
     sourcePort: env.PORT,
     sourceHost: env.HOST,
+    voiceGovernance: {
+      providerMode: parseProviderMode(env.VOICE_PROVIDER_MODE),
+      providerAllowlist: parseCsvAllowlist(env.VOICE_PROVIDER_ALLOWLIST),
+      commercialMode: parseCommercialMode(env.VOICE_COMMERCIAL_MODE),
+    },
   };
 };

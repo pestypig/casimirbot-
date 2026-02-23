@@ -84,3 +84,60 @@ export async function postMissionAck(
     snapshot: MissionBoardSnapshot;
   }>(response);
 }
+
+
+export type MissionVoiceModeControls = {
+  voiceEnabled: boolean;
+  criticalOnly: boolean;
+  muteWhileTyping: boolean;
+};
+
+export const DEFAULT_MISSION_VOICE_MODE_CONTROLS: MissionVoiceModeControls = {
+  voiceEnabled: true,
+  criticalOnly: false,
+  muteWhileTyping: true,
+};
+
+const MISSION_VOICE_MODE_KEY = "helix:mission-voice-mode:v1";
+
+export function readMissionVoiceModeControls(): MissionVoiceModeControls {
+  if (typeof window === "undefined") return { ...DEFAULT_MISSION_VOICE_MODE_CONTROLS };
+  try {
+    const raw = window.localStorage.getItem(MISSION_VOICE_MODE_KEY);
+    if (!raw) return { ...DEFAULT_MISSION_VOICE_MODE_CONTROLS };
+    const parsed = JSON.parse(raw) as Partial<MissionVoiceModeControls>;
+    return {
+      voiceEnabled:
+        typeof parsed.voiceEnabled === "boolean"
+          ? parsed.voiceEnabled
+          : DEFAULT_MISSION_VOICE_MODE_CONTROLS.voiceEnabled,
+      criticalOnly:
+        typeof parsed.criticalOnly === "boolean"
+          ? parsed.criticalOnly
+          : DEFAULT_MISSION_VOICE_MODE_CONTROLS.criticalOnly,
+      muteWhileTyping:
+        typeof parsed.muteWhileTyping === "boolean"
+          ? parsed.muteWhileTyping
+          : DEFAULT_MISSION_VOICE_MODE_CONTROLS.muteWhileTyping,
+    };
+  } catch {
+    return { ...DEFAULT_MISSION_VOICE_MODE_CONTROLS };
+  }
+}
+
+export function writeMissionVoiceModeControls(next: MissionVoiceModeControls): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(MISSION_VOICE_MODE_KEY, JSON.stringify(next));
+}
+
+export function shouldSpeakMissionEvent(options: {
+  controls: MissionVoiceModeControls;
+  classification: MissionBoardEvent["classification"];
+  isUserTyping: boolean;
+}): boolean {
+  const { controls, classification, isUserTyping } = options;
+  if (!controls.voiceEnabled) return false;
+  if (controls.muteWhileTyping && isUserTyping) return false;
+  if (controls.criticalOnly && classification !== "critical" && classification !== "action") return false;
+  return true;
+}
