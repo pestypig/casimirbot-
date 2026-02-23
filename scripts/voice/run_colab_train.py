@@ -18,6 +18,7 @@ from typing import Any, Dict, Optional
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+AUX_ARTIFACTS_DIR = REPO_ROOT / "artifacts"
 AUDIO_PATH = REPO_ROOT / "data/knowledge_audio_source/auntie_dottie.flac"
 MANIFEST_PATH = REPO_ROOT / "external/audiocraft/data/knowledge_audio/voice_dataset_manifest.json"
 STATUS_PATH = REPO_ROOT / "external/audiocraft/checkpoints/train_status.json"
@@ -168,6 +169,7 @@ def main() -> int:
         env["KNOWLEDGE_AUDIO_DIR"] = env.get("KNOWLEDGE_AUDIO_DIR", "external/audiocraft/data/knowledge_audio")
         env["TRAIN_STATUS_PATH"] = env.get("TRAIN_STATUS_PATH", "external/audiocraft/checkpoints/train_status.json")
         env["INSTALL_AUDIOCRAFT_EDITABLE"] = env.get("INSTALL_AUDIOCRAFT_EDITABLE", "auto")
+        env["RESET_TRAIN_OUTPUTS"] = env.get("RESET_TRAIN_OUTPUTS", "1")
         env["EFFICIENT_ATTENTION_BACKEND"] = env.get("EFFICIENT_ATTENTION_BACKEND", "torch")
         _run("bootstrap_colab_train", ["bash", str(BOOTSTRAP_PATH)], env=env)
 
@@ -198,10 +200,16 @@ def main() -> int:
             report["next_unblock_action"] = "inspect train_status_json and bootstrap logs"
 
     except subprocess.CalledProcessError as exc:
+        AUX_ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+        stdout_log = AUX_ARTIFACTS_DIR / "colab_bootstrap_stdout.log"
+        stderr_log = AUX_ARTIFACTS_DIR / "colab_bootstrap_stderr.log"
+        stdout_log.write_text(exc.stdout or "", encoding="utf-8")
+        stderr_log.write_text(exc.stderr or "", encoding="utf-8")
         report["objective_status"] = "failed"
         report["root_cause"] = (
             f"command failed ({exc.returncode}): {' '.join(exc.cmd)} | "
-            f"stdout_tail={_tail(exc.stdout)} | stderr_tail={_tail(exc.stderr)}"
+            f"stdout_tail={_tail(exc.stdout)} | stderr_tail={_tail(exc.stderr)} | "
+            f"stdout_log={stdout_log} | stderr_log={stderr_log}"
         )
         report["next_unblock_action"] = "fix first_failed_step command and rerun"
     except Exception as exc:  # noqa: BLE001

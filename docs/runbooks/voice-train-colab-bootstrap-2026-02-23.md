@@ -30,6 +30,8 @@ python scripts/voice/run_colab_train.py
 - `RUN_GIT_SYNC=1` to force in-script `git fetch/checkout/pull`.
 - `CLEAR_PREVIOUS_ARTIFACTS=1` (default) removes stale manifest/status/checkpoint
   before each run.
+- `RESET_TRAIN_OUTPUTS=1` (default) removes stale status/checkpoint at bootstrap
+  right before prepare/train execution.
 - `EFFICIENT_ATTENTION_BACKEND=torch` is the expected default.
 - `RUN_PREPARE=0` or `RUN_TRAIN=0` are passed through to bootstrap when needed.
 - `AUDIO_PATH=data/knowledge_audio_source/auntie_dottie.flac` selects the source
@@ -41,6 +43,9 @@ python scripts/voice/run_colab_train.py
 - `INSTALL_AUDIOCRAFT_EDITABLE=auto` (default) attempts editable install with
   `--no-build-isolation`; on failure, bootstrap falls back to source import via
   `PYTHONPATH` instead of aborting.
+- On wrapper failures, full bootstrap logs are written to:
+  - `artifacts/colab_bootstrap_stdout.log`
+  - `artifacts/colab_bootstrap_stderr.log`
 
 ## Required input
 

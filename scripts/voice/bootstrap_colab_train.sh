@@ -12,6 +12,7 @@ REQ_FILE="${REQ_FILE:-external/audiocraft/requirements.train-py312.txt}"
 INSTALL_AUDIOCRAFT_EDITABLE="${INSTALL_AUDIOCRAFT_EDITABLE:-auto}"
 RUN_PREPARE="${RUN_PREPARE:-1}"
 RUN_TRAIN="${RUN_TRAIN:-1}"
+RESET_TRAIN_OUTPUTS="${RESET_TRAIN_OUTPUTS:-1}"
 
 echo "[bootstrap] root=${ROOT_DIR}"
 echo "[bootstrap] python=$(${PYTHON_BIN} -V 2>&1)"
@@ -53,6 +54,20 @@ export TRAIN_JOB_TYPE="${TRAIN_JOB_TYPE:-tts_voice_train}"
 export KNOWLEDGE_AUDIO_DIR="${KNOWLEDGE_AUDIO_DIR:-external/audiocraft/data/knowledge_audio}"
 export KNOWLEDGE_SOURCE_DIR="${KNOWLEDGE_SOURCE_DIR:-${SOURCE_DIR}}"
 export TRAIN_STATUS_PATH="${TRAIN_STATUS_PATH:-external/audiocraft/checkpoints/train_status.json}"
+export TRANSFORMERS_NO_TF="${TRANSFORMERS_NO_TF:-1}"
+export USE_TF="${USE_TF:-0}"
+
+mkdir -p "$(dirname "${TRAIN_STATUS_PATH}")"
+
+if [[ "${TRAIN_JOB_TYPE}" == "tts_voice_train" ]]; then
+  EXPECTED_CKPT="checkpoints/tts_voice_train_musicgen_small.pt"
+else
+  EXPECTED_CKPT="checkpoints/spectral_adapters_musicgen_small.pt"
+fi
+
+if [[ "${RESET_TRAIN_OUTPUTS}" == "1" ]]; then
+  rm -f "${TRAIN_STATUS_PATH}" "${EXPECTED_CKPT}"
+fi
 
 ${PYTHON_BIN} - <<'PY'
 import audiocraft
@@ -101,6 +116,35 @@ PY
 
 if [[ "${RUN_TRAIN}" == "1" ]]; then
   ${PYTHON_BIN} external/audiocraft/scripts/train_spectral_adapter.py
+fi
+
+if [[ "${RUN_TRAIN}" == "1" ]]; then
+  ${PYTHON_BIN} - <<PY
+from pathlib import Path
+import json
+
+status_path = Path("${TRAIN_STATUS_PATH}")
+ckpt_path = Path("${EXPECTED_CKPT}")
+
+if not status_path.exists():
+    raise SystemExit(f"[bootstrap] missing training status file after train: {status_path}")
+
+try:
+    payload = json.loads(status_path.read_text(encoding="utf-8"))
+except Exception as exc:
+    raise SystemExit(f"[bootstrap] training status parse failed: {exc}")
+
+status = payload.get("status") if isinstance(payload, dict) else None
+print(f"[bootstrap] training_status={status}")
+if status != "completed":
+    raise SystemExit(f"[bootstrap] training did not complete cleanly: {payload}")
+
+if not ckpt_path.exists():
+    raise SystemExit(f"[bootstrap] missing expected checkpoint after train: {ckpt_path}")
+
+print(f"[bootstrap] checkpoint_path={ckpt_path}")
+print(f"[bootstrap] checkpoint_size_bytes={ckpt_path.stat().st_size}")
+PY
 fi
 
 echo "[bootstrap] completed"
