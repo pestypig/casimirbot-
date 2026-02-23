@@ -236,3 +236,9 @@ To scale beyond ~1 request at a time, move inference off CPU (GPU or hosted mode
 - Permission denial or revoked tracks become deterministic `error` state transitions.
 - Tier 0 remains fully supported when Tier 1 is unavailable.
 - Context callout eligibility is disabled whenever session state is not `active`.
+
+
+## Evolution governance runtime note (report-only CI hook)
+
+An optional report-only CI hook may emit `artifacts/evolution-gate-report.json` via `POST /api/evolution/gate/run`.
+This hook is additive and must not replace or weaken mandatory Casimir verify behavior in CI.

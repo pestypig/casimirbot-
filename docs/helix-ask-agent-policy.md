@@ -82,3 +82,12 @@ without changing policy semantics.
 - No hidden, background, or implicit auto-capture flows are permitted.
 - Voice callouts may consume context events only while session state is `active`.
 - If session state is `idle|requesting|stopping|error`, non-critical context callouts are suppressed.
+
+
+## Evolution governance compatibility (v1, additive)
+
+For governance wave endpoints under `/api/evolution`:
+- Do not modify existing Helix Ask action policy behavior; governance is report-first and additive.
+- When policy or contract surfaces are touched, emit deterministic hard-fail taxonomy IDs in envelopes.
+- Preserve evidence-first posture: governance outputs must include deterministic artifact refs and replay-safe fail reasons.
+- Casimir remains mandatory baseline; governance outcomes may not override Casimir FAIL.
