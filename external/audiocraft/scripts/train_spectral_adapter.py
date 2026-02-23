@@ -43,6 +43,7 @@ if not hasattr(pytree, "register_pytree_node") and hasattr(pytree, "_register_py
 
 
 from audiocraft.models import MusicGen
+from audiocraft.modules.transformer import set_efficient_attention_backend
 from audiocraft.modules.spectral_block import SpectralBlock
 
 
@@ -127,6 +128,10 @@ def attach_spectral_adapters(lm: nn.Module, num_adapters: int = 2) -> nn.Module:
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"[train] Using device: {device}")
+
+    # Keep training compatible with environments where xformers wheels are unavailable.
+    # The torch backend still supports scaled dot-product attention.
+    set_efficient_attention_backend(os.environ.get("EFFICIENT_ATTENTION_BACKEND", "torch"))
 
     status_path = os.environ.get("TRAIN_STATUS_PATH", "external/audiocraft/checkpoints/train_status.json")
     train_job_type = os.environ.get("TRAIN_JOB_TYPE", "train").strip().lower()

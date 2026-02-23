@@ -20,7 +20,10 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
-from xformers import ops
+try:
+    from xformers import ops  # type: ignore
+except ImportError:
+    ops = None  # type: ignore
 
 from .rope import RotaryEmbedding
 from .streaming import StreamingModule
@@ -31,7 +34,9 @@ _efficient_attention_backend: str = 'torch'
 def set_efficient_attention_backend(backend: str = 'torch'):
     # Using torch by default, it seems a bit faster on older P100 GPUs (~20% faster).
     global _efficient_attention_backend
-    assert _efficient_attention_backend in ['xformers', 'torch']
+    assert backend in ['xformers', 'torch']
+    if backend == 'xformers' and ops is None:
+        raise ImportError("xformers backend requested but xformers is not installed.")
     _efficient_attention_backend = backend
 
 
@@ -187,7 +192,7 @@ class StreamingMultiheadAttention(StreamingModule):
             assert not causal, "Causal cannot work with cross attention."
             assert rope is None, "Rope cannot work with cross attention."
 
-        if memory_efficient:
+        if memory_efficient and _efficient_attention_backend == 'xformers':
             _verify_xformers_memory_efficient_compat()
 
         self.custom = _is_custom(custom, memory_efficient)
@@ -235,7 +240,7 @@ class StreamingMultiheadAttention(StreamingModule):
         # We actually return a bias for the attention score, as this has the same
         # convention both in the builtin MHA in Pytorch, and Xformers functions.
         time_dim = _get_attention_time_dimension(self.memory_efficient)
-        if self.memory_efficient:
+        if self.memory_efficient and _efficient_attention_backend == 'xformers':
             from xformers.ops import LowerTriangularMask
             if current_steps == 1:
                 # If we only have one step, then we do not need a mask.
@@ -371,7 +376,10 @@ class StreamingMultiheadAttention(StreamingModule):
                     else:
                         bound_layout = "b t p h d"
                     packed = rearrange(projected, f"b t (p h d) -> {bound_layout}", p=3, h=self.num_heads)
-                    q, k, v = ops.unbind(packed, dim=2)
+                    if ops is not None:
+                        q, k, v = ops.unbind(packed, dim=2)
+                    else:
+                        q, k, v = torch.unbind(packed, dim=2)
                 else:
                     embed_dim = self.embed_dim
                     per_head_dim = (embed_dim // self.num_heads)
