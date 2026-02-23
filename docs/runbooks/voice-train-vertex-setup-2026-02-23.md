@@ -48,6 +48,32 @@ Create a Docker repository matching workflow input `artifact_repository`
 
 ## How to run
 
+### Option A: no Codex Cloud secrets (controlled push trigger)
+
+Push to `main` with commit message containing:
+
+`[run-vertex-train]`
+
+The workflow now supports a guarded `push` trigger and only runs on push when
+that marker is present in `github.event.head_commit.message`.
+
+For push-triggered runs, defaults come from workflow vars/fallbacks:
+- region: `us-central1`
+- Artifact Registry repo: `casimir-voice-train`
+- machine: `g2-standard-8`
+- accelerator: `NVIDIA_TESLA_T4` x `1`
+- optional output URI: `vars.VERTEX_GCS_OUTPUT_URI` if set
+
+You can override these via repository/environment variables:
+- `VERTEX_GCP_REGION`
+- `VERTEX_ARTIFACT_REPOSITORY`
+- `VERTEX_MACHINE_TYPE`
+- `VERTEX_ACCELERATOR_TYPE`
+- `VERTEX_ACCELERATOR_COUNT`
+- `VERTEX_GCS_OUTPUT_URI`
+
+### Option B: manual run via Actions UI (`workflow_dispatch`)
+
 1. Open GitHub Actions.
 2. Run workflow `Voice Train (Vertex AI)` using `workflow_dispatch`.
 3. Optionally set `vertex_gcs_output_uri` (`gs://bucket/prefix`) to upload

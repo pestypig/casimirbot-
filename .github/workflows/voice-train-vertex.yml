@@ -27,6 +27,9 @@ on:
         description: "Optional gs://bucket/prefix for checkpoint + logs upload"
         required: false
         default: ""
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -34,15 +37,16 @@ permissions:
 
 jobs:
   submit-vertex-job:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-vertex-train]') }}
     runs-on: ubuntu-latest
     env:
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      GCP_REGION: ${{ inputs.gcp_region }}
-      GCP_ARTIFACT_REPOSITORY: ${{ inputs.artifact_repository }}
-      MACHINE_TYPE: ${{ inputs.machine_type }}
-      ACCELERATOR_TYPE: ${{ inputs.accelerator_type }}
-      ACCELERATOR_COUNT: ${{ inputs.accelerator_count }}
-      VERTEX_GCS_OUTPUT_URI: ${{ inputs.vertex_gcs_output_uri }}
+      GCP_REGION: ${{ inputs.gcp_region || vars.VERTEX_GCP_REGION || 'us-central1' }}
+      GCP_ARTIFACT_REPOSITORY: ${{ inputs.artifact_repository || vars.VERTEX_ARTIFACT_REPOSITORY || 'casimir-voice-train' }}
+      MACHINE_TYPE: ${{ inputs.machine_type || vars.VERTEX_MACHINE_TYPE || 'g2-standard-8' }}
+      ACCELERATOR_TYPE: ${{ inputs.accelerator_type || vars.VERTEX_ACCELERATOR_TYPE || 'NVIDIA_TESLA_T4' }}
+      ACCELERATOR_COUNT: ${{ inputs.accelerator_count || vars.VERTEX_ACCELERATOR_COUNT || '1' }}
+      VERTEX_GCS_OUTPUT_URI: ${{ inputs.vertex_gcs_output_uri || vars.VERTEX_GCS_OUTPUT_URI || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
