@@ -9,13 +9,16 @@ export type SalienceInput = {
   timerId?: string;
   dedupeKey?: string;
   tsMs?: number;
+  contextTier?: "tier0" | "tier1";
+  sessionState?: "idle" | "requesting" | "active" | "stopping" | "error";
+  voiceMode?: "off" | "critical_only" | "normal" | "dnd";
 };
 
 export type SalienceDecision = {
   speak: boolean;
   priority: MissionCalloutPriority;
   dedupeKey: string;
-  reason: "emit" | "dedupe_cooldown" | "mission_rate_limited";
+  reason: "emit" | "dedupe_cooldown" | "mission_rate_limited" | "context_ineligible";
   cooldownMs: number;
 };
 
@@ -51,6 +54,44 @@ export const evaluateSalience = (
   const now = Number.isFinite(input.tsMs) ? Math.floor(input.tsMs as number) : Date.now();
   const dedupeKey = buildKey(input);
   const cooldownMs = PRIORITY_COOLDOWN_SECONDS[input.classification] * 1000;
+
+
+  if (input.contextTier === "tier0") {
+    return {
+      speak: false,
+      priority: input.classification,
+      dedupeKey,
+      reason: "context_ineligible",
+      cooldownMs,
+    };
+  }
+  if (input.sessionState && input.sessionState !== "active") {
+    return {
+      speak: false,
+      priority: input.classification,
+      dedupeKey,
+      reason: "context_ineligible",
+      cooldownMs,
+    };
+  }
+  if (input.voiceMode === "off" || input.voiceMode === "dnd") {
+    return {
+      speak: false,
+      priority: input.classification,
+      dedupeKey,
+      reason: "context_ineligible",
+      cooldownMs,
+    };
+  }
+  if (input.voiceMode === "critical_only" && input.classification !== "critical" && input.classification !== "action") {
+    return {
+      speak: false,
+      priority: input.classification,
+      dedupeKey,
+      reason: "context_ineligible",
+      cooldownMs,
+    };
+  }
 
   const dedupeUntil = state.dedupeUntilMs.get(dedupeKey) ?? 0;
   if (dedupeUntil > now) {

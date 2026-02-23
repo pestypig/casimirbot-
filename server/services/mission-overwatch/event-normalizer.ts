@@ -11,6 +11,9 @@ export type MissionNormalizedEvent = {
   ts: string;
   entityRefs: string[];
   evidenceRefs: string[];
+  contextTier?: "tier0" | "tier1";
+  sessionState?: "idle" | "requesting" | "active" | "stopping" | "error";
+  traceId?: string;
 };
 
 export type MissionRawEvent = {
@@ -23,6 +26,9 @@ export type MissionRawEvent = {
   ts?: string | number;
   entityRefs?: string[];
   evidenceRefs?: string[];
+  contextTier?: "tier0" | "tier1";
+  sessionState?: "idle" | "requesting" | "active" | "stopping" | "error";
+  traceId?: string;
 };
 
 const inferClassification = (raw: MissionRawEvent): MissionCalloutPriority => {
@@ -110,5 +116,8 @@ export const normalizeMissionEvent = (raw: MissionRawEvent): MissionNormalizedEv
     ts,
     entityRefs,
     evidenceRefs,
+    contextTier: raw.contextTier,
+    sessionState: raw.sessionState,
+    traceId: raw.traceId?.trim() || undefined,
   };
 };

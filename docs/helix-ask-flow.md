@@ -67,6 +67,17 @@ result, uncertainty interval, reproducibility metadata, and corrective-action
 signals. This is emitted in trace artifacts for downstream eval/replay policy
 loops.
 
+
+## Context session contract (Wave-3A)
+
+Wave-3A context operations are explicitly tiered:
+- Tier 0: text-only context
+- Tier 1: explicit screen session (user-started only)
+
+Session states are deterministic: `idle -> requesting -> active -> stopping -> idle` with an `error` branch from `requesting` or `active`. Context events use a canonical envelope containing `tier`, `sessionState`, `eventType`, `traceId`, and mission linkage fields for replay safety.
+
+Tier 1 callouts and ingestion are disabled unless the session is `active`.
+
 ## Communication discipline
 - Event-driven over prompt-driven: callouts occur on meaningful state changes.
 - Short, structured, actionable phrasing over narrative reading.

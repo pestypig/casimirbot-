@@ -73,3 +73,12 @@ uses Helix Ask state must follow these rules:
 ### Policy note
 When voice is unavailable, the same callout payload must be renderable as text
 without changing policy semantics.
+
+
+## Context sensing and no-covert policy rails (Wave-3A)
+
+- Tier 1 sensing/capture is strictly opt-in and user-started per session.
+- Tier 1 requires an always-visible active-state indicator and explicit stop control.
+- No hidden, background, or implicit auto-capture flows are permitted.
+- Voice callouts may consume context events only while session state is `active`.
+- If session state is `idle|requesting|stopping|error`, non-critical context callouts are suppressed.

@@ -162,6 +162,30 @@ describe("mission board routes", () => {
     expect(eventsLatencyMs).toBeLessThan(250);
   });
 
+
+  it("accepts additive context event ingestion with trace parity", async () => {
+    const app = buildApp();
+    const missionId = uniqueMissionId();
+
+    const res = await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
+      eventType: "context_session_started",
+      classification: "info",
+      text: "Operator started explicit context session",
+      tier: "tier1",
+      sessionState: "active",
+      traceId: "trace-123",
+      evidenceRefs: ["ctx:screen"],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.traceId).toBe("trace-123");
+    expect(res.body.event.text).toContain("context:tier1/active");
+
+    const events = await request(app).get(`/api/mission-board/${missionId}/events`).query({ limit: 10 });
+    expect(events.status).toBe(200);
+    expect((events.body.events as Array<{ text: string }>).some((event) => event.text.includes("context:tier1/active"))).toBe(true);
+  });
+
   it("returns deterministic invalid request envelope", async () => {
     const app = buildApp();
     const missionId = uniqueMissionId();

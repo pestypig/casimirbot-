@@ -92,6 +92,21 @@ export type MissionVoiceModeControls = {
   muteWhileTyping: boolean;
 };
 
+export type MissionContextTier = "tier0" | "tier1";
+export type MissionVoiceMode = "off" | "critical_only" | "normal" | "dnd";
+
+export type MissionContextControls = {
+  tier: MissionContextTier;
+  voiceMode: MissionVoiceMode;
+  muteWhileTyping: boolean;
+};
+
+export const DEFAULT_MISSION_CONTEXT_CONTROLS: MissionContextControls = {
+  tier: "tier0",
+  voiceMode: "normal",
+  muteWhileTyping: true,
+};
+
 export const DEFAULT_MISSION_VOICE_MODE_CONTROLS: MissionVoiceModeControls = {
   voiceEnabled: true,
   criticalOnly: false,
@@ -99,6 +114,7 @@ export const DEFAULT_MISSION_VOICE_MODE_CONTROLS: MissionVoiceModeControls = {
 };
 
 const MISSION_VOICE_MODE_KEY = "helix:mission-voice-mode:v1";
+const MISSION_CONTEXT_CONTROLS_KEY = "helix:mission-context-controls:v1";
 
 export function readMissionVoiceModeControls(): MissionVoiceModeControls {
   if (typeof window === "undefined") return { ...DEFAULT_MISSION_VOICE_MODE_CONTROLS };
@@ -140,4 +156,128 @@ export function shouldSpeakMissionEvent(options: {
   if (controls.muteWhileTyping && isUserTyping) return false;
   if (controls.criticalOnly && classification !== "critical" && classification !== "action") return false;
   return true;
+}
+
+export function readMissionContextControls(): MissionContextControls {
+  if (typeof window === "undefined") return { ...DEFAULT_MISSION_CONTEXT_CONTROLS };
+  try {
+    const raw = window.localStorage.getItem(MISSION_CONTEXT_CONTROLS_KEY);
+    if (!raw) return { ...DEFAULT_MISSION_CONTEXT_CONTROLS };
+    const parsed = JSON.parse(raw) as Partial<MissionContextControls>;
+    const tier: MissionContextTier = parsed.tier === "tier1" ? "tier1" : "tier0";
+    const voiceMode: MissionVoiceMode =
+      parsed.voiceMode === "off" ||
+      parsed.voiceMode === "critical_only" ||
+      parsed.voiceMode === "normal" ||
+      parsed.voiceMode === "dnd"
+        ? parsed.voiceMode
+        : DEFAULT_MISSION_CONTEXT_CONTROLS.voiceMode;
+    return {
+      tier,
+      voiceMode,
+      muteWhileTyping:
+        typeof parsed.muteWhileTyping === "boolean"
+          ? parsed.muteWhileTyping
+          : DEFAULT_MISSION_CONTEXT_CONTROLS.muteWhileTyping,
+    };
+  } catch {
+    return { ...DEFAULT_MISSION_CONTEXT_CONTROLS };
+  }
+}
+
+export function writeMissionContextControls(next: MissionContextControls): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(MISSION_CONTEXT_CONTROLS_KEY, JSON.stringify(next));
+}
+
+export function canStartContextSession(options: {
+  tier: MissionContextTier;
+  sessionState: "idle" | "requesting" | "active" | "stopping" | "error";
+}): boolean {
+  return options.tier === "tier1" && (options.sessionState === "idle" || options.sessionState === "error");
+}
+
+export function shouldEmitContextCallout(options: {
+  controls: MissionContextControls;
+  sessionState: "idle" | "requesting" | "active" | "stopping" | "error";
+  classification: MissionBoardEvent["classification"];
+  isUserTyping: boolean;
+}): boolean {
+  const { controls, sessionState, classification, isUserTyping } = options;
+  if (controls.tier === "tier0") return false;
+  if (sessionState !== "active") return false;
+  if (controls.muteWhileTyping && isUserTyping) return false;
+  if (controls.voiceMode === "off" || controls.voiceMode === "dnd") return false;
+  if (controls.voiceMode === "critical_only") {
+    return classification === "critical" || classification === "action";
+  }
+  return true;
+}
+
+
+export type ContextSessionState = "idle" | "requesting" | "active" | "stopping" | "error";
+
+export type ContextLifecycleEventType =
+  | "context_session_started"
+  | "context_session_stopped"
+  | "context_session_error";
+
+export type ContextLifecycleEvent = {
+  eventType: ContextLifecycleEventType;
+  tier: MissionContextTier;
+  sessionState: ContextSessionState;
+  ts: string;
+  reason?: string;
+};
+
+export async function startDesktopTier1ScreenSession(
+  emit: (event: ContextLifecycleEvent) => void,
+): Promise<MediaStream | null> {
+  emit({
+    eventType: "context_session_error",
+    tier: "tier1",
+    sessionState: "requesting",
+    ts: new Date().toISOString(),
+    reason: "requesting",
+  });
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    emit({
+      eventType: "context_session_started",
+      tier: "tier1",
+      sessionState: "active",
+      ts: new Date().toISOString(),
+    });
+    return stream;
+  } catch (error) {
+    emit({
+      eventType: "context_session_error",
+      tier: "tier1",
+      sessionState: "error",
+      ts: new Date().toISOString(),
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+export function stopDesktopTier1ScreenSession(
+  stream: MediaStream | null | undefined,
+  emit: (event: ContextLifecycleEvent) => void,
+): void {
+  emit({
+    eventType: "context_session_stopped",
+    tier: "tier1",
+    sessionState: "stopping",
+    ts: new Date().toISOString(),
+  });
+  for (const track of stream?.getTracks?.() ?? []) {
+    track.stop();
+  }
+  emit({
+    eventType: "context_session_stopped",
+    tier: "tier1",
+    sessionState: "idle",
+    ts: new Date().toISOString(),
+  });
 }

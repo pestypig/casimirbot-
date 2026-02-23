@@ -64,6 +64,19 @@ Per-prompt report block:
 - status (done|partial-blocked|blocked)
 ```
 
+
+## Wave-3A deterministic done checklist
+
+- [ ] Prompt path scope honored for each slice.
+- [ ] Tier 0/Tier 1 lock preserved (no speculative Tier 2/3 overreach).
+- [ ] Prompt checks executed with deterministic output capture.
+- [ ] Casimir verify PASS recorded with certificate hash and `integrityOk: true`.
+- [ ] Ledger updated after every prompt commit with status and commit SHA.
+
+## Wave-3A blocker handling policy
+
+If blocked in a prompt, commit the maximal safe additive subset, mark status as `partial-blocked` or `blocked`, and continue to the next prompt while preserving API compatibility and no-covert posture constraints.
+
 ## Single autorun launcher prompt (paste into Codex Cloud)
 
 ```text

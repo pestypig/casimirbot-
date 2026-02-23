@@ -415,3 +415,23 @@ describe("voice routes", () => {
     }
   });
 });
+
+
+  it("suppresses non-eligible context callouts", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Context ping",
+      priority: "warn",
+      contextTier: "tier0",
+      sessionState: "idle",
+      voiceMode: "normal",
+      traceId: "trace-context-suppress",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("voice_context_ineligible");
+    expect(res.body.traceId).toBe("trace-context-suppress");
+  });

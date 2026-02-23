@@ -21,6 +21,9 @@ const requestSchema = z.object({
   dedupe_key: z.string().trim().max(240).optional(),
   provider: z.string().trim().min(1).max(120).optional(),
   durationMs: z.number().int().nonnegative().max(600000).optional(),
+  contextTier: z.enum(["tier0", "tier1"]).optional(),
+  sessionState: z.enum(["idle", "requesting", "active", "stopping", "error"]).optional(),
+  voiceMode: z.enum(["off", "critical_only", "normal", "dnd"]).optional(),
 });
 
 type VoiceRequest = z.infer<typeof requestSchema>;
@@ -218,6 +221,15 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   const payload = parsed.data;
+  if (payload.contextTier === "tier0" || (payload.sessionState && payload.sessionState !== "active")) {
+    return res.status(200).json({ ok: true, suppressed: true, reason: "voice_context_ineligible", traceId: payload.traceId ?? null });
+  }
+  if (payload.voiceMode === "off" || payload.voiceMode === "dnd") {
+    return res.status(200).json({ ok: true, suppressed: true, reason: "voice_context_ineligible", traceId: payload.traceId ?? null });
+  }
+  if (payload.voiceMode === "critical_only" && payload.priority !== "critical" && payload.priority !== "action") {
+    return res.status(200).json({ ok: true, suppressed: true, reason: "voice_context_ineligible", traceId: payload.traceId ?? null });
+  }
   const traceId = payload.traceId?.trim() || undefined;
   const tenantId =
     (req.header("x-tenant-id") ?? req.header("x-customer-id") ?? "single-tenant").trim().toLowerCase() ||
