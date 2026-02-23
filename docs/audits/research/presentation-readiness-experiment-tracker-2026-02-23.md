@@ -40,6 +40,7 @@ Derived from:
 | run_id | date_utc | operator | model | prompt_sha256 | status | artifacts | notes |
 |---|---|---|---|---|---|---|---|
 | R00 | 2026-02-23 | dan/codex | pending | 34A2550BBCEA5F1A25B508D73D8D47075305161DBA667384998304DD84699BF2 | initialized | tracker + frozen prompt | Baseline tracking started before next deep-research rerun |
+| R01 | 2026-02-23 | user+codex | external-run(imported) | 34A2550BBCEA5F1A25B508D73D8D47075305161DBA667384998304DD84699BF2 | recorded | `docs/audits/research/presentation-readiness-review-2026-02-23-run-R01-full.md`; `docs/audits/research/presentation-readiness-review-2026-02-23-run-R01.md` | Imported stakeholder-readiness result with audience GO/NO-GO matrix and claim-boundary posture |
 
 ## Confusion guards checklist
 
@@ -47,12 +48,11 @@ Derived from:
 - [x] Prompt hash recorded.
 - [x] Experiment ID assigned.
 - [x] Comparison rule constrained by prompt hash.
-- [ ] First rerun report logged with required answer tag.
-- [ ] Audience GO/NO-GO matrix attached to run record.
+- [x] First rerun report logged with required answer tag.
+- [x] Audience GO/NO-GO matrix attached to run record.
 
 ## Mutation policy
 
 - Allowed: add new run rows, attach artifacts, append evidence links.
 - Not allowed: change frozen prompt text in place.
 - If mutation needed: create `presentation-readiness-deep-research-prompt-<date>-v2.md` and start a new tracker row with new SHA.
-
