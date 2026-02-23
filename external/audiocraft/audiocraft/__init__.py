@@ -21,8 +21,18 @@ At the moment we provide the training code for:
 - [JASCO](https://arxiv.org/abs/2406.10970) Joint Audio and Symbolic Conditioning for Temporally Controlled
     Text-to-Music Generation.
 """
+import importlib
+import typing as tp
 
 # flake8: noqa
-from . import data, modules, models
-
 __version__ = '1.4.0a2'
+_LAZY_SUBMODULES = {"data", "modules", "models"}
+__all__ = ["data", "modules", "models", "__version__"]
+
+
+def __getattr__(name: str) -> tp.Any:
+    if name in _LAZY_SUBMODULES:
+        module = importlib.import_module(f"{__name__}.{name}")
+        globals()[name] = module
+        return module
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
