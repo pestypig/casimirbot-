@@ -10,6 +10,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Helix Ask integration suites are memory-heavy; run files sequentially for stable CI/local gates.
+    fileParallelism: false,
     include: [
       "tests/**/*.spec.ts",
       "server/**/__tests__/**/*.{spec,test}.ts",

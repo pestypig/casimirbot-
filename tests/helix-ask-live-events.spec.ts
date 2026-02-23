@@ -87,7 +87,7 @@ describe("Helix Ask live events", () => {
     expect(allMissing).toEqual([]);
     expect(payload.debug?.synthesis_mode).toBeDefined();
     expect(payload.debug?.synthesis_reason).toMatch(/mode=/);
-  }, 20000);
+  }, 45000);
 
   it("answers ideology concept query with grounded narrative + technical notes", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {

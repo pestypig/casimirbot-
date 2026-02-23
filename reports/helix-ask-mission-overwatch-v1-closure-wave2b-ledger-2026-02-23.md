@@ -31,15 +31,19 @@ Each blocked row must still include prompt checks attempted + Casimir output.
 
 ## Prompt execution table
 
-| prompt_id | scope summary | status | commit_sha |
-| --- | --- | --- | --- |
-| Prompt 0 | Wave-2B ledger + unresolved-gap lock | done | c411e23 |
-| Prompt 1 | Voice failure isolation + circuit-breaker behavior | done | 0bf2c4e |
-| Prompt 2 | Provider allowlist + commercialization runtime gates | done | 0216dc5 |
-| Prompt 3 | Voice metering + budget enforcement | done | c7d1544 |
-| Prompt 4 | Explicit UX controls + mode coverage | done | 77c022e |
-| Prompt 5 | SLO gate implementation + release checks | done | c83e934 |
-| Prompt 6 | Final closure report | done | HEAD |
+| prompt_id | scope summary | status | branch_sha (historical) | canonical_main_sha |
+| --- | --- | --- | --- | --- |
+| Prompt 0 | Wave-2B ledger + unresolved-gap lock | done | c411e23 | 61c3c0e3 |
+| Prompt 1 | Voice failure isolation + circuit-breaker behavior | done | 0bf2c4e | 61c3c0e3 |
+| Prompt 2 | Provider allowlist + commercialization runtime gates | done | 0216dc5 | 61c3c0e3 |
+| Prompt 3 | Voice metering + budget enforcement | done | c7d1544 | 61c3c0e3 |
+| Prompt 4 | Explicit UX controls + mode coverage | done | 77c022e | 61c3c0e3 |
+| Prompt 5 | SLO gate implementation + release checks | done | c83e934 | 61c3c0e3 |
+| Prompt 6 | Final closure report | done | HEAD (branch) | 61c3c0e3 |
+
+Post-merge note:
+- Wave-2B landed on `main` via consolidated commit `61c3c0e3` and merge commit `676f4b8d`.
+- Branch-local per-prompt SHAs are preserved above as historical provenance only.
 
 ## Per-prompt report blocks
 
@@ -185,3 +189,27 @@ Each blocked row must still include prompt checks attempted + Casimir output.
 - casimir_runId: 7
 - commit_sha: HEAD
 - status: done
+
+
+## Post-merge stabilization truth-lock
+
+Stabilization patch applied after merged review to make the recorded test gate deterministic:
+- `tests/setup-vitest.ts`: default `TOOL_LOG_STDOUT=0`; cap tool-log buffers in tests.
+- `tests/helix-ask-live-events.spec.ts`: raise first case timeout from 20s to 45s.
+- `vitest.config.ts`: set `fileParallelism: false`.
+
+Re-verified command set:
+- `npx vitest run tests/voice.routes.spec.ts tests/mission-board.routes.spec.ts` PASS
+- `npx vitest run tests/startup-config.spec.ts tests/voice.routes.spec.ts` PASS
+- `npx vitest run tests/voice.routes.spec.ts` PASS
+- `npx vitest run tests/helix-ask-live-events.spec.ts tests/helix-ask-focused-utility-hardening.spec.ts` PASS
+- `npx vitest run tests/mission-board.routes.spec.ts tests/voice.routes.spec.ts tests/mission-overwatch-salience.spec.ts` PASS
+
+Casimir verify (required gate) rerun after stabilization:
+- command: `npm run casimir:verify -- --url http://127.0.0.1:5173/api/agi/adapter/run --export-url http://127.0.0.1:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci`
+- casimir_verdict: PASS
+- casimir_firstFail: null
+- casimir_certificateHash: 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45
+- casimir_integrityOk: true
+- casimir_traceId: adapter:c95ce692-3633-4d7e-90a3-827bb4306761
+- casimir_runId: 20659
