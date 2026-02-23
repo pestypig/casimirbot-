@@ -380,6 +380,22 @@ export function LiveEnergyPipeline({
               })}
             </SelectContent>
           </Select>
+
+          <div className="flex items-center gap-2" data-testid="audience-mode-control">
+            <span className="text-sm font-medium">Audience:</span>
+            <Select
+              value={audienceMode}
+              onValueChange={(value) => setAudienceMode(value as AudienceMode)}
+            >
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="Audience mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="public">Public</SelectItem>
+                <SelectItem value="academic">Academic</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Exotic Mass Target Control */}

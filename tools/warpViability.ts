@@ -255,6 +255,11 @@ const resolveMetricT00GeomFromPipeline = (
     (pipeline as any).natario.metricT00ContractStatus.length > 0
       ? String((pipeline as any).natario.metricT00ContractStatus)
       : undefined;
+  const natarioChartContractStatus =
+    typeof (pipeline as any).natario?.chartContractStatus === "string" &&
+    (pipeline as any).natario.chartContractStatus.length > 0
+      ? String((pipeline as any).natario.chartContractStatus)
+      : warpChartContractStatus;
   const natarioContractReason =
     typeof (pipeline as any).natario?.metricT00ContractReason === "string" &&
     (pipeline as any).natario.metricT00ContractReason.length > 0
@@ -262,7 +267,7 @@ const resolveMetricT00GeomFromPipeline = (
       : undefined;
   const natarioContractOk = hasStrictNatarioContractMetadata({
     chart: natarioChart ?? warpChart,
-    chartContractStatus: warpChartContractStatus,
+    chartContractStatus: natarioChartContractStatus,
     observer: natarioObserver,
     normalization: natarioNormalization,
     unitSystem: natarioUnitSystem,

@@ -157,6 +157,34 @@ describe("warp viability congruence wiring", () => {
     expect(cl3?.details).not.toContain("T00_ref=n/a");
   });
 
+  it("accepts Natário chart contract metadata when warp adapter chart metadata is missing", async () => {
+    runtime.pipeline = makePipeline({
+      warp: {
+        metricAdapter: { betaDiagnostics: { thetaMax: 0.5, method: "finite-diff" } },
+      },
+      natario: {
+        metricT00: -42,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.natario.shift",
+        chartLabel: "natario_comoving",
+        chartContractStatus: "ok",
+        metricT00Observer: "eulerian_n",
+        metricT00Normalization: "si_stress",
+        metricT00UnitSystem: "SI",
+        metricT00ContractStatus: "ok",
+      },
+    });
+
+    const result = await evaluateWarpViability({});
+    expect((result.snapshot as any).rho_delta_metric_source).toBe("warp.metric.T00.natario.shift");
+    expect((result.snapshot as any).rho_delta_metric_chart).toBe("natario_comoving");
+    expect((result.snapshot as any).rho_delta_metric_contract_status).toBe("ok");
+    expect((result.snapshot as any).rho_delta_metric_contract_ok).toBe(true);
+    const cl3 = result.constraints.find((c) => c.id === "CL3_RhoDelta");
+    expect(cl3?.details).toContain("contract=ok");
+    expect(cl3?.note).not.toBe("metric_source_missing");
+  });
+
   it("emits failing CL3_RhoDelta when metric-derived T00 is missing", async () => {
     runtime.pipeline = makePipeline({
       warp: {

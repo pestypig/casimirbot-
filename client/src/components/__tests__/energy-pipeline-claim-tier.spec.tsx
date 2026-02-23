@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const useEnergyPipelineMock = vi.fn();
@@ -73,5 +73,31 @@ describe("LiveEnergyPipeline claim tier / provenance surfacing", () => {
     render(<TooltipProvider><LiveEnergyPipeline {...baseProps} /></TooltipProvider>);
 
     expect(screen.getByTestId("live-maturity-language-value").textContent).toBe("Certified evidence");
+  });
+
+  it("switches QI derivation labels between Public and Academic audience modes", () => {
+    useEnergyPipelineMock.mockReturnValue({
+      data: {
+        claim_tier: "diagnostic",
+        provenance_class: "simulation",
+        currentMode: "hover",
+        qi: { margin: 0.3, bound: -2, avg: -1, tau_s_ms: 1, sampler: "unit", samples: 2 },
+        qiBadge: "ok",
+        qiGuardrail: {
+          metricDerived: false,
+          metricDerivedSource: "pipeline",
+        },
+      },
+    });
+
+    render(<TooltipProvider><LiveEnergyPipeline {...baseProps} /></TooltipProvider>);
+
+    expect(screen.getByText(/OK · operational estimate/)).toBeInTheDocument();
+
+    const audienceControl = screen.getByTestId("audience-mode-control");
+    fireEvent.click(within(audienceControl).getByRole("combobox"));
+    fireEvent.click(screen.getByText("Academic"));
+
+    expect(screen.getByText(/OK · proxy-derived \(pipeline\)/)).toBeInTheDocument();
   });
 });
