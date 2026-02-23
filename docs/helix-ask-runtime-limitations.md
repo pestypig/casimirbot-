@@ -238,6 +238,18 @@ To scale beyond ~1 request at a time, move inference off CPU (GPU or hosted mode
 - Context callout eligibility is disabled whenever session state is not `active`.
 
 
+## Voice runtime policy limits (ownership-first)
+- Production-core mission callouts must remain available with managed providers disabled.
+- Managed provider paths are non-critical fallback only; disablement cannot block mission-critical callouts.
+- `/api/voice/speak` remains backward compatible: legacy request fields continue to work while governance fields are additive.
+- Consent gates apply to custom/reference voice usage; failures must use deterministic error envelopes.
+
+
+
+## Ownership-first local-only operations
+- Local-only mission mode is the default safety posture for production-core callouts.
+- Disabling managed providers must not break critical mission synthesis paths.
+- When managed fallback is enabled, outages must degrade to deterministic non-critical errors without impacting local core operation.
 ## Evolution governance runtime note (report-only CI hook)
 
 An optional report-only CI hook may emit `artifacts/evolution-gate-report.json` via `POST /api/evolution/gate/run`.

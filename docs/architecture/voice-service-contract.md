@@ -83,6 +83,21 @@ Stable error codes:
 - `voice_backend_timeout`
 - `voice_backend_error`
 
+
+## Ownership-first routing policy (mission callouts)
+- Mission-critical callouts (`priority=critical|action` or explicit mission/go-board events) must route through the local ownership path first.
+- Managed providers are fallback-only and must never be required for production-core mission continuity.
+- If managed providers are disabled, `/api/voice/speak` must continue serving local-capable synthesis or deterministic `voice_unavailable`/capacity envelopes.
+
+## Governance fields (consent + profile)
+The request contract supports explicit governance fields and existing clients remain compatible:
+- `consent_asserted` indicates operator consent for custom/reference voice paths.
+- `voiceProfile` remains accepted for current clients.
+- `voice_profile_id` is an optional alias for policy-controlled profile routing.
+- `referenceAudioHash` is audit metadata, not an implicit consent bypass.
+
+Compatibility rule: servers should accept existing payloads without requiring new fields unless custom-profile governance policy explicitly demands consent.
+
 ## Runtime controls
 - Concurrency guard for synthesis jobs.
 - Queue cap with deterministic rejection when full.

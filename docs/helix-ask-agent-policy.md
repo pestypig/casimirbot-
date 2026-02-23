@@ -70,6 +70,17 @@ uses Helix Ask state must follow these rules:
 - low-information updates without state change
 - repeated progress updates in the same stage unless severity increased
 
+
+### Ownership-first production rule
+- For production-core mission callouts, local ownership routes are mandatory.
+- Managed voice providers are allowed only for explicitly non-critical fallback traffic.
+- Voice certainty and policy semantics must remain no stronger than text envelopes, including fallback mode.
+
+### Consent and voice profile governance
+- `consent_asserted` is required for any reference-audio or custom profile operation.
+- Profile resolution may use either `voiceProfile` (legacy-compatible) or `voice_profile_id` (governed identifier).
+- Policy/audit records should include the resolved profile identifier and consent assertion outcome.
+
 ### Policy note
 When voice is unavailable, the same callout payload must be renderable as text
 without changing policy semantics.
@@ -84,6 +95,10 @@ without changing policy semantics.
 - If session state is `idle|requesting|stopping|error`, non-critical context callouts are suppressed.
 
 
+### Consent boundaries and usage constraints
+- Consent is required before using reference audio or identity-specific voice profile cloning flows.
+- Mission callouts must avoid impersonation or deceptive operator signaling.
+- Fallback voice providers are optional and must remain non-critical to mission operation.
 ## Evolution governance compatibility (v1, additive)
 
 For governance wave endpoints under `/api/evolution`:

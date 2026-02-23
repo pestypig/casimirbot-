@@ -20,6 +20,8 @@ const ORIGINAL_ENV = {
   VOICE_PROVIDER_MODE: process.env.VOICE_PROVIDER_MODE,
   VOICE_PROVIDER_ALLOWLIST: process.env.VOICE_PROVIDER_ALLOWLIST,
   VOICE_COMMERCIAL_MODE: process.env.VOICE_COMMERCIAL_MODE,
+  VOICE_MANAGED_PROVIDERS_ENABLED: process.env.VOICE_MANAGED_PROVIDERS_ENABLED,
+  VOICE_LOCAL_ONLY_MISSION_MODE: process.env.VOICE_LOCAL_ONLY_MISSION_MODE,
   VOICE_BUDGET_MISSION_WINDOW_MS: process.env.VOICE_BUDGET_MISSION_WINDOW_MS,
   VOICE_BUDGET_MISSION_MAX_REQUESTS: process.env.VOICE_BUDGET_MISSION_MAX_REQUESTS,
   VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS: process.env.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS,
@@ -52,6 +54,16 @@ describe("voice routes", () => {
       delete process.env.VOICE_COMMERCIAL_MODE;
     } else {
       process.env.VOICE_COMMERCIAL_MODE = ORIGINAL_ENV.VOICE_COMMERCIAL_MODE;
+    }
+    if (ORIGINAL_ENV.VOICE_MANAGED_PROVIDERS_ENABLED === undefined) {
+      delete process.env.VOICE_MANAGED_PROVIDERS_ENABLED;
+    } else {
+      process.env.VOICE_MANAGED_PROVIDERS_ENABLED = ORIGINAL_ENV.VOICE_MANAGED_PROVIDERS_ENABLED;
+    }
+    if (ORIGINAL_ENV.VOICE_LOCAL_ONLY_MISSION_MODE === undefined) {
+      delete process.env.VOICE_LOCAL_ONLY_MISSION_MODE;
+    } else {
+      process.env.VOICE_LOCAL_ONLY_MISSION_MODE = ORIGINAL_ENV.VOICE_LOCAL_ONLY_MISSION_MODE;
     }
     if (ORIGINAL_ENV.VOICE_BUDGET_MISSION_WINDOW_MS === undefined) {
       delete process.env.VOICE_BUDGET_MISSION_WINDOW_MS;
@@ -154,6 +166,43 @@ describe("voice routes", () => {
     });
     expect(allowed.status).toBe(200);
     expect(allowed.body.ok).toBe(true);
+  });
+
+
+  it("routes mission-critical requests to local provider in local-only mission mode", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    process.env.VOICE_LOCAL_ONLY_MISSION_MODE = "1";
+    process.env.VOICE_PROVIDER_MODE = "allow_remote";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Critical escalation",
+      priority: "critical",
+      provider: "remote-approved",
+      traceId: "trace-critical-local",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.provider).toBe("dry-run");
+  });
+
+  it("blocks managed providers when disabled for non-critical callouts", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    process.env.VOICE_PROVIDER_MODE = "allow_remote";
+    process.env.VOICE_MANAGED_PROVIDERS_ENABLED = "0";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Non-critical remote",
+      priority: "warn",
+      provider: "remote-tts",
+      traceId: "trace-managed-disabled",
+    });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("voice_provider_not_allowed");
+    expect(res.body.details?.managedProvidersEnabled).toBe(false);
   });
 
   it("supports dry-run mode and suppresses dedupe duplicates", async () => {
@@ -281,6 +330,40 @@ describe("voice routes", () => {
     expect(second.status).toBe(200);
     expect(third.status).toBe(429);
     expect(third.body.error).toBe("voice_rate_limited");
+  });
+
+
+
+  it("passes voice_profile_id through to proxy contract without breaking legacy shape", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "0";
+    const upstreamApp = express();
+    upstreamApp.use(express.json());
+    let seenProfile: string | null = null;
+    upstreamApp.post("/speak", (req, res) => {
+      seenProfile = req.body.voice_profile_id ?? req.body.voiceProfile ?? null;
+      res.setHeader("content-type", "audio/wav");
+      res.send(Buffer.from("ok"));
+    });
+    const upstreamServer = await new Promise<Server>((resolve) => {
+      const server = upstreamApp.listen(0, () => resolve(server));
+    });
+
+    try {
+      const address = upstreamServer.address();
+      if (!address || typeof address !== "object") throw new Error("no port");
+      process.env.TTS_BASE_URL = `http://127.0.0.1:${address.port}`;
+      const app = buildApp();
+      const res = await request(app).post("/api/voice/speak").send({
+        text: "profile passthrough",
+        voice_profile_id: "dottie_governed",
+      });
+
+      expect(res.status).toBe(200);
+      expect(seenProfile).toBe("dottie_governed");
+      expect(res.headers["x-voice-profile"]).toBe("dottie_governed");
+    } finally {
+      await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
+    }
   });
 
   it("opens deterministic circuit breaker after repeated backend failures", async () => {

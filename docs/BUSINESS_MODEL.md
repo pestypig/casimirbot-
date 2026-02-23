@@ -138,3 +138,9 @@ Current gaps for this pivot:
 - No first-class mission-state Go Board schema yet.
 - No unified voice service contract in server routes yet.
 - No explicit business KPI dashboard for mission-control outcomes.
+
+
+## Voice economics: managed-off vs fallback-enabled
+- Managed-off mode: lowest external usage COGS, highest ownership posture, and predictable local capacity planning requirements.
+- Fallback-enabled mode: higher resilience for non-critical paths but introduces variable managed-provider spend and provider governance overhead.
+- Pricing posture should separate guaranteed local-core continuity from optional managed fallback usage so customers can choose sovereignty vs elasticity.

@@ -12,7 +12,7 @@ const defaultPython = process.env.TRAIN_PYTHON ?? "python";
 const projectRoot = process.cwd();
 
 type JobState = "pending" | "running" | "done" | "error";
-type JobType = "dataset" | "train";
+type JobType = "dataset" | "train" | "tts_voice_train";
 
 type JobInfo = {
   id: string;
@@ -21,6 +21,8 @@ type JobInfo = {
   message: string;
   progress?: { current: number; total: number };
   datasetStats?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  artifactRefs?: string[];
   logs: string[];
   startedAt: number;
   endedAt?: number;
@@ -56,7 +58,7 @@ const runScript = (scriptPath: string, env: Record<string, string> = {}) => {
   return spawn(defaultPython, [scriptPath], {
     cwd: projectRoot,
     env: { ...process.env, ...env },
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
     detached: true,
   });
 };
@@ -76,9 +78,12 @@ router.post("/api/train/dataset", (req, res) => {
     };
     jobs.set(jobId, job);
 
+    const datasetMode = (req.body?.mode ?? process.env.DATASET_PREP_MODE ?? "knowledge_audio").toString();
+    job.metadata = { datasetMode };
     const child = runScript(script, {
       KNOWLEDGE_SOURCE_DIR: process.env.KNOWLEDGE_SOURCE_DIR ?? "data/knowledge_audio_source",
       KNOWLEDGE_AUDIO_DIR: process.env.KNOWLEDGE_AUDIO_DIR ?? "external/audiocraft/data/knowledge_audio",
+      DATASET_PREP_MODE: datasetMode,
     });
     child.stdout?.on("data", (chunk) => {
       const line = chunk.toString();
@@ -93,6 +98,7 @@ router.post("/api/train/dataset", (req, res) => {
         try {
             const payload = line.slice("STATS".length).trim();
             job.datasetStats = JSON.parse(payload);
+            job.metadata = { ...(job.metadata ?? {}), mode: job.datasetStats.mode, manifestPath: job.datasetStats.manifestPath ?? null };
         } catch {
           // ignore parse errors
         }
@@ -117,9 +123,11 @@ router.post("/api/train/start", (req, res) => {
   try {
     const script = path.resolve(projectRoot, "external", "audiocraft", "scripts", "train_spectral_adapter.py");
     const jobId = randomUUID();
+    const requestedType = (req.body?.jobType ?? "train").toString();
+    const type: JobType = requestedType === "tts_voice_train" ? "tts_voice_train" : "train";
     const job: JobInfo = {
       id: jobId,
-      type: "train",
+      type,
       state: "running",
       message: "Training started",
       logs: [],
@@ -131,6 +139,7 @@ router.post("/api/train/start", (req, res) => {
     const child = runScript(script, {
       TRAIN_STATUS_PATH: statusPath,
       KNOWLEDGE_AUDIO_DIR: process.env.KNOWLEDGE_AUDIO_DIR ?? "external/audiocraft/data/knowledge_audio",
+      TRAIN_JOB_TYPE: type,
     });
     child.stdout?.on("data", (chunk) => {
       const line = chunk.toString();
@@ -145,6 +154,12 @@ router.post("/api/train/start", (req, res) => {
       }
       if (line.toLowerCase().includes("loss")) {
         job.message = line.trim();
+      }
+      if (line.startsWith("ARTIFACT")) {
+        const ref = line.slice("ARTIFACT".length).trim();
+        if (ref) {
+          job.artifactRefs = [...(job.artifactRefs ?? []), ref];
+        }
       }
     });
     child.stderr?.on("data", (chunk) => {

@@ -28,12 +28,16 @@ describe("resolveStartupConfig", () => {
     expect(defaults.voiceGovernance.providerMode).toBe("allow_remote");
     expect(defaults.voiceGovernance.providerAllowlist).toEqual([]);
     expect(defaults.voiceGovernance.commercialMode).toBe(false);
+    expect(defaults.voiceGovernance.managedProvidersEnabled).toBe(true);
+    expect(defaults.voiceGovernance.localOnlyMissionMode).toBe(true);
 
     const configured = resolveStartupConfig(
       {
         VOICE_PROVIDER_MODE: "local_only",
         VOICE_PROVIDER_ALLOWLIST: "local-chatterbox,remote-a, remote-b",
         VOICE_COMMERCIAL_MODE: "1",
+        VOICE_MANAGED_PROVIDERS_ENABLED: "0",
+        VOICE_LOCAL_ONLY_MISSION_MODE: "false",
       },
       "development",
     );
@@ -45,6 +49,25 @@ describe("resolveStartupConfig", () => {
       "remote-b",
     ]);
     expect(configured.voiceGovernance.commercialMode).toBe(true);
+    expect(configured.voiceGovernance.managedProvidersEnabled).toBe(false);
+    expect(configured.voiceGovernance.localOnlyMissionMode).toBe(true);
+  });
+
+
+
+  it("exposes deterministic managed/local mode state from explicit flags", () => {
+    const configured = resolveStartupConfig(
+      {
+        VOICE_PROVIDER_MODE: "allow_remote",
+        VOICE_MANAGED_PROVIDERS_ENABLED: "true",
+        VOICE_LOCAL_ONLY_MISSION_MODE: "0",
+      },
+      "development",
+    );
+
+    expect(configured.voiceGovernance.providerMode).toBe("allow_remote");
+    expect(configured.voiceGovernance.managedProvidersEnabled).toBe(true);
+    expect(configured.voiceGovernance.localOnlyMissionMode).toBe(false);
   });
 
   it("falls back to environment default ports when PORT is invalid", () => {
