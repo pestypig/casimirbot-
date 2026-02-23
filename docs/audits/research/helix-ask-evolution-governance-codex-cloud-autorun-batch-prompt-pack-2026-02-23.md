@@ -64,6 +64,30 @@ Per-prompt report block:
 - [ ] Casimir verify PASS recorded after each prompt with `integrityOk: true`.
 - [ ] Ledger updated after every prompt commit with status and commit SHA.
 
+## Prompt index (scope lock)
+
+| Prompt | Title | Primary output |
+|---|---|---|
+| 0 | Wave ledger and scope lock | Ledger initialized, scope + constraints locked |
+| 1 | Evolution contracts and schema docs | Additive contract and taxonomy docs |
+| 2 | Evolution domain types and config surface | Typed schemas + deterministic config loader |
+| 3 | Patch ingest route + storage | Deterministic ingest endpoint + JSONL persistence |
+| 4 | Momentum engine | Deterministic momentum vector computation |
+| 5 | Checklist addendum generator | Deterministic AGENTS/WARP addendum artifact |
+| 6 | Congruence gate endpoint | Additive deterministic congruence gate envelope |
+| 7 | Training-trace integration | Evolution runs persisted to trace lifecycle |
+| 8 | Trajectory endpoint and replay | Deterministic trajectory query + storage |
+| 9 | Operator report and artifacts | Governance report + artifact wiring |
+| 10 | Wave closeout | Final verification + GO/NO-GO closeout |
+
+## Blocker policy (deterministic)
+
+If any prompt is blocked:
+1) Ship the maximal safe additive subset inside that prompt's allowed paths.
+2) Mark prompt status as `partial-blocked` or `blocked` with explicit cause.
+3) Still run mandatory Casimir verify and record verdict + certificate hash + `integrityOk`.
+4) Continue strict prompt order without skipping ledger updates.
+
 ## Single autorun launcher prompt (paste into Codex Cloud)
 
 ```text
