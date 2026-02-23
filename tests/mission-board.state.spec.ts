@@ -105,4 +105,34 @@ describe("mission board state", () => {
     expect(snapshot.unresolvedCritical).toBe(0);
     expect(snapshot.updatedAt).toBe("2026-02-22T01:01:00.000Z");
   });
+
+  it("clears unresolved critical count when ack references critical event", () => {
+    const missionId = "mission-state-3";
+    const events: MissionBoardEvent[] = [
+      {
+        eventId: "action-critical-1",
+        missionId,
+        type: "action_required",
+        classification: "critical",
+        text: "Escalation required",
+        ts: "2026-02-22T02:00:00.000Z",
+        evidenceRefs: [],
+      },
+      {
+        eventId: "ack:action-critical-1:1700",
+        missionId,
+        type: "state_change",
+        classification: "info",
+        text: "Acknowledged escalation",
+        ts: "2026-02-22T02:00:05.000Z",
+        fromState: "pending",
+        toState: "active",
+        evidenceRefs: ["action-critical-1"],
+      },
+    ];
+
+    const snapshot = foldMissionSnapshot(events, missionId);
+    expect(snapshot.unresolvedCritical).toBe(0);
+    expect(snapshot.status).toBe("active");
+  });
 });

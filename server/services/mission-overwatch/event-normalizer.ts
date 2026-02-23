@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { MissionCalloutPriority } from "./salience";
 
 export type MissionNormalizedEvent = {
@@ -44,17 +45,70 @@ const normalizeTimestamp = (value?: string | number): string => {
   return new Date().toISOString();
 };
 
+const normalizeList = (items?: string[]): string[] => {
+  if (!items?.length) return [];
+  const unique = new Set<string>();
+  for (const item of items) {
+    const trimmed = item?.trim();
+    if (trimmed) unique.add(trimmed);
+  }
+  return Array.from(unique).sort((a, b) => a.localeCompare(b));
+};
+
+const buildDeterministicEventId = (input: {
+  missionId: string;
+  source: MissionNormalizedEvent["source"];
+  eventType: string;
+  classification: MissionCalloutPriority;
+  text: string;
+  ts: string;
+  entityRefs: string[];
+  evidenceRefs: string[];
+}): string => {
+  const canonical = JSON.stringify({
+    missionId: input.missionId,
+    source: input.source,
+    eventType: input.eventType,
+    classification: input.classification,
+    text: input.text,
+    ts: input.ts,
+    entityRefs: input.entityRefs,
+    evidenceRefs: input.evidenceRefs,
+  });
+  const digest = createHash("sha256").update(canonical).digest("hex").slice(0, 24);
+  return `evt:${input.missionId}:${digest}`;
+};
+
 export const normalizeMissionEvent = (raw: MissionRawEvent): MissionNormalizedEvent => {
   const ts = normalizeTimestamp(raw.ts);
+  const missionId = raw.missionId.trim();
+  const source = raw.source ?? "helix_ask";
+  const eventType = raw.eventType?.trim() || "state_change";
+  const classification = inferClassification(raw);
+  const text = raw.text?.trim() || "Mission update";
+  const entityRefs = normalizeList(raw.entityRefs);
+  const evidenceRefs = normalizeList(raw.evidenceRefs);
+  const providedEventId = raw.eventId?.trim();
   return {
-    eventId: raw.eventId?.trim() || `evt:${raw.missionId}:${Date.parse(ts)}`,
-    missionId: raw.missionId.trim(),
-    source: raw.source ?? "helix_ask",
-    eventType: raw.eventType?.trim() || "state_change",
-    classification: inferClassification(raw),
-    text: raw.text?.trim() || "Mission update",
+    eventId:
+      providedEventId ||
+      buildDeterministicEventId({
+        missionId,
+        source,
+        eventType,
+        classification,
+        text,
+        ts,
+        entityRefs,
+        evidenceRefs,
+      }),
+    missionId,
+    source,
+    eventType,
+    classification,
+    text,
     ts,
-    entityRefs: Array.from(new Set(raw.entityRefs ?? [])).filter(Boolean),
-    evidenceRefs: Array.from(new Set(raw.evidenceRefs ?? [])).filter(Boolean),
+    entityRefs,
+    evidenceRefs,
   };
 };

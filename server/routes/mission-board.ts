@@ -115,14 +115,26 @@ const getMissionEvents = (missionId: string): MissionBoardEvent[] => {
 const foldMissionSnapshot = (events: MissionBoardEvent[], missionId: string): MissionBoardSnapshot => {
   let phase: MissionPhase = "observe";
   let status: MissionStatus = "active";
-  let unresolvedCritical = 0;
+  const unresolvedCriticalIds = new Set<string>();
   let updatedAt = new Date().toISOString();
 
   for (const event of events) {
     updatedAt = event.ts;
     if (event.classification === "critical") {
-      unresolvedCritical += 1;
-      if (status === "active") status = "degraded";
+      unresolvedCriticalIds.add(event.eventId);
+    }
+
+    const isAckEvent =
+      event.type === "state_change" &&
+      event.eventId.startsWith("ack:") &&
+      event.evidenceRefs.length > 0;
+    if (isAckEvent) {
+      for (const evidenceRef of event.evidenceRefs) {
+        const ref = evidenceRef.trim();
+        if (ref) {
+          unresolvedCriticalIds.delete(ref);
+        }
+      }
     }
 
     if (event.type === "state_change" && event.toState) {
@@ -152,6 +164,15 @@ const foldMissionSnapshot = (events: MissionBoardEvent[], missionId: string): Mi
     if (event.type === "debrief") {
       phase = "debrief";
     }
+  }
+  const unresolvedCritical = unresolvedCriticalIds.size;
+  if (
+    unresolvedCritical > 0 &&
+    status !== "blocked" &&
+    status !== "complete" &&
+    status !== "aborted"
+  ) {
+    status = "degraded";
   }
 
   return {

@@ -121,6 +121,29 @@ describe("mission board routes", () => {
     expect(ackEvent?.evidenceRefs).toContain("action-ack-target");
   });
 
+  it("acknowledgment clears unresolved critical count for referenced critical event", async () => {
+    const app = buildApp();
+    const missionId = uniqueMissionId();
+
+    const criticalAction = await request(app).post(`/api/mission-board/${missionId}/actions`).send({
+      actionId: "action-critical-target",
+      type: "ESCALATE_TO_COMMAND",
+      requestedAt: "2026-02-22T00:30:00.000Z",
+    });
+    expect(criticalAction.status).toBe(200);
+    expect(criticalAction.body.snapshot.unresolvedCritical).toBe(1);
+    expect(criticalAction.body.snapshot.status).toBe("degraded");
+
+    const ack = await request(app).post(`/api/mission-board/${missionId}/ack`).send({
+      eventId: "action-critical-target",
+      actorId: "operator-2",
+      ts: "2026-02-22T00:30:10.000Z",
+    });
+    expect(ack.status).toBe(200);
+    expect(ack.body.snapshot.unresolvedCritical).toBe(0);
+    expect(ack.body.snapshot.status).toBe("active");
+  });
+
   it("returns deterministic invalid request envelope", async () => {
     const app = buildApp();
     const missionId = uniqueMissionId();
