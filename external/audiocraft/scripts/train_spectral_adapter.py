@@ -254,6 +254,18 @@ def main():
 
             lm_out = lm.compute_predictions(codes=fake_codes, conditions=conditions)
             logits = lm_out.logits  # [B, K, T, card]
+            if not torch.isfinite(logits).all():
+                bad_count = int((~torch.isfinite(logits)).sum().item())
+                print(
+                    f"[train] non_finite_logits_detected count={bad_count}; applying nan_to_num",
+                    flush=True,
+                )
+                # Smoke-lane stabilization for CPU/low-resource runs: replace NaN/Inf logits
+                # with bounded finite values before CE loss.
+                logits = torch.nan_to_num(logits, nan=0.0, posinf=1e4, neginf=-1e4)
+            if device == "cpu":
+                # Keep CE numerically stable on CPU fallback runs.
+                logits = torch.clamp(logits, min=-30.0, max=30.0)
             B, K, T, card = logits.shape
 
             target = fake_codes.view(B * K, T)
