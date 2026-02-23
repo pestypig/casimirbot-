@@ -129,6 +129,7 @@ def main():
     print(f"[train] Using device: {device}")
 
     status_path = os.environ.get("TRAIN_STATUS_PATH", "external/audiocraft/checkpoints/train_status.json")
+    train_job_type = os.environ.get("TRAIN_JOB_TYPE", "train").strip().lower()
     status_dir = os.path.dirname(status_path)
     if status_dir:
         os.makedirs(status_dir, exist_ok=True)
@@ -211,9 +212,11 @@ def main():
 
     # Save adapters only
     os.makedirs("checkpoints", exist_ok=True)
-    ckpt_path = os.path.join("checkpoints", "spectral_adapters_musicgen_small.pt")
+    ckpt_name = "tts_voice_train_musicgen_small.pt" if train_job_type == "tts_voice_train" else "spectral_adapters_musicgen_small.pt"
+    ckpt_path = os.path.join("checkpoints", ckpt_name)
     torch.save(spectral_adapters.state_dict(), ckpt_path)
     print(f"[train] Saved spectral adapters to {ckpt_path}")
+    print(f"ARTIFACT {ckpt_path}", flush=True)
     final_status = {
         "epoch": num_epochs - 1,
         "step": current_step,
@@ -221,6 +224,8 @@ def main():
         "timestamp": time.time(),
         "status": "completed",
         "checkpoint": ckpt_path,
+        "jobType": train_job_type,
+        "artifactRefs": [ckpt_path],
     }
     with open(status_path, "w", encoding="utf-8") as f:
         json.dump(final_status, f)

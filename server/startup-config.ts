@@ -2,6 +2,8 @@ export type VoiceGovernanceConfig = {
   providerMode: "local_only" | "allow_remote";
   providerAllowlist: string[];
   commercialMode: boolean;
+  managedProvidersEnabled: boolean;
+  localOnlyMissionMode: boolean;
 };
 
 export type StartupConfig = {
@@ -13,7 +15,6 @@ export type StartupConfig = {
   sourceHost: string | undefined;
   voiceGovernance: VoiceGovernanceConfig;
 };
-
 
 const parseProviderMode = (value: string | undefined): "local_only" | "allow_remote" => {
   const normalized = value?.trim().toLowerCase();
@@ -29,9 +30,12 @@ const parseCsvAllowlist = (value: string | undefined): string[] => {
     .filter((entry) => entry.length > 0);
 };
 
-const parseCommercialMode = (value: string | undefined): boolean => {
-  const normalized = value?.trim();
-  return normalized === "1" || normalized === "true";
+const parseBooleanFlag = (value: string | undefined, defaultValue: boolean): boolean => {
+  if (!value?.trim()) return defaultValue;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "1" || normalized === "true") return true;
+  if (normalized === "0" || normalized === "false") return false;
+  return defaultValue;
 };
 
 const parsePositivePort = (value: string | undefined): number | null => {
@@ -51,6 +55,9 @@ export const resolveStartupConfig = (env: NodeJS.ProcessEnv, appEnv: string): St
 
   const port = parsePositivePort(env.PORT) ?? fallbackPort;
   const host = env.HOST?.trim() ? env.HOST.trim() : "0.0.0.0";
+  const providerMode = parseProviderMode(env.VOICE_PROVIDER_MODE);
+  const managedProvidersEnabled = parseBooleanFlag(env.VOICE_MANAGED_PROVIDERS_ENABLED, true);
+  const localOnlyMissionMode = parseBooleanFlag(env.VOICE_LOCAL_ONLY_MISSION_MODE, true);
 
   return {
     port,
@@ -60,9 +67,11 @@ export const resolveStartupConfig = (env: NodeJS.ProcessEnv, appEnv: string): St
     sourcePort: env.PORT,
     sourceHost: env.HOST,
     voiceGovernance: {
-      providerMode: parseProviderMode(env.VOICE_PROVIDER_MODE),
+      providerMode,
       providerAllowlist: parseCsvAllowlist(env.VOICE_PROVIDER_ALLOWLIST),
-      commercialMode: parseCommercialMode(env.VOICE_COMMERCIAL_MODE),
+      commercialMode: parseBooleanFlag(env.VOICE_COMMERCIAL_MODE, false),
+      managedProvidersEnabled,
+      localOnlyMissionMode: providerMode === "local_only" ? true : localOnlyMissionMode,
     },
   };
 };

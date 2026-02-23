@@ -11,6 +11,7 @@ const requestSchema = z.object({
   mode: z.enum(["callout", "briefing", "debrief"]).default("callout"),
   priority: z.enum(["info", "warn", "critical", "action"]).default("info"),
   voiceProfile: z.string().trim().min(1).max(120).optional(),
+  voice_profile_id: z.string().trim().min(1).max(120).optional(),
   format: z.enum(["wav", "mp3"]).default("wav"),
   consent_asserted: z.boolean().optional(),
   watermark_mode: z.string().trim().max(120).optional(),
@@ -35,6 +36,16 @@ type ProviderGovernance = {
   providerMode: VoiceProviderMode;
   providerAllowlist: string[];
   commercialMode: boolean;
+  managedProvidersEnabled: boolean;
+  localOnlyMissionMode: boolean;
+};
+
+const parseBooleanFlag = (value: string | undefined, defaultValue: boolean): boolean => {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return defaultValue;
+  if (normalized === "1" || normalized === "true") return true;
+  if (normalized === "0" || normalized === "false") return false;
+  return defaultValue;
 };
 
 const resolveProviderGovernance = (): ProviderGovernance => {
@@ -43,8 +54,10 @@ const resolveProviderGovernance = (): ProviderGovernance => {
     .split(",")
     .map((entry) => entry.trim().toLowerCase())
     .filter((entry) => entry.length > 0);
-  const commercialMode = ["1", "true"].includes((process.env.VOICE_COMMERCIAL_MODE ?? "0").trim().toLowerCase());
-  return { providerMode, providerAllowlist, commercialMode };
+  const commercialMode = parseBooleanFlag(process.env.VOICE_COMMERCIAL_MODE, false);
+  const managedProvidersEnabled = parseBooleanFlag(process.env.VOICE_MANAGED_PROVIDERS_ENABLED, true);
+  const localOnlyMissionMode = providerMode === "local_only" ? true : parseBooleanFlag(process.env.VOICE_LOCAL_ONLY_MISSION_MODE, true);
+  return { providerMode, providerAllowlist, commercialMode, managedProvidersEnabled, localOnlyMissionMode };
 };
 
 const isLocalProvider = (provider: string): boolean => provider.toLowerCase().startsWith("local");
@@ -254,8 +267,21 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     );
   }
 
-  const provider = payload.provider?.trim() || "local-chatterbox";
   const governance = resolveProviderGovernance();
+  const missionCritical = payload.priority === "critical" || payload.priority === "action";
+  const requestedProvider = payload.provider?.trim() || "local-chatterbox";
+  const provider = missionCritical && governance.localOnlyMissionMode ? "local-chatterbox" : requestedProvider;
+
+  if (!isLocalProvider(provider) && !governance.managedProvidersEnabled) {
+    return errorEnvelope(
+      res,
+      403,
+      "voice_provider_not_allowed",
+      "Managed voice providers are disabled by runtime policy.",
+      { provider, managedProvidersEnabled: false },
+      traceId,
+    );
+  }
 
   if (governance.providerMode === "local_only" && !isLocalProvider(provider)) {
     return errorEnvelope(
@@ -328,7 +354,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
       ok: true,
       dryRun: true,
       provider: "dry-run",
-      voiceProfile: payload.voiceProfile ?? "default",
+      voiceProfile: payload.voiceProfile ?? payload.voice_profile_id ?? "default",
       metering: {
         ...metering,
         durationMs: payload.durationMs ?? Math.max(250, payload.text.length * 45),
@@ -371,7 +397,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     const upstream = await fetch(`${baseUrl.replace(/\/+$/, "")}/speak`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, provider, ...(payload.voice_profile_id ? { voiceProfile: payload.voiceProfile ?? payload.voice_profile_id } : {}) }),
       signal: controller.signal,
     });
 
@@ -393,7 +419,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     recordBackendSuccess();
     res.setHeader("content-type", contentType);
     res.setHeader("x-voice-provider", "proxy");
-    res.setHeader("x-voice-profile", payload.voiceProfile ?? "default");
+    res.setHeader("x-voice-profile", payload.voiceProfile ?? payload.voice_profile_id ?? "default");
     if (payload.watermark_mode) {
       res.setHeader("x-watermark-mode", payload.watermark_mode);
     }
