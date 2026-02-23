@@ -205,6 +205,11 @@ def main():
     # Load pretrained MusicGen (LM + codec)
     model = MusicGen.get_pretrained("facebook/musicgen-small", device=device)
     lm = model.lm
+    if device == "cpu":
+        # CPU Colab runs are numerically unstable with half precision checkpoints.
+        # Force the LM stack to float32 before forward/loss computation.
+        lm = lm.float()
+        print("[train] cpu_mode_cast=float32", flush=True)
 
     # Attach adapters
     spectral_adapters = attach_spectral_adapters(lm, num_adapters=2).to(device)
