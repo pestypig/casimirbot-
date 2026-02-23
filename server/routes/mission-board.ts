@@ -5,6 +5,7 @@ import {
   appendMissionBoardEvent,
   listMissionBoardEvents,
 } from "../services/mission-overwatch/mission-board-store";
+import { normalizeMissionEvent } from "../services/mission-overwatch/event-normalizer";
 
 type MissionPhase =
   | "observe"
@@ -70,6 +71,19 @@ const actionSchema = z.object({
   requestedAt: z.string().datetime().optional(),
   evidenceRefs: z.array(z.string().trim().min(1).max(500)).max(32).default([]),
   payload: z.record(z.unknown()).optional(),
+});
+
+
+const contextEventSchema = z.object({
+  eventId: z.string().trim().min(1).max(200).optional(),
+  eventType: z.string().trim().min(1).max(80),
+  classification: eventClassSchema.default("info"),
+  text: z.string().trim().min(1).max(600),
+  ts: z.string().datetime().optional(),
+  tier: z.enum(["tier0", "tier1"]),
+  sessionState: z.enum(["idle", "requesting", "active", "stopping", "error"]),
+  traceId: z.string().trim().max(200).optional(),
+  evidenceRefs: z.array(z.string().trim().min(1).max(500)).max(32).default([]),
 });
 
 const ackSchema = z.object({
@@ -319,6 +333,58 @@ missionBoardRouter.post("/:missionId/actions", async (req, res) => {
     return res.status(200).json({
       receipt: { actionId, missionId, ts, status: payload.status },
       snapshot,
+    });
+  } catch (error) {
+    return missionBoardUnavailable(res, error);
+  }
+});
+
+
+missionBoardRouter.post("/:missionId/context-events", async (req, res) => {
+  const missionId = missionIdFromReq(req);
+  if (!missionId) {
+    return errorEnvelope(res, 400, "mission_board_invalid_request", "Mission id is required.");
+  }
+
+  const parsed = contextEventSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return errorEnvelope(res, 400, "mission_board_invalid_request", "Invalid context event payload.", {
+      issues: parsed.error.flatten(),
+    });
+  }
+
+  const payload = parsed.data;
+  const normalized = normalizeMissionEvent({
+    eventId: payload.eventId,
+    missionId,
+    source: "telemetry",
+    eventType: payload.eventType,
+    classification: payload.classification,
+    text: payload.text,
+    ts: payload.ts,
+    evidenceRefs: payload.evidenceRefs,
+    contextTier: payload.tier,
+    sessionState: payload.sessionState,
+    traceId: payload.traceId,
+  });
+
+  const missionEvent: MissionBoardEvent = {
+    eventId: normalized.eventId,
+    missionId,
+    type: eventTypeSchema.safeParse(payload.eventType).success ? (payload.eventType as EventType) : "state_change",
+    classification: payload.classification,
+    text: `[context:${payload.tier}/${payload.sessionState}] ${payload.text}`,
+    ts: normalized.ts,
+    evidenceRefs: payload.evidenceRefs,
+  };
+
+  try {
+    await appendEvent(missionId, missionEvent);
+    const events = await getMissionEvents(missionId);
+    return res.status(200).json({
+      event: missionEvent,
+      snapshot: foldMissionSnapshot(events, missionId),
+      traceId: payload.traceId ?? null,
     });
   } catch (error) {
     return missionBoardUnavailable(res, error);

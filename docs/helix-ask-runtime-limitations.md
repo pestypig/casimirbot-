@@ -227,3 +227,12 @@ Plans/credits impact:
 
 ## Reminder
 To scale beyond ~1 request at a time, move inference off CPU (GPU or hosted model server).
+
+
+## Context session runtime limitations (Tier 0/Tier 1)
+
+- Tier 1 screen context depends on browser capture APIs and operator permission flow.
+- Capture cannot start silently; it must be triggered by direct user interaction.
+- Permission denial or revoked tracks become deterministic `error` state transitions.
+- Tier 0 remains fully supported when Tier 1 is unavailable.
+- Context callout eligibility is disabled whenever session state is not `active`.

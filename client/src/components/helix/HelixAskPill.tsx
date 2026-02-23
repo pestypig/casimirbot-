@@ -27,6 +27,13 @@ import { classifyMoodFromWhisper } from "@/lib/luma-mood-spectrum";
 import { LUMA_MOOD_ORDER, resolveMoodAsset, type LumaMood } from "@/lib/luma-moods";
 import { broadcastLumaMood } from "@/lib/luma-mood-theme";
 import { reportClientError } from "@/lib/observability/client-error";
+import {
+  readMissionContextControls,
+  writeMissionContextControls,
+  type MissionContextControls,
+  type MissionContextTier,
+  type MissionVoiceMode,
+} from "@/lib/mission-overwatch";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 
@@ -1185,6 +1192,12 @@ export function HelixAskPill({
   const moodHintSessionId = useMemo(() => `helix:mood:${contextId}`, [contextId]);
   const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>({});
   const [askMode, setAskMode] = useState<"read" | "observe" | "act" | "verify">("read");
+  const [missionContextControls, setMissionContextControls] = useState<MissionContextControls>(() =>
+    readMissionContextControls(),
+  );
+  const [contextSessionState, setContextSessionState] = useState<
+    "idle" | "requesting" | "active" | "stopping" | "error"
+  >("idle");
 
   const getHelixAskSessionId = useCallback(() => {
     if (helixAskSessionRef.current) return helixAskSessionRef.current;
@@ -2175,6 +2188,16 @@ export function HelixAskPill({
   const maxWidthClass = maxWidthClassName ?? "max-w-4xl";
   const inputPlaceholder = placeholder ?? "Ask anything about this system";
   const currentPlaceholder = askBusy ? "Add another question..." : inputPlaceholder;
+
+  useEffect(() => {
+    writeMissionContextControls(missionContextControls);
+    setContextSessionState((prev) => {
+      if (missionContextControls.tier === "tier0") return "idle";
+      if (prev === "error" || prev === "stopping") return prev;
+      return "active";
+    });
+  }, [missionContextControls]);
+
   const queuePreview = useMemo(() => {
     const preview = askQueue.slice(0, 3).map((entry) => clipText(entry, 80));
     const remainder = Math.max(0, askQueue.length - preview.length);
@@ -2274,6 +2297,71 @@ export function HelixAskPill({
               {askBusy ? <Square className="h-4 w-4" /> : <Search className="h-4 w-4" />}
             </button>
           </div>
+            <div className="-mt-1 px-4 pb-2 text-[10px] text-slate-300">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="uppercase tracking-[0.2em] text-slate-500">Dot context</span>
+                <span className="rounded-full border border-white/10 px-2 py-0.5">
+                  {missionContextControls.tier === "tier1" ? "Tier 1" : "Tier 0"}
+                </span>
+                <span className="rounded-full border border-white/10 px-2 py-0.5">
+                  {contextSessionState === "active" ? "LIVE" : contextSessionState === "error" ? "ERROR" : "IDLE"}
+                </span>
+                {missionContextControls.tier === "tier1" ? (
+                  <span className="rounded-full border border-cyan-300/30 px-2 py-0.5 text-cyan-200">screen</span>
+                ) : null}
+                <label className="ml-auto flex items-center gap-1">
+                  <span className="text-slate-400">tier</span>
+                  <select
+                    value={missionContextControls.tier}
+                    onChange={(event) =>
+                      setMissionContextControls((prev) => ({
+                        ...prev,
+                        tier: event.target.value as MissionContextTier,
+                      }))
+                    }
+                    className="rounded border border-white/10 bg-black/30 px-1 py-0.5 text-[10px] text-slate-200"
+                  >
+                    <option value="tier0">tier0</option>
+                    <option value="tier1">tier1</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-1">
+                  <span className="text-slate-400">voice</span>
+                  <select
+                    value={missionContextControls.voiceMode}
+                    onChange={(event) =>
+                      setMissionContextControls((prev) => ({
+                        ...prev,
+                        voiceMode: event.target.value as MissionVoiceMode,
+                      }))
+                    }
+                    className="rounded border border-white/10 bg-black/30 px-1 py-0.5 text-[10px] text-slate-200"
+                  >
+                    <option value="off">off</option>
+                    <option value="critical_only">critical_only</option>
+                    <option value="normal">normal</option>
+                    <option value="dnd">dnd</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-1 text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={missionContextControls.muteWhileTyping}
+                    onChange={(event) =>
+                      setMissionContextControls((prev) => ({ ...prev, muteWhileTyping: event.target.checked }))
+                    }
+                  />
+                  mute while typing
+                </label>
+                <button
+                  type="button"
+                  className="rounded border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-300"
+                  onClick={() => setContextSessionState("idle")}
+                >
+                  stop
+                </button>
+              </div>
+            </div>
           {askBusy ? (
             <div
               className={`relative overflow-hidden border-t px-4 py-2 text-[11px] text-slate-300 ${moodPalette.liveBorder}`}

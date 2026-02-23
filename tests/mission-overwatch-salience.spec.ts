@@ -181,3 +181,26 @@ describe("mission overwatch salience", () => {
     expect(decision.speak).toBe(true);
   });
 });
+
+
+  it("suppresses when context tier is 0 or session inactive", () => {
+    const state = createSalienceState();
+    const tier0 = evaluateSalience({
+      missionId: "mission-tier",
+      eventType: "context_signal",
+      classification: "critical",
+      dedupeKey: "tier0",
+      contextTier: "tier0",
+    }, state);
+    expect(tier0.reason).toBe("context_ineligible");
+
+    const inactive = evaluateSalience({
+      missionId: "mission-tier",
+      eventType: "context_signal",
+      classification: "critical",
+      dedupeKey: "inactive",
+      contextTier: "tier1",
+      sessionState: "idle",
+    }, state);
+    expect(inactive.reason).toBe("context_ineligible");
+  });
