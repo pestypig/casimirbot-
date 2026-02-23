@@ -72,14 +72,18 @@ Per-prompt report block:
 
 ```text
 Execution mode:
-AUTORUN. Run Prompt 0 through Prompt 10 in strict order with one commit per prompt.
+AUTORUN. STRICT SEQUENTIAL MODE.
+Run Prompt 1 through Prompt 10 only (Prompt 0 is already completed in the ledger).
+Exactly one commit per prompt. Do not batch multiple prompts into one commit.
 
 Primary source of truth:
 - docs/audits/research/helix-ask-ownership-first-dottie-voice-codex-cloud-autorun-batch-prompt-pack-2026-02-23.md
 - docs/audits/research/helix-ask-ownership-first-dottie-voice-pipeline-2026-02-23.md
+- reports/helix-ask-ownership-first-dottie-voice-ledger-2026-02-23.md
 
 Baseline lock:
 - origin/main@d602240c
+- If current `origin/main` is ahead because Prompt 0 is already merged, do not reset backward; continue from current main and run Prompt 1..10 only.
 
 Global rules:
 1) Keep changes additive and non-breaking.
@@ -90,12 +94,87 @@ Global rules:
 6) On Casimir FAIL, repair first failing HARD constraint and rerun.
 7) Update voice wave ledger after each prompt commit.
 8) Do not claim completion without final PASS and integrityOk true.
+9) Do not edit files outside each prompt's allowed paths.
+10) If blocked, mark prompt status partial-blocked or blocked with deterministic reason, ship maximal safe additive subset, commit, and continue to next prompt.
+11) Never rewrite or reset prior prompt commits.
+
+Execution preflight (mandatory):
+1) Confirm Prompt 0 status is already done in the ledger.
+2) Confirm Prompt 1..10 statuses are pending before starting.
+3) Start execution at Prompt 1.
+
+Per-prompt loop (mandatory):
+1) Implement only the current prompt scope and allowed paths.
+2) Run the prompt-specific tests listed in that prompt.
+3) Run Casimir verify:
+   npm run casimir:verify -- --url http://127.0.0.1:5173/api/agi/adapter/run --export-url http://127.0.0.1:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci
+4) If Casimir FAIL, fix first failing HARD constraint and rerun until PASS.
+5) Commit with message prefix: "prompt-<N>:".
+6) Update ledger:
+   - prompt table status/commit_sha/notes
+   - append/update per-prompt execution report block
+   - include casimir_verdict, casimir_firstFail, casimir_certificateHash, casimir_integrityOk, casimir_traceId, casimir_runId
+7) Print a compact checkpoint summary before proceeding to the next prompt.
+
+Checkpoint output format after each prompt:
+- prompt_id: Prompt <N>
+- commit_sha: <sha>
+- status: done|partial-blocked|blocked
+- files_changed: <count>
+- tests_or_checks_run: <commands>
+- casimir_verdict: PASS|FAIL
+- casimir_certificateHash: <hash or null>
+- casimir_integrityOk: true|false|null
+- blockers: <none or deterministic short reason>
+
+Stop conditions:
+- Stop immediately only if repository state is corrupted or commands cannot run at all.
+- Otherwise continue through Prompt 10 even when partial-blocked, and record deterministic blocker notes.
 
 Final deliverables:
 - ordered commit table
 - artifact existence table
 - final GO/NO-GO + blockers
 - final Casimir PASS block
+```
+
+## Copy/paste strict launcher (recommended)
+
+Use this exact prompt text in Codex Cloud:
+
+```text
+Run the ownership-first Dottie voice batch in strict order using:
+docs/audits/research/helix-ask-ownership-first-dottie-voice-codex-cloud-autorun-batch-prompt-pack-2026-02-23.md
+
+Execution constraints:
+- Start at Prompt 1 (Prompt 0 already complete); run through Prompt 10.
+- One prompt = one commit.
+- Respect each prompt's allowed paths.
+- After each prompt: run listed tests + Casimir verify.
+- If Casimir FAIL: fix first HARD fail and rerun until PASS.
+- Update ledger after each prompt:
+  reports/helix-ask-ownership-first-dottie-voice-ledger-2026-02-23.md
+- If blocked: ship maximal safe additive subset, mark partial-blocked/blocked with deterministic reason, then continue.
+
+Casimir command:
+npm run casimir:verify -- --url http://127.0.0.1:5173/api/agi/adapter/run --export-url http://127.0.0.1:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci
+
+Required checkpoint after every prompt:
+- prompt_id
+- commit_sha
+- status
+- files_changed
+- tests_or_checks_run
+- casimir_verdict
+- casimir_certificateHash
+- casimir_integrityOk
+- blockers
+
+Final output must include:
+1) ordered commit table (Prompt 1..10)
+2) artifact existence table
+3) GO/NO-GO with blockers
+4) final Casimir PASS + certificate hash + integrityOk
 ```
 
 ## Prompt 0: Wave ledger and scope lock
