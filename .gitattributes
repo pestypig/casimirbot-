@@ -1,1 +1,2 @@
 datasets/solar/spectra/solar-hrs/v1/*.txt filter=lfs diff=lfs merge=lfs -text
+data/knowledge_audio_source/*.wav filter=lfs diff=lfs merge=lfs -text
