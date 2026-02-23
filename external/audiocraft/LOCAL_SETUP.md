@@ -44,3 +44,16 @@ $env:HUGGING_FACE_HUB_TOKEN = "<your_token>"
 Notes  
 - This venv is CPU-only unless you install a CUDA-enabled torch build into it first.  
 - If you want to start fresh: delete `.venv` and rerun steps 1–3.
+
+## Docker runtime (recommended for locked-down environments)
+
+When cloud sandboxes block outbound `pip`/package downloads, use the prebuilt
+training image from this repo:
+
+```bash
+docker build -f docker/voice-train/Dockerfile -t casimir-voice-train:latest .
+docker run --rm -v "$PWD:/workspace/casimirbot-" casimir-voice-train:latest
+```
+
+This runs dataset prep + training and emits a deterministic
+`=== DOCKER TRAIN REPORT ===` block. See `docker/voice-train/README.md`.
