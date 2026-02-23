@@ -201,8 +201,9 @@ def main():
     # Attach adapters
     spectral_adapters = attach_spectral_adapters(lm, num_adapters=2).to(device)
 
-    # Freeze everything except adapters
-    for p in model.parameters():
+    # Freeze everything except adapters.
+    # MusicGen is a wrapper object; trainable parameters live on the LM module.
+    for p in lm.parameters():
         p.requires_grad = False
     for p in spectral_adapters.parameters():
         p.requires_grad = True
