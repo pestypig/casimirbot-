@@ -26,8 +26,8 @@ export const evolutionConstraintSchema = z.object({
   id: z.string().min(1),
   severity: z.enum(["HARD", "SOFT"]),
   status: z.enum(["pass", "warn", "fail"]),
-  value: z.union([z.string(), z.number(), z.null()]).optional(),
-  limit: z.union([z.string(), z.number(), z.null()]).optional(),
+  value: z.number().nullable().optional(),
+  limit: z.string().nullable().optional(),
   note: z.string().optional(),
 });
 

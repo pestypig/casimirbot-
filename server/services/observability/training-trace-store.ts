@@ -98,6 +98,22 @@ const filterByTenant = (
 const sortBySequence = (records: TrainingTraceRecord[]): TrainingTraceRecord[] =>
   records.slice().sort((a, b) => a.seq - b.seq);
 
+const mergeVisibleRecords = (
+  persisted: TrainingTraceRecord[],
+  buffered: TrainingTraceRecord[],
+  limit?: number | null,
+): TrainingTraceRecord[] => {
+  const byId = new Map<string, TrainingTraceRecord>();
+  for (const record of [...persisted, ...buffered]) {
+    byId.set(record.id, record);
+  }
+  const merged = sortBySequence(Array.from(byId.values()));
+  if (limit === null || limit === undefined) {
+    return merged;
+  }
+  return merged.slice(-limit);
+};
+
 const persistedTraces = loadPersistedTraces();
 if (persistedTraces.length > 0) {
   traceBuffer.push(...persistedTraces);
@@ -165,18 +181,10 @@ export function getTrainingTraces(
 ): TrainingTraceRecord[] {
   const limit = clampLimit(options?.limit);
   const tenantId = normalizeTenantId(options?.tenantId);
-  if (AUDIT_PERSIST_ENABLED) {
-    const persisted = readPersistedTraces(limit, tenantId);
-    if (persisted.length > 0) {
-      return persisted.slice(-limit).reverse();
-    }
-  }
-  if (traceBuffer.length === 0) {
-    return [];
-  }
-  const filtered = sortBySequence(filterByTenant(traceBuffer, tenantId));
-  const start = Math.max(0, filtered.length - limit);
-  return filtered.slice(start).reverse();
+  const persisted = AUDIT_PERSIST_ENABLED ? readPersistedTraces(limit, tenantId) : [];
+  const buffered = filterByTenant(traceBuffer, tenantId);
+  const merged = mergeVisibleRecords(persisted, buffered, limit);
+  return merged.slice().reverse();
 }
 
 export function getTrainingTraceById(
@@ -185,14 +193,13 @@ export function getTrainingTraceById(
 ): TrainingTraceRecord | null {
   if (!id) return null;
   const normalizedTenant = normalizeTenantId(tenantId);
-  const record = traceBuffer.find((entry) => entry.id === id);
-  if (record && matchesTenant(record, normalizedTenant)) return record;
-  if (AUDIT_PERSIST_ENABLED) {
-    const persisted = readPersistedTraces(Number.MAX_SAFE_INTEGER, normalizedTenant);
-    const match = persisted.find((entry) => entry.id === id);
-    return match ?? null;
-  }
-  return null;
+  const persisted = AUDIT_PERSIST_ENABLED
+    ? readPersistedTraces(Number.MAX_SAFE_INTEGER, normalizedTenant)
+    : [];
+  const buffered = filterByTenant(traceBuffer, normalizedTenant);
+  const merged = mergeVisibleRecords(persisted, buffered, null);
+  const match = merged.find((entry) => entry.id === id);
+  return match ?? null;
 }
 
 type GetTrainingTraceExportOptions = {
@@ -209,20 +216,11 @@ export function getTrainingTraceExport(
     rawLimit === undefined || rawLimit === null || Number.isNaN(rawLimit)
       ? null
       : Math.max(1, Math.floor(rawLimit));
-  if (AUDIT_PERSIST_ENABLED) {
-    const persisted = readPersistedTraces(
-      limit ?? Number.MAX_SAFE_INTEGER,
-      normalizedTenant,
-    );
-    if (persisted.length > 0) {
-      return persisted;
-    }
-  }
-  const filtered = sortBySequence(filterByTenant(traceBuffer, normalizedTenant));
-  if (!limit) {
-    return filtered.slice();
-  }
-  return filtered.slice(-limit);
+  const persisted = AUDIT_PERSIST_ENABLED
+    ? readPersistedTraces(limit ?? Number.MAX_SAFE_INTEGER, normalizedTenant)
+    : [];
+  const buffered = filterByTenant(traceBuffer, normalizedTenant);
+  return mergeVisibleRecords(persisted, buffered, limit);
 }
 
 export function getTrainingTraceLogPath(): string {
@@ -232,6 +230,32 @@ export function getTrainingTraceLogPath(): string {
 export function __resetTrainingTraceStore(): void {
   traceBuffer.length = 0;
 }
+
+
+const toEvolutionTrainingConstraint = (firstFail: unknown): TrainingTraceConstraint | undefined => {
+  if (!firstFail || typeof firstFail !== "object") return undefined;
+  const candidate = firstFail as Record<string, unknown>;
+  const parsedValue =
+    typeof candidate.value === "number" && Number.isFinite(candidate.value)
+      ? candidate.value
+      : candidate.value === null
+        ? null
+        : undefined;
+  const parsedLimit =
+    typeof candidate.limit === "string"
+      ? candidate.limit
+      : candidate.limit === null
+        ? null
+        : undefined;
+  return {
+    id: typeof candidate.id === "string" ? candidate.id : "EVOLUTION_FIRST_FAIL_UNKNOWN",
+    severity: typeof candidate.severity === "string" ? candidate.severity : undefined,
+    status: typeof candidate.status === "string" ? candidate.status : undefined,
+    value: parsedValue,
+    limit: parsedLimit,
+    note: typeof candidate.note === "string" ? candidate.note : "source=evolution.gate",
+  };
+};
 
 
 export function recordEvolutionTrace(input: {
@@ -244,10 +268,27 @@ export function recordEvolutionTrace(input: {
 }): TrainingTraceRecord {
   return recordTrainingTrace({
     traceId: input.traceId,
+    source: { system: "evolution", component: "gate", tool: "evolution.gate", version: "1" },
     pass: input.pass,
-    firstFail: input.firstFail as any,
-    deltas: typeof input.score === "number" ? [{ key: "evolution_congruence_score", from: null, to: input.score, delta: input.score, unit: "score", change: "added" }] : [],
-    notes: ["source=evolution.gate", `verdict=${input.verdict}`, ...(input.artifacts ?? []).map((a) => `artifact:${a.kind}=${a.ref}`)],
+    firstFail: toEvolutionTrainingConstraint(input.firstFail),
+    deltas:
+      typeof input.score === "number"
+        ? [
+            {
+              key: "evolution_congruence_score",
+              from: null,
+              to: input.score,
+              delta: input.score,
+              unit: "score",
+              change: "added",
+            },
+          ]
+        : [],
+    notes: [
+      "source=evolution.gate",
+      `verdict=${input.verdict}`,
+      ...(input.artifacts ?? []).map((a) => `artifact:${a.kind}=${a.ref}`),
+    ],
   });
 }
 const clampLimit = (value?: number): number => {

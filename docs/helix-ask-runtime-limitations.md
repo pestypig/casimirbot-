@@ -254,3 +254,15 @@ To scale beyond ~1 request at a time, move inference off CPU (GPU or hosted mode
 
 An optional report-only CI hook may emit `artifacts/evolution-gate-report.json` via `POST /api/evolution/gate/run`.
 This hook is additive and must not replace or weaken mandatory Casimir verify behavior in CI.
+
+
+## Evolution governance storage limits
+| Constraint | Default | Control | Behavior |
+| --- | --- | --- | --- |
+| Evolution patch JSONL retention | 1,000 lines | `EVOLUTION_PATCH_RETENTION_MAX` | Keeps newest records and rotates oldest lines after append. |
+| Evolution write payload bound | 65,536 bytes | `EVOLUTION_MAX_BODY_BYTES` | Rejects write endpoints with deterministic `EVOLUTION_PAYLOAD_TOO_LARGE`. |
+
+Evolution trajectory parsing is stable under partial/corrupt JSONL lines:
+- invalid lines are ignored (not fatal),
+- valid records are sorted by timestamp for deterministic replay order,
+- trajectory lookups remain additive and non-breaking for existing consumers.

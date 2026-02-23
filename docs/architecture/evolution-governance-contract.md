@@ -16,8 +16,8 @@ All `/api/evolution` decision endpoints MUST return this envelope:
     "id": "TAXONOMY_ID",
     "severity": "HARD|SOFT",
     "status": "fail|warn|pass",
-    "value": "string|number|null",
-    "limit": "string|number|null",
+    "value": "number|null",
+    "limit": "string|null",
     "note": "stable-classification-notes"
   },
   "deltas": [{ "id": "metric_id", "before": 0, "after": 0, "delta": 0 }],
@@ -29,6 +29,7 @@ All `/api/evolution` decision endpoints MUST return this envelope:
 - Stable taxonomy IDs and ordering.
 - Stable serialization keys and sorting for arrays.
 - `firstFail` is either `null` or the first failed HARD constraint by deterministic order.
+- `firstFail.value` MUST be `number|null` and `firstFail.limit` MUST be `string|null` for compatibility with training-trace constraint schema.
 
 ## Additive endpoint contracts
 
