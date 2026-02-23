@@ -140,13 +140,56 @@ def main():
         os.makedirs(status_dir, exist_ok=True)
 
     data_root = os.environ.get("KNOWLEDGE_AUDIO_DIR", "external/audiocraft/data/knowledge_audio")
+    data_root_path = Path(data_root).expanduser()
+    try:
+        data_root_resolved = str(data_root_path.resolve())
+    except Exception:
+        data_root_resolved = str(data_root_path)
+    manifest_path = data_root_path / "voice_dataset_manifest.json"
+    audio_exts = {".wav", ".mp3", ".flac", ".ogg"}
+    discovered_files = sorted(
+        [p for p in data_root_path.rglob("*") if p.is_file() and p.suffix.lower() in audio_exts]
+    ) if data_root_path.exists() else []
+    print(f"[train] knowledge_audio_dir={data_root_resolved}")
+    print(f"[train] discovered_audio_files={len(discovered_files)}")
+    if discovered_files:
+        preview = ", ".join(str(p.name) for p in discovered_files[:3])
+        print(f"[train] discovered_audio_preview={preview}")
+    if manifest_path.exists():
+        try:
+            manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest_entries = (
+                len(manifest_payload.get("entries", []))
+                if isinstance(manifest_payload, dict)
+                else "unknown"
+            )
+        except Exception as exc:
+            manifest_entries = f"parse_error:{exc}"
+        print(f"[train] manifest_path={manifest_path}")
+        print(f"[train] manifest_entries={manifest_entries}")
+    else:
+        print(f"[train] manifest_path_missing={manifest_path}")
+
     dataset = KnowledgeAudioDataset(root=data_root)
+    print(f"[train] dataset_audio_files={len(dataset.files)}")
+    print(f"[train] dataset_items={len(dataset)}")
     if len(dataset) == 0:
         msg = f"[train] No audio found in {data_root}; aborting."
         print(msg, flush=True)
         with open(status_path, "w", encoding="utf-8") as f:
             json.dump(
-                {"status": "error", "message": msg, "timestamp": time.time()},
+                {
+                    "status": "error",
+                    "message": msg,
+                    "timestamp": time.time(),
+                    "details": {
+                        "knowledgeAudioDir": data_root_resolved,
+                        "discoveredAudioFiles": len(discovered_files),
+                        "datasetAudioFiles": len(dataset.files),
+                        "datasetItems": len(dataset),
+                        "manifestPath": str(manifest_path),
+                    },
+                },
                 f,
             )
         sys.exit(1)
