@@ -1,4 +1,5 @@
 export const SPEED_OF_LIGHT_M_S = 299_792_458;
+export const WARP_TS_RATIO_MIN = 1.5;
 
 export type ClockingSnapshot = {
   tauLC_ms: number | null;
@@ -135,7 +136,7 @@ export function computeClocking(
 }
 
 
-export function evaluateTsRatioGate(tsRatio: number | null | undefined, min = 1.5) {
+export function evaluateTsRatioGate(tsRatio: number | null | undefined, min = WARP_TS_RATIO_MIN) {
   const value = Number(tsRatio);
   if (!Number.isFinite(value) || value <= 0) {
     return { pass: false, status: "fail" as const, detail: "TS ratio missing or non-positive" };

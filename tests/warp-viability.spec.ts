@@ -480,7 +480,47 @@ describe("warp viability congruence wiring", () => {
   });
 
   // restore the caller environment for subsequent tests
-  afterAll(() => {
+  
+
+  it("fails closed in strict mode when Natário contract metadata is incomplete", async () => {
+    runtime.pipeline = makePipeline({
+      warp: {
+        metricT00: -100,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.natario.shift",
+        metricT00Observer: undefined,
+        metricT00Normalization: "si_stress",
+        metricT00UnitSystem: "SI",
+        metricT00ContractStatus: "ok",
+        metricAdapter: {
+          family: "natario",
+          chart: { label: "comoving_cartesian", contractStatus: "ok" },
+          betaDiagnostics: { thetaMax: 0.5, method: "finite-diff" },
+        },
+      },
+    });
+
+    const result = await evaluateWarpViability({});
+    expect((result.snapshot as any).rho_delta_metric_contract_ok).toBe(false);
+    const cl3 = result.constraints.find((c) => c.id === "CL3_RhoDelta");
+    expect(cl3?.details ?? "").toContain("contract=");
+  });
+
+  it("prevents certified promotion when QI applicability is not PASS", async () => {
+    runtime.pipeline = makePipeline({
+      qiGuardrail: {
+        marginRatio: 0.2,
+        lhs_Jm3: -1,
+        bound_Jm3: -5,
+        rhoSource: "warp.metric.T00.natario.shift",
+        applicabilityStatus: "NOT_APPLICABLE",
+      },
+    });
+    const result = await evaluateWarpViability({});
+    expect((result.snapshot as any).warp_mechanics_claim_tier).toBe("diagnostic");
+    expect((result.snapshot as any).qi_applicability_status).toBe("NOT_APPLICABLE");
+  });
+afterAll(() => {
     process.env.WARP_STRICT_CONGRUENCE = strictEnv;
   });
 });

@@ -1,0 +1,8 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`audience mode > matches audience snapshots 1`] = `
+{
+  "academic": "proxy-derived (pipeline)",
+  "public": "operational estimate",
+}
+`;

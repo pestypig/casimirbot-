@@ -416,4 +416,47 @@ describe("deriveQiStatus", () => {
     expect(green).toBe("green");
     expect(muted).toBe("muted");
   });
+
+
+  test("reports NOT_APPLICABLE when curvature-window assumptions are violated", () => {
+    const sectorPeriod_ms = 1;
+    const tau_ms = 10;
+    const schedule = makeSchedule(1, [0], sectorPeriod_ms, tau_ms);
+    const scheduleGuard: PhaseSchedule = {
+      phi_deg_by_sector: schedule.phi_deg_by_sector,
+      negSectors: schedule.negSectors,
+      posSectors: schedule.posSectors,
+      weights: schedule.weights ?? Array.from({ length: schedule.N }, () => 1),
+    };
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 5,
+        dutyShip: 5,
+        dutyEffective_FR: 5,
+        gr: { invariants: { kretschmann: { p98: 1e20 } } },
+      }),
+      { schedule: scheduleGuard, sectorPeriod_ms, tau_ms },
+    );
+    expect(guard.curvatureOk).toBe(false);
+    expect(guard.applicabilityStatus).toBe("NOT_APPLICABLE");
+  });
+
+  test("reports PASS applicability when curvature-window assumptions are satisfied", () => {
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 5,
+        dutyShip: 5,
+        dutyEffective_FR: 5,
+        gr: { invariants: { kretschmann: { p98: 1e-32 } } },
+      }),
+      { tau_ms: 1 },
+    );
+    expect(guard.curvatureOk).toBe(true);
+    expect(guard.applicabilityStatus).toBe("PASS");
+  });
+
+  test("reports UNKNOWN applicability when curvature invariants are unavailable", () => {
+    const guard = evaluateQiGuardrail(makeState({ dutyCycle: 5, dutyShip: 5, dutyEffective_FR: 5 }), { tau_ms: 1 });
+    expect(guard.applicabilityStatus).toBe("UNKNOWN");
+  });
 });

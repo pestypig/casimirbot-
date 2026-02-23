@@ -216,9 +216,31 @@ describe("pipeline ts/qi autoscale integration", () => {
       warpSpy.mockRestore();
     }
   });
+
+
+  it("emits QI applicability and repayment heuristic labels", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
+    const snapshot = await calculateEnergyPipeline(initializePipelineState());
+    const app = String((snapshot as any).qiGuardrail?.applicabilityStatus ?? "UNKNOWN");
+    expect(["PASS", "NOT_APPLICABLE", "UNKNOWN"]).toContain(app);
+    expect((snapshot as any).qi?.repayment_label).toBe("repayment_heuristic");
+  });
 });
 
 
+
+
+  it("emits explicit Natário contract metadata fields in strict mode", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
+    const snapshot = await calculateEnergyPipeline(initializePipelineState());
+    expect((snapshot as any).warp?.metricT00Observer).toBeTruthy();
+    expect((snapshot as any).warp?.metricT00Normalization).toBeTruthy();
+    expect((snapshot as any).warp?.metricT00UnitSystem).toBe("SI");
+    expect((snapshot as any).warp?.metricAdapter?.chart?.label).toBeTruthy();
+    expect((snapshot as any).warp?.metricAdapter?.chart?.contractStatus).toBeTruthy();
+  });
 describe("sector-control adapter hooks", () => {
   it("tracks monotonic QI behavior vs tau", async () => {
     const { fordRomanBound, isQiBoundMonotoneByTau } = await import("../server/qi/qi-bounds");

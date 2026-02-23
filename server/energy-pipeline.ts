@@ -6253,6 +6253,8 @@ function updateQiTelemetry(state: EnergyPipelineState) {
         ...(lrlTelemetry ?? {}),
       };
   const interest = computeQuantumInterestBook(state);
+  // Reduced-order only: repayment bookkeeping is heuristic unless theorem-mapped for the active regime.
+  (stats as any).repayment_label = "repayment_heuristic";
   if (interest) {
     state.qiInterest = interest;
     stats.interestRate = interest.rate;
@@ -6263,6 +6265,7 @@ function updateQiTelemetry(state: EnergyPipelineState) {
     stats.interestNetCycle = interest.netCycle_Jm3;
     stats.interestNeg = interest.neg_Jm3;
     stats.interestPos = interest.pos_Jm3;
+    (stats as any).repayment_label = "repayment_heuristic";
   } else {
     state.qiInterest = null;
   }
@@ -7210,6 +7213,7 @@ export function evaluateQiGuardrail(
   curvatureSource?: string;
   curvatureNote?: string;
   curvatureEnforced?: boolean;
+  applicabilityStatus?: "PASS" | "FAIL" | "NOT_APPLICABLE" | "UNKNOWN";
   metricDerived?: boolean;
   metricDerivedSource?: string;
   metricDerivedReason?: string;
@@ -7268,6 +7272,14 @@ export function evaluateQiGuardrail(
   const curvatureOk = curvatureInfo.ok;
   const curvatureNote = curvatureInfo.note;
   const curvatureEnforced = QI_CURVATURE_ENFORCE;
+  const applicabilityStatus: "PASS" | "FAIL" | "NOT_APPLICABLE" | "UNKNOWN" =
+    curvatureRatio == null
+      ? "UNKNOWN"
+      : curvatureOk === false
+        ? "NOT_APPLICABLE"
+        : curvatureOk === true
+          ? "PASS"
+          : "UNKNOWN";
   const dt_s = pattern.dt_s;
   const sumWindowDt = pattern.window.reduce((acc, v) => acc + v * dt_s, 0);
   let lhs = 0;
@@ -7366,6 +7378,7 @@ export function evaluateQiGuardrail(
     curvatureSource: curvatureInfo.source,
     curvatureNote,
     curvatureEnforced,
+    applicabilityStatus,
     metricDerived,
     metricDerivedSource,
     metricDerivedReason,
