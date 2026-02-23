@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -110,6 +111,13 @@ def main() -> int:
     }
 
     try:
+        # Start from clean outputs by default to avoid stale report artifacts.
+        if os.environ.get("CLEAR_PREVIOUS_ARTIFACTS", "1") == "1":
+            report["first_failed_step"] = "reset_outputs"
+            for path in (MANIFEST_PATH, STATUS_PATH, CKPT_PATH):
+                if path.exists():
+                    path.unlink()
+
         # Optional sync for environments with network access.
         if os.environ.get("RUN_GIT_SYNC", "0") == "1":
             report["first_failed_step"] = "git_fetch"
@@ -124,14 +132,18 @@ def main() -> int:
         report["head_commit"] = cp.stdout.strip()
 
         # GPU detection (non-fatal).
-        nvidia = subprocess.run(
-            ["nvidia-smi"],
-            cwd=str(REPO_ROOT),
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        report["gpu_available"] = nvidia.returncode == 0
+        report["first_failed_step"] = "gpu_probe"
+        if shutil.which("nvidia-smi") is None:
+            report["gpu_available"] = False
+        else:
+            nvidia = subprocess.run(
+                ["nvidia-smi"],
+                cwd=str(REPO_ROOT),
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            report["gpu_available"] = nvidia.returncode == 0
 
         # Audio preflight.
         report["first_failed_step"] = "audio_preflight"
