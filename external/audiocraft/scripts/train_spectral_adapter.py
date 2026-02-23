@@ -45,6 +45,7 @@ if not hasattr(pytree, "register_pytree_node") and hasattr(pytree, "_register_py
 from audiocraft.models import MusicGen
 from audiocraft.modules.transformer import set_efficient_attention_backend
 from audiocraft.modules.spectral_block import SpectralBlock
+from audiocraft.modules.conditioners import ConditioningAttributes
 
 
 # ---------- Dataset stubs ----------
@@ -224,7 +225,19 @@ def main():
             # Run LM on dummy codes until EnCodec integration is added
             fake_codes = torch.randint(0, lm.card, (1, lm.num_codebooks, 64), device=device)
 
-            conditions = []  # replace with ConditioningAttributes built from prompt/metadata
+            # MusicGen LM expects cross-attention conditioning when using text-conditioned checkpoints.
+            # Provide a minimal per-sample text condition so the fuser can build cross-attention tensors.
+            prompt_list: List[str]
+            if isinstance(_prompt, (list, tuple)):
+                prompt_list = [str(p) for p in _prompt]
+            else:
+                prompt_list = [str(_prompt)]
+            if len(prompt_list) < fake_codes.shape[0]:
+                prompt_list.extend(["knowledge audio"] * (fake_codes.shape[0] - len(prompt_list)))
+            conditions = [
+                ConditioningAttributes(text={"description": prompt_list[i] if prompt_list[i] else "knowledge audio"})
+                for i in range(fake_codes.shape[0])
+            ]
 
             lm_out = lm.compute_predictions(codes=fake_codes, conditions=conditions)
             logits = lm_out.logits  # [B, K, T, card]
