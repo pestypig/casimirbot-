@@ -162,6 +162,11 @@ def main() -> int:
         # Bootstrap owns install + prepare + train.
         report["first_failed_step"] = "bootstrap_colab_train"
         env = os.environ.copy()
+        env["AUDIO_PATH"] = env.get("AUDIO_PATH", "data/knowledge_audio_source/auntie_dottie.flac")
+        env["SOURCE_DIR"] = env.get("SOURCE_DIR", "data/knowledge_audio_source")
+        env["KNOWLEDGE_SOURCE_DIR"] = env.get("KNOWLEDGE_SOURCE_DIR", env["SOURCE_DIR"])
+        env["KNOWLEDGE_AUDIO_DIR"] = env.get("KNOWLEDGE_AUDIO_DIR", "external/audiocraft/data/knowledge_audio")
+        env["TRAIN_STATUS_PATH"] = env.get("TRAIN_STATUS_PATH", "external/audiocraft/checkpoints/train_status.json")
         env["EFFICIENT_ATTENTION_BACKEND"] = env.get("EFFICIENT_ATTENTION_BACKEND", "torch")
         _run("bootstrap_colab_train", ["bash", str(BOOTSTRAP_PATH)], env=env)
 
@@ -194,7 +199,8 @@ def main() -> int:
     except subprocess.CalledProcessError as exc:
         report["objective_status"] = "failed"
         report["root_cause"] = (
-            f"command failed ({exc.returncode}): {' '.join(exc.cmd)} | stderr_tail={_tail(exc.stderr)}"
+            f"command failed ({exc.returncode}): {' '.join(exc.cmd)} | "
+            f"stdout_tail={_tail(exc.stdout)} | stderr_tail={_tail(exc.stderr)}"
         )
         report["next_unblock_action"] = "fix first_failed_step command and rerun"
     except Exception as exc:  # noqa: BLE001

@@ -28,8 +28,16 @@ python scripts/voice/run_colab_train.py
 ## Optional flags/env
 
 - `RUN_GIT_SYNC=1` to force in-script `git fetch/checkout/pull`.
+- `CLEAR_PREVIOUS_ARTIFACTS=1` (default) removes stale manifest/status/checkpoint
+  before each run.
 - `EFFICIENT_ATTENTION_BACKEND=torch` is the expected default.
 - `RUN_PREPARE=0` or `RUN_TRAIN=0` are passed through to bootstrap when needed.
+- `AUDIO_PATH=data/knowledge_audio_source/auntie_dottie.flac` selects the source
+  file used for preflight checks.
+- `KNOWLEDGE_SOURCE_DIR=data/knowledge_audio_source` is passed explicitly to
+  prepare so source discovery cannot drift from shell defaults.
+- `KNOWLEDGE_AUDIO_DIR=external/audiocraft/data/knowledge_audio` sets the staged
+  dataset output path and is validated before training starts.
 
 ## Required input
 
