@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1.7
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/casimirbot-
+
+# Copy only the files needed by the training harness.
+COPY external/audiocraft/ /workspace/casimirbot-/external/audiocraft/
+COPY data/knowledge_audio_source/ /workspace/casimirbot-/data/knowledge_audio_source/
+
+RUN python -m pip install --upgrade pip setuptools wheel && \
+    python -m pip install -e /workspace/casimirbot-/external/audiocraft && \
+    python -m pip install google-cloud-storage
+
+COPY docker/voice-train/run_voice_train.sh /usr/local/bin/run_voice_train
+RUN chmod +x /usr/local/bin/run_voice_train
+
+ENV REPO_ROOT="/workspace/casimirbot-" \
+    PYTHONPATH="/workspace/casimirbot-/external/audiocraft:${PYTHONPATH}"
+
+ENTRYPOINT ["/usr/local/bin/run_voice_train"]

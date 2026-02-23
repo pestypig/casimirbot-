@@ -1,0 +1,88 @@
+name: Voice Train (Vertex AI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      gcp_region:
+        description: "GCP region for Artifact Registry and Vertex AI job"
+        required: false
+        default: "us-central1"
+      artifact_repository:
+        description: "Artifact Registry repository name (Docker)"
+        required: false
+        default: "casimir-voice-train"
+      machine_type:
+        description: "Vertex worker machine type"
+        required: false
+        default: "g2-standard-8"
+      accelerator_type:
+        description: "Vertex accelerator type"
+        required: false
+        default: "NVIDIA_TESLA_T4"
+      accelerator_count:
+        description: "Vertex accelerator count"
+        required: false
+        default: "1"
+      vertex_gcs_output_uri:
+        description: "Optional gs://bucket/prefix for checkpoint + logs upload"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  submit-vertex-job:
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ inputs.gcp_region }}
+      GCP_ARTIFACT_REPOSITORY: ${{ inputs.artifact_repository }}
+      MACHINE_TYPE: ${{ inputs.machine_type }}
+      ACCELERATOR_TYPE: ${{ inputs.accelerator_type }}
+      ACCELERATOR_COUNT: ${{ inputs.accelerator_count }}
+      VERTEX_GCS_OUTPUT_URI: ${{ inputs.vertex_gcs_output_uri }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (OIDC/WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Setup gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Preflight checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${GCP_PROJECT_ID:?missing GCP_PROJECT_ID secret}"
+          : "${GCP_REGION:?missing GCP region input}"
+          : "${GCP_ARTIFACT_REPOSITORY:?missing Artifact Registry repository input}"
+          test -f data/knowledge_audio_source/auntie_dottie.flac
+          [ "$(wc -c < data/knowledge_audio_source/auntie_dottie.flac)" -gt 5000000 ]
+          ! grep -q "git-lfs.github.com/spec/v1" data/knowledge_audio_source/auntie_dottie.flac
+          command -v docker
+          docker --version
+          gcloud --version
+
+      - name: Submit Vertex custom training job
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/voice/submit_vertex_voice_train.sh
+          scripts/voice/submit_vertex_voice_train.sh
+
+      - name: Upload Vertex submission artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vertex-voice-train-job
+          path: artifacts/vertex-custom-job.json
+          if-no-files-found: warn

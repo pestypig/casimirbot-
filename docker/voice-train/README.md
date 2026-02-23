@@ -44,3 +44,14 @@ docker run --rm --gpus all \
   -v "$PWD:/workspace/casimirbot-" \
   casimir-voice-train:latest
 ```
+
+## Vertex AI container variant
+
+For offloaded training without repo bind mounts, use:
+
+```bash
+docker build -f docker/voice-train/Dockerfile.vertex -t casimir-voice-train:vertex .
+```
+
+The Vertex workflow (`.github/workflows/voice-train-vertex.yml`) builds and
+pushes this image to Artifact Registry, then submits a Vertex CustomJob.

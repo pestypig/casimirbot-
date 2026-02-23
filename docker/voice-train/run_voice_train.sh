@@ -9,6 +9,7 @@ MANIFEST_PATH="${MANIFEST_PATH:-${KNOWLEDGE_AUDIO_DIR}/voice_dataset_manifest.js
 TRAIN_STATUS_PATH="${TRAIN_STATUS_PATH:-${REPO_ROOT}/external/audiocraft/checkpoints/train_status.json}"
 CHECKPOINT_PATH="${CHECKPOINT_PATH:-${REPO_ROOT}/checkpoints/tts_voice_train_musicgen_small.pt}"
 LOG_PATH="${LOG_PATH:-${REPO_ROOT}/artifacts/docker_voice_train.log}"
+VERTEX_GCS_OUTPUT_URI="${VERTEX_GCS_OUTPUT_URI:-}"
 
 mkdir -p "$(dirname "${LOG_PATH}")" \
   "$(dirname "${TRAIN_STATUS_PATH}")" \
@@ -53,6 +54,42 @@ if [[ -z "${FAILED_STEP}" ]]; then
     KNOWLEDGE_AUDIO_DIR="${KNOWLEDGE_AUDIO_DIR}" \
     TRAIN_JOB_TYPE="tts_voice_train" \
     python "${REPO_ROOT}/external/audiocraft/scripts/train_spectral_adapter.py"
+fi
+
+if [[ -z "${FAILED_STEP}" && -n "${VERTEX_GCS_OUTPUT_URI}" ]]; then
+  run_step "upload_vertex_artifacts" python - <<PY
+import os
+from pathlib import Path
+
+from google.cloud import storage
+
+uri = ${VERTEX_GCS_OUTPUT_URI@Q}
+if not uri.startswith("gs://"):
+    raise SystemExit(f"VERTEX_GCS_OUTPUT_URI must start with gs://, got {uri}")
+bucket_and_prefix = uri[len("gs://"):]
+bucket_name, _, prefix = bucket_and_prefix.partition("/")
+prefix = prefix.strip("/")
+
+client = storage.Client()
+bucket = client.bucket(bucket_name)
+
+files = [
+    Path(${MANIFEST_PATH@Q}),
+    Path(${TRAIN_STATUS_PATH@Q}),
+    Path(${CHECKPOINT_PATH@Q}),
+    Path(${LOG_PATH@Q}),
+]
+uploaded = []
+for path in files:
+    if not path.exists():
+        continue
+    target = f"{prefix}/{path.name}" if prefix else path.name
+    blob = bucket.blob(target)
+    blob.upload_from_filename(str(path))
+    uploaded.append(f"gs://{bucket_name}/{target}")
+
+print("Uploaded:", *uploaded, sep="\\n- ")
+PY
 fi
 
 python - <<PY
@@ -112,6 +149,7 @@ print("checkpoint_path:", ckpt)
 print("checkpoint_exists:", ckpt.exists())
 print("checkpoint_size_bytes:", ckpt.stat().st_size if ckpt.exists() else "N/A")
 print("checkpoint_sha256:", sha256(ckpt) if ckpt.exists() else "N/A")
+print("vertex_gcs_output_uri:", ${VERTEX_GCS_OUTPUT_URI@Q} if ${VERTEX_GCS_OUTPUT_URI@Q} else "none")
 if log.exists():
     lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
     print("log_tail_begin")
