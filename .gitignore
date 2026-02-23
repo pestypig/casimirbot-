@@ -5,6 +5,8 @@ server/public
 vite.config.ts.*
 *.tar.gz
 data/
+!external/audiocraft/audiocraft/data/
+!external/audiocraft/audiocraft/data/**
 !data/noisegen/
 data/noisegen/*
 !data/noisegen/store.json
