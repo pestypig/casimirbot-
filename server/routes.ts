@@ -34,6 +34,7 @@ import { tokamakRouter } from "./routes/physics.tokamak";
 import { collapseBenchmarksRouter } from "./routes/benchmarks.collapse";        
 import { grAgentRouter } from "./routes/gr-agent";
 import { trainingTraceRouter } from "./routes/training-trace";
+import { evolutionRouter } from "./routes/evolution";
 import { adapterRouter } from "./routes/agi.adapter";
 import { constraintPacksRouter } from "./routes/agi.constraint-packs";
 import { chatRouter } from "./routes/agi.chat";
@@ -159,6 +160,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/dev-terminal", devTerminalRouter);
   app.use("/api/voice", voiceRouter);
   app.use("/api/mission-board", missionBoardRouter);
+  app.use("/api/evolution", evolutionRouter);
 
   if (!fastBoot) {
     const { knowledgeRouter } = await import("./routes/knowledge");

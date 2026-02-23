@@ -250,3 +250,7 @@ To scale beyond ~1 request at a time, move inference off CPU (GPU or hosted mode
 - Local-only mission mode is the default safety posture for production-core callouts.
 - Disabling managed providers must not break critical mission synthesis paths.
 - When managed fallback is enabled, outages must degrade to deterministic non-critical errors without impacting local core operation.
+## Evolution governance runtime note (report-only CI hook)
+
+An optional report-only CI hook may emit `artifacts/evolution-gate-report.json` via `POST /api/evolution/gate/run`.
+This hook is additive and must not replace or weaken mandatory Casimir verify behavior in CI.

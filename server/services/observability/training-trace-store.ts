@@ -233,6 +233,23 @@ export function __resetTrainingTraceStore(): void {
   traceBuffer.length = 0;
 }
 
+
+export function recordEvolutionTrace(input: {
+  traceId: string;
+  pass: boolean;
+  verdict: string;
+  firstFail?: unknown;
+  score?: number;
+  artifacts?: Array<{ kind: string; ref: string }>;
+}): TrainingTraceRecord {
+  return recordTrainingTrace({
+    traceId: input.traceId,
+    pass: input.pass,
+    firstFail: input.firstFail as any,
+    deltas: typeof input.score === "number" ? [{ key: "evolution_congruence_score", from: null, to: input.score, delta: input.score, unit: "score", change: "added" }] : [],
+    notes: ["source=evolution.gate", `verdict=${input.verdict}`, ...(input.artifacts ?? []).map((a) => `artifact:${a.kind}=${a.ref}`)],
+  });
+}
 const clampLimit = (value?: number): number => {
   const fallback = 25;
   if (value === undefined || value === null || Number.isNaN(value)) {
