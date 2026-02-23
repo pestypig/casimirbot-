@@ -14,6 +14,23 @@ This runbook is the reproducible path for Python 3.12 Colab sessions where
   and runs prepare/train using torch attention backend.
 - `scripts/voice/run_colab_train.py` orchestrates bootstrap + artifact checks
   and always emits a deterministic final `=== COLAB TRAIN REPORT ===` block.
+- `external/audiocraft/scripts/train_spectral_adapter.py` now includes CPU smoke
+  lane stabilization:
+  - force LM to `float32` on CPU (`cpu_mode_cast=float32`)
+  - sanitize non-finite logits (`nan_to_num`) and clamp CPU logits before CE
+  - deterministic hard-fail on non-finite loss with status artifact emission
+
+## Latest reproducible baseline (2026-02-23)
+
+- Repo head: `6442a579`
+- Result: `objective_status: completed` on CPU Colab smoke lane
+- Final training status:
+  - `status: completed`
+  - `loss: 9.698966026306152` (finite)
+  - `checkpoint: checkpoints/tts_voice_train_musicgen_small.pt`
+  - `checkpoint_sha256: 64242758c67eff5e2c3a54f96a33ec5b08b182a98f5c2ab286c7aa3897ec8e86`
+
+Use this baseline for regression checks when the lane changes.
 
 ## Colab usage
 
@@ -24,11 +41,14 @@ cd /content
 rm -rf casimirbot-
 git clone https://github.com/pestypig/casimirbot-.git
 cd casimirbot-
-EXPECTED_HEAD=38017ff9 bash scripts/voice/colab_run_once.sh
+EXPECTED_HEAD=6442a579 bash scripts/voice/colab_run_once.sh
 ```
 
 This avoids Python-in-bash quoting errors and enforces a fresh sync before
 running training.
+
+Note: if you compare short SHAs manually, use `git rev-parse --short=8 HEAD`.
+`git rev-parse --short HEAD` may emit 7 chars and cause false mismatches.
 
 ### Manual sequence
 
@@ -76,6 +96,18 @@ python scripts/voice/run_colab_train.py
 - `external/audiocraft/data/knowledge_audio/voice_dataset_manifest.json`
 - `external/audiocraft/checkpoints/train_status.json`
 - `checkpoints/tts_voice_train_musicgen_small.pt`
+
+## Reproducibility gates (must pass)
+
+- `=== COLAB TRAIN REPORT ===` exists and reports:
+  - `objective_status: completed`
+  - `first_failed_step: none`
+  - `root_cause: none`
+- `external/audiocraft/checkpoints/train_status.json` exists and reports:
+  - `status: completed`
+  - finite numeric `loss` (not `NaN`, not `Inf`)
+- `checkpoints/tts_voice_train_musicgen_small.pt` exists and is non-empty
+- If `status: completed` with non-finite loss, treat as failure/regression
 
 
 ## Production boundary
