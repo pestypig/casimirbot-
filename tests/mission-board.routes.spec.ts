@@ -144,6 +144,24 @@ describe("mission board routes", () => {
     expect(ack.body.snapshot.status).toBe("active");
   });
 
+  it("meets lightweight snapshot/events latency budget", async () => {
+    const app = buildApp();
+    const missionId = uniqueMissionId();
+
+    const snapshotStart = Date.now();
+    const snapshot = await request(app).get(`/api/mission-board/${missionId}`);
+    const snapshotLatencyMs = Date.now() - snapshotStart;
+
+    const eventsStart = Date.now();
+    const events = await request(app).get(`/api/mission-board/${missionId}/events`).query({ limit: 10 });
+    const eventsLatencyMs = Date.now() - eventsStart;
+
+    expect(snapshot.status).toBe(200);
+    expect(events.status).toBe(200);
+    expect(snapshotLatencyMs).toBeLessThan(250);
+    expect(eventsLatencyMs).toBeLessThan(250);
+  });
+
   it("returns deterministic invalid request envelope", async () => {
     const app = buildApp();
     const missionId = uniqueMissionId();

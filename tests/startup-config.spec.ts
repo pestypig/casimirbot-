@@ -21,6 +21,32 @@ describe("resolveStartupConfig", () => {
     expect(cfg.host).toBe("0.0.0.0");
   });
 
+
+
+  it("parses voice provider governance defaults and env overrides", () => {
+    const defaults = resolveStartupConfig({}, "development");
+    expect(defaults.voiceGovernance.providerMode).toBe("allow_remote");
+    expect(defaults.voiceGovernance.providerAllowlist).toEqual([]);
+    expect(defaults.voiceGovernance.commercialMode).toBe(false);
+
+    const configured = resolveStartupConfig(
+      {
+        VOICE_PROVIDER_MODE: "local_only",
+        VOICE_PROVIDER_ALLOWLIST: "local-chatterbox,remote-a, remote-b",
+        VOICE_COMMERCIAL_MODE: "1",
+      },
+      "development",
+    );
+
+    expect(configured.voiceGovernance.providerMode).toBe("local_only");
+    expect(configured.voiceGovernance.providerAllowlist).toEqual([
+      "local-chatterbox",
+      "remote-a",
+      "remote-b",
+    ]);
+    expect(configured.voiceGovernance.commercialMode).toBe(true);
+  });
+
   it("falls back to environment default ports when PORT is invalid", () => {
     const prod = resolveStartupConfig({ PORT: "abc" }, "production");
     const dev = resolveStartupConfig({ PORT: "0", HOST: " " }, "development");

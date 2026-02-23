@@ -337,3 +337,60 @@ describe("Helix Ask live events", () => {
   }, 45000);
 
 });
+
+
+describe("mission voice mode controls", () => {
+  it("gates mission voice callouts using explicit UX controls", async () => {
+    const { shouldSpeakMissionEvent } = await import("../client/src/lib/mission-overwatch");
+
+    expect(
+      shouldSpeakMissionEvent({
+        controls: { voiceEnabled: false, criticalOnly: false, muteWhileTyping: false },
+        classification: "critical",
+        isUserTyping: false,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldSpeakMissionEvent({
+        controls: { voiceEnabled: true, criticalOnly: true, muteWhileTyping: false },
+        classification: "warn",
+        isUserTyping: false,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldSpeakMissionEvent({
+        controls: { voiceEnabled: true, criticalOnly: true, muteWhileTyping: false },
+        classification: "critical",
+        isUserTyping: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldSpeakMissionEvent({
+        controls: { voiceEnabled: true, criticalOnly: false, muteWhileTyping: true },
+        classification: "action",
+        isUserTyping: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps voice mode controls independent from text ask semantics", async () => {
+    const { shouldSpeakMissionEvent } = await import("../client/src/lib/mission-overwatch");
+    const forTextPipeline = {
+      source: "ask_text",
+      question: "Explain mission status",
+      expectedAnswerMode: "text-only",
+    };
+
+    expect(forTextPipeline.expectedAnswerMode).toBe("text-only");
+    expect(
+      shouldSpeakMissionEvent({
+        controls: { voiceEnabled: true, criticalOnly: false, muteWhileTyping: false },
+        classification: "info",
+        isUserTyping: false,
+      }),
+    ).toBe(true);
+  });
+});

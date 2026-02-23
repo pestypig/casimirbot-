@@ -2,7 +2,7 @@ import express from "express";
 import request from "supertest";
 import type { Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
-import { voiceRouter } from "../server/routes/voice";
+import { resetVoiceRouteState, voiceRouter } from "../server/routes/voice";
 
 const buildApp = () => {
   const app = express();
@@ -17,10 +17,17 @@ const uniqueId = (prefix: string) =>
 const ORIGINAL_ENV = {
   VOICE_PROXY_DRY_RUN: process.env.VOICE_PROXY_DRY_RUN,
   TTS_BASE_URL: process.env.TTS_BASE_URL,
+  VOICE_PROVIDER_MODE: process.env.VOICE_PROVIDER_MODE,
+  VOICE_PROVIDER_ALLOWLIST: process.env.VOICE_PROVIDER_ALLOWLIST,
+  VOICE_COMMERCIAL_MODE: process.env.VOICE_COMMERCIAL_MODE,
+  VOICE_BUDGET_MISSION_WINDOW_MS: process.env.VOICE_BUDGET_MISSION_WINDOW_MS,
+  VOICE_BUDGET_MISSION_MAX_REQUESTS: process.env.VOICE_BUDGET_MISSION_MAX_REQUESTS,
+  VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS: process.env.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS,
 };
 
 describe("voice routes", () => {
   afterEach(() => {
+    resetVoiceRouteState();
     if (ORIGINAL_ENV.VOICE_PROXY_DRY_RUN === undefined) {
       delete process.env.VOICE_PROXY_DRY_RUN;
     } else {
@@ -30,6 +37,36 @@ describe("voice routes", () => {
       delete process.env.TTS_BASE_URL;
     } else {
       process.env.TTS_BASE_URL = ORIGINAL_ENV.TTS_BASE_URL;
+    }
+    if (ORIGINAL_ENV.VOICE_PROVIDER_MODE === undefined) {
+      delete process.env.VOICE_PROVIDER_MODE;
+    } else {
+      process.env.VOICE_PROVIDER_MODE = ORIGINAL_ENV.VOICE_PROVIDER_MODE;
+    }
+    if (ORIGINAL_ENV.VOICE_PROVIDER_ALLOWLIST === undefined) {
+      delete process.env.VOICE_PROVIDER_ALLOWLIST;
+    } else {
+      process.env.VOICE_PROVIDER_ALLOWLIST = ORIGINAL_ENV.VOICE_PROVIDER_ALLOWLIST;
+    }
+    if (ORIGINAL_ENV.VOICE_COMMERCIAL_MODE === undefined) {
+      delete process.env.VOICE_COMMERCIAL_MODE;
+    } else {
+      process.env.VOICE_COMMERCIAL_MODE = ORIGINAL_ENV.VOICE_COMMERCIAL_MODE;
+    }
+    if (ORIGINAL_ENV.VOICE_BUDGET_MISSION_WINDOW_MS === undefined) {
+      delete process.env.VOICE_BUDGET_MISSION_WINDOW_MS;
+    } else {
+      process.env.VOICE_BUDGET_MISSION_WINDOW_MS = ORIGINAL_ENV.VOICE_BUDGET_MISSION_WINDOW_MS;
+    }
+    if (ORIGINAL_ENV.VOICE_BUDGET_MISSION_MAX_REQUESTS === undefined) {
+      delete process.env.VOICE_BUDGET_MISSION_MAX_REQUESTS;
+    } else {
+      process.env.VOICE_BUDGET_MISSION_MAX_REQUESTS = ORIGINAL_ENV.VOICE_BUDGET_MISSION_MAX_REQUESTS;
+    }
+    if (ORIGINAL_ENV.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS === undefined) {
+      delete process.env.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS;
+    } else {
+      process.env.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS = ORIGINAL_ENV.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS;
     }
   });
 
@@ -81,6 +118,44 @@ describe("voice routes", () => {
     expect(res.body.details?.providerConfigured).toBe(false);
   });
 
+  it("enforces local-only provider mode", async () => {
+    process.env.VOICE_PROVIDER_MODE = "local_only";
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Remote callout",
+      provider: "remote-tts",
+      traceId: "trace-local-only",
+    });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("voice_provider_not_allowed");
+    expect(res.body.traceId).toBe("trace-local-only");
+  });
+
+  it("enforces commercial allowlist when enabled", async () => {
+    process.env.VOICE_PROVIDER_MODE = "allow_remote";
+    process.env.VOICE_PROVIDER_ALLOWLIST = "local-chatterbox,remote-approved";
+    process.env.VOICE_COMMERCIAL_MODE = "1";
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const denied = await request(app).post("/api/voice/speak").send({
+      text: "Denied callout",
+      provider: "remote-denied",
+    });
+    expect(denied.status).toBe(403);
+    expect(denied.body.error).toBe("voice_provider_not_allowed");
+
+    const allowed = await request(app).post("/api/voice/speak").send({
+      text: "Allowed callout",
+      provider: "remote-approved",
+    });
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.ok).toBe(true);
+  });
+
   it("supports dry-run mode and suppresses dedupe duplicates", async () => {
     process.env.VOICE_PROXY_DRY_RUN = "1";
     delete process.env.TTS_BASE_URL;
@@ -115,6 +190,73 @@ describe("voice routes", () => {
     expect(second.body.reason).toBe("dedupe_cooldown");
   });
 
+  it("returns normalized metering in dry-run mode", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Meter this callout.",
+      missionId: uniqueId("mission-meter"),
+      durationMs: 1200,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.metering?.requestCount).toBe(1);
+    expect(res.body.metering?.charCount).toBe("Meter this callout.".length);
+    expect(res.body.metering?.durationMs).toBe(1200);
+  });
+
+  it("enforces mission and tenant voice budgets deterministically", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    process.env.VOICE_BUDGET_MISSION_WINDOW_MS = "60000";
+    process.env.VOICE_BUDGET_MISSION_MAX_REQUESTS = "2";
+    process.env.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS = "3";
+    const app = buildApp();
+    const missionId = uniqueId("mission-budget");
+
+    const first = await request(app)
+      .post("/api/voice/speak")
+      .set("x-tenant-id", "tenant-a")
+      .send({ text: "one", missionId, eventId: uniqueId("event") });
+    const second = await request(app)
+      .post("/api/voice/speak")
+      .set("x-tenant-id", "tenant-a")
+      .send({ text: "two", missionId, eventId: uniqueId("event") });
+    const missionBudget = await request(app)
+      .post("/api/voice/speak")
+      .set("x-tenant-id", "tenant-a")
+      .send({ text: "three", missionId, eventId: uniqueId("event") });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(missionBudget.status).toBe(429);
+    expect(missionBudget.body.error).toBe("voice_budget_exceeded");
+    expect(missionBudget.body.details?.scope).toBe("mission_window");
+
+    const tenantMissionA = await request(app)
+      .post("/api/voice/speak")
+      .set("x-tenant-id", "tenant-b")
+      .send({ text: "b-one", missionId: uniqueId("mission-b") });
+    const tenantMissionB = await request(app)
+      .post("/api/voice/speak")
+      .set("x-tenant-id", "tenant-b")
+      .send({ text: "b-two", missionId: uniqueId("mission-b") });
+    const tenantDaily = await request(app)
+      .post("/api/voice/speak")
+      .set("x-tenant-id", "tenant-b")
+      .send({ text: "b-three", missionId: uniqueId("mission-b") });
+    const tenantDailyExceeded = await request(app)
+      .post("/api/voice/speak")
+      .set("x-tenant-id", "tenant-b")
+      .send({ text: "b-four", missionId: uniqueId("mission-b") });
+
+    expect(tenantMissionA.status).toBe(200);
+    expect(tenantMissionB.status).toBe(200);
+    expect(tenantDaily.status).toBe(200);
+    expect(tenantDailyExceeded.status).toBe(429);
+    expect(tenantDailyExceeded.body.details?.scope).toBe("tenant_day");
+  });
+
   it("enforces mission-level rate cap for non-critical callouts", async () => {
     process.env.VOICE_PROXY_DRY_RUN = "1";
     delete process.env.TTS_BASE_URL;
@@ -139,6 +281,92 @@ describe("voice routes", () => {
     expect(second.status).toBe(200);
     expect(third.status).toBe(429);
     expect(third.body.error).toBe("voice_rate_limited");
+  });
+
+  it("opens deterministic circuit breaker after repeated backend failures", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "0";
+    const upstreamApp = express();
+    upstreamApp.use(express.json());
+    upstreamApp.post("/speak", (_req, res) => {
+      res.status(500).json({ error: "upstream_failure" });
+    });
+    const upstreamServer = await new Promise<Server>((resolve) => {
+      const server = upstreamApp.listen(0, () => resolve(server));
+    });
+
+    try {
+      const address = upstreamServer.address();
+      if (!address || typeof address !== "object") {
+        throw new Error("Failed to resolve upstream listen port");
+      }
+      process.env.TTS_BASE_URL = `http://127.0.0.1:${address.port}`;
+      const app = buildApp();
+
+      const sendFail = () =>
+        request(app).post("/api/voice/speak").send({
+          text: "Backend unstable.",
+          mode: "callout",
+          priority: "warn",
+          missionId: uniqueId("mission-breaker"),
+          eventId: uniqueId("event-breaker"),
+        });
+
+      const first = await sendFail();
+      const second = await sendFail();
+      const third = await sendFail();
+      const fourth = await sendFail();
+
+      expect(first.status).toBe(502);
+      expect(second.status).toBe(502);
+      expect(third.status).toBe(502);
+      expect(fourth.status).toBe(503);
+      expect(fourth.body.error).toBe("voice_backend_error");
+      expect(fourth.body.details?.circuitBreakerOpen).toBe(true);
+      expect(fourth.body.details?.retryAfterMs).toBeGreaterThan(0);
+    } finally {
+      await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
+    }
+  });
+
+  it("meets voice dry-run latency budget", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const start = Date.now();
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Latency check",
+      missionId: uniqueId("mission-latency"),
+      eventId: uniqueId("event-latency"),
+    });
+    const latencyMs = Date.now() - start;
+
+    expect(res.status).toBe(200);
+    expect(latencyMs).toBeLessThan(250);
+  });
+
+  it("keeps deterministic envelope under controlled overload", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    process.env.VOICE_BUDGET_MISSION_WINDOW_MS = "60000";
+    process.env.VOICE_BUDGET_MISSION_MAX_REQUESTS = "1";
+    const app = buildApp();
+    const missionId = uniqueId("mission-overload");
+
+    const first = await request(app).post("/api/voice/speak").send({
+      text: "baseline",
+      missionId,
+      eventId: uniqueId("event-overload"),
+    });
+    const overloaded = await request(app).post("/api/voice/speak").send({
+      text: "overload",
+      missionId,
+      eventId: uniqueId("event-overload"),
+    });
+
+    expect(first.status).toBe(200);
+    expect(overloaded.status).toBe(429);
+    expect(overloaded.body.error).toBe("voice_budget_exceeded");
+    expect(typeof overloaded.body.message).toBe("string");
+    expect(overloaded.body.details?.scope).toBe("mission_window");
   });
 
   it("proxies configured backend audio bytes", async () => {

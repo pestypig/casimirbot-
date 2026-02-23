@@ -23,6 +23,8 @@ This Wave-2B batch targets remaining gaps from the last research:
 Execution ledger for this wave:
 - `reports/helix-ask-mission-overwatch-v1-closure-wave2b-ledger-2026-02-23.md`
 
+Ledger policy: update the prompt table and the corresponding per-prompt report block after every prompt commit.
+
 ## Shared guardrails (apply to every prompt)
 
 ```text

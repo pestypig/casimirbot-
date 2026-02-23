@@ -120,6 +120,46 @@ describe("mission overwatch salience", () => {
     });
   });
 
+  it("returns deterministic reason under repeated overload events", () => {
+    const state = createSalienceState();
+    const t0 = Date.parse("2026-02-22T00:04:00.000Z");
+
+    const first = evaluateSalience(
+      {
+        missionId: "mission-overload",
+        eventType: "state_change",
+        classification: "warn",
+        dedupeKey: "evt-a",
+        tsMs: t0,
+      },
+      state,
+    );
+    const second = evaluateSalience(
+      {
+        missionId: "mission-overload",
+        eventType: "state_change",
+        classification: "warn",
+        dedupeKey: "evt-b",
+        tsMs: t0 + 100,
+      },
+      state,
+    );
+    const third = evaluateSalience(
+      {
+        missionId: "mission-overload",
+        eventType: "state_change",
+        classification: "warn",
+        dedupeKey: "evt-c",
+        tsMs: t0 + 200,
+      },
+      state,
+    );
+
+    expect(first.reason).toBe("emit");
+    expect(second.reason).toBe("emit");
+    expect(third.reason).toBe("mission_rate_limited");
+  });
+
   it("falls back to composed dedupe key when explicit key is absent", () => {
     const state = createSalienceState();
     const t0 = Date.parse("2026-02-22T00:03:00.000Z");
