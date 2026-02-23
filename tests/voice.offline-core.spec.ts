@@ -48,3 +48,19 @@ describe("voice offline-core ownership gates", () => {
     expect(res.body.error).toBe("voice_provider_not_allowed");
   });
 });
+
+
+it("keeps offline-core outcomes unchanged when production lane env is set", async () => {
+  process.env.TRAIN_JOB_TYPE = "tts_prod_train";
+  process.env.VOICE_PROXY_DRY_RUN = "1";
+  process.env.VOICE_MANAGED_PROVIDERS_ENABLED = "0";
+
+  const res = await request(app()).post("/api/voice/speak").send({
+    text: "Warn update",
+    priority: "warn",
+    provider: "remote-provider",
+  });
+
+  expect(res.status).toBe(403);
+  expect(res.body.error).toBe("voice_provider_not_allowed");
+});

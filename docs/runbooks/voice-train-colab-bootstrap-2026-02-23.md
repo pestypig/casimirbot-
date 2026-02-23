@@ -1,5 +1,7 @@
 # Voice Train Colab Bootstrap (2026-02-23)
 
+> Status: **experimental lane** (best-effort). Use `tts_prod_train` for production-authoritative voice artifacts.
+
 This runbook is the reproducible path for Python 3.12 Colab sessions where
 `xformers` wheels are unavailable.
 
@@ -74,3 +76,10 @@ python scripts/voice/run_colab_train.py
 - `external/audiocraft/data/knowledge_audio/voice_dataset_manifest.json`
 - `external/audiocraft/checkpoints/train_status.json`
 - `checkpoints/tts_voice_train_musicgen_small.pt`
+
+
+## Production boundary
+
+- Colab bootstrap is preserved for exploratory iteration and compatibility.
+- Production promotion must come from the deterministic `tts_prod_train` lane that writes train-status JSON, dataset manifest, and validated voice bundle outputs.
+- `/api/voice/speak` compatibility is unchanged by this runbook; this document does not redefine serving contracts.

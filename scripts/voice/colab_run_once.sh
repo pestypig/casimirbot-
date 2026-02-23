@@ -61,3 +61,9 @@ PY
   exit 1
 fi
 
+
+# Production-lane helper handoff (additive, non-breaking)
+if [[ "${RUN_PRODUCTION_LANE:-0}" == "1" ]]; then
+  TRAIN_BACKEND="${TRAIN_BACKEND:-local_docker}" AUDIO_PATH="${AUDIO_PATH}" EXPECTED_HEAD="${EXPECTED_HEAD}" \
+    bash scripts/voice/train_production_voice.sh
+fi

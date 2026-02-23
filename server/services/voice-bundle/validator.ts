@@ -78,3 +78,10 @@ export const validateVoiceBundle = (bundleDir: string): VoiceBundleValidationRes
 
   return { ok: true, profileId: manifest.voice_profile_id, filesValidated: manifest.files.length };
 };
+
+
+export const validateVoiceBundleOrThrow = (bundleDir: string): VoiceBundleValidationResult => {
+  const result = validateVoiceBundle(bundleDir);
+  if (!result.ok) throw new Error(`${result.failure.code}:${result.failure.message}`);
+  return result;
+};

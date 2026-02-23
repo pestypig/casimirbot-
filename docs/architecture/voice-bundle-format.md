@@ -26,3 +26,32 @@ A portable voice bundle packages profile metadata and files required for local-f
 - Every file listed in `files[]` must exist in the bundle root.
 - Each listed file must match declared `sha256` and `bytes`.
 - Failures must return deterministic codes and metadata.
+
+
+## Lane classification (2026-02-23)
+
+- Existing Audiocraft/Colab training path remains **experimental** and best-effort for research iteration.
+- `tts_prod_train` is the authoritative production training lane for operator-facing deployment artifacts.
+- Serving via `/api/voice/speak` stays backward-compatible; lane choice only affects training artifact provenance.
+
+## Production lane artifact contract
+
+A successful production run must produce deterministic artifacts under repo paths:
+
+- `artifacts/train_status.tts_prod_train.json`
+- `artifacts/dataset_manifest.tts_prod_train.json`
+- `bundles/<voice_profile_id>/voice_bundle/manifest.json`
+
+`train_status` minimum fields:
+
+```json
+{
+  "job_type": "tts_prod_train",
+  "state": "completed",
+  "progress": { "current": 100, "total": 100 },
+  "stats": { "dataset_items": 1, "bundle_valid": true },
+  "artifacts": ["bundles/dottie_default/voice_bundle/manifest.json"]
+}
+```
+
+Determinism requirement: the trainer emits protocol lines in this order for each update tick: `PROGRESS`, optional `STATS`, optional `ARTIFACT`.
