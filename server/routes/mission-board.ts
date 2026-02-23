@@ -1,6 +1,10 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { z } from "zod";
+import {
+  appendMissionBoardEvent,
+  listMissionBoardEvents,
+} from "../services/mission-overwatch/mission-board-store";
 
 type MissionPhase =
   | "observe"
@@ -36,7 +40,6 @@ type MissionBoardSnapshot = {
 };
 
 const missionBoardRouter = Router();
-const boardEvents = new Map<string, MissionBoardEvent[]>();
 
 const eventClassSchema = z.enum(["info", "warn", "critical", "action"]);
 const eventTypeSchema = z.enum(["state_change", "threat_update", "timer_update", "action_required", "debrief"]);
@@ -104,12 +107,42 @@ const parseLimit = (value: unknown, fallback: number): number => {
   return Math.min(200, Math.max(1, Math.floor(parsed)));
 };
 
-const getMissionEvents = (missionId: string): MissionBoardEvent[] => {
-  const existing = boardEvents.get(missionId);
-  if (existing) return existing;
-  const created: MissionBoardEvent[] = [];
-  boardEvents.set(missionId, created);
-  return created;
+const missionBoardUnavailable = (res: Response, error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return errorEnvelope(
+    res,
+    503,
+    "mission_board_unavailable",
+    "Mission board storage is unavailable.",
+    { reason: message },
+  );
+};
+
+const getMissionEvents = async (missionId: string): Promise<MissionBoardEvent[]> => {
+  const events = await listMissionBoardEvents(missionId);
+  const normalized: MissionBoardEvent[] = [];
+  for (const event of events) {
+    const typeResult = eventTypeSchema.safeParse(event.type);
+    const classResult = eventClassSchema.safeParse(event.classification);
+    if (!typeResult.success || !classResult.success) {
+      continue;
+    }
+    normalized.push({
+      eventId: event.eventId,
+      missionId: event.missionId,
+      type: typeResult.data,
+      classification: classResult.data,
+      text: event.text,
+      ts: event.ts,
+      fromState: event.fromState,
+      toState: event.toState,
+      evidenceRefs: event.evidenceRefs,
+    });
+  }
+  return normalized.sort((a, b) => {
+    const tsDiff = Date.parse(a.ts) - Date.parse(b.ts);
+    return tsDiff !== 0 ? tsDiff : a.eventId.localeCompare(b.eventId);
+  });
 };
 
 const foldMissionSnapshot = (events: MissionBoardEvent[], missionId: string): MissionBoardSnapshot => {
@@ -184,14 +217,8 @@ const foldMissionSnapshot = (events: MissionBoardEvent[], missionId: string): Mi
   };
 };
 
-const appendEvent = (missionId: string, event: MissionBoardEvent) => {
-  const events = getMissionEvents(missionId);
-  if (events.some((entry) => entry.eventId === event.eventId)) return;
-  events.push(event);
-  events.sort((a, b) => {
-    const tsDiff = Date.parse(a.ts) - Date.parse(b.ts);
-    return tsDiff !== 0 ? tsDiff : a.eventId.localeCompare(b.eventId);
-  });
+const appendEvent = async (missionId: string, event: MissionBoardEvent) => {
+  await appendMissionBoardEvent(missionId, event);
 };
 
 const nowIso = () => new Date().toISOString();
@@ -213,17 +240,21 @@ missionBoardRouter.options("/:missionId/ack", (_req, res) => {
   res.status(200).end();
 });
 
-missionBoardRouter.get("/:missionId", (req, res) => {
+missionBoardRouter.get("/:missionId", async (req, res) => {
   setCors(res);
   const missionId = missionIdFromReq(req);
   if (!missionId) {
     return errorEnvelope(res, 400, "mission_board_invalid_request", "missionId is required.");
   }
-  const snapshot = foldMissionSnapshot(getMissionEvents(missionId), missionId);
-  return res.json({ snapshot });
+  try {
+    const snapshot = foldMissionSnapshot(await getMissionEvents(missionId), missionId);
+    return res.json({ snapshot });
+  } catch (error) {
+    return missionBoardUnavailable(res, error);
+  }
 });
 
-missionBoardRouter.get("/:missionId/events", (req, res) => {
+missionBoardRouter.get("/:missionId/events", async (req, res) => {
   setCors(res);
   const missionId = missionIdFromReq(req);
   if (!missionId) {
@@ -235,19 +266,23 @@ missionBoardRouter.get("/:missionId/events", (req, res) => {
   const cursor = cursorRaw ? Number(cursorRaw) : 0;
   const offset = Number.isFinite(cursor) ? Math.max(0, Math.floor(cursor)) : 0;
 
-  const events = getMissionEvents(missionId);
-  const slice = events.slice(offset, offset + limit);
-  const nextCursor = offset + slice.length < events.length ? offset + slice.length : null;
+  try {
+    const events = await getMissionEvents(missionId);
+    const slice = events.slice(offset, offset + limit);
+    const nextCursor = offset + slice.length < events.length ? offset + slice.length : null;
 
-  return res.json({
-    missionId,
-    events: slice,
-    cursor: offset,
-    nextCursor,
-  });
+    return res.json({
+      missionId,
+      events: slice,
+      cursor: offset,
+      nextCursor,
+    });
+  } catch (error) {
+    return missionBoardUnavailable(res, error);
+  }
 });
 
-missionBoardRouter.post("/:missionId/actions", (req, res) => {
+missionBoardRouter.post("/:missionId/actions", async (req, res) => {
   setCors(res);
   const missionId = missionIdFromReq(req);
   if (!missionId) {
@@ -269,24 +304,28 @@ missionBoardRouter.post("/:missionId/actions", (req, res) => {
   const actionId = payload.actionId?.trim() || `action:${missionId}:${Date.now()}`;
   const ts = payload.requestedAt ?? nowIso();
 
-  appendEvent(missionId, {
-    eventId: actionId,
-    missionId,
-    type: "action_required",
-    classification: payload.type.includes("ESCALATE") || payload.type.includes("abort") ? "critical" : "action",
-    text: `Action ${payload.type} (${payload.status})`,
-    ts,
-    evidenceRefs: payload.evidenceRefs,
-  });
+  try {
+    await appendEvent(missionId, {
+      eventId: actionId,
+      missionId,
+      type: "action_required",
+      classification: payload.type.includes("ESCALATE") || payload.type.includes("abort") ? "critical" : "action",
+      text: `Action ${payload.type} (${payload.status})`,
+      ts,
+      evidenceRefs: payload.evidenceRefs,
+    });
 
-  const snapshot = foldMissionSnapshot(getMissionEvents(missionId), missionId);
-  return res.status(200).json({
-    receipt: { actionId, missionId, ts, status: payload.status },
-    snapshot,
-  });
+    const snapshot = foldMissionSnapshot(await getMissionEvents(missionId), missionId);
+    return res.status(200).json({
+      receipt: { actionId, missionId, ts, status: payload.status },
+      snapshot,
+    });
+  } catch (error) {
+    return missionBoardUnavailable(res, error);
+  }
 });
 
-missionBoardRouter.post("/:missionId/ack", (req, res) => {
+missionBoardRouter.post("/:missionId/ack", async (req, res) => {
   setCors(res);
   const missionId = missionIdFromReq(req);
   if (!missionId) {
@@ -306,28 +345,32 @@ missionBoardRouter.post("/:missionId/ack", (req, res) => {
 
   const payload = parsed.data;
   const ts = payload.ts ?? nowIso();
-  appendEvent(missionId, {
-    eventId: `ack:${payload.eventId}:${Date.parse(ts) || Date.now()}`,
-    missionId,
-    type: "state_change",
-    classification: eventClassSchema.parse("info"),
-    text: payload.note?.trim() || `Acknowledged ${payload.eventId}`,
-    ts,
-    fromState: "pending",
-    toState: "active",
-    evidenceRefs: [payload.eventId],
-  });
-
-  const snapshot = foldMissionSnapshot(getMissionEvents(missionId), missionId);
-  return res.status(200).json({
-    receipt: {
+  try {
+    await appendEvent(missionId, {
+      eventId: `ack:${payload.eventId}:${Date.parse(ts) || Date.now()}`,
       missionId,
-      eventId: payload.eventId,
-      actorId: payload.actorId ?? null,
+      type: "state_change",
+      classification: eventClassSchema.parse("info"),
+      text: payload.note?.trim() || `Acknowledged ${payload.eventId}`,
       ts,
-    },
-    snapshot,
-  });
+      fromState: "pending",
+      toState: "active",
+      evidenceRefs: [payload.eventId],
+    });
+
+    const snapshot = foldMissionSnapshot(await getMissionEvents(missionId), missionId);
+    return res.status(200).json({
+      receipt: {
+        missionId,
+        eventId: payload.eventId,
+        actorId: payload.actorId ?? null,
+        ts,
+      },
+      snapshot,
+    });
+  } catch (error) {
+    return missionBoardUnavailable(res, error);
+  }
 });
 
 export {
