@@ -5,6 +5,7 @@ Currently uses a dummy dataset (random codes) just to validate the plumbing.
 Replace DummyChunkDataset with your real EnCodec-tokenized dataset.
 """
 import json
+import math
 import os
 import time
 import sys
@@ -124,6 +125,11 @@ def attach_spectral_adapters(lm: nn.Module, num_adapters: int = 2) -> nn.Module:
     return adapters
 
 
+def write_status(path: str, payload: dict) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f)
+
+
 # ---------- Training ----------
 
 def main():
@@ -177,22 +183,23 @@ def main():
     if len(dataset) == 0:
         msg = f"[train] No audio found in {data_root}; aborting."
         print(msg, flush=True)
-        with open(status_path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "status": "error",
-                    "message": msg,
-                    "timestamp": time.time(),
-                    "details": {
-                        "knowledgeAudioDir": data_root_resolved,
-                        "discoveredAudioFiles": len(discovered_files),
-                        "datasetAudioFiles": len(dataset.files),
-                        "datasetItems": len(dataset),
-                        "manifestPath": str(manifest_path),
-                    },
+        write_status(
+            status_path,
+            {
+                "status": "error",
+                "message": msg,
+                "timestamp": time.time(),
+                "jobType": train_job_type,
+                "details": {
+                    "knowledgeAudioDir": data_root_resolved,
+                    "discoveredAudioFiles": len(discovered_files),
+                    "datasetAudioFiles": len(dataset.files),
+                    "datasetItems": len(dataset),
+                    "manifestPath": str(manifest_path),
                 },
-                f,
-            )
+            },
+        )
+        print(f"ARTIFACT {status_path}", flush=True)
         sys.exit(1)
 
     # Load pretrained MusicGen (LM + codec)
@@ -218,6 +225,7 @@ def main():
     lm.train()
     total_steps = num_epochs * len(loader)
     current_step = 0
+    last_loss_value = float("nan")
 
     for epoch in range(num_epochs):
         for step, (codes, _prompt) in enumerate(loader):
@@ -249,23 +257,49 @@ def main():
             target = target[:, 1:]
 
             loss = criterion(logits_flat.reshape(-1, card), target.reshape(-1))
+            loss_value = float(loss.item())
+            last_loss_value = loss_value
+            if not math.isfinite(loss_value):
+                msg = "[train] non_finite_loss; aborting."
+                print(
+                    f"[train] non_finite_loss at epoch={epoch} step={step} loss={loss_value}",
+                    flush=True,
+                )
+                write_status(
+                    status_path,
+                    {
+                        "status": "error",
+                        "message": msg,
+                        "timestamp": time.time(),
+                        "epoch": epoch,
+                        "step": step,
+                        "loss": loss_value,
+                        "jobType": train_job_type,
+                        "details": {
+                            "knowledgeAudioDir": data_root_resolved,
+                            "manifestPath": str(manifest_path),
+                        },
+                    },
+                )
+                print(f"ARTIFACT {status_path}", flush=True)
+                sys.exit(2)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             if step % 10 == 0:
-                print(f"[epoch {epoch} step {step}] loss={loss.item():.4f}")
+                print(f"[epoch {epoch} step {step}] loss={loss_value:.4f}")
                 status = {
                     "epoch": epoch,
                     "step": step,
-                    "loss": float(loss.item()),
+                    "loss": loss_value,
                     "timestamp": time.time(),
                     "status": "running",
+                    "jobType": train_job_type,
                 }
-                with open(status_path, "w", encoding="utf-8") as f:
-                    json.dump(status, f)
-                print(f"PROGRESS {current_step} {total_steps} LOSS {loss.item():.4f}", flush=True)
+                write_status(status_path, status)
+                print(f"PROGRESS {current_step} {total_steps} LOSS {loss_value:.4f}", flush=True)
 
             # keep short for smoke test
             if step >= 50:
@@ -282,15 +316,15 @@ def main():
     final_status = {
         "epoch": num_epochs - 1,
         "step": current_step,
-        "loss": float(loss.item()),
+        "loss": last_loss_value,
         "timestamp": time.time(),
         "status": "completed",
         "checkpoint": ckpt_path,
         "jobType": train_job_type,
         "artifactRefs": [ckpt_path],
     }
-    with open(status_path, "w", encoding="utf-8") as f:
-        json.dump(final_status, f)
+    write_status(status_path, final_status)
+    print(f"ARTIFACT {status_path}", flush=True)
     print("PROGRESS {0} {1} DONE".format(current_step, total_steps), flush=True)
 
 

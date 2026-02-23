@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -57,6 +58,18 @@ def _load_json(path: Path) -> Optional[Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
+
+
+def _is_finite_number(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if not isinstance(value, (int, float, str)):
+        return False
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(numeric)
 
 
 def _emit_report(report: Dict[str, Any]) -> None:
@@ -187,8 +200,12 @@ def main() -> int:
             report["manifest_entry_count"] = len(manifest.get("entries", []))
 
         status = _load_json(STATUS_PATH)
+        completed_with_non_finite_loss = False
         if status is not None:
             report["training_status_json"] = json.dumps(status, ensure_ascii=False)
+            if isinstance(status, dict) and status.get("status") == "completed":
+                if "loss" in status and not _is_finite_number(status.get("loss")):
+                    completed_with_non_finite_loss = True
 
         report["checkpoint_exists"] = CKPT_PATH.exists()
         if CKPT_PATH.exists():
@@ -196,10 +213,15 @@ def main() -> int:
             report["checkpoint_sha256"] = _sha256(CKPT_PATH)
 
         if report["checkpoint_exists"]:
-            report["objective_status"] = "completed"
-            report["first_failed_step"] = "none"
-            report["root_cause"] = "none"
-            report["next_unblock_action"] = "none"
+            if completed_with_non_finite_loss:
+                report["objective_status"] = "blocked"
+                report["root_cause"] = "training completed with non_finite_loss"
+                report["next_unblock_action"] = "fix non-finite loss and rerun"
+            else:
+                report["objective_status"] = "completed"
+                report["first_failed_step"] = "none"
+                report["root_cause"] = "none"
+                report["next_unblock_action"] = "none"
         else:
             report["objective_status"] = "blocked"
             report["root_cause"] = "training did not produce checkpoint"
