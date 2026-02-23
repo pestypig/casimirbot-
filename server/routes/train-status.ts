@@ -12,7 +12,7 @@ const defaultPython = process.env.TRAIN_PYTHON ?? "python";
 const projectRoot = process.cwd();
 
 type JobState = "pending" | "running" | "done" | "error";
-type JobType = "dataset" | "train" | "tts_voice_train";
+type JobType = "dataset" | "train" | "tts_voice_train" | "tts_prod_train";
 
 type JobInfo = {
   id: string;
@@ -121,10 +121,12 @@ router.post("/api/train/dataset", (req, res) => {
 
 router.post("/api/train/start", (req, res) => {
   try {
-    const script = path.resolve(projectRoot, "external", "audiocraft", "scripts", "train_spectral_adapter.py");
     const jobId = randomUUID();
     const requestedType = (req.body?.jobType ?? "train").toString();
-    const type: JobType = requestedType === "tts_voice_train" ? "tts_voice_train" : "train";
+    const type: JobType = requestedType === "tts_voice_train" ? "tts_voice_train" : requestedType === "tts_prod_train" ? "tts_prod_train" : "train";
+    const script = type === "tts_prod_train"
+      ? path.resolve(projectRoot, "scripts", "voice", "train_production_tts.py")
+      : path.resolve(projectRoot, "external", "audiocraft", "scripts", "train_spectral_adapter.py");
     const job: JobInfo = {
       id: jobId,
       type,
@@ -154,6 +156,15 @@ router.post("/api/train/start", (req, res) => {
       }
       if (line.toLowerCase().includes("loss")) {
         job.message = line.trim();
+      }
+      if (line.startsWith("STATS")) {
+        try {
+          const payload = line.slice("STATS".length).trim();
+          const stats = JSON.parse(payload) as Record<string, unknown>;
+          job.metadata = { ...(job.metadata ?? {}), ...stats };
+        } catch {
+          // ignore parse errors
+        }
       }
       if (line.startsWith("ARTIFACT")) {
         const ref = line.slice("ARTIFACT".length).trim();

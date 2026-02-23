@@ -129,3 +129,11 @@ Compatibility rule: servers should accept existing payloads without requiring ne
 - Returns deterministic JSON error envelope when unavailable or invalid.
 - Enforces consent and request limits.
 - Emits enough metadata for replay and operator audit.
+
+
+## Training lane compatibility contract
+
+- Existing train APIs (`/api/train/status`, `/api/train/start`, `/api/train/job/:id`) remain backward-compatible for existing callers.
+- Existing Audiocraft/Colab lane remains available as an experimental path and must not be removed.
+- New production lane (`tts_prod_train`) is additive and must emit deterministic `PROGRESS`/`STATS`/`ARTIFACT` lines plus train-status JSON.
+- Voice serving contract at `/api/voice/speak` is non-breaking and independent from training-lane internals.

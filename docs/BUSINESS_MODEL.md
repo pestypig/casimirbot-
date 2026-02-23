@@ -144,3 +144,10 @@ Current gaps for this pivot:
 - Managed-off mode: lowest external usage COGS, highest ownership posture, and predictable local capacity planning requirements.
 - Fallback-enabled mode: higher resilience for non-critical paths but introduces variable managed-provider spend and provider governance overhead.
 - Pricing posture should separate guaranteed local-core continuity from optional managed fallback usage so customers can choose sovereignty vs elasticity.
+
+
+## Voice lane economics (experimental vs production)
+
+- Experimental lane (`audiocraft`/Colab): low setup friction, variable reproducibility, and higher operator supervision burden.
+- Production lane (`tts_prod_train`): higher up-front containerization cost with lower incident rate via deterministic status and artifact protocols.
+- Margin preference for operator deployments: use production lane for repeatable outcomes, keep experimental lane for research only.
