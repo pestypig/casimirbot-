@@ -126,6 +126,42 @@ def attach_spectral_adapters(lm: nn.Module, num_adapters: int = 2) -> nn.Module:
 
 # ---------- Training ----------
 
+def write_status(
+    status_path: str,
+    *,
+    status: str,
+    message: Optional[str] = None,
+    epoch: Optional[int] = None,
+    step: Optional[int] = None,
+    loss: Optional[float] = None,
+    job_type: Optional[str] = None,
+    details: Optional[dict] = None,
+    checkpoint: Optional[str] = None,
+    artifact_refs: Optional[List[str]] = None,
+) -> None:
+    payload: dict = {
+        "status": status,
+        "timestamp": time.time(),
+    }
+    if message is not None:
+        payload["message"] = message
+    if epoch is not None:
+        payload["epoch"] = epoch
+    if step is not None:
+        payload["step"] = step
+    if loss is not None:
+        payload["loss"] = loss
+    if job_type is not None:
+        payload["jobType"] = job_type
+    if details is not None:
+        payload["details"] = details
+    if checkpoint is not None:
+        payload["checkpoint"] = checkpoint
+    if artifact_refs is not None:
+        payload["artifactRefs"] = artifact_refs
+    with open(status_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f)
+
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"[train] Using device: {device}")
@@ -177,22 +213,19 @@ def main():
     if len(dataset) == 0:
         msg = f"[train] No audio found in {data_root}; aborting."
         print(msg, flush=True)
-        with open(status_path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "status": "error",
-                    "message": msg,
-                    "timestamp": time.time(),
-                    "details": {
-                        "knowledgeAudioDir": data_root_resolved,
-                        "discoveredAudioFiles": len(discovered_files),
-                        "datasetAudioFiles": len(dataset.files),
-                        "datasetItems": len(dataset),
-                        "manifestPath": str(manifest_path),
-                    },
-                },
-                f,
-            )
+        write_status(
+            status_path,
+            status="error",
+            message=msg,
+            details={
+                "knowledgeAudioDir": data_root_resolved,
+                "discoveredAudioFiles": len(discovered_files),
+                "datasetAudioFiles": len(dataset.files),
+                "datasetItems": len(dataset),
+                "manifestPath": str(manifest_path),
+            },
+            job_type=train_job_type,
+        )
         sys.exit(1)
 
     # Load pretrained MusicGen (LM + codec)
@@ -249,6 +282,24 @@ def main():
             target = target[:, 1:]
 
             loss = criterion(logits_flat.reshape(-1, card), target.reshape(-1))
+            loss_value = float(loss.item())
+            if not torch.isfinite(loss).item():
+                message = "[train] non_finite_loss; aborting."
+                write_status(
+                    status_path,
+                    status="error",
+                    message=message,
+                    epoch=epoch,
+                    step=step,
+                    loss=loss_value,
+                    job_type=train_job_type,
+                    details={
+                        "knowledgeAudioDir": data_root_resolved,
+                    },
+                )
+                print(f"[train] non_finite_loss at epoch={epoch} step={step}", flush=True)
+                print(f"ARTIFACT {status_path}", flush=True)
+                sys.exit(2)
 
             optimizer.zero_grad()
             loss.backward()
@@ -259,13 +310,18 @@ def main():
                 status = {
                     "epoch": epoch,
                     "step": step,
-                    "loss": float(loss.item()),
-                    "timestamp": time.time(),
-                    "status": "running",
+                    "loss": loss_value,
                 }
-                with open(status_path, "w", encoding="utf-8") as f:
-                    json.dump(status, f)
-                print(f"PROGRESS {current_step} {total_steps} LOSS {loss.item():.4f}", flush=True)
+                write_status(
+                    status_path,
+                    status="running",
+                    epoch=status["epoch"],
+                    step=status["step"],
+                    loss=status["loss"],
+                    job_type=train_job_type,
+                    details={"knowledgeAudioDir": data_root_resolved},
+                )
+                print(f"PROGRESS {current_step} {total_steps} LOSS {loss_value:.4f}", flush=True)
 
             # keep short for smoke test
             if step >= 50:
@@ -279,18 +335,34 @@ def main():
     torch.save(spectral_adapters.state_dict(), ckpt_path)
     print(f"[train] Saved spectral adapters to {ckpt_path}")
     print(f"ARTIFACT {ckpt_path}", flush=True)
-    final_status = {
-        "epoch": num_epochs - 1,
-        "step": current_step,
-        "loss": float(loss.item()),
-        "timestamp": time.time(),
-        "status": "completed",
-        "checkpoint": ckpt_path,
-        "jobType": train_job_type,
-        "artifactRefs": [ckpt_path],
-    }
-    with open(status_path, "w", encoding="utf-8") as f:
-        json.dump(final_status, f)
+    final_loss_value = float(loss.item())
+    if not torch.isfinite(loss).item():
+        message = "[train] non_finite_loss; aborting."
+        write_status(
+            status_path,
+            status="error",
+            message=message,
+            epoch=num_epochs - 1,
+            step=current_step,
+            loss=final_loss_value,
+            job_type=train_job_type,
+            details={"knowledgeAudioDir": data_root_resolved},
+        )
+        print(f"[train] non_finite_loss at epoch={num_epochs - 1} step={current_step}", flush=True)
+        print(f"ARTIFACT {status_path}", flush=True)
+        sys.exit(2)
+
+    write_status(
+        status_path,
+        status="completed",
+        epoch=num_epochs - 1,
+        step=current_step,
+        loss=final_loss_value,
+        job_type=train_job_type,
+        details={"knowledgeAudioDir": data_root_resolved},
+        checkpoint=ckpt_path,
+        artifact_refs=[ckpt_path],
+    )
     print("PROGRESS {0} {1} DONE".format(current_step, total_steps), flush=True)
 
 

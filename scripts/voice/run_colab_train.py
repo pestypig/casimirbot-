@@ -59,6 +59,14 @@ def _load_json(path: Path) -> Optional[Any]:
         return None
 
 
+def _is_non_finite_loss(value: Any) -> bool:
+    if isinstance(value, (int, float)):
+        return not (float("-inf") < float(value) < float("inf"))
+    if isinstance(value, str):
+        text = value.strip().lower()
+        return text in {"nan", "+nan", "-nan", "inf", "+inf", "-inf", "infinity", "+infinity", "-infinity"}
+    return False
+
 def _emit_report(report: Dict[str, Any]) -> None:
     print("=== COLAB TRAIN REPORT ===")
     ordered_keys = [
@@ -200,6 +208,13 @@ def main() -> int:
             report["first_failed_step"] = "none"
             report["root_cause"] = "none"
             report["next_unblock_action"] = "none"
+
+            status_loss = status.get("loss") if isinstance(status, dict) else None
+            status_state = status.get("status") if isinstance(status, dict) else None
+            if status_state == "completed" and _is_non_finite_loss(status_loss):
+                report["objective_status"] = "blocked"
+                report["root_cause"] = "training completed with non_finite_loss"
+                report["next_unblock_action"] = "fix non-finite loss and rerun"
         else:
             report["objective_status"] = "blocked"
             report["root_cause"] = "training did not produce checkpoint"

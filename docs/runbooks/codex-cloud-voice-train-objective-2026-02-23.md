@@ -20,7 +20,7 @@ Non-negotiable constraints:
 
 Success criteria:
 1. `external/audiocraft/data/knowledge_audio/voice_dataset_manifest.json` exists and has `entries >= 1`.
-2. `external/audiocraft/checkpoints/train_status.json` has `"status":"completed"`.
+2. `external/audiocraft/checkpoints/train_status.json` has `"status":"completed"` and `loss` is a finite numeric value (not `NaN`/`Inf`).
 3. `checkpoints/tts_voice_train_musicgen_small.pt` exists and has non-zero size.
 4. A final report block is printed with artifact paths, sizes, and checkpoint sha256.
 
