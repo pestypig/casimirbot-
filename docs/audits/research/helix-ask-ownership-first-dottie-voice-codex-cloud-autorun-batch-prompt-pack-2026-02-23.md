@@ -22,6 +22,7 @@ Execution ledger for this wave:
 
 Ledger policy:
 - update prompt table and per-prompt report block after every prompt commit.
+- Prompt 0 initialized in `reports/helix-ask-ownership-first-dottie-voice-ledger-2026-02-23.md`; continue strict Prompt 1..10 sequencing from that ledger.
 
 ## Shared guardrails (apply to every prompt)
 
