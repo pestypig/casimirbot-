@@ -15,6 +15,21 @@ This runbook is the reproducible path for Python 3.12 Colab sessions where
 
 ## Colab usage
 
+### One-command entrypoint (recommended)
+
+```bash
+cd /content
+rm -rf casimirbot-
+git clone https://github.com/pestypig/casimirbot-.git
+cd casimirbot-
+EXPECTED_HEAD=38017ff9 bash scripts/voice/colab_run_once.sh
+```
+
+This avoids Python-in-bash quoting errors and enforces a fresh sync before
+running training.
+
+### Manual sequence
+
 ```bash
 cd /content
 test -d casimirbot- || git clone https://github.com/pestypig/casimirbot-.git
