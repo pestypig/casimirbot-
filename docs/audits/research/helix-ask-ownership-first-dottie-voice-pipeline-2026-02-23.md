@@ -103,14 +103,15 @@ Keep `docs/architecture/voice-service-contract.md` non-breaking:
 - preserve public request/response shape,
 - allow additive optional fields for internal routing metadata.
 
-## Section D: Colab training and local artifact handoff
+## Section D: Training backend and local artifact handoff
 
-### Colab role
+### Backend role
 
-Colab is experimentation acceleration, not production authority.
-Production acceptance requires local reproducibility and offline serving validation.
+Default training backend is Codex Cloud compute.
+Colab is optional fallback for experimentation only.
+Production acceptance requires local reproducibility and offline serving validation regardless of where training ran.
 
-### Training blueprint
+### Training blueprint (backend-agnostic)
 
 1. Environment lock:
    - pinned dependencies, deterministic config capture.
@@ -122,6 +123,14 @@ Production acceptance requires local reproducibility and offline serving validat
    - portable artifact package.
 5. Handoff:
    - local offline load test and regression suite pass required.
+
+### Backend selection policy
+
+- `TRAIN_BACKEND=codex_cloud` (default)
+- `TRAIN_BACKEND=colab` (fallback, non-authoritative)
+- `TRAIN_BACKEND=local` (offline/local GPU path)
+
+Use the same dataset manifest, training config, and export bundle shape for all backends so file setup and promotion gates are unchanged.
 
 ### Required handoff artifacts
 

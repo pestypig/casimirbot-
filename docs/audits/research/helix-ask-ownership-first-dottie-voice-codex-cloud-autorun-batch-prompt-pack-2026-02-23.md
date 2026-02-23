@@ -36,6 +36,7 @@ Hard constraints:
 6) Additive changes only; no destructive refactors.
 7) One commit per prompt scope.
 8) If blocked, ship maximal safe additive subset and continue.
+9) Training backend default is Codex Cloud (`TRAIN_BACKEND=codex_cloud`); Colab may be used only as optional fallback with identical artifact outputs.
 
 Mandatory verification after each prompt:
 npm run casimir:verify -- --url http://127.0.0.1:5173/api/agi/adapter/run --export-url http://127.0.0.1:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci
@@ -95,8 +96,9 @@ Global rules:
 7) Update voice wave ledger after each prompt commit.
 8) Do not claim completion without final PASS and integrityOk true.
 9) Do not edit files outside each prompt's allowed paths.
-10) If blocked, mark prompt status partial-blocked or blocked with deterministic reason, ship maximal safe additive subset, commit, and continue to next prompt.
-11) Never rewrite or reset prior prompt commits.
+10) Use backend-neutral artifacts and keep training outputs compatible across `codex_cloud|colab|local`.
+11) If blocked, mark prompt status partial-blocked or blocked with deterministic reason, ship maximal safe additive subset, commit, and continue to next prompt.
+12) Never rewrite or reset prior prompt commits.
 
 Execution preflight (mandatory):
 1) Confirm Prompt 0 status is already done in the ledger.
