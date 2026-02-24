@@ -9,6 +9,7 @@ export type MissionMicroDebrief = {
   ts: string;
   evidenceRefs: string[];
   derivedFromEventIds: string[];
+  closureStatus: "open" | "closed";
 };
 
 export const buildMicroDebrief = (params: {
@@ -17,13 +18,13 @@ export const buildMicroDebrief = (params: {
   advice: string;
   operatorAction?: string;
   outcomeStatus?: string;
+  derivedFromEventIds?: string[];
 }): MissionMicroDebrief => {
   const ts = new Date().toISOString();
   const operator = params.operatorAction?.trim() || "no_operator_action_recorded";
   const outcome = params.outcomeStatus?.trim() || "outcome_pending";
   const text = [
     `Trigger: ${params.trigger.text}`,
-    `Advice: ${params.advice.trim()}`,
     `Action: ${operator}`,
     `Outcome: ${outcome}`,
   ].join(" | ");
@@ -36,6 +37,7 @@ export const buildMicroDebrief = (params: {
     text,
     ts,
     evidenceRefs: params.trigger.evidenceRefs,
-    derivedFromEventIds: [params.trigger.eventId],
+    derivedFromEventIds: params.derivedFromEventIds?.length ? params.derivedFromEventIds : [params.trigger.eventId],
+    closureStatus: outcome === "outcome_pending" ? "open" : "closed",
   };
 };

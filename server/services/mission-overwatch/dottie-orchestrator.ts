@@ -34,6 +34,7 @@ export class DottieOrchestrator {
           missionId: normalized.missionId,
           trigger: normalized,
           advice: salience.speak ? "Operator action required." : "Suppressed due to cooldown/rate policy.",
+          outcomeStatus: salience.speak ? "pending_operator_ack" : "suppressed",
         })
       : undefined;
 

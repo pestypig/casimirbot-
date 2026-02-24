@@ -30,6 +30,11 @@ type MissionBoardEvent = {
   fromState?: string;
   toState?: string;
   evidenceRefs: string[];
+  timerId?: string;
+  timerKind?: "countdown" | "deadline";
+  timerStatus?: "scheduled" | "running" | "expired" | "cancelled" | "completed";
+  timerDueTs?: string;
+  derivedFromEventId?: string;
 };
 
 type MissionBoardSnapshot = {
@@ -74,6 +79,15 @@ const actionSchema = z.object({
 });
 
 
+
+const timerPayloadSchema = z.object({
+  timerId: z.string().trim().min(1).max(200),
+  timerKind: z.enum(["countdown", "deadline"]).default("countdown"),
+  status: z.enum(["scheduled", "running", "expired", "cancelled", "completed"]),
+  dueTs: z.string().datetime(),
+  derivedFromEventId: z.string().trim().min(1).max(200).optional(),
+});
+
 const contextEventSchema = z.object({
   eventId: z.string().trim().min(1).max(200).optional(),
   eventType: z.string().trim().min(1).max(80),
@@ -84,6 +98,7 @@ const contextEventSchema = z.object({
   sessionState: z.enum(["idle", "requesting", "active", "stopping", "error"]),
   traceId: z.string().trim().max(200).optional(),
   evidenceRefs: z.array(z.string().trim().min(1).max(500)).max(32).default([]),
+  timer: timerPayloadSchema.optional(),
 });
 
 const ackSchema = z.object({
@@ -151,6 +166,11 @@ const getMissionEvents = async (missionId: string): Promise<MissionBoardEvent[]>
       fromState: event.fromState,
       toState: event.toState,
       evidenceRefs: event.evidenceRefs,
+      timerId: event.timerId,
+      timerKind: event.timerKind,
+      timerStatus: event.timerStatus,
+      timerDueTs: event.timerDueTs,
+      derivedFromEventId: event.derivedFromEventId,
     });
   }
   return normalized.sort((a, b) => {
@@ -373,6 +393,10 @@ missionBoardRouter.post("/:missionId/context-events", async (req, res) => {
     traceId: payload.traceId,
   });
 
+  if (payload.eventType === "timer_update" && !payload.timer) {
+    return errorEnvelope(res, 400, "mission_board_invalid_request", "timer_update requires timer payload.");
+  }
+
   const missionEvent: MissionBoardEvent = {
     eventId: normalized.eventId,
     missionId,
@@ -381,6 +405,11 @@ missionBoardRouter.post("/:missionId/context-events", async (req, res) => {
     text: `[context:${payload.tier}/${payload.sessionState}] ${payload.text}`,
     ts: normalized.ts,
     evidenceRefs: payload.evidenceRefs,
+    timerId: payload.timer?.timerId,
+    timerKind: payload.timer?.timerKind,
+    timerStatus: payload.timer?.status,
+    timerDueTs: payload.timer?.dueTs,
+    derivedFromEventId: payload.timer?.derivedFromEventId,
   };
 
   try {
@@ -417,7 +446,7 @@ missionBoardRouter.post("/:missionId/ack", async (req, res) => {
   const payload = parsed.data;
   const ts = payload.ts ?? nowIso();
   try {
-    await appendEvent(missionId, {
+        await appendEvent(missionId, {
       eventId: `ack:${payload.eventId}:${Date.parse(ts) || Date.now()}`,
       missionId,
       type: "state_change",
@@ -427,6 +456,18 @@ missionBoardRouter.post("/:missionId/ack", async (req, res) => {
       fromState: "pending",
       toState: "active",
       evidenceRefs: [payload.eventId],
+      derivedFromEventId: payload.eventId,
+    });
+
+    await appendEvent(missionId, {
+      eventId: `debrief:closure:${payload.eventId}:${Date.parse(ts) || Date.now()}`,
+      missionId,
+      type: "debrief",
+      classification: eventClassSchema.parse("info"),
+      text: `Debrief closed for ${payload.eventId}`,
+      ts,
+      evidenceRefs: [payload.eventId],
+      derivedFromEventId: payload.eventId,
     });
 
     const snapshot = foldMissionSnapshot(await getMissionEvents(missionId), missionId);

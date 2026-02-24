@@ -143,3 +143,13 @@ For prompt-batch replay safety, mission-overwatch callouts and operator actions 
 - `trace_id`
 
 Derived micro-debrief events should reference the originating source event IDs to preserve deterministic replay provenance.
+
+## Addendum: prompt-style contract mapping
+
+Mission Go Board event rendering SHOULD map event semantics to the v1 prompt-style contract (`docs/architecture/helix-ask-dottie-prompt-style-contract.v1.md`) to preserve deterministic replay:
+- map board event rows to `event_type` and `classification`,
+- persist suppression reason labels exactly as emitted,
+- keep certainty parity across board text and voice callouts,
+- include evidence anchors for repo-attributed mission state claims.
+
+This is additive and does not change existing board schema requirements.

@@ -153,3 +153,13 @@ Behavioral binding:
 - Existing Audiocraft/Colab lane remains available as an experimental path and must not be removed.
 - New production lane (`tts_prod_train`) is additive and must emit deterministic `PROGRESS`/`STATS`/`ARTIFACT` lines plus train-status JSON.
 - Voice serving contract at `/api/voice/speak` is non-breaking and independent from training-lane internals.
+
+## Addendum: Helix Ask x Dottie prompt-style parity (v1)
+
+Voice service consumers integrating mission-overwatch callouts MUST follow `docs/architecture/helix-ask-dottie-prompt-style-contract.v1.md` for:
+- canonical `certainty_class` ordering and parity constraints,
+- suppression reason labels,
+- bounded mode-specific output lengths, and
+- required `evidence_anchor` behavior for repo-attributed claims.
+
+This addendum is additive: existing `/api/voice/speak` transport fields remain unchanged.

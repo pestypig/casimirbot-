@@ -1,49 +1,33 @@
 # Helix Ask x Dottie Pipeline Bottleneck Audit (2026-02-24)
 
-Status: draft  
-Scope: current `main` audit for reasoning -> mission event -> voice callout path.
-
-## Stage map (current code)
-
-| Stage | Owner files | Inputs -> Outputs | Deterministic contract | Primary failure modes |
+## Stage map
+| Stage | Primary files | IO contract | Determinism contract | Failure modes |
 |---|---|---|---|---|
-| API ingress + route registration | `server/routes.ts:20`, `server/routes.ts:25`, `server/routes.ts:26`, `server/routes.ts:92` | HTTP request -> route dispatch | Optional API rate limit middleware shape (`rate_limited` envelope when enabled) | Admission controls depend on env gate (`RATE_LIMIT_ENABLED`) |
-| Ask route mode/contracts | `tests/helix-ask-modes.spec.ts:21`, `tests/helix-ask-modes.spec.ts:98`, `tests/helix-ask-modes.spec.ts:102` | Ask payload -> `phase6.ask.v1` style envelope | Test evidence for normalized contract + deterministic `fail_class/fail_reason` | Missing/invalid input, strict provenance failures |
-| Mission event normalization | `server/services/mission-overwatch/event-normalizer.ts:34`, `server/services/mission-overwatch/event-normalizer.ts:64`, `server/services/mission-overwatch/event-normalizer.ts:88` | Raw event -> normalized event + deterministic ID | SHA-256 canonical ID + stable normalization | Heuristic classification only (keyword rules) |
-| Mission salience decision | `server/services/mission-overwatch/salience.ts:21`, `server/services/mission-overwatch/salience.ts:50`, `server/services/mission-overwatch/salience.ts:107` | Normalized event -> `speak/no-speak` + reason | Typed reasons (`emit`, `dedupe_cooldown`, `mission_rate_limited`, `context_ineligible`) | Context ineligible suppression, dedupe, mission window cap |
-| Voice proxy governance + budget | `server/routes/voice.ts:9`, `server/routes/voice.ts:25`, `server/routes/voice.ts:237`, `server/routes/voice.ts:312`, `server/routes/voice.ts:327`, `server/routes/voice.ts:338` | Voice request -> audio or deterministic suppression/error | Typed errors (`voice_invalid_request`, `voice_provider_not_allowed`, `voice_budget_exceeded`, `voice_rate_limited`) + suppression reasons | Budget/rate rejection, provider governance block, context suppression |
-| Mission board persistence/snapshot | `server/routes/mission-board.ts:20`, `server/routes/mission-board.ts:77`, `server/routes/mission-board.ts:162`, `server/routes/mission-board.ts:261` | Board event/action -> mission snapshot/events | Snapshot folding from ordered events + deterministic event enums | Store unavailable, invalid payload, unresolved critical accumulation |
+| Ingest/normalize | `server/services/mission-overwatch/event-normalizer.ts` | raw event -> normalized event | fixed enum defaults, deterministic timestamp fallback | invalid event shape, unknown types, missing mission/event IDs |
+| Salience gate | `server/services/mission-overwatch/salience.ts` | normalized event -> speak/suppress decision + reason | deterministic cooldown/rate logic from state and key tuple | rate limit saturation, missing dedupe key, invalid ts ordering |
+| Orchestration | `server/services/mission-overwatch/dottie-orchestrator.ts` | normalized + salience -> outcome (+ debrief candidate) | micro-debrief creation follows classification gates | no persistence for debrief lifecycle, weak reason taxonomy |
+| Mission board persistence | `server/routes/mission-board.ts`, `server/services/mission-overwatch/mission-board-store.ts` | route payloads <-> event/action records | sorted by `(ts,eventId)`, stable status fold rules | storage unavailable, shape mismatch, missing references |
+| Voice emission | `server/routes/voice.ts` + service adapters | text/utility -> voice speak request | bounded payload lengths + optional suppression | backend key missing, voice lane timeout, noisy repeats |
 
 ## Bottleneck register
-
-| ID | Severity | Symptom | Evidence | Root cause | Unblock action |
-|---|---|---|---|---|---|
-| `BOT-LLM-001` | Critical | Long-tail ask latency and queue buildup | `docs/helix-ask-runtime-limitations.md:35`, `docs/helix-ask-runtime-limitations.md:45`, `docs/helix-ask-runtime-limitations.md:52` | CPU generation throughput (~3-4 tok/s) + serialized concurrency (`concurrency=1`) | Implement adaptive token budgets + dedicated inference endpoint migration path |
-| `BOT-QUEUE-002` | High | Operator-facing backlog feels stalled under concurrent asks | `docs/helix-ask-runtime-limitations.md:54`, `docs/helix-ask-runtime-limitations.md:132` | Queue exists but no hard admission cap behavior documented as active default | Add explicit queue caps and deterministic overload envelopes for `/api/agi/*` |
-| `BOT-CONTRACT-003` | High | Text/voice/board behavior can drift | `server/services/mission-overwatch/salience.ts:21`, `server/routes/voice.ts:237`, `server/routes/mission-board.ts:20` | No single enforced cross-surface contract in runtime code | Enforce shared prompt-style contract + parity tests in CI |
-| `BOT-THREAT-004` | Medium | Threat interpretation quality limited | `server/services/mission-overwatch/event-normalizer.ts:34` | Keyword heuristic classification without contradiction/corroboration model | Add typed threat object contract + contradiction tests |
-| `BOT-TIMER-005` | Medium | Time-to-event not first-class in orchestration | `server/routes/mission-board.ts:20`, `server/services/mission-overwatch/salience.ts:107` | Timer events exist by enum, but no explicit T-minus policy/contract surfaced here | Add timer entity semantics with deterministic countdown/escalation rules |
+| ID | Severity | Bottleneck | Evidence | Unblock action |
+|---|---|---|---|---|
+| B1 | High | Orchestrator debrief generation is inline and non-persisted, limiting replay closure semantics. | `dottie-orchestrator` constructs debrief but does not persist linkage metadata.【server/services/mission-overwatch/dottie-orchestrator.ts:31-44】 | Persist `derived_from` links through mission-board write path.
+| B2 | High | Mission board snapshot ack resolution depends on overloaded `evidenceRefs` semantics, increasing ambiguity. | ack logic deletes unresolved critical IDs from evidence refs list.【server/routes/mission-board.ts:174-184】 | Add explicit ack linkage field and deterministic parser contract.
+| B3 | Medium | Event normalization path lacks explicit timer-specific validation in route layer. | timer_update exists as enum, but no timer schema in top-level event object in mission-board route section shown.【server/routes/mission-board.ts:20-47】 | Add timer payload schema + tests for deterministic timer updates.
+| B4 | Medium | Salience dedupe key in orchestrator uses raw `eventId` only, not canonical normalized tuple. | salience call uses `dedupeKey: raw.eventId` directly.【server/services/mission-overwatch/dottie-orchestrator.ts:25】 | Build stable hash from `(mission,eventType,classification,text)` when eventId absent/noisy.
+| B5 | Medium | Storage-unavailable handling maps all persistence errors to one 503 envelope, reducing actionable diagnostics. | `missionBoardUnavailable` emits single `mission_board_unavailable` envelope for all errors.【server/routes/mission-board.ts:124-133】 | Preserve deterministic sub-reason labels while keeping public contract stable.
 
 ## Top 5 blockers by impact/effort
+1. B1 (high impact / medium effort)
+2. B2 (high impact / medium effort)
+3. B3 (medium impact / low-medium effort)
+4. B4 (medium impact / low effort)
+5. B5 (medium impact / low effort)
 
-| Rank | Blocker | Impact | Effort | Rationale |
-|---|---|---|---|---|
-| 1 | Ask-path overload envelopes | High | Medium | Current runtime constraints show queue pressure risk; deterministic 429 behavior should be explicit in ask routes |
-| 2 | Cross-surface parity tests (text/voice/board) | High | Medium | Policy exists, but enforcement needs automated parity checks |
-| 3 | Threat model upgrade from regex heuristics | Medium | Medium | Current classification is deterministic but shallow |
-| 4 | Timer update contract wiring | Medium | Medium | Mission board supports timer event type but lacks first-class timer semantics |
-| 5 | Per-stage observability | High | Medium | Need latency/gate/suppression metrics for operator SLO confidence |
-
-## Instrumentation gaps (current state)
-
-1. Per-stage timing (retrieve, gate, synthesize, voice proxy) is not emitted as a unified pipeline metric artifact.
-2. Queue depth/admission pressure metrics for `/api/agi/*` are not surfaced as first-class operator telemetry.
-3. Cross-surface parity counters (`voice_certainty > text_certainty`, missing evidence suppressions) are not published as rollups.
-4. Mission-level suppression reason histograms are not exposed for replay trend analysis.
-5. Timer escalation metrics (time-to-breach, overdue duration) are not represented in current board snapshot contract.
-
-## Evidence notes
-
-- Runtime doc explicitly identifies CPU throughput and serialized concurrency as the dominant bottleneck (`docs/helix-ask-runtime-limitations.md:35-54`).
-- Salience and voice layers already have deterministic suppression/error reasons; this is a strong base to extend into unified parity enforcement (`server/services/mission-overwatch/salience.ts:21`, `server/routes/voice.ts:237-245`, `server/routes/voice.ts:338-347`).
-- Mission board has deterministic event model and snapshot fold path but still requires deeper timer/threat semantics for full Auntie-Dot-style situational-awareness behavior (`server/routes/mission-board.ts:20-33`, `server/routes/mission-board.ts:162-231`).
+## Instrumentation gaps + required metrics
+- Missing explicit counters for suppression reason distribution by event class (`suppression_reason_count{reason,event_type}`).
+- Missing timer lifecycle latency (`timer_due_ts - now` at callout/debrief emit).
+- Missing closure-loop SLI (`trigger_to_ack_ms`, `ack_to_outcome_ms`, `trigger_to_debrief_closed_ms`).
+- Missing overload envelope observability (`agi_overload_429_count{reason,route}`).
+- Missing certainty parity drift monitor (`voice_certainty_gt_text_certainty_count`).

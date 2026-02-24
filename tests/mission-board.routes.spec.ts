@@ -119,6 +119,12 @@ describe("mission board routes", () => {
     );
     expect(ackEvent?.type).toBe("state_change");
     expect(ackEvent?.evidenceRefs).toContain("action-ack-target");
+
+    const debriefEvent = (events.body.events as Array<{ eventId: string; type: string; derivedFromEventId?: string }>).find(
+      (event) => event.eventId.startsWith("debrief:closure:"),
+    );
+    expect(debriefEvent?.type).toBe("debrief");
+    expect(debriefEvent?.derivedFromEventId).toBe("action-ack-target");
   });
 
   it("acknowledgment clears unresolved critical count for referenced critical event", async () => {
@@ -199,4 +205,28 @@ describe("mission board routes", () => {
     expect(typeof res.body.message).toBe("string");
     expect(res.body.details).toBeTruthy();
   });
+});
+
+it("accepts timer_update with deterministic timer fields", async () => {
+  const app = buildApp();
+  const missionId = uniqueMissionId();
+
+  const res = await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
+    eventType: "timer_update",
+    classification: "warn",
+    text: "Ingress timer updated",
+    tier: "tier1",
+    sessionState: "active",
+    timer: {
+      timerId: "timer-1",
+      timerKind: "countdown",
+      status: "running",
+      dueTs: "2026-02-24T06:00:00.000Z",
+      derivedFromEventId: "event-root",
+    },
+  });
+
+  expect(res.status).toBe(200);
+  expect(res.body.event.timerId).toBe("timer-1");
+  expect(res.body.event.derivedFromEventId).toBe("event-root");
 });
