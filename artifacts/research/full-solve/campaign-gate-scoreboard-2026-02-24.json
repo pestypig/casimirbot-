@@ -9,7 +9,7 @@
     "G1": "NOT_READY",
     "G2": "NOT_READY",
     "G3": "NOT_READY",
-    "G4": "NOT_READY",
+    "G4": "FAIL",
     "G5": "NOT_APPLICABLE",
     "G6": "NOT_READY",
     "G7": "NOT_READY",
@@ -35,8 +35,8 @@
       "G4": "NOT_READY",
       "G5": "NOT_APPLICABLE",
       "G6": "NOT_READY",
-      "G7": "NOT_APPLICABLE",
-      "G8": "NOT_APPLICABLE"
+      "G7": "NOT_READY",
+      "G8": "NOT_READY"
     },
     "C": {
       "G0": "NOT_READY",
@@ -47,7 +47,7 @@
       "G5": "NOT_APPLICABLE",
       "G6": "NOT_READY",
       "G7": "NOT_READY",
-      "G8": "NOT_APPLICABLE"
+      "G8": "NOT_READY"
     },
     "D": {
       "G0": "NOT_READY",
@@ -65,7 +65,7 @@
   "statusCounts": {
     "FAIL": 0,
     "NOT_APPLICABLE": 1,
-    "NOT_READY": 8,
+    "NOT_READY": 7,
     "PASS": 0,
     "UNKNOWN": 0
   }

@@ -31,12 +31,6 @@
       "wave": "A"
     },
     {
-      "gateId": "G6",
-      "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present. Missing required signals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system.",
-      "status": "NOT_READY",
-      "wave": "A"
-    },
-    {
       "gateId": "G0",
       "reason": "No GR loop run artifacts found.",
       "status": "NOT_READY",
@@ -69,6 +63,18 @@
     {
       "gateId": "G6",
       "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present. Missing required signals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system.",
+      "status": "NOT_READY",
+      "wave": "B"
+    },
+    {
+      "gateId": "G7",
+      "reason": "Stability check enabled for waves C and D only. Missing required signals: evaluation_gate_status.",
+      "status": "NOT_READY",
+      "wave": "B"
+    },
+    {
+      "gateId": "G8",
+      "reason": "Replication parity applies to wave D only. Missing required signals: hard_constraint_ford_roman_qi, hard_constraint_theta_audit.",
       "status": "NOT_READY",
       "wave": "B"
     },
@@ -111,6 +117,12 @@
     {
       "gateId": "G7",
       "reason": "Need at least 2 runs for stability check. Missing required signals: evaluation_gate_status.",
+      "status": "NOT_READY",
+      "wave": "C"
+    },
+    {
+      "gateId": "G8",
+      "reason": "Replication parity applies to wave D only. Missing required signals: hard_constraint_ford_roman_qi, hard_constraint_theta_audit.",
       "status": "NOT_READY",
       "wave": "C"
     },
