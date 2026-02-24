@@ -28,7 +28,7 @@ export type ProposalPressureContext = {
   activePressures?: string[];
 };
 
-const PATCH_PROMPT_FRAMEWORK = `
+export const PATCH_PROMPT_FRAMEWORK = `
 You are designing a Needle Hull Warp Bubble with a live energy pipeline that must feed a stable, adaptive field around a spacecraft.
 Brainstorm detailed approaches to:
 1. sourcing and buffering energy (fusion/antimatter staging, capacitors, superfluid reservoirs),
