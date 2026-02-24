@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import fs from 'node:fs';
 import path from 'node:path';
 import {
   aggregateGateStatusAcrossWaves,
@@ -113,6 +114,21 @@ describe('warp-full-solve-campaign runner', () => {
     expect(gatesD.G8.reason).toContain('missing_constraints_payload');
   });
 
+
+
+  it('parses timeout args strictly as finite integers', () => {
+    expect(() => parseArgs(['--wave-timeout-ms', 'abc'])).toThrow(/Seed must be a finite integer/);
+    expect(() => parseArgs(['--campaign-timeout-ms', '1.2'])).toThrow(/Seed must be a finite integer/);
+  });
+
+  it('marks gates NOT_READY when required signals are missing', () => {
+    const incompleteRuns = [{ attempts: [{ initial: {}, evaluation: { gate: {}, constraints: [] } }] }] as any;
+    const gates = buildGateMap('A', incompleteRuns, [] as any);
+    expect(gates.G1.status).toBe('NOT_READY');
+    expect(gates.G2.status).toBe('NOT_READY');
+    expect(gates.G4.status).toBe('NOT_READY');
+  });
+
   it('cross-wave aggregation uses deterministic precedence', () => {
     const aggregate = aggregateGateStatusAcrossWaves([
       { G7: 'PASS', G8: 'NOT_APPLICABLE' },
@@ -135,7 +151,8 @@ describe('warp-full-solve-campaign runner', () => {
 
   it('CLI completes within bounded time (no hang)', async () => {
     const cliPath = path.resolve('scripts/warp-full-solve-campaign-cli.ts');
-    const { stdout } = await execFileAsync('npx', ['tsx', cliPath, '--wave', 'A', '--ci'], {
+    const tsxCli = path.resolve('node_modules/tsx/dist/cli.mjs');
+    const { stdout } = await execFileAsync(process.execPath, [tsxCli, cliPath, '--wave', 'A', '--ci', '--wave-timeout-ms', '120000'], {
       timeout: 120_000,
       maxBuffer: 1024 * 1024,
     });
