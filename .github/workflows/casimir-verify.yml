@@ -83,6 +83,9 @@ jobs:
       - name: Public claim disclaimer check
         run: npm run claims:disclaimer:check
 
+      - name: Ultimate warp readiness doc check
+        run: npm run warp:ultimate:check
+
       - name: Evidence pack determinism test
         run: npx vitest run tests/warp-evidence-pack.spec.ts
 

@@ -106,6 +106,7 @@
     "helix:decision:bundle": "tsx scripts/helix-decision-bundle.ts",
     "helix:decision:bundle:verify": "tsx scripts/helix-decision-bundle-verify.ts",
     "claims:disclaimer:check": "tsx scripts/check-public-claim-disclaimer.ts",
+    "warp:ultimate:check": "tsx scripts/check-warp-ultimate-readiness.ts",
     "warp:evidence:pack": "tsx scripts/warp-evidence-pack.ts",
     "voice:verify-weights-manifest": "python scripts/voice/verify_weights_manifest.py configs/voice/weights-manifest.example.json"
   },
