@@ -81,16 +81,23 @@ class KnowledgeAudioDataset(Dataset):
                 self.files.append(path)
 
         self.items: List[tuple[Path, int, int]] = []
+        has_info = hasattr(torchaudio, "info")
         for file in self.files:
             try:
-                info = torchaudio.info(str(file))
+                if has_info:
+                    info = torchaudio.info(str(file))
+                    source_rate = max(int(getattr(info, "sample_rate", 0)) or 1, 1)
+                    num_frames = int(getattr(info, "num_frames", 0))
+                else:
+                    wav, source_rate = torchaudio.load(str(file))
+                    source_rate = max(int(source_rate), 1)
+                    num_frames = int(wav.shape[-1])
             except Exception as exc:
                 print(f"[dataset] Skipping {file}: {exc}")
                 continue
 
             # Normalize frame counts to the target sample rate in case of resampling.
-            source_rate = max(info.sample_rate, 1)
-            total = int(info.num_frames * (self.sample_rate / source_rate))
+            total = int(num_frames * (self.sample_rate / source_rate))
             if total <= 0:
                 continue
             pos = 0
