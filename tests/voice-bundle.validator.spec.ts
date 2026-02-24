@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
@@ -83,5 +84,37 @@ describe("validateVoiceBundle", () => {
     const result = validateVoiceBundle(dir);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure.code).toBe("bytes_mismatch");
+  });
+
+  it("promotes prod_tts_voice_bundle/1 into a serving voice_bundle/1 with provenance", () => {
+    const root = makeBundle();
+    const sourceDir = join(root, "checkpoints", "prod_tts_voice_bundle");
+    const targetRoot = join(root, "bundles");
+    const modelPath = join(sourceDir, "model.nemo");
+    const samplePath = join(sourceDir, "sample.wav");
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(modelPath, "nemo-model");
+    writeFileSync(samplePath, "sample-data");
+    writeFileSync(join(sourceDir, "manifest.json"), JSON.stringify({
+      bundle_version: "prod_tts_voice_bundle/1",
+      commit: "b357dba3",
+      config_sha256: hash("cfg"),
+      dataset_sha256: hash("dataset"),
+      artifact_sha256: hash("artifact"),
+      weights_refs: { id: "nvidia/nemo-tts-fastpitch-en" },
+      files: [
+        { path: "model.nemo", sha256: hash("nemo-model"), bytes: 10 },
+        { path: "sample.wav", sha256: hash("sample-data"), bytes: 11 },
+      ],
+    }, null, 2));
+
+    execFileSync("python", ["scripts/voice/prod/promote_voice_bundle.py", "--input-manifest", join(sourceDir, "manifest.json"), "--output-root", targetRoot, "--voice-profile-id", "dottie_default", "--display-name", "Dottie"], {
+      cwd: process.cwd(),
+      encoding: "utf-8",
+    });
+
+    const promotedDir = join(targetRoot, "dottie_default", "voice_bundle");
+    const promoted = validateVoiceBundle(promotedDir);
+    expect(promoted).toEqual({ ok: true, profileId: "dottie_default", filesValidated: 2 });
   });
 });
