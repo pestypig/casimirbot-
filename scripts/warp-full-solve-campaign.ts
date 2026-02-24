@@ -770,6 +770,36 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, wa
     }
   }
 
+  if (runArtifacts.length < profile.runCount) {
+    const fallbackError = runErrors.length > 0 ? runErrors[runErrors.length - 1].error : 'campaign_incomplete';
+    const fallbackState = fallbackError.startsWith('wave_timeout:') || fallbackError.startsWith('campaign_timeout:') ? 'timeout' : 'not_executed';
+    for (let runIndex = runArtifacts.length; runIndex < profile.runCount; runIndex += 1) {
+      const outputPath = path.join(base, `run-${runIndex + 1}-raw-output.json`);
+      const nowIso = new Date().toISOString();
+      writeJson(outputPath, {
+        wave,
+        runIndex: runIndex + 1,
+        startedAt: nowIso,
+        completedAt: nowIso,
+        durationMs: 0,
+        options: profile.options,
+        error: fallbackError,
+        skipped: true,
+      });
+      runArtifacts.push({
+        runIndex: runIndex + 1,
+        startedAt: nowIso,
+        completedAt: nowIso,
+        durationMs: 0,
+        accepted: false,
+        state: fallbackState,
+        attemptCount: 0,
+        outputPath,
+      });
+      runErrors.push({ runIndex: runIndex + 1, error: fallbackError });
+    }
+  }
+
   const gateMap = buildGateMap(wave, runResults, runArtifacts);
   const latestAttempt = runResults.length ? extractLatestAttempt(runResults[runResults.length - 1]) : null;
   const latestResult = runResults.length ? runResults[runResults.length - 1] : null;
