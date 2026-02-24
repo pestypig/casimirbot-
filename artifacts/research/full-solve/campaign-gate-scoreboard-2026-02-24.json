@@ -1,0 +1,110 @@
+{
+  "campaignId": "FS-CAMPAIGN-2026-02-24",
+  "asOfDate": "2026-02-24",
+  "timezone": "America/New_York",
+  "decision": "INADMISSIBLE",
+  "statusCounts": {
+    "PASS": 1,
+    "FAIL": 2,
+    "UNKNOWN": 2,
+    "NOT_READY": 4
+  },
+  "gates": [
+    {
+      "gate": "G0",
+      "status": "PASS",
+      "evidence": [
+        "npm run warp:evidence:pack produced deterministic artifact and checksum",
+        "npm run casimir:verify returned PASS with integrityOk=true"
+      ],
+      "blockingIssue": null,
+      "nextAction": "Add replay tolerance statement for full-solve outputs once runner exists."
+    },
+    {
+      "gate": "G1",
+      "status": "NOT_READY",
+      "evidence": [
+        "No wave-level convergence summaries found at artifacts/research/full-solve/<wave>/convergence-summary.md",
+        "No package.json script includes an explicit full-solve campaign runner"
+      ],
+      "blockingIssue": "Missing full-solve runner path and convergence artifact generation.",
+      "nextAction": "Implement and register a full-solve command that emits multi-resolution residual deltas."
+    },
+    {
+      "gate": "G2",
+      "status": "FAIL",
+      "evidence": [
+        "Full-solve ADM residual artifacts are absent",
+        "Campaign policy requires unknownAsFail=true for hard ADM gate"
+      ],
+      "blockingIssue": "No admissible ADM residual dataset tied to this campaign run.",
+      "nextAction": "Emit H/M residual metrics per run and enforce threshold checks in evidence pack."
+    },
+    {
+      "gate": "G3",
+      "status": "UNKNOWN",
+      "evidence": [
+        "Strict contract checks exist in tests, but no full-solve campaign artifact demonstrates complete chart/observer/normalization/units closure for every surfaced channel"
+      ],
+      "blockingIssue": "Campaign-specific strict metadata ledger not generated.",
+      "nextAction": "Publish strict contract completeness report for each wave artifact."
+    },
+    {
+      "gate": "G4",
+      "status": "FAIL",
+      "evidence": [
+        "gr:loop:ci produced QI guard exceedance log before terminating",
+        "No completed full-solve guardrail summary with hard/soft statuses was generated"
+      ],
+      "blockingIssue": "Hard guardrail pass cannot be established for full-solve campaign state.",
+      "nextAction": "Run guardrails within a deterministic full-solve pipeline and export per-run hard/soft verdicts."
+    },
+    {
+      "gate": "G5",
+      "status": "UNKNOWN",
+      "evidence": [
+        "No campaign-level qiApplicabilityStatus table discovered for G0..G8 runs"
+      ],
+      "blockingIssue": "Applicability basis is not attached to full-solve campaign records.",
+      "nextAction": "Attach qiApplicabilityStatus and basis metadata to each run artifact."
+    },
+    {
+      "gate": "G6",
+      "status": "NOT_READY",
+      "evidence": [
+        "TS semantics are tested in repo, but no full-solve campaign output asserts canonical TS gate + regime labeling parity"
+      ],
+      "blockingIssue": "No campaign TS semantics audit report.",
+      "nextAction": "Export TS semantic parity check in campaign evidence pack."
+    },
+    {
+      "gate": "G7",
+      "status": "NOT_READY",
+      "evidence": [
+        "No perturbation sweep outputs (seed/duty/jitter) found for the campaign"
+      ],
+      "blockingIssue": "Counterexample robustness sweep missing.",
+      "nextAction": "Run perturbation matrix and record first-fail ordering stability."
+    },
+    {
+      "gate": "G8",
+      "status": "NOT_READY",
+      "evidence": [
+        "No independent-environment replication delta artifact found"
+      ],
+      "blockingIssue": "Replication wave (D) not executed.",
+      "nextAction": "Execute independent environment replay and publish replication-delta.json."
+    }
+  ],
+  "missingRunnerPath": {
+    "status": "NOT_READY",
+    "finding": "missing runner path",
+    "gaps": [
+      "No package.json script named or documented for full-solve campaign orchestration",
+      "No generated artifacts at artifacts/research/full-solve/<wave>/evidence-pack.json",
+      "No generated artifacts at artifacts/research/full-solve/<wave>/first-fail-map.json",
+      "No generated artifacts at artifacts/research/full-solve/<wave>/convergence-summary.md",
+      "No generated artifacts at artifacts/research/full-solve/<wave>/replication-delta.json"
+    ]
+  }
+}

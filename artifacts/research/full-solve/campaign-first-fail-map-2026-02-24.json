@@ -1,0 +1,39 @@
+{
+  "campaignId": "FS-CAMPAIGN-2026-02-24",
+  "asOfDate": "2026-02-24",
+  "firstFailMap": {
+    "globalFirstFail": "G2",
+    "rationale": "G2 is hard-gated with unknownAsFail=true and campaign ADM residual evidence is missing.",
+    "gateOrderedFailures": [
+      {
+        "gate": "G2",
+        "failureType": "HARD_UNKNOWN_AS_FAIL",
+        "detail": "No campaign ADM residual metrics available to evaluate hard thresholds."
+      },
+      {
+        "gate": "G4",
+        "failureType": "HARD_GUARD_UNRESOLVED",
+        "detail": "No completed full-solve hard guard summary; exploratory gr loop emitted QI exceedance logs."
+      }
+    ]
+  },
+  "noGoRegionSummary": {
+    "status": "PROVISIONAL",
+    "regions": [
+      {
+        "regionId": "QI_EXCEEDANCE_LOGGED",
+        "source": "npm run gr:loop:ci stderr",
+        "signature": {
+          "margin": 1,
+          "lhs_Jm3": -74987316161011570,
+          "bound_Jm3": -18,
+          "TS": 50,
+          "rhoSource": "warp.metric.T00.natario.shift"
+        },
+        "interpretation": "Configuration enters a guardrail no-go region under current reduced-order QI monitor semantics.",
+        "confidence": "medium",
+        "failCloseNote": "Without full-solve artifact parity this region remains diagnostic and non-promotional."
+      }
+    ]
+  }
+}

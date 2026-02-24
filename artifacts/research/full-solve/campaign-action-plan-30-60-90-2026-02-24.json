@@ -1,0 +1,54 @@
+{
+  "campaignId": "FS-CAMPAIGN-2026-02-24",
+  "decision": "INADMISSIBLE",
+  "plan": {
+    "30_days": [
+      {
+        "rank": 1,
+        "owner": "Simulation Platform",
+        "blocker": "Missing full-solve runner path",
+        "action": "Implement npm script for full-solve campaign orchestration and artifact emission",
+        "acceptanceTest": "Runner emits wave A evidence-pack + first-fail-map + convergence-summary with commit/run/trace/checksum fields"
+      },
+      {
+        "rank": 2,
+        "owner": "Governance/Provenance",
+        "blocker": "No campaign strict-contract completeness ledger",
+        "action": "Export strict metadata closure report for chart/observer/normalization/units",
+        "acceptanceTest": "Every metric-derived channel has complete contract metadata in strict mode"
+      }
+    ],
+    "60_days": [
+      {
+        "rank": 1,
+        "owner": "Numerics + GR",
+        "blocker": "G1/G2 evidence absent",
+        "action": "Run coarse/refined multi-resolution campaigns with ADM threshold checks",
+        "acceptanceTest": "Monotone convergence demonstrated on two resolutions and all G2 thresholds computed"
+      },
+      {
+        "rank": 2,
+        "owner": "Guardrails",
+        "blocker": "Hard/soft guard matrix not campaign-exported",
+        "action": "Attach FordRomanQI/ThetaAudit/CL3/TS/VdB statuses to each run",
+        "acceptanceTest": "Machine-readable guardrail verdict table generated per run"
+      }
+    ],
+    "90_days": [
+      {
+        "rank": 1,
+        "owner": "Replication",
+        "blocker": "No independent environment parity run",
+        "action": "Execute Wave D independent replay and publish replication-delta",
+        "acceptanceTest": "G0..G8 verdict parity within tolerance on independent environment"
+      },
+      {
+        "rank": 2,
+        "owner": "Program Review",
+        "blocker": "Promotion policy not yet satisfied",
+        "action": "Re-evaluate decision label only after G0..G8 evidence is complete",
+        "acceptanceTest": "Policy check returns REDUCED_ORDER_ADMISSIBLE or higher without hard failures"
+      }
+    ]
+  }
+}
