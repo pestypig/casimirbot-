@@ -1,0 +1,28 @@
+{
+  "version": "prod_tts_allowlist/1",
+  "updated_at": "2026-02-24T00:00:00Z",
+  "weights": [
+    {
+      "id": "nvidia/nemo-tts-fastpitch-en",
+      "provider": "NVIDIA",
+      "source": "https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/tts_en_fastpitch",
+      "weights_license": "NVIDIA Open Model License",
+      "code_license": "Apache-2.0",
+      "commercial_use_allowed": true,
+      "redistribution_allowed": true,
+      "attribution_required": true,
+      "license_url": "https://developer.nvidia.com/ngc/nvidia-open-model-license"
+    },
+    {
+      "id": "nvidia/nemo-tts-hifigan-en",
+      "provider": "NVIDIA",
+      "source": "https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/tts_hifigan",
+      "weights_license": "NVIDIA Open Model License",
+      "code_license": "Apache-2.0",
+      "commercial_use_allowed": true,
+      "redistribution_allowed": true,
+      "attribution_required": true,
+      "license_url": "https://developer.nvidia.com/ngc/nvidia-open-model-license"
+    }
+  ]
+}
