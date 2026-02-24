@@ -22,6 +22,7 @@ describe('warp publication bundle', () => {
     expect(Array.isArray(parsed.files)).toBe(true);
     expect(parsed.files.length).toBeGreaterThan(0);
     expect(parsed.missing).toEqual([]);
+    expect(parsed.files.some((entry: { path: string }) => entry.path === 'reports/gates-executive-translation.md')).toBe(true);
   });
 
   it('fails bundle generation when required files are missing', () => {
@@ -53,5 +54,6 @@ describe('warp publication bundle', () => {
     expect(parsed.ok).toBe(true);
     expect(parsed.outDir).toBe(out);
     expect(fs.existsSync(path.join(out, 'checksum-manifest.json'))).toBe(true);
+    expect(fs.existsSync(path.join(out, 'reports', 'gates-executive-translation.md'))).toBe(true);
   });
 });

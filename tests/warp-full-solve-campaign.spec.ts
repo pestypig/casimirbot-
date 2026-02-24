@@ -209,6 +209,33 @@ describe('warp-full-solve-campaign runner', () => {
     expect(typeof run2.error).toBe('string');
   }, 50_000);
 
+  it('emits executive translation reference in wave evidence pack', async () => {
+    const cliPath = path.resolve('scripts/warp-full-solve-campaign-cli.ts');
+    const tsxCli = path.resolve('node_modules/tsx/dist/cli.mjs');
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-wave-translation-ref-'));
+    const outDir = path.join(tempRoot, 'out');
+    await execFileAsync(process.execPath, [
+      tsxCli,
+      cliPath,
+      '--wave',
+      'C',
+      '--out',
+      outDir,
+      '--ci',
+      '--wave-timeout-ms',
+      '1',
+      '--campaign-timeout-ms',
+      '2000',
+    ], {
+      timeout: 45_000,
+      maxBuffer: 1024 * 1024,
+    });
+    const evidencePath = path.join(outDir, 'C', 'evidence-pack.json');
+    const evidence = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
+    expect(typeof evidence.executiveTranslationRef).toBe('string');
+    expect(String(evidence.executiveTranslationRef)).toContain('docs/audits/research/warp-gates-executive-translation-2026-02-24.md');
+  }, 50_000);
+
   it('residualTrend is FAIL when non-decreasing and PASS when strictly decreasing', () => {
     const nonDecreasing = computeReproducibility([
       { attempts: [{ initial: { residual: 1 }, evaluation: { gate: { status: 'pass' }, constraints: [] } }] },

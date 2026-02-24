@@ -1,0 +1,97 @@
+{
+  "head": "d1c6a0db8132300f12672f749098e49896d92cc2",
+  "generated_at": "2026-02-24",
+  "rubric_weights": {
+    "fit_to_event_driven_ops": 25,
+    "determinism_replay_trust": 25,
+    "operational_maturity": 20,
+    "integration_cost_to_current_repo": 15,
+    "licensing_deployment_safety": 15
+  },
+  "scoring_notes": {
+    "status": "inference",
+    "note": "Scores are decision-planning estimates; validate with workload benchmarks and deployment constraints."
+  },
+  "approaches": [
+    {
+      "id": "A",
+      "name": "Harden current Helix Ask x Dottie method (keep contracts; remove nondeterminism defaults; prevent policy drift)",
+      "scores": {
+        "fit_to_event_driven_ops": 23,
+        "determinism_replay_trust": 16,
+        "operational_maturity": 14,
+        "integration_cost_to_current_repo": 14,
+        "licensing_deployment_safety": 13
+      },
+      "total": 80,
+      "latency_throughput_cost_assumptions": {
+        "status": "inference",
+        "assumptions": {
+          "mission_board_read_p95_ms_target": 300,
+          "voice_callout_start_p95_ms_target_dry_run": 1200,
+          "peak_events_per_mission_per_minute": 60,
+          "max_non_critical_callouts_per_15s_per_mission": 2,
+          "tenant_daily_voice_requests_cap_default": 500
+        },
+        "likely_bottlenecks": [
+          "silent Date.now()/new Date defaults in IDs and timestamps",
+          "policy drift across client/server implementations",
+          "external TTS latency variance if managed providers are enabled"
+        ]
+      }
+    },
+    {
+      "id": "B",
+      "name": "Adopt deterministic workflow-history substrate for mission orchestration (keep current HTTP edges as adapters)",
+      "scores": {
+        "fit_to_event_driven_ops": 22,
+        "determinism_replay_trust": 23,
+        "operational_maturity": 18,
+        "integration_cost_to_current_repo": 9,
+        "licensing_deployment_safety": 14
+      },
+      "total": 86,
+      "latency_throughput_cost_assumptions": {
+        "status": "inference",
+        "assumptions": {
+          "workflow_history_replay_is_primary_audit_artifact": true,
+          "expected_added_infra": [
+            "workflow service",
+            "worker fleet",
+            "persistence backend"
+          ],
+          "cost_risk": "additional infra + ops overhead, offset by stronger replay trust"
+        }
+      }
+    },
+    {
+      "id": "C",
+      "name": "Introduce replayable internal event bus (streams + durable consumers) and treat mission board as a projection",
+      "scores": {
+        "fit_to_event_driven_ops": 21,
+        "determinism_replay_trust": 18,
+        "operational_maturity": 17,
+        "integration_cost_to_current_repo": 10,
+        "licensing_deployment_safety": 12
+      },
+      "total": 78,
+      "licensing_note": {
+        "status": "missing_evidence",
+        "note": "Core license and deployment constraints should be validated from non-GitHub primary sources before selection."
+      },
+      "latency_throughput_cost_assumptions": {
+        "status": "inference",
+        "assumptions": {
+          "at_least_once_delivery": true,
+          "idempotency_required": true,
+          "cost_risk": "operating message bus + storage; mitigated by clear replay path"
+        }
+      }
+    }
+  ],
+  "ranked_top_3": [
+    "B",
+    "A",
+    "C"
+  ]
+}

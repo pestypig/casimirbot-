@@ -93,6 +93,7 @@ type EvidencePack = {
     };
   };
   claimPosture: 'diagnostic/reduced-order';
+  executiveTranslationRef: string;
   boundaryStatement: string;
 };
 
@@ -102,6 +103,7 @@ const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
 
 const DATE_STAMP = '2026-02-24';
+const EXECUTIVE_TRANSLATION_DOC = `docs/audits/research/warp-gates-executive-translation-${DATE_STAMP}.md`;
 const ALLOWED_WAVES: readonly WaveArg[] = ['A', 'B', 'C', 'D', 'all'] as const;
 const FIRST_FAIL_ORDER = ['G0', 'G1', 'G2', 'G3', 'G4', 'G6', 'G7', 'G8'] as const;
 
@@ -867,6 +869,7 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, wa
     timeout,
     reproducibility,
     claimPosture: 'diagnostic/reduced-order',
+    executiveTranslationRef: EXECUTIVE_TRANSLATION_DOC,
     boundaryStatement: BOUNDARY_STATEMENT,
   };
 
@@ -894,6 +897,7 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
   writeJson(path.join(outDir, `campaign-gate-scoreboard-${DATE_STAMP}.json`), {
     campaignId: `FS-CAMPAIGN-${DATE_STAMP}`,
     asOfDate: DATE_STAMP,
+    executiveTranslationRef: EXECUTIVE_TRANSLATION_DOC,
     decision,
     statusCounts: scoreboard.counts,
     gateCount: scoreboard.gateCount,
@@ -905,12 +909,14 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
   writeJson(path.join(outDir, `campaign-first-fail-map-${DATE_STAMP}.json`), {
     campaignId: `FS-CAMPAIGN-${DATE_STAMP}`,
     asOfDate: DATE_STAMP,
+    executiveTranslationRef: EXECUTIVE_TRANSLATION_DOC,
     globalFirstFail: aggregateFirstFail.firstFail,
     perWave: Object.fromEntries(waves.map((w) => [w, (JSON.parse(fs.readFileSync(path.join(outDir, w, 'first-fail-map.json'), 'utf8')) as { globalFirstFail: string }).globalFirstFail])),
   });
 
   writeJson(path.join(outDir, `campaign-action-plan-30-60-90-${DATE_STAMP}.json`), {
     campaignId: `FS-CAMPAIGN-${DATE_STAMP}`,
+    executiveTranslationRef: EXECUTIVE_TRANSLATION_DOC,
     decision,
     blockers: packs.flatMap((pack) =>
       Object.entries(pack.gateDetails)
@@ -926,7 +932,7 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
 
   writeMd(
     path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.md`),
-    `# Warp Full-Solve Campaign Execution Report (${DATE_STAMP})\n\n## Executive verdict\n**${decision}**\n\n## Gate scoreboard (G0..G8)\n- PASS: ${scoreboard.counts.PASS}\n- FAIL: ${scoreboard.counts.FAIL}\n- UNKNOWN: ${scoreboard.counts.UNKNOWN}\n- NOT_READY: ${scoreboard.counts.NOT_READY}\n- NOT_APPLICABLE: ${scoreboard.counts.NOT_APPLICABLE}\n- Total gates: ${scoreboard.gateCount}\n- Reconciled: ${scoreboard.reconciled}\n\nCross-wave aggregate gate status:\n${Object.entries(aggregatedGateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n\nPer-wave gate status snapshots:\n${packs.map((pack) => `### Wave ${pack.wave}\n${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n- missingSignals: ${(pack.missingSignals ?? []).join(', ') || 'none'}\n- reproducibility.gateAgreement: ${pack.reproducibility?.repeatedRunGateAgreement?.status ?? 'NOT_READY'}`).join('\n\n')}\n\n## Decision output\n- Final decision label: **${decision}**\n- Claim posture: diagnostic/reduced-order (fail-closed on hard evidence gaps).\n\n## Boundary statement\n${BOUNDARY_STATEMENT}\n`,
+    `# Warp Full-Solve Campaign Execution Report (${DATE_STAMP})\n\n## Executive verdict\n**${decision}**\n\n## Required companion\n- Executive translation: \`${EXECUTIVE_TRANSLATION_DOC}\`\n\n## Gate scoreboard (G0..G8)\n- PASS: ${scoreboard.counts.PASS}\n- FAIL: ${scoreboard.counts.FAIL}\n- UNKNOWN: ${scoreboard.counts.UNKNOWN}\n- NOT_READY: ${scoreboard.counts.NOT_READY}\n- NOT_APPLICABLE: ${scoreboard.counts.NOT_APPLICABLE}\n- Total gates: ${scoreboard.gateCount}\n- Reconciled: ${scoreboard.reconciled}\n\nCross-wave aggregate gate status:\n${Object.entries(aggregatedGateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n\nPer-wave gate status snapshots:\n${packs.map((pack) => `### Wave ${pack.wave}\n${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n- missingSignals: ${(pack.missingSignals ?? []).join(', ') || 'none'}\n- reproducibility.gateAgreement: ${pack.reproducibility?.repeatedRunGateAgreement?.status ?? 'NOT_READY'}`).join('\n\n')}\n\n## Decision output\n- Final decision label: **${decision}**\n- Claim posture: diagnostic/reduced-order (fail-closed on hard evidence gaps).\n\n## Boundary statement\n${BOUNDARY_STATEMENT}\n`,
   );
 
   return { counts: scoreboard.counts, decision, reconciled: scoreboard.reconciled };
@@ -1017,6 +1023,7 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
           },
         },
         claimPosture: 'diagnostic/reduced-order',
+        executiveTranslationRef: EXECUTIVE_TRANSLATION_DOC,
         boundaryStatement: BOUNDARY_STATEMENT,
       });
       break;

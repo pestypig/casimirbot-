@@ -3,6 +3,9 @@
 ## Executive verdict
 **NOT_READY**
 
+## Required companion
+- Executive translation: `docs/audits/research/warp-gates-executive-translation-2026-02-24.md`
+
 ## Gate scoreboard (G0..G8)
 - PASS: 0
 - FAIL: 0

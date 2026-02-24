@@ -61,6 +61,7 @@ export const buildPublicationBundle = (outDir = DEFAULT_OUT_DIR) => {
 
   const requiredCopies: Array<[string, string]> = [
     ['docs/audits/research/warp-full-solve-campaign-execution-report-2026-02-24.md', 'reports/campaign-execution-report.md'],
+    ['docs/audits/research/warp-gates-executive-translation-2026-02-24.md', 'reports/gates-executive-translation.md'],
     ['artifacts/research/full-solve/campaign-gate-scoreboard-2026-02-24.json', 'reports/campaign-gate-scoreboard.json'],
     ['artifacts/research/full-solve/campaign-first-fail-map-2026-02-24.json', 'reports/campaign-first-fail-map.json'],
     ['artifacts/research/full-solve/campaign-action-plan-30-60-90-2026-02-24.json', 'reports/campaign-action-plan-30-60-90.json'],

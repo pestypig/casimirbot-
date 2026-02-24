@@ -1,6 +1,7 @@
 {
   "asOfDate": "2026-02-24",
   "campaignId": "FS-CAMPAIGN-2026-02-24",
+  "executiveTranslationRef": "docs/audits/research/warp-gates-executive-translation-2026-02-24.md",
   "globalFirstFail": "G0",
   "perWave": {
     "A": "G0",
