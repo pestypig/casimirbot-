@@ -95,6 +95,18 @@ Required board event fields:
 - `evidenceRefs`
 - `ts`
 
+### Prompt-style alignment fields (v1, additive)
+
+For uniform text/voice/board behavior, board events should also include:
+- `certaintyClass` (`confirmed|reasoned|hypothesis|unknown`)
+- `suppressionReason` (typed deterministic enum when callout was suppressed)
+
+Reference contract:
+- `docs/architecture/helix-ask-dottie-prompt-style-contract.v1.md`
+
+Alignment rule:
+- Any board event that can emit voice callouts must keep certainty class no stronger than the paired text payload certainty.
+
 ## API surface (proposed)
 - `GET /api/mission-board/:missionId`
   - Returns current board snapshot.

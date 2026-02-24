@@ -118,6 +118,22 @@ Compatibility rule: servers should accept existing payloads without requiring ne
   - `consent_asserted`
   - `referenceAudioHash` (if provided)
 
+## Prompt-style contract binding (v1, additive)
+
+For mission-overwatch and Helix Ask callouts, implementations should also comply with:
+- `docs/architecture/helix-ask-dottie-prompt-style-contract.v1.md`
+
+Recommended additive request metadata (when available):
+- `contextTier` (`0|1`)
+- `sessionState` (`idle|requesting|active|stopping|error`)
+- `voiceMode` (`normal|critical_only|dnd|off`)
+- `certaintyClass` (`confirmed|reasoned|hypothesis|unknown`)
+
+Behavioral binding:
+- Speak eligibility is determined by tier/session/voice mode matrix.
+- Missing evidence for repo-attributed mission claims should suppress or downgrade certainty.
+- Suppression responses should carry stable deterministic reason labels.
+
 ## Integration points
 - Input signals from Helix Ask live events and final envelopes.
 - Optional integration with Mission Go Board event stream.
