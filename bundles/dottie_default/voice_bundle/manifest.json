@@ -1,18 +1,55 @@
 {
   "bundle_version": "voice_bundle/1",
-  "voice_profile_id": "dottie_default",
+  "created_at": "2026-02-24T03:51:45.717385+00:00",
   "display_name": "Dottie",
-  "created_at": "2026-02-23T21:21:50.604933+00:00",
   "files": [
     {
-      "path": "model.bin",
-      "sha256": "9704aedc35dbe44f79b0d42b7ddee82d22cf4089675e04f2daace004d9bcc83e",
-      "bytes": 17
+      "bytes": 619437,
+      "path": "fastpitch.nemo",
+      "sha256": "4421ed37fee3c43f0a7bbe826bb96a3400ee92771381326aaee16b2144ec711f"
     },
     {
-      "path": "sample.wav",
-      "sha256": "574da915e17d3f132551f0a139b1be9d1816167de08fbb96d150975ad5c8aeb8",
-      "bytes": 15
+      "bytes": 1517,
+      "path": "hifigan.nemo",
+      "sha256": "9dedc28096159ff4888a0f27e75748e8cbb9e44681ddec654dcf6c4c1725b960"
+    },
+    {
+      "bytes": 211,
+      "path": "prod_tts_eval.json",
+      "sha256": "ead790c0c0828a5b800f30139f6c883183eb6902b7765b3299e1417e2d73938a"
     }
-  ]
+  ],
+  "provenance": {
+    "source_artifact_sha256": "9ab758d3197580ef964459172538b675db9603a2090ccf63c6d81985715c0d1e",
+    "source_bundle_version": "prod_tts_voice_bundle/1",
+    "source_commit": "b357dba3",
+    "source_config_sha256": "c0c82c695cd3d22991b041c660da137097a46812ffec2ae1e9f393813aff28bc",
+    "source_dataset_sha256": "fa789579a4851dcb6df63423626b88329de3c339106a6525a9efee3e78e567c2",
+    "source_files": [
+      {
+        "bytes": 619437,
+        "path": "fastpitch.nemo",
+        "sha256": "4421ed37fee3c43f0a7bbe826bb96a3400ee92771381326aaee16b2144ec711f"
+      },
+      {
+        "bytes": 1517,
+        "path": "hifigan.nemo",
+        "sha256": "9dedc28096159ff4888a0f27e75748e8cbb9e44681ddec654dcf6c4c1725b960"
+      },
+      {
+        "bytes": 211,
+        "path": "prod_tts_eval.json",
+        "sha256": "ead790c0c0828a5b800f30139f6c883183eb6902b7765b3299e1417e2d73938a"
+      }
+    ],
+    "source_manifest_path": "checkpoints/prod_tts_voice_bundle/manifest.json",
+    "source_manifest_sha256": "e2efe6d214d890538bdeee22e2887a24924b51c478ae3662f2f8c8352d7f1b27",
+    "source_weights_refs": {
+      "code_license": "Apache-2.0",
+      "id": "nvidia/nemo-tts-fastpitch-en",
+      "license_url": "https://developer.nvidia.com/ngc/nvidia-open-model-license",
+      "weights_license": "NVIDIA Open Model License"
+    }
+  },
+  "voice_profile_id": "dottie_default"
 }
