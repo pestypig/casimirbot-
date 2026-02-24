@@ -217,6 +217,7 @@ describe("voice routes", () => {
       mode: "callout",
       priority: "warn",
       missionId,
+      evidenceRefs: ["docs/helix-ask-flow.md#L1"],
       eventId: dedupeKey,
       dedupe_key: dedupeKey,
       traceId: "trace-first",
@@ -230,6 +231,7 @@ describe("voice routes", () => {
       mode: "callout",
       priority: "warn",
       missionId,
+      evidenceRefs: ["docs/helix-ask-flow.md#L1"],
       eventId: dedupeKey,
       dedupe_key: dedupeKey,
       traceId: "trace-second",
@@ -246,6 +248,7 @@ describe("voice routes", () => {
     const res = await request(app).post("/api/voice/speak").send({
       text: "Meter this callout.",
       missionId: uniqueId("mission-meter"),
+      repoAttributed: false,
       durationMs: 1200,
     });
 
@@ -266,15 +269,15 @@ describe("voice routes", () => {
     const first = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-a")
-      .send({ text: "one", missionId, eventId: uniqueId("event") });
+      .send({ text: "one", missionId, eventId: uniqueId("event"), repoAttributed: false });
     const second = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-a")
-      .send({ text: "two", missionId, eventId: uniqueId("event") });
+      .send({ text: "two", missionId, eventId: uniqueId("event"), repoAttributed: false });
     const missionBudget = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-a")
-      .send({ text: "three", missionId, eventId: uniqueId("event") });
+      .send({ text: "three", missionId, eventId: uniqueId("event"), repoAttributed: false });
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
@@ -285,19 +288,19 @@ describe("voice routes", () => {
     const tenantMissionA = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-b")
-      .send({ text: "b-one", missionId: uniqueId("mission-b") });
+      .send({ text: "b-one", missionId: uniqueId("mission-b"), repoAttributed: false });
     const tenantMissionB = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-b")
-      .send({ text: "b-two", missionId: uniqueId("mission-b") });
+      .send({ text: "b-two", missionId: uniqueId("mission-b"), repoAttributed: false });
     const tenantDaily = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-b")
-      .send({ text: "b-three", missionId: uniqueId("mission-b") });
+      .send({ text: "b-three", missionId: uniqueId("mission-b"), repoAttributed: false });
     const tenantDailyExceeded = await request(app)
       .post("/api/voice/speak")
       .set("x-tenant-id", "tenant-b")
-      .send({ text: "b-four", missionId: uniqueId("mission-b") });
+      .send({ text: "b-four", missionId: uniqueId("mission-b"), repoAttributed: false });
 
     expect(tenantMissionA.status).toBe(200);
     expect(tenantMissionB.status).toBe(200);
@@ -318,6 +321,7 @@ describe("voice routes", () => {
         mode: "callout",
         priority: "info",
         missionId,
+      evidenceRefs: ["docs/helix-ask-flow.md#L1"],
         eventId,
         dedupe_key: eventId,
       });
@@ -392,6 +396,7 @@ describe("voice routes", () => {
           priority: "warn",
           missionId: uniqueId("mission-breaker"),
           eventId: uniqueId("event-breaker"),
+          evidenceRefs: ["docs/helix-ask-flow.md#L1"],
         });
 
       const first = await sendFail();
@@ -437,11 +442,13 @@ describe("voice routes", () => {
     const first = await request(app).post("/api/voice/speak").send({
       text: "baseline",
       missionId,
+      evidenceRefs: ["docs/helix-ask-flow.md#L1"],
       eventId: uniqueId("event-overload"),
     });
     const overloaded = await request(app).post("/api/voice/speak").send({
       text: "overload",
       missionId,
+      evidenceRefs: ["docs/helix-ask-flow.md#L1"],
       eventId: uniqueId("event-overload"),
     });
 
@@ -486,6 +493,7 @@ describe("voice routes", () => {
           priority: "action",
           missionId: uniqueId("mission-audio"),
           eventId: uniqueId("event-audio"),
+          evidenceRefs: ["docs/helix-ask-flow.md#L1"],
         });
 
       expect(res.status).toBe(200);
@@ -515,6 +523,40 @@ describe("voice routes", () => {
     expect(res.body.suppressed).toBe(true);
     expect(res.body.reason).toBe("voice_context_ineligible");
     expect(res.body.traceId).toBe("trace-context-suppress");
+  });
+
+
+  it("suppresses mission callout without evidence by default", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Mission callout without evidence",
+      mode: "callout",
+      missionId: uniqueId("mission-parity"),
+      priority: "action",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("missing_evidence");
+  });
+
+  it("keeps explicit repoAttributed false behavior for mission callouts", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Mission callout without evidence explicit false",
+      mode: "callout",
+      missionId: uniqueId("mission-nonrepo"),
+      priority: "action",
+      repoAttributed: false,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed ?? false).toBe(false);
+    expect(res.body.reason).toBeUndefined();
   });
 
   it("suppresses when voice certainty exceeds text certainty", async () => {

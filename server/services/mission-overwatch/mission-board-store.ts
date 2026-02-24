@@ -19,6 +19,9 @@ export type MissionBoardStoredEvent = {
   metrics?: {
     trigger_to_debrief_closed_ms?: number;
   };
+  traceId?: string;
+  contextTier?: "tier0" | "tier1";
+  sessionState?: "idle" | "requesting" | "active" | "stopping" | "error";
 };
 
 type MissionBoardStore = {
@@ -74,6 +77,9 @@ const readPayload = (
   timerKind?: unknown;
   timerStatus?: unknown;
   timerDueTs?: unknown;
+  traceId?: unknown;
+  contextTier?: unknown;
+  sessionState?: unknown;
 } => {
   if (!value) return {};
   if (typeof value === "object") {
@@ -89,6 +95,9 @@ const readPayload = (
       timerKind?: unknown;
       timerStatus?: unknown;
       timerDueTs?: unknown;
+      traceId?: unknown;
+      contextTier?: unknown;
+      sessionState?: unknown;
     };
   }
   if (typeof value === "string") {
@@ -105,6 +114,9 @@ const readPayload = (
         timerKind?: unknown;
         timerStatus?: unknown;
         timerDueTs?: unknown;
+        traceId?: unknown;
+        contextTier?: unknown;
+        sessionState?: unknown;
       };
       if (parsed && typeof parsed === "object") {
         return parsed;
@@ -161,6 +173,16 @@ const rowToEvent = (row: MissionBoardRow): MissionBoardStoredEvent => {
     derivedFromEventId: typeof payload.derivedFromEventId === "string" ? payload.derivedFromEventId : undefined,
     ackRefId: typeof payload.ackRefId === "string" ? payload.ackRefId : undefined,
     metrics: normalizeMetrics(payload.metrics),
+    traceId: typeof payload.traceId === "string" ? payload.traceId : undefined,
+    contextTier: payload.contextTier === "tier0" || payload.contextTier === "tier1" ? payload.contextTier : undefined,
+    sessionState:
+      payload.sessionState === "idle" ||
+      payload.sessionState === "requesting" ||
+      payload.sessionState === "active" ||
+      payload.sessionState === "stopping" ||
+      payload.sessionState === "error"
+        ? payload.sessionState
+        : undefined,
   };
 };
 
@@ -212,10 +234,19 @@ const dbStore: MissionBoardStore = {
           derivedFromEventId: event.derivedFromEventId ?? null,
           ackRefId: event.ackRefId ?? null,
           metrics: event.metrics ?? null,
+          traceId: event.traceId ?? null,
+          contextTier: event.contextTier ?? null,
+          sessionState: event.sessionState ?? null,
         }),
       ],
     );
   },
+};
+
+
+const strictPersistenceEnabled = (): boolean => {
+  const value = process.env.MISSION_BOARD_STORE_STRICT?.trim().toLowerCase();
+  return value === "1" || value === "true";
 };
 
 const shouldUseMemoryStore = (): boolean => {
@@ -241,6 +272,9 @@ const resolveStore = async (): Promise<MissionBoardStore> => {
     resolvedStore = dbStore;
     return resolvedStore;
   } catch (error) {
+    if (strictPersistenceEnabled()) {
+      throw error;
+    }
     if (!warnedStoreError) {
       warnedStoreError = true;
       const message = error instanceof Error ? error.message : String(error);

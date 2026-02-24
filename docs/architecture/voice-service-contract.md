@@ -163,3 +163,12 @@ Voice service consumers integrating mission-overwatch callouts MUST follow `docs
 - required `evidence_anchor` behavior for repo-attributed claims.
 
 This addendum is additive: existing `/api/voice/speak` transport fields remain unchanged.
+
+
+## Replay-safe policy clock
+
+`/api/voice/speak` accepts optional `policyTsMs` (and alias `tsMs`) to force deterministic policy-time evaluation for dedupe, rate-limit, budget, and circuit-breaker gates during replay. If neither is supplied, wall-clock time is used.
+
+## Mission callout repo-attribution default
+
+For mission callouts, effective repo attribution defaults to true when `missionId` is present and `mode` is `callout` unless `repoAttributed` is explicitly provided. This enforces evidence parity by default while preserving backward compatibility through explicit `repoAttributed: false`.

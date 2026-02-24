@@ -31,6 +31,8 @@ const requestSchema = z.object({
   deterministic: z.boolean().optional(),
   evidenceRefs: z.array(z.string().trim().min(1).max(500)).max(32).optional(),
   repoAttributed: z.boolean().optional(),
+  policyTsMs: z.number().int().nonnegative().optional(),
+  tsMs: z.number().int().nonnegative().optional(),
 });
 
 type VoiceRequest = z.infer<typeof requestSchema>;
@@ -99,7 +101,7 @@ const resolveBudgetConfig = () => ({
   tenantDailyMaxRequests: parseIntEnv(process.env.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS, 500),
 });
 
-const currentDayKey = (): string => new Date().toISOString().slice(0, 10);
+const currentDayKey = (nowMs: number): string => new Date(nowMs).toISOString().slice(0, 10);
 
 type BudgetRejection = {
   scope: "mission_window" | "tenant_day";
@@ -108,12 +110,11 @@ type BudgetRejection = {
   tenantId: string;
 };
 
-const checkAndRecordBudget = (missionId: string | undefined, tenantId: string): BudgetRejection | null => {
+const checkAndRecordBudget = (missionId: string | undefined, tenantId: string, nowMs: number): BudgetRejection | null => {
   const cfg = resolveBudgetConfig();
 
   if (missionId) {
-    const now = Date.now();
-    const windowStart = now - cfg.missionWindowMs;
+    const windowStart = nowMs - cfg.missionWindowMs;
     const existing = missionBudgetWindow.get(missionId) ?? [];
     const next = existing.filter((ts) => ts >= windowStart);
     if (next.length >= cfg.missionMaxRequests) {
@@ -125,11 +126,11 @@ const checkAndRecordBudget = (missionId: string | undefined, tenantId: string): 
         tenantId,
       };
     }
-    next.push(now);
+    next.push(nowMs);
     missionBudgetWindow.set(missionId, next);
   }
 
-  const day = currentDayKey();
+  const day = currentDayKey(nowMs);
   const tenantState = tenantBudgetDaily.get(tenantId);
   const nextTenant = !tenantState || tenantState.day !== day ? { day, count: 0 } : tenantState;
   if (nextTenant.count >= cfg.tenantDailyMaxRequests) {
@@ -160,13 +161,13 @@ const BREAKER_FAILURE_WINDOW_MS = 60_000;
 const BREAKER_FAILURE_THRESHOLD = 3;
 const BREAKER_OPEN_MS = 30_000;
 
-const isCircuitBreakerOpen = (): boolean => circuitBreaker.openedUntil > Date.now();
+const isCircuitBreakerOpen = (nowMs: number): boolean => circuitBreaker.openedUntil > nowMs;
 
-const recordBackendFailure = (): void => {
-  const now = Date.now();
+const recordBackendFailure = (nowMs: number): void => {
+  const now = nowMs;
   const windowStart = now - BREAKER_FAILURE_WINDOW_MS;
   const next = circuitBreaker.recentFailures.filter((ts) => ts >= windowStart);
-  next.push(now);
+  next.push(nowMs);
   circuitBreaker.recentFailures = next;
   if (next.length >= BREAKER_FAILURE_THRESHOLD) {
     circuitBreaker.openedUntil = now + BREAKER_OPEN_MS;
@@ -200,29 +201,27 @@ const errorEnvelope = (
   });
 };
 
-const missionRateAllowed = (missionId: string | undefined): boolean => {
+const missionRateAllowed = (missionId: string | undefined, nowMs: number): boolean => {
   if (!missionId) return true;
-  const now = Date.now();
-  const windowStart = now - 15_000;
+  const windowStart = nowMs - 15_000;
   const existing = missionWindow.get(missionId) ?? [];
   const next = existing.filter((ts) => ts >= windowStart);
   if (next.length >= 2) {
     missionWindow.set(missionId, next);
     return false;
   }
-  next.push(now);
+  next.push(nowMs);
   missionWindow.set(missionId, next);
   return true;
 };
 
-const dedupeSuppressed = (payload: VoiceRequest): boolean => {
+const dedupeSuppressed = (payload: VoiceRequest, nowMs: number): boolean => {
   const key = payload.dedupe_key?.trim() || payload.eventId?.trim();
   if (!key) return false;
-  const now = Date.now();
   const until = dedupeUntil.get(key) ?? 0;
-  if (until > now) return true;
+  if (until > nowMs) return true;
   const cooldownMs = COOLDOWN_SECONDS[payload.priority] * 1000;
-  dedupeUntil.set(key, now + cooldownMs);
+  dedupeUntil.set(key, nowMs + cooldownMs);
   return false;
 };
 
@@ -247,6 +246,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   const payload = parsed.data;
+  const policyNowMs = payload.policyTsMs ?? payload.tsMs ?? Date.now();
   if (payload.contextTier === "tier0" || (payload.sessionState && payload.sessionState !== "active")) {
     return res.status(200).json({ ok: true, suppressed: true, reason: "voice_context_ineligible", traceId: payload.traceId ?? null });
   }
@@ -256,6 +256,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   if (payload.voiceMode === "critical_only" && payload.priority !== "critical" && payload.priority !== "action") {
     return res.status(200).json({ ok: true, suppressed: true, reason: "voice_context_ineligible", traceId: payload.traceId ?? null });
   }
+  const repoAttributedEffective = payload.repoAttributed ?? Boolean(payload.missionId && payload.mode === "callout");
   const textCertainty = payload.textCertainty ?? PRIORITY_TO_CERTAINTY[payload.priority];
   const voiceCertainty = payload.voiceCertainty ?? PRIORITY_TO_CERTAINTY[payload.priority];
   const parity = enforceCalloutParity({
@@ -263,7 +264,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     voiceCertainty,
     deterministic: payload.deterministic ?? true,
     evidenceRefs: payload.evidenceRefs ?? [],
-    requireEvidence: payload.repoAttributed ?? false,
+    requireEvidence: repoAttributedEffective,
   });
   if (!parity.allowed) {
     return res.status(200).json({
@@ -341,7 +342,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     );
   }
 
-  const budgetRejection = checkAndRecordBudget(payload.missionId, tenantId);
+  const budgetRejection = checkAndRecordBudget(payload.missionId, tenantId, policyNowMs);
   if (budgetRejection) {
     return errorEnvelope(
       res,
@@ -356,7 +357,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     );
   }
 
-  if (!missionRateAllowed(payload.missionId)) {
+  if (!missionRateAllowed(payload.missionId, policyNowMs)) {
     return errorEnvelope(
       res,
       429,
@@ -367,7 +368,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     );
   }
 
-  if (dedupeSuppressed(payload)) {
+  if (dedupeSuppressed(payload, policyNowMs)) {
     return res.status(200).json({
       ok: true,
       suppressed: true,
@@ -406,8 +407,8 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     );
   }
 
-  if (isCircuitBreakerOpen()) {
-    const retryAfterMs = Math.max(0, circuitBreaker.openedUntil - Date.now());
+  if (isCircuitBreakerOpen(policyNowMs)) {
+    const retryAfterMs = Math.max(0, circuitBreaker.openedUntil - policyNowMs);
     return errorEnvelope(
       res,
       503,
@@ -434,7 +435,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     });
 
     if (!upstream.ok) {
-      recordBackendFailure();
+      recordBackendFailure(policyNowMs);
       const responseText = await upstream.text().catch(() => "");
       return errorEnvelope(
         res,
@@ -463,7 +464,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     }
     return res.status(200).send(buffer);
   } catch (error) {
-    recordBackendFailure();
+    recordBackendFailure(policyNowMs);
     const aborted = error instanceof Error && error.name === "AbortError";
     return errorEnvelope(
       res,
