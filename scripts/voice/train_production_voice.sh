@@ -9,7 +9,7 @@ EXPECTED_HEAD="${EXPECTED_HEAD:-}"
 AUDIO_PATH="${AUDIO_PATH:-data/knowledge_audio_source/auntie_dottie.flac}"
 TRAIN_LANE="${TRAIN_LANE:-tts_prod_train}"
 
-head_sha="$(git rev-parse --short HEAD)"
+head_sha="$(git rev-parse --short=8 HEAD)"
 echo "[tts-prod] head=${head_sha}"
 if [[ -n "${EXPECTED_HEAD}" && "${head_sha}" != "${EXPECTED_HEAD}" ]]; then
   echo "[tts-prod][error] deterministic_head_mismatch got=${head_sha} expected=${EXPECTED_HEAD}" >&2
@@ -21,8 +21,13 @@ if [[ ! -f "${AUDIO_PATH}" ]]; then
   exit 1
 fi
 
+WEIGHTS_MANIFEST_PATH="${WEIGHTS_MANIFEST_PATH:-configs/voice/weights-manifest.example.json}"
 
 if [[ "${TRAIN_LANE}" == "tts_prod_train_nemo" ]]; then
+  if ! python scripts/voice/verify_weights_manifest.py "${WEIGHTS_MANIFEST_PATH}"; then
+    echo "[tts-prod][error] invalid_weights_manifest path=${WEIGHTS_MANIFEST_PATH}" >&2
+    exit 1
+  fi
   TRAIN_STATUS_PATH="${TRAIN_STATUS_PATH:-artifacts/train_status.tts_prod_train_nemo.json}" \
   TRAIN_JOB_TYPE="tts_prod_train_nemo" \
   python scripts/voice/train_production_nemo.py
@@ -36,6 +41,11 @@ fi
 
 if [[ "${TRAIN_BACKEND}" != "local_docker" ]]; then
   echo "[tts-prod][error] invalid_backend backend=${TRAIN_BACKEND}" >&2
+  exit 1
+fi
+
+if ! python scripts/voice/verify_weights_manifest.py "${WEIGHTS_MANIFEST_PATH}"; then
+  echo "[tts-prod][error] invalid_weights_manifest path=${WEIGHTS_MANIFEST_PATH}" >&2
   exit 1
 fi
 

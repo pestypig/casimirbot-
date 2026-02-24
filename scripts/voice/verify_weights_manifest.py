@@ -49,6 +49,9 @@ def main() -> int:
     if not isinstance(payload["commercial_use_allowed"], bool):
         print("[weights-manifest] error=invalid_type field=commercial_use_allowed expected=bool")
         return 5
+    if payload["commercial_use_allowed"] is not True:
+        print("[weights-manifest] error=commercial_use_required field=commercial_use_allowed expected=true")
+        return 9
     if not isinstance(payload["attribution_required"], bool):
         print("[weights-manifest] error=invalid_type field=attribution_required expected=bool")
         return 6

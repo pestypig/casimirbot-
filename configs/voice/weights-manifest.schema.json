@@ -19,7 +19,7 @@
     "source_url": { "type": "string", "minLength": 1 },
     "code_license": { "type": "string", "minLength": 1 },
     "weights_license": { "type": "string", "minLength": 1 },
-    "commercial_use_allowed": { "type": "boolean" },
+    "commercial_use_allowed": { "const": true },
     "attribution_required": { "type": "boolean" },
     "evidence_links": {
       "type": "array",
