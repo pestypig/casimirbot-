@@ -157,7 +157,11 @@ This is additive and does not change existing board schema requirements.
 
 ## Tier1 active context timestamp requirement
 
-`POST /api/mission-board/:missionId/context-events` now requires `ts` for Tier1 active context events (`tier=tier1` and `sessionState=active`). Missing timestamps return deterministic `mission_board_invalid_request` with reason `missing_tier1_ts`.
+Timestamp policy is explicitly scoped to **Tier1 active** events only:
+- Require `ts` when `tier=tier1` **and** `sessionState=active`.
+- Do not require `ts` for Tier1 non-active states (`idle|requesting|stopping|error`) or Tier0 events.
+
+Rejected payloads must return deterministic `mission_board_invalid_request` with reason `missing_tier1_ts`.
 
 ## Replay linkage fields
 

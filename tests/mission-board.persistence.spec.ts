@@ -163,25 +163,42 @@ describe("mission board persistence", () => {
     expect(res.body.receipt.actionId).toBe("fallback-action");
   });
 
-});
+  it("persists context linkage metadata in db payload", async () => {
+    const app = await buildApp();
+    await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
+      eventId: "persist-context-meta",
+      eventType: "context_session_started",
+      classification: "info",
+      text: "Context linked",
+      ts: "2026-02-22T03:20:00.000Z",
+      tier: "tier1",
+      sessionState: "active",
+      traceId: "trace-meta-1",
+    });
 
+    const { ensureDatabase, getPool } = await import("../server/db/client");
+    await ensureDatabase();
+    const pool = getPool();
+    const persisted = await pool.query<{ payload: unknown }>(
+      `SELECT payload
+       FROM mission_board_events
+       WHERE mission_id = $1 AND id = $2`,
+      [missionId, "persist-context-meta"],
+    );
+    expect(persisted.rowCount).toBe(1);
+    const payloadRaw = persisted.rows[0]?.payload;
+    const payload =
+      typeof payloadRaw === "string" ? (JSON.parse(payloadRaw) as Record<string, unknown>) : (payloadRaw as Record<string, unknown>);
+    expect(payload.traceId).toBe("trace-meta-1");
+    expect(payload.contextTier).toBe("tier1");
+    expect(payload.sessionState).toBe("active");
 
-it("persists context linkage metadata in db payload", async () => {
-  const app = await buildApp();
-  await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
-    eventId: "persist-context-meta",
-    eventType: "context_session_started",
-    classification: "info",
-    text: "Context linked",
-    ts: "2026-02-22T03:20:00.000Z",
-    tier: "tier1",
-    sessionState: "active",
-    traceId: "trace-meta-1",
+    const events = await request(app).get(`/api/mission-board/${missionId}/events`).query({ limit: 20 });
+    expect(events.status).toBe(200);
+    const row = (events.body.events as Array<{ eventId: string; traceId?: string; contextTier?: string; sessionState?: string }>).find((e) => e.eventId === "persist-context-meta");
+    expect(row?.traceId).toBe("trace-meta-1");
+    expect(row?.contextTier).toBe("tier1");
+    expect(row?.sessionState).toBe("active");
   });
-  const events = await request(app).get(`/api/mission-board/${missionId}/events`).query({ limit: 20 });
-  expect(events.status).toBe(200);
-  const row = (events.body.events as Array<{ eventId: string; traceId?: string; contextTier?: string; sessionState?: string }>).find((e) => e.eventId === "persist-context-meta");
-  expect(row?.traceId).toBe("trace-meta-1");
-  expect(row?.contextTier).toBe("tier1");
-  expect(row?.sessionState).toBe("active");
+
 });

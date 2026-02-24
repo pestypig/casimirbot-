@@ -205,6 +205,42 @@ describe("mission board routes", () => {
   });
 
 
+  it("accepts tier1 non-active context event without ts", async () => {
+    const app = buildApp();
+    const missionId = uniqueMissionId();
+
+    const res = await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
+      eventType: "context_session_started",
+      classification: "info",
+      text: "Tier1 requesting context",
+      tier: "tier1",
+      sessionState: "requesting",
+      traceId: "trace-tier1-requesting",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.event.contextTier).toBe("tier1");
+    expect(res.body.event.sessionState).toBe("requesting");
+  });
+
+  it("accepts tier0 active context event without ts", async () => {
+    const app = buildApp();
+    const missionId = uniqueMissionId();
+
+    const res = await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
+      eventType: "context_session_started",
+      classification: "info",
+      text: "Tier0 active context",
+      tier: "tier0",
+      sessionState: "active",
+      traceId: "trace-tier0-active",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.event.contextTier).toBe("tier0");
+    expect(res.body.event.sessionState).toBe("active");
+  });
+
   it("rejects tier1 active context event without deterministic ts", async () => {
     const app = buildApp();
     const missionId = uniqueMissionId();
@@ -237,29 +273,30 @@ describe("mission board routes", () => {
     expect(typeof res.body.message).toBe("string");
     expect(res.body.details).toBeTruthy();
   });
-});
 
-it("accepts timer_update with deterministic timer fields", async () => {
-  const app = buildApp();
-  const missionId = uniqueMissionId();
+  it("accepts timer_update with deterministic timer fields", async () => {
+    const app = buildApp();
+    const missionId = uniqueMissionId();
 
-  const res = await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
-    eventType: "timer_update",
-    classification: "warn",
-    text: "Ingress timer updated",
-    tier: "tier1",
-    sessionState: "active",
-    ts: "2026-02-24T06:00:10.000Z",
-    timer: {
-      timerId: "timer-1",
-      timerKind: "countdown",
-      status: "running",
-      dueTs: "2026-02-24T06:00:00.000Z",
-      derivedFromEventId: "event-root",
-    },
+    const res = await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
+      eventType: "timer_update",
+      classification: "warn",
+      text: "Ingress timer updated",
+      tier: "tier1",
+      sessionState: "active",
+      ts: "2026-02-24T06:00:10.000Z",
+      timer: {
+        timerId: "timer-1",
+        timerKind: "countdown",
+        status: "running",
+        dueTs: "2026-02-24T06:00:00.000Z",
+        derivedFromEventId: "event-root",
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.event.timerId).toBe("timer-1");
+    expect(res.body.event.derivedFromEventId).toBe("event-root");
   });
 
-  expect(res.status).toBe(200);
-  expect(res.body.event.timerId).toBe("timer-1");
-  expect(res.body.event.derivedFromEventId).toBe("event-root");
 });

@@ -323,8 +323,13 @@ const runScenarios = async (fixture: Fixture, fixturePath: string): Promise<RunO
 
     if (scenario.voice) {
       const voicePayload = { ...scenario.voice } as Record<string, unknown>;
-      if (voicePayload.repoAttributed === undefined) {
-        voicePayload.repoAttributed = false;
+      if (
+        (voicePayload.mode === "callout" || voicePayload.mode === undefined) &&
+        typeof voicePayload.missionId === "string" &&
+        !Array.isArray(voicePayload.evidenceRefs) &&
+        voicePayload.repoAttributed === undefined
+      ) {
+        voicePayload.evidenceRefs = ["docs/helix-ask-flow.md#L1"];
       }
       const voiceRes = await request(app).post("/api/voice/speak").send(voicePayload);
       voiceResponse = voiceRes.body as Record<string, unknown>;
