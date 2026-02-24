@@ -192,8 +192,8 @@ const computeTriggerToDebriefClosedMs = (events: MissionBoardEvent[], derivedFro
   const trigger = events.find((event) => event.eventId === derivedFromEventId);
   if (!trigger) return null;
   const delta = Date.parse(closureTs) - Date.parse(trigger.ts);
-  if (!Number.isFinite(delta) || delta < 0) return null;
-  return Math.floor(delta);
+  if (!Number.isFinite(delta)) return null;
+  return Math.max(0, Math.floor(delta));
 };
 
 const foldMissionSnapshot = (events: MissionBoardEvent[], missionId: string): MissionBoardSnapshot => {

@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "name": "helix-dottie-situational-awareness",
+    "version": 1,
+    "generatedAt": "2026-02-24T18:42:10Z"
+  },
+  "scenarios": [
+    {
+      "id": "S01-parity-pass",
+      "intent": "voice certainty parity allowed",
+      "voice": { "text": "Reasoned action update", "priority": "action", "textCertainty": "reasoned", "voiceCertainty": "reasoned", "deterministic": true, "repoAttributed": true, "evidenceRefs": ["docs/helix-ask-flow.md#L1"] },
+      "expected": { "allowed": true }
+    },
+    {
+      "id": "S02-parity-fail",
+      "intent": "voice certainty above text certainty must suppress",
+      "voice": { "text": "Confirmed action update", "priority": "action", "textCertainty": "hypothesis", "voiceCertainty": "confirmed", "deterministic": true, "repoAttributed": true, "evidenceRefs": ["docs/helix-ask-flow.md#L1"] },
+      "expected": { "suppressed": true, "reason": "contract_violation" }
+    },
+    {
+      "id": "S03-evidence-pass",
+      "intent": "repo-attributed callout with evidence allowed",
+      "voice": { "text": "Evidence cited update", "priority": "warn", "textCertainty": "hypothesis", "voiceCertainty": "hypothesis", "deterministic": true, "repoAttributed": true, "evidenceRefs": ["docs/architecture/voice-service-contract.md#L1"] },
+      "expected": { "allowed": true }
+    },
+    {
+      "id": "S04-evidence-fail-missing",
+      "intent": "repo-attributed claim with missing evidence suppressed deterministically",
+      "voice": { "text": "No evidence update", "priority": "warn", "textCertainty": "hypothesis", "voiceCertainty": "hypothesis", "deterministic": true, "repoAttributed": true, "evidenceRefs": [] },
+      "expected": { "suppressed": true, "reason": "missing_evidence" }
+    },
+    {
+      "id": "S05-evidence-fail-nondeterministic",
+      "intent": "repo-attributed nondeterministic claim suppressed",
+      "voice": { "text": "Non deterministic update", "priority": "warn", "textCertainty": "hypothesis", "voiceCertainty": "hypothesis", "deterministic": false, "repoAttributed": true, "evidenceRefs": ["docs/helix-ask-agent-policy.md#L1"] },
+      "expected": { "suppressed": true, "reason": "contract_violation" }
+    },
+    {
+      "id": "S06-context-tier0-suppress",
+      "intent": "tier0 context suppression",
+      "voice": { "text": "Tier0 quiet", "priority": "info", "contextTier": "tier0" },
+      "expected": { "suppressed": true, "reason": "voice_context_ineligible" }
+    },
+    {
+      "id": "S07-session-idle-suppress",
+      "intent": "session idle suppression",
+      "voice": { "text": "Idle quiet", "priority": "info", "sessionState": "idle" },
+      "expected": { "suppressed": true, "reason": "voice_context_ineligible" }
+    },
+    {
+      "id": "S08-voice-mode-critical-only-suppress",
+      "intent": "critical_only suppresses info priority",
+      "voice": { "text": "Critical only gate", "priority": "info", "voiceMode": "critical_only" },
+      "expected": { "suppressed": true, "reason": "voice_context_ineligible" }
+    },
+    {
+      "id": "S09-dedupe-first-pass",
+      "intent": "first dedupe key should pass",
+      "voice": { "text": "Dedupe first", "priority": "warn", "missionId": "M-DEDUPE", "eventId": "E-DEDUPE-1" },
+      "expected": { "allowed": true }
+    },
+    {
+      "id": "S10-dedupe-second-suppress",
+      "intent": "duplicate key should suppress with stable reason",
+      "voice": { "text": "Dedupe second", "priority": "warn", "missionId": "M-DEDUPE", "eventId": "E-DEDUPE-1" },
+      "expected": { "suppressed": true, "reason": "dedupe_cooldown" }
+    },
+    {
+      "id": "S11-ackref-propagation-and-metric",
+      "intent": "ackRefId propagates to debrief and closure metric is deterministic",
+      "contextEvent": { "missionId": "M-ACK", "eventId": "E-ACK-1", "ts": "2026-02-24T12:00:00.000Z" },
+      "ack": { "missionId": "M-ACK", "eventId": "E-ACK-1", "ackRefId": "ACK-REF-11", "ts": "2026-02-24T12:00:15.000Z" },
+      "expected": { "ackRefId": "ACK-REF-11", "trigger_to_debrief_closed_ms": 15000 }
+    },
+    {
+      "id": "S12-ack-metric-nonnegative-past-event",
+      "intent": "ack before event timestamp is clamped non-negative",
+      "contextEvent": { "missionId": "M-ACK2", "eventId": "E-ACK-2", "ts": "2026-02-24T12:00:10.000Z" },
+      "ack": { "missionId": "M-ACK2", "eventId": "E-ACK-2", "ackRefId": "ACK-REF-12", "ts": "2026-02-24T12:00:05.000Z" },
+      "expected": { "ackRefId": "ACK-REF-12", "trigger_to_debrief_closed_ms": 0 }
+    },
+    {
+      "id": "S13-replay-consistency-1",
+      "intent": "same input run 1 yields deterministic suppression reason",
+      "voice": { "text": "Replay deterministic", "priority": "action", "textCertainty": "reasoned", "voiceCertainty": "confirmed", "deterministic": true, "repoAttributed": true, "evidenceRefs": ["docs/helix-ask-flow.md#L1"] },
+      "expected": { "suppressed": true, "reason": "contract_violation" }
+    },
+    {
+      "id": "S14-replay-consistency-2",
+      "intent": "same input run 2 yields identical suppression reason",
+      "voice": { "text": "Replay deterministic", "priority": "action", "textCertainty": "reasoned", "voiceCertainty": "confirmed", "deterministic": true, "repoAttributed": true, "evidenceRefs": ["docs/helix-ask-flow.md#L1"] },
+      "expected": { "suppressed": true, "reason": "contract_violation" }
+    }
+  ]
+}
