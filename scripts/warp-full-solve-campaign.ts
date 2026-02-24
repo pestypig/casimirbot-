@@ -14,6 +14,14 @@ type ParsedArgs = {
   ci: boolean;
 };
 
+export type CliResult = {
+  ok: boolean;
+  waves: Wave[];
+  out: string;
+  campaign: { counts: ReturnType<typeof summarizeScoreboard>['counts'] | null; decision: string; reconciled: boolean };
+  mode: 'ci' | 'local';
+};
+
 type GateRecord = {
   status: GateStatus;
   reason: string;
@@ -118,8 +126,20 @@ export const parseWaveArg = (value: string | undefined): WaveArg => {
   throw new Error(`Invalid --wave value "${value}". Allowed values: A|B|C|D|all`);
 };
 
-const parseArgs = (): ParsedArgs => {
-  const args = process.argv.slice(2);
+export const parseSeedArg = (value: string | undefined): number => {
+  const normalized = (value ?? '').trim();
+  if (!normalized) {
+    throw new Error('Invalid --seed value "". Seed must be a finite integer.');
+  }
+  const numeric = Number(normalized);
+  if (!Number.isFinite(numeric) || !Number.isInteger(numeric)) {
+    throw new Error(`Invalid --seed value "${value}". Seed must be a finite integer.`);
+  }
+  return numeric;
+};
+
+export const parseArgs = (argv = process.argv.slice(2)): ParsedArgs => {
+  const args = argv;
   const read = (name: string, fallback?: string) => {
     const i = args.findIndex((v) => v === name || v.startsWith(`${name}=`));
     if (i < 0) return fallback;
@@ -131,7 +151,7 @@ const parseArgs = (): ParsedArgs => {
   return {
     wave,
     out: read('--out', 'artifacts/research/full-solve')!,
-    seed: Number(read('--seed', '20260224')),
+    seed: parseSeedArg(read('--seed', '20260224')),
     ci: args.includes('--ci'),
   };
 };
@@ -145,10 +165,19 @@ const toGate = (status: string | undefined, source: string, reasonMissing: strin
   return { status: 'UNKNOWN', source, reason: `Unrecognized status: ${status}` };
 };
 
-const extractLatestAttempt = (result: GrAgentLoopResult): GrAgentLoopAttempt | null =>
+export const extractLatestAttempt = (result: GrAgentLoopResult): GrAgentLoopAttempt | null =>
   result.attempts.length ? result.attempts[result.attempts.length - 1] : null;
 
-const buildGateMap = (wave: Wave, runResults: GrAgentLoopResult[]): Record<string, GateRecord> => {
+const extractLatestEvaluation = (result: GrAgentLoopResult) => extractLatestAttempt(result)?.evaluation;
+
+const hasPersistedRawOutputFiles = (runArtifacts: EvidencePack['runArtifacts']) =>
+  runArtifacts.some((artifact) => fs.existsSync(artifact.outputPath));
+
+export const buildGateMap = (
+  wave: Wave,
+  runResults: GrAgentLoopResult[],
+  runArtifacts: EvidencePack['runArtifacts'] = [],
+): Record<string, GateRecord> => {
   const latest = runResults.length ? runResults[runResults.length - 1] : null;
   const attempt = latest ? extractLatestAttempt(latest) : null;
   const constraints = attempt?.evaluation?.constraints ?? [];
@@ -195,18 +224,26 @@ const buildGateMap = (wave: Wave, runResults: GrAgentLoopResult[]): Record<strin
       reason: 'Reduced-order campaign; no physical-feasibility promotion claim is evaluated here.',
     },
     G6: {
-      status: runResults.length > 0 ? 'PASS' : 'NOT_READY',
+      status: hasPersistedRawOutputFiles(runArtifacts)
+        ? attempt?.evaluation
+          ? 'PASS'
+          : 'FAIL'
+        : 'NOT_READY',
       source: 'campaign.artifacts',
-      reason: runResults.length > 0 ? 'Raw run outputs persisted for this wave.' : 'Run outputs are missing for this wave.',
+      reason: hasPersistedRawOutputFiles(runArtifacts)
+        ? attempt?.evaluation
+          ? 'Raw run outputs persisted and evaluator signals are present.'
+          : 'Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present.'
+        : 'Run outputs are missing for this wave.',
     },
     G7:
       wave === 'C' || wave === 'D'
         ? runResults.length >= 2
           ? {
-              status: runResults[0].attempts[0]?.evaluation?.gate?.status === runResults[1].attempts[0]?.evaluation?.gate?.status ? 'PASS' : 'FAIL',
+              status: extractLatestEvaluation(runResults[0])?.gate?.status === extractLatestEvaluation(runResults[1])?.gate?.status ? 'PASS' : 'FAIL',
               source: 'campaign.stability.check',
               reason:
-                runResults[0].attempts[0]?.evaluation?.gate?.status === runResults[1].attempts[0]?.evaluation?.gate?.status
+                extractLatestEvaluation(runResults[0])?.gate?.status === extractLatestEvaluation(runResults[1])?.gate?.status
                   ? 'First-order gate status remained stable across repeated runs.'
                   : 'Repeated runs produced inconsistent gate outcomes.',
             }
@@ -216,10 +253,15 @@ const buildGateMap = (wave: Wave, runResults: GrAgentLoopResult[]): Record<strin
       wave === 'D'
         ? runResults.length >= 2
           ? {
-              status: JSON.stringify(runResults[0].attempts[0]?.evaluation?.constraints ?? []) === JSON.stringify(runResults[1].attempts[0]?.evaluation?.constraints ?? []) ? 'PASS' : 'FAIL',
+              status:
+                JSON.stringify(extractLatestEvaluation(runResults[0])?.constraints ?? []) ===
+                JSON.stringify(extractLatestEvaluation(runResults[1])?.constraints ?? [])
+                  ? 'PASS'
+                  : 'FAIL',
               source: 'campaign.replication.parity',
               reason:
-                JSON.stringify(runResults[0].attempts[0]?.evaluation?.constraints ?? []) === JSON.stringify(runResults[1].attempts[0]?.evaluation?.constraints ?? [])
+                JSON.stringify(extractLatestEvaluation(runResults[0])?.constraints ?? []) ===
+                JSON.stringify(extractLatestEvaluation(runResults[1])?.constraints ?? [])
                   ? 'Replication parity matched on evaluator constraint payload.'
                   : 'Replication parity drift detected in evaluator constraints.',
             }
@@ -324,7 +366,7 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean): P
     }
   }
 
-  const gateMap = buildGateMap(wave, runResults);
+  const gateMap = buildGateMap(wave, runResults, runArtifacts);
   const gateStatus = Object.fromEntries(Object.entries(gateMap).map(([key, value]) => [key, value.status])) as Record<string, GateStatus>;
   const firstFail = deriveFirstFail(gateMap);
 
@@ -428,8 +470,8 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
   return { counts: scoreboard.counts, decision, reconciled: scoreboard.reconciled };
 };
 
-const main = async () => {
-  const args = parseArgs();
+export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliResult> => {
+  const args = parseArgs(argv);
   const waves: Wave[] = args.wave === 'all' ? ['A', 'B', 'C', 'D'] : [args.wave];
   for (const wave of waves) {
     await runWave(wave, args.out, args.seed, args.ci);
@@ -438,14 +480,8 @@ const main = async () => {
   const campaign = allWaves.every((w) => fs.existsSync(path.join(args.out, w, 'evidence-pack.json')))
     ? regenCampaign(args.out, allWaves)
     : { counts: null, decision: 'NOT_READY', reconciled: false };
-  const payload = { ok: true, waves, out: args.out, campaign, mode: args.ci ? 'ci' : 'local' };
-  console.log(JSON.stringify(payload, null, 2));
+  return { ok: true, waves, out: args.out, campaign, mode: args.ci ? 'ci' : 'local' };
 };
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  if (error instanceof Error && error.message.includes('Invalid --wave value')) {
-    console.error('Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <n>] [--ci]');
-  }
-  process.exit(1);
-});
+export const CAMPAIGN_USAGE =
+  'Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <integer>] [--ci]';
