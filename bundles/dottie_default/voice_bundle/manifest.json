@@ -1,0 +1,18 @@
+{
+  "bundle_version": "voice_bundle/1",
+  "voice_profile_id": "dottie_default",
+  "display_name": "Dottie",
+  "created_at": "2026-02-23T21:21:50.604933+00:00",
+  "files": [
+    {
+      "path": "model.bin",
+      "sha256": "9704aedc35dbe44f79b0d42b7ddee82d22cf4089675e04f2daace004d9bcc83e",
+      "bytes": 17
+    },
+    {
+      "path": "sample.wav",
+      "sha256": "574da915e17d3f132551f0a139b1be9d1816167de08fbb96d150975ad5c8aeb8",
+      "bytes": 15
+    }
+  ]
+}
