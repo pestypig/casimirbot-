@@ -1,0 +1,67 @@
+{
+  "date": "2026-02-24",
+  "decision": "GO_SCOPED",
+  "rubric_weights": {
+    "operator_ux_fit": 30,
+    "determinism_replay_trust": 25,
+    "integration_cost": 20,
+    "delivery_speed": 15,
+    "policy_safety": 10
+  },
+  "approaches": [
+    {
+      "id": "A",
+      "name": "Objective-first overlay on existing mission/voice stack",
+      "scores": {
+        "operator_ux_fit": 28,
+        "determinism_replay_trust": 22,
+        "integration_cost": 18,
+        "delivery_speed": 14,
+        "policy_safety": 9
+      },
+      "total": 91,
+      "notes": [
+        "Best near-term fit with current contracts",
+        "Requires single-source eligibility policy to prevent drift"
+      ]
+    },
+    {
+      "id": "B",
+      "name": "Event-only continuation with incremental UI polish",
+      "scores": {
+        "operator_ux_fit": 18,
+        "determinism_replay_trust": 21,
+        "integration_cost": 19,
+        "delivery_speed": 12,
+        "policy_safety": 8
+      },
+      "total": 78,
+      "notes": [
+        "Fastest to ship",
+        "Does not solve objective-gap alignment semantics"
+      ]
+    },
+    {
+      "id": "C",
+      "name": "Full orchestration refactor before UI integration",
+      "scores": {
+        "operator_ux_fit": 25,
+        "determinism_replay_trust": 24,
+        "integration_cost": 10,
+        "delivery_speed": 7,
+        "policy_safety": 9
+      },
+      "total": 75,
+      "notes": [
+        "Highest eventual rigor",
+        "Too slow for current objective of visible UI utility"
+      ]
+    }
+  ],
+  "recommended_approach_id": "A",
+  "recommended_batches": [
+    "Batch 1: objective/gap contract plus shared eligibility evaluator",
+    "Batch 2: Helix Ask UI objective and gap projection",
+    "Batch 3 (conditional): replay hardening and SLO gate expansion"
+  ]
+}
