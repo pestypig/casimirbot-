@@ -75,6 +75,34 @@ describe("LiveEnergyPipeline claim tier / provenance surfacing", () => {
     expect(screen.getByTestId("live-maturity-language-value").textContent).toBe("Certified evidence");
   });
 
+
+  it("fails closed on strict metric-claim contract absence in public mode", () => {
+    useEnergyPipelineMock.mockReturnValue({
+      data: {
+        claim_tier: "diagnostic",
+        provenance_class: "simulation",
+        currentMode: "hover",
+        qi: { margin: 0.3, bound: -2, avg: -1, tau_s_ms: 1, sampler: "unit", samples: 2 },
+        qiBadge: "ok",
+        qiGuardrail: {
+          strictMode: true,
+          metricDerived: true,
+          metricContractOk: false,
+          metricDerivedSource: "warp.metric.T00",
+        },
+      },
+    });
+
+    render(<TooltipProvider><LiveEnergyPipeline {...baseProps} /></TooltipProvider>);
+    expect(screen.getByText(/OK · metric claim unavailable/)).toBeInTheDocument();
+
+    const audienceControl = screen.getByTestId("audience-mode-control");
+    fireEvent.click(within(audienceControl).getByRole("combobox"));
+    fireEvent.click(screen.getByText("Academic"));
+
+    expect(screen.getByText(/OK · metric claim unavailable \(contract missing\)/)).toBeInTheDocument();
+  });
+
   it("switches QI derivation labels between Public and Academic audience modes", () => {
     useEnergyPipelineMock.mockReturnValue({
       data: {
