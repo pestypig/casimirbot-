@@ -25,6 +25,7 @@ const ORIGINAL_ENV = {
   VOICE_BUDGET_MISSION_WINDOW_MS: process.env.VOICE_BUDGET_MISSION_WINDOW_MS,
   VOICE_BUDGET_MISSION_MAX_REQUESTS: process.env.VOICE_BUDGET_MISSION_MAX_REQUESTS,
   VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS: process.env.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS,
+  VOICE_REPLAY_CLOCK_TRUSTED: process.env.VOICE_REPLAY_CLOCK_TRUSTED,
 };
 
 describe("voice routes", () => {
@@ -79,6 +80,11 @@ describe("voice routes", () => {
       delete process.env.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS;
     } else {
       process.env.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS = ORIGINAL_ENV.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS;
+    }
+    if (ORIGINAL_ENV.VOICE_REPLAY_CLOCK_TRUSTED === undefined) {
+      delete process.env.VOICE_REPLAY_CLOCK_TRUSTED;
+    } else {
+      process.env.VOICE_REPLAY_CLOCK_TRUSTED = ORIGINAL_ENV.VOICE_REPLAY_CLOCK_TRUSTED;
     }
   });
 
@@ -256,6 +262,66 @@ describe("voice routes", () => {
     expect(res.body.metering?.requestCount).toBe(1);
     expect(res.body.metering?.charCount).toBe("Meter this callout.".length);
     expect(res.body.metering?.durationMs).toBe(1200);
+  });
+
+  it("ignores untrusted policy clock overrides for mission budget enforcement", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    process.env.VOICE_BUDGET_MISSION_WINDOW_MS = "60000";
+    process.env.VOICE_BUDGET_MISSION_MAX_REQUESTS = "1";
+    delete process.env.VOICE_REPLAY_CLOCK_TRUSTED;
+    const app = buildApp();
+    const missionId = uniqueId("mission-untrusted-clock");
+
+    const first = await request(app).post("/api/voice/speak").send({
+      text: "first",
+      missionId,
+      eventId: uniqueId("evt-untrusted"),
+      repoAttributed: false,
+      policyTsMs: 0,
+      replayMode: true,
+    });
+    const second = await request(app).post("/api/voice/speak").send({
+      text: "second",
+      missionId,
+      eventId: uniqueId("evt-untrusted"),
+      repoAttributed: false,
+      policyTsMs: 4102444800000,
+      replayMode: true,
+    });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(429);
+    expect(second.body.error).toBe("voice_budget_exceeded");
+  });
+
+  it("allows trusted replay mode policy clock overrides deterministically", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    process.env.VOICE_BUDGET_MISSION_WINDOW_MS = "60000";
+    process.env.VOICE_BUDGET_MISSION_MAX_REQUESTS = "1";
+    process.env.VOICE_REPLAY_CLOCK_TRUSTED = "1";
+    const app = buildApp();
+    const missionId = uniqueId("mission-trusted-clock");
+
+    const first = await request(app).post("/api/voice/speak").send({
+      text: "first",
+      missionId,
+      eventId: uniqueId("evt-trusted"),
+      repoAttributed: false,
+      policyTsMs: 1000,
+      replayMode: true,
+    });
+    const second = await request(app).post("/api/voice/speak").send({
+      text: "second",
+      missionId,
+      eventId: uniqueId("evt-trusted"),
+      repoAttributed: false,
+      policyTsMs: 62000,
+      replayMode: true,
+    });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(second.body.ok).toBe(true);
   });
 
   it("enforces mission and tenant voice budgets deterministically", async () => {

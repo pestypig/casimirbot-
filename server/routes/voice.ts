@@ -31,6 +31,7 @@ const requestSchema = z.object({
   deterministic: z.boolean().optional(),
   evidenceRefs: z.array(z.string().trim().min(1).max(500)).max(32).optional(),
   repoAttributed: z.boolean().optional(),
+  replayMode: z.boolean().optional(),
   policyTsMs: z.number().int().nonnegative().optional(),
   tsMs: z.number().int().nonnegative().optional(),
 });
@@ -54,6 +55,15 @@ const parseBooleanFlag = (value: string | undefined, defaultValue: boolean): boo
   if (normalized === "1" || normalized === "true") return true;
   if (normalized === "0" || normalized === "false") return false;
   return defaultValue;
+};
+
+const resolvePolicyNowMs = (payload: VoiceRequest): number => {
+  const serverNowMs = Date.now();
+  const replayClockTrusted = parseBooleanFlag(process.env.VOICE_REPLAY_CLOCK_TRUSTED, false);
+  if (replayClockTrusted && payload.replayMode === true) {
+    return payload.policyTsMs ?? payload.tsMs ?? serverNowMs;
+  }
+  return serverNowMs;
 };
 
 const resolveProviderGovernance = (): ProviderGovernance => {
@@ -246,7 +256,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   const payload = parsed.data;
-  const policyNowMs = payload.policyTsMs ?? payload.tsMs ?? Date.now();
+  const policyNowMs = resolvePolicyNowMs(payload);
   if (payload.contextTier === "tier0" || (payload.sessionState && payload.sessionState !== "active")) {
     return res.status(200).json({ ok: true, suppressed: true, reason: "voice_context_ineligible", traceId: payload.traceId ?? null });
   }
