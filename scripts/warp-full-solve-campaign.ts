@@ -12,6 +12,8 @@ type ParsedArgs = {
   out: string;
   seed: number;
   ci: boolean;
+  waveTimeoutMs: number;
+  campaignTimeoutMs: number;
 };
 
 export type CliResult = {
@@ -74,6 +76,21 @@ type EvidencePack = {
     hardConstraintMap: Record<string, string>;
     gateStatusByAttempt: Array<{ runIndex: number; gateStatus: string; pass: boolean }>;
   };
+  requiredSignals: Record<string, { required: boolean; present: boolean }>;
+  missingSignals: string[];
+  gateMissingSignalMap: Record<string, string[]>;
+  timeout?: { kind: 'wave_timeout' | 'campaign_timeout'; timeoutMs: number; elapsedMs: number; wave?: Wave };
+  reproducibility: {
+    repeatedRunGateAgreement: { status: GateStatus; agreementRatio: number | null; reason: string };
+    constraintPayloadDrift: { status: GateStatus; driftRatio: number | null; reason: string };
+    residualTrend: {
+      status: GateStatus;
+      fidelityLevels: number;
+      trend: 'decreasing' | 'non_decreasing' | 'unknown';
+      reason: string;
+      series: number[];
+    };
+  };
   claimPosture: 'diagnostic/reduced-order';
   boundaryStatement: string;
 };
@@ -116,9 +133,14 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
 };
 
 const mkdirp = (p: string) => fs.mkdirSync(p, { recursive: true });
+const sortDeep = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(sortDeep);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value as Record<string, unknown>).sort().map((key) => [key, sortDeep((value as Record<string, unknown>)[key])])) as Record<string, unknown>;
+};
 const writeJson = (p: string, value: unknown) => {
   mkdirp(path.dirname(p));
-  fs.writeFileSync(p, `${JSON.stringify(value, null, 2)}\n`);
+  fs.writeFileSync(p, `${JSON.stringify(sortDeep(value), null, 2)}\n`);
 };
 const writeMd = (p: string, body: string) => {
   mkdirp(path.dirname(p));
@@ -161,8 +183,12 @@ export const parseArgs = (argv = process.argv.slice(2)): ParsedArgs => {
     out: read('--out', 'artifacts/research/full-solve')!,
     seed: parseSeedArg(read('--seed', '20260224')),
     ci: args.includes('--ci'),
+    waveTimeoutMs: parseSeedArg(read('--wave-timeout-ms', '120000')),
+    campaignTimeoutMs: parseSeedArg(read('--campaign-timeout-ms', '600000')),
   };
 };
+
+const SUPPORTED_EVALUATION_GATE_STATUSES = new Set(['pass', 'fail']);
 
 const toGate = (status: string | undefined, source: string, reasonMissing: string): GateRecord => {
   if (!status) {
@@ -278,7 +304,16 @@ export const buildGateMap = (
                   reason: `Missing stability signals: ${Array.from(new Set(missing)).join(', ')}.`,
                 };
               }
-              const sameStatus = lhs?.gate?.status === rhs?.gate?.status;
+              const lhsStatus = lhs?.gate?.status;
+              const rhsStatus = rhs?.gate?.status;
+              if (!SUPPORTED_EVALUATION_GATE_STATUSES.has(lhsStatus ?? '') || !SUPPORTED_EVALUATION_GATE_STATUSES.has(rhsStatus ?? '')) {
+                return {
+                  status: 'NOT_READY' as const,
+                  source: 'campaign.stability.check',
+                  reason: `Unsupported gate status values for latest attempts: lhs=${lhsStatus ?? 'missing'}, rhs=${rhsStatus ?? 'missing'}.`,
+                };
+              }
+              const sameStatus = lhsStatus === rhsStatus;
               return {
                 status: sameStatus ? 'PASS' : 'FAIL',
                 source: 'campaign.stability.check',
@@ -303,7 +338,16 @@ export const buildGateMap = (
                   reason: `Missing replication signals: ${Array.from(new Set(missing)).join(', ')}.`,
                 };
               }
-              const stableConstraints = JSON.stringify(lhs?.constraints) === JSON.stringify(rhs?.constraints);
+              const lhsConstraints = lhs?.constraints;
+              const rhsConstraints = rhs?.constraints;
+              if (!Array.isArray(lhsConstraints) || !Array.isArray(rhsConstraints) || lhsConstraints.length === 0 || rhsConstraints.length === 0) {
+                return {
+                  status: 'NOT_READY' as const,
+                  source: 'campaign.replication.parity',
+                  reason: 'Constraints payload missing or structurally incomplete for replication parity.',
+                };
+              }
+              const stableConstraints = JSON.stringify(lhsConstraints) === JSON.stringify(rhsConstraints);
               return {
                 status: stableConstraints ? 'PASS' : 'FAIL',
                 source: 'campaign.replication.parity',
@@ -367,7 +411,91 @@ export const deriveCampaignDecision = (counts: ReturnType<typeof summarizeScoreb
   return 'REDUCED_ORDER_ADMISSIBLE';
 };
 
-const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean): Promise<EvidencePack> => {
+const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null) => {
+  const requiredSignals: EvidencePack['requiredSignals'] = {
+    initial_solver_status: { required: true, present: Boolean(attempt?.initial?.status) },
+    evaluation_gate_status: { required: true, present: Boolean(attempt?.evaluation?.gate?.status) },
+    hard_constraint_ford_roman_qi: {
+      required: true,
+      present: (attempt?.evaluation?.constraints ?? []).some((entry) => entry.id === 'FordRomanQI' && Boolean(entry.status)),
+    },
+    hard_constraint_theta_audit: {
+      required: true,
+      present: (attempt?.evaluation?.constraints ?? []).some((entry) => entry.id === 'ThetaAudit' && Boolean(entry.status)),
+    },
+    certificate_hash: { required: true, present: Boolean(attempt?.evaluation?.certificate?.certificateHash) },
+    certificate_integrity: { required: true, present: typeof attempt?.evaluation?.certificate?.integrityOk === 'boolean' },
+    provenance_chart: { required: true, present: true },
+    provenance_observer: { required: true, present: true },
+    provenance_normalization: { required: true, present: true },
+    provenance_unit_system: { required: true, present: true },
+  };
+  const missingSignals = Object.entries(requiredSignals)
+    .filter(([, state]) => state.required && !state.present)
+    .map(([signal]) => signal)
+    .sort();
+  return { requiredSignals, missingSignals };
+};
+
+const buildGateMissingSignalMap = (missingSignals: string[]) => {
+  const mapping: EvidencePack['gateMissingSignalMap'] = {
+    G1: missingSignals.filter((signal) => signal === 'initial_solver_status'),
+    G2: missingSignals.filter((signal) => signal === 'evaluation_gate_status'),
+    G3: missingSignals.filter((signal) => signal === 'certificate_hash' || signal === 'certificate_integrity'),
+    G4: missingSignals.filter((signal) => signal === 'hard_constraint_ford_roman_qi' || signal === 'hard_constraint_theta_audit'),
+    G6: missingSignals,
+    G7: missingSignals.filter((signal) => signal === 'evaluation_gate_status'),
+    G8: missingSignals.filter((signal) => signal.startsWith('hard_constraint_')),
+  };
+  return Object.fromEntries(Object.entries(mapping).filter(([, signals]) => signals.length > 0));
+};
+
+const applyMissingSignalFailClosed = (gateMap: Record<string, GateRecord>, gateMissingSignalMap: Record<string, string[]>) => {
+  for (const [gateId, signals] of Object.entries(gateMissingSignalMap)) {
+    const gate = gateMap[gateId];
+    if (!gate) continue;
+    gateMap[gateId] = {
+      status: 'NOT_READY',
+      source: gate.source,
+      reason: `${gate.reason} Missing required signals: ${signals.join(', ')}.`,
+    };
+  }
+  return gateMap;
+};
+
+const computeReproducibility = (runResults: GrAgentLoopResult[]): EvidencePack['reproducibility'] => {
+  const evaluations = runResults.map((result) => extractLatestAttempt(result)?.evaluation).filter(Boolean);
+  const gateStatuses = evaluations.map((evaluation) => evaluation?.gate?.status).filter((status): status is string => Boolean(status));
+  const agreementRatio = gateStatuses.length >= 2 ? gateStatuses.filter((status) => status === gateStatuses[0]).length / gateStatuses.length : null;
+  const payloads = evaluations.map((evaluation) => JSON.stringify(evaluation?.constraints ?? null));
+  const driftRatio = payloads.length >= 2 ? payloads.slice(1).filter((value) => value !== payloads[0]).length / (payloads.length - 1) : null;
+  const residualSeries = runResults
+    .map((result) => extractLatestAttempt(result)?.initial?.residual)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  const residualTrendReady = residualSeries.length >= 2;
+  const decreasing = residualTrendReady && residualSeries[residualSeries.length - 1] <= residualSeries[0];
+  return {
+    repeatedRunGateAgreement: {
+      status: agreementRatio === null ? 'NOT_READY' : agreementRatio === 1 ? 'PASS' : 'FAIL',
+      agreementRatio,
+      reason: agreementRatio === null ? 'Need at least two repeated runs to compute agreement.' : 'Agreement computed from latest-attempt gate status values.',
+    },
+    constraintPayloadDrift: {
+      status: driftRatio === null ? 'NOT_READY' : driftRatio === 0 ? 'PASS' : 'FAIL',
+      driftRatio,
+      reason: driftRatio === null ? 'Need at least two repeated runs to compute drift.' : 'Drift computed from serialized latest-attempt constraint payload.',
+    },
+    residualTrend: {
+      status: residualTrendReady ? 'PASS' : 'NOT_READY',
+      fidelityLevels: residualSeries.length,
+      trend: residualTrendReady ? (decreasing ? 'decreasing' : 'non_decreasing') : 'unknown',
+      reason: residualTrendReady ? 'Residual trend computed across available fidelity levels.' : 'Need at least 2 fidelity levels for residual trend.',
+      series: residualSeries,
+    },
+  };
+};
+
+const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, waveTimeoutMs: number, campaignElapsedMs: number, campaignTimeoutMs: number): Promise<EvidencePack> => {
   const commitSha = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
   const startIso = new Date().toISOString();
   const runId = `fs-${wave.toLowerCase()}-${seed}-${Date.now()}`;
@@ -381,10 +509,18 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean): P
   const runErrors: Array<{ runIndex: number; error: string }> = [];
 
   for (let runIndex = 0; runIndex < profile.runCount; runIndex += 1) {
+    const elapsedMs = Date.now() - Date.parse(startIso);
+    if (campaignElapsedMs + elapsedMs > campaignTimeoutMs) {
+      runErrors.push({ runIndex: runIndex + 1, error: `campaign_timeout:${campaignTimeoutMs}` });
+      break;
+    }
     const startedAt = new Date().toISOString();
     const started = Date.now();
     try {
-      const result = await runGrAgentLoop(profile.options);
+      const result = await runGrAgentLoop({
+        ...profile.options,
+        budget: { ...(profile.options.budget ?? {}), maxTotalMs: waveTimeoutMs },
+      });
       const completedAt = new Date().toISOString();
       const durationMs = Date.now() - started;
       runResults.push(result);
@@ -432,6 +568,10 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean): P
   }
 
   const gateMap = buildGateMap(wave, runResults, runArtifacts);
+  const latestAttempt = runResults.length ? extractLatestAttempt(runResults[runResults.length - 1]) : null;
+  const { requiredSignals, missingSignals } = collectRequiredSignals(latestAttempt);
+  const gateMissingSignalMap = buildGateMissingSignalMap(missingSignals);
+  applyMissingSignalFailClosed(gateMap, gateMissingSignalMap);
   const gateStatus = Object.fromEntries(Object.entries(gateMap).map(([key, value]) => [key, value.status])) as Record<string, GateStatus>;
   const firstFail = deriveFirstFail(gateMap);
 
@@ -449,6 +589,15 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean): P
       pass: Boolean(extractLatestAttempt(result)?.evaluation?.pass),
     })),
   };
+
+  const reproducibility = computeReproducibility(runResults);
+  const elapsedWaveMs = Date.now() - Date.parse(startIso);
+  const timeout = elapsedWaveMs > waveTimeoutMs
+    ? { kind: 'wave_timeout' as const, timeoutMs: waveTimeoutMs, elapsedMs: elapsedWaveMs, wave }
+    : campaignElapsedMs + elapsedWaveMs > campaignTimeoutMs
+      ? { kind: 'campaign_timeout' as const, timeoutMs: campaignTimeoutMs, elapsedMs: campaignElapsedMs + elapsedWaveMs, wave }
+      : undefined;
+
 
   const pack: EvidencePack = {
     commitSha,
@@ -475,6 +624,11 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean): P
     firstFailReason: firstFail.reason,
     parsedGateMap: gateMap,
     evaluationSummary,
+    requiredSignals,
+    missingSignals,
+    gateMissingSignalMap,
+    timeout,
+    reproducibility,
     claimPosture: 'diagnostic/reduced-order',
     boundaryStatement: BOUNDARY_STATEMENT,
   };
@@ -535,7 +689,7 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
 
   writeMd(
     path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.md`),
-    `# Warp Full-Solve Campaign Execution Report (${DATE_STAMP})\n\n## Executive verdict\n**${decision}**\n\n## Gate scoreboard (G0..G8)\n- PASS: ${scoreboard.counts.PASS}\n- FAIL: ${scoreboard.counts.FAIL}\n- UNKNOWN: ${scoreboard.counts.UNKNOWN}\n- NOT_READY: ${scoreboard.counts.NOT_READY}\n- NOT_APPLICABLE: ${scoreboard.counts.NOT_APPLICABLE}\n- Total gates: ${scoreboard.gateCount}\n- Reconciled: ${scoreboard.reconciled}\n\nCross-wave aggregate gate status:\n${Object.entries(aggregatedGateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n\nPer-wave gate status snapshots:\n${packs.map((pack) => `### Wave ${pack.wave}\n${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`).join('\n\n')}\n\n## Decision output\n- Final decision label: **${decision}**\n- Claim posture: diagnostic/reduced-order (fail-closed on hard evidence gaps).\n\n## Boundary statement\n${BOUNDARY_STATEMENT}\n`,
+    `# Warp Full-Solve Campaign Execution Report (${DATE_STAMP})\n\n## Executive verdict\n**${decision}**\n\n## Gate scoreboard (G0..G8)\n- PASS: ${scoreboard.counts.PASS}\n- FAIL: ${scoreboard.counts.FAIL}\n- UNKNOWN: ${scoreboard.counts.UNKNOWN}\n- NOT_READY: ${scoreboard.counts.NOT_READY}\n- NOT_APPLICABLE: ${scoreboard.counts.NOT_APPLICABLE}\n- Total gates: ${scoreboard.gateCount}\n- Reconciled: ${scoreboard.reconciled}\n\nCross-wave aggregate gate status:\n${Object.entries(aggregatedGateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n\nPer-wave gate status snapshots:\n${packs.map((pack) => `### Wave ${pack.wave}\n${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n- missingSignals: ${(pack.missingSignals ?? []).join(', ') || 'none'}\n- reproducibility.gateAgreement: ${pack.reproducibility?.repeatedRunGateAgreement?.status ?? 'NOT_READY'}`).join('\n\n')}\n\n## Decision output\n- Final decision label: **${decision}**\n- Claim posture: diagnostic/reduced-order (fail-closed on hard evidence gaps).\n\n## Boundary statement\n${BOUNDARY_STATEMENT}\n`,
   );
 
   return { counts: scoreboard.counts, decision, reconciled: scoreboard.reconciled };
@@ -544,8 +698,21 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
 export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliResult> => {
   const args = parseArgs(argv);
   const waves: Wave[] = args.wave === 'all' ? ['A', 'B', 'C', 'D'] : [args.wave];
+  const campaignStarted = Date.now();
   for (const wave of waves) {
-    await runWave(wave, args.out, args.seed, args.ci);
+    const campaignElapsedMs = Date.now() - campaignStarted;
+    if (campaignElapsedMs > args.campaignTimeoutMs) {
+      const timeoutArtifact = path.join(args.out, wave, 'evidence-pack.json');
+      writeJson(timeoutArtifact, {
+        wave,
+        gateStatus: { G0: 'NOT_READY' },
+        gateDetails: { G0: { status: 'NOT_READY', reason: 'campaign_timeout', source: 'campaign.timeout' } },
+        timeout: { kind: 'campaign_timeout', timeoutMs: args.campaignTimeoutMs, elapsedMs: campaignElapsedMs, wave },
+        boundaryStatement: BOUNDARY_STATEMENT,
+      });
+      break;
+    }
+    await runWave(wave, args.out, args.seed, args.ci, args.waveTimeoutMs, campaignElapsedMs, args.campaignTimeoutMs);
   }
   const allWaves: Wave[] = ['A', 'B', 'C', 'D'];
   const campaign = allWaves.every((w) => fs.existsSync(path.join(args.out, w, 'evidence-pack.json')))
@@ -555,4 +722,4 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
 };
 
 export const CAMPAIGN_USAGE =
-  'Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <integer>] [--ci]';
+  'Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <integer>] [--wave-timeout-ms <ms>] [--campaign-timeout-ms <ms>] [--ci]';
