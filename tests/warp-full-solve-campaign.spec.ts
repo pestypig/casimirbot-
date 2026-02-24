@@ -12,6 +12,7 @@ import {
   deriveCampaignDecision,
   deriveFirstFail,
   parseArgs,
+  parsePositiveIntArg,
   parseSeedArg,
   parseWaveArg,
   summarizeScoreboard,
@@ -120,8 +121,11 @@ describe('warp-full-solve-campaign runner', () => {
 
 
   it('parses timeout args strictly as finite integers', () => {
-    expect(() => parseArgs(['--wave-timeout-ms', 'abc'])).toThrow(/Seed must be a finite integer/);
-    expect(() => parseArgs(['--campaign-timeout-ms', '1.2'])).toThrow(/Seed must be a finite integer/);
+    expect(() => parsePositiveIntArg('abc', 'wave-timeout-ms')).toThrow(/positive integer in milliseconds/);
+    expect(() => parsePositiveIntArg('1.2', 'campaign-timeout-ms')).toThrow(/positive integer in milliseconds/);
+    expect(() => parsePositiveIntArg('0', 'campaign-timeout-ms')).toThrow(/positive integer in milliseconds/);
+    expect(() => parseArgs(['--wave-timeout-ms', 'abc'])).toThrow(/Invalid --wave-timeout-ms value/);
+    expect(() => parseArgs(['--campaign-timeout-ms', '1.2'])).toThrow(/Invalid --campaign-timeout-ms value/);
   });
 
   it('marks gates NOT_READY when required signals are missing', () => {
@@ -155,12 +159,22 @@ describe('warp-full-solve-campaign runner', () => {
   it('CLI completes within bounded time (no hang)', async () => {
     const cliPath = path.resolve('scripts/warp-full-solve-campaign-cli.ts');
     const tsxCli = path.resolve('node_modules/tsx/dist/cli.mjs');
-    const { stdout } = await execFileAsync(process.execPath, [tsxCli, cliPath, '--wave', 'A', '--ci', '--wave-timeout-ms', '120000'], {
-      timeout: 120_000,
+    const { stdout } = await execFileAsync(process.execPath, [
+      tsxCli,
+      cliPath,
+      '--wave',
+      'A',
+      '--ci',
+      '--wave-timeout-ms',
+      '4000',
+      '--campaign-timeout-ms',
+      '10000',
+    ], {
+      timeout: 45_000,
       maxBuffer: 1024 * 1024,
     });
     expect(stdout).toContain('"ok": true');
-  }, 125_000);
+  }, 50_000);
 
   it('residualTrend is FAIL when non-decreasing and PASS when strictly decreasing', () => {
     const nonDecreasing = computeReproducibility([
@@ -198,5 +212,36 @@ describe('warp-full-solve-campaign runner', () => {
     expect(requiredSignals.provenance_unit_system.present).toBe(false);
     const gateMap = buildGateMissingSignalMap(missingSignals);
     expect(gateMap.G6).toEqual(expect.arrayContaining(['provenance_chart', 'provenance_observer', 'provenance_normalization', 'provenance_unit_system']));
+  });
+
+  it('uses attempt grRequest provenance fallback when finalState is restored without metric contract metadata', () => {
+    const attempt = {
+      initial: { status: 'CERTIFIED' },
+      evaluation: {
+        gate: { status: 'pass' },
+        constraints: [
+          { id: 'FordRomanQI', status: 'pass' },
+          { id: 'ThetaAudit', status: 'pass' },
+        ],
+        certificate: { certificateHash: 'abc', integrityOk: true },
+      },
+      grRequest: {
+        warp: {
+          metricAdapter: { chart: { label: 'comoving_cartesian' } },
+          metricT00Contract: {
+            observer: 'eulerian_n',
+            normalization: 'si_stress',
+            unitSystem: 'SI',
+          },
+        },
+      },
+    } as any;
+    const latestResult = { finalState: {} } as any;
+    const { requiredSignals, missingSignals } = collectRequiredSignals(attempt, latestResult);
+    expect(requiredSignals.provenance_chart.present).toBe(true);
+    expect(requiredSignals.provenance_observer.present).toBe(true);
+    expect(requiredSignals.provenance_normalization.present).toBe(true);
+    expect(requiredSignals.provenance_unit_system.present).toBe(true);
+    expect(missingSignals).not.toEqual(expect.arrayContaining(['provenance_chart', 'provenance_observer', 'provenance_normalization', 'provenance_unit_system']));
   });
 });

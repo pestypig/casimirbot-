@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
-import { runGrAgentLoop, type GrAgentLoopAttempt, type GrAgentLoopOptions, type GrAgentLoopResult } from '../server/gr/gr-agent-loop.js';
+import { spawn } from 'node:child_process';
+import { type GrAgentLoopAttempt, type GrAgentLoopOptions, type GrAgentLoopResult } from '../server/gr/gr-agent-loop.js';
 
 type GateStatus = 'PASS' | 'FAIL' | 'UNKNOWN' | 'NOT_READY' | 'NOT_APPLICABLE';
 type Wave = 'A' | 'B' | 'C' | 'D';
@@ -105,16 +106,25 @@ const ALLOWED_WAVES: readonly WaveArg[] = ['A', 'B', 'C', 'D', 'all'] as const;
 const FIRST_FAIL_ORDER = ['G0', 'G1', 'G2', 'G3', 'G4', 'G6', 'G7', 'G8'] as const;
 
 const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOptions }> = {
-  A: { runCount: 1, options: { maxIterations: 1, commitAccepted: false, proposals: [{ label: 'wave-a-baseline', params: {} }] } },
+  A: {
+    runCount: 1,
+    options: { maxIterations: 1, commitAccepted: false, useLiveSnapshot: false, proposals: [{ label: 'wave-a-baseline', params: {} }] },
+  },
   B: {
     runCount: 1,
-    options: { maxIterations: 2, commitAccepted: false, proposals: [{ label: 'wave-b-duty-lower', params: { dutyCycle: 0.09 } }] },
+    options: {
+      maxIterations: 2,
+      commitAccepted: false,
+      useLiveSnapshot: false,
+      proposals: [{ label: 'wave-b-duty-lower', params: { dutyCycle: 0.09 } }],
+    },
   },
   C: {
     runCount: 2,
     options: {
       maxIterations: 2,
       commitAccepted: false,
+      useLiveSnapshot: false,
       proposals: [
         { label: 'wave-c-seed-profile', params: { dutyCycle: 0.08, gammaGeo: 1.95 } },
         { label: 'wave-c-perturb', params: { dutyCycle: 0.085, gammaGeo: 1.9 } },
@@ -126,6 +136,7 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
     options: {
       maxIterations: 2,
       commitAccepted: false,
+      useLiveSnapshot: false,
       proposals: [
         { label: 'wave-d-replica-a', params: { dutyCycle: 0.075, gammaGeo: 1.85 } },
         { label: 'wave-d-replica-b', params: { dutyCycle: 0.075, gammaGeo: 1.85 } },
@@ -149,6 +160,8 @@ const writeMd = (p: string, body: string) => {
   fs.writeFileSync(p, body);
 };
 const hashId = (src: string) => Buffer.from(src).toString('hex').slice(0, 16);
+const resolveTsxRunner = () => path.resolve(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
+const resolveSingleRunCli = () => path.resolve(process.cwd(), 'scripts', 'warp-full-solve-single-runner.ts');
 
 class CampaignTimeoutError extends Error {
   kind: TimeoutKind;
@@ -208,6 +221,96 @@ export const parseSeedArg = (value: string | undefined): number => {
   return numeric;
 };
 
+const runGrAgentLoopIsolated = async (
+  args: { options: GrAgentLoopOptions; wave: Wave; runIndex: number; baseDir: string },
+  timeoutMs: number,
+  timeoutKind: TimeoutKind,
+  elapsedBaseMs: number,
+): Promise<GrAgentLoopResult> => {
+  const tsxCli = resolveTsxRunner();
+  const runnerCli = resolveSingleRunCli();
+  if (!fs.existsSync(tsxCli)) {
+    throw new Error(`Missing tsx runtime: ${tsxCli}`);
+  }
+  if (!fs.existsSync(runnerCli)) {
+    throw new Error(`Missing isolated runner: ${runnerCli}`);
+  }
+
+  const runNonce = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const inputPath = path.join(args.baseDir, `run-${args.runIndex}-input-${runNonce}.json`);
+  const outputPath = path.join(args.baseDir, `run-${args.runIndex}-isolated-${runNonce}.json`);
+  writeJson(inputPath, {
+    wave: args.wave,
+    runIndex: args.runIndex,
+    options: args.options,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(process.execPath, [tsxCli, runnerCli, '--input', inputPath, '--output', outputPath], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, timeoutMs);
+
+    child.once('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once('exit', (code) => {
+      clearTimeout(timer);
+      if (timedOut) {
+        reject(new CampaignTimeoutError(timeoutKind, timeoutMs, elapsedBaseMs + timeoutMs, args.wave));
+        return;
+      }
+      if (code !== 0) {
+        let message = `Isolated GR runner exited with code ${code}`;
+        if (fs.existsSync(outputPath)) {
+          try {
+            const payload = JSON.parse(fs.readFileSync(outputPath, 'utf8')) as { ok?: boolean; error?: { message?: string } };
+            if (payload?.error?.message) {
+              message = payload.error.message;
+            }
+          } catch {
+            // Preserve default message when parsing fails.
+          }
+        }
+        reject(new Error(message));
+        return;
+      }
+      resolve();
+    });
+  });
+
+  if (!fs.existsSync(outputPath)) {
+    throw new Error('Isolated GR runner completed without output artifact.');
+  }
+  const payload = JSON.parse(fs.readFileSync(outputPath, 'utf8')) as {
+    ok?: boolean;
+    result?: GrAgentLoopResult;
+    error?: { message?: string };
+  };
+  if (!payload.ok || !payload.result) {
+    throw new Error(payload.error?.message ?? 'Isolated GR runner returned missing result payload.');
+  }
+  return payload.result;
+};
+
+export const parsePositiveIntArg = (value: string | undefined, argName: string): number => {
+  const normalized = (value ?? '').trim();
+  if (!normalized) {
+    throw new Error(`Invalid --${argName} value "". Value must be a positive integer in milliseconds.`);
+  }
+  const numeric = Number(normalized);
+  if (!Number.isFinite(numeric) || !Number.isInteger(numeric) || numeric <= 0) {
+    throw new Error(`Invalid --${argName} value "${value}". Value must be a positive integer in milliseconds.`);
+  }
+  return numeric;
+};
+
 export const parseArgs = (argv = process.argv.slice(2)): ParsedArgs => {
   const args = argv;
   const read = (name: string, fallback?: string) => {
@@ -223,8 +326,8 @@ export const parseArgs = (argv = process.argv.slice(2)): ParsedArgs => {
     out: read('--out', 'artifacts/research/full-solve')!,
     seed: parseSeedArg(read('--seed', '20260224')),
     ci: args.includes('--ci'),
-    waveTimeoutMs: parseSeedArg(read('--wave-timeout-ms', '120000')),
-    campaignTimeoutMs: parseSeedArg(read('--campaign-timeout-ms', '600000')),
+    waveTimeoutMs: parsePositiveIntArg(read('--wave-timeout-ms', '120000'), 'wave-timeout-ms'),
+    campaignTimeoutMs: parsePositiveIntArg(read('--campaign-timeout-ms', '600000'), 'campaign-timeout-ms'),
   };
 };
 
@@ -455,12 +558,32 @@ const isMeaningfulValue = (value: unknown) => typeof value === 'string' && value
 
 export const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null, latestResult: GrAgentLoopResult | null) => {
   const finalState = latestResult?.finalState as Record<string, unknown> | undefined;
-  const metricAdapter = (finalState?.metricAdapter as Record<string, unknown> | undefined) ?? {};
-  const chartLabel = (metricAdapter.chart as Record<string, unknown> | undefined)?.label;
-  const metricContract = (finalState?.metricT00Contract as Record<string, unknown> | undefined) ?? {};
-  const observer = metricContract.observer ?? finalState?.metricT00Observer;
-  const normalization = metricContract.normalization ?? finalState?.metricT00Normalization;
-  const unitSystem = metricContract.unitSystem ?? finalState?.metricT00UnitSystem;
+  const finalWarp = (finalState?.warp as Record<string, unknown> | undefined) ?? {};
+  const attemptWarp = (attempt?.grRequest?.warp as Record<string, unknown> | undefined) ?? {};
+
+  const finalMetricAdapter = (finalWarp.metricAdapter as Record<string, unknown> | undefined) ?? {};
+  const attemptMetricAdapter = (attemptWarp.metricAdapter as Record<string, unknown> | undefined) ?? {};
+  const chartLabel =
+    (finalMetricAdapter.chart as Record<string, unknown> | undefined)?.label ??
+    (attemptMetricAdapter.chart as Record<string, unknown> | undefined)?.label;
+
+  const finalMetricContract = (finalWarp.metricT00Contract as Record<string, unknown> | undefined) ?? {};
+  const attemptMetricContract = (attemptWarp.metricT00Contract as Record<string, unknown> | undefined) ?? {};
+  const observer =
+    finalMetricContract.observer ??
+    attemptMetricContract.observer ??
+    finalWarp.metricT00Observer ??
+    attemptWarp.metricT00Observer;
+  const normalization =
+    finalMetricContract.normalization ??
+    attemptMetricContract.normalization ??
+    finalWarp.metricT00Normalization ??
+    attemptWarp.metricT00Normalization;
+  const unitSystem =
+    finalMetricContract.unitSystem ??
+    attemptMetricContract.unitSystem ??
+    finalWarp.metricT00UnitSystem ??
+    attemptWarp.metricT00UnitSystem;
 
   const requiredSignals: EvidencePack['requiredSignals'] = {
     initial_solver_status: { required: true, present: Boolean(attempt?.initial?.status) },
@@ -573,13 +696,28 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, wa
     try {
       const perRunCampaignRemainingMs = Math.max(1, campaignTimeoutMs - (campaignElapsedMs + (Date.now() - Date.parse(startIso))));
       const effectiveRunTimeoutMs = Math.max(1, Math.min(waveTimeoutMs, perRunCampaignRemainingMs));
+      const timeoutKind = perRunCampaignRemainingMs <= waveTimeoutMs ? 'campaign_timeout' : 'wave_timeout';
       const result = await withTimeout(
-        runGrAgentLoop({
-          ...profile.options,
-          budget: { ...(profile.options.budget ?? {}), maxTotalMs: effectiveRunTimeoutMs },
-        }),
-        effectiveRunTimeoutMs,
-        perRunCampaignRemainingMs <= waveTimeoutMs ? 'campaign_timeout' : 'wave_timeout',
+        runGrAgentLoopIsolated(
+          {
+            wave,
+            runIndex: runIndex + 1,
+            baseDir: base,
+            options: {
+              ...profile.options,
+              budget: {
+                ...(profile.options.budget ?? {}),
+                maxAttemptMs: effectiveRunTimeoutMs,
+                maxTotalMs: effectiveRunTimeoutMs,
+              },
+            },
+          },
+          effectiveRunTimeoutMs,
+          timeoutKind,
+          campaignElapsedMs + (Date.now() - Date.parse(startIso)),
+        ),
+        effectiveRunTimeoutMs + 500,
+        timeoutKind,
         campaignElapsedMs + (Date.now() - Date.parse(startIso)),
         wave,
       );
@@ -772,11 +910,83 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
     const campaignElapsedMs = Date.now() - campaignStarted;
     if (campaignElapsedMs > args.campaignTimeoutMs) {
       const timeoutArtifact = path.join(args.out, wave, 'evidence-pack.json');
+      const requiredSignals: EvidencePack['requiredSignals'] = {
+        initial_solver_status: { required: true, present: false },
+        evaluation_gate_status: { required: true, present: false },
+        hard_constraint_ford_roman_qi: { required: true, present: false },
+        hard_constraint_theta_audit: { required: true, present: false },
+        certificate_hash: { required: true, present: false },
+        certificate_integrity: { required: true, present: false },
+        provenance_chart: { required: true, present: false },
+        provenance_observer: { required: true, present: false },
+        provenance_normalization: { required: true, present: false },
+        provenance_unit_system: { required: true, present: false },
+      };
+      const missingSignals = Object.keys(requiredSignals).sort();
+      const gateMissingSignalMap = buildGateMissingSignalMap(missingSignals);
+      const gateStatus: EvidencePack['gateStatus'] = {
+        G0: 'NOT_READY',
+        G1: 'NOT_READY',
+        G2: 'NOT_READY',
+        G3: 'NOT_READY',
+        G4: 'NOT_READY',
+        G5: 'NOT_APPLICABLE',
+        G6: 'NOT_READY',
+        G7: 'NOT_READY',
+        G8: 'NOT_READY',
+      };
+      const gateDetails: EvidencePack['gateDetails'] = {
+        G0: { status: 'NOT_READY', reason: 'Campaign timeout reached before wave execution.', source: 'campaign.timeout' },
+        G1: { status: 'NOT_READY', reason: 'Initial solver status unavailable due campaign timeout.', source: 'campaign.timeout' },
+        G2: { status: 'NOT_READY', reason: 'Evaluation gate status unavailable due campaign timeout.', source: 'campaign.timeout' },
+        G3: { status: 'NOT_READY', reason: 'Certificate signal unavailable due campaign timeout.', source: 'campaign.timeout' },
+        G4: { status: 'NOT_READY', reason: 'Hard constraint signals unavailable due campaign timeout.', source: 'campaign.timeout' },
+        G5: { status: 'NOT_APPLICABLE', reason: 'Reduced-order campaign; physical feasibility gate not evaluated.', source: 'campaign.policy.reduced-order' },
+        G6: { status: 'NOT_READY', reason: 'No run outputs persisted before campaign timeout.', source: 'campaign.timeout' },
+        G7: { status: 'NOT_READY', reason: 'Stability check unavailable due campaign timeout.', source: 'campaign.timeout' },
+        G8: { status: 'NOT_READY', reason: 'Replication parity unavailable due campaign timeout.', source: 'campaign.timeout' },
+      };
       writeJson(timeoutArtifact, {
+        commitSha: execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim(),
+        runTimestamp: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        runId: `fs-${wave.toLowerCase()}-${args.seed}-${Date.now()}`,
+        traceId: `trace-${hashId(`${wave}-${args.seed}-campaign-timeout`)}`,
         wave,
-        gateStatus: { G0: 'NOT_READY' },
-        gateDetails: { G0: { status: 'NOT_READY', reason: 'campaign_timeout', source: 'campaign.timeout' } },
+        seed: args.seed,
+        provenance: {
+          command: `npm run warp:full-solve:campaign -- --wave ${wave}${args.ci ? ' --ci' : ''}`,
+          cwd: process.cwd(),
+          mode: args.ci ? 'ci' : 'local',
+        },
+        commandMetadata: {
+          maxIterations: WAVE_PROFILES[wave].options.maxIterations ?? 0,
+          runCount: WAVE_PROFILES[wave].runCount,
+          waveProfile: WAVE_PROFILES[wave].options,
+        },
+        runArtifacts: [],
+        gateStatus,
+        gateDetails,
+        firstFail: 'G0',
+        firstFailReason: 'Campaign timeout reached before wave execution.',
+        parsedGateMap: gateDetails,
+        evaluationSummary: { hardConstraintMap: {}, gateStatusByAttempt: [] },
+        requiredSignals,
+        missingSignals,
+        gateMissingSignalMap,
         timeout: { kind: 'campaign_timeout', timeoutMs: args.campaignTimeoutMs, elapsedMs: campaignElapsedMs, wave },
+        reproducibility: {
+          repeatedRunGateAgreement: { status: 'NOT_READY', agreementRatio: null, reason: 'No runs executed before campaign timeout.' },
+          constraintPayloadDrift: { status: 'NOT_READY', driftRatio: null, reason: 'No runs executed before campaign timeout.' },
+          residualTrend: {
+            status: 'NOT_READY',
+            fidelityLevels: 0,
+            trend: 'unknown',
+            reason: 'No runs executed before campaign timeout.',
+            series: [],
+          },
+        },
+        claimPosture: 'diagnostic/reduced-order',
         boundaryStatement: BOUNDARY_STATEMENT,
       });
       break;
