@@ -1,0 +1,27 @@
+experiment:
+  lane: prod_tts_nemo
+  model_family: fastpitch_hifigan
+  seed: 1337
+  precision: fp16
+
+dataset:
+  manifest_path: external/audiocraft/data/knowledge_audio/metadata.jsonl
+  sample_rate_hz: 22050
+  text_normalization: english_basic
+
+training:
+  max_steps: 50000
+  batch_size: 16
+  accumulate_grad_batches: 2
+  learning_rate: 0.0001
+  checkpoint_every_steps: 1000
+
+evaluation:
+  metrics:
+    - mcd
+    - wer_proxy
+    - duration_rmse
+
+artifacts:
+  train_status_path: artifacts/prod_tts_train_status.json
+  bundle_dir: checkpoints/prod_tts_voice_bundle
