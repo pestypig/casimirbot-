@@ -29,7 +29,7 @@ Baseline:
 |---|---|---|---|---|---|---|---|
 | 0 | Ledger + scope lock | completed | `pending_commit` | `PASS` | `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45` | `true` | This file |
 | 1 | Prompt-style contract spec | completed | `pending_commit` | `PASS` | `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45` | `true` | `docs/architecture/helix-ask-dottie-prompt-style-contract.v1.md` |
-| 2 | Pipeline bottleneck audit artifact | pending | - | - | - | - |  |
+| 2 | Pipeline bottleneck audit artifact | completed | `pending_commit` | `PASS` | `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45` | `true` | `reports/helix-ask-dottie-pipeline-bottleneck-audit-2026-02-24.md` |
 | 3 | Deterministic callout templates + taxonomy | pending | - | - | - | - |  |
 | 4 | Certainty parity enforcement tests | pending | - | - | - | - |  |
 | 5 | Admission control + deterministic overload envelopes | pending | - | - | - | - |  |
