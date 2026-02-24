@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -116,5 +116,63 @@ describe("validateVoiceBundle", () => {
     const promotedDir = join(targetRoot, "dottie_default", "voice_bundle");
     const promoted = validateVoiceBundle(promotedDir);
     expect(promoted).toEqual({ ok: true, profileId: "dottie_default", filesValidated: 2 });
+  });
+
+  it("fails closed when source file checksum does not match source manifest", () => {
+    const root = makeBundle();
+    const sourceDir = join(root, "checkpoints", "prod_tts_voice_bundle");
+    const targetRoot = join(root, "bundles");
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(join(sourceDir, "model.nemo"), "nemo-model");
+    writeFileSync(join(sourceDir, "manifest.json"), JSON.stringify({
+      bundle_version: "prod_tts_voice_bundle/1",
+      files: [
+        { path: "model.nemo", sha256: hash("wrong-model"), bytes: 10 },
+      ],
+    }, null, 2));
+
+    expect(() => execFileSync("python", [
+      "scripts/voice/prod/promote_voice_bundle.py",
+      "--input-manifest",
+      join(sourceDir, "manifest.json"),
+      "--output-root",
+      targetRoot,
+      "--voice-profile-id",
+      "dottie_default",
+      "--display-name",
+      "Dottie",
+    ], { cwd: process.cwd(), encoding: "utf-8" })).toThrow();
+
+    const promotedManifest = join(targetRoot, "dottie_default", "voice_bundle", "manifest.json");
+    expect(existsSync(promotedManifest)).toBe(false);
+  });
+
+  it("fails closed when source manifest path escapes source bundle root", () => {
+    const root = makeBundle();
+    const sourceDir = join(root, "checkpoints", "prod_tts_voice_bundle");
+    const targetRoot = join(root, "bundles");
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(join(root, "escape.bin"), "escape-data");
+    writeFileSync(join(sourceDir, "manifest.json"), JSON.stringify({
+      bundle_version: "prod_tts_voice_bundle/1",
+      files: [
+        { path: "../escape.bin", sha256: hash("escape-data"), bytes: 11 },
+      ],
+    }, null, 2));
+
+    expect(() => execFileSync("python", [
+      "scripts/voice/prod/promote_voice_bundle.py",
+      "--input-manifest",
+      join(sourceDir, "manifest.json"),
+      "--output-root",
+      targetRoot,
+      "--voice-profile-id",
+      "dottie_default",
+      "--display-name",
+      "Dottie",
+    ], { cwd: process.cwd(), encoding: "utf-8" })).toThrow();
+
+    const promotedManifest = join(targetRoot, "dottie_default", "voice_bundle", "manifest.json");
+    expect(existsSync(promotedManifest)).toBe(false);
   });
 });
