@@ -1,7 +1,10 @@
-import { Router } from "express";
+import {
+  evaluateCalloutEligibility,
+ Router } from "express";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { enforceCalloutParity, type CertaintyClass } from "../../shared/helix-dottie-callout-contract";
+import { evaluateCalloutEligibility as evaluateSharedEligibility } from "../../shared/callout-eligibility";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
@@ -257,13 +260,13 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
 
   const payload = parsed.data;
   const policyNowMs = resolvePolicyNowMs(payload);
-  if (payload.contextTier === "tier0" || (payload.sessionState && payload.sessionState !== "active")) {
-    return res.status(200).json({ ok: true, suppressed: true, reason: "voice_context_ineligible", traceId: payload.traceId ?? null });
-  }
-  if (payload.voiceMode === "off" || payload.voiceMode === "dnd") {
-    return res.status(200).json({ ok: true, suppressed: true, reason: "voice_context_ineligible", traceId: payload.traceId ?? null });
-  }
-  if (payload.voiceMode === "critical_only" && payload.priority !== "critical" && payload.priority !== "action") {
+  const contextEligibility = evaluateSharedEligibility({
+    contextTier: payload.contextTier,
+    sessionState: payload.sessionState,
+    voiceMode: payload.voiceMode,
+    classification: payload.priority,
+  });
+  if (!contextEligibility.emitVoice) {
     return res.status(200).json({ ok: true, suppressed: true, reason: "voice_context_ineligible", traceId: payload.traceId ?? null });
   }
   const repoAttributedEffective = payload.repoAttributed ?? Boolean(payload.missionId && payload.mode === "callout");

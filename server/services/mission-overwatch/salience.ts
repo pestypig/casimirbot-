@@ -1,3 +1,4 @@
+import { evaluateCalloutEligibility } from "../../../shared/callout-eligibility";
 export type MissionCalloutPriority = "info" | "warn" | "critical" | "action";
 
 export type SalienceInput = {
@@ -55,35 +56,13 @@ export const evaluateSalience = (
   const dedupeKey = buildKey(input);
   const cooldownMs = PRIORITY_COOLDOWN_SECONDS[input.classification] * 1000;
 
-
-  if (input.contextTier === "tier0") {
-    return {
-      speak: false,
-      priority: input.classification,
-      dedupeKey,
-      reason: "context_ineligible",
-      cooldownMs,
-    };
-  }
-  if (input.sessionState && input.sessionState !== "active") {
-    return {
-      speak: false,
-      priority: input.classification,
-      dedupeKey,
-      reason: "context_ineligible",
-      cooldownMs,
-    };
-  }
-  if (input.voiceMode === "off" || input.voiceMode === "dnd") {
-    return {
-      speak: false,
-      priority: input.classification,
-      dedupeKey,
-      reason: "context_ineligible",
-      cooldownMs,
-    };
-  }
-  if (input.voiceMode === "critical_only" && input.classification !== "critical" && input.classification !== "action") {
+  const eligibility = evaluateCalloutEligibility({
+    contextTier: input.contextTier,
+    sessionState: input.sessionState,
+    voiceMode: input.voiceMode,
+    classification: input.classification,
+  });
+  if (!eligibility.emitVoice) {
     return {
       speak: false,
       priority: input.classification,

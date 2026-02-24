@@ -22,6 +22,14 @@ export type MissionBoardStoredEvent = {
   traceId?: string;
   contextTier?: "tier0" | "tier1";
   sessionState?: "idle" | "requesting" | "active" | "stopping" | "error";
+  objectiveId?: string;
+  objectiveTitle?: string;
+  objectiveStatus?: "open" | "in_progress" | "blocked" | "resolved";
+  gapId?: string;
+  gapSummary?: string;
+  gapSeverity?: "low" | "medium" | "high" | "critical";
+  gapOpenedAt?: string;
+  gapResolvedAt?: string;
 };
 
 type MissionBoardStore = {
@@ -80,6 +88,14 @@ const readPayload = (
   traceId?: unknown;
   contextTier?: unknown;
   sessionState?: unknown;
+  objectiveId?: unknown;
+  objectiveTitle?: unknown;
+  objectiveStatus?: unknown;
+  gapId?: unknown;
+  gapSummary?: unknown;
+  gapSeverity?: unknown;
+  gapOpenedAt?: unknown;
+  gapResolvedAt?: unknown;
 } => {
   if (!value) return {};
   if (typeof value === "object") {
@@ -117,6 +133,14 @@ const readPayload = (
         traceId?: unknown;
         contextTier?: unknown;
         sessionState?: unknown;
+        objectiveId?: unknown;
+        objectiveTitle?: unknown;
+        objectiveStatus?: unknown;
+        gapId?: unknown;
+        gapSummary?: unknown;
+        gapSeverity?: unknown;
+        gapOpenedAt?: unknown;
+        gapResolvedAt?: unknown;
       };
       if (parsed && typeof parsed === "object") {
         return parsed;
@@ -183,6 +207,26 @@ const rowToEvent = (row: MissionBoardRow): MissionBoardStoredEvent => {
       payload.sessionState === "error"
         ? payload.sessionState
         : undefined,
+    objectiveId: typeof payload.objectiveId === "string" ? payload.objectiveId : undefined,
+    objectiveTitle: typeof payload.objectiveTitle === "string" ? payload.objectiveTitle : undefined,
+    objectiveStatus:
+      payload.objectiveStatus === "open" ||
+      payload.objectiveStatus === "in_progress" ||
+      payload.objectiveStatus === "blocked" ||
+      payload.objectiveStatus === "resolved"
+        ? payload.objectiveStatus
+        : undefined,
+    gapId: typeof payload.gapId === "string" ? payload.gapId : undefined,
+    gapSummary: typeof payload.gapSummary === "string" ? payload.gapSummary : undefined,
+    gapSeverity:
+      payload.gapSeverity === "low" ||
+      payload.gapSeverity === "medium" ||
+      payload.gapSeverity === "high" ||
+      payload.gapSeverity === "critical"
+        ? payload.gapSeverity
+        : undefined,
+    gapOpenedAt: typeof payload.gapOpenedAt === "string" ? payload.gapOpenedAt : undefined,
+    gapResolvedAt: typeof payload.gapResolvedAt === "string" ? payload.gapResolvedAt : undefined,
   };
 };
 

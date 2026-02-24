@@ -1941,6 +1941,21 @@ export function HelixAskPill({
     });
   }, []);
 
+
+  const extractObjectiveSignals = useCallback((events: AskLiveEventEntry[]) => {
+    const objective = events.find((event) => /objective/i.test(event.text));
+    const gaps = events
+      .filter((event) => /gap/i.test(event.text))
+      .map((event) => event.text)
+      .sort((a, b) => a.localeCompare(b));
+    const suppression = events.find((event) => /suppress/i.test(event.text) || /context_ineligible|dedupe_cooldown|mission_rate_limited/.test(event.text));
+    return {
+      objective: objective?.text ?? null,
+      gaps: gaps.slice(0, 3),
+      suppression: suppression?.text ?? null,
+    };
+  }, []);
+
   const resumePendingAsk = useCallback(
     async (pending: PendingHelixAskJob) => {
       if (!pending.jobId) return;
@@ -2661,6 +2676,18 @@ export function HelixAskPill({
                   </p>
                 ) : null}
                 {renderHelixAskEnvelope(reply)}
+                {(() => {
+                  const objectiveSignals = extractObjectiveSignals(replyEvents);
+                  if (!objectiveSignals.objective && objectiveSignals.gaps.length === 0 && !objectiveSignals.suppression) return null;
+                  return (
+                    <div className="mt-2 rounded-lg border border-indigo-400/20 bg-indigo-950/20 px-3 py-2 text-xs text-indigo-100">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-indigo-300">Objective-first situational view</p>
+                      {objectiveSignals.objective ? <p className="mt-1">Objective: {objectiveSignals.objective}</p> : null}
+                      {objectiveSignals.gaps.length > 0 ? <p className="mt-1">Top unresolved gaps: {objectiveSignals.gaps.join(" · ")}</p> : null}
+                      <p className="mt-1">Suppression inspector: {objectiveSignals.suppression ?? "not suppressed"}</p>
+                    </div>
+                  );
+                })()}
                 {reply.proof ? (
                   <div className="mt-2 rounded-lg border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100">
                     <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-300">Proof</p>

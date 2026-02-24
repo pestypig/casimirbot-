@@ -50,9 +50,12 @@ type ScenarioResult = {
 
 type CorrelationRow = {
   missionId: string | null;
+  objectiveId: string | null;
+  gapId: string | null;
   eventId: string | null;
   traceId: string | null;
   suppressionReason: string | null;
+  policyClock: number | null;
   replayMeta: unknown;
   ackRefId: string | null;
   trigger_to_debrief_closed_ms: number | null;
@@ -191,7 +194,7 @@ const buildTranscriptMarkdown = (run: RunOutput): string => {
   lines.push("## Situation -> Dot Transcript Table");
   lines.push("");
   lines.push("| Scenario | Situation narration (event) | LLM candidate response | Dot transcript output | Expected | Actual | PASS/FAIL |");
-  lines.push("|---|---|---|---|---|---|---|");
+  lines.push("|---|---|---|---|---|---|---|---|---|---|");
   for (const row of run.results) {
     lines.push(
       `| ${markdownEscape(row.id)} | ${markdownEscape(row.situationNarration)} | ${markdownEscape(row.llmCandidateText)} | ${markdownEscape(row.dotTranscript)} | ${markdownEscape(row.expectedSummary)} | ${markdownEscape(row.actualSummary)} | ${row.pass ? "PASS" : "FAIL"} |`,
@@ -201,7 +204,7 @@ const buildTranscriptMarkdown = (run: RunOutput): string => {
   lines.push("## Policy-Trace Correlation");
   lines.push("");
   lines.push("| missionId | eventId | traceId | suppressionReason | replayMeta | ackRefId | trigger_to_debrief_closed_ms |");
-  lines.push("|---|---|---|---|---|---|---|");
+  lines.push("|---|---|---|---|---|---|---|---|---|---|");
   for (const row of run.correlation) {
     lines.push(`| ${markdownEscape(row.missionId ?? "")} | ${markdownEscape(row.eventId ?? "")} | ${markdownEscape(row.traceId ?? "")} | ${markdownEscape(row.suppressionReason ?? "")} | ${markdownEscape(JSON.stringify(row.replayMeta ?? null))} | ${markdownEscape(row.ackRefId ?? "")} | ${markdownEscape(row.trigger_to_debrief_closed_ms ?? "")} |`);
   }
@@ -426,9 +429,12 @@ const runScenarios = async (fixture: Fixture, fixturePath: string): Promise<RunO
 
     correlation.push({
       missionId: scenario.contextEvent?.missionId ?? scenario.ack?.missionId ?? (typeof scenario.voice?.missionId === "string" ? scenario.voice.missionId : null),
+      objectiveId: typeof scenario.voice?.objectiveId === "string" ? scenario.voice.objectiveId : null,
+      gapId: typeof scenario.voice?.gapId === "string" ? scenario.voice.gapId : null,
       eventId: scenario.contextEvent?.eventId ?? scenario.ack?.eventId ?? (typeof scenario.voice?.eventId === "string" ? scenario.voice.eventId : null),
       traceId: typeof scenario.voice?.traceId === "string" ? scenario.voice.traceId : null,
       suppressionReason: typeof voiceResponse?.reason === "string" ? String(voiceResponse.reason) : null,
+      policyClock: typeof scenario.voice?.policyTsMs === "number" ? scenario.voice.policyTsMs : null,
       replayMeta: voiceResponse?.replayMeta ?? null,
       ackRefId: typeof (ackResponse?.receipt as { ackRefId?: string } | undefined)?.ackRefId === "string" ? (ackResponse?.receipt as { ackRefId?: string }).ackRefId ?? null : null,
       trigger_to_debrief_closed_ms:
