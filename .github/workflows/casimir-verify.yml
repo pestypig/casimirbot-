@@ -42,6 +42,9 @@ jobs:
       - name: Validate agent context checklist
         run: npm run audit:agent-context:check
 
+      - name: Validate Helix Dottie docs/schema alignment
+        run: npm run validate:helix-dottie-docs-schema
+
       - name: Validate math stages
         env:
           MATH_UNIT_WARNINGS_STRICT: "1"
