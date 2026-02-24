@@ -1,6 +1,4 @@
-import {
-  evaluateCalloutEligibility,
- Router } from "express";
+import { Router } from "express";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { enforceCalloutParity, type CertaintyClass } from "../../shared/helix-dottie-callout-contract";

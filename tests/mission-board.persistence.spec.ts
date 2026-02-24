@@ -174,6 +174,12 @@ describe("mission board persistence", () => {
       tier: "tier1",
       sessionState: "active",
       traceId: "trace-meta-1",
+      objectiveId: "obj-meta-1",
+      objectiveTitle: "Persist objective metadata",
+      objectiveStatus: "open",
+      gapId: "gap-meta-1",
+      gapSummary: "Persist gap metadata",
+      gapSeverity: "medium",
     });
 
     const { ensureDatabase, getPool } = await import("../server/db/client");
@@ -192,13 +198,38 @@ describe("mission board persistence", () => {
     expect(payload.traceId).toBe("trace-meta-1");
     expect(payload.contextTier).toBe("tier1");
     expect(payload.sessionState).toBe("active");
+    expect(payload.objectiveId).toBe("obj-meta-1");
+    expect(payload.objectiveTitle).toBe("Persist objective metadata");
+    expect(payload.objectiveStatus).toBe("open");
+    expect(payload.gapId).toBe("gap-meta-1");
+    expect(payload.gapSummary).toBe("Persist gap metadata");
+    expect(payload.gapSeverity).toBe("medium");
 
     const events = await request(app).get(`/api/mission-board/${missionId}/events`).query({ limit: 20 });
     expect(events.status).toBe(200);
-    const row = (events.body.events as Array<{ eventId: string; traceId?: string; contextTier?: string; sessionState?: string }>).find((e) => e.eventId === "persist-context-meta");
+    const row = (
+      events.body.events as Array<{
+        eventId: string;
+        traceId?: string;
+        contextTier?: string;
+        sessionState?: string;
+        objectiveId?: string;
+        objectiveTitle?: string;
+        objectiveStatus?: string;
+        gapId?: string;
+        gapSummary?: string;
+        gapSeverity?: string;
+      }>
+    ).find((e) => e.eventId === "persist-context-meta");
     expect(row?.traceId).toBe("trace-meta-1");
     expect(row?.contextTier).toBe("tier1");
     expect(row?.sessionState).toBe("active");
+    expect(row?.objectiveId).toBe("obj-meta-1");
+    expect(row?.objectiveTitle).toBe("Persist objective metadata");
+    expect(row?.objectiveStatus).toBe("open");
+    expect(row?.gapId).toBe("gap-meta-1");
+    expect(row?.gapSummary).toBe("Persist gap metadata");
+    expect(row?.gapSeverity).toBe("medium");
   });
 
 });

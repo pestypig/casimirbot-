@@ -114,6 +114,14 @@ const readPayload = (
       traceId?: unknown;
       contextTier?: unknown;
       sessionState?: unknown;
+      objectiveId?: unknown;
+      objectiveTitle?: unknown;
+      objectiveStatus?: unknown;
+      gapId?: unknown;
+      gapSummary?: unknown;
+      gapSeverity?: unknown;
+      gapOpenedAt?: unknown;
+      gapResolvedAt?: unknown;
     };
   }
   if (typeof value === "string") {
@@ -281,6 +289,14 @@ const dbStore: MissionBoardStore = {
           traceId: event.traceId ?? null,
           contextTier: event.contextTier ?? null,
           sessionState: event.sessionState ?? null,
+          objectiveId: event.objectiveId ?? null,
+          objectiveTitle: event.objectiveTitle ?? null,
+          objectiveStatus: event.objectiveStatus ?? null,
+          gapId: event.gapId ?? null,
+          gapSummary: event.gapSummary ?? null,
+          gapSeverity: event.gapSeverity ?? null,
+          gapOpenedAt: event.gapOpenedAt ?? event.ts ?? null,
+          gapResolvedAt: event.gapResolvedAt ?? null,
         }),
       ],
     );

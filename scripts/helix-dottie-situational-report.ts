@@ -194,7 +194,7 @@ const buildTranscriptMarkdown = (run: RunOutput): string => {
   lines.push("## Situation -> Dot Transcript Table");
   lines.push("");
   lines.push("| Scenario | Situation narration (event) | LLM candidate response | Dot transcript output | Expected | Actual | PASS/FAIL |");
-  lines.push("|---|---|---|---|---|---|---|---|---|---|");
+  lines.push("|---|---|---|---|---|---|---|");
   for (const row of run.results) {
     lines.push(
       `| ${markdownEscape(row.id)} | ${markdownEscape(row.situationNarration)} | ${markdownEscape(row.llmCandidateText)} | ${markdownEscape(row.dotTranscript)} | ${markdownEscape(row.expectedSummary)} | ${markdownEscape(row.actualSummary)} | ${row.pass ? "PASS" : "FAIL"} |`,
@@ -203,10 +203,10 @@ const buildTranscriptMarkdown = (run: RunOutput): string => {
   lines.push("");
   lines.push("## Policy-Trace Correlation");
   lines.push("");
-  lines.push("| missionId | eventId | traceId | suppressionReason | replayMeta | ackRefId | trigger_to_debrief_closed_ms |");
+  lines.push("| missionId | objectiveId | gapId | eventId | traceId | suppressionReason | policyClock | replayMeta | ackRefId | trigger_to_debrief_closed_ms |");
   lines.push("|---|---|---|---|---|---|---|---|---|---|");
   for (const row of run.correlation) {
-    lines.push(`| ${markdownEscape(row.missionId ?? "")} | ${markdownEscape(row.eventId ?? "")} | ${markdownEscape(row.traceId ?? "")} | ${markdownEscape(row.suppressionReason ?? "")} | ${markdownEscape(JSON.stringify(row.replayMeta ?? null))} | ${markdownEscape(row.ackRefId ?? "")} | ${markdownEscape(row.trigger_to_debrief_closed_ms ?? "")} |`);
+    lines.push(`| ${markdownEscape(row.missionId ?? "")} | ${markdownEscape(row.objectiveId ?? "")} | ${markdownEscape(row.gapId ?? "")} | ${markdownEscape(row.eventId ?? "")} | ${markdownEscape(row.traceId ?? "")} | ${markdownEscape(row.suppressionReason ?? "")} | ${markdownEscape(row.policyClock ?? "")} | ${markdownEscape(JSON.stringify(row.replayMeta ?? null))} | ${markdownEscape(row.ackRefId ?? "")} | ${markdownEscape(row.trigger_to_debrief_closed_ms ?? "")} |`);
   }
   lines.push("");
   lines.push("## Replay Determinism Check");

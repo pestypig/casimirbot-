@@ -117,6 +117,13 @@ const contextEventSchema = z.object({
   traceId: z.string().trim().max(200).optional(),
   evidenceRefs: z.array(z.string().trim().min(1).max(500)).max(32).default([]),
   timer: timerPayloadSchema.optional(),
+  objectiveId: z.string().trim().min(1).max(200).optional(),
+  objectiveTitle: z.string().trim().min(1).max(300).optional(),
+  objectiveStatus: z.enum(["open", "in_progress", "blocked", "resolved"]).optional(),
+  gapId: z.string().trim().min(1).max(200).optional(),
+  gapSummary: z.string().trim().min(1).max(500).optional(),
+  gapSeverity: z.enum(["low", "medium", "high", "critical"]).optional(),
+  gapResolvedAt: z.string().datetime().optional(),
 });
 
 const ackSchema = z.object({
@@ -195,6 +202,13 @@ const getMissionEvents = async (missionId: string): Promise<MissionBoardEvent[]>
       traceId: event.traceId,
       contextTier: event.contextTier,
       sessionState: event.sessionState,
+      objectiveId: event.objectiveId,
+      objectiveTitle: event.objectiveTitle,
+      objectiveStatus: event.objectiveStatus,
+      gapId: event.gapId,
+      gapSummary: event.gapSummary,
+      gapSeverity: event.gapSeverity,
+      gapResolvedAt: event.gapResolvedAt,
     });
   }
   return normalized.sort((a, b) => {
@@ -462,6 +476,13 @@ missionBoardRouter.post("/:missionId/context-events", async (req, res) => {
     traceId: payload.traceId,
     contextTier: payload.tier,
     sessionState: payload.sessionState,
+    objectiveId: payload.objectiveId,
+    objectiveTitle: payload.objectiveTitle,
+    objectiveStatus: payload.objectiveStatus,
+    gapId: payload.gapId,
+    gapSummary: payload.gapSummary,
+    gapSeverity: payload.gapSeverity,
+    gapResolvedAt: payload.gapResolvedAt,
   };
 
   try {

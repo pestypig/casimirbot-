@@ -204,6 +204,61 @@ describe("mission board routes", () => {
     expect(contextEvent?.sessionState).toBe("active");
   });
 
+  it("projects objective/gap fields from context-events into snapshot", async () => {
+    const app = buildApp();
+    const missionId = uniqueMissionId();
+
+    const res = await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
+      eventId: "objective-gap-1",
+      eventType: "objective_update",
+      classification: "action",
+      text: "Objective updated with unresolved gap",
+      tier: "tier1",
+      sessionState: "active",
+      ts: "2026-02-24T06:05:00.000Z",
+      traceId: "trace-objective-gap-1",
+      objectiveId: "obj-1",
+      objectiveTitle: "Stabilize objective-first loop",
+      objectiveStatus: "in_progress",
+      gapId: "gap-1",
+      gapSummary: "Suppression reason not visible in UI",
+      gapSeverity: "high",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.event.objectiveId).toBe("obj-1");
+    expect(res.body.event.gapId).toBe("gap-1");
+
+    const snapshot = await request(app).get(`/api/mission-board/${missionId}`);
+    expect(snapshot.status).toBe(200);
+    expect(snapshot.body.snapshot.objectives).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          objectiveId: "obj-1",
+          title: "Stabilize objective-first loop",
+          status: "in_progress",
+        }),
+      ]),
+    );
+    expect(snapshot.body.snapshot.gaps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          gapId: "gap-1",
+          objectiveId: "obj-1",
+          severity: "high",
+        }),
+      ]),
+    );
+
+    const events = await request(app).get(`/api/mission-board/${missionId}/events`).query({ limit: 10 });
+    expect(events.status).toBe(200);
+    const objectiveEvent = (events.body.events as Array<{ eventId: string; objectiveId?: string; gapId?: string }>).find(
+      (event) => event.eventId === "objective-gap-1",
+    );
+    expect(objectiveEvent?.objectiveId).toBe("obj-1");
+    expect(objectiveEvent?.gapId).toBe("gap-1");
+  });
+
 
   it("accepts tier1 non-active context event without ts", async () => {
     const app = buildApp();
