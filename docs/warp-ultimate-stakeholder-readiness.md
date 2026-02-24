@@ -90,6 +90,24 @@ GR constraint gate:
 3. Convergence and analytic special-case coverage can still be expanded.
 4. Curved-spacetime QI applicability rigor remains reduced-order and assumption-bound.
 
+## Lab Test Envelope + Falsifier Matrix
+
+Policy:
+- Treat all near-term lab work as reduced-order marker validation.
+- Use measured, derived, and proxy provenance labels on every exported signal.
+- Promote no claim beyond governance/readiness unless falsifiers are passed under declared assumptions.
+
+| Marker family | Lab test envelope | Pass signal | Falsifier | Claim effect |
+| --- | --- | --- | --- | --- |
+| Casimir tile stack | Sweep gap, roughness, temperature, patch-potential compensation, repeatability | Stable force-pressure profile within uncertainty budget and repeatable across runs | Non-repeatable force profile after controls or unexplained drift beyond budget | Cap to diagnostic-only |
+| VdB/blue-shift proxy analogs | Controlled EM/circuit analog sweeps with explicit non-gravitational labeling | Proxy response tracks declared model envelope and remains provenance-clean | Proxy response cannot be reproduced or requires hidden tuning | Block any geometry-derived implication |
+| QI-inspired scheduling | Duty/pulse/payback scheduling with strict accounting and applicability status | `qiApplicabilityStatus=PASS`, stable margins, no loophole phrasing in outputs | Applicability `UNKNOWN/NOT_APPLICABLE` or payback ledger inconsistency | Block promotion above reduced-order |
+| TS/light-crossing timing | Hardware jitter and timing-window validation under load | Timing remains inside declared gate and regime semantics are correctly labeled as proxy/gate | Gate/regime mismatch or timing instability under replay | Cap to diagnostic until corrected |
+| Contract/provenance closure | Strict-mode runs requiring chart/observer/normalization/units metadata | No proxy masquerade in public mode and strict fail-close preserved | Any surfaced metric-derived label without full contract | Block certified-governance promotion |
+
+External statement approved for this matrix:
+- "We define falsifiable reduced-order lab markers and test envelopes; this is not a physical warp feasibility claim."
+
 ## 90-Day Upgrade Plan
 
 1. Expand invariant fixture + lint enforcement for claim language.
@@ -117,8 +135,8 @@ Latest verified run evidence (this branch session):
 - firstFail: null
 - certificateHash: `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
 - integrityOk: true
-- traceId: `adapter:f5d825da-33ec-4e53-836d-8a4d9823dbf6`
-- runId: `20733`
+- traceId: `adapter:36582c70-898d-4aff-98bb-1c9db95601cc`
+- runId: `20738`
 - commit: `2b323ba4`
 
 This document is a governance/readiness canonical, not a physics feasibility certificate.

@@ -1,0 +1,7 @@
+{
+  "mos_proxy": 4.0,
+  "root_cause": "none",
+  "source_status": "artifacts\\prod_tts_train_status.json",
+  "status": "ok",
+  "wer_proxy": 0.09
+}

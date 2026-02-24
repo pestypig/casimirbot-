@@ -12,6 +12,7 @@ const REQUIRED_SECTIONS = [
   "## Proof Visibility",
   "## Claims Matrix",
   "## Gap Register",
+  "## Lab Test Envelope + Falsifier Matrix",
   "## 90-Day Upgrade Plan",
   "## Release Checklist",
   "## Appendix",
