@@ -29,6 +29,32 @@ export type GrEvaluationResult = {
   integrityOk: boolean;
 };
 
+
+const normalizeConstraintStatus = (status: string | undefined): "pass" | "fail" | "unknown" => {
+  if (status === "pass" || status === "fail" || status === "unknown") return status;
+  return "unknown";
+};
+
+const ensureHardConstraintEntries = (constraints: GrEvaluation["constraints"]): GrEvaluation["constraints"] => {
+  const byId = new Map(constraints.map((entry) => [entry.id, entry]));
+  const hardIds = ["FordRomanQI", "ThetaAudit"] as const;
+  for (const id of hardIds) {
+    if (!byId.has(id)) {
+      byId.set(id, {
+        id,
+        label: id,
+        severity: "HARD",
+        status: "unknown",
+        message: `${id} missing from evaluator output; defaulted to unknown for deterministic payload completeness.`,
+      });
+      continue;
+    }
+    const entry = byId.get(id)!;
+    byId.set(id, { ...entry, status: normalizeConstraintStatus(entry.status) });
+  }
+  return Array.from(byId.values());
+};
+
 export async function runGrEvaluation(
   input: GrEvaluationInput,
 ): Promise<GrEvaluationResult> {
@@ -123,13 +149,15 @@ export async function runGrEvaluation(
         ? { code: "OK" }
         : { code: "ERROR", message: "GR constraint gate failed" };
 
+      const completeConstraints = ensureHardConstraintEntries(gateEval.constraints);
+
       const evaluation: GrEvaluation = {
         kind: "gr-evaluation",
         updatedAt: Date.now(),
         policy: policyBundle,
         residuals,
-        gate: gateEval.gate,
-        constraints: gateEval.constraints,
+        gate: { ...gateEval.gate, status: normalizeConstraintStatus(gateEval.gate.status) },
+        constraints: completeConstraints,
         certificate: {
           status: certificateStatus,
           admissibleStatus,
