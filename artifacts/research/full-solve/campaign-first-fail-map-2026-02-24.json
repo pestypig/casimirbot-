@@ -1,11 +1,11 @@
 {
   "campaignId": "FS-CAMPAIGN-2026-02-24",
   "asOfDate": "2026-02-24",
-  "globalFirstFail": "G2",
+  "globalFirstFail": "G0",
   "perWave": {
-    "A": "G2",
-    "B": "G2",
-    "C": "G2",
-    "D": "G2"
+    "A": "G0",
+    "B": "G0",
+    "C": "G0",
+    "D": "G0"
   }
 }

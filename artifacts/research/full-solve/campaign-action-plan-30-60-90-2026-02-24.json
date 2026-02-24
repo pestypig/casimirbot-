@@ -1,15 +1,209 @@
 {
   "campaignId": "FS-CAMPAIGN-2026-02-24",
-  "decision": "INADMISSIBLE",
+  "decision": "NOT_READY",
+  "blockers": [
+    {
+      "wave": "A",
+      "gateId": "G0",
+      "status": "NOT_READY",
+      "reason": "No GR loop run artifacts found."
+    },
+    {
+      "wave": "A",
+      "gateId": "G1",
+      "status": "NOT_READY",
+      "reason": "Initial solver status missing in artifact."
+    },
+    {
+      "wave": "A",
+      "gateId": "G2",
+      "status": "NOT_READY",
+      "reason": "Evaluation gate status missing in artifact."
+    },
+    {
+      "wave": "A",
+      "gateId": "G3",
+      "status": "NOT_READY",
+      "reason": "Certificate data missing from evaluator output."
+    },
+    {
+      "wave": "A",
+      "gateId": "G4",
+      "status": "NOT_READY",
+      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints."
+    },
+    {
+      "wave": "A",
+      "gateId": "G6",
+      "status": "NOT_READY",
+      "reason": "Run outputs are missing for this wave."
+    },
+    {
+      "wave": "A",
+      "gateId": "G7",
+      "status": "NOT_READY",
+      "reason": "Stability check enabled for waves C and D only."
+    },
+    {
+      "wave": "A",
+      "gateId": "G8",
+      "status": "NOT_READY",
+      "reason": "Replication parity applies to wave D only."
+    },
+    {
+      "wave": "B",
+      "gateId": "G0",
+      "status": "NOT_READY",
+      "reason": "No GR loop run artifacts found."
+    },
+    {
+      "wave": "B",
+      "gateId": "G1",
+      "status": "NOT_READY",
+      "reason": "Initial solver status missing in artifact."
+    },
+    {
+      "wave": "B",
+      "gateId": "G2",
+      "status": "NOT_READY",
+      "reason": "Evaluation gate status missing in artifact."
+    },
+    {
+      "wave": "B",
+      "gateId": "G3",
+      "status": "NOT_READY",
+      "reason": "Certificate data missing from evaluator output."
+    },
+    {
+      "wave": "B",
+      "gateId": "G4",
+      "status": "NOT_READY",
+      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints."
+    },
+    {
+      "wave": "B",
+      "gateId": "G6",
+      "status": "NOT_READY",
+      "reason": "Run outputs are missing for this wave."
+    },
+    {
+      "wave": "B",
+      "gateId": "G7",
+      "status": "NOT_READY",
+      "reason": "Stability check enabled for waves C and D only."
+    },
+    {
+      "wave": "B",
+      "gateId": "G8",
+      "status": "NOT_READY",
+      "reason": "Replication parity applies to wave D only."
+    },
+    {
+      "wave": "C",
+      "gateId": "G0",
+      "status": "NOT_READY",
+      "reason": "No GR loop run artifacts found."
+    },
+    {
+      "wave": "C",
+      "gateId": "G1",
+      "status": "NOT_READY",
+      "reason": "Initial solver status missing in artifact."
+    },
+    {
+      "wave": "C",
+      "gateId": "G2",
+      "status": "NOT_READY",
+      "reason": "Evaluation gate status missing in artifact."
+    },
+    {
+      "wave": "C",
+      "gateId": "G3",
+      "status": "NOT_READY",
+      "reason": "Certificate data missing from evaluator output."
+    },
+    {
+      "wave": "C",
+      "gateId": "G4",
+      "status": "NOT_READY",
+      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints."
+    },
+    {
+      "wave": "C",
+      "gateId": "G6",
+      "status": "NOT_READY",
+      "reason": "Run outputs are missing for this wave."
+    },
+    {
+      "wave": "C",
+      "gateId": "G7",
+      "status": "NOT_READY",
+      "reason": "Need at least 2 runs for stability check."
+    },
+    {
+      "wave": "C",
+      "gateId": "G8",
+      "status": "NOT_READY",
+      "reason": "Replication parity applies to wave D only."
+    },
+    {
+      "wave": "D",
+      "gateId": "G0",
+      "status": "NOT_READY",
+      "reason": "No GR loop run artifacts found."
+    },
+    {
+      "wave": "D",
+      "gateId": "G1",
+      "status": "NOT_READY",
+      "reason": "Initial solver status missing in artifact."
+    },
+    {
+      "wave": "D",
+      "gateId": "G2",
+      "status": "NOT_READY",
+      "reason": "Evaluation gate status missing in artifact."
+    },
+    {
+      "wave": "D",
+      "gateId": "G3",
+      "status": "NOT_READY",
+      "reason": "Certificate data missing from evaluator output."
+    },
+    {
+      "wave": "D",
+      "gateId": "G4",
+      "status": "NOT_READY",
+      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints."
+    },
+    {
+      "wave": "D",
+      "gateId": "G6",
+      "status": "NOT_READY",
+      "reason": "Run outputs are missing for this wave."
+    },
+    {
+      "wave": "D",
+      "gateId": "G7",
+      "status": "NOT_READY",
+      "reason": "Need at least 2 runs for stability check."
+    },
+    {
+      "wave": "D",
+      "gateId": "G8",
+      "status": "NOT_READY",
+      "reason": "Need replicated runs for wave D parity check."
+    }
+  ],
   "plan": {
     "30_days": [
-      "Address first hard failure in G2 or G4 and re-run all waves."
+      "Resolve first FAIL/NOT_READY hard gate from campaign-first-fail map and capture new evidence-pack outputs."
     ],
     "60_days": [
-      "Demonstrate monotone convergence with hard thresholds passing."
+      "Demonstrate stable repeated-run outcomes for waves C and D from persisted raw outputs."
     ],
     "90_days": [
-      "Independent replication parity with zero hard-gate regressions."
+      "Close evidence gaps so gates are PASS/NOT_APPLICABLE with reproducible artifacts and replayable provenance."
     ]
   }
 }
