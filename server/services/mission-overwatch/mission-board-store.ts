@@ -10,6 +10,15 @@ export type MissionBoardStoredEvent = {
   fromState?: string;
   toState?: string;
   evidenceRefs: string[];
+  timerId?: string;
+  timerKind?: "countdown" | "deadline";
+  timerStatus?: "scheduled" | "running" | "expired" | "cancelled" | "completed";
+  timerDueTs?: string;
+  derivedFromEventId?: string;
+  ackRefId?: string;
+  metrics?: {
+    trigger_to_debrief_closed_ms?: number;
+  };
 };
 
 type MissionBoardStore = {
@@ -53,10 +62,34 @@ const toIso = (value: Date | string): string => {
 
 const readPayload = (
   value: unknown,
-): { text?: string; fromState?: string; toState?: string; evidenceRefs?: unknown } => {
+): {
+  text?: string;
+  fromState?: string;
+  toState?: string;
+  evidenceRefs?: unknown;
+  derivedFromEventId?: unknown;
+  ackRefId?: unknown;
+  metrics?: unknown;
+  timerId?: unknown;
+  timerKind?: unknown;
+  timerStatus?: unknown;
+  timerDueTs?: unknown;
+} => {
   if (!value) return {};
   if (typeof value === "object") {
-    return value as { text?: string; fromState?: string; toState?: string; evidenceRefs?: unknown };
+    return value as {
+      text?: string;
+      fromState?: string;
+      toState?: string;
+      evidenceRefs?: unknown;
+      derivedFromEventId?: unknown;
+      ackRefId?: unknown;
+      metrics?: unknown;
+      timerId?: unknown;
+      timerKind?: unknown;
+      timerStatus?: unknown;
+      timerDueTs?: unknown;
+    };
   }
   if (typeof value === "string") {
     try {
@@ -65,6 +98,13 @@ const readPayload = (
         fromState?: string;
         toState?: string;
         evidenceRefs?: unknown;
+        derivedFromEventId?: unknown;
+        ackRefId?: unknown;
+        metrics?: unknown;
+        timerId?: unknown;
+        timerKind?: unknown;
+        timerStatus?: unknown;
+        timerDueTs?: unknown;
       };
       if (parsed && typeof parsed === "object") {
         return parsed;
@@ -87,6 +127,14 @@ const normalizeEvidenceRefs = (value: unknown): string[] => {
   return [...refs];
 };
 
+
+const normalizeMetrics = (value: unknown): { trigger_to_debrief_closed_ms?: number } | undefined => {
+  if (!value || typeof value !== "object") return undefined;
+  const candidate = (value as { trigger_to_debrief_closed_ms?: unknown }).trigger_to_debrief_closed_ms;
+  if (typeof candidate !== "number" || !Number.isFinite(candidate) || candidate < 0) return undefined;
+  return { trigger_to_debrief_closed_ms: Math.floor(candidate) };
+};
+
 const rowToEvent = (row: MissionBoardRow): MissionBoardStoredEvent => {
   const payload = readPayload(row.payload);
   return {
@@ -99,6 +147,20 @@ const rowToEvent = (row: MissionBoardRow): MissionBoardStoredEvent => {
     fromState: typeof payload.fromState === "string" ? payload.fromState : undefined,
     toState: typeof payload.toState === "string" ? payload.toState : undefined,
     evidenceRefs: normalizeEvidenceRefs(payload.evidenceRefs),
+    timerId: typeof payload.timerId === "string" ? payload.timerId : undefined,
+    timerKind: payload.timerKind === "countdown" || payload.timerKind === "deadline" ? payload.timerKind : undefined,
+    timerStatus:
+      payload.timerStatus === "scheduled" ||
+      payload.timerStatus === "running" ||
+      payload.timerStatus === "expired" ||
+      payload.timerStatus === "cancelled" ||
+      payload.timerStatus === "completed"
+        ? payload.timerStatus
+        : undefined,
+    timerDueTs: typeof payload.timerDueTs === "string" ? payload.timerDueTs : undefined,
+    derivedFromEventId: typeof payload.derivedFromEventId === "string" ? payload.derivedFromEventId : undefined,
+    ackRefId: typeof payload.ackRefId === "string" ? payload.ackRefId : undefined,
+    metrics: normalizeMetrics(payload.metrics),
   };
 };
 
@@ -143,6 +205,13 @@ const dbStore: MissionBoardStore = {
           fromState: event.fromState ?? null,
           toState: event.toState ?? null,
           evidenceRefs: event.evidenceRefs,
+          timerId: event.timerId ?? null,
+          timerKind: event.timerKind ?? null,
+          timerStatus: event.timerStatus ?? null,
+          timerDueTs: event.timerDueTs ?? null,
+          derivedFromEventId: event.derivedFromEventId ?? null,
+          ackRefId: event.ackRefId ?? null,
+          metrics: event.metrics ?? null,
         }),
       ],
     );

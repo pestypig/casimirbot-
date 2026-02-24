@@ -35,6 +35,10 @@ type MissionBoardEvent = {
   timerStatus?: "scheduled" | "running" | "expired" | "cancelled" | "completed";
   timerDueTs?: string;
   derivedFromEventId?: string;
+  ackRefId?: string;
+  metrics?: {
+    trigger_to_debrief_closed_ms?: number;
+  };
 };
 
 type MissionBoardSnapshot = {
@@ -104,6 +108,7 @@ const contextEventSchema = z.object({
 
 const ackSchema = z.object({
   eventId: z.string().trim().min(1).max(200),
+  ackRefId: z.string().trim().min(1).max(200).optional(),
   actorId: z.string().trim().max(200).optional(),
   note: z.string().trim().max(600).optional(),
   ts: z.string().datetime().optional(),
@@ -172,12 +177,23 @@ const getMissionEvents = async (missionId: string): Promise<MissionBoardEvent[]>
       timerStatus: event.timerStatus,
       timerDueTs: event.timerDueTs,
       derivedFromEventId: event.derivedFromEventId,
+      ackRefId: event.ackRefId,
+      metrics: event.metrics,
     });
   }
   return normalized.sort((a, b) => {
     const tsDiff = Date.parse(a.ts) - Date.parse(b.ts);
     return tsDiff !== 0 ? tsDiff : a.eventId.localeCompare(b.eventId);
   });
+};
+
+
+const computeTriggerToDebriefClosedMs = (events: MissionBoardEvent[], derivedFromEventId: string, closureTs: string): number | null => {
+  const trigger = events.find((event) => event.eventId === derivedFromEventId);
+  if (!trigger) return null;
+  const delta = Date.parse(closureTs) - Date.parse(trigger.ts);
+  if (!Number.isFinite(delta) || delta < 0) return null;
+  return Math.floor(delta);
 };
 
 const foldMissionSnapshot = (events: MissionBoardEvent[], missionId: string): MissionBoardSnapshot => {
@@ -449,7 +465,11 @@ missionBoardRouter.post("/:missionId/ack", async (req, res) => {
 
   const payload = parsed.data;
   const ts = payload.ts ?? nowIso();
+  const ackRefId = payload.ackRefId ?? payload.eventId;
   try {
+    const existingEvents = await getMissionEvents(missionId);
+    const triggerToDebriefClosedMs = computeTriggerToDebriefClosedMs(existingEvents, payload.eventId, ts);
+
     await appendEvent(missionId, {
       eventId: `ack:${payload.eventId}:${Date.parse(ts) || Date.now()}`,
       missionId,
@@ -461,6 +481,7 @@ missionBoardRouter.post("/:missionId/ack", async (req, res) => {
       toState: "active",
       evidenceRefs: [payload.eventId],
       derivedFromEventId: payload.eventId,
+      ackRefId,
     });
 
     await appendEvent(missionId, {
@@ -472,16 +493,21 @@ missionBoardRouter.post("/:missionId/ack", async (req, res) => {
       ts,
       evidenceRefs: [payload.eventId],
       derivedFromEventId: payload.eventId,
+      ackRefId,
+      metrics: triggerToDebriefClosedMs === null ? undefined : { trigger_to_debrief_closed_ms: triggerToDebriefClosedMs },
     });
 
-    const snapshot = foldMissionSnapshot(await getMissionEvents(missionId), missionId);
+    const updatedEvents = await getMissionEvents(missionId);
+    const snapshot = foldMissionSnapshot(updatedEvents, missionId);
     return res.status(200).json({
       receipt: {
         missionId,
         eventId: payload.eventId,
+        ackRefId,
         actorId: payload.actorId ?? null,
         ts,
       },
+      metrics: triggerToDebriefClosedMs === null ? {} : { trigger_to_debrief_closed_ms: triggerToDebriefClosedMs },
       snapshot,
     });
   } catch (error) {

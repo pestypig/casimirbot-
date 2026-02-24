@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { z } from "zod";
+import { enforceCalloutParity, type CertaintyClass } from "../../shared/helix-dottie-callout-contract";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
@@ -25,6 +26,11 @@ const requestSchema = z.object({
   contextTier: z.enum(["tier0", "tier1"]).optional(),
   sessionState: z.enum(["idle", "requesting", "active", "stopping", "error"]).optional(),
   voiceMode: z.enum(["off", "critical_only", "normal", "dnd"]).optional(),
+  textCertainty: z.enum(["unknown", "hypothesis", "reasoned", "confirmed"]).optional(),
+  voiceCertainty: z.enum(["unknown", "hypothesis", "reasoned", "confirmed"]).optional(),
+  deterministic: z.boolean().optional(),
+  evidenceRefs: z.array(z.string().trim().min(1).max(500)).max(32).optional(),
+  repoAttributed: z.boolean().optional(),
 });
 
 type VoiceRequest = z.infer<typeof requestSchema>;
@@ -67,6 +73,13 @@ const COOLDOWN_SECONDS: Record<VoicePriority, number> = {
   warn: 30,
   critical: 10,
   action: 5,
+};
+
+const PRIORITY_TO_CERTAINTY: Record<VoicePriority, CertaintyClass> = {
+  info: "unknown",
+  warn: "hypothesis",
+  action: "reasoned",
+  critical: "confirmed",
 };
 
 const dedupeUntil = new Map<string, number>();
@@ -242,6 +255,25 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
   if (payload.voiceMode === "critical_only" && payload.priority !== "critical" && payload.priority !== "action") {
     return res.status(200).json({ ok: true, suppressed: true, reason: "voice_context_ineligible", traceId: payload.traceId ?? null });
+  }
+  const textCertainty = payload.textCertainty ?? PRIORITY_TO_CERTAINTY[payload.priority];
+  const voiceCertainty = payload.voiceCertainty ?? PRIORITY_TO_CERTAINTY[payload.priority];
+  const parity = enforceCalloutParity({
+    textCertainty,
+    voiceCertainty,
+    deterministic: payload.deterministic ?? true,
+    evidenceRefs: payload.evidenceRefs ?? [],
+    requireEvidence: payload.repoAttributed ?? false,
+  });
+  if (!parity.allowed) {
+    return res.status(200).json({
+      ok: true,
+      suppressed: true,
+      reason: parity.reason,
+      suppressionReason: parity.reason,
+      traceId: payload.traceId ?? null,
+      replayMeta: parity.metadata,
+    });
   }
   const traceId = payload.traceId?.trim() || undefined;
   const tenantId =

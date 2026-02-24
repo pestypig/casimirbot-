@@ -13,6 +13,7 @@ export const suppressionReasonSchema = z.enum([
   "mission_rate_limited",
   "voice_rate_limited",
   "voice_budget_exceeded",
+  "voice_backend_error",
   "missing_evidence",
   "contract_violation",
   "agi_overload_admission_control",
@@ -42,6 +43,59 @@ export const isVoiceCertaintyAllowed = (
   voiceCertainty: CertaintyClass,
 ): boolean => {
   return CERTAINTY_RANK[voiceCertainty] <= CERTAINTY_RANK[textCertainty];
+};
+
+export const enforceCalloutParity = (input: {
+  textCertainty: CertaintyClass;
+  voiceCertainty: CertaintyClass;
+  deterministic: boolean;
+  evidenceRefs: string[];
+  requireEvidence?: boolean;
+}):
+  | { allowed: true }
+  | {
+      allowed: false;
+      reason: SuppressionReason;
+      metadata: {
+        textCertainty: CertaintyClass;
+        voiceCertainty: CertaintyClass;
+        deterministic: boolean;
+        evidenceRefCount: number;
+      };
+    } => {
+  if (!isVoiceCertaintyAllowed(input.textCertainty, input.voiceCertainty)) {
+    return {
+      allowed: false,
+      reason: "contract_violation",
+      metadata: {
+        textCertainty: input.textCertainty,
+        voiceCertainty: input.voiceCertainty,
+        deterministic: input.deterministic,
+        evidenceRefCount: input.evidenceRefs.length,
+      },
+    };
+  }
+
+  if (input.requireEvidence) {
+    const reason = deriveCalloutSuppressionReason({
+      deterministic: input.deterministic,
+      evidenceRefs: input.evidenceRefs,
+    });
+    if (reason) {
+      return {
+        allowed: false,
+        reason,
+        metadata: {
+          textCertainty: input.textCertainty,
+          voiceCertainty: input.voiceCertainty,
+          deterministic: input.deterministic,
+          evidenceRefCount: input.evidenceRefs.length,
+        },
+      };
+    }
+  }
+
+  return { allowed: true };
 };
 
 export const deriveCalloutSuppressionReason = (input: {
