@@ -1,16 +1,8 @@
 {
-  "campaignId": "FS-CAMPAIGN-2026-02-24",
   "asOfDate": "2026-02-24",
-  "decision": "INADMISSIBLE",
-  "statusCounts": {
-    "PASS": 0,
-    "FAIL": 1,
-    "UNKNOWN": 0,
-    "NOT_READY": 7,
-    "NOT_APPLICABLE": 1
-  },
+  "campaignId": "FS-CAMPAIGN-2026-02-24",
+  "decision": "NOT_READY",
   "gateCount": 9,
-  "reconciled": true,
   "gates": {
     "G0": "NOT_READY",
     "G1": "NOT_READY",
@@ -18,7 +10,7 @@
     "G3": "NOT_READY",
     "G4": "NOT_READY",
     "G5": "NOT_APPLICABLE",
-    "G6": "FAIL",
+    "G6": "NOT_READY",
     "G7": "NOT_READY",
     "G8": "NOT_READY"
   },
@@ -30,7 +22,7 @@
       "G3": "NOT_READY",
       "G4": "NOT_READY",
       "G5": "NOT_APPLICABLE",
-      "G6": "FAIL",
+      "G6": "NOT_READY",
       "G7": "NOT_READY",
       "G8": "NOT_READY"
     },
@@ -41,7 +33,7 @@
       "G3": "NOT_READY",
       "G4": "NOT_READY",
       "G5": "NOT_APPLICABLE",
-      "G6": "FAIL",
+      "G6": "NOT_READY",
       "G7": "NOT_READY",
       "G8": "NOT_READY"
     },
@@ -52,7 +44,7 @@
       "G3": "NOT_READY",
       "G4": "NOT_READY",
       "G5": "NOT_APPLICABLE",
-      "G6": "FAIL",
+      "G6": "NOT_READY",
       "G7": "NOT_READY",
       "G8": "NOT_READY"
     },
@@ -63,9 +55,17 @@
       "G3": "NOT_READY",
       "G4": "NOT_READY",
       "G5": "NOT_APPLICABLE",
-      "G6": "FAIL",
+      "G6": "NOT_READY",
       "G7": "NOT_READY",
       "G8": "NOT_READY"
     }
+  },
+  "reconciled": true,
+  "statusCounts": {
+    "FAIL": 0,
+    "NOT_APPLICABLE": 1,
+    "NOT_READY": 8,
+    "PASS": 0,
+    "UNKNOWN": 0
   }
 }

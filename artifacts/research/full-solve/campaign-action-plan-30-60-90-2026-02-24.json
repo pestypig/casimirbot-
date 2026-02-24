@@ -1,200 +1,200 @@
 {
-  "campaignId": "FS-CAMPAIGN-2026-02-24",
-  "decision": "INADMISSIBLE",
   "blockers": [
     {
-      "wave": "A",
       "gateId": "G0",
+      "reason": "No GR loop run artifacts found.",
       "status": "NOT_READY",
-      "reason": "No GR loop run artifacts found."
+      "wave": "A"
     },
     {
-      "wave": "A",
       "gateId": "G1",
+      "reason": "Initial solver status missing in artifact. Missing required signals: initial_solver_status.",
       "status": "NOT_READY",
-      "reason": "Initial solver status missing in artifact."
+      "wave": "A"
     },
     {
-      "wave": "A",
       "gateId": "G2",
+      "reason": "Evaluation gate status missing in artifact. Missing required signals: evaluation_gate_status.",
       "status": "NOT_READY",
-      "reason": "Evaluation gate status missing in artifact."
+      "wave": "A"
     },
     {
-      "wave": "A",
       "gateId": "G3",
+      "reason": "Certificate data missing from evaluator output. Missing required signals: certificate_hash, certificate_integrity.",
       "status": "NOT_READY",
-      "reason": "Certificate data missing from evaluator output."
+      "wave": "A"
     },
     {
-      "wave": "A",
       "gateId": "G4",
+      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints. Missing required signals: hard_constraint_ford_roman_qi, hard_constraint_theta_audit.",
       "status": "NOT_READY",
-      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints."
+      "wave": "A"
     },
     {
-      "wave": "A",
       "gateId": "G6",
-      "status": "FAIL",
-      "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present."
+      "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present. Missing required signals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system.",
+      "status": "NOT_READY",
+      "wave": "A"
     },
     {
-      "wave": "A",
       "gateId": "G7",
+      "reason": "Stability check enabled for waves C and D only. Missing required signals: evaluation_gate_status.",
       "status": "NOT_READY",
-      "reason": "Stability check enabled for waves C and D only."
+      "wave": "A"
     },
     {
-      "wave": "A",
       "gateId": "G8",
+      "reason": "Replication parity applies to wave D only. Missing required signals: hard_constraint_ford_roman_qi, hard_constraint_theta_audit.",
       "status": "NOT_READY",
-      "reason": "Replication parity applies to wave D only."
+      "wave": "A"
     },
     {
-      "wave": "B",
       "gateId": "G0",
+      "reason": "No GR loop run artifacts found.",
       "status": "NOT_READY",
-      "reason": "No GR loop run artifacts found."
+      "wave": "B"
     },
     {
-      "wave": "B",
       "gateId": "G1",
+      "reason": "Initial solver status missing in artifact. Missing required signals: initial_solver_status.",
       "status": "NOT_READY",
-      "reason": "Initial solver status missing in artifact."
+      "wave": "B"
     },
     {
-      "wave": "B",
       "gateId": "G2",
+      "reason": "Evaluation gate status missing in artifact. Missing required signals: evaluation_gate_status.",
       "status": "NOT_READY",
-      "reason": "Evaluation gate status missing in artifact."
+      "wave": "B"
     },
     {
-      "wave": "B",
       "gateId": "G3",
+      "reason": "Certificate data missing from evaluator output. Missing required signals: certificate_hash, certificate_integrity.",
       "status": "NOT_READY",
-      "reason": "Certificate data missing from evaluator output."
+      "wave": "B"
     },
     {
-      "wave": "B",
       "gateId": "G4",
+      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints. Missing required signals: hard_constraint_ford_roman_qi, hard_constraint_theta_audit.",
       "status": "NOT_READY",
-      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints."
+      "wave": "B"
     },
     {
-      "wave": "B",
       "gateId": "G6",
-      "status": "FAIL",
-      "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present."
+      "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present. Missing required signals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system.",
+      "status": "NOT_READY",
+      "wave": "B"
     },
     {
-      "wave": "B",
       "gateId": "G7",
+      "reason": "Stability check enabled for waves C and D only. Missing required signals: evaluation_gate_status.",
       "status": "NOT_READY",
-      "reason": "Stability check enabled for waves C and D only."
+      "wave": "B"
     },
     {
-      "wave": "B",
       "gateId": "G8",
+      "reason": "Replication parity applies to wave D only. Missing required signals: hard_constraint_ford_roman_qi, hard_constraint_theta_audit.",
       "status": "NOT_READY",
-      "reason": "Replication parity applies to wave D only."
+      "wave": "B"
     },
     {
-      "wave": "C",
       "gateId": "G0",
+      "reason": "No GR loop run artifacts found.",
       "status": "NOT_READY",
-      "reason": "No GR loop run artifacts found."
+      "wave": "C"
     },
     {
-      "wave": "C",
       "gateId": "G1",
+      "reason": "Initial solver status missing in artifact. Missing required signals: initial_solver_status.",
       "status": "NOT_READY",
-      "reason": "Initial solver status missing in artifact."
+      "wave": "C"
     },
     {
-      "wave": "C",
       "gateId": "G2",
+      "reason": "Evaluation gate status missing in artifact. Missing required signals: evaluation_gate_status.",
       "status": "NOT_READY",
-      "reason": "Evaluation gate status missing in artifact."
+      "wave": "C"
     },
     {
-      "wave": "C",
       "gateId": "G3",
+      "reason": "Certificate data missing from evaluator output. Missing required signals: certificate_hash, certificate_integrity.",
       "status": "NOT_READY",
-      "reason": "Certificate data missing from evaluator output."
+      "wave": "C"
     },
     {
-      "wave": "C",
       "gateId": "G4",
+      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints. Missing required signals: hard_constraint_ford_roman_qi, hard_constraint_theta_audit.",
       "status": "NOT_READY",
-      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints."
+      "wave": "C"
     },
     {
-      "wave": "C",
       "gateId": "G6",
-      "status": "FAIL",
-      "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present."
+      "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present. Missing required signals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system.",
+      "status": "NOT_READY",
+      "wave": "C"
     },
     {
-      "wave": "C",
       "gateId": "G7",
+      "reason": "Need at least 2 runs for stability check. Missing required signals: evaluation_gate_status.",
       "status": "NOT_READY",
-      "reason": "Need at least 2 runs for stability check."
+      "wave": "C"
     },
     {
-      "wave": "C",
       "gateId": "G8",
+      "reason": "Replication parity applies to wave D only. Missing required signals: hard_constraint_ford_roman_qi, hard_constraint_theta_audit.",
       "status": "NOT_READY",
-      "reason": "Replication parity applies to wave D only."
+      "wave": "C"
     },
     {
-      "wave": "D",
       "gateId": "G0",
+      "reason": "No GR loop run artifacts found.",
       "status": "NOT_READY",
-      "reason": "No GR loop run artifacts found."
+      "wave": "D"
     },
     {
-      "wave": "D",
       "gateId": "G1",
+      "reason": "Initial solver status missing in artifact. Missing required signals: initial_solver_status.",
       "status": "NOT_READY",
-      "reason": "Initial solver status missing in artifact."
+      "wave": "D"
     },
     {
-      "wave": "D",
       "gateId": "G2",
+      "reason": "Evaluation gate status missing in artifact. Missing required signals: evaluation_gate_status.",
       "status": "NOT_READY",
-      "reason": "Evaluation gate status missing in artifact."
+      "wave": "D"
     },
     {
-      "wave": "D",
       "gateId": "G3",
+      "reason": "Certificate data missing from evaluator output. Missing required signals: certificate_hash, certificate_integrity.",
       "status": "NOT_READY",
-      "reason": "Certificate data missing from evaluator output."
+      "wave": "D"
     },
     {
-      "wave": "D",
       "gateId": "G4",
+      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints. Missing required signals: hard_constraint_ford_roman_qi, hard_constraint_theta_audit.",
       "status": "NOT_READY",
-      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints."
+      "wave": "D"
     },
     {
-      "wave": "D",
       "gateId": "G6",
-      "status": "FAIL",
-      "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present."
+      "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present. Missing required signals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system.",
+      "status": "NOT_READY",
+      "wave": "D"
     },
     {
-      "wave": "D",
       "gateId": "G7",
+      "reason": "Need at least 2 runs for stability check. Missing required signals: evaluation_gate_status.",
       "status": "NOT_READY",
-      "reason": "Need at least 2 runs for stability check."
+      "wave": "D"
     },
     {
-      "wave": "D",
       "gateId": "G8",
+      "reason": "Need replicated runs for wave D parity check. Missing required signals: hard_constraint_ford_roman_qi, hard_constraint_theta_audit.",
       "status": "NOT_READY",
-      "reason": "Need replicated runs for wave D parity check."
+      "wave": "D"
     }
   ],
+  "campaignId": "FS-CAMPAIGN-2026-02-24",
+  "decision": "NOT_READY",
   "plan": {
     "30_days": [
       "Resolve first FAIL/NOT_READY hard gate from campaign-first-fail map and capture new evidence-pack outputs."

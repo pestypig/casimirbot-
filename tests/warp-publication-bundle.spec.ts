@@ -17,5 +17,22 @@ describe('warp publication bundle', () => {
     const parsed = JSON.parse(m1);
     expect(Array.isArray(parsed.files)).toBe(true);
     expect(parsed.files.length).toBeGreaterThan(0);
+    expect(parsed.missing).toEqual([]);
+  });
+
+  it('fails bundle generation when required files are missing', () => {
+    const missingWaveD = 'artifacts/research/full-solve/D/run-2-raw-output.json';
+    const backup = `${missingWaveD}.bak-test`;
+    if (!fs.existsSync(missingWaveD)) {
+      throw new Error(`fixture missing: ${missingWaveD}`);
+    }
+    fs.renameSync(missingWaveD, backup);
+    try {
+      expect(() => buildPublicationBundle(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'warp-pub-bundle-missing-')), 'bundle'))).toThrow(
+        /Publication bundle missing required files/,
+      );
+    } finally {
+      fs.renameSync(backup, missingWaveD);
+    }
   });
 });

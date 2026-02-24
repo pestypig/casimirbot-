@@ -6,6 +6,9 @@ import path from 'node:path';
 import {
   aggregateGateStatusAcrossWaves,
   buildGateMap,
+  buildGateMissingSignalMap,
+  collectRequiredSignals,
+  computeReproducibility,
   deriveCampaignDecision,
   deriveFirstFail,
   parseArgs,
@@ -158,4 +161,42 @@ describe('warp-full-solve-campaign runner', () => {
     });
     expect(stdout).toContain('"ok": true');
   }, 125_000);
+
+  it('residualTrend is FAIL when non-decreasing and PASS when strictly decreasing', () => {
+    const nonDecreasing = computeReproducibility([
+      { attempts: [{ initial: { residual: 1 }, evaluation: { gate: { status: 'pass' }, constraints: [] } }] },
+      { attempts: [{ initial: { residual: 1 }, evaluation: { gate: { status: 'pass' }, constraints: [] } }] },
+    ] as any);
+    expect(nonDecreasing.residualTrend.status).toBe('FAIL');
+    expect(nonDecreasing.residualTrend.trend).toBe('non_decreasing');
+
+    const decreasing = computeReproducibility([
+      { attempts: [{ initial: { residual: 2 }, evaluation: { gate: { status: 'pass' }, constraints: [] } }] },
+      { attempts: [{ initial: { residual: 1 }, evaluation: { gate: { status: 'pass' }, constraints: [] } }] },
+    ] as any);
+    expect(decreasing.residualTrend.status).toBe('PASS');
+    expect(decreasing.residualTrend.trend).toBe('decreasing');
+  });
+
+  it('marks provenance signals as missing when pipeline provenance fields are unavailable', () => {
+    const attempt = {
+      initial: { status: 'CERTIFIED' },
+      evaluation: {
+        gate: { status: 'pass' },
+        constraints: [
+          { id: 'FordRomanQI', status: 'pass' },
+          { id: 'ThetaAudit', status: 'pass' },
+        ],
+        certificate: { certificateHash: 'abc', integrityOk: true },
+      },
+    } as any;
+    const latestResult = { finalState: {} } as any;
+    const { requiredSignals, missingSignals } = collectRequiredSignals(attempt, latestResult);
+    expect(requiredSignals.provenance_chart.present).toBe(false);
+    expect(requiredSignals.provenance_observer.present).toBe(false);
+    expect(requiredSignals.provenance_normalization.present).toBe(false);
+    expect(requiredSignals.provenance_unit_system.present).toBe(false);
+    const gateMap = buildGateMissingSignalMap(missingSignals);
+    expect(gateMap.G6).toEqual(expect.arrayContaining(['provenance_chart', 'provenance_observer', 'provenance_normalization', 'provenance_unit_system']));
+  });
 });

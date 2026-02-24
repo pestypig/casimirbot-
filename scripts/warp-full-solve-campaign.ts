@@ -95,6 +95,8 @@ type EvidencePack = {
   boundaryStatement: string;
 };
 
+type TimeoutKind = 'wave_timeout' | 'campaign_timeout';
+
 const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
 
@@ -147,6 +149,44 @@ const writeMd = (p: string, body: string) => {
   fs.writeFileSync(p, body);
 };
 const hashId = (src: string) => Buffer.from(src).toString('hex').slice(0, 16);
+
+class CampaignTimeoutError extends Error {
+  kind: TimeoutKind;
+  timeoutMs: number;
+  elapsedMs: number;
+  wave?: Wave;
+
+  constructor(kind: TimeoutKind, timeoutMs: number, elapsedMs: number, wave?: Wave) {
+    super(`${kind}:${timeoutMs}`);
+    this.name = 'CampaignTimeoutError';
+    this.kind = kind;
+    this.timeoutMs = timeoutMs;
+    this.elapsedMs = elapsedMs;
+    this.wave = wave;
+  }
+}
+
+const withTimeout = async <T>(
+  run: Promise<T>,
+  timeoutMs: number,
+  kind: TimeoutKind,
+  elapsedBaseMs: number,
+  wave?: Wave,
+): Promise<T> => {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      run,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new CampaignTimeoutError(kind, timeoutMs, elapsedBaseMs + timeoutMs, wave));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
 
 export const parseWaveArg = (value: string | undefined): WaveArg => {
   const normalized = (value ?? 'all').trim();
@@ -411,7 +451,17 @@ export const deriveCampaignDecision = (counts: ReturnType<typeof summarizeScoreb
   return 'REDUCED_ORDER_ADMISSIBLE';
 };
 
-const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null) => {
+const isMeaningfulValue = (value: unknown) => typeof value === 'string' && value.trim().length > 0 && value !== 'unknown' && value !== 'unspecified';
+
+export const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null, latestResult: GrAgentLoopResult | null) => {
+  const finalState = latestResult?.finalState as Record<string, unknown> | undefined;
+  const metricAdapter = (finalState?.metricAdapter as Record<string, unknown> | undefined) ?? {};
+  const chartLabel = (metricAdapter.chart as Record<string, unknown> | undefined)?.label;
+  const metricContract = (finalState?.metricT00Contract as Record<string, unknown> | undefined) ?? {};
+  const observer = metricContract.observer ?? finalState?.metricT00Observer;
+  const normalization = metricContract.normalization ?? finalState?.metricT00Normalization;
+  const unitSystem = metricContract.unitSystem ?? finalState?.metricT00UnitSystem;
+
   const requiredSignals: EvidencePack['requiredSignals'] = {
     initial_solver_status: { required: true, present: Boolean(attempt?.initial?.status) },
     evaluation_gate_status: { required: true, present: Boolean(attempt?.evaluation?.gate?.status) },
@@ -425,10 +475,10 @@ const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null) => {
     },
     certificate_hash: { required: true, present: Boolean(attempt?.evaluation?.certificate?.certificateHash) },
     certificate_integrity: { required: true, present: typeof attempt?.evaluation?.certificate?.integrityOk === 'boolean' },
-    provenance_chart: { required: true, present: true },
-    provenance_observer: { required: true, present: true },
-    provenance_normalization: { required: true, present: true },
-    provenance_unit_system: { required: true, present: true },
+    provenance_chart: { required: true, present: isMeaningfulValue(chartLabel) },
+    provenance_observer: { required: true, present: isMeaningfulValue(observer) },
+    provenance_normalization: { required: true, present: isMeaningfulValue(normalization) },
+    provenance_unit_system: { required: true, present: isMeaningfulValue(unitSystem) },
   };
   const missingSignals = Object.entries(requiredSignals)
     .filter(([, state]) => state.required && !state.present)
@@ -437,7 +487,7 @@ const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null) => {
   return { requiredSignals, missingSignals };
 };
 
-const buildGateMissingSignalMap = (missingSignals: string[]) => {
+export const buildGateMissingSignalMap = (missingSignals: string[]) => {
   const mapping: EvidencePack['gateMissingSignalMap'] = {
     G1: missingSignals.filter((signal) => signal === 'initial_solver_status'),
     G2: missingSignals.filter((signal) => signal === 'evaluation_gate_status'),
@@ -463,7 +513,7 @@ const applyMissingSignalFailClosed = (gateMap: Record<string, GateRecord>, gateM
   return gateMap;
 };
 
-const computeReproducibility = (runResults: GrAgentLoopResult[]): EvidencePack['reproducibility'] => {
+export const computeReproducibility = (runResults: GrAgentLoopResult[]): EvidencePack['reproducibility'] => {
   const evaluations = runResults.map((result) => extractLatestAttempt(result)?.evaluation).filter(Boolean);
   const gateStatuses = evaluations.map((evaluation) => evaluation?.gate?.status).filter((status): status is string => Boolean(status));
   const agreementRatio = gateStatuses.length >= 2 ? gateStatuses.filter((status) => status === gateStatuses[0]).length / gateStatuses.length : null;
@@ -473,7 +523,7 @@ const computeReproducibility = (runResults: GrAgentLoopResult[]): EvidencePack['
     .map((result) => extractLatestAttempt(result)?.initial?.residual)
     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
   const residualTrendReady = residualSeries.length >= 2;
-  const decreasing = residualTrendReady && residualSeries[residualSeries.length - 1] <= residualSeries[0];
+  const decreasing = residualTrendReady && residualSeries[residualSeries.length - 1] < residualSeries[0];
   return {
     repeatedRunGateAgreement: {
       status: agreementRatio === null ? 'NOT_READY' : agreementRatio === 1 ? 'PASS' : 'FAIL',
@@ -486,10 +536,14 @@ const computeReproducibility = (runResults: GrAgentLoopResult[]): EvidencePack['
       reason: driftRatio === null ? 'Need at least two repeated runs to compute drift.' : 'Drift computed from serialized latest-attempt constraint payload.',
     },
     residualTrend: {
-      status: residualTrendReady ? 'PASS' : 'NOT_READY',
+      status: residualTrendReady ? (decreasing ? 'PASS' : 'FAIL') : 'NOT_READY',
       fidelityLevels: residualSeries.length,
       trend: residualTrendReady ? (decreasing ? 'decreasing' : 'non_decreasing') : 'unknown',
-      reason: residualTrendReady ? 'Residual trend computed across available fidelity levels.' : 'Need at least 2 fidelity levels for residual trend.',
+      reason: !residualTrendReady
+        ? 'Need at least 2 fidelity levels for residual trend.'
+        : decreasing
+          ? 'Residual trend is strictly decreasing across available fidelity levels.'
+          : 'Residual trend is non-decreasing across available fidelity levels.',
       series: residualSeries,
     },
   };
@@ -517,10 +571,18 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, wa
     const startedAt = new Date().toISOString();
     const started = Date.now();
     try {
-      const result = await runGrAgentLoop({
-        ...profile.options,
-        budget: { ...(profile.options.budget ?? {}), maxTotalMs: waveTimeoutMs },
-      });
+      const perRunCampaignRemainingMs = Math.max(1, campaignTimeoutMs - (campaignElapsedMs + (Date.now() - Date.parse(startIso))));
+      const effectiveRunTimeoutMs = Math.max(1, Math.min(waveTimeoutMs, perRunCampaignRemainingMs));
+      const result = await withTimeout(
+        runGrAgentLoop({
+          ...profile.options,
+          budget: { ...(profile.options.budget ?? {}), maxTotalMs: effectiveRunTimeoutMs },
+        }),
+        effectiveRunTimeoutMs,
+        perRunCampaignRemainingMs <= waveTimeoutMs ? 'campaign_timeout' : 'wave_timeout',
+        campaignElapsedMs + (Date.now() - Date.parse(startIso)),
+        wave,
+      );
       const completedAt = new Date().toISOString();
       const durationMs = Date.now() - started;
       runResults.push(result);
@@ -564,12 +626,16 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, wa
         outputPath,
       });
       runErrors.push({ runIndex: runIndex + 1, error: message });
+      if (error instanceof CampaignTimeoutError) {
+        break;
+      }
     }
   }
 
   const gateMap = buildGateMap(wave, runResults, runArtifacts);
   const latestAttempt = runResults.length ? extractLatestAttempt(runResults[runResults.length - 1]) : null;
-  const { requiredSignals, missingSignals } = collectRequiredSignals(latestAttempt);
+  const latestResult = runResults.length ? runResults[runResults.length - 1] : null;
+  const { requiredSignals, missingSignals } = collectRequiredSignals(latestAttempt, latestResult);
   const gateMissingSignalMap = buildGateMissingSignalMap(missingSignals);
   applyMissingSignalFailClosed(gateMap, gateMissingSignalMap);
   const gateStatus = Object.fromEntries(Object.entries(gateMap).map(([key, value]) => [key, value.status])) as Record<string, GateStatus>;
@@ -592,11 +658,14 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, wa
 
   const reproducibility = computeReproducibility(runResults);
   const elapsedWaveMs = Date.now() - Date.parse(startIso);
-  const timeout = elapsedWaveMs > waveTimeoutMs
-    ? { kind: 'wave_timeout' as const, timeoutMs: waveTimeoutMs, elapsedMs: elapsedWaveMs, wave }
-    : campaignElapsedMs + elapsedWaveMs > campaignTimeoutMs
-      ? { kind: 'campaign_timeout' as const, timeoutMs: campaignTimeoutMs, elapsedMs: campaignElapsedMs + elapsedWaveMs, wave }
-      : undefined;
+  const timeoutError = runErrors
+    .map((entry) => entry.error)
+    .find((entry) => entry.startsWith('wave_timeout:') || entry.startsWith('campaign_timeout:'));
+  const timeout = timeoutError
+    ? timeoutError.startsWith('wave_timeout:')
+      ? { kind: 'wave_timeout' as const, timeoutMs: waveTimeoutMs, elapsedMs: elapsedWaveMs, wave }
+      : { kind: 'campaign_timeout' as const, timeoutMs: campaignTimeoutMs, elapsedMs: campaignElapsedMs + elapsedWaveMs, wave }
+    : undefined;
 
 
   const pack: EvidencePack = {
