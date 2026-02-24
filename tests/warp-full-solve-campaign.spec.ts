@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import {
   aggregateGateStatusAcrossWaves,
   buildGateMap,
@@ -174,6 +175,38 @@ describe('warp-full-solve-campaign runner', () => {
       maxBuffer: 1024 * 1024,
     });
     expect(stdout).toContain('"ok": true');
+  }, 50_000);
+
+  it('synthesizes trailing run artifacts when a multi-run wave exits early', async () => {
+    const cliPath = path.resolve('scripts/warp-full-solve-campaign-cli.ts');
+    const tsxCli = path.resolve('node_modules/tsx/dist/cli.mjs');
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-wave-synth-'));
+    const outDir = path.join(tempRoot, 'out');
+    await execFileAsync(process.execPath, [
+      tsxCli,
+      cliPath,
+      '--wave',
+      'C',
+      '--out',
+      outDir,
+      '--ci',
+      '--wave-timeout-ms',
+      '1',
+      '--campaign-timeout-ms',
+      '2000',
+    ], {
+      timeout: 45_000,
+      maxBuffer: 1024 * 1024,
+    });
+    const run1Path = path.join(outDir, 'C', 'run-1-raw-output.json');
+    const run2Path = path.join(outDir, 'C', 'run-2-raw-output.json');
+    expect(fs.existsSync(run1Path)).toBe(true);
+    expect(fs.existsSync(run2Path)).toBe(true);
+    const run2 = JSON.parse(fs.readFileSync(run2Path, 'utf8'));
+    expect(run2.runIndex).toBe(2);
+    expect(run2.skipped).toBe(true);
+    expect(run2.durationMs).toBe(0);
+    expect(typeof run2.error).toBe('string');
   }, 50_000);
 
   it('residualTrend is FAIL when non-decreasing and PASS when strictly decreasing', () => {

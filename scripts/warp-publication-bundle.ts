@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 const DATE_STAMP = '2026-02-24';
 const DEFAULT_OUT_DIR = `artifacts/research/full-solve/publication-bundle-${DATE_STAMP}`;
@@ -131,6 +132,16 @@ export const buildPublicationBundle = (outDir = DEFAULT_OUT_DIR) => {
   };
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isMainModule = () => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return import.meta.url === pathToFileURL(path.resolve(entry)).href;
+  } catch {
+    return false;
+  }
+};
+
+if (isMainModule()) {
   console.log(JSON.stringify(buildPublicationBundle(process.argv[2] || DEFAULT_OUT_DIR), null, 2));
 }

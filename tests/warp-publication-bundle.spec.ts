@@ -1,8 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { buildPublicationBundle } from '../scripts/warp-publication-bundle';
+
+const execFileAsync = promisify(execFile);
 
 describe('warp publication bundle', () => {
   it('produces deterministic checksum manifest for identical inputs', () => {
@@ -34,5 +38,20 @@ describe('warp publication bundle', () => {
     } finally {
       fs.renameSync(backup, missingWaveD);
     }
+  });
+
+  it('CLI entrypoint builds bundle when executed via tsx', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-pub-bundle-cli-'));
+    const out = path.join(root, 'bundle-cli');
+    const tsxCli = path.resolve('node_modules/tsx/dist/cli.mjs');
+    const scriptPath = path.resolve('scripts/warp-publication-bundle.ts');
+    const { stdout } = await execFileAsync(process.execPath, [tsxCli, scriptPath, out], {
+      timeout: 60_000,
+      maxBuffer: 1024 * 1024,
+    });
+    const parsed = JSON.parse(stdout);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.outDir).toBe(out);
+    expect(fs.existsSync(path.join(out, 'checksum-manifest.json'))).toBe(true);
   });
 });
