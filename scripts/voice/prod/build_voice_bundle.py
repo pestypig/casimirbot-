@@ -2,12 +2,14 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 
 STATUS_PATH = Path(os.getenv("PROD_TTS_STATUS_PATH", "artifacts/prod_tts_train_status.json"))
 EVAL_PATH = Path(os.getenv("PROD_TTS_EVAL_PATH", "artifacts/prod_tts_eval.json"))
 BUNDLE_DIR = Path(os.getenv("PROD_TTS_BUNDLE_DIR", "checkpoints/prod_tts_voice_bundle"))
 COMMIT = os.getenv("PROD_TTS_COMMIT", "unknown")
+DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def emit(kind: str, payload: str) -> None:
@@ -30,6 +32,12 @@ def file_entry(path: Path, base: Path) -> dict[str, object]:
     }
 
 
+def validate_digest(name: str, value: object) -> str:
+    if not isinstance(value, str) or not DIGEST_RE.match(value):
+        raise RuntimeError(f"invalid_{name}")
+    return value
+
+
 def main() -> int:
     emit("PROGRESS", "0 1")
     if not STATUS_PATH.exists():
@@ -40,6 +48,13 @@ def main() -> int:
     if status.get("status") != "ok":
         emit("STATS", json.dumps({"status": "blocked", "root_cause": status.get("root_cause", "status_not_ok")}, sort_keys=True, separators=(",", ":")))
         return 3
+
+    try:
+        config_sha = validate_digest("config_sha256", status.get("config_sha256"))
+        dataset_sha = validate_digest("dataset_sha256", status.get("dataset_sha256"))
+    except RuntimeError as err:
+        emit("STATS", json.dumps({"status": "blocked", "root_cause": str(err)}, sort_keys=True, separators=(",", ":")))
+        return 4
 
     BUNDLE_DIR.mkdir(parents=True, exist_ok=True)
     artifacts = []
@@ -56,11 +71,15 @@ def main() -> int:
         eval_copy.write_bytes(EVAL_PATH.read_bytes())
         artifacts.append(eval_copy)
 
+    if not artifacts:
+        emit("STATS", '{"status":"blocked","root_cause":"no_bundle_artifacts"}')
+        return 5
+
     manifest = {
         "bundle_version": "prod_tts_voice_bundle/1",
         "commit": COMMIT,
-        "config_sha256": status.get("config_sha256", "missing"),
-        "dataset_sha256": status.get("dataset_sha256", "missing"),
+        "config_sha256": config_sha,
+        "dataset_sha256": dataset_sha,
         "weights_refs": {
             "id": status.get("selected_weights_id"),
             "weights_license": (status.get("selected_weights") or {}).get("weights_license"),

@@ -3,11 +3,11 @@ import hashlib
 import json
 import os
 import shutil
-import sys
 from pathlib import Path
 from typing import Any
 
 STATUS_PATH = Path(os.getenv("PROD_TTS_STATUS_PATH", "artifacts/prod_tts_train_status.json"))
+ARTIFACTS_DIR = Path(os.getenv("PROD_TTS_ARTIFACTS_DIR", "artifacts"))
 ALLOWLIST_PATH = Path(os.getenv("PROD_TTS_ALLOWLIST", "configs/voice/prod_tts/weights_allowlist.json"))
 CONFIG_PATH = Path(os.getenv("PROD_TTS_CONFIG", "configs/voice/prod_tts/nemo_fastpitch_hifigan.yaml"))
 DATASET_MANIFEST = Path(os.getenv("PROD_TTS_DATASET_MANIFEST", "external/audiocraft/data/knowledge_audio/metadata.jsonl"))
@@ -21,13 +21,17 @@ def emit(kind: str, payload: str) -> None:
 
 
 def sha256_file(path: Path) -> str:
-    if not path.exists():
-        return "missing"
     digest = hashlib.sha256()
     with path.open("rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def ensure_hash(path: Path, label: str) -> str:
+    if not path.exists():
+        raise RuntimeError(f"{label}_missing:{path}")
+    return sha256_file(path)
 
 
 def load_allowlist() -> dict[str, Any]:
@@ -57,27 +61,57 @@ def write_status(payload: dict[str, Any]) -> None:
     STATUS_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def resolve_dataset_manifest() -> tuple[Path, str]:
+    if DATASET_MANIFEST.exists():
+        return DATASET_MANIFEST, sha256_file(DATASET_MANIFEST)
+    if DRY_RUN:
+        ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+        fallback = ARTIFACTS_DIR / "prod_tts_dataset_dry_run.jsonl"
+        # Deterministic synthetic dataset reference for CI-only dry runs.
+        fallback.write_text(
+            '{"audio_filepath":"dry_run.wav","text":"dry run dataset placeholder"}\n',
+            encoding="utf-8",
+        )
+        return fallback, sha256_file(fallback)
+    raise RuntimeError(f"dataset_manifest_missing:{DATASET_MANIFEST}")
+
+
+def write_blocked_status(
+    root_cause: str,
+    gpu_available: bool,
+    config_sha256: str = "missing",
+    dataset_manifest: str | None = None,
+    dataset_sha256: str = "missing",
+) -> None:
+    payload = {
+        "lane": "prod_tts_nemo",
+        "objective_status": "blocked",
+        "root_cause": root_cause,
+        "gpu_available": gpu_available,
+        "dry_run": DRY_RUN,
+        "status": "blocked",
+        "status_json": str(STATUS_PATH),
+        "selected_weights_id": BASE_WEIGHTS_ID,
+        "config_path": str(CONFIG_PATH),
+        "config_sha256": config_sha256,
+        "dataset_manifest": dataset_manifest or str(DATASET_MANIFEST),
+        "dataset_sha256": dataset_sha256,
+    }
+    write_status(payload)
+    emit("STATS", json.dumps({"status": "blocked", "root_cause": root_cause}, sort_keys=True, separators=(",", ":")))
+    emit("ARTIFACT", str(STATUS_PATH))
+
+
 def main() -> int:
     emit("PROGRESS", "0 4")
     gpu_available = shutil.which("nvidia-smi") is not None
-    allowlist = load_allowlist()
     try:
+        allowlist = load_allowlist()
         selected = select_weights(allowlist)
+        config_sha256 = ensure_hash(CONFIG_PATH, "config")
+        dataset_manifest_path, dataset_sha256 = resolve_dataset_manifest()
     except RuntimeError as err:
-        payload = {
-            "lane": "prod_tts_nemo",
-            "objective_status": "blocked",
-            "root_cause": str(err),
-            "gpu_available": gpu_available,
-            "dry_run": DRY_RUN,
-            "status": "blocked",
-            "status_json": str(STATUS_PATH),
-            "selected_weights_id": BASE_WEIGHTS_ID,
-            "config_path": str(CONFIG_PATH),
-        }
-        write_status(payload)
-        emit("STATS", json.dumps({"status": "blocked", "root_cause": str(err)}, sort_keys=True, separators=(",", ":")))
-        emit("ARTIFACT", str(STATUS_PATH))
+        write_blocked_status(str(err), gpu_available)
         return 2
 
     CHECKPOINTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -93,24 +127,23 @@ def main() -> int:
         try:
             __import__("nemo")
         except Exception:
-            payload = {
-                "lane": "prod_tts_nemo",
-                "objective_status": "blocked",
-                "root_cause": "nemo_runtime_unavailable",
-                "gpu_available": gpu_available,
-                "dry_run": DRY_RUN,
-                "status": "blocked",
-                "status_json": str(STATUS_PATH),
-                "selected_weights_id": BASE_WEIGHTS_ID,
-                "config_path": str(CONFIG_PATH),
-            }
-            write_status(payload)
-            emit("STATS", json.dumps({"status": "blocked", "root_cause": "nemo_runtime_unavailable"}, sort_keys=True, separators=(",", ":")))
-            emit("ARTIFACT", str(STATUS_PATH))
+            write_blocked_status(
+                "nemo_runtime_unavailable",
+                gpu_available,
+                config_sha256=config_sha256,
+                dataset_manifest=str(dataset_manifest_path),
+                dataset_sha256=dataset_sha256,
+            )
             return 3
-        model_path.write_text("trained-fastpitch-placeholder", encoding="utf-8")
-        vocoder_path.write_text("trained-hifigan-placeholder", encoding="utf-8")
-        train_note = "real_run_placeholder_completed"
+        # This lane is scaffold-only until the NeMo trainer is wired end-to-end.
+        write_blocked_status(
+            "real_training_not_implemented",
+            gpu_available,
+            config_sha256=config_sha256,
+            dataset_manifest=str(dataset_manifest_path),
+            dataset_sha256=dataset_sha256,
+        )
+        return 4
 
     emit("PROGRESS", "3 4")
     payload = {
@@ -124,9 +157,9 @@ def main() -> int:
         "selected_weights_id": BASE_WEIGHTS_ID,
         "selected_weights": selected,
         "config_path": str(CONFIG_PATH),
-        "config_sha256": sha256_file(CONFIG_PATH),
-        "dataset_manifest": str(DATASET_MANIFEST),
-        "dataset_sha256": sha256_file(DATASET_MANIFEST),
+        "config_sha256": config_sha256,
+        "dataset_manifest": str(dataset_manifest_path),
+        "dataset_sha256": dataset_sha256,
         "train_note": train_note,
         "artifacts": [str(model_path), str(vocoder_path)],
     }
