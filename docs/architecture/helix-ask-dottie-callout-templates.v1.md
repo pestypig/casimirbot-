@@ -31,6 +31,7 @@ EVIDENCE: {evidence_anchor}
 - `mission_rate_limited`
 - `voice_rate_limited`
 - `voice_budget_exceeded`
+- `voice_backend_error`
 - `missing_evidence`
 - `contract_violation`
 - `agi_overload_admission_control`

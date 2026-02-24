@@ -99,6 +99,7 @@ describe("mission board routes", () => {
 
     const ack = await request(app).post(`/api/mission-board/${missionId}/ack`).send({
       eventId: "action-ack-target",
+      ackRefId: "ack-ref-1",
       actorId: "operator-1",
       note: "Acknowledged and proceeding",
       ts: "2026-02-22T00:20:05.000Z",
@@ -108,10 +109,12 @@ describe("mission board routes", () => {
     expect(ack.body.receipt).toMatchObject({
       missionId,
       eventId: "action-ack-target",
+      ackRefId: "ack-ref-1",
       actorId: "operator-1",
     });
     expect(ack.body.snapshot.status).toBe("active");
     expect(ack.body.snapshot.phase).toBe("observe");
+    expect(ack.body.metrics.trigger_to_debrief_closed_ms).toBe(5000);
 
     const events = await request(app).get(`/api/mission-board/${missionId}/events`).query({ limit: 20 });
     expect(events.status).toBe(200);
@@ -121,11 +124,12 @@ describe("mission board routes", () => {
     expect(ackEvent?.type).toBe("state_change");
     expect(ackEvent?.evidenceRefs).toContain("action-ack-target");
 
-    const debriefEvent = (events.body.events as Array<{ eventId: string; type: string; derivedFromEventId?: string }>).find(
+    const debriefEvent = (events.body.events as Array<{ eventId: string; type: string; derivedFromEventId?: string; ackRefId?: string }>).find(
       (event) => event.eventId.startsWith("debrief:closure:"),
     );
     expect(debriefEvent?.type).toBe("debrief");
     expect(debriefEvent?.derivedFromEventId).toBe("action-ack-target");
+    expect(debriefEvent?.ackRefId).toBe("ack-ref-1");
   });
 
   it("acknowledgment clears unresolved critical count for referenced critical event", async () => {
@@ -150,6 +154,7 @@ describe("mission board routes", () => {
     expect(ack.body.snapshot.unresolvedCritical).toBe(0);
     expect(ack.body.snapshot.status).toBe("active");
     expect(ack.body.snapshot.phase).toBe("observe");
+    expect(ack.body.metrics.trigger_to_debrief_closed_ms).toBe(10000);
   });
 
   it("meets lightweight snapshot/events latency budget", async () => {

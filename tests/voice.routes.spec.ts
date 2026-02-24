@@ -497,8 +497,6 @@ describe("voice routes", () => {
       await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
     }
   });
-});
-
 
   it("suppresses non-eligible context callouts", async () => {
     process.env.VOICE_PROXY_DRY_RUN = "1";
@@ -518,3 +516,23 @@ describe("voice routes", () => {
     expect(res.body.reason).toBe("voice_context_ineligible");
     expect(res.body.traceId).toBe("trace-context-suppress");
   });
+
+  it("suppresses when voice certainty exceeds text certainty", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Critical certainty mismatch",
+      priority: "action",
+      textCertainty: "reasoned",
+      voiceCertainty: "confirmed",
+      deterministic: true,
+      evidenceRefs: ["docs/helix-ask-flow.md#L1"],
+      repoAttributed: true,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suppressed).toBe(true);
+    expect(res.body.reason).toBe("contract_violation");
+  });
+});

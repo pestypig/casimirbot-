@@ -55,6 +55,7 @@ Certainty ordering:
 - `voice_backend_error`
 - `missing_evidence`
 - `contract_violation`
+- `agi_overload_admission_control`
 
 ## Canonical utility payload
 
