@@ -87,9 +87,14 @@ export const createAgiAdmissionControl = (maxInFlight: number) => {
       });
     }
     inFlight += 1;
-    res.on("finish", () => {
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
       inFlight = Math.max(0, inFlight - 1);
-    });
+    };
+    res.once("finish", release);
+    res.once("close", release);
     return next();
   };
 };

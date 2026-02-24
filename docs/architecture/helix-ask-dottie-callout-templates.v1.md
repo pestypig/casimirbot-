@@ -33,7 +33,7 @@ EVIDENCE: {evidence_anchor}
 - `voice_budget_exceeded`
 - `missing_evidence`
 - `contract_violation`
-- `overload_admission_control`
+- `agi_overload_admission_control`
 
 ## Stable failure reason labels
 - `invalid_event_shape`

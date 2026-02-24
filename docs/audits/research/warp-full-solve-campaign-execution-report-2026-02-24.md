@@ -64,7 +64,7 @@ Per-wave gate status snapshots:
 - G3: NOT_READY
 - G4: NOT_READY
 - G5: NOT_APPLICABLE
-- G6: NOT_READY
+- G6: FAIL
 - G7: NOT_READY
 - G8: NOT_READY
 

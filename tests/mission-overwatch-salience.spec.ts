@@ -209,6 +209,25 @@ describe("mission overwatch salience", () => {
 
 
 describe("micro debrief closure", () => {
+  it("keeps debrief open while awaiting operator acknowledgment", () => {
+    const debrief = buildMicroDebrief({
+      missionId: "mission-pending",
+      trigger: {
+        eventId: "evt-pending",
+        missionId: "mission-pending",
+        source: "telemetry",
+        eventType: "action_required",
+        classification: "action",
+        text: "Operator action required",
+        ts: "2026-02-24T06:00:00.000Z",
+        evidenceRefs: [],
+      },
+      advice: "Proceed",
+      outcomeStatus: "pending_operator_ack",
+    });
+    expect(debrief.closureStatus).toBe("open");
+  });
+
   it("marks debrief closed when outcome is provided", () => {
     const debrief = buildMicroDebrief({
       missionId: "mission-z",

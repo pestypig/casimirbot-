@@ -111,6 +111,7 @@ describe("mission board routes", () => {
       actorId: "operator-1",
     });
     expect(ack.body.snapshot.status).toBe("active");
+    expect(ack.body.snapshot.phase).toBe("observe");
 
     const events = await request(app).get(`/api/mission-board/${missionId}/events`).query({ limit: 20 });
     expect(events.status).toBe(200);
@@ -148,6 +149,7 @@ describe("mission board routes", () => {
     expect(ack.status).toBe(200);
     expect(ack.body.snapshot.unresolvedCritical).toBe(0);
     expect(ack.body.snapshot.status).toBe("active");
+    expect(ack.body.snapshot.phase).toBe("observe");
   });
 
   it("meets lightweight snapshot/events latency budget", async () => {

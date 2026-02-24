@@ -12,6 +12,14 @@ export type MissionMicroDebrief = {
   closureStatus: "open" | "closed";
 };
 
+const CLOSED_OUTCOME_STATUSES = new Set([
+  "resolved",
+  "completed",
+  "closed",
+  "mitigated",
+  "suppressed",
+]);
+
 export const buildMicroDebrief = (params: {
   missionId: string;
   trigger: MissionNormalizedEvent;
@@ -23,6 +31,7 @@ export const buildMicroDebrief = (params: {
   const ts = new Date().toISOString();
   const operator = params.operatorAction?.trim() || "no_operator_action_recorded";
   const outcome = params.outcomeStatus?.trim() || "outcome_pending";
+  const normalizedOutcome = outcome.toLowerCase();
   const text = [
     `Trigger: ${params.trigger.text}`,
     `Action: ${operator}`,
@@ -38,6 +47,6 @@ export const buildMicroDebrief = (params: {
     ts,
     evidenceRefs: params.trigger.evidenceRefs,
     derivedFromEventIds: params.derivedFromEventIds?.length ? params.derivedFromEventIds : [params.trigger.eventId],
-    closureStatus: outcome === "outcome_pending" ? "open" : "closed",
+    closureStatus: CLOSED_OUTCOME_STATUSES.has(normalizedOutcome) ? "closed" : "open",
   };
 };

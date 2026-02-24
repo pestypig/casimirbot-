@@ -150,49 +150,49 @@
       "wave": "D",
       "gateId": "G0",
       "status": "NOT_READY",
-      "reason": "missing_wave_evidence"
+      "reason": "No GR loop run artifacts found."
     },
     {
       "wave": "D",
       "gateId": "G1",
       "status": "NOT_READY",
-      "reason": "missing_wave_evidence"
+      "reason": "Initial solver status missing in artifact."
     },
     {
       "wave": "D",
       "gateId": "G2",
       "status": "NOT_READY",
-      "reason": "missing_wave_evidence"
+      "reason": "Evaluation gate status missing in artifact."
     },
     {
       "wave": "D",
       "gateId": "G3",
       "status": "NOT_READY",
-      "reason": "missing_wave_evidence"
+      "reason": "Certificate data missing from evaluator output."
     },
     {
       "wave": "D",
       "gateId": "G4",
       "status": "NOT_READY",
-      "reason": "missing_wave_evidence"
+      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints."
     },
     {
       "wave": "D",
       "gateId": "G6",
-      "status": "NOT_READY",
-      "reason": "missing_wave_evidence"
+      "status": "FAIL",
+      "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present."
     },
     {
       "wave": "D",
       "gateId": "G7",
       "status": "NOT_READY",
-      "reason": "missing_wave_evidence"
+      "reason": "Need at least 2 runs for stability check."
     },
     {
       "wave": "D",
       "gateId": "G8",
       "status": "NOT_READY",
-      "reason": "missing_wave_evidence"
+      "reason": "Need replicated runs for wave D parity check."
     }
   ],
   "plan": {

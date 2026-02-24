@@ -46,6 +46,7 @@ type MissionBoardSnapshot = {
 };
 
 const missionBoardRouter = Router();
+const DEBRIEF_CLOSURE_EVENT_PREFIX = "debrief:closure:";
 
 const eventClassSchema = z.enum(["info", "warn", "critical", "action"]);
 const eventTypeSchema = z.enum(["state_change", "threat_update", "timer_update", "action_required", "debrief"]);
@@ -228,7 +229,10 @@ const foldMissionSnapshot = (events: MissionBoardEvent[], missionId: string): Mi
       }
     }
 
-    if (event.type === "debrief") {
+    const isDebriefClosure =
+      event.type === "debrief" &&
+      event.eventId.startsWith(DEBRIEF_CLOSURE_EVENT_PREFIX);
+    if (event.type === "debrief" && !isDebriefClosure) {
       phase = "debrief";
     }
   }
@@ -446,7 +450,7 @@ missionBoardRouter.post("/:missionId/ack", async (req, res) => {
   const payload = parsed.data;
   const ts = payload.ts ?? nowIso();
   try {
-        await appendEvent(missionId, {
+    await appendEvent(missionId, {
       eventId: `ack:${payload.eventId}:${Date.parse(ts) || Date.now()}`,
       missionId,
       type: "state_change",
@@ -460,7 +464,7 @@ missionBoardRouter.post("/:missionId/ack", async (req, res) => {
     });
 
     await appendEvent(missionId, {
-      eventId: `debrief:closure:${payload.eventId}:${Date.parse(ts) || Date.now()}`,
+      eventId: `${DEBRIEF_CLOSURE_EVENT_PREFIX}${payload.eventId}:${Date.parse(ts) || Date.now()}`,
       missionId,
       type: "debrief",
       classification: eventClassSchema.parse("info"),

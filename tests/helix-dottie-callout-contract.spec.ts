@@ -26,6 +26,6 @@ describe("helix dottie callout contract", () => {
 
   it("keeps suppression labels deterministic", () => {
     expect(suppressionReasonSchema.options).toContain("missing_evidence");
-    expect(suppressionReasonSchema.options).toContain("overload_admission_control");
+    expect(suppressionReasonSchema.options).toContain("agi_overload_admission_control");
   });
 });
