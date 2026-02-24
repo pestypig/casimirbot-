@@ -109,5 +109,28 @@ describe("train-status routes", () => {
     ]);
   });
 
+  it("parses deterministic signals for tts_prod_train_nemo jobs", async () => {
+    const child = makeChild();
+    spawnMock.mockReturnValue(child);
+
+    const app = buildApp();
+    const started = await request(app).post("/api/train/start").send({ jobType: "tts_prod_train_nemo" });
+    const spawnArgs = spawnMock.mock.calls[0];
+    expect(spawnArgs[1]?.[0]).toContain("train_production_nemo.py");
+    expect(spawnArgs[2]?.env?.TRAIN_JOB_TYPE).toBe("tts_prod_train_nemo");
+    const jobId = started.body.jobId as string;
+
+    child.stdout.emit("data", Buffer.from("PROGRESS 1 3\n"));
+    child.stdout.emit("data", Buffer.from('STATS {"status":"blocked","reason":"nemo_runtime_unavailable"}\n'));
+    child.stdout.emit("data", Buffer.from("ARTIFACT artifacts/train_status.tts_prod_train_nemo.json\n"));
+
+    const job = await request(app).get(`/api/train/job/${jobId}`);
+    expect(job.status).toBe(200);
+    expect(job.body.type).toBe("tts_prod_train_nemo");
+    expect(job.body.progress).toEqual({ current: 1, total: 3 });
+    expect(job.body.metadata?.reason).toBe("nemo_runtime_unavailable");
+    expect(job.body.artifactRefs).toContain("artifacts/train_status.tts_prod_train_nemo.json");
+  });
+
 });
 

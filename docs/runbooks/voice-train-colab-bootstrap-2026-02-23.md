@@ -129,3 +129,9 @@ The trainer-level non-finite loss hard-fail remains required and unchanged.
 - Colab bootstrap is preserved for exploratory iteration and compatibility.
 - Production promotion must come from the deterministic `tts_prod_train` lane that writes train-status JSON, dataset manifest, and validated voice bundle outputs.
 - `/api/voice/speak` compatibility is unchanged by this runbook; this document does not redefine serving contracts.
+
+
+## Lane policy reminder (2026-02-24)
+
+- Colab Audiocraft path is an **experimental lane and must not be used as sole production promotion evidence**.
+- Production promotion requires the NeMo-first lane plus weights-manifest gate and Casimir PASS.

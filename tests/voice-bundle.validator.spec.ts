@@ -53,8 +53,21 @@ describe("validateVoiceBundle", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure.code).toBe("checksum_mismatch");
   });
-});
 
+  it("returns deterministic failure for required file missing", () => {
+    const dir = makeBundle();
+    writeFileSync(join(dir, "manifest.json"), JSON.stringify({
+      bundle_version: "voice_bundle/1",
+      voice_profile_id: "dottie_default",
+      display_name: "Dottie",
+      created_at: "2026-02-23T00:00:00Z",
+      files: [{ path: "model.bin", sha256: hash("model-data"), bytes: 10 }],
+    }));
+
+    const result = validateVoiceBundle(dir);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure.code).toBe("required_file_missing");
+  });
 
   it("returns deterministic failure for bytes mismatch", () => {
     const dir = makeBundle();
@@ -71,3 +84,4 @@ describe("validateVoiceBundle", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure.code).toBe("bytes_mismatch");
   });
+});
