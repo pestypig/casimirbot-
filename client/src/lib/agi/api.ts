@@ -521,6 +521,42 @@ export type PanelSnapshotResponse = {
 
 export type BadgeTelemetryResponse = BadgeTelemetrySnapshot;
 
+export type VoiceSpeakPayload = {
+  text: string;
+  mode?: "callout" | "briefing" | "debrief";
+  priority?: "info" | "warn" | "critical" | "action";
+  voice_profile_id?: string;
+  traceId?: string;
+  missionId?: string;
+  eventId?: string;
+  contextTier?: "tier0" | "tier1";
+  sessionState?: "idle" | "requesting" | "active" | "stopping" | "error";
+  voiceMode?: "off" | "critical_only" | "normal" | "dnd";
+};
+
+export type VoiceSpeakJsonResponse = {
+  ok?: boolean;
+  suppressed?: boolean;
+  reason?: string;
+  error?: string;
+  message?: string;
+  traceId?: string | null;
+  details?: Record<string, unknown>;
+};
+
+export type VoiceSpeakResponse =
+  | {
+      kind: "json";
+      status: number;
+      payload: VoiceSpeakJsonResponse;
+    }
+  | {
+      kind: "audio";
+      status: number;
+      mimeType: string;
+      blob: Blob;
+    };
+
 async function asJson<T>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type") ?? "";
   const isJson = contentType.includes("application/json");
@@ -578,6 +614,36 @@ async function asJson<T>(response: Response): Promise<T> {
   }
 
   return payload as T;
+}
+
+export async function speakVoice(payload: VoiceSpeakPayload): Promise<VoiceSpeakResponse> {
+  const response = await fetch("/api/voice/speak", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json, audio/wav, audio/mpeg",
+    },
+    body: JSON.stringify(payload),
+  });
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  if (contentType.includes("application/json")) {
+    const json = (await response.json().catch(() => ({}))) as VoiceSpeakJsonResponse;
+    return {
+      kind: "json",
+      status: response.status,
+      payload: json,
+    };
+  }
+  const blob = await response.blob();
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText || "Voice request failed"}`);
+  }
+  return {
+    kind: "audio",
+    status: response.status,
+    mimeType: contentType || blob.type || "application/octet-stream",
+    blob,
+  };
 }
 
 export type PlanRequestOptions = {
