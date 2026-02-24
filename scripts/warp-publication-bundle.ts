@@ -5,6 +5,12 @@ import { execSync } from 'node:child_process';
 
 const DATE_STAMP = '2026-02-24';
 const DEFAULT_OUT_DIR = `artifacts/research/full-solve/publication-bundle-${DATE_STAMP}`;
+const WAVE_REQUIRED_RUNS: Record<'A' | 'B' | 'C' | 'D', number[]> = {
+  A: [1],
+  B: [1],
+  C: [1, 2],
+  D: [1, 2],
+};
 
 type ManifestEntry = { path: string; sha256: string; bytes: number };
 
@@ -59,11 +65,12 @@ export const buildPublicationBundle = (outDir = DEFAULT_OUT_DIR) => {
     ['artifacts/research/full-solve/campaign-action-plan-30-60-90-2026-02-24.json', 'reports/campaign-action-plan-30-60-90.json'],
   ];
 
-  for (const wave of ['A', 'B', 'C', 'D']) {
+  for (const wave of ['A', 'B', 'C', 'D'] as const) {
     requiredCopies.push([`artifacts/research/full-solve/${wave}/evidence-pack.json`, `waves/${wave}/evidence-pack.json`]);
     requiredCopies.push([`artifacts/research/full-solve/${wave}/first-fail-map.json`, `waves/${wave}/first-fail-map.json`]);
-    requiredCopies.push([`artifacts/research/full-solve/${wave}/run-1-raw-output.json`, `waves/${wave}/run-1-raw-output.json`]);
-    requiredCopies.push([`artifacts/research/full-solve/${wave}/run-2-raw-output.json`, `waves/${wave}/run-2-raw-output.json`]);
+    for (const runIndex of WAVE_REQUIRED_RUNS[wave]) {
+      requiredCopies.push([`artifacts/research/full-solve/${wave}/run-${runIndex}-raw-output.json`, `waves/${wave}/run-${runIndex}-raw-output.json`]);
+    }
   }
 
   const copied: string[] = [];
@@ -108,6 +115,12 @@ export const buildPublicationBundle = (outDir = DEFAULT_OUT_DIR) => {
     files: checksumManifest,
     missing,
   });
+
+  if (missing.length > 0) {
+    const error = new Error(`Publication bundle missing required files (${missing.length}): ${missing.join(', ')}`);
+    (error as Error & { missingRequiredFiles?: string[] }).missingRequiredFiles = missing;
+    throw error;
+  }
 
   return {
     ok: true,
