@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -14,7 +14,22 @@ type Scenario = {
   expected: Record<string, unknown>;
 };
 
-const fixturePath = "artifacts/test-inputs/helix-dottie-situational-2026-02-24T18-42-10Z.json";
+const fixtureDirectory = "artifacts/test-inputs";
+const fixtureOverride = process.env.HELIX_DOTTIE_SITUATIONAL_FIXTURE;
+const resolveFixturePath = () => {
+  if (fixtureOverride && fixtureOverride.trim().length > 0) {
+    return fixtureOverride.trim();
+  }
+  const fixtures = readdirSync(fixtureDirectory)
+    .filter((name) => /^helix-dottie-situational-.*\.json$/.test(name))
+    .sort();
+  if (fixtures.length === 0) {
+    throw new Error(`No generated situational fixture found in ${fixtureDirectory}`);
+  }
+  return `${fixtureDirectory}/${fixtures[fixtures.length - 1]}`;
+};
+
+const fixturePath = resolveFixturePath();
 const fixture = JSON.parse(readFileSync(fixturePath, "utf8")) as { scenarios: Scenario[] };
 
 const buildApp = () => {
