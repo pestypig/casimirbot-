@@ -4,6 +4,8 @@ import { llmLocalHandler, resolveLlmLocalBackend } from "../skills/llm.local";
 const envKeys = [
   "ENABLE_LLM_LOCAL_SPAWN",
   "LLM_LOCAL_CMD",
+  "LLM_RUNTIME",
+  "LLM_POLICY",
   "LLM_HTTP_BASE",
   "LLM_HTTP_API_KEY",
   "OPENAI_API_KEY",
@@ -23,7 +25,14 @@ describe("llm.local bridge routing", () => {
     vi.restoreAllMocks();
   });
 
-  it("resolves spawn before http when both are configured", () => {
+  it("prefers http when both backends are configured", () => {
+    process.env.ENABLE_LLM_LOCAL_SPAWN = "1";
+    process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
+    expect(resolveLlmLocalBackend()).toBe("http");
+  });
+
+  it("respects explicit local runtime override when spawn is available", () => {
+    process.env.LLM_RUNTIME = "local";
     process.env.ENABLE_LLM_LOCAL_SPAWN = "1";
     process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
     expect(resolveLlmLocalBackend()).toBe("spawn");

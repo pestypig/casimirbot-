@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { __resetLlmHttpBreakerForTests, llmHttpHandler } from "../skills/llm.http";
+import {
+  __resetLlmHttpBreakerForTests,
+  __setLlmHttpFetchForTests,
+  llmHttpHandler,
+} from "../skills/llm.http";
 
 const envKeys = [
   "LLM_HTTP_BASE",
@@ -15,6 +19,7 @@ describe("llm.http safeguards", () => {
   afterEach(() => {
     for (const key of envKeys) delete process.env[key];
     __resetLlmHttpBreakerForTests();
+    __setLlmHttpFetchForTests(typeof globalThis.fetch === "function" ? globalThis.fetch : null);
     vi.restoreAllMocks();
   });
 
@@ -25,7 +30,10 @@ describe("llm.http safeguards", () => {
     process.env.LLM_HTTP_BREAKER_THRESHOLD = "1";
     process.env.LLM_HTTP_BREAKER_COOLDOWN_MS = "60000";
 
-    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("econnrefused"));
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(new Error("econnrefused")) as unknown as typeof fetch;
+    __setLlmHttpFetchForTests(fetchMock);
 
     await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow(/llm_http_transport/);
     await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow("llm_http_circuit_open");

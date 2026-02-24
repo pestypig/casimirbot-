@@ -37,6 +37,10 @@ export const __resetLlmHttpBreakerForTests = (): void => {
   resetBreaker();
 };
 
+export const __setLlmHttpFetchForTests = (impl: typeof fetch | null): void => {
+  fetchImpl = impl;
+};
+
 const noteBreakerFailure = (): void => {
   llmHttpBreakerConsecutiveFailures += 1;
   if (llmHttpBreakerConsecutiveFailures >= getBreakerThreshold()) {

@@ -5,8 +5,8 @@
   "globalFirstFail": "G4",
   "perWave": {
     "A": "G4",
-    "B": "G4",
-    "C": "G4",
-    "D": "G4"
+    "B": "G0",
+    "C": "G0",
+    "D": "G0"
   }
 }
