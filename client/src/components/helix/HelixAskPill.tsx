@@ -57,6 +57,32 @@ export function transitionReadAloudState(
   return current;
 }
 
+const SPEAK_TEXT_MAX_CHARS = 600;
+
+export function buildSpeakText(source: string, maxChars = SPEAK_TEXT_MAX_CHARS): string {
+  const text = source.trim();
+  if (!text || maxChars <= 0) return "";
+  if (text.length <= maxChars) return text;
+
+  const capped = text.slice(0, maxChars).trimEnd();
+  const boundaryIndex = Math.max(
+    capped.lastIndexOf("\n"),
+    capped.lastIndexOf("."),
+    capped.lastIndexOf("!"),
+    capped.lastIndexOf("?"),
+  );
+  const bounded = boundaryIndex > 0 ? capped.slice(0, boundaryIndex + 1).trimEnd() : capped;
+  const fallback = bounded || capped;
+  if (!fallback) return "";
+  if (fallback.length < maxChars) return `${fallback}…`;
+  if (maxChars === 1) return "…";
+  return `${fallback.slice(0, maxChars - 1).trimEnd()}…`;
+}
+
+export function isActivePlayback(audio: HTMLAudioElement | null, active: HTMLAudioElement): boolean {
+  return audio === active;
+}
+
 type HelixAskReply = {
   id: string;
   content: string;
@@ -1687,7 +1713,7 @@ export function HelixAskPill({
   }, []);
 
   const handleReadAloud = useCallback(async (reply: HelixAskReply) => {
-    const text = buildCopyText(reply).trim();
+    const text = buildSpeakText(buildCopyText(reply));
     if (!text) return;
     stopReadAloud();
     setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "request") }));
@@ -1714,9 +1740,12 @@ export function HelixAskPill({
       playbackReplyIdRef.current = reply.id;
       audio.src = url;
       audio.onended = () => {
+        if (!isActivePlayback(playbackAudioRef.current, audio)) {
+          return;
+        }
         setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "ended") }));
-        if (playbackUrlRef.current) {
-          URL.revokeObjectURL(playbackUrlRef.current);
+        if (playbackUrlRef.current === url) {
+          URL.revokeObjectURL(url);
           playbackUrlRef.current = null;
         }
         playbackAudioRef.current = null;
