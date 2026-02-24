@@ -1178,6 +1178,16 @@ export type GrRequestPayload = {
   hullArea_m2?: number;
   N_tiles: number;
   tilesPerSector: number;
+  warp?: {
+    metricAdapter?: {
+      chart?: { label?: string };
+    };
+    metricT00Contract?: {
+      observer?: string;
+      normalization?: string;
+      unitSystem?: string;
+    };
+  };
 };
 
 export interface EnergyPipelineState {
@@ -1491,6 +1501,10 @@ export const buildGrRequestPayload = (state: EnergyPipelineState): GrRequestPayl
   const tilesPerSector = Number.isFinite(state.tilesPerSector)
     ? Math.round(state.tilesPerSector)
     : 0;
+  const warpState = ((state as any).warp ?? {}) as Record<string, any>;
+  const metricAdapter = (warpState.metricAdapter ?? {}) as Record<string, any>;
+  const chart = (metricAdapter.chart ?? {}) as Record<string, any>;
+  const metricContract = (warpState.metricT00Contract ?? {}) as Record<string, any>;
 
   return {
     P_avg_W,
@@ -1503,6 +1517,33 @@ export const buildGrRequestPayload = (state: EnergyPipelineState): GrRequestPayl
     hullArea_m2,
     N_tiles,
     tilesPerSector,
+    warp: {
+      metricAdapter: {
+        chart: {
+          label: typeof chart.label === 'string' ? chart.label : 'unspecified',
+        },
+      },
+      metricT00Contract: {
+        observer:
+          typeof metricContract.observer === 'string'
+            ? metricContract.observer
+            : typeof warpState.metricT00Observer === 'string'
+              ? warpState.metricT00Observer
+              : 'unknown',
+        normalization:
+          typeof metricContract.normalization === 'string'
+            ? metricContract.normalization
+            : typeof warpState.metricT00Normalization === 'string'
+              ? warpState.metricT00Normalization
+              : 'unknown',
+        unitSystem:
+          typeof metricContract.unitSystem === 'string'
+            ? metricContract.unitSystem
+            : typeof warpState.metricT00UnitSystem === 'string'
+              ? warpState.metricT00UnitSystem
+              : 'unknown',
+      },
+    },
   };
 };
 
