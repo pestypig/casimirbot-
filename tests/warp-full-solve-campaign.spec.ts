@@ -1,12 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import path from 'node:path';
 import {
+  aggregateGateStatusAcrossWaves,
   buildGateMap,
+  deriveCampaignDecision,
   deriveFirstFail,
   parseArgs,
   parseSeedArg,
   parseWaveArg,
   summarizeScoreboard,
 } from '../scripts/warp-full-solve-campaign';
+
+const execFileAsync = promisify(execFile);
 
 describe('warp-full-solve-campaign runner', () => {
   it('is import-safe and does not execute cli side effects on import', async () => {
@@ -92,6 +99,32 @@ describe('warp-full-solve-campaign runner', () => {
     expect(gatesD.G8.status).toBe('PASS');
   });
 
+  it('G7/G8 return NOT_READY with explicit missing evaluation reasons', () => {
+    const incompleteRuns = [
+      { attempts: [{ evaluation: { gate: {}, constraints: [] } }] },
+      { attempts: [] },
+    ] as any;
+    const gatesC = buildGateMap('C', incompleteRuns, [] as any);
+    const gatesD = buildGateMap('D', incompleteRuns, [] as any);
+    expect(gatesC.G7.status).toBe('NOT_READY');
+    expect(gatesC.G7.reason).toContain('missing_latest_evaluation');
+    expect(gatesC.G7.reason).toContain('missing_gate_status');
+    expect(gatesD.G8.status).toBe('NOT_READY');
+    expect(gatesD.G8.reason).toContain('missing_constraints_payload');
+  });
+
+  it('cross-wave aggregation uses deterministic precedence', () => {
+    const aggregate = aggregateGateStatusAcrossWaves([
+      { G7: 'PASS', G8: 'NOT_APPLICABLE' },
+      { G7: 'UNKNOWN', G8: 'PASS' },
+      { G7: 'NOT_READY', G8: 'PASS' },
+      { G7: 'FAIL', G8: 'PASS' },
+    ]);
+    expect(aggregate.G7).toBe('FAIL');
+    expect(aggregate.G8).toBe('PASS');
+    expect(deriveCampaignDecision(summarizeScoreboard(aggregate).counts)).toBe('INADMISSIBLE');
+  });
+
   it('G6 reflects raw artifact evidence and explicit missing evaluator signals', () => {
     const runResults = [{ attempts: [] }] as any;
     const runArtifacts = [{ outputPath: __filename, runIndex: 1, startedAt: '', completedAt: '', durationMs: 1, accepted: false, state: 'error', attemptCount: 0 }] as any;
@@ -99,4 +132,13 @@ describe('warp-full-solve-campaign runner', () => {
     expect(gates.G6.status).toBe('FAIL');
     expect(gates.G6.reason).toContain('Raw run outputs persisted but evaluator signals are missing');
   });
+
+  it('CLI completes within bounded time (no hang)', async () => {
+    const cliPath = path.resolve('scripts/warp-full-solve-campaign-cli.ts');
+    const { stdout } = await execFileAsync('npx', ['tsx', cliPath, '--wave', 'A', '--ci'], {
+      timeout: 120_000,
+      maxBuffer: 1024 * 1024,
+    });
+    expect(stdout).toContain('"ok": true');
+  }, 125_000);
 });

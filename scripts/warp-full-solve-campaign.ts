@@ -28,6 +28,14 @@ type GateRecord = {
   source: string;
 };
 
+const GATE_PRECEDENCE: Record<GateStatus, number> = {
+  FAIL: 5,
+  NOT_READY: 4,
+  UNKNOWN: 3,
+  PASS: 2,
+  NOT_APPLICABLE: 1,
+};
+
 type EvidencePack = {
   commitSha: string;
   runTimestamp: string;
@@ -170,6 +178,26 @@ export const extractLatestAttempt = (result: GrAgentLoopResult): GrAgentLoopAtte
 
 const extractLatestEvaluation = (result: GrAgentLoopResult) => extractLatestAttempt(result)?.evaluation;
 
+const collectMissingSignals = (
+  evaluation: ReturnType<typeof extractLatestEvaluation>,
+  required: { gateStatus?: boolean; constraints?: boolean },
+) => {
+  const missing: string[] = [];
+  if (!evaluation) {
+    missing.push('missing_latest_evaluation');
+    if (required.gateStatus) missing.push('missing_gate_status');
+    if (required.constraints) missing.push('missing_constraints_payload');
+    return missing;
+  }
+  if (required.gateStatus && !evaluation.gate?.status) {
+    missing.push('missing_gate_status');
+  }
+  if (required.constraints && !Array.isArray(evaluation.constraints)) {
+    missing.push('missing_constraints_payload');
+  }
+  return missing;
+};
+
 const hasPersistedRawOutputFiles = (runArtifacts: EvidencePack['runArtifacts']) =>
   runArtifacts.some((artifact) => fs.existsSync(artifact.outputPath));
 
@@ -239,32 +267,51 @@ export const buildGateMap = (
     G7:
       wave === 'C' || wave === 'D'
         ? runResults.length >= 2
-          ? {
-              status: extractLatestEvaluation(runResults[0])?.gate?.status === extractLatestEvaluation(runResults[1])?.gate?.status ? 'PASS' : 'FAIL',
-              source: 'campaign.stability.check',
-              reason:
-                extractLatestEvaluation(runResults[0])?.gate?.status === extractLatestEvaluation(runResults[1])?.gate?.status
+          ? (() => {
+              const lhs = extractLatestEvaluation(runResults[0]);
+              const rhs = extractLatestEvaluation(runResults[1]);
+              const missing = [...collectMissingSignals(lhs, { gateStatus: true }), ...collectMissingSignals(rhs, { gateStatus: true })];
+              if (missing.length > 0) {
+                return {
+                  status: 'NOT_READY' as const,
+                  source: 'campaign.stability.check',
+                  reason: `Missing stability signals: ${Array.from(new Set(missing)).join(', ')}.`,
+                };
+              }
+              const sameStatus = lhs?.gate?.status === rhs?.gate?.status;
+              return {
+                status: sameStatus ? 'PASS' : 'FAIL',
+                source: 'campaign.stability.check',
+                reason: sameStatus
                   ? 'First-order gate status remained stable across repeated runs.'
                   : 'Repeated runs produced inconsistent gate outcomes.',
-            }
+              };
+            })()
           : { status: 'NOT_READY', source: 'campaign.stability.check', reason: 'Need at least 2 runs for stability check.' }
         : { status: 'NOT_READY', source: 'campaign.stability.check', reason: 'Stability check enabled for waves C and D only.' },
     G8:
       wave === 'D'
         ? runResults.length >= 2
-          ? {
-              status:
-                JSON.stringify(extractLatestEvaluation(runResults[0])?.constraints ?? []) ===
-                JSON.stringify(extractLatestEvaluation(runResults[1])?.constraints ?? [])
-                  ? 'PASS'
-                  : 'FAIL',
-              source: 'campaign.replication.parity',
-              reason:
-                JSON.stringify(extractLatestEvaluation(runResults[0])?.constraints ?? []) ===
-                JSON.stringify(extractLatestEvaluation(runResults[1])?.constraints ?? [])
+          ? (() => {
+              const lhs = extractLatestEvaluation(runResults[0]);
+              const rhs = extractLatestEvaluation(runResults[1]);
+              const missing = [...collectMissingSignals(lhs, { constraints: true }), ...collectMissingSignals(rhs, { constraints: true })];
+              if (missing.length > 0) {
+                return {
+                  status: 'NOT_READY' as const,
+                  source: 'campaign.replication.parity',
+                  reason: `Missing replication signals: ${Array.from(new Set(missing)).join(', ')}.`,
+                };
+              }
+              const stableConstraints = JSON.stringify(lhs?.constraints) === JSON.stringify(rhs?.constraints);
+              return {
+                status: stableConstraints ? 'PASS' : 'FAIL',
+                source: 'campaign.replication.parity',
+                reason: stableConstraints
                   ? 'Replication parity matched on evaluator constraint payload.'
                   : 'Replication parity drift detected in evaluator constraints.',
-            }
+              };
+            })()
           : { status: 'NOT_READY', source: 'campaign.replication.parity', reason: 'Need replicated runs for wave D parity check.' }
         : { status: 'NOT_READY', source: 'campaign.replication.parity', reason: 'Replication parity applies to wave D only.' },
   };
@@ -300,6 +347,24 @@ export const summarizeScoreboard = (gateStatus: Record<string, GateStatus>) => {
   const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
   const gateCount = statuses.length;
   return { counts, total, gateCount, reconciled: total === gateCount };
+};
+
+
+export const aggregateGateStatusAcrossWaves = (waveStatuses: Array<Record<string, GateStatus>>) => {
+  const gateIds = Array.from(new Set(waveStatuses.flatMap((statusMap) => Object.keys(statusMap)))).sort();
+  return Object.fromEntries(
+    gateIds.map((gateId) => {
+      const gateStates = waveStatuses.map((map) => map[gateId] ?? 'UNKNOWN');
+      const resolved = gateStates.reduce<GateStatus>((current, next) => (GATE_PRECEDENCE[next] > GATE_PRECEDENCE[current] ? next : current), 'NOT_APPLICABLE');
+      return [gateId, resolved];
+    }),
+  ) as Record<string, GateStatus>;
+};
+
+export const deriveCampaignDecision = (counts: ReturnType<typeof summarizeScoreboard>['counts']) => {
+  if (counts.FAIL > 0) return 'INADMISSIBLE';
+  if (counts.NOT_READY > 0 || counts.UNKNOWN > 0) return 'NOT_READY';
+  return 'REDUCED_ORDER_ADMISSIBLE';
 };
 
 const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean): Promise<EvidencePack> => {
@@ -426,9 +491,14 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean): P
 
 const regenCampaign = (outDir: string, waves: Wave[]) => {
   const packs = waves.map((w) => JSON.parse(fs.readFileSync(path.join(outDir, w, 'evidence-pack.json'), 'utf8')) as EvidencePack);
-  const aggregate = packs[packs.length - 1] ?? packs[0];
-  const scoreboard = summarizeScoreboard(aggregate.gateStatus);
-  const decision = scoreboard.counts.FAIL > 0 ? 'INADMISSIBLE' : scoreboard.counts.NOT_READY > 0 || scoreboard.counts.UNKNOWN > 0 ? 'NOT_READY' : 'REDUCED_ORDER_ADMISSIBLE';
+  const aggregatedGateStatus = aggregateGateStatusAcrossWaves(packs.map((pack) => pack.gateStatus));
+  const scoreboard = summarizeScoreboard(aggregatedGateStatus);
+  const decision = deriveCampaignDecision(scoreboard.counts);
+  const aggregateFirstFail = deriveFirstFail(
+    Object.fromEntries(
+      Object.entries(aggregatedGateStatus).map(([gateId, status]) => [gateId, { status, reason: `Aggregated from waves: ${waves.join(',')}`, source: 'campaign.cross-wave.aggregate' }]),
+    ) as Record<string, GateRecord>,
+  );
 
   writeJson(path.join(outDir, `campaign-gate-scoreboard-${DATE_STAMP}.json`), {
     campaignId: `FS-CAMPAIGN-${DATE_STAMP}`,
@@ -437,13 +507,14 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
     statusCounts: scoreboard.counts,
     gateCount: scoreboard.gateCount,
     reconciled: scoreboard.reconciled,
-    gates: aggregate.gateStatus,
+    gates: aggregatedGateStatus,
+    perWaveGates: Object.fromEntries(packs.map((pack) => [pack.wave, pack.gateStatus])),
   });
 
   writeJson(path.join(outDir, `campaign-first-fail-map-${DATE_STAMP}.json`), {
     campaignId: `FS-CAMPAIGN-${DATE_STAMP}`,
     asOfDate: DATE_STAMP,
-    globalFirstFail: aggregate.firstFail,
+    globalFirstFail: aggregateFirstFail.firstFail,
     perWave: Object.fromEntries(waves.map((w) => [w, (JSON.parse(fs.readFileSync(path.join(outDir, w, 'first-fail-map.json'), 'utf8')) as { globalFirstFail: string }).globalFirstFail])),
   });
 
@@ -464,7 +535,7 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
 
   writeMd(
     path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.md`),
-    `# Warp Full-Solve Campaign Execution Report (${DATE_STAMP})\n\n## Executive verdict\n**${decision}**\n\n## Gate scoreboard (G0..G8)\n- PASS: ${scoreboard.counts.PASS}\n- FAIL: ${scoreboard.counts.FAIL}\n- UNKNOWN: ${scoreboard.counts.UNKNOWN}\n- NOT_READY: ${scoreboard.counts.NOT_READY}\n- NOT_APPLICABLE: ${scoreboard.counts.NOT_APPLICABLE}\n- Total gates: ${scoreboard.gateCount}\n- Reconciled: ${scoreboard.reconciled}\n\nFinal gate status (from latest wave artifact):\n${Object.entries(aggregate.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n\n## Decision output\n- Final decision label: **${decision}**\n- Claim posture: diagnostic/reduced-order (fail-closed on hard evidence gaps).\n\n## Boundary statement\n${BOUNDARY_STATEMENT}\n`,
+    `# Warp Full-Solve Campaign Execution Report (${DATE_STAMP})\n\n## Executive verdict\n**${decision}**\n\n## Gate scoreboard (G0..G8)\n- PASS: ${scoreboard.counts.PASS}\n- FAIL: ${scoreboard.counts.FAIL}\n- UNKNOWN: ${scoreboard.counts.UNKNOWN}\n- NOT_READY: ${scoreboard.counts.NOT_READY}\n- NOT_APPLICABLE: ${scoreboard.counts.NOT_APPLICABLE}\n- Total gates: ${scoreboard.gateCount}\n- Reconciled: ${scoreboard.reconciled}\n\nCross-wave aggregate gate status:\n${Object.entries(aggregatedGateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n\nPer-wave gate status snapshots:\n${packs.map((pack) => `### Wave ${pack.wave}\n${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`).join('\n\n')}\n\n## Decision output\n- Final decision label: **${decision}**\n- Claim posture: diagnostic/reduced-order (fail-closed on hard evidence gaps).\n\n## Boundary statement\n${BOUNDARY_STATEMENT}\n`,
   );
 
   return { counts: scoreboard.counts, decision, reconciled: scoreboard.reconciled };
