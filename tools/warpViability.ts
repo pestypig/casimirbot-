@@ -1117,7 +1117,7 @@ export async function evaluateWarpViability(
   if (Number.isFinite(tsValue)) {
     const meta = applySpec("TS_ratio_min", {
       severity: "SOFT",
-      description: "Minimum TS_ratio for stable warp bubble",
+      description: "Canonical minimum TS_ratio gate for operational timing proxy semantics",
     });
     const tsDetail = `TS_ratio=${tsValue} required>=${DEFAULT_TS_MIN}`;
     const idleJitterPass = tsAutoscaleGating === "idle" && tsValue >= TS_IDLE_JITTER_MIN;
@@ -1325,6 +1325,7 @@ export async function evaluateWarpViability(
     thetaMetricDerived,
     tsMetricDerived,
     qiMetricDerived,
+    qiApplicabilityStatus: qiGuard?.applicabilityStatus,
   });
   const promotionReplayPack = buildPromotionReplayPack({
     strictMode: strictCongruence,

@@ -1,5 +1,7 @@
 export const SPEED_OF_LIGHT_M_S = 299_792_458;
 export const WARP_TS_RATIO_MIN = 1.5;
+export const WARP_TS_RATIO_MIN_LABEL = "canonical_gate_minimum";
+export const WARP_TS_REGIME_LABEL = "operational_regime_proxy";
 
 export type ClockingSnapshot = {
   tauLC_ms: number | null;
@@ -142,7 +144,7 @@ export function evaluateTsRatioGate(tsRatio: number | null | undefined, min = WA
     return { pass: false, status: "fail" as const, detail: "TS ratio missing or non-positive" };
   }
   if (value < min) {
-    return { pass: false, status: "fail" as const, detail: `TS ratio ${value.toFixed(3)} < ${min}` };
+    return { pass: false, status: "fail" as const, detail: `TS ratio ${value.toFixed(3)} < ${min} (${WARP_TS_RATIO_MIN_LABEL})` };
   }
-  return { pass: true, status: "pass" as const, detail: `TS ratio ${value.toFixed(3)} >= ${min}` };
+  return { pass: true, status: "pass" as const, detail: `TS ratio ${value.toFixed(3)} >= ${min} (${WARP_TS_RATIO_MIN_LABEL})` };
 }

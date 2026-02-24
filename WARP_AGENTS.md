@@ -33,7 +33,7 @@ constraints pass and the viability oracle has produced an `ADMISSIBLE` status.
     {
       "id": "TS_ratio_min",
       "severity": "SOFT",
-      "description": "Minimum TS_ratio for stable warp bubble.",
+      "description": "Canonical minimum TS_ratio gate for operational timing proxy semantics.",
       "type": "threshold",
       "expression": "TS_ratio >= 1.5"
     },

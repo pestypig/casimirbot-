@@ -9,7 +9,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
 import { useRegisterWhisperContext } from "@/lib/whispers/contextRegistry";
 import { usePanelHashFocus } from "@/lib/whispers/usePanelHashFocus";
-import { formatDerivationLabel, type AudienceMode } from "@/lib/audience-mode";
+import { resolveMetricClaimLabel, type AudienceMode } from "@/lib/audience-mode";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -213,8 +213,10 @@ export function LiveEnergyPipeline({
   const qiBadgeTitle = qiBadgeTitleParts.join(" | ");
   const hasQi = Boolean(qiStats);
 
-  const qiDerivationLabel = formatDerivationLabel({
+  const qiDerivationLabel = resolveMetricClaimLabel({
     mode: audienceMode,
+    strictMode: (P as any)?.qiGuardrail?.strictMode === true,
+    metricContractOk: (P as any)?.qiGuardrail?.metricContractOk,
     metricDerived: (P as any)?.qiGuardrail?.metricDerived === true,
     sourceLabel: (P as any)?.qiGuardrail?.metricDerivedSource,
   });

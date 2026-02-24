@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDerivationLabel, sanitizeAudienceText } from "../audience-mode";
+import { formatDerivationLabel, resolveMetricClaimLabel, sanitizeAudienceText } from "../audience-mode";
 
 describe("audience mode", () => {
   it("suppresses speculative/internal terms in public mode", () => {
@@ -19,6 +19,27 @@ describe("audience mode", () => {
     expect(formatDerivationLabel({ mode: "public", metricDerived: true, sourceLabel: "warp.metric.T00" })).toBe(
       "geometry-derived",
     );
+  });
+
+  it("fails closed for strict metric claims with missing contract", () => {
+    expect(
+      resolveMetricClaimLabel({
+        mode: "public",
+        strictMode: true,
+        metricDerived: true,
+        metricContractOk: false,
+        sourceLabel: "warp.metric.T00",
+      }),
+    ).toBe("metric claim unavailable");
+    expect(
+      resolveMetricClaimLabel({
+        mode: "academic",
+        strictMode: true,
+        metricDerived: true,
+        metricContractOk: false,
+        sourceLabel: "warp.metric.T00",
+      }),
+    ).toBe("metric claim unavailable (contract missing)");
   });
 
   it("matches audience snapshots", () => {

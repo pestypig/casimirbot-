@@ -22,3 +22,16 @@ export function formatDerivationLabel(args: {
   }
   return args.metricDerived ? `geometry-derived (${source})` : `proxy-derived (${source})`;
 }
+
+export function resolveMetricClaimLabel(args: {
+  mode: AudienceMode;
+  strictMode?: boolean;
+  metricContractOk?: boolean;
+  metricDerived?: boolean;
+  sourceLabel?: string;
+}): string {
+  if (args.strictMode && args.metricDerived && args.metricContractOk === false) {
+    return args.mode === "public" ? "metric claim unavailable" : "metric claim unavailable (contract missing)";
+  }
+  return formatDerivationLabel(args);
+}
