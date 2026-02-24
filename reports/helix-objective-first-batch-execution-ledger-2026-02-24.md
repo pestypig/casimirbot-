@@ -80,3 +80,6 @@ Replay scenarios `S13-replay-consistency-1` and `S14-replay-consistency-2`:
 - integrityOk: `true`
 - traceId: `adapter:05ee2162-3afa-47a8-b545-a067d93999ae`
 - runId: `20773`
+
+## Operator handoff note
+- This ledger snapshot was reposted verbatim to operator chat on 2026-02-24 for mainline reconciliation visibility.
