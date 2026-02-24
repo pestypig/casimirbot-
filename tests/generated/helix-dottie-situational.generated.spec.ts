@@ -70,14 +70,6 @@ describe("helix dottie generated situational-awareness", () => {
 
       if (scenario.voice) {
         const payload = { ...scenario.voice } as Record<string, unknown>;
-        if (
-          (payload.mode === "callout" || payload.mode === undefined) &&
-          typeof payload.missionId === "string" &&
-          !Array.isArray(payload.evidenceRefs) &&
-          payload.repoAttributed === undefined
-        ) {
-          payload.evidenceRefs = ["docs/helix-ask-flow.md#L1"];
-        }
         const res = await request(app).post("/api/voice/speak").send(payload);
         expect(res.status).toBe(200);
         const expectedSuppressed = scenario.expected.suppressed;

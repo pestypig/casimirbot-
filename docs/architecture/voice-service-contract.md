@@ -167,7 +167,13 @@ This addendum is additive: existing `/api/voice/speak` transport fields remain u
 
 ## Replay-safe policy clock
 
-`/api/voice/speak` accepts optional `policyTsMs` (and alias `tsMs`) to force deterministic policy-time evaluation for dedupe, rate-limit, budget, and circuit-breaker gates during replay. If neither is supplied, wall-clock time is used.
+`/api/voice/speak` accepts optional `policyTsMs` (and alias `tsMs`) for replay-mode policy evaluation (dedupe, rate-limit, budget, and circuit-breaker gates).
+
+Clock override is honored only when both of the following are true:
+- request sets `replayMode=true`
+- runtime enables trusted replay clock (`VOICE_REPLAY_CLOCK_TRUSTED=1`)
+
+Otherwise, policy evaluation uses server wall-clock time.
 
 ## Mission callout repo-attribution default
 
