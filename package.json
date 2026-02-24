@@ -109,7 +109,7 @@
     "warp:ultimate:check": "tsx scripts/check-warp-ultimate-readiness.ts",
     "warp:evidence:pack": "tsx scripts/warp-evidence-pack.ts",
     "voice:verify-weights-manifest": "python scripts/voice/verify_weights_manifest.py configs/voice/weights-manifest.example.json",
-    "warp:full-solve:campaign": "tsx scripts/warp-full-solve-campaign.ts"
+    "warp:full-solve:campaign": "tsx scripts/warp-full-solve-campaign-cli.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",
