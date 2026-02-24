@@ -279,6 +279,17 @@ const runGrAgentLoopIsolated = async (
     child.once('exit', (code) => {
       clearTimeout(timer);
       if (timedOut) {
+        if (fs.existsSync(outputPath)) {
+          try {
+            const timeoutPayload = JSON.parse(fs.readFileSync(outputPath, 'utf8')) as { ok?: boolean; result?: GrAgentLoopResult };
+            if (timeoutPayload.ok && timeoutPayload.result) {
+              resolve();
+              return;
+            }
+          } catch {
+            // Fall through to fail-closed timeout handling.
+          }
+        }
         reject(new CampaignTimeoutError(timeoutKind, timeoutMs, elapsedBaseMs + timeoutMs, args.wave));
         return;
       }
@@ -355,7 +366,7 @@ const toGate = (status: string | undefined, source: string, reasonMissing: strin
   }
   if (status === 'pass') return { status: 'PASS', source, reason: 'Constraint passed from evaluation artifact.' };
   if (status === 'fail') return { status: 'FAIL', source, reason: 'Constraint failed from evaluation artifact.' };
-  return { status: 'UNKNOWN', source, reason: `Unrecognized status: ${status}` };
+  return { status: 'FAIL', source, reason: `Unrecognized status: ${status}; fail-closed for hard-constraint semantics.` };
 };
 
 export const extractLatestAttempt = (result: GrAgentLoopResult): GrAgentLoopAttempt | null =>
@@ -385,6 +396,18 @@ const collectMissingSignals = (
 
 const hasPersistedRawOutputFiles = (runArtifacts: EvidencePack['runArtifacts']) =>
   runArtifacts.some((artifact) => fs.existsSync(artifact.outputPath));
+
+const canonicalizeConstraintPayload = (constraints: unknown[]): string => {
+  const canonicalEntries = constraints
+    .map((entry) => sortDeep(entry) as Record<string, unknown>)
+    .sort((lhs, rhs) => {
+      const lhsId = typeof lhs.id === 'string' ? lhs.id : '';
+      const rhsId = typeof rhs.id === 'string' ? rhs.id : '';
+      if (lhsId !== rhsId) return lhsId.localeCompare(rhsId);
+      return JSON.stringify(lhs).localeCompare(JSON.stringify(rhs));
+    });
+  return JSON.stringify(canonicalEntries);
+};
 
 export const buildGateMap = (
   wave: Wave,
@@ -506,7 +529,8 @@ export const buildGateMap = (
                   reason: 'Constraints payload missing or structurally incomplete for replication parity.',
                 };
               }
-              const stableConstraints = JSON.stringify(lhsConstraints) === JSON.stringify(rhsConstraints);
+              const stableConstraints =
+                canonicalizeConstraintPayload(lhsConstraints) === canonicalizeConstraintPayload(rhsConstraints);
               return {
                 status: stableConstraints ? 'PASS' : 'FAIL',
                 source: 'campaign.replication.parity',
@@ -627,15 +651,17 @@ export const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null, lates
   return { requiredSignals, missingSignals };
 };
 
-export const buildGateMissingSignalMap = (missingSignals: string[]) => {
+export const buildGateMissingSignalMap = (missingSignals: string[], wave?: Wave) => {
+  const appliesG7 = wave === 'C' || wave === 'D';
+  const appliesG8 = wave === 'D';
   const mapping: EvidencePack['gateMissingSignalMap'] = {
     G1: missingSignals.filter((signal) => signal === 'initial_solver_status'),
     G2: missingSignals.filter((signal) => signal === 'evaluation_gate_status'),
     G3: missingSignals.filter((signal) => signal === 'certificate_hash' || signal === 'certificate_integrity'),
     G4: missingSignals.filter((signal) => signal === 'hard_constraint_ford_roman_qi' || signal === 'hard_constraint_theta_audit'),
     G6: missingSignals,
-    G7: missingSignals.filter((signal) => signal === 'evaluation_gate_status'),
-    G8: missingSignals.filter((signal) => signal.startsWith('hard_constraint_')),
+    G7: appliesG7 ? missingSignals.filter((signal) => signal === 'evaluation_gate_status') : [],
+    G8: appliesG8 ? missingSignals.filter((signal) => signal.startsWith('hard_constraint_')) : [],
   };
   return Object.fromEntries(Object.entries(mapping).filter(([, signals]) => signals.length > 0));
 };
@@ -644,6 +670,7 @@ const applyMissingSignalFailClosed = (gateMap: Record<string, GateRecord>, gateM
   for (const [gateId, signals] of Object.entries(gateMissingSignalMap)) {
     const gate = gateMap[gateId];
     if (!gate) continue;
+    if (gate.status === 'NOT_APPLICABLE') continue;
     gateMap[gateId] = {
       status: 'NOT_READY',
       source: gate.source,
@@ -720,7 +747,7 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, wa
             wave,
             runIndex: runIndex + 1,
             baseDir: base,
-            ciFastPath: ci && waveTimeoutMs <= 5000,
+            ciFastPath: ci,
             options: {
               ...profile.options,
               budget: {
@@ -822,7 +849,7 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, wa
   const latestAttempt = runResults.length ? extractLatestAttempt(runResults[runResults.length - 1]) : null;
   const latestResult = runResults.length ? runResults[runResults.length - 1] : null;
   const { requiredSignals, missingSignals } = collectRequiredSignals(latestAttempt, latestResult);
-  const gateMissingSignalMap = buildGateMissingSignalMap(missingSignals);
+  const gateMissingSignalMap = buildGateMissingSignalMap(missingSignals, wave);
   applyMissingSignalFailClosed(gateMap, gateMissingSignalMap);
   const gateStatus = Object.fromEntries(Object.entries(gateMap).map(([key, value]) => [key, value.status])) as Record<string, GateStatus>;
   const firstFail = deriveFirstFail(gateMap);
@@ -976,7 +1003,7 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
         provenance_unit_system: { required: true, present: false },
       };
       const missingSignals = REQUIRED_SIGNAL_KEYS.slice().sort();
-      const gateMissingSignalMap = buildGateMissingSignalMap(missingSignals);
+      const gateMissingSignalMap = buildGateMissingSignalMap(missingSignals, wave);
       const gateStatus: EvidencePack['gateStatus'] = {
         G0: 'NOT_READY',
         G1: 'NOT_READY',
