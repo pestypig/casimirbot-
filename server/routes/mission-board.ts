@@ -6,6 +6,7 @@ import {
   listMissionBoardEvents,
 } from "../services/mission-overwatch/mission-board-store";
 import { normalizeMissionEvent } from "../services/mission-overwatch/event-normalizer";
+import { foldObjectiveState } from "../services/mission-overwatch/objective-state";
 
 type MissionPhase =
   | "observe"
@@ -42,6 +43,13 @@ type MissionBoardEvent = {
   traceId?: string;
   contextTier?: "tier0" | "tier1";
   sessionState?: "idle" | "requesting" | "active" | "stopping" | "error";
+  objectiveId?: string;
+  objectiveTitle?: string;
+  objectiveStatus?: "open" | "in_progress" | "blocked" | "resolved";
+  gapId?: string;
+  gapSummary?: string;
+  gapSeverity?: "low" | "medium" | "high" | "critical";
+  gapResolvedAt?: string;
 };
 
 type MissionBoardSnapshot = {
@@ -50,6 +58,8 @@ type MissionBoardSnapshot = {
   status: MissionStatus;
   updatedAt: string;
   unresolvedCritical: number;
+  objectives?: Array<{ objectiveId: string; title: string; status: "open" | "in_progress" | "blocked" | "resolved"; updatedAt: string }>;
+  gaps?: Array<{ gapId: string; objectiveId: string; summary: string; severity: "low" | "medium" | "high" | "critical"; openedAt: string; resolvedAt?: string }>;
 };
 
 const missionBoardRouter = Router();
@@ -207,8 +217,11 @@ const foldMissionSnapshot = (events: MissionBoardEvent[], missionId: string): Mi
   let status: MissionStatus = "active";
   const unresolvedCriticalIds = new Set<string>();
   let updatedAt = new Date().toISOString();
+  const objectives = new Map<string, { objectiveId: string; missionId: string; title: string; status: "open" | "in_progress" | "blocked" | "resolved"; updatedAt: string }>();
+  const gaps = new Map<string, { gapId: string; missionId: string; objectiveId: string; summary: string; severity: "low" | "medium" | "high" | "critical"; openedAt: string; resolvedAt?: string }>();
 
   for (const event of events) {
+    foldObjectiveState(objectives as any, gaps as any, event as any);
     updatedAt = event.ts;
     if (event.classification === "critical") {
       unresolvedCriticalIds.add(event.eventId);
@@ -274,6 +287,8 @@ const foldMissionSnapshot = (events: MissionBoardEvent[], missionId: string): Mi
     status,
     updatedAt,
     unresolvedCritical,
+    objectives: Array.from(objectives.values()).sort((a, b) => a.updatedAt.localeCompare(b.updatedAt) || a.objectiveId.localeCompare(b.objectiveId)),
+    gaps: Array.from(gaps.values()).sort((a, b) => a.openedAt.localeCompare(b.openedAt) || a.gapId.localeCompare(b.gapId)),
   };
 };
 

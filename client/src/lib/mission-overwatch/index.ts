@@ -1,9 +1,32 @@
+
+export type MissionObjectiveStatus = "open" | "in_progress" | "blocked" | "resolved";
+
+export type MissionObjectiveView = {
+  objectiveId: string;
+  title: string;
+  status: MissionObjectiveStatus;
+  updatedAt: string;
+};
+
+export type MissionGapView = {
+  gapId: string;
+  objectiveId: string;
+  summary: string;
+  severity: "low" | "medium" | "high" | "critical";
+  openedAt: string;
+  resolvedAt?: string;
+};
+
+import { evaluateCalloutEligibility } from "../../../../shared/callout-eligibility";
+
 export type MissionBoardSnapshot = {
   missionId: string;
   phase: "observe" | "plan" | "retrieve" | "gate" | "synthesize" | "verify" | "execute" | "debrief";
   status: "active" | "degraded" | "blocked" | "complete" | "aborted";
   updatedAt: string;
   unresolvedCritical: number;
+  objectives?: MissionObjectiveView[];
+  gaps?: MissionGapView[];
 };
 
 export type MissionBoardEvent = {
@@ -19,6 +42,13 @@ export type MissionBoardEvent = {
   timerStatus?: "scheduled" | "running" | "expired" | "cancelled" | "completed";
   timerDueTs?: string;
   derivedFromEventId?: string;
+  objectiveId?: string;
+  objectiveTitle?: string;
+  objectiveStatus?: MissionObjectiveStatus;
+  gapId?: string;
+  gapSummary?: string;
+  gapSeverity?: "low" | "medium" | "high" | "critical";
+  gapResolvedAt?: string;
 };
 
 type MissionApiError = {
@@ -208,15 +238,15 @@ export function shouldEmitContextCallout(options: {
   classification: MissionBoardEvent["classification"];
   isUserTyping: boolean;
 }): boolean {
-  const { controls, sessionState, classification, isUserTyping } = options;
-  if (controls.tier === "tier0") return false;
-  if (sessionState !== "active") return false;
-  if (controls.muteWhileTyping && isUserTyping) return false;
-  if (controls.voiceMode === "off" || controls.voiceMode === "dnd") return false;
-  if (controls.voiceMode === "critical_only") {
-    return classification === "critical" || classification === "action";
-  }
-  return true;
+  const decision = evaluateCalloutEligibility({
+    contextTier: options.controls.tier,
+    sessionState: options.sessionState,
+    voiceMode: options.controls.voiceMode,
+    classification: options.classification,
+    isUserTyping: options.isUserTyping,
+    muteWhileTyping: options.controls.muteWhileTyping,
+  });
+  return decision.emitVoice;
 }
 
 
