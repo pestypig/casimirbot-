@@ -1,0 +1,853 @@
+{
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "profiles": {
+    "strict": {
+      "decision": "NOT_READY",
+      "statusCounts": {
+        "FAIL": 0,
+        "NOT_APPLICABLE": 1,
+        "NOT_READY": 8,
+        "PASS": 0,
+        "UNKNOWN": 0
+      },
+      "gates": {
+        "G0": "NOT_READY",
+        "G1": "NOT_READY",
+        "G2": "NOT_READY",
+        "G3": "NOT_READY",
+        "G4": "NOT_READY",
+        "G5": "NOT_APPLICABLE",
+        "G6": "NOT_READY",
+        "G7": "NOT_READY",
+        "G8": "NOT_READY"
+      },
+      "waves": {
+        "A": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "wave_timeout:4000",
+              "runIndex": 1
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 4158,
+            "kind": "wave_timeout",
+            "timeoutMs": 4000,
+            "wave": "A"
+          },
+          "run1RawOutputKind": "error"
+        },
+        "B": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "wave_timeout:4000",
+              "runIndex": 1
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 4125,
+            "kind": "wave_timeout",
+            "timeoutMs": 4000,
+            "wave": "B"
+          },
+          "run1RawOutputKind": "error"
+        },
+        "C": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            },
+            {
+              "runIndex": 2,
+              "attemptCount": 0,
+              "state": "timeout"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "wave_timeout:4000",
+              "runIndex": 1
+            },
+            {
+              "error": "wave_timeout:4000",
+              "runIndex": 2
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 4124,
+            "kind": "wave_timeout",
+            "timeoutMs": 4000,
+            "wave": "C"
+          },
+          "run1RawOutputKind": "error"
+        },
+        "D": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            },
+            {
+              "runIndex": 2,
+              "attemptCount": 0,
+              "state": "timeout"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "campaign_timeout:2530",
+              "runIndex": 1
+            },
+            {
+              "error": "campaign_timeout:2530",
+              "runIndex": 2
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 15124,
+            "kind": "campaign_timeout",
+            "timeoutMs": 15000,
+            "wave": "D"
+          },
+          "run1RawOutputKind": "error"
+        }
+      }
+    },
+    "relaxed": {
+      "decision": "NOT_READY",
+      "statusCounts": {
+        "FAIL": 0,
+        "NOT_APPLICABLE": 1,
+        "NOT_READY": 8,
+        "PASS": 0,
+        "UNKNOWN": 0
+      },
+      "gates": {
+        "G0": "NOT_READY",
+        "G1": "NOT_READY",
+        "G2": "NOT_READY",
+        "G3": "NOT_READY",
+        "G4": "NOT_READY",
+        "G5": "NOT_APPLICABLE",
+        "G6": "NOT_READY",
+        "G7": "NOT_READY",
+        "G8": "NOT_READY"
+      },
+      "waves": {
+        "A": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "wave_timeout:20000",
+              "runIndex": 1
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 20134,
+            "kind": "wave_timeout",
+            "timeoutMs": 20000,
+            "wave": "A"
+          },
+          "run1RawOutputKind": "error"
+        },
+        "B": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "wave_timeout:20000",
+              "runIndex": 1
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 20150,
+            "kind": "wave_timeout",
+            "timeoutMs": 20000,
+            "wave": "B"
+          },
+          "run1RawOutputKind": "error"
+        },
+        "C": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            },
+            {
+              "runIndex": 2,
+              "attemptCount": 0,
+              "state": "timeout"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "wave_timeout:20000",
+              "runIndex": 1
+            },
+            {
+              "error": "wave_timeout:20000",
+              "runIndex": 2
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 20147,
+            "kind": "wave_timeout",
+            "timeoutMs": 20000,
+            "wave": "C"
+          },
+          "run1RawOutputKind": "error"
+        },
+        "D": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            },
+            {
+              "runIndex": 2,
+              "attemptCount": 0,
+              "state": "timeout"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "wave_timeout:20000",
+              "runIndex": 1
+            },
+            {
+              "error": "wave_timeout:20000",
+              "runIndex": 2
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 20144,
+            "kind": "wave_timeout",
+            "timeoutMs": 20000,
+            "wave": "D"
+          },
+          "run1RawOutputKind": "error"
+        }
+      }
+    },
+    "extended": {
+      "decision": "NOT_READY",
+      "statusCounts": {
+        "FAIL": 0,
+        "NOT_APPLICABLE": 1,
+        "NOT_READY": 8,
+        "PASS": 0,
+        "UNKNOWN": 0
+      },
+      "gates": {
+        "G0": "NOT_READY",
+        "G1": "NOT_READY",
+        "G2": "NOT_READY",
+        "G3": "NOT_READY",
+        "G4": "NOT_READY",
+        "G5": "NOT_APPLICABLE",
+        "G6": "NOT_READY",
+        "G7": "NOT_READY",
+        "G8": "NOT_READY"
+      },
+      "waves": {
+        "A": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "wave_timeout:60000",
+              "runIndex": 1
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 60167,
+            "kind": "wave_timeout",
+            "timeoutMs": 60000,
+            "wave": "A"
+          },
+          "run1RawOutputKind": "error"
+        },
+        "B": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "wave_timeout:60000",
+              "runIndex": 1
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 60188,
+            "kind": "wave_timeout",
+            "timeoutMs": 60000,
+            "wave": "B"
+          },
+          "run1RawOutputKind": "error"
+        },
+        "C": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            },
+            {
+              "runIndex": 2,
+              "attemptCount": 0,
+              "state": "timeout"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "wave_timeout:60000",
+              "runIndex": 1
+            },
+            {
+              "error": "wave_timeout:60000",
+              "runIndex": 2
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 60199,
+            "kind": "wave_timeout",
+            "timeoutMs": 60000,
+            "wave": "C"
+          },
+          "run1RawOutputKind": "error"
+        },
+        "D": {
+          "gateStatus": {
+            "G0": "NOT_READY",
+            "G1": "NOT_READY",
+            "G2": "NOT_READY",
+            "G3": "NOT_READY",
+            "G4": "NOT_READY",
+            "G5": "NOT_APPLICABLE",
+            "G6": "NOT_READY",
+            "G7": "NOT_READY",
+            "G8": "NOT_READY"
+          },
+          "firstFail": "G0",
+          "missingSignals": [
+            "certificate_hash",
+            "certificate_integrity",
+            "evaluation_gate_status",
+            "hard_constraint_ford_roman_qi",
+            "hard_constraint_theta_audit",
+            "initial_solver_status",
+            "provenance_chart",
+            "provenance_normalization",
+            "provenance_observer",
+            "provenance_unit_system"
+          ],
+          "runArtifacts": [
+            {
+              "runIndex": 1,
+              "attemptCount": 0,
+              "state": "error"
+            },
+            {
+              "runIndex": 2,
+              "attemptCount": 0,
+              "state": "timeout"
+            }
+          ],
+          "runErrors": [
+            {
+              "error": "wave_timeout:60000",
+              "runIndex": 1
+            },
+            {
+              "error": "wave_timeout:60000",
+              "runIndex": 2
+            }
+          ],
+          "timeout": {
+            "elapsedMs": 60185,
+            "kind": "wave_timeout",
+            "timeoutMs": 60000,
+            "wave": "D"
+          },
+          "run1RawOutputKind": "error"
+        }
+      }
+    }
+  },
+  "profileComparison": {
+    "strict": {
+      "decision": "NOT_READY",
+      "statusCounts": {
+        "FAIL": 0,
+        "NOT_APPLICABLE": 1,
+        "NOT_READY": 8,
+        "PASS": 0,
+        "UNKNOWN": 0
+      },
+      "gateDeltaVsStrict": {
+        "G0": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G1": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G2": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G3": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G4": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G5": {
+          "strict": "NOT_APPLICABLE",
+          "profile": "NOT_APPLICABLE",
+          "delta": "same"
+        },
+        "G6": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G7": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G8": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        }
+      }
+    },
+    "relaxed": {
+      "decision": "NOT_READY",
+      "statusCounts": {
+        "FAIL": 0,
+        "NOT_APPLICABLE": 1,
+        "NOT_READY": 8,
+        "PASS": 0,
+        "UNKNOWN": 0
+      },
+      "gateDeltaVsStrict": {
+        "G0": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G1": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G2": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G3": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G4": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G5": {
+          "strict": "NOT_APPLICABLE",
+          "profile": "NOT_APPLICABLE",
+          "delta": "same"
+        },
+        "G6": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G7": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G8": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        }
+      }
+    },
+    "extended": {
+      "decision": "NOT_READY",
+      "statusCounts": {
+        "FAIL": 0,
+        "NOT_APPLICABLE": 1,
+        "NOT_READY": 8,
+        "PASS": 0,
+        "UNKNOWN": 0
+      },
+      "gateDeltaVsStrict": {
+        "G0": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G1": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G2": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G3": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G4": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G5": {
+          "strict": "NOT_APPLICABLE",
+          "profile": "NOT_APPLICABLE",
+          "delta": "same"
+        },
+        "G6": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G7": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        },
+        "G8": {
+          "strict": "NOT_READY",
+          "profile": "NOT_READY",
+          "delta": "same"
+        }
+      }
+    }
+  }
+}
