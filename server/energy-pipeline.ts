@@ -5602,6 +5602,31 @@ export async function calculateEnergyPipeline(
       allowMassOverride && Number.isFinite(state.exoticMassTarget_kg)
         ? Number(state.exoticMassTarget_kg)
         : undefined;
+    const modeKey = String(state.currentMode ?? "hover").toLowerCase();
+    const lowGTargetsByMode: Record<string, number> = {
+      standby: 0,
+      nearzero: 0.01 * 9.80665,
+      taxi: 0.08 * 9.80665,
+      hover: 0.10 * 9.80665,
+      cruise: 0.05 * 9.80665,
+      emergency: 0.30 * 9.80665,
+    };
+    const gTarget =
+      firstFinite(
+        Number((state.dynamicConfig as any)?.gTarget),
+        Number((state as any).gTarget),
+        lowGTargetsByMode[modeKey],
+      ) ?? 0;
+    const epsilonTilt =
+      firstFinite(
+        Number((state.dynamicConfig as any)?.epsilonTilt),
+        Number((state as any).epsilonTilt),
+        Math.min(5e-7, Math.max(0, (gTarget * geomR_warp) / (C * C))),
+      ) ?? 0;
+    const betaTiltVec = toFiniteVec3(
+      (state.dynamicConfig as any)?.betaTiltVec ?? (state as any).betaTiltVec,
+      [0, -1, 0],
+    );
 
     const warpParams = {
       geometry: 'bowl' as const,
@@ -5629,10 +5654,14 @@ export async function calculateEnergyPipeline(
         lightCrossingTimeNs: tauLC_s * 1e9,
         shiftAmplitude: 50e-12,
         expansionTolerance: 1e-12,
+        gTarget,
+        epsilonTilt,
+        betaTiltVec,
         warpFieldType,
         warpGeometry: warpGeometry ?? undefined,
         warpGeometryKind
       },
+      currentMode: state.currentMode,
       bubble: bubblePayload,
       R: bubblePayload.R,
       sigma: bubblePayload.sigma,

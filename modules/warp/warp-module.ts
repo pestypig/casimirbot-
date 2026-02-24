@@ -30,6 +30,24 @@ const logError = (...args: unknown[]) => {
   }
 };
 
+const toFiniteVec3 = (value: unknown): [number, number, number] | undefined => {
+  if (!Array.isArray(value) || value.length < 3) return undefined;
+  const x = Number(value[0]);
+  const y = Number(value[1]);
+  const z = Number(value[2]);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return undefined;
+  return [x, y, z];
+};
+
+const normalizeVec3 = (
+  value: [number, number, number],
+  fallback: [number, number, number],
+): [number, number, number] => {
+  const mag = Math.hypot(value[0], value[1], value[2]);
+  if (!Number.isFinite(mag) || mag <= 1e-12) return fallback;
+  return [value[0] / mag, value[1] / mag, value[2] / mag];
+};
+
 export interface WarpBubbleResult extends NatarioWarpResult {
   // Module-specific additions
   moduleVersion: string;
@@ -190,6 +208,18 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     : Number.isFinite((params as any).beta)
       ? Number((params as any).beta)
       : undefined;
+  const epsilonTiltRaw = Number(
+    (dyn as any)?.epsilonTilt ?? (params as any).epsilonTilt,
+  );
+  const epsilonTilt = Number.isFinite(epsilonTiltRaw)
+    ? Math.max(0, Math.min(5e-7, epsilonTiltRaw))
+    : undefined;
+  const gTargetRaw = Number((dyn as any)?.gTarget ?? (params as any).gTarget);
+  const gTarget = Number.isFinite(gTargetRaw) ? Math.max(0, gTargetRaw) : undefined;
+  const betaTiltVec = normalizeVec3(
+    toFiniteVec3((dyn as any)?.betaTiltVec ?? (params as any).betaTiltVec) ?? [0, -1, 0],
+    [0, -1, 0],
+  );
 
   // Sector counts / duty
   const sectorCount = Math.max(1, Math.floor(dyn?.sectorCount ?? 1));
@@ -336,6 +366,9 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     bubbleRadius_m,
     bubbleSigma,
     bubbleBeta,
+    gTarget,
+    epsilonTilt,
+    betaTiltVec,
 
     // --- Pipeline seeds (threaded through) ---
     gammaGeo,

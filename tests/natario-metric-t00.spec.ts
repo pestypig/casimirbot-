@@ -53,4 +53,30 @@ describe("natario metric-derived T00", () => {
     expect(result.metricStressDiagnostics?.sampleCount ?? 0).toBeGreaterThan(0);
     expect(Number.isFinite(result.stressEnergyTensor.T00)).toBe(true);
   });
+
+  it("applies epsilon tilt to Natario interior shift field", () => {
+    const result = calculateNatarioWarpBubble({
+      ...baseParams,
+      shiftAmplitude: 0,
+      epsilonTilt: 2e-7,
+      betaTiltVec: [0, -1, 0],
+    });
+    const center = result.shiftVectorField.evaluateShiftVector(0, 0, 0);
+    expect(center[1]).toBeLessThan(0);
+    expect(Math.abs(center[1])).toBeGreaterThan(1e-9);
+  });
+
+  it("applies epsilon tilt to Natario SDF interior shift field", () => {
+    const result = calculateNatarioWarpBubble({
+      ...baseParams,
+      warpFieldType: "natario_sdf",
+      warpGridResolution: 12,
+      shiftAmplitude: 0,
+      epsilonTilt: 2e-7,
+      betaTiltVec: [0, -1, 0],
+    });
+    const center = result.shiftVectorField.evaluateShiftVector(0, 0, 0);
+    expect(center[1]).toBeLessThan(0);
+    expect(Math.abs(center[1])).toBeGreaterThan(1e-10);
+  });
 });

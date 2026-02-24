@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-02-13T03:07:09.857Z",
+  "generatedAt": "2026-02-24T04:34:41.913Z",
   "registryCount": 74,
   "coverage": {
     "exploratory": {
@@ -98,7 +98,7 @@
     }
   },
   "unstaged": {
-    "count": 10,
+    "count": 13,
     "modules": [
       "modules/gr/gr-diagnostics.ts",
       "modules/warp/warp-metric-adapter.ts",
@@ -106,8 +106,11 @@
       "server/gr/gr-os-payload.ts",
       "server/routes/agi.chat.ts",
       "server/routes/agi.contributions.ts",
+      "server/routes/agi.demonstration.ts",
       "server/routes/agi.refinery.ts",
       "server/services/observability/error-reporter.ts",
+      "server/services/observability/event-spine-ring-buffer.ts",
+      "server/services/observability/event-spine.ts",
       "server/services/observability/gr-os-payload-store.ts",
       "server/services/observability/tool-event-adapters.ts"
     ],
@@ -121,10 +124,13 @@
         "modules/warp/warp-metric-adapter.ts",
         "server/routes/agi.chat.ts",
         "server/routes/agi.contributions.ts",
+        "server/routes/agi.demonstration.ts",
         "server/routes/agi.refinery.ts"
       ],
       "exploratory": [
         "server/services/observability/error-reporter.ts",
+        "server/services/observability/event-spine-ring-buffer.ts",
+        "server/services/observability/event-spine.ts",
         "server/services/observability/gr-os-payload-store.ts",
         "server/services/observability/tool-event-adapters.ts"
       ]
@@ -186,8 +192,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 551,
-    "edgeCount": 1199
+    "nodeCount": 607,
+    "edgeCount": 1286
   },
   "evidenceProfiles": [
     {

@@ -295,6 +295,7 @@ export interface NatarioWarpParams {
   powerTarget_W?: number;                   // optional compliance target
   powerTolerance?: number;                  // fractional tolerance
   betaTiltVec?: [number, number, number];   // optional pipeline tilt mapping   
+  epsilonTilt?: number;                      // low-g interior tilt amplitude (dimensionless)
   exoticMassTarget_kg?: number;
   invariantMass_kg?: number;
   tileArea_m2_override?: number;
@@ -449,6 +450,22 @@ export function calculateSectorStrobing(
 export function calculateNatarioShiftField(params: NatarioWarpParams, _totalExoticMass:number) {
   const amp = params.shiftAmplitude || 0.0;
   const R = Math.max(1e-9, (params.bowlRadius||1) * 1e-6);
+  const epsilonTilt = Number.isFinite(params.epsilonTilt)
+    ? clamp(Math.abs(params.epsilonTilt as number), 0, 5e-7)
+    : 0;
+  const tiltDir = vecNormalize(
+    params.betaTiltVec ??
+      [0, -1, 0],
+  );
+  const interiorRadius = Number.isFinite(params.bubbleRadius_m)
+    ? Math.max(1e-9, params.bubbleRadius_m as number)
+    : R;
+  const duty = Math.max(0, params.effectiveDuty || 0);
+  const interiorProfile = (r: number) => {
+    const x = clamp(Math.abs(r) / Math.max(1e-9, interiorRadius), 0, 1);
+    const t = 1 - x;
+    return t * t * (3 - 2 * t);
+  };
   // radial profile: simple compact bump, safe and smooth
   const radialProfile = (r:number) => {
     // normalized r in [0, 2R]
@@ -461,17 +478,19 @@ export function calculateNatarioShiftField(params: NatarioWarpParams, _totalExot
   const evaluateShiftVector = (x:number,y:number,z:number) => {
     const r = Math.hypot(x,y,z) || 1e-9;
     const s = radialProfile(r);
-    // purely radial field scaled by s
-    return [s * (x/r), s * (y/r), s * (z/r)];
+    const radial: Vec3 = [s * (x/r), s * (y/r), s * (z/r)];
+    const tilt = vecScale(tiltDir, epsilonTilt * interiorProfile(r));
+    return vecAdd(radial, tilt);
   };
+  const amplitude = Math.max(amp, epsilonTilt);
   return {
-    amplitude: amp,
+    amplitude,
     radialProfile,
     tangentialComponent: amp * 0.0,
     axialComponent: amp * 0.0,
-    positivePhaseAmplitude: amp * (1 + 0.5 * Math.max(0, params.effectiveDuty || 0)),
-    negativePhaseAmplitude: amp * (1 - 0.5 * Math.max(0, params.effectiveDuty || 0)),
-    netShiftAmplitude: amp * (Math.max(0, params.effectiveDuty || 0)),
+    positivePhaseAmplitude: amp * (1 + 0.5 * duty) + epsilonTilt,
+    negativePhaseAmplitude: amp * (1 - 0.5 * duty) + epsilonTilt,
+    netShiftAmplitude: amp * duty + epsilonTilt,
     evaluateShiftVector
   };
 }
@@ -720,7 +739,13 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     if (!hodge) {
       hodge = helmholtzHodgeProject(params);
     }
-    baseResult.shiftVectorField = { amplitude: params.shiftAmplitude ?? shift.amplitude, evaluateShiftVector: hodge.evaluate } as any;
+    baseResult.shiftVectorField = {
+      amplitude: Math.max(
+        Number(params.shiftAmplitude ?? shift.amplitude ?? 0),
+        Number(params.epsilonTilt ?? 0),
+      ),
+      evaluateShiftVector: hodge.evaluate,
+    } as any;
     baseResult.expansionScalar = hodge.rmsDiv;
     baseResult.curlMagnitude = hodge.rmsCurl;
     baseResult.isZeroExpansion = hodge.maxDiv < (params.expansionTolerance ?? 1e-12);
@@ -962,7 +987,11 @@ function helmholtzHodgeProject(params: NatarioWarpParams): HodgeResult {
   const div = new Float64Array(total);
 
   const amp = params.shiftAmplitude || 0;
-  if (amp === 0) {
+  const epsilonTilt = Number.isFinite(params.epsilonTilt)
+    ? clamp(Math.abs(params.epsilonTilt as number), 0, 5e-7)
+    : 0;
+  const tiltDir = vecNormalize(params.betaTiltVec ?? [0, -1, 0]);
+  if (amp === 0 && epsilonTilt === 0) {
     return {
       evaluate: () => [0, 0, 0],
       maxDiv: 0,
@@ -992,9 +1021,10 @@ function helmholtzHodgeProject(params: NatarioWarpParams): HodgeResult {
         const envelope = Math.exp(-Math.pow(sd / Math.max(1e-9, geom.wall), 2));
         const taper = clamp(1 - Math.abs(sd) / Math.max(1e-9, geom.band), 0, 1);
         const w = envelope * taper;
-        betaX[idx] = dir[0] * amp * w;
-        betaY[idx] = dir[1] * amp * w;
-        betaZ[idx] = dir[2] * amp * w;
+        const interior = sd <= 0 ? 1 : 0;
+        betaX[idx] = dir[0] * amp * w + tiltDir[0] * epsilonTilt * interior;
+        betaY[idx] = dir[1] * amp * w + tiltDir[1] * epsilonTilt * interior;
+        betaZ[idx] = dir[2] * amp * w + tiltDir[2] * epsilonTilt * interior;
 
         const ixp = i < nx - 1 ? idx + 1 : idx;
         const ixm = i > 0 ? idx - 1 : idx;

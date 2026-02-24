@@ -1,6 +1,6 @@
 # Math Report
 
-Generated: 2026-02-13T03:07:09.857Z
+Generated: 2026-02-24T04:34:41.913Z
 Registry entries: 74
 
 ## Coverage by Stage
@@ -16,15 +16,18 @@ Registry entries: 74
 - server/gr/gr-os-payload.ts
 - server/routes/agi.chat.ts
 - server/routes/agi.contributions.ts
+- server/routes/agi.demonstration.ts
 - server/routes/agi.refinery.ts
 - server/services/observability/error-reporter.ts
+- server/services/observability/event-spine-ring-buffer.ts
+- server/services/observability/event-spine.ts
 - server/services/observability/gr-os-payload-store.ts
 - server/services/observability/tool-event-adapters.ts
 
 ## Unstaged Stage Suggestions
 - diagnostic: 3
-- reduced-order: 4
-- exploratory: 3
+- reduced-order: 5
+- exploratory: 5
 - default: exploratory
 
 ## Missing Evidence
@@ -55,8 +58,8 @@ none
 - tests considered: 0
 
 ## Auto-discovered Dependencies
-- nodes: 551
-- edges: 1199
+- nodes: 607
+- edges: 1286
 
 ## Stage Violations (Edges)
 none
