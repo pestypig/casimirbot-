@@ -5,6 +5,7 @@ import { runGrAgentLoop, type GrAgentLoopOptions } from '../server/gr/gr-agent-l
 type RunnerInput = {
   wave?: string;
   runIndex?: number;
+  ciFastPath?: boolean;
   options: GrAgentLoopOptions;
 };
 
@@ -32,7 +33,7 @@ const run = async () => {
   try {
     const raw = fs.readFileSync(inputPath, 'utf8');
     const parsed = JSON.parse(raw) as RunnerInput;
-    const result = await runGrAgentLoop(parsed.options ?? {});
+    const result = await runGrAgentLoop({ ...(parsed.options ?? {}), ciFastPath: Boolean(parsed.ciFastPath) });
     writeOutput({
       ok: true,
       wave: parsed.wave,

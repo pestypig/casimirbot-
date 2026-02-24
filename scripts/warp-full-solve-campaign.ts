@@ -106,6 +106,19 @@ const DATE_STAMP = '2026-02-24';
 const EXECUTIVE_TRANSLATION_DOC = `docs/audits/research/warp-gates-executive-translation-${DATE_STAMP}.md`;
 const ALLOWED_WAVES: readonly WaveArg[] = ['A', 'B', 'C', 'D', 'all'] as const;
 const FIRST_FAIL_ORDER = ['G0', 'G1', 'G2', 'G3', 'G4', 'G6', 'G7', 'G8'] as const;
+const REQUIRED_SIGNAL_KEYS = [
+  'initial_solver_status',
+  'evaluation_gate_status',
+  'hard_constraint_ford_roman_qi',
+  'hard_constraint_theta_audit',
+  'certificate_hash',
+  'certificate_integrity',
+  'provenance_chart',
+  'provenance_observer',
+  'provenance_normalization',
+  'provenance_unit_system',
+] as const;
+
 
 const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOptions }> = {
   A: {
@@ -224,7 +237,7 @@ export const parseSeedArg = (value: string | undefined): number => {
 };
 
 const runGrAgentLoopIsolated = async (
-  args: { options: GrAgentLoopOptions; wave: Wave; runIndex: number; baseDir: string },
+  args: { options: GrAgentLoopOptions; wave: Wave; runIndex: number; baseDir: string; ciFastPath?: boolean },
   timeoutMs: number,
   timeoutKind: TimeoutKind,
   elapsedBaseMs: number,
@@ -245,6 +258,7 @@ const runGrAgentLoopIsolated = async (
     wave: args.wave,
     runIndex: args.runIndex,
     options: args.options,
+    ciFastPath: Boolean(args.ciFastPath),
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -468,7 +482,7 @@ export const buildGateMap = (
               };
             })()
           : { status: 'NOT_READY', source: 'campaign.stability.check', reason: 'Need at least 2 runs for stability check.' }
-        : { status: 'NOT_READY', source: 'campaign.stability.check', reason: 'Stability check enabled for waves C and D only.' },
+        : { status: 'NOT_APPLICABLE', source: 'campaign.stability.check', reason: 'Stability check enabled for waves C and D only.' },
     G8:
       wave === 'D'
         ? runResults.length >= 2
@@ -502,7 +516,7 @@ export const buildGateMap = (
               };
             })()
           : { status: 'NOT_READY', source: 'campaign.replication.parity', reason: 'Need replicated runs for wave D parity check.' }
-        : { status: 'NOT_READY', source: 'campaign.replication.parity', reason: 'Replication parity applies to wave D only.' },
+        : { status: 'NOT_APPLICABLE', source: 'campaign.replication.parity', reason: 'Replication parity applies to wave D only.' },
   };
 
   return gateMap;
@@ -587,6 +601,7 @@ export const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null, lates
     finalWarp.metricT00UnitSystem ??
     attemptWarp.metricT00UnitSystem;
 
+  // Producer/consumer contract: these keys are authoritative and deterministic for gate fail-closed wiring.
   const requiredSignals: EvidencePack['requiredSignals'] = {
     initial_solver_status: { required: true, present: Boolean(attempt?.initial?.status) },
     evaluation_gate_status: { required: true, present: Boolean(attempt?.evaluation?.gate?.status) },
@@ -605,9 +620,9 @@ export const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null, lates
     provenance_normalization: { required: true, present: isMeaningfulValue(normalization) },
     provenance_unit_system: { required: true, present: isMeaningfulValue(unitSystem) },
   };
-  const missingSignals = Object.entries(requiredSignals)
-    .filter(([, state]) => state.required && !state.present)
-    .map(([signal]) => signal)
+  const missingSignals = REQUIRED_SIGNAL_KEYS
+    .filter((signal) => requiredSignals[signal]?.required && !requiredSignals[signal]?.present)
+    .slice()
     .sort();
   return { requiredSignals, missingSignals };
 };
@@ -705,6 +720,7 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, wa
             wave,
             runIndex: runIndex + 1,
             baseDir: base,
+            ciFastPath: ci && waveTimeoutMs <= 5000,
             options: {
               ...profile.options,
               budget: {
@@ -946,6 +962,7 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
     const campaignElapsedMs = Date.now() - campaignStarted;
     if (campaignElapsedMs > args.campaignTimeoutMs) {
       const timeoutArtifact = path.join(args.out, wave, 'evidence-pack.json');
+      // Producer/consumer contract: these keys are authoritative and deterministic for gate fail-closed wiring.
       const requiredSignals: EvidencePack['requiredSignals'] = {
         initial_solver_status: { required: true, present: false },
         evaluation_gate_status: { required: true, present: false },
@@ -958,7 +975,7 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
         provenance_normalization: { required: true, present: false },
         provenance_unit_system: { required: true, present: false },
       };
-      const missingSignals = Object.keys(requiredSignals).sort();
+      const missingSignals = REQUIRED_SIGNAL_KEYS.slice().sort();
       const gateMissingSignalMap = buildGateMissingSignalMap(missingSignals);
       const gateStatus: EvidencePack['gateStatus'] = {
         G0: 'NOT_READY',
@@ -968,8 +985,8 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
         G4: 'NOT_READY',
         G5: 'NOT_APPLICABLE',
         G6: 'NOT_READY',
-        G7: 'NOT_READY',
-        G8: 'NOT_READY',
+        G7: wave === 'C' || wave === 'D' ? 'NOT_READY' : 'NOT_APPLICABLE',
+        G8: wave === 'D' ? 'NOT_READY' : 'NOT_APPLICABLE',
       };
       const gateDetails: EvidencePack['gateDetails'] = {
         G0: { status: 'NOT_READY', reason: 'Campaign timeout reached before wave execution.', source: 'campaign.timeout' },

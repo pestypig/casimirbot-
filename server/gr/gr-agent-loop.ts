@@ -134,6 +134,7 @@ export type GrAgentLoopOptions = {
   budget?: GrAgentLoopBudget;
   escalation?: GrAgentLoopEscalation;
   gr?: GrAgentLoopGrParams;
+  ciFastPath?: boolean;
 };
 
 export type GrAgentLoopAttempt = {
@@ -360,6 +361,7 @@ const resolveFidelity = (
   options: {
     gr?: GrAgentLoopGrParams;
     escalation: Required<GrAgentLoopEscalation>;
+    ciFastPath: boolean;
   },
 ): GrAgentLoopFidelity => {
   const base = options.gr ?? {};
@@ -406,6 +408,23 @@ const resolveFidelity = (
     base.evolveDt_s,
   );
 
+  if (options.ciFastPath) {
+    return {
+      dims: [Math.min(dims[0], 12), Math.min(dims[1], 12), Math.min(dims[2], 12)],
+      bounds,
+      unitSystem: base.unitSystem,
+      initialIterations: Math.min(initialIterations, 8),
+      initialTolerance: base.initialTolerance ?? 0,
+      evolveSteps: Math.min(evolveSteps, 1),
+      evolveDt_s,
+      evolveIterations: Math.min(evolveIterations, 1),
+      evolveTolerance: base.evolveTolerance ?? 0,
+      includeExtra: false,
+      includeMatter: false,
+      includeKij: false,
+    };
+  }
+
   return {
     dims,
     bounds,
@@ -435,7 +454,8 @@ export async function runGrAgentLoop(
       },
     },
     async (span) => {
-      const maxIterations = Math.max(1, options.maxIterations ?? 4);
+      const ciFastPath = Boolean(options.ciFastPath);
+      const maxIterations = Math.max(1, ciFastPath ? Math.min(options.maxIterations ?? 4, 1) : options.maxIterations ?? 4);
       const strategy = { ...DEFAULT_STRATEGY, ...(options.strategy ?? {}) };
       const escalation = normalizeEscalation(options.escalation);
       const budget = normalizeBudget(options.budget);
@@ -486,6 +506,7 @@ export async function runGrAgentLoop(
         const fidelity = resolveFidelity(iteration, bounds, {
           gr: options.gr,
           escalation,
+          ciFastPath,
         });
         const attemptStart = Date.now();
         recordState("initializing", iteration);
