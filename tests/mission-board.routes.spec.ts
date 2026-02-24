@@ -188,6 +188,7 @@ describe("mission board routes", () => {
       sessionState: "active",
       traceId: "trace-123",
       evidenceRefs: ["ctx:screen"],
+      ts: "2026-02-24T06:01:00.000Z",
     });
 
     expect(res.status).toBe(200);
@@ -196,7 +197,31 @@ describe("mission board routes", () => {
 
     const events = await request(app).get(`/api/mission-board/${missionId}/events`).query({ limit: 10 });
     expect(events.status).toBe(200);
-    expect((events.body.events as Array<{ text: string }>).some((event) => event.text.includes("context:tier1/active"))).toBe(true);
+    const contextEvent = (events.body.events as Array<{ text: string; traceId?: string; contextTier?: string; sessionState?: string }>).find((event) => event.text.includes("context:tier1/active"));
+    expect(contextEvent).toBeTruthy();
+    expect(contextEvent?.traceId).toBe("trace-123");
+    expect(contextEvent?.contextTier).toBe("tier1");
+    expect(contextEvent?.sessionState).toBe("active");
+  });
+
+
+  it("rejects tier1 active context event without deterministic ts", async () => {
+    const app = buildApp();
+    const missionId = uniqueMissionId();
+
+    const res = await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
+      eventType: "context_session_started",
+      classification: "info",
+      text: "Operator started explicit context session",
+      tier: "tier1",
+      sessionState: "active",
+      traceId: "trace-123",
+      evidenceRefs: ["ctx:screen"],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("mission_board_invalid_request");
+    expect(res.body.details?.reason).toBe("missing_tier1_ts");
   });
 
   it("returns deterministic invalid request envelope", async () => {
@@ -224,6 +249,7 @@ it("accepts timer_update with deterministic timer fields", async () => {
     text: "Ingress timer updated",
     tier: "tier1",
     sessionState: "active",
+    ts: "2026-02-24T06:00:10.000Z",
     timer: {
       timerId: "timer-1",
       timerKind: "countdown",

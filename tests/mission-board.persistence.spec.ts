@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const ORIGINAL_DB_URL = process.env.DATABASE_URL;
 const ORIGINAL_STORE = process.env.MISSION_BOARD_STORE;
 const ORIGINAL_USE_INMEM = process.env.USE_INMEM_MISSION_BOARD_STORE;
+const ORIGINAL_STRICT = process.env.MISSION_BOARD_STORE_STRICT;
 
 const missionId = "mission-persistence-1";
 
@@ -27,6 +28,7 @@ describe("mission board persistence", () => {
     process.env.DATABASE_URL = "pg-mem://mission-board-persistence";
     process.env.MISSION_BOARD_STORE = "db";
     delete process.env.USE_INMEM_MISSION_BOARD_STORE;
+    delete process.env.MISSION_BOARD_STORE_STRICT;
     vi.resetModules();
   });
 
@@ -34,6 +36,7 @@ describe("mission board persistence", () => {
     process.env.DATABASE_URL = ORIGINAL_DB_URL;
     process.env.MISSION_BOARD_STORE = ORIGINAL_STORE;
     process.env.USE_INMEM_MISSION_BOARD_STORE = ORIGINAL_USE_INMEM;
+    process.env.MISSION_BOARD_STORE_STRICT = ORIGINAL_STRICT;
     vi.resetModules();
     await resetDb();
   });
@@ -46,6 +49,18 @@ describe("mission board persistence", () => {
       type: "ESCALATE_TO_COMMAND",
       requestedAt: "2026-02-22T03:00:00.000Z",
     });
+
+    await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
+      eventId: "persist-context-1",
+      eventType: "context_session_started",
+      classification: "info",
+      text: "Context active",
+      ts: "2026-02-22T03:00:02.000Z",
+      tier: "tier1",
+      sessionState: "active",
+      traceId: "trace-persist-1",
+    });
+
     await request(app).post(`/api/mission-board/${missionId}/ack`).send({
       eventId: "persist-action-1",
       actorId: "operator-persist",
@@ -60,8 +75,9 @@ describe("mission board persistence", () => {
       mission_id: string;
       type: string;
       classification: string;
+      payload: { traceId?: string; contextTier?: string; sessionState?: string } | string;
     }>(
-      `SELECT id, mission_id, type, classification
+      `SELECT id, mission_id, type, classification, payload
        FROM mission_board_events
        WHERE mission_id = $1
        ORDER BY event_ts ASC, id ASC`,
@@ -70,10 +86,12 @@ describe("mission board persistence", () => {
 
     expect(rows.map((row) => row.id)).toEqual([
       "persist-action-1",
+      "persist-context-1",
       `ack:persist-action-1:${Date.parse("2026-02-22T03:00:05.000Z")}`,
+      `debrief:closure:persist-action-1:${Date.parse("2026-02-22T03:00:05.000Z")}`,
     ]);
-    expect(rows.map((row) => row.type)).toEqual(["action_required", "state_change"]);
-    expect(rows.map((row) => row.classification)).toEqual(["critical", "info"]);
+    expect(rows.map((row) => row.type)).toEqual(["action_required", "state_change", "state_change", "debrief"]);
+    expect(rows.map((row) => row.classification)).toEqual(["critical", "info", "info", "info"]);
     expect(new Set(rows.map((row) => row.mission_id))).toEqual(new Set([missionId]));
   });
 
@@ -110,4 +128,60 @@ describe("mission board persistence", () => {
       classification: "critical",
     });
   });
+
+  it("fails fast when strict persistence is enabled and db init fails", async () => {
+    process.env.DATABASE_URL = "postgres://base/invalid";
+    process.env.MISSION_BOARD_STORE = "db";
+    process.env.MISSION_BOARD_STORE_STRICT = "1";
+    vi.resetModules();
+    const app = await buildApp();
+
+    const res = await request(app).post(`/api/mission-board/${missionId}/actions`).send({
+      actionId: "strict-fail-action",
+      type: "ESCALATE_TO_COMMAND",
+      requestedAt: "2026-02-22T03:30:00.000Z",
+    });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe("mission_board_unavailable");
+  });
+
+  it("falls back to memory when strict persistence is disabled", async () => {
+    process.env.DATABASE_URL = "postgres://base/invalid";
+    process.env.MISSION_BOARD_STORE = "db";
+    delete process.env.MISSION_BOARD_STORE_STRICT;
+    vi.resetModules();
+    const app = await buildApp();
+
+    const res = await request(app).post(`/api/mission-board/${missionId}/actions`).send({
+      actionId: "fallback-action",
+      type: "ESCALATE_TO_COMMAND",
+      requestedAt: "2026-02-22T03:31:00.000Z",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.receipt.actionId).toBe("fallback-action");
+  });
+
+});
+
+
+it("persists context linkage metadata in db payload", async () => {
+  const app = await buildApp();
+  await request(app).post(`/api/mission-board/${missionId}/context-events`).send({
+    eventId: "persist-context-meta",
+    eventType: "context_session_started",
+    classification: "info",
+    text: "Context linked",
+    ts: "2026-02-22T03:20:00.000Z",
+    tier: "tier1",
+    sessionState: "active",
+    traceId: "trace-meta-1",
+  });
+  const events = await request(app).get(`/api/mission-board/${missionId}/events`).query({ limit: 20 });
+  expect(events.status).toBe(200);
+  const row = (events.body.events as Array<{ eventId: string; traceId?: string; contextTier?: string; sessionState?: string }>).find((e) => e.eventId === "persist-context-meta");
+  expect(row?.traceId).toBe("trace-meta-1");
+  expect(row?.contextTier).toBe("tier1");
+  expect(row?.sessionState).toBe("active");
 });

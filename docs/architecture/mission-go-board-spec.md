@@ -153,3 +153,16 @@ Mission Go Board event rendering SHOULD map event semantics to the v1 prompt-sty
 - include evidence anchors for repo-attributed mission state claims.
 
 This is additive and does not change existing board schema requirements.
+
+
+## Tier1 active context timestamp requirement
+
+`POST /api/mission-board/:missionId/context-events` now requires `ts` for Tier1 active context events (`tier=tier1` and `sessionState=active`). Missing timestamps return deterministic `mission_board_invalid_request` with reason `missing_tier1_ts`.
+
+## Replay linkage fields
+
+Mission-board events persist and return replay-linkage metadata: `traceId`, `contextTier`, and `sessionState`. These fields are preserved in list/read paths and database payloads.
+
+## Strict persistence mode
+
+Set `MISSION_BOARD_STORE_STRICT=1` to disable DB->memory fallback. In strict mode, initialization failures surface deterministic `mission_board_unavailable` errors instead of silent memory fallback.

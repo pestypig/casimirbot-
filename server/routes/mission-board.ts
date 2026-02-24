@@ -39,6 +39,9 @@ type MissionBoardEvent = {
   metrics?: {
     trigger_to_debrief_closed_ms?: number;
   };
+  traceId?: string;
+  contextTier?: "tier0" | "tier1";
+  sessionState?: "idle" | "requesting" | "active" | "stopping" | "error";
 };
 
 type MissionBoardSnapshot = {
@@ -179,6 +182,9 @@ const getMissionEvents = async (missionId: string): Promise<MissionBoardEvent[]>
       derivedFromEventId: event.derivedFromEventId,
       ackRefId: event.ackRefId,
       metrics: event.metrics,
+      traceId: event.traceId,
+      contextTier: event.contextTier,
+      sessionState: event.sessionState,
     });
   }
   return normalized.sort((a, b) => {
@@ -399,6 +405,14 @@ missionBoardRouter.post("/:missionId/context-events", async (req, res) => {
   }
 
   const payload = parsed.data;
+  if (payload.tier === "tier1" && payload.sessionState === "active" && !payload.ts) {
+    return errorEnvelope(res, 400, "mission_board_invalid_request", "Tier1 active context events require ts.", {
+      reason: "missing_tier1_ts",
+      tier: payload.tier,
+      sessionState: payload.sessionState,
+    });
+  }
+
   const normalized = normalizeMissionEvent({
     eventId: payload.eventId,
     missionId,
@@ -430,6 +444,9 @@ missionBoardRouter.post("/:missionId/context-events", async (req, res) => {
     timerStatus: payload.timer?.status,
     timerDueTs: payload.timer?.dueTs,
     derivedFromEventId: payload.timer?.derivedFromEventId,
+    traceId: payload.traceId,
+    contextTier: payload.tier,
+    sessionState: payload.sessionState,
   };
 
   try {

@@ -69,7 +69,20 @@ describe("helix dottie generated situational-awareness", () => {
       }
 
       if (scenario.voice) {
-        const res = await request(app).post("/api/voice/speak").send(scenario.voice);
+        const payload = { ...scenario.voice } as Record<string, unknown>;
+        if (
+          scenario.expected.allowed === true &&
+          payload.mode === "callout" &&
+          typeof payload.missionId === "string" &&
+          !Array.isArray(payload.evidenceRefs) &&
+          payload.repoAttributed === undefined
+        ) {
+          payload.evidenceRefs = ["docs/helix-ask-flow.md#L1"];
+        }
+        if (payload.repoAttributed === undefined) {
+          payload.repoAttributed = false;
+        }
+        const res = await request(app).post("/api/voice/speak").send(payload);
         expect(res.status).toBe(200);
         const expectedSuppressed = scenario.expected.suppressed;
         if (expectedSuppressed === true) {

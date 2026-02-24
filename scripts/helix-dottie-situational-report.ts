@@ -48,6 +48,16 @@ type ScenarioResult = {
   };
 };
 
+type CorrelationRow = {
+  missionId: string | null;
+  eventId: string | null;
+  traceId: string | null;
+  suppressionReason: string | null;
+  replayMeta: unknown;
+  ackRefId: string | null;
+  trigger_to_debrief_closed_ms: number | null;
+};
+
 type RunOutput = {
   generatedAt: string;
   fixturePath: string;
@@ -62,6 +72,7 @@ type RunOutput = {
     details: string;
   };
   results: ScenarioResult[];
+  correlation: CorrelationRow[];
   overallPass: boolean;
 };
 
@@ -187,6 +198,14 @@ const buildTranscriptMarkdown = (run: RunOutput): string => {
     );
   }
   lines.push("");
+  lines.push("## Policy-Trace Correlation");
+  lines.push("");
+  lines.push("| missionId | eventId | traceId | suppressionReason | replayMeta | ackRefId | trigger_to_debrief_closed_ms |");
+  lines.push("|---|---|---|---|---|---|---|");
+  for (const row of run.correlation) {
+    lines.push(`| ${markdownEscape(row.missionId ?? "")} | ${markdownEscape(row.eventId ?? "")} | ${markdownEscape(row.traceId ?? "")} | ${markdownEscape(row.suppressionReason ?? "")} | ${markdownEscape(JSON.stringify(row.replayMeta ?? null))} | ${markdownEscape(row.ackRefId ?? "")} | ${markdownEscape(row.trigger_to_debrief_closed_ms ?? "")} |`);
+  }
+  lines.push("");
   lines.push("## Replay Determinism Check");
   lines.push(
     `- ${run.replayConsistency.scenarioA} vs ${run.replayConsistency.scenarioB}: ${run.replayConsistency.pass ? "PASS" : "FAIL"} (${run.replayConsistency.details})`,
@@ -234,6 +253,8 @@ const buildDebugMarkdown = (run: RunOutput, jsonPath: string): string => {
     });
     lines.push("");
   }
+  lines.push("## Policy-Trace Correlation");
+  lines.push(jsonFence(run.correlation));
   lines.push("## Replay Determinism");
   lines.push(jsonFence(run.replayConsistency));
   return lines.join("\n");
@@ -256,6 +277,7 @@ const runScenarios = async (fixture: Fixture, fixturePath: string): Promise<RunO
   const generatedAt = new Date().toISOString();
   const results: ScenarioResult[] = [];
   const observed = new Map<string, string>();
+  const correlation: CorrelationRow[] = [];
 
   for (const scenario of fixture.scenarios) {
     const steps: ScenarioStep[] = [];
@@ -300,13 +322,17 @@ const runScenarios = async (fixture: Fixture, fixturePath: string): Promise<RunO
     }
 
     if (scenario.voice) {
-      const voiceRes = await request(app).post("/api/voice/speak").send(scenario.voice);
+      const voicePayload = { ...scenario.voice } as Record<string, unknown>;
+      if (voicePayload.repoAttributed === undefined) {
+        voicePayload.repoAttributed = false;
+      }
+      const voiceRes = await request(app).post("/api/voice/speak").send(voicePayload);
       voiceResponse = voiceRes.body as Record<string, unknown>;
       steps.push({
         name: "voice_speak",
         method: "POST",
         path: "/api/voice/speak",
-        request: scenario.voice,
+        request: voicePayload,
         status: voiceRes.status,
         response: voiceRes.body,
       });
@@ -401,6 +427,19 @@ const runScenarios = async (fixture: Fixture, fixturePath: string): Promise<RunO
     const actualSummary = summarizeActual({ voiceResponse, ackResponse });
     observed.set(scenario.id, actualSummary);
 
+    correlation.push({
+      missionId: scenario.contextEvent?.missionId ?? scenario.ack?.missionId ?? (typeof scenario.voice?.missionId === "string" ? scenario.voice.missionId : null),
+      eventId: scenario.contextEvent?.eventId ?? scenario.ack?.eventId ?? (typeof scenario.voice?.eventId === "string" ? scenario.voice.eventId : null),
+      traceId: typeof scenario.voice?.traceId === "string" ? scenario.voice.traceId : null,
+      suppressionReason: typeof voiceResponse?.reason === "string" ? String(voiceResponse.reason) : null,
+      replayMeta: voiceResponse?.replayMeta ?? null,
+      ackRefId: typeof (ackResponse?.receipt as { ackRefId?: string } | undefined)?.ackRefId === "string" ? (ackResponse?.receipt as { ackRefId?: string }).ackRefId ?? null : null,
+      trigger_to_debrief_closed_ms:
+        typeof (ackResponse?.metrics as { trigger_to_debrief_closed_ms?: number } | undefined)?.trigger_to_debrief_closed_ms === "number"
+          ? (ackResponse?.metrics as { trigger_to_debrief_closed_ms?: number }).trigger_to_debrief_closed_ms ?? null
+          : null,
+    });
+
     results.push({
       id: scenario.id,
       intent: scenario.intent,
@@ -459,6 +498,7 @@ const runScenarios = async (fixture: Fixture, fixturePath: string): Promise<RunO
         : `mismatch:${String(replayA)} vs ${String(replayB)}`,
     },
     results,
+    correlation,
     overallPass: failedScenarios === 0 && replayPass,
   };
 };
