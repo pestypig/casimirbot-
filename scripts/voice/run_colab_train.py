@@ -148,11 +148,12 @@ def main() -> int:
             _run("git_pull", ["git", "pull", "--rebase", "origin", "main"])
 
         report["first_failed_step"] = "read_head_commit"
-        cp = _run("read_head_commit", ["git", "rev-parse", "--short", "HEAD"])
+        cp = _run("read_head_commit", ["git", "rev-parse", "--short=8", "HEAD"])
         report["head_commit"] = cp.stdout.strip()
 
-        # GPU detection (non-fatal).
+        # GPU detection (GPU required by default for this experimental smoke lane).
         report["first_failed_step"] = "gpu_probe"
+        allow_cpu_smoke = os.environ.get("ALLOW_CPU_SMOKE", "0") == "1"
         if shutil.which("nvidia-smi") is None:
             report["gpu_available"] = False
         else:
@@ -164,6 +165,12 @@ def main() -> int:
                 check=False,
             )
             report["gpu_available"] = nvidia.returncode == 0
+
+        if not report["gpu_available"] and not allow_cpu_smoke:
+            report["objective_status"] = "failed"
+            report["root_cause"] = "gpu_required_for_colab_smoke_lane"
+            report["next_unblock_action"] = "attach a GPU runtime or set ALLOW_CPU_SMOKE=1 for explicit CPU override"
+            return 1
 
         # Audio preflight.
         report["first_failed_step"] = "audio_preflight"
@@ -200,32 +207,63 @@ def main() -> int:
             report["manifest_entry_count"] = len(manifest.get("entries", []))
 
         status = _load_json(STATUS_PATH)
-        completed_with_non_finite_loss = False
         if status is not None:
             report["training_status_json"] = json.dumps(status, ensure_ascii=False)
-            if isinstance(status, dict) and status.get("status") == "completed":
-                if "loss" in status and not _is_finite_number(status.get("loss")):
-                    completed_with_non_finite_loss = True
 
         report["checkpoint_exists"] = CKPT_PATH.exists()
         if CKPT_PATH.exists():
             report["checkpoint_size_bytes"] = CKPT_PATH.stat().st_size
             report["checkpoint_sha256"] = _sha256(CKPT_PATH)
 
-        if report["checkpoint_exists"]:
-            if completed_with_non_finite_loss:
-                report["objective_status"] = "blocked"
-                report["root_cause"] = "training completed with non_finite_loss"
-                report["next_unblock_action"] = "fix non-finite loss and rerun"
-            else:
-                report["objective_status"] = "completed"
-                report["first_failed_step"] = "none"
-                report["root_cause"] = "none"
-                report["next_unblock_action"] = "none"
+        # Candidate completion before strict gate validation.
+        report["objective_status"] = "completed"
+
+        # Deterministic strict acceptance gates (first failure wins).
+        gate_failures = [
+            (
+                report.get("objective_status") == "completed",
+                "objective_status_gate",
+                f"objective_status_must_be_completed: got={report.get('objective_status')}",
+                "ensure the wrapper reaches completion path before artifact validation",
+            ),
+            (
+                STATUS_PATH.exists(),
+                "train_status_exists_gate",
+                f"missing_train_status_json:{STATUS_PATH}",
+                "inspect bootstrap logs and ensure training emits train_status.json",
+            ),
+            (
+                isinstance(status, dict) and status.get("status") == "completed",
+                "train_status_completed_gate",
+                f"train_status_not_completed: got={status.get('status') if isinstance(status, dict) else type(status).__name__}",
+                "resolve training error and rerun",
+            ),
+            (
+                isinstance(status, dict) and "loss" in status and _is_finite_number(status.get("loss")),
+                "loss_finite_gate",
+                f"loss_missing_or_non_finite: loss={status.get('loss') if isinstance(status, dict) else 'N/A'}",
+                "keep non-finite loss hard-fail behavior and rerun after fix",
+            ),
+            (
+                CKPT_PATH.exists() and CKPT_PATH.stat().st_size > 0,
+                "checkpoint_nonempty_gate",
+                f"checkpoint_missing_or_empty:{CKPT_PATH}",
+                "ensure training writes a non-empty checkpoint",
+            ),
+        ]
+
+        for ok, step, cause, action in gate_failures:
+            if not ok:
+                report["objective_status"] = "failed"
+                report["first_failed_step"] = step
+                report["root_cause"] = cause
+                report["next_unblock_action"] = action
+                break
         else:
-            report["objective_status"] = "blocked"
-            report["root_cause"] = "training did not produce checkpoint"
-            report["next_unblock_action"] = "inspect train_status_json and bootstrap logs"
+            report["objective_status"] = "completed"
+            report["first_failed_step"] = "none"
+            report["root_cause"] = "none"
+            report["next_unblock_action"] = "none"
 
     except subprocess.CalledProcessError as exc:
         AUX_ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)

@@ -14,7 +14,7 @@ if [[ "${SYNC_MAIN}" == "1" ]]; then
   git reset --hard origin/main
 fi
 
-HEAD_SHA="$(git rev-parse --short HEAD)"
+HEAD_SHA="$(git rev-parse --short=8 HEAD)"
 echo "[colab-run] head=${HEAD_SHA}"
 if [[ -n "${EXPECTED_HEAD}" && "${HEAD_SHA}" != "${EXPECTED_HEAD}" ]]; then
   echo "[colab-run] unexpected head: got=${HEAD_SHA} expected=${EXPECTED_HEAD}" >&2

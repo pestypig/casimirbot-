@@ -1,6 +1,6 @@
 # Voice Train Colab Bootstrap (2026-02-23)
 
-> Status: **experimental lane** (best-effort). Use `tts_prod_train` for production-authoritative voice artifacts.
+> Status: **experimental smoke lane** (GPU-authoritative by default). Use `tts_prod_train` for production-authoritative voice artifacts.
 
 This runbook is the reproducible path for Python 3.12 Colab sessions where
 `xformers` wheels are unavailable.
@@ -22,7 +22,7 @@ This runbook is the reproducible path for Python 3.12 Colab sessions where
 
 ## Latest reproducible baseline (2026-02-23)
 
-- Repo head: `6442a579`
+- Repo head: `6442a579` (8-char short SHA)
 - Result: `objective_status: completed` on CPU Colab smoke lane
 - Final training status:
   - `status: completed`
@@ -41,14 +41,22 @@ cd /content
 rm -rf casimirbot-
 git clone https://github.com/pestypig/casimirbot-.git
 cd casimirbot-
-EXPECTED_HEAD=6442a579 bash scripts/voice/colab_run_once.sh
+EXPECTED_HEAD=6442a579 ALLOW_CPU_SMOKE=0 bash scripts/voice/colab_run_once.sh
 ```
 
 This avoids Python-in-bash quoting errors and enforces a fresh sync before
 running training.
 
-Note: if you compare short SHAs manually, use `git rev-parse --short=8 HEAD`.
-`git rev-parse --short HEAD` may emit 7 chars and cause false mismatches.
+### GPU default (authoritative) + CPU override
+
+- Default behavior requires GPU availability (`nvidia-smi` passes).
+- Without GPU, the wrapper fails deterministically in `=== COLAB TRAIN REPORT ===` with:
+  - `objective_status: failed`
+  - `first_failed_step: gpu_probe`
+  - `root_cause: gpu_required_for_colab_smoke_lane`
+- Explicit override for CPU smoke testing only: `ALLOW_CPU_SMOKE=1`.
+
+Note: scripts now use `git rev-parse --short=8 HEAD` to avoid 7-vs-8 mismatch false failures.
 
 ### Manual sequence
 
@@ -99,15 +107,21 @@ python scripts/voice/run_colab_train.py
 
 ## Reproducibility gates (must pass)
 
-- `=== COLAB TRAIN REPORT ===` exists and reports:
-  - `objective_status: completed`
-  - `first_failed_step: none`
-  - `root_cause: none`
-- `external/audiocraft/checkpoints/train_status.json` exists and reports:
-  - `status: completed`
-  - finite numeric `loss` (not `NaN`, not `Inf`)
-- `checkpoints/tts_voice_train_musicgen_small.pt` exists and is non-empty
-- If `status: completed` with non-finite loss, treat as failure/regression
+`run_colab_train.py` enforces strict deterministic gates (first failure wins):
+
+1. `objective_status == completed`
+2. `external/audiocraft/checkpoints/train_status.json` exists
+3. `train_status.status == completed`
+4. `train_status.loss` exists and is finite (`not NaN/Inf`)
+5. `checkpoints/tts_voice_train_musicgen_small.pt` exists and size `> 0`
+
+On first failing gate, report fields are set deterministically:
+- `objective_status: failed`
+- `first_failed_step: <gate_name>`
+- `root_cause: <stable_reason>`
+- `next_unblock_action: <deterministic_fix_hint>`
+
+The trainer-level non-finite loss hard-fail remains required and unchanged.
 
 
 ## Production boundary
