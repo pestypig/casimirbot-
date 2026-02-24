@@ -7,6 +7,7 @@ cd "${ROOT_DIR}"
 TRAIN_BACKEND="${TRAIN_BACKEND:-local_docker}"
 EXPECTED_HEAD="${EXPECTED_HEAD:-}"
 AUDIO_PATH="${AUDIO_PATH:-data/knowledge_audio_source/auntie_dottie.flac}"
+TRAIN_LANE="${TRAIN_LANE:-tts_prod_train}"
 
 head_sha="$(git rev-parse --short HEAD)"
 echo "[tts-prod] head=${head_sha}"
@@ -18,6 +19,14 @@ fi
 if [[ ! -f "${AUDIO_PATH}" ]]; then
   echo "[tts-prod][error] missing_audio_path path=${AUDIO_PATH}" >&2
   exit 1
+fi
+
+
+if [[ "${TRAIN_LANE}" == "tts_prod_train_nemo" ]]; then
+  TRAIN_STATUS_PATH="${TRAIN_STATUS_PATH:-artifacts/train_status.tts_prod_train_nemo.json}" \
+  TRAIN_JOB_TYPE="tts_prod_train_nemo" \
+  python scripts/voice/train_production_nemo.py
+  exit $?
 fi
 
 if [[ "${TRAIN_BACKEND}" == "managed_job" ]]; then

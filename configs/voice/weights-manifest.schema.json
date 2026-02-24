@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Voice Weights Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "model_id",
+    "source_url",
+    "code_license",
+    "weights_license",
+    "commercial_use_allowed",
+    "attribution_required",
+    "evidence_links",
+    "checksum",
+    "created_at"
+  ],
+  "properties": {
+    "model_id": { "type": "string", "minLength": 1 },
+    "source_url": { "type": "string", "minLength": 1 },
+    "code_license": { "type": "string", "minLength": 1 },
+    "weights_license": { "type": "string", "minLength": 1 },
+    "commercial_use_allowed": { "type": "boolean" },
+    "attribution_required": { "type": "boolean" },
+    "evidence_links": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "checksum": { "type": "string", "minLength": 8 },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

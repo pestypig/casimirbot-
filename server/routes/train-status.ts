@@ -12,7 +12,7 @@ const defaultPython = process.env.TRAIN_PYTHON ?? "python";
 const projectRoot = process.cwd();
 
 type JobState = "pending" | "running" | "done" | "error";
-type JobType = "dataset" | "train" | "tts_voice_train" | "tts_prod_train";
+type JobType = "dataset" | "train" | "tts_voice_train" | "tts_prod_train" | "tts_prod_train_nemo";
 
 type JobInfo = {
   id: string;
@@ -123,10 +123,18 @@ router.post("/api/train/start", (req, res) => {
   try {
     const jobId = randomUUID();
     const requestedType = (req.body?.jobType ?? "train").toString();
-    const type: JobType = requestedType === "tts_voice_train" ? "tts_voice_train" : requestedType === "tts_prod_train" ? "tts_prod_train" : "train";
+    const type: JobType = requestedType === "tts_voice_train"
+      ? "tts_voice_train"
+      : requestedType === "tts_prod_train"
+        ? "tts_prod_train"
+        : requestedType === "tts_prod_train_nemo"
+          ? "tts_prod_train_nemo"
+          : "train";
     const script = type === "tts_prod_train"
       ? path.resolve(projectRoot, "scripts", "voice", "train_production_tts.py")
-      : path.resolve(projectRoot, "external", "audiocraft", "scripts", "train_spectral_adapter.py");
+      : type === "tts_prod_train_nemo"
+        ? path.resolve(projectRoot, "scripts", "voice", "train_production_nemo.py")
+        : path.resolve(projectRoot, "external", "audiocraft", "scripts", "train_spectral_adapter.py");
     const job: JobInfo = {
       id: jobId,
       type,

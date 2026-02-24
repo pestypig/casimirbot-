@@ -43,3 +43,33 @@ Expected deterministic result:
 - Existing Audiocraft Colab scripts remain available but experimental.
 - `/api/train/start` accepts `tts_prod_train` without breaking `train` or `tts_voice_train`.
 - `/api/voice/speak` serving contract remains unchanged.
+
+## Stack and licensing policy lock (2026-02-24)
+
+- Primary production lane: `tts_prod_train_nemo` (NeMo-first).
+- Backup production lane: ESPnet2 fallback plan (only when NeMo path is blocked).
+- Audiocraft/MusicGen remains **experimental** and not a production promotion basis.
+- **NO-GO** when weights license is non-commercial or unclear, even if code license is permissive.
+- Treat code-license facts and weight-license facts as separate mandatory checks.
+
+## Operator command surface (Wave 1)
+
+### Production lane (NeMo-first scaffold)
+
+```bash
+python scripts/voice/verify_weights_manifest.py configs/voice/weights-manifest.example.json
+TRAIN_LANE=tts_prod_train_nemo bash scripts/voice/train_production_voice.sh
+```
+
+Expected production-lane deterministic behavior:
+- `PROGRESS`, `STATS`, and `ARTIFACT` lines are emitted
+- `artifacts/train_status.tts_prod_train_nemo.json` is always written
+- blocked runtime surfaces deterministic reason (`nemo_runtime_unavailable`)
+
+### Promotion checklist
+
+- [ ] Weights manifest validation passes (`status=ok`).
+- [ ] Weights license explicitly allows commercial use, or release is NO-GO.
+- [ ] Route/report surfaces preserve deterministic `PROGRESS/STATS/ARTIFACT`.
+- [ ] `train_status.json` exists for production job outcome capture.
+- [ ] Casimir verify verdict is PASS with certificate integrity true.
