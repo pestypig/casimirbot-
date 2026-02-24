@@ -21,7 +21,7 @@ bash scripts/voice/colab_run_prod_tts_once.sh
 ## Dry-run vs real-run
 
 - `PROD_TTS_DRY_RUN=1`: skips heavy NeMo training and emits deterministic status/eval/bundle artifacts for CI and contract checks.
-- `PROD_TTS_DRY_RUN=0`: fail-closed scaffold mode. If NeMo is unavailable, `root_cause=nemo_runtime_unavailable`; if NeMo is available, this scaffold still exits blocked with `root_cause=real_training_not_implemented` until full trainer wiring lands.
+- `PROD_TTS_DRY_RUN=0`: runs real spectral-adapter training over the manifest audio set and emits trained artifacts. The lane fails closed when runtime dependencies or valid audio samples are missing.
 
 ## Required env vars
 
@@ -36,6 +36,10 @@ bash scripts/voice/colab_run_prod_tts_once.sh
   - `PROD_TTS_BUNDLE_DIR`
   - `PROD_TTS_PIP_CORE_SPECS`
   - `PROD_TTS_PIP_TTS_SPECS`
+  - `PROD_TTS_PIP_OPTIONAL_SPECS`
+  - `PROD_TTS_OPTIONAL_STRICT`
+  - `PROD_TTS_SOURCE_DIR`
+  - `PROD_TTS_MAX_STEPS`
 
 ## Artifact layout
 
@@ -47,8 +51,9 @@ bash scripts/voice/colab_run_prod_tts_once.sh
 Manifest includes: bundle version, commit SHA, config/dataset hashes, selected weights + license references, and artifact checksums.
 
 Notes:
-- Missing config/dataset hashes now fail closed in bundle build.
-- If dataset manifest is absent in dry-run, a deterministic synthetic manifest is generated under `PROD_TTS_ARTIFACTS_DIR`.
+- Missing config/dataset hashes fail closed in bundle build.
+- If dataset manifest is absent, the lane auto-generates one from `PROD_TTS_SOURCE_DIR` (or a deterministic synthetic manifest in dry-run).
+- Optional NeMo installs are best-effort by default; set `PROD_TTS_OPTIONAL_STRICT=1` to enforce them.
 
 ## Promotion checklist
 

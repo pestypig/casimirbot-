@@ -68,8 +68,12 @@ describe("prod TTS lane", () => {
     const status = JSON.parse(readFileSync(statusPath, "utf-8"));
     expect(status.objective_status).toBe("ready_for_bundle");
     expect(status.status_json).toBe(statusPath);
-    expect(status.dataset_manifest).toContain("prod_tts_dataset_dry_run.jsonl");
+    expect(
+      String(status.dataset_manifest).includes("prod_tts_dataset_dry_run.jsonl")
+      || String(status.dataset_manifest).includes("prod_tts_dataset_auto.jsonl"),
+    ).toBe(true);
     expect(status.dataset_sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(status.metrics.final_loss).toBe(0);
 
     const manifestPath = join(bundleDir, "manifest.json");
     expect(existsSync(manifestPath)).toBe(true);
@@ -124,8 +128,12 @@ describe("prod TTS lane", () => {
     const status = JSON.parse(readFileSync(statusPath, "utf-8"));
     expect(status.status).toBe("blocked");
     expect([
-      "nemo_runtime_unavailable",
-      "real_training_not_implemented",
+      "dataset_no_valid_audio",
+      "non_finite_loss:step=0",
+      "runtime_dependency_missing:numpy,soundfile",
+      "runtime_dependency_missing:numpy,soundfile,torch",
+      "runtime_dependency_missing:soundfile",
+      "runtime_dependency_missing:torch",
     ]).toContain(String(status.root_cause));
   });
 
