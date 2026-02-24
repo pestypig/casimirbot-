@@ -110,7 +110,7 @@
     "warp:evidence:pack": "tsx scripts/warp-evidence-pack.ts",
     "voice:verify-weights-manifest": "python scripts/voice/verify_weights_manifest.py configs/voice/weights-manifest.example.json",
     "warp:full-solve:campaign": "tsx scripts/warp-full-solve-campaign-cli.ts",
-    "warp:publication:bundle": "tsx scripts/warp-publication-bundle.ts"
+    "warp:publication:bundle": "tsx scripts/warp-publication-bundle.ts",
     "validate:helix-dottie-docs-schema": "tsx scripts/validate-helix-dottie-docs-schema.ts"
   },
   "dependencies": {
