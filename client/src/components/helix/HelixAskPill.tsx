@@ -16,6 +16,7 @@ import {
   askMoodHint,
   getPendingHelixAskJob,
   resumeHelixAskJob,
+  speakVoice,
   subscribeToolLogs,
   type AtomicViewerLaunch,
   type PendingHelixAskJob,
@@ -40,6 +41,21 @@ import {
 } from "@/lib/mission-overwatch";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
+
+
+export type ReadAloudPlaybackState = "idle" | "requesting" | "playing" | "dry-run" | "error";
+
+export function transitionReadAloudState(
+  current: ReadAloudPlaybackState,
+  event: "request" | "audio" | "dry-run" | "error" | "stop" | "ended",
+): ReadAloudPlaybackState {
+  if (event === "request") return "requesting";
+  if (event === "audio") return "playing";
+  if (event === "dry-run") return "dry-run";
+  if (event === "error") return "error";
+  if (event === "stop" || event === "ended") return "idle";
+  return current;
+}
 
 type HelixAskReply = {
   id: string;
@@ -1202,6 +1218,10 @@ export function HelixAskPill({
   const [contextSessionState, setContextSessionState] = useState<
     "idle" | "requesting" | "active" | "stopping" | "error"
   >("idle");
+  const [readAloudByReply, setReadAloudByReply] = useState<Record<string, ReadAloudPlaybackState>>({});
+  const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackUrlRef = useRef<string | null>(null);
+  const playbackReplyIdRef = useRef<string | null>(null);
   const contextSessionStreamRef = useRef<MediaStream | null>(null);
   const contextSessionStartInFlightRef = useRef(false);
 
@@ -1646,6 +1666,83 @@ export function HelixAskPill({
     },
     [buildCopyText],
   );
+
+
+  const stopReadAloud = useCallback(() => {
+    const currentAudio = playbackAudioRef.current;
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.src = "";
+      playbackAudioRef.current = null;
+    }
+    if (playbackUrlRef.current) {
+      URL.revokeObjectURL(playbackUrlRef.current);
+      playbackUrlRef.current = null;
+    }
+    if (playbackReplyIdRef.current) {
+      const replyId = playbackReplyIdRef.current;
+      setReadAloudByReply((prev) => ({ ...prev, [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "stop") }));
+      playbackReplyIdRef.current = null;
+    }
+  }, []);
+
+  const handleReadAloud = useCallback(async (reply: HelixAskReply) => {
+    const text = buildCopyText(reply).trim();
+    if (!text) return;
+    stopReadAloud();
+    setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "request") }));
+    try {
+      const response = await speakVoice({
+        text,
+        mode: "briefing",
+        priority: "info",
+        traceId: askLiveTraceId ?? `ask:${crypto.randomUUID()}`,
+        missionId: contextId,
+        eventId: reply.id,
+        contextTier: missionContextControls.tier,
+        sessionState: contextSessionState,
+        voiceMode: missionContextControls.voiceMode,
+      });
+      if (response.kind === "json") {
+        const statusEvent = response.status >= 400 ? "error" : "dry-run";
+        setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", statusEvent) }));
+        return;
+      }
+      const audio = new Audio();
+      const url = URL.createObjectURL(response.blob);
+      playbackUrlRef.current = url;
+      playbackReplyIdRef.current = reply.id;
+      audio.src = url;
+      audio.onended = () => {
+        setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "ended") }));
+        if (playbackUrlRef.current) {
+          URL.revokeObjectURL(playbackUrlRef.current);
+          playbackUrlRef.current = null;
+        }
+        playbackAudioRef.current = null;
+        playbackReplyIdRef.current = null;
+      };
+      playbackAudioRef.current = audio;
+      setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "audio") }));
+      await audio.play();
+    } catch {
+      if (playbackAudioRef.current) {
+        playbackAudioRef.current.pause();
+        playbackAudioRef.current.src = "";
+        playbackAudioRef.current = null;
+      }
+      if (playbackUrlRef.current) {
+        URL.revokeObjectURL(playbackUrlRef.current);
+        playbackUrlRef.current = null;
+      }
+      playbackReplyIdRef.current = null;
+      setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "error") }));
+    }
+  }, [askLiveTraceId, buildCopyText, contextId, contextSessionState, missionContextControls.tier, missionContextControls.voiceMode, stopReadAloud]);
+
+  useEffect(() => () => {
+    stopReadAloud();
+  }, [stopReadAloud]);
 
   const handleOpenConversationPanel = useCallback(() => {
     const sessionId = getHelixAskSessionId();
@@ -2582,6 +2679,14 @@ export function HelixAskPill({
                     aria-label="Copy response"
                   >
                     Copy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleReadAloud(reply)}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-slate-400 transition hover:text-slate-200"
+                    aria-label="Read aloud"
+                  >
+                    Read aloud ({readAloudByReply[reply.id] ?? "idle"})
                   </button>
                   {onOpenConversation ? (
                     <button
