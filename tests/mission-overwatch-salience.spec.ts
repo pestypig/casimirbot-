@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createSalienceState, evaluateSalience } from "../server/services/mission-overwatch/salience";
 
+import { buildMicroDebrief } from "../server/services/mission-overwatch/micro-debrief";
+
 describe("mission overwatch salience", () => {
   it("emits first event and suppresses duplicate during cooldown", () => {
     const state = createSalienceState();
@@ -204,3 +206,28 @@ describe("mission overwatch salience", () => {
     }, state);
     expect(inactive.reason).toBe("context_ineligible");
   });
+
+
+describe("micro debrief closure", () => {
+  it("marks debrief closed when outcome is provided", () => {
+    const debrief = buildMicroDebrief({
+      missionId: "mission-z",
+      trigger: {
+        eventId: "evt-z",
+        missionId: "mission-z",
+        source: "telemetry",
+        eventType: "action_required",
+        classification: "action",
+        text: "Operator act",
+        ts: "2026-02-24T06:05:00.000Z",
+        evidenceRefs: [],
+      },
+      advice: "Proceed",
+      operatorAction: "ACK",
+      outcomeStatus: "resolved",
+      derivedFromEventIds: ["evt-z", "ack-z"],
+    });
+    expect(debrief.closureStatus).toBe("closed");
+    expect(debrief.derivedFromEventIds).toEqual(["evt-z", "ack-z"]);
+  });
+});

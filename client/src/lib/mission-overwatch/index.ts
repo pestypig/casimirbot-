@@ -14,6 +14,11 @@ export type MissionBoardEvent = {
   text: string;
   ts: string;
   evidenceRefs: string[];
+  timerId?: string;
+  timerKind?: "countdown" | "deadline";
+  timerStatus?: "scheduled" | "running" | "expired" | "cancelled" | "completed";
+  timerDueTs?: string;
+  derivedFromEventId?: string;
 };
 
 type MissionApiError = {
@@ -281,4 +286,13 @@ export function stopDesktopTier1ScreenSession(
     sessionState: "idle",
     ts: new Date().toISOString(),
   });
+}
+
+
+export function isTimerCalloutEligible(event: MissionBoardEvent, nowTs = Date.now()): boolean {
+  if (event.type !== "timer_update") return false;
+  if (!event.timerDueTs || !event.timerStatus) return false;
+  const dueMs = Date.parse(event.timerDueTs);
+  if (!Number.isFinite(dueMs)) return false;
+  return event.timerStatus === "running" && dueMs - nowTs <= 60_000;
 }

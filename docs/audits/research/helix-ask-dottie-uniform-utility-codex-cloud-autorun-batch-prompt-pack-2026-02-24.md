@@ -10,6 +10,11 @@ Derived from:
 - `docs/architecture/mission-go-board-spec.md`
 - `docs/architecture/helix-ask-mission-systems-integration-plan.md`
 
+## Autorun execution note
+
+- Execution ledger artifact: `reports/helix-ask-dottie-uniform-utility-ledger-2026-02-24.md`
+- Prompt completion must update ledger status, commit SHA, and Casimir certificate/integrity metadata.
+
 ## Baseline lock
 
 Use current main head at run time:

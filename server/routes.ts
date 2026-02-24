@@ -69,6 +69,30 @@ const headerValue = (value: string | string[] | undefined): string => {
   return value ?? "";
 };
 
+
+const AGI_ADMISSION_REASON = "agi_overload_admission_control";
+
+export const createAgiAdmissionControl = (maxInFlight: number) => {
+  let inFlight = 0;
+  return (req: Request, res: Response, next: () => void) => {
+    if (req.method === "OPTIONS" || req.method === "GET") {
+      return next();
+    }
+    if (inFlight >= maxInFlight) {
+      return res.status(429).json({
+        error: "agi_overloaded",
+        message: "AGI admission control is active. Retry shortly.",
+        reason: AGI_ADMISSION_REASON,
+        retryAfterMs: 250,
+      });
+    }
+    inFlight += 1;
+    res.on("finish", () => {
+      inFlight = Math.max(0, inFlight - 1);
+    });
+    return next();
+  };
+};
 const toPositiveInt = (value: string | undefined, fallback: number): number => {
   const parsed = Number(value);
   if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
@@ -141,6 +165,11 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       }),
     );
   }
+  const agiAdmissionMax = toPositiveInt(process.env.AGI_ADMISSION_MAX, 16);
+  if (agiAdmissionMax > 0) {
+    app.use("/api/agi", createAgiAdmissionControl(agiAdmissionMax));
+  }
+
   const askConcurrencyMax = toPositiveInt(process.env.HELIX_ASK_CONCURRENCY_MAX, 4);
   if (askConcurrencyMax > 0) {
     app.use(

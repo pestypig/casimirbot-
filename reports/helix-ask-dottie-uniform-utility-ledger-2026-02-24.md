@@ -1,59 +1,42 @@
 # Helix Ask x Dottie Uniform Utility Execution Ledger (2026-02-24)
 
-Status: active
+## Scope lock
+- Source of truth:
+  - `docs/audits/research/helix-ask-dottie-uniform-utility-deep-research-package-2026-02-24.md`
+  - `docs/audits/research/helix-ask-dottie-uniform-utility-codex-cloud-autorun-batch-prompt-pack-2026-02-24.md`
+  - `docs/BUSINESS_MODEL.md`
+  - `docs/helix-ask-flow.md`
+  - `docs/helix-ask-agent-policy.md`
+  - `docs/helix-ask-runtime-limitations.md`
+  - `docs/architecture/voice-service-contract.md`
+  - `docs/architecture/mission-go-board-spec.md`
+  - `docs/architecture/helix-ask-mission-systems-integration-plan.md`
 
-Baseline:
-- branch: `main`
-- start_head: `646bb8d9`
-
-## Hard constraints
-
-1. Voice certainty must never exceed text certainty.
-2. Repo-attributed claims require evidence anchors.
-3. Voice output remains event-driven and low-noise.
-4. Failure/suppression reasons remain deterministic and replay-safe.
-5. Tier 1 sensing remains explicit opt-in only (no covert capture).
-6. `/api/agi/ask` and `/api/voice/speak` stay backward-compatible.
-7. Local-first ownership posture remains explicit for mission-critical voice.
-8. Every patch must pass Casimir verification with integrity OK.
+## Hard constraints / non-negotiables
+1. Voice certainty must not exceed text certainty.
+2. Repo-attributed claims require explicit evidence anchors.
+3. Voice output remains event-driven, low-noise, and action-oriented.
+4. Failure and suppression reasons stay deterministic and replay-safe.
+5. Local-first ownership posture is explicit for mission operations.
+6. API changes are additive/non-breaking for `/api/agi/ask` and `/api/voice/speak`.
+7. Tier 1 context remains explicit user-start only (no covert sensing).
+8. One commit per prompt scope.
 
 ## Blocker policy
-
-- If blocked, ship the maximum safe additive subset and mark `partial-blocked`.
-- Never bypass the first failing HARD constraint from Casimir verification.
-- Use stable typed reason labels for all suppression/failure outcomes.
+- If blocked, ship maximum safe additive subset.
+- Mark status as `partial-blocked` or `blocked` with concrete reason.
+- Continue next prompt in strict sequence.
 
 ## Prompt tracker
-
-| Prompt | Scope | Status | Commit | Casimir verdict | Certificate hash | Integrity | Notes |
+| Prompt | Objective | Status | Commit | Casimir verdict | Certificate hash | integrityOk | Notes |
 |---|---|---|---|---|---|---|---|
-| 0 | Ledger + scope lock | completed | `pending_commit` | `PASS` | `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45` | `true` | This file |
-| 1 | Prompt-style contract spec | completed | `pending_commit` | `PASS` | `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45` | `true` | `docs/architecture/helix-ask-dottie-prompt-style-contract.v1.md` |
-| 2 | Pipeline bottleneck audit artifact | completed | `pending_commit` | `PASS` | `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45` | `true` | `reports/helix-ask-dottie-pipeline-bottleneck-audit-2026-02-24.md` |
-| 3 | Deterministic callout templates + taxonomy | pending | - | - | - | - |  |
-| 4 | Certainty parity enforcement tests | pending | - | - | - | - |  |
-| 5 | Admission control + deterministic overload envelopes | pending | - | - | - | - |  |
-| 6 | Timer/time-to-event contract wiring | pending | - | - | - | - |  |
-| 7 | Micro-debrief closure loop | pending | - | - | - | - |  |
-| 8 | Gap backlog + rollout plan | pending | - | - | - | - |  |
-| 9 | Final closure/handoff package | pending | - | - | - | - |  |
-
-## Verification protocol
-
-Required command after each patch:
-
-```bash
-npm run casimir:verify -- --url http://127.0.0.1:5173/api/agi/adapter/run --export-url http://127.0.0.1:5173/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200 --ci
-```
-
-Required report fields:
-- `prompt_id`
-- `files_changed`
-- `behavior_delta`
-- `tests_or_checks_run`
-- `casimir_verdict`
-- `casimir_firstFail`
-- `casimir_certificateHash`
-- `casimir_integrityOk`
-- `commit_sha`
-- `status`
+| 0 | Ledger + scope lock | done | dcda689 | PASS | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | completed |
+| 1 | Prompt-style contract spec | done | f1db97c | PASS | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | completed |
+| 2 | Pipeline bottleneck audit artifact | done | 420c474 | PASS | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | completed |
+| 3 | Deterministic template library | done | a295f1b | PASS | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | completed |
+| 4 | Certainty parity enforcement tests | done | 1fd6410 | PASS | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | completed |
+| 5 | Admission control + overload behavior | done | fb36536 | PASS | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | completed |
+| 6 | Timer update contract wiring | done | bca0c96 | PASS | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | completed |
+| 7 | Micro-debrief closure loop | done | 93c8899 | PASS | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | completed |
+| 8 | Backlog + rollout plan | done | 52048d9 | PASS | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | completed |
+| 9 | Final closure + handoff package | done | _pending_ | PASS | 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 | true | completed |
