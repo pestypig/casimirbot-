@@ -13,6 +13,7 @@ type ParsedArgs = {
   out: string;
   seed: number;
   ci: boolean;
+  ciFastPath: boolean;
   waveTimeoutMs: number;
   campaignTimeoutMs: number;
 };
@@ -353,6 +354,7 @@ export const parseArgs = (argv = process.argv.slice(2)): ParsedArgs => {
     out: read('--out', 'artifacts/research/full-solve')!,
     seed: parseSeedArg(read('--seed', '20260224')),
     ci: args.includes('--ci'),
+    ciFastPath: args.includes('--ci-fast-path'),
     waveTimeoutMs: parsePositiveIntArg(read('--wave-timeout-ms', '120000'), 'wave-timeout-ms'),
     campaignTimeoutMs: parsePositiveIntArg(read('--campaign-timeout-ms', '600000'), 'campaign-timeout-ms'),
   };
@@ -716,7 +718,16 @@ export const computeReproducibility = (runResults: GrAgentLoopResult[]): Evidenc
   };
 };
 
-const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, waveTimeoutMs: number, campaignElapsedMs: number, campaignTimeoutMs: number): Promise<EvidencePack> => {
+const runWave = async (
+  wave: Wave,
+  outDir: string,
+  seed: number,
+  ci: boolean,
+  ciFastPath: boolean,
+  waveTimeoutMs: number,
+  campaignElapsedMs: number,
+  campaignTimeoutMs: number,
+): Promise<EvidencePack> => {
   const commitSha = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
   const startIso = new Date().toISOString();
   const runId = `fs-${wave.toLowerCase()}-${seed}-${Date.now()}`;
@@ -747,7 +758,7 @@ const runWave = async (wave: Wave, outDir: string, seed: number, ci: boolean, wa
             wave,
             runIndex: runIndex + 1,
             baseDir: base,
-            ciFastPath: ci,
+            ciFastPath,
             options: {
               ...profile.options,
               budget: {
@@ -1072,7 +1083,7 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
       });
       break;
     }
-    await runWave(wave, args.out, args.seed, args.ci, args.waveTimeoutMs, campaignElapsedMs, args.campaignTimeoutMs);
+    await runWave(wave, args.out, args.seed, args.ci, args.ciFastPath, args.waveTimeoutMs, campaignElapsedMs, args.campaignTimeoutMs);
   }
   const allWaves: Wave[] = ['A', 'B', 'C', 'D'];
   const campaign = allWaves.every((w) => fs.existsSync(path.join(args.out, w, 'evidence-pack.json')))
@@ -1082,4 +1093,4 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
 };
 
 export const CAMPAIGN_USAGE =
-  'Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <integer>] [--wave-timeout-ms <ms>] [--campaign-timeout-ms <ms>] [--ci]';
+  'Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <integer>] [--wave-timeout-ms <ms>] [--campaign-timeout-ms <ms>] [--ci] [--ci-fast-path]';

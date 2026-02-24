@@ -129,6 +129,20 @@ describe('warp-full-solve-campaign runner', () => {
     expect(() => parseArgs(['--campaign-timeout-ms', '1.2'])).toThrow(/Invalid --campaign-timeout-ms value/);
   });
 
+  it('keeps CI fast-path opt-in and independent from --ci', () => {
+    const ciOnly = parseArgs(['--ci']);
+    expect(ciOnly.ci).toBe(true);
+    expect(ciOnly.ciFastPath).toBe(false);
+
+    const ciFast = parseArgs(['--ci', '--ci-fast-path']);
+    expect(ciFast.ci).toBe(true);
+    expect(ciFast.ciFastPath).toBe(true);
+
+    const localFast = parseArgs(['--ci-fast-path']);
+    expect(localFast.ci).toBe(false);
+    expect(localFast.ciFastPath).toBe(true);
+  });
+
   it('marks gates NOT_READY when required signals are missing', () => {
     const incompleteRuns = [{ attempts: [{ initial: {}, evaluation: { gate: {}, constraints: [] } }] }] as any;
     const gates = buildGateMap('A', incompleteRuns, [] as any);
