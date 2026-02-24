@@ -20,15 +20,21 @@ This runbook is the reproducible path for Python 3.12 Colab sessions where
   - sanitize non-finite logits (`nan_to_num`) and clamp CPU logits before CE
   - deterministic hard-fail on non-finite loss with status artifact emission
 
-## Latest reproducible baseline (2026-02-23)
+## Latest reproducible baseline (2026-02-24)
 
-- Repo head: `6442a579` (8-char short SHA)
-- Result: `objective_status: completed` on CPU Colab smoke lane
+- Repo head: `c3224a0a` (8-char short SHA)
+- Result: `objective_status: completed` on CPU Colab smoke lane (`ALLOW_CPU_SMOKE=1`)
 - Final training status:
   - `status: completed`
-  - `loss: 9.698966026306152` (finite)
+  - `loss: 9.503506660461426` (finite)
   - `checkpoint: checkpoints/tts_voice_train_musicgen_small.pt`
-  - `checkpoint_sha256: 64242758c67eff5e2c3a54f96a33ec5b08b182a98f5c2ab286c7aa3897ec8e86`
+  - `checkpoint_sha256: e0b6106b6772e5958c224c14029f53e51405280a6d7f40024691826e19091150`
+- Note: this baseline includes runtime compatibility fallback when `torchaudio.info` is unavailable.
+
+Previous baseline (2026-02-23):
+- Repo head: `6442a579`
+- `loss: 9.698966026306152`
+- `checkpoint_sha256: 64242758c67eff5e2c3a54f96a33ec5b08b182a98f5c2ab286c7aa3897ec8e86`
 
 Use this baseline for regression checks when the lane changes.
 
@@ -41,7 +47,7 @@ cd /content
 rm -rf casimirbot-
 git clone https://github.com/pestypig/casimirbot-.git
 cd casimirbot-
-EXPECTED_HEAD=6442a579 ALLOW_CPU_SMOKE=0 bash scripts/voice/colab_run_once.sh
+EXPECTED_HEAD=c3224a0a ALLOW_CPU_SMOKE=0 bash scripts/voice/colab_run_once.sh
 ```
 
 This avoids Python-in-bash quoting errors and enforces a fresh sync before
