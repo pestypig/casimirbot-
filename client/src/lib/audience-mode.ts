@@ -30,7 +30,7 @@ export function resolveMetricClaimLabel(args: {
   metricDerived?: boolean;
   sourceLabel?: string;
 }): string {
-  if (args.strictMode && args.metricDerived && args.metricContractOk === false) {
+  if (args.strictMode && args.metricDerived && args.metricContractOk !== true) {
     return args.mode === "public" ? "metric claim unavailable" : "metric claim unavailable (contract missing)";
   }
   return formatDerivationLabel(args);

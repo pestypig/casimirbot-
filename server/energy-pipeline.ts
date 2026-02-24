@@ -7214,6 +7214,8 @@ export function evaluateQiGuardrail(
   curvatureNote?: string;
   curvatureEnforced?: boolean;
   applicabilityStatus?: "PASS" | "FAIL" | "NOT_APPLICABLE" | "UNKNOWN";
+  strictMode?: boolean;
+  metricContractOk?: boolean;
   metricDerived?: boolean;
   metricDerivedSource?: string;
   metricDerivedReason?: string;
@@ -7352,6 +7354,43 @@ export function evaluateQiGuardrail(
       : timingMetricDerived
         ? "rho_source_non_metric"
         : `rho_source_non_metric;timing_non_metric;timing_reason=${timingMetricDerivedReason}`;
+  const strictMode = strictCongruenceEnabled();
+  const warpState = (state as any).warp as Record<string, unknown> | undefined;
+  const natarioState = (state as any).natario as Record<string, unknown> | undefined;
+  const metricContractStatus =
+    (warpState as any)?.metricT00Contract?.status ??
+    (warpState as any)?.metricT00ContractStatus ??
+    (natarioState as any)?.metricT00ContractStatus;
+  const metricChartContractStatus =
+    (warpState as any)?.metricAdapter?.chart?.contractStatus ??
+    (warpState as any)?.metricAdapter?.chart?.contract_status ??
+    (natarioState as any)?.chartContractStatus;
+  const metricChart =
+    (warpState as any)?.metricAdapter?.chart?.label ??
+    (natarioState as any)?.chartLabel;
+  const metricObserver =
+    (warpState as any)?.metricT00Contract?.observer ??
+    (warpState as any)?.metricT00Observer ??
+    (natarioState as any)?.metricT00Observer;
+  const metricNormalization =
+    (warpState as any)?.metricT00Contract?.normalization ??
+    (warpState as any)?.metricT00Normalization ??
+    (natarioState as any)?.metricT00Normalization;
+  const metricUnitSystem =
+    (warpState as any)?.metricT00Contract?.unitSystem ??
+    (warpState as any)?.metricT00UnitSystem ??
+    (natarioState as any)?.metricT00UnitSystem;
+  const metricContractOk =
+    metricContractStatus === "ok" &&
+    metricChartContractStatus === "ok" &&
+    typeof metricChart === "string" &&
+    metricChart.length > 0 &&
+    metricChart !== "unspecified" &&
+    typeof metricObserver === "string" &&
+    metricObserver.length > 0 &&
+    typeof metricNormalization === "string" &&
+    metricNormalization.length > 0 &&
+    metricUnitSystem === "SI";
 
   return {
     lhs_Jm3: lhs,
@@ -7379,6 +7418,8 @@ export function evaluateQiGuardrail(
     curvatureNote,
     curvatureEnforced,
     applicabilityStatus,
+    strictMode,
+    metricContractOk,
     metricDerived,
     metricDerivedSource,
     metricDerivedReason,

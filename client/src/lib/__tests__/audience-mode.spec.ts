@@ -42,6 +42,27 @@ describe("audience mode", () => {
     ).toBe("metric claim unavailable (contract missing)");
   });
 
+  it("fails closed for strict metric claims with unknown contract status", () => {
+    expect(
+      resolveMetricClaimLabel({
+        mode: "public",
+        strictMode: true,
+        metricDerived: true,
+        metricContractOk: undefined,
+        sourceLabel: "warp.metric.T00",
+      }),
+    ).toBe("metric claim unavailable");
+    expect(
+      resolveMetricClaimLabel({
+        mode: "academic",
+        strictMode: true,
+        metricDerived: true,
+        metricContractOk: undefined,
+        sourceLabel: "warp.metric.T00",
+      }),
+    ).toBe("metric claim unavailable (contract missing)");
+  });
+
   it("matches audience snapshots", () => {
     expect({
       public: formatDerivationLabel({ mode: "public", metricDerived: false, sourceLabel: "pipeline" }),

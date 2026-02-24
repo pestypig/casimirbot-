@@ -224,6 +224,8 @@ describe("pipeline ts/qi autoscale integration", () => {
     const snapshot = await calculateEnergyPipeline(initializePipelineState());
     const app = String((snapshot as any).qiGuardrail?.applicabilityStatus ?? "UNKNOWN");
     expect(["PASS", "NOT_APPLICABLE", "UNKNOWN"]).toContain(app);
+    expect((snapshot as any).qiGuardrail?.strictMode).toBe(true);
+    expect(typeof (snapshot as any).qiGuardrail?.metricContractOk).toBe("boolean");
     expect((snapshot as any).qi?.repayment_label).toBe("repayment_heuristic");
   });
 });

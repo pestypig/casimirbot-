@@ -7,8 +7,8 @@ const REQUIRED_DISCLAIMER =
 
 describe("warp evidence pack determinism", () => {
   it("produces deterministic bundle bytes for same inputs", () => {
-    execSync("npm run warp:evidence:pack -- --out artifacts/evidence-a.json --first-fail FordRomanQI --claim-tier reduced-order --proof-pack-ref api:/api/helix/pipeline/proofs --proof-pack-export artifacts/proof-pack.json --viability-status ADMISSIBLE", { stdio: "pipe" });
-    execSync("npm run warp:evidence:pack -- --out artifacts/evidence-b.json --first-fail FordRomanQI --claim-tier reduced-order --proof-pack-ref api:/api/helix/pipeline/proofs --proof-pack-export artifacts/proof-pack.json --viability-status ADMISSIBLE", { stdio: "pipe" });
+    execSync("npm run warp:evidence:pack -- --out artifacts/evidence-a.json --first-fail FordRomanQI --first-fail-severity HARD --claim-tier reduced-order --proof-pack-ref api:/api/helix/pipeline/proofs --proof-pack-export artifacts/proof-pack.json --viability-status ADMISSIBLE", { stdio: "pipe" });
+    execSync("npm run warp:evidence:pack -- --out artifacts/evidence-b.json --first-fail FordRomanQI --first-fail-severity HARD --claim-tier reduced-order --proof-pack-ref api:/api/helix/pipeline/proofs --proof-pack-export artifacts/proof-pack.json --viability-status ADMISSIBLE", { stdio: "pipe" });
     const a = fs.readFileSync("artifacts/evidence-a.json", "utf8");
     const b = fs.readFileSync("artifacts/evidence-b.json", "utf8");
     expect(a).toBe(b);
@@ -27,5 +27,17 @@ describe("warp evidence pack determinism", () => {
     expect(pack.claimTierSnapshot).toEqual({ claimTier: "diagnostic", posture: "governance-only" });
     expect(pack.requiredDisclaimer).toBe(REQUIRED_DISCLAIMER);
     expect(pack.checksum).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("defaults firstFail severity to unknown unless explicitly provided", () => {
+    execSync("npm run warp:evidence:pack -- --out artifacts/evidence-severity-default.json --first-fail FordRomanQI --claim-tier reduced-order", { stdio: "pipe" });
+    const pack = JSON.parse(fs.readFileSync("artifacts/evidence-severity-default.json", "utf8"));
+    expect(pack.firstFailReport).toEqual({ firstFail: "FordRomanQI", severity: "unknown" });
+  });
+
+  it("uses explicit firstFail severity when provided", () => {
+    execSync("npm run warp:evidence:pack -- --out artifacts/evidence-severity-explicit.json --first-fail FordRomanQI --first-fail-severity SOFT --claim-tier reduced-order", { stdio: "pipe" });
+    const pack = JSON.parse(fs.readFileSync("artifacts/evidence-severity-explicit.json", "utf8"));
+    expect(pack.firstFailReport).toEqual({ firstFail: "FordRomanQI", severity: "SOFT" });
   });
 });
