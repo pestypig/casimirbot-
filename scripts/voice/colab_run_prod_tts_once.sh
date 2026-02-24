@@ -39,6 +39,7 @@ run_step bootstrap bash scripts/voice/prod/bootstrap_colab_prod_tts.sh
 run_step train python scripts/voice/prod/train_nemo_tts.py
 run_step eval python scripts/voice/prod/eval_nemo_tts.py
 run_step bundle python scripts/voice/prod/build_voice_bundle.py
+run_step promote python scripts/voice/prod/promote_voice_bundle.py --input-manifest "${PROD_TTS_BUNDLE_DIR}/manifest.json" --output-root "${PROMOTED_BUNDLE_ROOT:-bundles}" --voice-profile-id "${VOICE_PROFILE_ID:-dottie_default}" --display-name "${VOICE_DISPLAY_NAME:-Dottie}"
 
 BUNDLE_MANIFEST="${PROD_TTS_BUNDLE_DIR}/manifest.json"
 BUNDLE_HASH="missing"
