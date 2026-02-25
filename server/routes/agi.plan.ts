@@ -19636,8 +19636,17 @@ const executeHelixAsk = async ({
         (repoExpectationLevel === "low" || repoExpectationLevel === "medium") &&
         HELIX_ASK_OPEN_WORLD_EXPLAIN_RE.test(baseQuestion) &&
         HELIX_ASK_OPEN_WORLD_DOMAIN_RE.test(baseQuestion);
+      const repoCodeClarifyBypass =
+        !isSecurityRiskPrompt(baseQuestion) &&
+        (explicitRepoExpectation ||
+          hasFilePathHints ||
+          /(^|[\s`"'(])(?:codebase|repo|module|route|handler|function|class|file|path)(?:[\s`"'.,:;!?)]|$)/i
+            .test(baseQuestion));
       const shouldApplyPreIntentClarify =
-        ambiguityResolution.shouldClarify && !warpEthosRelationQuery && !openWorldClarifyBypass;
+        ambiguityResolution.shouldClarify &&
+        !warpEthosRelationQuery &&
+        !openWorldClarifyBypass &&
+        !repoCodeClarifyBypass;
       if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
         debugPayload.ambiguity_resolver_applied = shouldApplyPreIntentClarify;
         debugPayload.ambiguity_resolver_reason = ambiguityResolution.reason;
@@ -19670,6 +19679,11 @@ const executeHelixAsk = async ({
         logEvent("Ambiguity resolver", "bypass_open_world", "low_repo_explainer");
         if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
           debugPayload.ambiguity_resolver_bypassed = "open_world_query";
+        }
+      } else if (ambiguityResolution.shouldClarify && repoCodeClarifyBypass) {
+        logEvent("Ambiguity resolver", "bypass_repo_code", "explicit_repo_or_code_query");
+        if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
+          debugPayload.ambiguity_resolver_bypassed = "repo_code_query";
         }
       } else if (ambiguityResolution.shouldClarify && warpEthosRelationQuery) {
         logEvent("Ambiguity resolver", "bypass_relation_query", "warp_ethos_relation");
@@ -25383,7 +25397,8 @@ const executeHelixAsk = async ({
         const hardForcedShortCircuit =
           forcedAnswerIsHard &&
           !hasClarifyOrFailClosedPath &&
-          (!forcedRule || hardForcedShortCircuitRules.has(forcedRule));
+          Boolean(forcedRule) &&
+          hardForcedShortCircuitRules.has(forcedRule);
         return hardForcedShortCircuit || (!prompt && !isIdeologyReferenceIntent);
       })();
     const forcedRule = answerPath.find((entry) => entry.startsWith("forcedAnswer:")) ?? null;
@@ -25398,7 +25413,8 @@ const executeHelixAsk = async ({
     const forcedAnswerShortCircuitEligible =
       forcedAnswerIsHard &&
       !hasClarifyOrFailClosedPath &&
-      (!forcedRule || hardForcedShortCircuitRules.has(forcedRule));
+      Boolean(forcedRule) &&
+      hardForcedShortCircuitRules.has(forcedRule);
     const shortCircuitReasonTokens: string[] = [];
     if (forcedAnswerIsHard) shortCircuitReasonTokens.push("forced_answer_hard");
     if (forcedAnswerIsHard && !forcedAnswerShortCircuitEligible) {

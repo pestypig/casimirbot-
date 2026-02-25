@@ -141,6 +141,36 @@ describe("Helix Ask llm debug skip metadata", () => {
     expect((payload.debug?.llm_calls ?? []).length).toBeGreaterThan(0);
   }, 45000);
 
+  it("keeps repo-api lookup prompts on invoke path when force-answer is unlabeled", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "How does llm.local.generate route to HTTP in this codebase?",
+        debug: true,
+        verbosity: "brief",
+        sessionId: "llm-repo-api-open-world",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      debug?: {
+        llm_invoke_attempted?: boolean;
+        llm_skip_reason?: string;
+        llm_skip_reason_detail?: string;
+        llm_backend_used?: string;
+        llm_provider_called?: boolean;
+        llm_calls?: Array<unknown>;
+      };
+    };
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_skip_reason).toBeUndefined();
+    expect(payload.debug?.llm_skip_reason_detail).toBeUndefined();
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect((payload.debug?.llm_calls ?? []).length).toBeGreaterThan(0);
+  }, 45000);
+
   it("allows debug forceLlmProbe to bypass short-circuit and record an LLM attempt", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",
