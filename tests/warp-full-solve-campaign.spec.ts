@@ -208,11 +208,15 @@ describe('warp-full-solve-campaign runner', () => {
   it('CLI completes within bounded time (no hang)', async () => {
     const cliPath = path.resolve('scripts/warp-full-solve-campaign-cli.ts');
     const tsxCli = path.resolve('node_modules/tsx/dist/cli.mjs');
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-wave-bounded-'));
+    const outDir = path.join(tempRoot, 'out');
     const { stdout } = await execFileAsync(process.execPath, [
       tsxCli,
       cliPath,
       '--wave',
       'A',
+      '--out',
+      outDir,
       '--ci',
       '--wave-timeout-ms',
       '4000',
