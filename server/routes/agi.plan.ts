@@ -28605,6 +28605,34 @@ const executeHelixAsk = async ({
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logDebug("executeHelixAsk ERROR", { message });
+    const buildRuntimeFallbackDebug = ({
+      fallbackReason,
+      finalText,
+      reportModeMismatch = false,
+      reportScaffoldGuardTriggered = false,
+    }: {
+      fallbackReason: string;
+      finalText: string;
+      reportModeMismatch?: boolean;
+      reportScaffoldGuardTriggered?: boolean;
+    }): Record<string, unknown> => {
+      const baseDebug =
+        debugPayload && typeof debugPayload === "object"
+          ? ({ ...(debugPayload as Record<string, unknown>) } as Record<string, unknown>)
+          : {};
+      return {
+        ...baseDebug,
+        fallback_reason: fallbackReason,
+        helix_ask_fail_reason: "GENERIC_COLLAPSE",
+        helix_ask_fail_class: "infra_fail",
+        report_mode_mismatch: reportModeMismatch,
+        report_scaffold_guard_triggered: reportScaffoldGuardTriggered,
+        answer_final_text: clipAskText(finalText, HELIX_ASK_ANSWER_PREVIEW_CHARS),
+        answer_after_fallback: clipAskText(finalText, HELIX_ASK_ANSWER_PREVIEW_CHARS),
+        placeholder_fallback_applied: false,
+        runtime_error: message,
+      };
+    };
     if (isFastModeRuntimeMissingSymbolError(error)) {
       const clarifyLine =
         "I hit an internal fast-mode runtime issue. Please retry once; if it persists, I can continue in deterministic clarify mode with one focused follow-up.";
@@ -28618,6 +28646,10 @@ const executeHelixAsk = async ({
         fallback: "fast_mode_runtime_missing",
         fail_reason: "GENERIC_COLLAPSE",
         fail_class: "infra_fail",
+        debug: buildRuntimeFallbackDebug({
+          fallbackReason: "fast_mode_runtime_missing_clarify",
+          finalText: fallbackText,
+        }),
       });
       return;
     }
@@ -28634,6 +28666,10 @@ const executeHelixAsk = async ({
         fallback: "helper_runtime_missing",
         fail_reason: "GENERIC_COLLAPSE",
         fail_class: "infra_fail",
+        debug: buildRuntimeFallbackDebug({
+          fallbackReason: "helper_runtime_missing_clarify",
+          finalText: fallbackText,
+        }),
       });
       return;
     }
@@ -28668,17 +28704,12 @@ const executeHelixAsk = async ({
       fallback: "runtime_deterministic",
       fail_reason: "GENERIC_COLLAPSE",
       fail_class: "infra_fail",
-      debug: {
-        fallback_reason: runtimeFallbackReason,
-        helix_ask_fail_reason: "GENERIC_COLLAPSE",
-        helix_ask_fail_class: "infra_fail",
-        report_mode_mismatch: nonReportGuard.mismatch,
-        report_scaffold_guard_triggered: nonReportGuard.hadScaffold,
-        answer_final_text: clipAskText(fallbackText, HELIX_ASK_ANSWER_PREVIEW_CHARS),
-        answer_after_fallback: clipAskText(fallbackText, HELIX_ASK_ANSWER_PREVIEW_CHARS),
-        placeholder_fallback_applied: false,
-        runtime_error: message,
-      },
+      debug: buildRuntimeFallbackDebug({
+        fallbackReason: runtimeFallbackReason,
+        finalText: fallbackText,
+        reportModeMismatch: nonReportGuard.mismatch,
+        reportScaffoldGuardTriggered: nonReportGuard.hadScaffold,
+      }),
     });
     return;
   } finally {
