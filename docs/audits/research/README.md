@@ -35,3 +35,4 @@ For reusable GPT Pro style standalone research prompts, use:
 ## Additional reference dossiers
 
 - `docs/audits/research/auntie-dot-halo-reach-capability-dossier-2026-02-25.md`
+- `docs/audits/research/helix-ask-dot-behavior-gap-closure-codex-cloud-autorun-batch-prompt-pack-2026-02-25.md`
