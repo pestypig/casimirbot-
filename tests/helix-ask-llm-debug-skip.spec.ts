@@ -79,6 +79,7 @@ describe("Helix Ask llm debug skip metadata", () => {
     });
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
+      text?: string;
       debug?: {
         llm_route_expected_backend?: string;
         llm_invoke_attempted?: boolean;
@@ -94,6 +95,7 @@ describe("Helix Ask llm debug skip metadata", () => {
         llm_force_probe_requested?: boolean;
         llm_force_probe_enabled?: boolean;
         llm_calls?: Array<unknown>;
+        answer_path?: string[];
       };
     };
     expect(payload.debug?.llm_route_expected_backend).toBe("http");
@@ -107,6 +109,10 @@ describe("Helix Ask llm debug skip metadata", () => {
     expect(payload.debug?.llm_force_probe_requested).toBe(false);
     expect(payload.debug?.llm_force_probe_enabled).toBe(false);
     expect((payload.debug?.llm_calls ?? []).length).toBe(0);
+    expect(payload.text ?? "").toMatch(/\b4\b/);
+    expect(payload.text ?? "").not.toMatch(/Evidence is limited in current retrieval/i);
+    expect((payload.debug?.answer_path ?? []).includes("answer:forced")).toBe(true);
+    expect((payload.debug?.answer_path ?? []).includes("fallback:RenderPlatonicFallback")).toBe(false);
   }, 45000);
 
   it("keeps conversational ideology prompts on invoke path without forced short-circuit", async () => {
@@ -155,6 +161,7 @@ describe("Helix Ask llm debug skip metadata", () => {
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
       debug?: {
+        intent_id?: string;
         llm_invoke_attempted?: boolean;
         llm_skip_reason?: string;
         llm_skip_reason_detail?: string;
@@ -163,6 +170,52 @@ describe("Helix Ask llm debug skip metadata", () => {
         llm_calls?: Array<unknown>;
       };
     };
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_skip_reason).toBeUndefined();
+    expect(payload.debug?.llm_skip_reason_detail).toBeUndefined();
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect((payload.debug?.llm_calls ?? []).length).toBeGreaterThan(0);
+    expect(
+      ["repo.repo_api_lookup", "hybrid.concept_plus_system_mapping"].includes(
+        String(payload.debug?.intent_id ?? ""),
+      ),
+    ).toBe(true);
+  }, 45000);
+
+  it("treats endpoint plus tool-id prompts as explicit repo lookup (not ideology open-world)", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "Summarize how /api/agi/ask routes through llm.local.generate.",
+        debug: true,
+        verbosity: "brief",
+        sessionId: "llm-endpoint-tool-repo-proof",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      debug?: {
+        intent_id?: string;
+        intent_reason?: string;
+        concept_source?: string;
+        concept_fast_path_blocked_reason?: string;
+        llm_invoke_attempted?: boolean;
+        llm_skip_reason?: string;
+        llm_skip_reason_detail?: string;
+        llm_backend_used?: string;
+        llm_provider_called?: boolean;
+        llm_calls?: Array<unknown>;
+      };
+    };
+    expect(
+      ["repo.repo_api_lookup", "hybrid.concept_plus_system_mapping"].includes(
+        String(payload.debug?.intent_id ?? ""),
+      ),
+    ).toBe(true);
+    expect(payload.debug?.intent_reason ?? "").not.toContain("ideology_open_world");
+    expect(payload.debug?.concept_source ?? "").not.toMatch(/docs\/(?:ethos|knowledge\/ethos)\//i);
     expect(payload.debug?.llm_invoke_attempted).toBe(true);
     expect(payload.debug?.llm_skip_reason).toBeUndefined();
     expect(payload.debug?.llm_skip_reason_detail).toBeUndefined();

@@ -12860,6 +12860,12 @@ const isSecurityRiskPrompt = (question: string): boolean =>
     question,
   );
 
+const isEthosDocPath = (value?: string): boolean =>
+  Boolean(
+    value &&
+      /(^|\/)docs\/(?:ethos\/|knowledge\/ethos\/)/i.test(value.replace(/\\/g, "/")),
+  );
+
 const classifyFallbackReason = (args: {
   fallbackReason?: string | null;
   failClosedReason?: string | null;
@@ -18408,6 +18414,7 @@ const executeHelixAsk = async ({
     );
     const ideologyCueDetected = HELIX_ASK_IDEOLOGY_QUERY_CUE_RE.test(initialReportQuestion);
     const isIdeologyConversationalCandidate =
+      !initialRepoCueDetected &&
       ideologyConversationalSeed &&
       (Boolean(ideologyConversationCandidate) || ideologyCueDetected);
     if (
@@ -19201,10 +19208,16 @@ const executeHelixAsk = async ({
       }
     }
     const hasFilePathHints = HELIX_ASK_FILE_HINT.test(baseQuestion);
+    const endpointHints = extractEndpointHints(baseQuestion);
+    const explicitRepoApiCue =
+      endpointHints.length > 0 ||
+      /\bllm\.[a-z0-9_.-]+\b/i.test(baseQuestion) ||
+      /\b(?:server|client|shared|docs|tests?)\/[a-z0-9_./-]+\b/i.test(baseQuestion);
     const explicitRepoExpectation =
       hasFilePathHints ||
       HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
-      HELIX_ASK_REPO_EXPECTS.test(baseQuestion);
+      HELIX_ASK_REPO_EXPECTS.test(baseQuestion) ||
+      explicitRepoApiCue;
     const warpEthosRelationQuery = warpEthosRelationReportQuery;
     if (warpEthosRelationQuery) {
       relationToolCapBonus = 1;
@@ -19735,6 +19748,53 @@ const executeHelixAsk = async ({
     }
     let isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
     const isIdeologyConversationalMode = isIdeologyReferenceIntent && ideologyConversationalMode;
+    const explicitRepoIdeologyMappingQuery =
+      explicitRepoExpectation &&
+      isIdeologyReferenceIntent &&
+      (hasFilePathHints ||
+        HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
+        /\b(map|mapping|which file|where in the code|file paths?|cite files?)\b/i.test(baseQuestion));
+    if (explicitRepoIdeologyMappingQuery) {
+      const explicitRepoProfile =
+        getHelixAskIntentProfileById("repo.repo_api_lookup") ?? resolveFallbackIntentProfile("hybrid");
+      intentProfile = explicitRepoProfile;
+      intentReasonBase = `${intentReasonBase}|ideology_repo_override:${explicitRepoProfile.id}`;
+      isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
+      logEvent(
+        "Fallback",
+        "ideology -> explicit_repo",
+        `profile=${explicitRepoProfile.id}`,
+      );
+      if (debugPayload) {
+        debugPayload.repo_expectation_level = "high";
+        if (!repoExpectationSignals.includes("ideology_repo_override")) {
+          repoExpectationSignals.push("ideology_repo_override");
+        }
+        debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
+      }
+    }
+    const explicitRepoApiLookupQuery =
+      explicitRepoApiCue &&
+      intentProfile.strategy !== "constraint_report" &&
+      intentProfile.id !== "repo.repo_api_lookup";
+    if (explicitRepoApiLookupQuery) {
+      const explicitRepoProfile =
+        getHelixAskIntentProfileById("repo.repo_api_lookup") ?? resolveFallbackIntentProfile("hybrid");
+      intentProfile = explicitRepoProfile;
+      intentReasonBase = `${intentReasonBase}|repo_api_override:${explicitRepoProfile.id}`;
+      isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
+      requiresRepoEvidence = true;
+      hasRepoHints = true;
+      repoExpectationLevel = "high";
+      if (!repoExpectationSignals.includes("repo_api_override")) {
+        repoExpectationSignals.push("repo_api_override");
+      }
+      logEvent("Fallback", "explicit_repo_api_cue", `profile=${explicitRepoProfile.id}`);
+      if (debugPayload) {
+        debugPayload.repo_expectation_level = repoExpectationLevel;
+        debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
+      }
+    }
     const ideologyConversationalOpenWorldMode =
       ideologyConversationalMode &&
       !explicitRepoExpectation &&
@@ -19916,6 +19976,14 @@ const executeHelixAsk = async ({
       updateIntentDebug();
     };
     applyIntentProfile(intentProfile);
+    const isRelationIntentRequested = (): boolean => {
+      if (isWarpEthosRelationQuestion(baseQuestion)) return true;
+      if (intentProfile.id === "hybrid.warp_ethos_relation") return true;
+      // Generic relation verbs like "map/connect" should not force relation mode
+      // for explicit repo/file-path questions.
+      if (!explicitRepoExpectation && HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion)) return true;
+      return false;
+    };
     if (isIdeologyReferenceIntent && isIdeologyConversationalMode) {
       formatSpec = { ...formatSpec, format: "brief", stageTags: false };
     }
@@ -19963,6 +20031,27 @@ const executeHelixAsk = async ({
         contextFiles = Array.from(merged);
       }
     }
+    const hasRepoCodeEvidencePaths = (paths: string[]): boolean =>
+      paths.some((entry) => {
+        const normalized = String(entry ?? "")
+          .replace(/\\/g, "/")
+          .trim()
+          .toLowerCase();
+        if (!normalized) return false;
+        if (/^(server|client|shared|modules|packages|tests?)\//.test(normalized)) return true;
+        if (!/^docs\//.test(normalized) && /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|swift|cpp|c|h|json|ya?ml)$/i.test(normalized)) {
+          return true;
+        }
+        return false;
+      });
+    const shouldPromoteRepoFromEvidence = (paths: string[]): boolean => {
+      if (intentStrategy === "constraint_report") return false;
+      if (ideologyConversationalOpenWorldMode && !explicitRepoExpectation) return false;
+      if (explicitRepoExpectation || hasFilePathHints || endpointHints.length > 0) return true;
+      if (intentDomain === "repo" || intentDomain === "hybrid") return true;
+      if (repoExpectationLevel === "high") return true;
+      return hasRepoCodeEvidencePaths(paths);
+    };
     let isRepoQuestion =
       intentProfile.evidencePolicy.allowRepoCitations &&
       (intentDomain === "repo" || intentDomain === "hybrid");
@@ -19972,7 +20061,7 @@ const executeHelixAsk = async ({
     if (blockScoped && intentStrategy !== "constraint_report") {
       isRepoQuestion = true;
     }
-    if (!isRepoQuestion && contextFiles.length > 0 && intentStrategy !== "constraint_report") {
+    if (!isRepoQuestion && shouldPromoteRepoFromEvidence(contextFiles)) {
       isRepoQuestion = true;
     }
     if (debugPayload) {
@@ -20194,6 +20283,27 @@ const executeHelixAsk = async ({
           debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
         }
       }
+    }
+    if (conceptMatch && explicitRepoApiCue) {
+      const suppressedConceptPath = `concept:${conceptMatch.card.id}`;
+      answerPath.push(
+        isEthosDocPath(conceptMatch.card.sourcePath)
+          ? "concept:repo_api_cue_ethos_suppressed"
+          : "concept:repo_api_cue_concept_suppressed",
+      );
+      for (let index = answerPath.length - 1; index >= 0; index -= 1) {
+        if (answerPath[index] === suppressedConceptPath) {
+          answerPath.splice(index, 1);
+        }
+      }
+      if (debugPayload) {
+        debugPayload.concept_id = undefined;
+        debugPayload.concept_label = undefined;
+        debugPayload.concept_source = undefined;
+        debugPayload.concept_fast_path_blocked_reason = "repo_api_cue";
+        debugPayload.concept_fast_path_removed = true;
+      }
+      conceptMatch = null;
     }
     if (
       strictConceptProvenance &&
@@ -20668,7 +20778,7 @@ const executeHelixAsk = async ({
     if (preflightEnabled) {
       const preflightSearchSeed = parsed.data.searchQuery?.trim() || baseQuestion;
       const preflightBaseQueries = buildHelixAskSearchQueries(preflightSearchSeed, topicTags);
-      if (!blockScoped && conceptMatch?.card.sourcePath) {
+      if (!blockScoped && conceptMatch?.card.sourcePath && !explicitRepoApiCue) {
         preflightBaseQueries.push(conceptMatch.card.sourcePath);
       }
       const preflightHeadingSeeds = buildDocHeadingSeedSlots(baseQuestion);
@@ -20816,12 +20926,16 @@ const executeHelixAsk = async ({
             (preflightFiles.length >= HELIX_ASK_PREFLIGHT_MIN_FILES &&
               preflightDocShare >= HELIX_ASK_PREFLIGHT_DOC_SHARE);
           const retrievalUpgradeEligible =
+            !ideologyConversationalOpenWorldMode &&
             intentDomain === "general" &&
             preflightSignalsOk &&
-            (repoExpectationLevel !== "low" ||
-              tagSignals.length > 0 ||
-              Boolean(graphPack?.frameworks.length) ||
-              Boolean(conceptMatch));
+            (
+              explicitRepoExpectation ||
+              hasFilePathHints ||
+              endpointHints.length > 0 ||
+              repoExpectationLevel === "high" ||
+              hasRepoCodeEvidencePaths(preflightFiles)
+            );
           if (retrievalUpgradeEligible) {
             const fallbackProfile = resolveFallbackIntentProfile("hybrid");
             applyIntentProfile(fallbackProfile, "retrieval_preflight");
@@ -20839,7 +20953,7 @@ const executeHelixAsk = async ({
               preflightStart,
             );
           }
-          if (!isRepoQuestion && preflightSignalsOk && intentStrategy !== "constraint_report") {
+          if (!isRepoQuestion && preflightSignalsOk && shouldPromoteRepoFromEvidence(preflightFiles)) {
             isRepoQuestion = true;
           }
           if (debugPayload) {
@@ -23643,8 +23757,10 @@ const executeHelixAsk = async ({
         });
         const rawArbiterMode = arbiterDecision.mode;
         const isIdeologyIntent = intentProfile.id === "repo.ideology_reference";
+        const isExplicitRepoApiIntent =
+          explicitRepoApiCue && intentProfile.id === "repo.repo_api_lookup";
         const arbiterMode =
-          isIdeologyIntent && rawArbiterMode !== "repo_grounded"
+          (isIdeologyIntent || isExplicitRepoApiIntent) && rawArbiterMode !== "repo_grounded"
             ? "repo_grounded"
             : rawArbiterMode;
         const arbiterReason = arbiterDecision.reason;
@@ -23663,7 +23779,12 @@ const executeHelixAsk = async ({
           "Arbiter",
           arbiterMode,
           [
-            isIdeologyIntent && rawArbiterMode !== "repo_grounded" ? "forced=repo_grounded" : "",
+            isIdeologyIntent && rawArbiterMode !== "repo_grounded"
+              ? "forced=repo_grounded:ideology"
+              : "",
+            isExplicitRepoApiIntent && rawArbiterMode !== "repo_grounded"
+              ? "forced=repo_grounded:repo_api"
+              : "",
             `reason=${arbiterReason}`,
             `expectation=${repoExpectationLevel}`,
             `score=${repoExpectationScore}`,
@@ -24702,13 +24823,19 @@ const executeHelixAsk = async ({
         }
       }
 
-      const ambiguityTerms = HELIX_ASK_AMBIGUITY_GATE
+      let ambiguityTerms = HELIX_ASK_AMBIGUITY_GATE
         ? extractAmbiguousTerms(
             baseQuestion,
             [contextText, promptContextText].filter(Boolean).join("\n"),
             conceptMatch,
           )
         : [];
+      if (ideologyConversationalOpenWorldMode && ambiguityTerms.length > 0) {
+        ambiguityTerms = [];
+        if (debugPayload) {
+          debugPayload.ambiguity_resolver_bypassed = "ideology_open_world_mode";
+        }
+      }
       if (debugPayload && ambiguityTerms.length > 0) {
         debugPayload.ambiguity_terms = ambiguityTerms.slice();
       }
@@ -24718,10 +24845,7 @@ const executeHelixAsk = async ({
           debugPayload.ambiguity_gate_applied = true;
         }
       }
-      const relationQuery =
-        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
-        isWarpEthosRelationQuestion(baseQuestion) ||
-        intentProfile.id === "hybrid.warp_ethos_relation";
+      const relationQuery = isRelationIntentRequested();
       const relationTopology = resolveRelationTopologySignal({
         question: baseQuestion,
         relationIntent: relationQuery,
@@ -24840,11 +24964,16 @@ const executeHelixAsk = async ({
         relationQuery &&
         ((coverageSlotSummary?.coveredSlots.length ?? 0) < 2 &&
           (docSlotSummary?.coveredSlots.length ?? 0) < 2);
+      const preferLlmFirstForExplicitRepoMapping =
+        explicitRepoExpectation &&
+        !relationQuery &&
+        intentStrategy !== "constraint_report";
       if (!forcedAnswer && relationAnchorsRequired && relationAnchorMissing) {
         forcedAnswer = `Relation topology is missing anchors: ${relationTopology.missingAnchors.join(", ")}. Please provide files from both warp and mission-ethos domains.`;
         forcedAnswerIsHard = true;
       }
       const shouldClarifyNow =
+        !preferLlmFirstForExplicitRepoMapping &&
         !promptIngested &&
         (intentDomain === "repo" || intentDomain === "hybrid") &&
         requiresRepoEvidence &&
@@ -24898,8 +25027,17 @@ const executeHelixAsk = async ({
         agentStopReason = "user_clarify_required";
         updateAgentDebug();
         recordControllerStop(agentStopReason, "ambiguity_gate");
+      } else if (preferLlmFirstForExplicitRepoMapping && debugPayload) {
+        (debugPayload as Record<string, unknown>).clarify_gate_bypassed_reason =
+          "explicit_repo_mapping_prefers_llm";
       }
-      if (failClosedRepoEvidence && !forcedAnswer && intentStrategy !== "constraint_report" && !skipIdeologyClarify) {
+      if (
+        failClosedRepoEvidence &&
+        !preferLlmFirstForExplicitRepoMapping &&
+        !forcedAnswer &&
+        intentStrategy !== "constraint_report" &&
+        !skipIdeologyClarify
+      ) {
           const planClarify = sanitizePlanClarifyLine(clarifyOverride ?? planDirectives?.clarifyQuestion ?? "");
           const missingSlots =
             docSlotSummary?.missingSlots?.length
@@ -25307,11 +25445,7 @@ const executeHelixAsk = async ({
       let next = stripRunawayAnswerArtifacts(
         stripTruncationMarkers(stripInlineJsonArtifacts(String(inputText ?? "").trim())),
       );
-      const relationQuery =
-        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
-        isWarpEthosRelationQuestion(baseQuestion) ||
-        warpEthosRelationQuery ||
-        intentProfile.id === "hybrid.warp_ethos_relation";
+      const relationQuery = isRelationIntentRequested() || warpEthosRelationQuery;
       const qualityFloorEligible =
         HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
         intentDomain === "repo" ||
@@ -27011,7 +27145,19 @@ const executeHelixAsk = async ({
           logEvent("Citation missing", "fallback", formatFileList(repoEvidencePaths));
         }
       }
+      const llmHttpStatusRaw = debugPayload
+        ? Number((debugPayload as Record<string, unknown>).llm_http_status ?? 0)
+        : 0;
+      const llmProviderCalled =
+        debugPayload && (debugPayload as Record<string, unknown>).llm_provider_called === true;
+      const llmHttpSuccess =
+        Boolean(llmProviderCalled) &&
+        Number.isFinite(llmHttpStatusRaw) &&
+        llmHttpStatusRaw >= 200 &&
+        llmHttpStatusRaw < 300;
+      const endpointGuardWarnOnly = explicitRepoApiCue && llmHttpSuccess;
       let endpointGuardApplied = false;
+      let endpointGuardWarned = false;
       let endpointGuardMessage: string | null = null;
       if (
         HELIX_ASK_ENDPOINT_GUARD &&
@@ -27025,24 +27171,40 @@ const executeHelixAsk = async ({
           const anchorSet = new Set(anchorPaths.map((entry) => entry.toLowerCase()));
           const hasAnchorCitation = Array.from(anchorSet).some((entry) => answerPathSet.has(entry));
           if (anchorPaths.length === 0) {
-            endpointGuardMessage =
-              "Repo evidence did not include the endpoint path requested. Please point to the relevant files or paste the route snippet.";
-            cleaned = endpointGuardMessage;
-            endpointGuardApplied = true;
-            logProgress("Endpoint anchor", "missing");
-            logEvent("Endpoint anchor", "missing", endpointHints.join(", "));
+            if (endpointGuardWarnOnly) {
+              endpointGuardWarned = true;
+              answerPath.push("endpointGuard:warn_missing_anchor");
+              logProgress("Endpoint anchor", "warn_missing");
+              logEvent("Endpoint anchor", "warn_missing", endpointHints.join(", "));
+            } else {
+              endpointGuardMessage =
+                "Repo evidence did not include the endpoint path requested. Please point to the relevant files or paste the route snippet.";
+              cleaned = endpointGuardMessage;
+              endpointGuardApplied = true;
+              logProgress("Endpoint anchor", "missing");
+              logEvent("Endpoint anchor", "missing", endpointHints.join(", "));
+            }
           } else if (!hasAnchorCitation) {
-            endpointGuardMessage =
-              "Repo evidence referenced the requested endpoint but the answer did not cite those files. Please point to the relevant files or narrow the request.";
-            cleaned = endpointGuardMessage;
-            endpointGuardApplied = true;
-            logProgress("Endpoint anchor", "mismatch");
-            logEvent("Endpoint anchor", "mismatch", formatFileList(anchorPaths));
+            if (endpointGuardWarnOnly) {
+              endpointGuardWarned = true;
+              answerPath.push("endpointGuard:warn_mismatch_anchor");
+              logProgress("Endpoint anchor", "warn_mismatch");
+              logEvent("Endpoint anchor", "warn_mismatch", formatFileList(anchorPaths));
+            } else {
+              endpointGuardMessage =
+                "Repo evidence referenced the requested endpoint but the answer did not cite those files. Please point to the relevant files or narrow the request.";
+              cleaned = endpointGuardMessage;
+              endpointGuardApplied = true;
+              logProgress("Endpoint anchor", "mismatch");
+              logEvent("Endpoint anchor", "mismatch", formatFileList(anchorPaths));
+            }
           }
           if (debugPayload) {
             debugPayload.endpoint_hints = endpointHints;
             debugPayload.endpoint_anchor_paths = anchorPaths;
             debugPayload.endpoint_anchor_violation = anchorPaths.length === 0 || !hasAnchorCitation;
+            debugPayload.endpoint_anchor_guard_mode = endpointGuardWarnOnly ? "warn_only" : "enforce";
+            debugPayload.endpoint_anchor_warning = endpointGuardWarned;
           }
         }
       }
@@ -27932,10 +28094,7 @@ const executeHelixAsk = async ({
       let selectedMove: "direct_answer" | "retrieve_more" | "relation_build" | "clarify" | "fail_closed" =
         "fail_closed";
       const securityRiskPrompt = isSecurityRiskPrompt(baseQuestion);
-      const relationIntentActive =
-        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
-        isWarpEthosRelationQuestion(baseQuestion) ||
-        intentProfile.id === "hybrid.warp_ethos_relation";
+      const relationIntentActive = isRelationIntentRequested();
       const groundednessScore = evidenceGateOk ? 1 : 0.35;
       const uncertaintyScore = Math.min(
         1,
@@ -28093,17 +28252,29 @@ const executeHelixAsk = async ({
         }
       }
 
+      const forcedAnswerPinned =
+        forcedAnswerShortCircuitEligible &&
+        answerPath.includes("answer:forced");
       const runtimeFallbackPinned =
+        forcedAnswerPinned ||
         answerPath.includes("answer:fallback_runtime_repo") ||
         Boolean(debugPayload?.answer_runtime_fallback);
       if (debugPayload) {
         debugPayload.answer_runtime_fallback_pinned = runtimeFallbackPinned;
       }
       if (runtimeFallbackPinned) {
-        answerPath.push("fallback:runtime_repo_preserve");
+        answerPath.push(forcedAnswerPinned ? "fallback:forced_answer_preserve" : "fallback:runtime_repo_preserve");
       }
+      const providerHttpSuccess =
+        debugPayload?.llm_invoke_attempted === true &&
+        debugPayload?.llm_backend_used === "http" &&
+        debugPayload?.llm_provider_called === true &&
+        debugPayload?.llm_http_status === 200 &&
+        !debugPayload?.llm_error_code;
+      const hasConcreteAnswerText = typeof cleaned === "string" && cleaned.trim().length > 0;
       const weakEvidenceForDeterministicFallback =
         !runtimeFallbackPinned &&
+        !(providerHttpSuccess && hasConcreteAnswerText) &&
         (
           !evidenceGateOk ||
           claimGateFailed ||
@@ -28211,16 +28382,20 @@ const executeHelixAsk = async ({
           }
         }
       }
-      const relationQueryForFinalize =
-        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
-        isWarpEthosRelationQuestion(baseQuestion) ||
-        intentProfile.id === "hybrid.warp_ethos_relation";
+      const relationQueryForFinalize = isRelationIntentRequested();
       const openWorldExplainer =
         isOpenWorldExplainerQuestion(baseQuestion) &&
         intentDomain !== "repo" &&
         intentProfile.id !== "repo.warp_definition_docs_first";
+      const openWorldProviderQualityFloorBypass =
+        llmHttpSuccess &&
+        openWorldExplainer &&
+        intentDomain === "general" &&
+        !explicitRepoExpectation &&
+        !relationQueryForFinalize;
       const qualityFloorEligible =
         !runtimeFallbackPinned &&
+        !openWorldProviderQualityFloorBypass &&
         (
           HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
           intentDomain === "repo" ||
@@ -28242,6 +28417,10 @@ const executeHelixAsk = async ({
       if (debugPayload) {
         (debugPayload as Record<string, unknown>).runtime_clock_a = clockASnapshot;
         (debugPayload as Record<string, unknown>).runtime_clock_b = clockBSnapshot;
+        if (openWorldProviderQualityFloorBypass) {
+          debugPayload.answer_quality_floor_bypassed = true;
+          debugPayload.answer_quality_floor_bypass_reason = "open_world_provider_success";
+        }
       }
       const qualityFloorReasons = qualityFloorEligible
         ? detectRepoAnswerQualityFloorReasons({

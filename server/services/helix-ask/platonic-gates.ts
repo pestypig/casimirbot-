@@ -1152,6 +1152,15 @@ export function evaluateCoverageSlots(args: {
 function computeCoverageSummary(input: HelixAskPlatonicInput): HelixAskCoverageSummary {
   const questionTokens = filterSignalTokens(tokenizeAskQuery(input.question));
   const tokenCount = questionTokens.length;
+  const repoApiLookupCoverageMode = input.intentId === "repo.repo_api_lookup";
+  const explicitSlots =
+    repoApiLookupCoverageMode
+      ? undefined
+      : input.coverageSlots;
+  const includeQuestionTokens =
+    repoApiLookupCoverageMode
+      ? true
+      : !(input.coverageSlots && input.coverageSlots.length > 0);
   const referenceText = [
     input.evidenceText,
     input.repoScaffold,
@@ -1167,8 +1176,8 @@ function computeCoverageSummary(input: HelixAskPlatonicInput): HelixAskCoverageS
     conceptMatch: input.conceptMatch ?? null,
     conceptAnchored: conceptEvidenceAnchored(input),
     domain: input.domain,
-    explicitSlots: input.coverageSlots,
-    includeQuestionTokens: !(input.coverageSlots && input.coverageSlots.length > 0),
+    explicitSlots,
+    includeQuestionTokens,
     slotAliases: input.coverageSlotAliases,
   });
   const keyCount = slotSummary.slots.length;
@@ -1819,6 +1828,9 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
   const evidenceHealthy =
     gatedInput.evidenceGateOk !== false &&
     Boolean(gatedInput.evidenceText && gatedInput.evidenceText.trim().length > 0);
+  const answerHasExplicitCitations =
+    extractFilePathsFromText(gatedInput.answer).length > 0 ||
+    /^\s*sources?\s*:/im.test(gatedInput.answer);
   const skipRattlingReplacement =
     gatedInput.intentId === "repo.ideology_reference" &&
     (Boolean(gatedInput.templateLockedAnswer) || Boolean(gatedInput.conceptMatch));
@@ -1826,6 +1838,7 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
     rattlingGateApplied &&
     (gatedInput.domain === "repo" || gatedInput.domain === "falsifiable") &&
     !evidenceHealthy &&
+    !answerHasExplicitCitations &&
     !skipRattlingReplacement
   ) {
     answer =

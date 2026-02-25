@@ -30,6 +30,16 @@ describe("Helix Ask math solver", () => {
     expect(result?.final).toContain("+3");
   });
 
+  it("evaluates arithmetic prompts with leading words cleanly", async () => {
+    const result = await solveHelixAskMathQuestion("What is 2 + 2?");
+    expect(result?.ok).toBe(true);
+    expect(result?.kind).toBe("evaluate");
+    expect(result?.expr).toBe("2 + 2");
+    expect(result?.final).toBe("4");
+    expect(buildHelixAskMathAnswer(result!)).toContain("2 + 2");
+    expect(buildHelixAskMathAnswer(result!)).toContain("4");
+  });
+
   it("solves small systems of equations", async () => {
     const result = await solveHelixAskMathQuestion(
       "Solve for x and y: x + y = 10; x - y = 4",

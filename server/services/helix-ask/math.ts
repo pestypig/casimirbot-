@@ -284,6 +284,16 @@ function stripLeadingNoise(expr: string): string {
   return expr.replace(/^(of|the)\s+/i, "").trim();
 }
 
+function extractEvaluableExpression(question: string): string {
+  const normalized = normalizeExpression(question);
+  if (!normalized) return "";
+  const prompted =
+    normalized.match(/\b(?:what(?:'s| is)|evaluate|compute|calculate)\s+(.+)$/i)?.[1] ?? normalized;
+  const candidate = stripLeadingNoise(normalizeExpression(prompted));
+  if (!candidate) return "";
+  return candidate;
+}
+
 function toExplicitMultiplication(expr: string): string {
   return expr
     .replace(/(\d)([A-Za-z_])/g, "$1*$2")
@@ -665,11 +675,15 @@ function solveWithNerdamer(question: string): HelixAskMathSolveResult | null {
       };
       return applyMathTruthGates(question, rawResult);
     }
-    const final = prettyMath(nerdamer(toExplicitMultiplication(normalizedQuestion)).evaluate().toString());
+    const evalExpr = extractEvaluableExpression(normalizedQuestion);
+    if (!evalExpr) {
+      return { ok: false, reason: "js_missing_expression" };
+    }
+    const final = prettyMath(nerdamer(toExplicitMultiplication(evalExpr)).evaluate().toString());
     return {
       ok: true,
       kind: "evaluate",
-      expr: normalizedQuestion,
+      expr: evalExpr,
       final,
       reason: "js_solver",
     };

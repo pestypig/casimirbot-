@@ -150,4 +150,140 @@ describe("Helix Ask jobs endpoint regression", () => {
     expect(jobPayload.result?.debug?.llm_skip_reason).toBeUndefined();
     expect(jobPayload.result?.debug?.llm_skip_reason_detail).toBeUndefined();
   }, 120000);
+
+  it("keeps explicit repo ideology mapping prompts on repo-api lane without deterministic clarify fallback", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question:
+          "In this repo, how does Feedback Loop Hygiene map to server/routes/agi.plan.ts? Cite file paths.",
+        sessionId: "repo-ideology-explicit-mapping",
+        debug: true,
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text?: string;
+      debug?: {
+        intent_id?: string;
+        llm_invoke_attempted?: boolean;
+        llm_backend_used?: string;
+        llm_http_status?: number;
+        llm_provider_called?: boolean;
+        llm_skip_reason?: string;
+        llm_skip_reason_detail?: string;
+        answer_path?: string[];
+        answer_quality_floor_reasons?: string[];
+      };
+    };
+    expect(payload.debug?.intent_id).toBe("repo.repo_api_lookup");
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_http_status).toBe(200);
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect(payload.debug?.llm_skip_reason).toBeUndefined();
+    expect(payload.debug?.llm_skip_reason_detail).toBeUndefined();
+    expect((payload.debug?.answer_path ?? []).includes("clarify:ambiguity")).toBe(false);
+    expect((payload.debug?.answer_path ?? []).includes("fallback:RenderPlatonicFallback")).toBe(
+      false,
+    );
+    expect((payload.debug?.answer_path ?? []).includes("qualityFloor:deterministic_contract")).toBe(
+      false,
+    );
+    expect(payload.debug?.answer_quality_floor_reasons ?? []).not.toContain(
+      "relation_missing_dual_domain_terms",
+    );
+    expect(payload.text ?? "").not.toMatch(/^what_is_warp_bubble:/i);
+  }, 120000);
+
+  it("bypasses deterministic quality-floor rewrite for successful open-world HTTP answers", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "How does sleep deprivation affect memory consolidation?",
+        sessionId: "open-world-general-quality-floor-bypass",
+        debug: true,
+        verbosity: "brief",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text?: string;
+      debug?: {
+        llm_invoke_attempted?: boolean;
+        llm_backend_used?: string;
+        llm_http_status?: number;
+        llm_provider_called?: boolean;
+        answer_path?: string[];
+        answer_quality_floor_bypassed?: boolean;
+        answer_quality_floor_bypass_reason?: string;
+      };
+    };
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_http_status).toBe(200);
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect((payload.debug?.answer_path ?? []).includes("qualityFloor:deterministic_contract")).toBe(
+      false,
+    );
+    expect((payload.debug?.answer_path ?? []).includes("qualityFloor:open_world_expansion")).toBe(
+      false,
+    );
+    if (payload.debug?.answer_quality_floor_bypassed) {
+      expect(payload.debug?.answer_quality_floor_bypass_reason).toBe("open_world_provider_success");
+    }
+  }, 120000);
+
+  it("keeps endpoint guard in warn-only mode for successful explicit repo-api prompts", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "Summarize how /api/agi/ask routes through llm.local.generate.",
+        sessionId: "endpoint-guard-warn-mode",
+        debug: true,
+        verbosity: "brief",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text?: string;
+      debug?: {
+        intent_id?: string;
+        llm_invoke_attempted?: boolean;
+        llm_backend_used?: string;
+        llm_http_status?: number;
+        llm_provider_called?: boolean;
+        concept_fast_path_blocked_reason?: string;
+        concept_fast_path_removed?: boolean;
+        endpoint_anchor_violation?: boolean;
+        endpoint_anchor_guard_mode?: string;
+        endpoint_anchor_warning?: boolean;
+        answer_path?: string[];
+      };
+    };
+    expect(payload.debug?.intent_id).toBe("repo.repo_api_lookup");
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_http_status).toBe(200);
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect(payload.debug?.concept_fast_path_blocked_reason).toBe("repo_api_cue");
+    expect(payload.debug?.concept_fast_path_removed).toBe(true);
+    expect(payload.debug?.endpoint_anchor_guard_mode).toBe("warn_only");
+    expect((payload.debug?.answer_path ?? []).includes("endpointGuard:applied")).toBe(false);
+    expect(
+      (payload.debug?.answer_path ?? []).some((entry) => /^concept:local-stability-compact$/i.test(entry)),
+    ).toBe(false);
+    expect((payload.text ?? "").toLowerCase()).not.toContain("local-stability-compact");
+    if (payload.debug?.endpoint_anchor_violation) {
+      expect(
+        (payload.debug?.answer_path ?? []).some(
+          (entry) => entry === "endpointGuard:warn_missing_anchor" || entry === "endpointGuard:warn_mismatch_anchor",
+        ),
+      ).toBe(true);
+      expect(payload.debug?.endpoint_anchor_warning).toBe(true);
+    }
+  }, 120000);
 });

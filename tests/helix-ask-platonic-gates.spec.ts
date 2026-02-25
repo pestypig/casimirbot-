@@ -195,6 +195,31 @@ describe("helix ask platonic gates", () => {
     expect(result.answer).not.toMatch(/drifted too far/i);
   });
 
+  it("preserves cited repo answers even when evidence gate is unhealthy", () => {
+    const result = applyHelixAskPlatonicGates({
+      question: "How does the Helix Ask pipeline work?",
+      answer:
+        "The Helix Ask pipeline uses the intent directory, evidence gate, and format step before building the envelope in server/routes/agi.plan.ts. " +
+        "Astrophysics and cicadas dominate the rest of the discussion. " +
+        "Plasma storms and sand dunes are unrelated digressions. " +
+        "The narrative then jumps to ancient calendars and mythic rivers. " +
+        "These topics are unrelated to the prompt.\n\n" +
+        "Sources: server/routes/agi.plan.ts",
+      domain: "repo",
+      tier: "F1",
+      intentId: "repo.helix_ask_pipeline_explain",
+      format: "compare",
+      evidenceGateOk: false,
+      evidenceText: "helix ask pipeline stage evidence gate intent directory.",
+      requiresRepoEvidence: true,
+      repoScaffold: "intent directory evidence gate pipeline stage",
+    });
+    expect(result.rattlingGateApplied || result.beliefGateApplied || result.coverageGateApplied).toBe(true);
+    expect(result.answer).not.toMatch(/Answer drifted too far from the provided evidence/i);
+    // Coverage/belief gates may still rewrite text, but the drift-fallback replacement must remain suppressed.
+    expect(result.answer).toMatch(/weakly reflected|repo evidence|key terms|pipeline/i);
+  });
+
   it("removes prompt leakage fragments before other gates", () => {
     const answer =
       '", no headings.\nts` uses the `req` object to fetch query parameters.\ntsx). ts). ts).\nHelix Ask works through intent and evidence.';
