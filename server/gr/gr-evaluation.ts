@@ -38,9 +38,21 @@ export type G4ConstraintDiagnostics = {
 };
 
 const G4_REASON_CODES = {
-  missingFordRomanSource: "G4_MISSING_SOURCE_FORD_ROMAN_QI",
-  missingThetaSource: "G4_MISSING_SOURCE_THETA_AUDIT",
+  marginExceeded: "G4_QI_MARGIN_EXCEEDED",
+  sourceNotMetric: "G4_QI_SOURCE_NOT_METRIC",
+  contractMissing: "G4_QI_CONTRACT_MISSING",
+  curvatureWindowFail: "G4_QI_CURVATURE_WINDOW_FAIL",
+  applicabilityNotPass: "G4_QI_APPLICABILITY_NOT_PASS",
+  signalMissing: "G4_QI_SIGNAL_MISSING",
 } as const;
+const G4_REASON_CODE_ORDER = [
+  G4_REASON_CODES.signalMissing,
+  G4_REASON_CODES.sourceNotMetric,
+  G4_REASON_CODES.contractMissing,
+  G4_REASON_CODES.curvatureWindowFail,
+  G4_REASON_CODES.applicabilityNotPass,
+  G4_REASON_CODES.marginExceeded,
+] as const;
 
 const SYNTHESIZED_SOURCE_PREFIX = "source=synthesized_unknown";
 const readConstraintMessage = (
@@ -55,11 +67,21 @@ const readConstraintMessage = (
 
 const readConstraintReasonCode = (
   entry: { note?: string } | undefined,
-): string | undefined => {
+): string[] => {
   const note = entry?.note;
-  if (typeof note !== "string") return undefined;
-  const match = note.match(/reasonCode=([A-Z0-9_]+)/);
-  return match?.[1];
+  if (typeof note !== "string") return [];
+  return Array.from(note.matchAll(/reasonCode=([A-Z0-9_]+)/g)).map((m) => m[1]);
+};
+
+const orderReasonCodes = (codes: string[]): string[] => {
+  const unique = Array.from(new Set(codes));
+  return unique.sort((a, b) => {
+    const ia = G4_REASON_CODE_ORDER.indexOf(a as (typeof G4_REASON_CODE_ORDER)[number]);
+    const ib = G4_REASON_CODE_ORDER.indexOf(b as (typeof G4_REASON_CODE_ORDER)[number]);
+    const na = ia === -1 ? Number.MAX_SAFE_INTEGER : ia;
+    const nb = ib === -1 ? Number.MAX_SAFE_INTEGER : ib;
+    return na - nb || a.localeCompare(b);
+  });
 };
 
 export const extractG4ConstraintDiagnostics = (constraints: GrEvaluation["constraints"]): G4ConstraintDiagnostics => {
@@ -79,17 +101,11 @@ export const extractG4ConstraintDiagnostics = (constraints: GrEvaluation["constr
   const reason = [readConstraintMessage(ford), readConstraintMessage(theta)].filter(
     (entry): entry is string => Boolean(entry && entry.trim()),
   );
-  const reasonCode = [readConstraintReasonCode(ford), readConstraintReasonCode(theta)].filter(
-    (entry): entry is string => Boolean(entry),
-  );
+  const reasonCode = [...readConstraintReasonCode(ford), ...readConstraintReasonCode(theta)];
 
-  if (!ford && !reasonCode.includes(G4_REASON_CODES.missingFordRomanSource)) {
-    reasonCode.push(G4_REASON_CODES.missingFordRomanSource);
-    reason.push(`${SYNTHESIZED_SOURCE_PREFIX};reasonCode=${G4_REASON_CODES.missingFordRomanSource};FordRomanQI missing from evaluation constraints.`);
-  }
-  if (!theta && !reasonCode.includes(G4_REASON_CODES.missingThetaSource)) {
-    reasonCode.push(G4_REASON_CODES.missingThetaSource);
-    reason.push(`${SYNTHESIZED_SOURCE_PREFIX};reasonCode=${G4_REASON_CODES.missingThetaSource};ThetaAudit missing from evaluation constraints.`);
+  if ((!ford || !theta) && !reasonCode.includes(G4_REASON_CODES.signalMissing)) {
+    reasonCode.push(G4_REASON_CODES.signalMissing);
+    reason.push(`${SYNTHESIZED_SOURCE_PREFIX};reasonCode=${G4_REASON_CODES.signalMissing};G4 hard-source payload incomplete in evaluation constraints.`);
   }
 
   return {
@@ -97,7 +113,7 @@ export const extractG4ConstraintDiagnostics = (constraints: GrEvaluation["constr
     thetaAuditStatus: normalize(theta?.status),
     source,
     reason,
-    reasonCode,
+    reasonCode: orderReasonCodes(reasonCode),
   };
 };
 
@@ -112,16 +128,12 @@ const toHardConstraintEntry = (
   id: "FordRomanQI" | "ThetaAudit",
 ): GrEvaluation["constraints"][number] => {
   if (!input) {
-    const reasonCode =
-      id === "FordRomanQI"
-        ? G4_REASON_CODES.missingFordRomanSource
-        : G4_REASON_CODES.missingThetaSource;
     return {
       id,
       severity: "HARD",
       status: "unknown",
       proxy: false,
-      note: `reasonCode=${reasonCode};${SYNTHESIZED_SOURCE_PREFIX};${id} missing from warp-viability evaluator constraints.`,
+      note: `reasonCode=${G4_REASON_CODES.signalMissing};${SYNTHESIZED_SOURCE_PREFIX};${id} missing from warp-viability evaluator constraints.`,
     };
   }
 

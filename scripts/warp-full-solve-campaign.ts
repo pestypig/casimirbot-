@@ -94,6 +94,19 @@ type EvidencePack = {
     source: 'evaluator_constraints' | 'synthesized_unknown';
     reason: string[];
     reasonCode: string[];
+    lhs_Jm3?: number;
+    bound_Jm3?: number;
+    marginRatio?: number;
+    marginRatioRaw?: number;
+    rhoSource?: string;
+    metricContractStatus?: string;
+    applicabilityStatus?: string;
+    curvatureOk?: boolean;
+    curvatureRatio?: number;
+    curvatureEnforced?: boolean;
+    tau_s?: number;
+    K?: number;
+    safetySigma_Jm3?: number;
   };
   timeout?: { kind: 'wave_timeout' | 'campaign_timeout'; timeoutMs: number; elapsedMs: number; wave?: Wave };
   reproducibility: {
@@ -122,6 +135,34 @@ const DATE_STAMP = '2026-02-24';
 const EXECUTIVE_TRANSLATION_DOC = `docs/audits/research/warp-gates-executive-translation-${DATE_STAMP}.md`;
 const ALLOWED_WAVES: readonly WaveArg[] = ['A', 'B', 'C', 'D', 'all'] as const;
 const FIRST_FAIL_ORDER = ['G0', 'G1', 'G2', 'G3', 'G4', 'G6', 'G7', 'G8'] as const;
+const G4_REASON_CODES = {
+  marginExceeded: 'G4_QI_MARGIN_EXCEEDED',
+  sourceNotMetric: 'G4_QI_SOURCE_NOT_METRIC',
+  contractMissing: 'G4_QI_CONTRACT_MISSING',
+  curvatureWindowFail: 'G4_QI_CURVATURE_WINDOW_FAIL',
+  applicabilityNotPass: 'G4_QI_APPLICABILITY_NOT_PASS',
+  signalMissing: 'G4_QI_SIGNAL_MISSING',
+} as const;
+const G4_REASON_CODE_ORDER = [
+  G4_REASON_CODES.signalMissing,
+  G4_REASON_CODES.sourceNotMetric,
+  G4_REASON_CODES.contractMissing,
+  G4_REASON_CODES.curvatureWindowFail,
+  G4_REASON_CODES.applicabilityNotPass,
+  G4_REASON_CODES.marginExceeded,
+] as const;
+
+const orderReasonCodes = (codes: string[]): string[] => {
+  const unique = Array.from(new Set(codes));
+  return unique.sort((a, b) => {
+    const ia = G4_REASON_CODE_ORDER.indexOf(a as (typeof G4_REASON_CODE_ORDER)[number]);
+    const ib = G4_REASON_CODE_ORDER.indexOf(b as (typeof G4_REASON_CODE_ORDER)[number]);
+    const na = ia === -1 ? Number.MAX_SAFE_INTEGER : ia;
+    const nb = ib === -1 ? Number.MAX_SAFE_INTEGER : ib;
+    return na - nb || a.localeCompare(b);
+  });
+};
+
 const REQUIRED_SIGNAL_KEYS = [
   'initial_solver_status',
   'evaluation_gate_status',
@@ -740,6 +781,7 @@ export const buildNotReadyClassification = (
 
 export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): EvidencePack['g4Diagnostics'] => {
   const constraints = attempt?.evaluation?.constraints ?? [];
+  const snapshot = (attempt as any)?.certificate?.payload?.snapshot ?? {};
   const ford = constraints.find((entry) => entry.id === 'FordRomanQI');
   const theta = constraints.find((entry) => entry.id === 'ThetaAudit');
   const toStatus = (entry: { status?: string } | undefined): EvidencePack['g4Diagnostics']['fordRomanStatus'] => {
@@ -752,32 +794,88 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
     const text = entry.note.trim();
     return text.length > 0 ? text : null;
   };
-  const readReasonCode = (entry: { note?: string } | undefined): string | null => {
-    if (typeof entry?.note !== 'string') return null;
-    const m = entry.note.match(/reasonCode=([A-Z0-9_]+)/);
-    return m?.[1] ?? null;
+  const readReasonCodes = (entry: { note?: string } | undefined): string[] => {
+    if (typeof entry?.note !== 'string') return [];
+    return Array.from(entry.note.matchAll(/reasonCode=([A-Z0-9_]+)/g)).map((m) => m[1]);
+  };
+  const parseFordField = (key: string): string | null => {
+    if (typeof ford?.note !== 'string') return null;
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = ford.note.match(new RegExp(`${escaped}=([^;|]+)`));
+    return m?.[1]?.trim() ?? null;
+  };
+  const parseNumberField = (key: string): number | null => {
+    const parsed = parseFordField(key);
+    if (parsed == null || parsed.toLowerCase() === 'n/a' || parsed.toLowerCase() === 'unknown') return null;
+    const n = Number(parsed);
+    return Number.isFinite(n) ? n : null;
   };
   const hasSynthesizedTag = [ford, theta].some((entry) => typeof entry?.note === 'string' && entry.note.includes('source=synthesized_unknown'));
   const missingAnyHardSource = !ford || !theta;
   const source: EvidencePack['g4Diagnostics']['source'] = hasSynthesizedTag || missingAnyHardSource ? 'synthesized_unknown' : 'evaluator_constraints';
   const reason = [readReason(ford), readReason(theta)].filter((msg): msg is string => typeof msg === 'string');
-  const reasonCode = [readReasonCode(ford), readReasonCode(theta)].filter((code): code is string => typeof code === 'string');
-  if (!ford && !reasonCode.includes('G4_MISSING_SOURCE_FORD_ROMAN_QI')) {
-    reasonCode.push('G4_MISSING_SOURCE_FORD_ROMAN_QI');
-    reason.push('source=synthesized_unknown;reasonCode=G4_MISSING_SOURCE_FORD_ROMAN_QI;FordRomanQI missing from evaluation constraints.');
-  }
-  if (!theta && !reasonCode.includes('G4_MISSING_SOURCE_THETA_AUDIT')) {
-    reasonCode.push('G4_MISSING_SOURCE_THETA_AUDIT');
-    reason.push('source=synthesized_unknown;reasonCode=G4_MISSING_SOURCE_THETA_AUDIT;ThetaAudit missing from evaluation constraints.');
+  const reasonCode = [...readReasonCodes(ford), ...readReasonCodes(theta)];
+  if ((!ford || !theta) && !reasonCode.includes(G4_REASON_CODES.signalMissing)) {
+    reasonCode.push(G4_REASON_CODES.signalMissing);
+    reason.push('source=synthesized_unknown;reasonCode=G4_QI_SIGNAL_MISSING;G4 hard-source payload incomplete in evaluation constraints.');
   }
   return {
     fordRomanStatus: toStatus(ford),
     thetaAuditStatus: toStatus(theta),
     source,
     reason,
-    reasonCode,
+    reasonCode: orderReasonCodes(reasonCode),
+    lhs_Jm3:
+      Number.isFinite(Number(snapshot?.qi_lhs_Jm3)) ? Number(snapshot.qi_lhs_Jm3) : parseNumberField('lhs_Jm3'),
+    bound_Jm3:
+      Number.isFinite(Number(snapshot?.qi_bound_Jm3)) ? Number(snapshot.qi_bound_Jm3) : parseNumberField('bound_Jm3'),
+    marginRatio:
+      Number.isFinite(Number(snapshot?.qi_margin_ratio)) ? Number(snapshot.qi_margin_ratio) : parseNumberField('marginRatio'),
+    marginRatioRaw:
+      Number.isFinite(Number(snapshot?.qi_margin_ratio_raw))
+        ? Number(snapshot.qi_margin_ratio_raw)
+        : parseNumberField('marginRatioRaw'),
+    rhoSource:
+      typeof snapshot?.qi_rho_source === 'string'
+        ? snapshot.qi_rho_source
+        : (parseFordField('rhoSource') ?? undefined),
+    metricContractStatus:
+      typeof snapshot?.qi_metric_contract_status === 'string'
+        ? snapshot.qi_metric_contract_status
+        : (parseFordField('metricContractStatus') ?? undefined),
+    applicabilityStatus:
+      typeof snapshot?.qi_applicability_status === 'string'
+        ? snapshot.qi_applicability_status
+        : (parseFordField('applicabilityStatus') ?? undefined),
+    curvatureOk:
+      typeof snapshot?.qi_curvature_ok === 'boolean'
+        ? snapshot.qi_curvature_ok
+        : parseFordField('curvatureOk') === 'true'
+          ? true
+          : parseFordField('curvatureOk') === 'false'
+            ? false
+            : undefined,
+    curvatureRatio:
+      Number.isFinite(Number(snapshot?.qi_curvature_ratio))
+        ? Number(snapshot.qi_curvature_ratio)
+        : parseNumberField('curvatureRatio'),
+    curvatureEnforced:
+      typeof snapshot?.qi_curvature_enforced === 'boolean'
+        ? snapshot.qi_curvature_enforced
+        : parseFordField('curvatureEnforced') === 'true'
+          ? true
+          : parseFordField('curvatureEnforced') === 'false'
+            ? false
+            : undefined,
+    tau_s: Number.isFinite(Number(snapshot?.qi_bound_tau_s)) ? Number(snapshot.qi_bound_tau_s) : parseNumberField('tau_s'),
+    K: Number.isFinite(Number(snapshot?.qi_bound_K)) ? Number(snapshot.qi_bound_K) : parseNumberField('K'),
+    safetySigma_Jm3:
+      Number.isFinite(Number(snapshot?.qi_safetySigma_Jm3))
+        ? Number(snapshot.qi_safetySigma_Jm3)
+        : parseNumberField('safetySigma_Jm3'),
   };
 };
+
 
 export const computeReproducibility = (runResults: GrAgentLoopResult[]): EvidencePack['reproducibility'] => {
   const evaluations = runResults.map((result) => extractLatestAttempt(result)?.evaluation).filter(Boolean);

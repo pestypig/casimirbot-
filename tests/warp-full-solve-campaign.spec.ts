@@ -112,24 +112,62 @@ describe('warp-full-solve-campaign runner', () => {
           {
             id: 'FordRomanQI',
             status: 'unknown',
-            note: 'reasonCode=G4_MISSING_SOURCE_FORD_ROMAN_QI;source=synthesized_unknown;FordRomanQI missing from warp-viability evaluator constraints.',
+            note: 'reasonCode=G4_QI_SIGNAL_MISSING;source=synthesized_unknown;FordRomanQI missing from warp-viability evaluator constraints.',
           },
           {
             id: 'ThetaAudit',
             status: 'unknown',
-            note: 'reasonCode=G4_MISSING_SOURCE_THETA_AUDIT;source=synthesized_unknown;ThetaAudit missing from warp-viability evaluator constraints.',
+            note: 'reasonCode=G4_QI_SIGNAL_MISSING;source=synthesized_unknown;ThetaAudit missing from warp-viability evaluator constraints.',
           },
         ],
       },
     } as any);
     expect(diagnostics.source).toBe('synthesized_unknown');
     expect(diagnostics.reasonCode).toEqual([
-      'G4_MISSING_SOURCE_FORD_ROMAN_QI',
-      'G4_MISSING_SOURCE_THETA_AUDIT',
+      'G4_QI_SIGNAL_MISSING',
     ]);
     expect(diagnostics.reason.join(' | ')).toContain('source=synthesized_unknown');
   });
 
+
+  it('derives FordRoman fail reason codes and exported diagnostics fields', () => {
+    const diagnostics = deriveG4Diagnostics({
+      evaluation: {
+        constraints: [
+          {
+            id: 'FordRomanQI',
+            status: 'fail',
+            note: 'reasonCode=G4_QI_SOURCE_NOT_METRIC;reasonCode=G4_QI_MARGIN_EXCEEDED;lhs_Jm3=-2;bound_Jm3=-1;marginRatio=2',
+          },
+          { id: 'ThetaAudit', status: 'pass', note: 'theta ok' },
+        ],
+      },
+      certificate: {
+        payload: {
+          snapshot: {
+            qi_lhs_Jm3: -2,
+            qi_bound_Jm3: -1,
+            qi_margin_ratio: 2,
+            qi_margin_ratio_raw: 2,
+            qi_rho_source: 'proxy',
+            qi_metric_contract_status: 'missing',
+            qi_applicability_status: 'PASS',
+            qi_curvature_ok: true,
+            qi_curvature_ratio: 0.5,
+            qi_curvature_enforced: true,
+            qi_bound_tau_s: 1,
+            qi_bound_K: 3,
+            qi_safetySigma_Jm3: 4,
+          },
+        },
+      },
+    } as any);
+    expect(diagnostics.reasonCode).toEqual(['G4_QI_SOURCE_NOT_METRIC', 'G4_QI_MARGIN_EXCEEDED']);
+    expect(diagnostics.lhs_Jm3).toBe(-2);
+    expect(diagnostics.bound_Jm3).toBe(-1);
+    expect(diagnostics.marginRatio).toBe(2);
+    expect(diagnostics.metricContractStatus).toBe('missing');
+  });
   it('does not emit generic synthesized fallback when source values are available', () => {
     const diagnostics = deriveG4Diagnostics({
       evaluation: {
@@ -154,8 +192,7 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.thetaAuditStatus).toBe('missing');
     expect(diagnostics.source).toBe('synthesized_unknown');
     expect(diagnostics.reasonCode).toEqual([
-      'G4_MISSING_SOURCE_FORD_ROMAN_QI',
-      'G4_MISSING_SOURCE_THETA_AUDIT',
+      'G4_QI_SIGNAL_MISSING',
     ]);
   });
 
@@ -168,7 +205,7 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.fordRomanStatus).toBe('missing');
     expect(diagnostics.thetaAuditStatus).toBe('pass');
     expect(diagnostics.source).toBe('synthesized_unknown');
-    expect(diagnostics.reasonCode).toEqual(['G4_MISSING_SOURCE_FORD_ROMAN_QI']);
+    expect(diagnostics.reasonCode).toEqual(['G4_QI_SIGNAL_MISSING']);
   });
 
   it('derives deterministic first-fail from canonical gate order', () => {

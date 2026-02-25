@@ -20,21 +20,18 @@ describe('gr-evaluation G4 diagnostics provenance', () => {
         id: 'FordRomanQI',
         severity: 'HARD',
         status: 'unknown',
-        note: 'reasonCode=G4_MISSING_SOURCE_FORD_ROMAN_QI;source=synthesized_unknown;FordRomanQI missing from warp-viability evaluator constraints.',
+        note: 'reasonCode=G4_QI_SIGNAL_MISSING;source=synthesized_unknown;FordRomanQI missing from warp-viability evaluator constraints.',
       },
       {
         id: 'ThetaAudit',
         severity: 'HARD',
         status: 'unknown',
-        note: 'reasonCode=G4_MISSING_SOURCE_THETA_AUDIT;source=synthesized_unknown;ThetaAudit missing from warp-viability evaluator constraints.',
+        note: 'reasonCode=G4_QI_SIGNAL_MISSING;source=synthesized_unknown;ThetaAudit missing from warp-viability evaluator constraints.',
       },
     ] as any);
 
     expect(result.source).toBe('synthesized_unknown');
-    expect(result.reasonCode).toEqual([
-      'G4_MISSING_SOURCE_FORD_ROMAN_QI',
-      'G4_MISSING_SOURCE_THETA_AUDIT',
-    ]);
+    expect(result.reasonCode).toEqual(['G4_QI_SIGNAL_MISSING']);
     expect(result.reason.join(' | ')).toContain('source=synthesized_unknown');
   });
 
@@ -44,10 +41,7 @@ describe('gr-evaluation G4 diagnostics provenance', () => {
     expect(result.fordRomanStatus).toBe('missing');
     expect(result.thetaAuditStatus).toBe('missing');
     expect(result.source).toBe('synthesized_unknown');
-    expect(result.reasonCode).toEqual([
-      'G4_MISSING_SOURCE_FORD_ROMAN_QI',
-      'G4_MISSING_SOURCE_THETA_AUDIT',
-    ]);
+    expect(result.reasonCode).toEqual(['G4_QI_SIGNAL_MISSING']);
   });
 
   it('marks source synthesized with deterministic reason code for partial hard-constraint payload', () => {
@@ -58,7 +52,7 @@ describe('gr-evaluation G4 diagnostics provenance', () => {
     expect(result.fordRomanStatus).toBe('pass');
     expect(result.thetaAuditStatus).toBe('missing');
     expect(result.source).toBe('synthesized_unknown');
-    expect(result.reasonCode).toEqual(['G4_MISSING_SOURCE_THETA_AUDIT']);
+    expect(result.reasonCode).toEqual(['G4_QI_SIGNAL_MISSING']);
   });
 
 });
