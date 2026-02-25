@@ -8,10 +8,10 @@
     "missing_required_signals": 0,
     "other": 0,
     "policy_not_applicable_misuse": 0,
-    "timeout_budget": 0
+    "timeout_budget": 6
   },
   "perWave": {
-    "A": "G4",
+    "A": "G0",
     "B": "G4",
     "C": "G4",
     "D": "G4"

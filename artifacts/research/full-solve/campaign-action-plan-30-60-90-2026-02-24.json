@@ -1,9 +1,39 @@
 {
   "blockers": [
     {
+      "gateId": "G0",
+      "reason": "No GR loop run artifacts found.",
+      "status": "NOT_READY",
+      "wave": "A"
+    },
+    {
+      "gateId": "G1",
+      "reason": "Initial solver status missing in artifact. Missing required signals: initial_solver_status.",
+      "status": "NOT_READY",
+      "wave": "A"
+    },
+    {
+      "gateId": "G2",
+      "reason": "Evaluation gate status missing in artifact. Missing required signals: evaluation_gate_status.",
+      "status": "NOT_READY",
+      "wave": "A"
+    },
+    {
+      "gateId": "G3",
+      "reason": "Certificate data missing from evaluator output. Missing required signals: certificate_hash, certificate_integrity.",
+      "status": "NOT_READY",
+      "wave": "A"
+    },
+    {
       "gateId": "G4",
-      "reason": "Hard guardrails failed: FordRomanQI=FAIL, ThetaAudit=FAIL.",
-      "status": "FAIL",
+      "reason": "FordRomanQI missing from constraints. ThetaAudit missing from constraints. Missing required signals: hard_constraint_ford_roman_qi, hard_constraint_theta_audit.",
+      "status": "NOT_READY",
+      "wave": "A"
+    },
+    {
+      "gateId": "G6",
+      "reason": "Raw run outputs persisted but evaluator signals are missing; fail-closed until evaluator output is present. Missing required signals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system.",
+      "status": "NOT_READY",
       "wave": "A"
     },
     {
@@ -33,7 +63,7 @@
     "missing_required_signals": 0,
     "other": 0,
     "policy_not_applicable_misuse": 0,
-    "timeout_budget": 0
+    "timeout_budget": 6
   },
   "plan": {
     "30_days": [
