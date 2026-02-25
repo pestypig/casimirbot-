@@ -81,6 +81,19 @@ type EvidencePack = {
   requiredSignals: Record<string, { required: boolean; present: boolean }>;
   missingSignals: string[];
   gateMissingSignalMap: Record<string, string[]>;
+  notReadyClassCounts: {
+    timeout_budget: number;
+    missing_required_signals: number;
+    policy_not_applicable_misuse: number;
+    other: number;
+  };
+  gateCauseClass: Record<string, 'timeout_budget' | 'missing_required_signals' | 'policy_not_applicable_misuse' | 'other' | 'none'>;
+  g4Diagnostics: {
+    fordRomanStatus: 'pass' | 'fail' | 'unknown' | 'missing';
+    thetaAuditStatus: 'pass' | 'fail' | 'unknown' | 'missing';
+    source: 'evaluator_constraints' | 'synthesized_unknown';
+    reason: string[];
+  };
   timeout?: { kind: 'wave_timeout' | 'campaign_timeout'; timeoutMs: number; elapsedMs: number; wave?: Wave };
   reproducibility: {
     repeatedRunGateAgreement: { status: GateStatus; agreementRatio: number | null; reason: string };
@@ -99,6 +112,7 @@ type EvidencePack = {
 };
 
 type TimeoutKind = 'wave_timeout' | 'campaign_timeout';
+type NotReadyClass = 'timeout_budget' | 'missing_required_signals' | 'policy_not_applicable_misuse' | 'other';
 
 const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
@@ -682,6 +696,69 @@ const applyMissingSignalFailClosed = (gateMap: Record<string, GateRecord>, gateM
   return gateMap;
 };
 
+const classifyGateCause = (
+  gateId: string,
+  gate: GateRecord,
+  gateMissingSignalMap: Record<string, string[]>,
+  timeout?: EvidencePack['timeout'],
+): EvidencePack['gateCauseClass'][string] => {
+  if (gate.status !== 'NOT_READY') return 'none';
+  if (gate.status === 'NOT_READY' && gate.source === 'campaign.policy.reduced-order') {
+    return 'policy_not_applicable_misuse';
+  }
+  if (timeout && (timeout.kind === 'wave_timeout' || timeout.kind === 'campaign_timeout')) {
+    return 'timeout_budget';
+  }
+  if ((gateMissingSignalMap[gateId] ?? []).length > 0) {
+    return 'missing_required_signals';
+  }
+  return 'other';
+};
+
+export const buildNotReadyClassification = (
+  gateMap: Record<string, GateRecord>,
+  gateMissingSignalMap: Record<string, string[]>,
+  timeout?: EvidencePack['timeout'],
+) => {
+  const gateCauseClass: EvidencePack['gateCauseClass'] = {};
+  const notReadyClassCounts: EvidencePack['notReadyClassCounts'] = {
+    timeout_budget: 0,
+    missing_required_signals: 0,
+    policy_not_applicable_misuse: 0,
+    other: 0,
+  };
+  for (const [gateId, gate] of Object.entries(gateMap)) {
+    const gateClass = classifyGateCause(gateId, gate, gateMissingSignalMap, timeout);
+    gateCauseClass[gateId] = gateClass;
+    if (gate.status === 'NOT_READY' && gateClass !== 'none') {
+      notReadyClassCounts[gateClass] += 1;
+    }
+  }
+  return { gateCauseClass, notReadyClassCounts };
+};
+
+export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): EvidencePack['g4Diagnostics'] => {
+  const constraints = attempt?.evaluation?.constraints ?? [];
+  const ford = constraints.find((entry) => entry.id === 'FordRomanQI');
+  const theta = constraints.find((entry) => entry.id === 'ThetaAudit');
+  const toStatus = (entry: { status?: string } | undefined): EvidencePack['g4Diagnostics']['fordRomanStatus'] => {
+    if (!entry) return 'missing';
+    if (entry.status === 'pass' || entry.status === 'fail' || entry.status === 'unknown') return entry.status;
+    return 'unknown';
+  };
+  const source: EvidencePack['g4Diagnostics']['source'] = ford || theta ? 'evaluator_constraints' : 'synthesized_unknown';
+  const reason = [ford?.message, theta?.message].filter((msg): msg is string => typeof msg === 'string' && msg.trim().length > 0);
+  if (reason.length === 0 && source === 'synthesized_unknown') {
+    reason.push('FordRomanQI and ThetaAudit constraint entries are missing from evaluator constraints; synthesized unknown diagnostics.');
+  }
+  return {
+    fordRomanStatus: toStatus(ford),
+    thetaAuditStatus: toStatus(theta),
+    source,
+    reason,
+  };
+};
+
 export const computeReproducibility = (runResults: GrAgentLoopResult[]): EvidencePack['reproducibility'] => {
   const evaluations = runResults.map((result) => extractLatestAttempt(result)?.evaluation).filter(Boolean);
   const gateStatuses = evaluations.map((evaluation) => evaluation?.gate?.status).filter((status): status is string => Boolean(status));
@@ -890,7 +967,8 @@ const runWave = async (
       ? { kind: 'wave_timeout' as const, timeoutMs: waveTimeoutMs, elapsedMs: elapsedWaveMs, wave }
       : { kind: 'campaign_timeout' as const, timeoutMs: campaignTimeoutMs, elapsedMs: campaignElapsedMs + elapsedWaveMs, wave }
     : undefined;
-
+  const { gateCauseClass, notReadyClassCounts } = buildNotReadyClassification(gateMap, gateMissingSignalMap, timeout);
+  const g4Diagnostics = deriveG4Diagnostics(latestAttempt);
 
   const pack: EvidencePack = {
     commitSha,
@@ -901,7 +979,7 @@ const runWave = async (
     wave,
     seed,
     provenance: {
-      command: `npm run warp:full-solve:campaign -- --wave ${wave}${ci ? ' --ci' : ''}`,
+      command: `npm run warp:full-solve:campaign -- --wave ${wave}${ci ? ' --ci' : ''}${ciFastPath ? ' --ci-fast-path' : ''}`,
       cwd: process.cwd(),
       mode: ci ? 'ci' : 'local',
     },
@@ -920,6 +998,9 @@ const runWave = async (
     requiredSignals,
     missingSignals,
     gateMissingSignalMap,
+    notReadyClassCounts,
+    gateCauseClass,
+    g4Diagnostics,
     timeout,
     reproducibility,
     claimPosture: 'diagnostic/reduced-order',
@@ -939,6 +1020,13 @@ const runWave = async (
 
 const regenCampaign = (outDir: string, waves: Wave[]) => {
   const packs = waves.map((w) => JSON.parse(fs.readFileSync(path.join(outDir, w, 'evidence-pack.json'), 'utf8')) as EvidencePack);
+  const lane = packs.some((pack) => String(pack.provenance?.command ?? '').includes('--ci-fast-path')) ? 'readiness' : 'budget-stress';
+  const campaignNotReadyClassCounts = packs.reduce((acc, pack) => ({
+    timeout_budget: acc.timeout_budget + (pack.notReadyClassCounts?.timeout_budget ?? 0),
+    missing_required_signals: acc.missing_required_signals + (pack.notReadyClassCounts?.missing_required_signals ?? 0),
+    policy_not_applicable_misuse: acc.policy_not_applicable_misuse + (pack.notReadyClassCounts?.policy_not_applicable_misuse ?? 0),
+    other: acc.other + (pack.notReadyClassCounts?.other ?? 0),
+  }), { timeout_budget: 0, missing_required_signals: 0, policy_not_applicable_misuse: 0, other: 0 });
   const aggregatedGateStatus = aggregateGateStatusAcrossWaves(packs.map((pack) => pack.gateStatus));
   const scoreboard = summarizeScoreboard(aggregatedGateStatus);
   const decision = deriveCampaignDecision(scoreboard.counts);
@@ -956,6 +1044,8 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
     statusCounts: scoreboard.counts,
     gateCount: scoreboard.gateCount,
     reconciled: scoreboard.reconciled,
+    lane,
+    notReadyClassCounts: campaignNotReadyClassCounts,
     gates: aggregatedGateStatus,
     perWaveGates: Object.fromEntries(packs.map((pack) => [pack.wave, pack.gateStatus])),
   });
@@ -966,12 +1056,16 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
     executiveTranslationRef: EXECUTIVE_TRANSLATION_DOC,
     globalFirstFail: aggregateFirstFail.firstFail,
     perWave: Object.fromEntries(waves.map((w) => [w, (JSON.parse(fs.readFileSync(path.join(outDir, w, 'first-fail-map.json'), 'utf8')) as { globalFirstFail: string }).globalFirstFail])),
+    lane,
+    notReadyClassCounts: campaignNotReadyClassCounts,
   });
 
   writeJson(path.join(outDir, `campaign-action-plan-30-60-90-${DATE_STAMP}.json`), {
     campaignId: `FS-CAMPAIGN-${DATE_STAMP}`,
     executiveTranslationRef: EXECUTIVE_TRANSLATION_DOC,
     decision,
+    lane,
+    notReadyClassCounts: campaignNotReadyClassCounts,
     blockers: packs.flatMap((pack) =>
       Object.entries(pack.gateDetails)
         .filter(([, detail]) => detail.status === 'FAIL' || detail.status === 'NOT_READY')
@@ -986,7 +1080,53 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
 
   writeMd(
     path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.md`),
-    `# Warp Full-Solve Campaign Execution Report (${DATE_STAMP})\n\n## Executive verdict\n**${decision}**\n\n## Required companion\n- Executive translation: \`${EXECUTIVE_TRANSLATION_DOC}\`\n\n## Gate scoreboard (G0..G8)\n- PASS: ${scoreboard.counts.PASS}\n- FAIL: ${scoreboard.counts.FAIL}\n- UNKNOWN: ${scoreboard.counts.UNKNOWN}\n- NOT_READY: ${scoreboard.counts.NOT_READY}\n- NOT_APPLICABLE: ${scoreboard.counts.NOT_APPLICABLE}\n- Total gates: ${scoreboard.gateCount}\n- Reconciled: ${scoreboard.reconciled}\n\nCross-wave aggregate gate status:\n${Object.entries(aggregatedGateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n\nPer-wave gate status snapshots:\n${packs.map((pack) => `### Wave ${pack.wave}\n${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n- missingSignals: ${(pack.missingSignals ?? []).join(', ') || 'none'}\n- reproducibility.gateAgreement: ${pack.reproducibility?.repeatedRunGateAgreement?.status ?? 'NOT_READY'}`).join('\n\n')}\n\n## Decision output\n- Final decision label: **${decision}**\n- Claim posture: diagnostic/reduced-order (fail-closed on hard evidence gaps).\n\n## Boundary statement\n${BOUNDARY_STATEMENT}\n`,
+    `# Warp Full-Solve Campaign Execution Report (${DATE_STAMP})
+
+## Executive verdict
+**${decision}**
+
+## Required companion
+- Executive translation: \`${EXECUTIVE_TRANSLATION_DOC}\`
+
+## Lane provenance
+- Artifact lane: **${lane}**
+- Budget-stress lane can legitimately emit timeout-driven NOT_READY outcomes due to strict runtime budgets.
+- Readiness lane (\`--ci-fast-path\`) is the source of gate evaluability and canonical campaign artifacts.
+
+## Gate scoreboard (G0..G8)
+- PASS: ${scoreboard.counts.PASS}
+- FAIL: ${scoreboard.counts.FAIL}
+- UNKNOWN: ${scoreboard.counts.UNKNOWN}
+- NOT_READY: ${scoreboard.counts.NOT_READY}
+- NOT_APPLICABLE: ${scoreboard.counts.NOT_APPLICABLE}
+- Total gates: ${scoreboard.gateCount}
+- Reconciled: ${scoreboard.reconciled}
+
+## NOT_READY cause classes
+- timeout_budget: ${campaignNotReadyClassCounts.timeout_budget}
+- missing_required_signals: ${campaignNotReadyClassCounts.missing_required_signals}
+- policy_not_applicable_misuse: ${campaignNotReadyClassCounts.policy_not_applicable_misuse}
+- other: ${campaignNotReadyClassCounts.other}
+
+Cross-wave aggregate gate status:
+${Object.entries(aggregatedGateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
+
+Per-wave gate status snapshots:
+${packs.map((pack) => `### Wave ${pack.wave}
+${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
+- missingSignals: ${(pack.missingSignals ?? []).join(', ') || 'none'}
+- notReadyClassCounts: timeout_budget=${pack.notReadyClassCounts?.timeout_budget ?? 0}, missing_required_signals=${pack.notReadyClassCounts?.missing_required_signals ?? 0}, policy_not_applicable_misuse=${pack.notReadyClassCounts?.policy_not_applicable_misuse ?? 0}, other=${pack.notReadyClassCounts?.other ?? 0}
+- g4Diagnostics: FordRomanQI=${pack.g4Diagnostics?.fordRomanStatus ?? 'missing'}, ThetaAudit=${pack.g4Diagnostics?.thetaAuditStatus ?? 'missing'}, source=${pack.g4Diagnostics?.source ?? 'synthesized_unknown'}
+- g4Reasons: ${(pack.g4Diagnostics?.reason ?? []).join(' | ') || 'none'}
+- reproducibility.gateAgreement: ${pack.reproducibility?.repeatedRunGateAgreement?.status ?? 'NOT_READY'}`).join('\n\n')}
+
+## Decision output
+- Final decision label: **${decision}**
+- Claim posture: diagnostic/reduced-order (fail-closed on hard evidence gaps).
+
+## Boundary statement
+${BOUNDARY_STATEMENT}
+`,
   );
 
   return { counts: scoreboard.counts, decision, reconciled: scoreboard.reconciled };
@@ -1046,7 +1186,7 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
         wave,
         seed: args.seed,
         provenance: {
-          command: `npm run warp:full-solve:campaign -- --wave ${wave}${args.ci ? ' --ci' : ''}`,
+          command: `npm run warp:full-solve:campaign -- --wave ${wave}${args.ci ? ' --ci' : ''}${args.ciFastPath ? ' --ci-fast-path' : ''}`,
           cwd: process.cwd(),
           mode: args.ci ? 'ci' : 'local',
         },
@@ -1065,6 +1205,24 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
         requiredSignals,
         missingSignals,
         gateMissingSignalMap,
+        notReadyClassCounts: { timeout_budget: 7, missing_required_signals: 0, policy_not_applicable_misuse: 0, other: 0 },
+        gateCauseClass: {
+          G0: 'timeout_budget',
+          G1: 'timeout_budget',
+          G2: 'timeout_budget',
+          G3: 'timeout_budget',
+          G4: 'timeout_budget',
+          G5: 'none',
+          G6: 'timeout_budget',
+          G7: wave === 'C' || wave === 'D' ? 'timeout_budget' : 'none',
+          G8: wave === 'D' ? 'timeout_budget' : 'none',
+        },
+        g4Diagnostics: {
+          fordRomanStatus: 'missing',
+          thetaAuditStatus: 'missing',
+          source: 'synthesized_unknown',
+          reason: ['Hard-constraint signals unavailable due campaign timeout.'],
+        },
         timeout: { kind: 'campaign_timeout', timeoutMs: args.campaignTimeoutMs, elapsedMs: campaignElapsedMs, wave },
         reproducibility: {
           repeatedRunGateAgreement: { status: 'NOT_READY', agreementRatio: null, reason: 'No runs executed before campaign timeout.' },
