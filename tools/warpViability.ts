@@ -38,6 +38,34 @@ const VDB_BPRIME_MIN_ABS = parseEnvNumber(process.env.WARP_VDB_BPRIME_MIN_ABS, 1
 const VDB_BDOUBLE_MIN_ABS = parseEnvNumber(process.env.WARP_VDB_BDOUBLE_MIN_ABS, 1e-18);
 const VDB_DFDR_MIN_ABS = parseEnvNumber(process.env.WARP_VDB_DFDR_MIN_ABS, 1e-18);
 const strictCongruenceEnabled = () => process.env.WARP_STRICT_CONGRUENCE !== "0";
+const G4_QI_REASON_CODES = {
+  marginExceeded: "G4_QI_MARGIN_EXCEEDED",
+  sourceNotMetric: "G4_QI_SOURCE_NOT_METRIC",
+  contractMissing: "G4_QI_CONTRACT_MISSING",
+  curvatureWindowFail: "G4_QI_CURVATURE_WINDOW_FAIL",
+  applicabilityNotPass: "G4_QI_APPLICABILITY_NOT_PASS",
+  signalMissing: "G4_QI_SIGNAL_MISSING",
+} as const;
+const G4_QI_REASON_CODE_ORDER = [
+  G4_QI_REASON_CODES.signalMissing,
+  G4_QI_REASON_CODES.sourceNotMetric,
+  G4_QI_REASON_CODES.contractMissing,
+  G4_QI_REASON_CODES.curvatureWindowFail,
+  G4_QI_REASON_CODES.applicabilityNotPass,
+  G4_QI_REASON_CODES.marginExceeded,
+] as const;
+
+const orderG4ReasonCodes = (codes: string[]): string[] => {
+  const unique = Array.from(new Set(codes));
+  return unique.sort((a, b) => {
+    const ia = G4_QI_REASON_CODE_ORDER.indexOf(a as (typeof G4_QI_REASON_CODE_ORDER)[number]);
+    const ib = G4_QI_REASON_CODE_ORDER.indexOf(b as (typeof G4_QI_REASON_CODE_ORDER)[number]);
+    const na = ia === -1 ? Number.MAX_SAFE_INTEGER : ia;
+    const nb = ib === -1 ? Number.MAX_SAFE_INTEGER : ib;
+    return na - nb || a.localeCompare(b);
+  });
+};
+
 const qiSourceIsMetric = (source: unknown): boolean => {
   const s = typeof source === "string" ? source.toLowerCase() : "";
   return s.startsWith("warp.metric") || s.startsWith("gr.rho_constraint") || s.startsWith("gr.metric");
@@ -984,8 +1012,25 @@ export async function evaluateWarpViability(
     theta_provenance_class: thetaProvenanceClass,
     theta_confidence_band: thetaConfidenceBand,
     zeta: (pipeline as any).zeta,
+    zetaRaw: (pipeline as any).zetaRaw,
     qiGuardrail: qiGuard?.marginRatio,
     qi_applicability_status: qiGuard?.applicabilityStatus,
+    qi_lhs_Jm3: qiGuard?.lhs_Jm3,
+    qi_bound_Jm3: qiGuard?.bound_Jm3,
+    qi_margin_ratio: qiGuard?.marginRatio,
+    qi_margin_ratio_raw: qiGuard?.marginRatioRaw,
+    qi_rho_source: qiGuard?.rhoSource,
+    qi_metric_contract_status:
+      qiGuard?.metricContractOk == null ? undefined : qiGuard.metricContractOk ? "ok" : "missing",
+    qi_curvature_ok: qiGuard?.curvatureOk,
+    qi_curvature_ratio: qiGuard?.curvatureRatio,
+    qi_curvature_enforced: qiGuard?.curvatureEnforced,
+    qi_bound_tau_s:
+      Number.isFinite((pipeline as any).qi?.tau_s_ms) && Number((pipeline as any).qi?.tau_s_ms) > 0
+        ? Number((pipeline as any).qi?.tau_s_ms) / 1000
+        : undefined,
+    qi_bound_K: Number((pipeline as any).qi?.boundK),
+    qi_safetySigma_Jm3: Number((pipeline as any).qi?.safetySigma_Jm3),
     qi_provenance_class: qiProvenanceClass,
     qi_confidence_band: qiConfidenceBand,
     warp_mechanics_provenance_class: warpMechanicsProvenanceClass,
@@ -1046,6 +1091,14 @@ export async function evaluateWarpViability(
     const contractPass = qiConstraintSource || warpMetricContractOk;
     const sourcePass = !strictCongruence || (metricRhoSource && contractPass);
     const passed = qiGuard.marginRatio < 1 && curvaturePass && sourcePass;
+    const applicabilityStatus = String(qiGuard.applicabilityStatus ?? "UNKNOWN").toUpperCase();
+    const g4ReasonCodes: string[] = [];
+    if (!metricRhoSource) g4ReasonCodes.push(G4_QI_REASON_CODES.sourceNotMetric);
+    if (metricRhoSource && !contractPass) g4ReasonCodes.push(G4_QI_REASON_CODES.contractMissing);
+    if (curvatureOk === false) g4ReasonCodes.push(G4_QI_REASON_CODES.curvatureWindowFail);
+    if (applicabilityStatus !== "PASS") g4ReasonCodes.push(G4_QI_REASON_CODES.applicabilityNotPass);
+    if (qiGuard.marginRatio >= 1) g4ReasonCodes.push(G4_QI_REASON_CODES.marginExceeded);
+    const orderedReasonCodes = orderG4ReasonCodes(g4ReasonCodes);
     const curvatureDetail =
       curvatureOk === undefined
         ? "curvature=unknown"
@@ -1073,7 +1126,23 @@ export async function evaluateWarpViability(
         passed,
         qiGuard.marginRatio,
         1,
-        `lhs=${qiGuard.lhs_Jm3 ?? "n/a"} bound=${qiGuard.bound_Jm3 ?? "n/a"} ${curvatureNote}`,
+        [
+          orderedReasonCodes.map((code) => `reasonCode=${code}`).join(";"),
+          `lhs_Jm3=${qiGuard.lhs_Jm3 ?? "n/a"}`,
+          `bound_Jm3=${qiGuard.bound_Jm3 ?? "n/a"}`,
+          `marginRatio=${qiGuard.marginRatio ?? "n/a"}`,
+          `marginRatioRaw=${qiGuard.marginRatioRaw ?? "n/a"}`,
+          `rhoSource=${qiGuard.rhoSource ?? "unknown"}`,
+          `metricContractStatus=${contractPass ? "ok" : "missing"}`,
+          `applicabilityStatus=${applicabilityStatus}`,
+          `curvatureOk=${qiGuard.curvatureOk ?? "unknown"}`,
+          `curvatureRatio=${qiGuard.curvatureRatio ?? "n/a"}`,
+          `curvatureEnforced=${curvatureEnforced}`,
+          `tau_s=${Number.isFinite((pipeline as any).qi?.tau_s_ms) ? Number((pipeline as any).qi?.tau_s_ms) / 1000 : "n/a"}`,
+          `K=${Number.isFinite(Number((pipeline as any).qi?.boundK)) ? Number((pipeline as any).qi?.boundK) : "n/a"}`,
+          `safetySigma_Jm3=${Number.isFinite(Number((pipeline as any).qi?.safetySigma_Jm3)) ? Number((pipeline as any).qi?.safetySigma_Jm3) : "n/a"}`,
+          curvatureNote,
+        ].join("; "),
         !sourcePass
           ? !metricRhoSource
             ? "proxy_input"
