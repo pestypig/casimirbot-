@@ -93,8 +93,8 @@ describe('warp-full-solve-campaign runner', () => {
     const diagnostics = deriveG4Diagnostics({
       evaluation: {
         constraints: [
-          { id: 'FordRomanQI', status: 'fail', message: 'FordRoman hard fail' },
-          { id: 'ThetaAudit', status: 'pass', message: 'Theta ok' },
+          { id: 'FordRomanQI', status: 'fail', note: 'FordRoman hard fail' },
+          { id: 'ThetaAudit', status: 'pass', note: 'Theta ok' },
         ],
       },
     } as any);
@@ -102,6 +102,46 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.thetaAuditStatus).toBe('pass');
     expect(diagnostics.source).toBe('evaluator_constraints');
     expect(diagnostics.reason.join(' | ')).toContain('FordRoman hard fail');
+    expect(diagnostics.reasonCode).toEqual([]);
+  });
+
+  it('keeps synthesized unknown provenance and deterministic reasonCode for missing hard sources', () => {
+    const diagnostics = deriveG4Diagnostics({
+      evaluation: {
+        constraints: [
+          {
+            id: 'FordRomanQI',
+            status: 'unknown',
+            note: 'reasonCode=G4_MISSING_SOURCE_FORD_ROMAN_QI;source=synthesized_unknown;FordRomanQI missing from warp-viability evaluator constraints.',
+          },
+          {
+            id: 'ThetaAudit',
+            status: 'unknown',
+            note: 'reasonCode=G4_MISSING_SOURCE_THETA_AUDIT;source=synthesized_unknown;ThetaAudit missing from warp-viability evaluator constraints.',
+          },
+        ],
+      },
+    } as any);
+    expect(diagnostics.source).toBe('synthesized_unknown');
+    expect(diagnostics.reasonCode).toEqual([
+      'G4_MISSING_SOURCE_FORD_ROMAN_QI',
+      'G4_MISSING_SOURCE_THETA_AUDIT',
+    ]);
+    expect(diagnostics.reason.join(' | ')).toContain('source=synthesized_unknown');
+  });
+
+  it('does not emit generic synthesized fallback when source values are available', () => {
+    const diagnostics = deriveG4Diagnostics({
+      evaluation: {
+        constraints: [
+          { id: 'FordRomanQI', status: 'pass', note: 'FordRomanQI evaluated from warp viability.' },
+          { id: 'ThetaAudit', status: 'fail', note: 'ThetaAudit evaluated from warp viability.' },
+        ],
+      },
+    } as any);
+    expect(diagnostics.source).toBe('evaluator_constraints');
+    expect(diagnostics.reasonCode).toEqual([]);
+    expect(diagnostics.reason.join(' | ')).not.toContain('synthesized unknown diagnostics');
   });
 
   it('derives deterministic first-fail from canonical gate order', () => {

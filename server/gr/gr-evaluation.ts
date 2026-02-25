@@ -32,7 +32,34 @@ export type GrEvaluationResult = {
 export type G4ConstraintDiagnostics = {
   fordRomanStatus: "pass" | "fail" | "unknown" | "missing";
   thetaAuditStatus: "pass" | "fail" | "unknown" | "missing";
+  source: "evaluator_constraints" | "synthesized_unknown";
   reason: string[];
+  reasonCode: string[];
+};
+
+const G4_REASON_CODES = {
+  missingFordRomanSource: "G4_MISSING_SOURCE_FORD_ROMAN_QI",
+  missingThetaSource: "G4_MISSING_SOURCE_THETA_AUDIT",
+} as const;
+
+const SYNTHESIZED_SOURCE_PREFIX = "source=synthesized_unknown";
+const readConstraintMessage = (
+  entry: { note?: string; message?: string } | undefined,
+): string | undefined => {
+  const note = entry?.note;
+  if (typeof note === "string" && note.trim().length > 0) return note;
+  const message = entry?.message;
+  if (typeof message === "string" && message.trim().length > 0) return message;
+  return undefined;
+};
+
+const readConstraintReasonCode = (
+  entry: { note?: string } | undefined,
+): string | undefined => {
+  const note = entry?.note;
+  if (typeof note !== "string") return undefined;
+  const match = note.match(/reasonCode=([A-Z0-9_]+)/);
+  return match?.[1];
 };
 
 export const extractG4ConstraintDiagnostics = (constraints: GrEvaluation["constraints"]): G4ConstraintDiagnostics => {
@@ -46,7 +73,18 @@ export const extractG4ConstraintDiagnostics = (constraints: GrEvaluation["constr
   return {
     fordRomanStatus: normalize(ford?.status),
     thetaAuditStatus: normalize(theta?.status),
-    reason: [ford?.message, theta?.message].filter((entry): entry is string => Boolean(entry && entry.trim())),
+    source:
+      [ford, theta].some(
+        (entry) => typeof entry?.note === "string" && entry.note.includes(SYNTHESIZED_SOURCE_PREFIX),
+      )
+        ? "synthesized_unknown"
+        : "evaluator_constraints",
+    reason: [readConstraintMessage(ford), readConstraintMessage(theta)].filter(
+      (entry): entry is string => Boolean(entry && entry.trim()),
+    ),
+    reasonCode: [readConstraintReasonCode(ford), readConstraintReasonCode(theta)].filter(
+      (entry): entry is string => Boolean(entry),
+    ),
   };
 };
 
@@ -56,23 +94,51 @@ const normalizeConstraintStatus = (status: string | undefined): "pass" | "fail" 
   return "unknown";
 };
 
-const ensureHardConstraintEntries = (constraints: GrEvaluation["constraints"]): GrEvaluation["constraints"] => {
+const toHardConstraintEntry = (
+  input: { id: string; severity: "HARD" | "SOFT"; passed: boolean; note?: string; details?: string } | undefined,
+  id: "FordRomanQI" | "ThetaAudit",
+): GrEvaluation["constraints"][number] => {
+  if (!input) {
+    const reasonCode =
+      id === "FordRomanQI"
+        ? G4_REASON_CODES.missingFordRomanSource
+        : G4_REASON_CODES.missingThetaSource;
+    return {
+      id,
+      severity: "HARD",
+      status: "unknown",
+      proxy: false,
+      note: `reasonCode=${reasonCode};${SYNTHESIZED_SOURCE_PREFIX};${id} missing from warp-viability evaluator constraints.`,
+    };
+  }
+
+  const detail = [input.details, input.note]
+    .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    .join(" | ");
+  return {
+    id,
+    severity: "HARD",
+    status: input.passed ? "pass" : "fail",
+    proxy: false,
+    ...(detail ? { note: detail } : {}),
+  };
+};
+
+const ensureHardConstraintEntries = (
+  constraints: GrEvaluation["constraints"],
+  certificate: WarpViabilityCertificate,
+): GrEvaluation["constraints"] => {
   const byId = new Map(constraints.map((entry) => [entry.id, entry]));
-  const hardIds = ["FordRomanQI", "ThetaAudit"] as const;
-  for (const id of hardIds) {
-    if (!byId.has(id)) {
-      byId.set(id, {
-        id,
-        label: id,
-        severity: "HARD",
-        status: "unknown",
-        message: `${id} missing from evaluator output; defaulted to unknown for deterministic payload completeness.`,
-      });
-      continue;
-    }
-    const entry = byId.get(id)!;
+  const certificateConstraints = certificate.payload?.constraints ?? [];
+  const ford = certificateConstraints.find((entry) => entry.id === "FordRomanQI");
+  const theta = certificateConstraints.find((entry) => entry.id === "ThetaAudit");
+  byId.set("FordRomanQI", toHardConstraintEntry(ford, "FordRomanQI"));
+  byId.set("ThetaAudit", toHardConstraintEntry(theta, "ThetaAudit"));
+
+  for (const [id, entry] of byId) {
     byId.set(id, { ...entry, status: normalizeConstraintStatus(entry.status) });
   }
+
   return Array.from(byId.values());
 };
 
@@ -170,10 +236,10 @@ export async function runGrEvaluation(
         ? { code: "OK" }
         : { code: "ERROR", message: "GR constraint gate failed" };
 
-      const completeConstraints = ensureHardConstraintEntries(gateEval.constraints);
+      const completeConstraints = ensureHardConstraintEntries(gateEval.constraints, certificate);
       const g4Diagnostics = extractG4ConstraintDiagnostics(completeConstraints);
       if (g4Diagnostics.reason.length > 0) {
-        notes.push(`G4 diagnostics: FordRomanQI=${g4Diagnostics.fordRomanStatus}, ThetaAudit=${g4Diagnostics.thetaAuditStatus}. ${g4Diagnostics.reason.join(" | ")}`);
+        notes.push(`G4 diagnostics: FordRomanQI=${g4Diagnostics.fordRomanStatus}, ThetaAudit=${g4Diagnostics.thetaAuditStatus}, source=${g4Diagnostics.source}. ${g4Diagnostics.reason.join(" | ")}`);
       }
 
       const evaluation: GrEvaluation = {

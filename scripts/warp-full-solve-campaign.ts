@@ -93,6 +93,7 @@ type EvidencePack = {
     thetaAuditStatus: 'pass' | 'fail' | 'unknown' | 'missing';
     source: 'evaluator_constraints' | 'synthesized_unknown';
     reason: string[];
+    reasonCode: string[];
   };
   timeout?: { kind: 'wave_timeout' | 'campaign_timeout'; timeoutMs: number; elapsedMs: number; wave?: Wave };
   reproducibility: {
@@ -746,16 +747,26 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
     if (entry.status === 'pass' || entry.status === 'fail' || entry.status === 'unknown') return entry.status;
     return 'unknown';
   };
-  const source: EvidencePack['g4Diagnostics']['source'] = ford || theta ? 'evaluator_constraints' : 'synthesized_unknown';
-  const reason = [ford?.message, theta?.message].filter((msg): msg is string => typeof msg === 'string' && msg.trim().length > 0);
-  if (reason.length === 0 && source === 'synthesized_unknown') {
-    reason.push('FordRomanQI and ThetaAudit constraint entries are missing from evaluator constraints; synthesized unknown diagnostics.');
-  }
+  const readReason = (entry: { note?: string } | undefined): string | null => {
+    if (typeof entry?.note !== 'string') return null;
+    const text = entry.note.trim();
+    return text.length > 0 ? text : null;
+  };
+  const readReasonCode = (entry: { note?: string } | undefined): string | null => {
+    if (typeof entry?.note !== 'string') return null;
+    const m = entry.note.match(/reasonCode=([A-Z0-9_]+)/);
+    return m?.[1] ?? null;
+  };
+  const hasSynthesizedTag = [ford, theta].some((entry) => typeof entry?.note === 'string' && entry.note.includes('source=synthesized_unknown'));
+  const source: EvidencePack['g4Diagnostics']['source'] = hasSynthesizedTag ? 'synthesized_unknown' : 'evaluator_constraints';
+  const reason = [readReason(ford), readReason(theta)].filter((msg): msg is string => typeof msg === 'string');
+  const reasonCode = [readReasonCode(ford), readReasonCode(theta)].filter((code): code is string => typeof code === 'string');
   return {
     fordRomanStatus: toStatus(ford),
     thetaAuditStatus: toStatus(theta),
     source,
     reason,
+    reasonCode,
   };
 };
 
@@ -1117,7 +1128,7 @@ ${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
 - missingSignals: ${(pack.missingSignals ?? []).join(', ') || 'none'}
 - notReadyClassCounts: timeout_budget=${pack.notReadyClassCounts?.timeout_budget ?? 0}, missing_required_signals=${pack.notReadyClassCounts?.missing_required_signals ?? 0}, policy_not_applicable_misuse=${pack.notReadyClassCounts?.policy_not_applicable_misuse ?? 0}, other=${pack.notReadyClassCounts?.other ?? 0}
 - g4Diagnostics: FordRomanQI=${pack.g4Diagnostics?.fordRomanStatus ?? 'missing'}, ThetaAudit=${pack.g4Diagnostics?.thetaAuditStatus ?? 'missing'}, source=${pack.g4Diagnostics?.source ?? 'synthesized_unknown'}
-- g4Reasons: ${(pack.g4Diagnostics?.reason ?? []).join(' | ') || 'none'}
+- g4Reasons: ${(pack.g4Diagnostics?.reason ?? []).join(' | ') || 'none'}\n- g4ReasonCodes: ${(pack.g4Diagnostics?.reasonCode ?? []).join(' | ') || 'none'}
 - reproducibility.gateAgreement: ${pack.reproducibility?.repeatedRunGateAgreement?.status ?? 'NOT_READY'}`).join('\n\n')}
 
 ## Decision output
@@ -1222,6 +1233,7 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
           thetaAuditStatus: 'missing',
           source: 'synthesized_unknown',
           reason: ['Hard-constraint signals unavailable due campaign timeout.'],
+          reasonCode: ['G4_TIMEOUT_NO_SIGNALS'],
         },
         timeout: { kind: 'campaign_timeout', timeoutMs: args.campaignTimeoutMs, elapsedMs: campaignElapsedMs, wave },
         reproducibility: {

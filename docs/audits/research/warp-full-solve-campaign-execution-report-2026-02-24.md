@@ -12,46 +12,47 @@
 - Readiness lane (`--ci-fast-path`) is the source of gate evaluability and canonical campaign artifacts.
 
 ## Gate scoreboard (G0..G8)
-- PASS: 2
+- PASS: 7
 - FAIL: 1
 - UNKNOWN: 0
-- NOT_READY: 5
+- NOT_READY: 0
 - NOT_APPLICABLE: 1
 - Total gates: 9
 - Reconciled: true
 
 ## NOT_READY cause classes
-- timeout_budget: 6
+- timeout_budget: 0
 - missing_required_signals: 0
 - policy_not_applicable_misuse: 0
 - other: 0
 
 Cross-wave aggregate gate status:
-- G0: NOT_READY
-- G1: NOT_READY
-- G2: NOT_READY
-- G3: NOT_READY
+- G0: PASS
+- G1: PASS
+- G2: PASS
+- G3: PASS
 - G4: FAIL
 - G5: NOT_APPLICABLE
-- G6: NOT_READY
+- G6: PASS
 - G7: PASS
 - G8: PASS
 
 Per-wave gate status snapshots:
 ### Wave A
-- G0: NOT_READY
-- G1: NOT_READY
-- G2: NOT_READY
-- G3: NOT_READY
-- G4: NOT_READY
+- G0: PASS
+- G1: PASS
+- G2: PASS
+- G3: PASS
+- G4: FAIL
 - G5: NOT_APPLICABLE
-- G6: NOT_READY
+- G6: PASS
 - G7: NOT_APPLICABLE
 - G8: NOT_APPLICABLE
-- missingSignals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system
-- notReadyClassCounts: timeout_budget=6, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
-- g4Diagnostics: FordRomanQI=missing, ThetaAudit=missing, source=synthesized_unknown
-- g4Reasons: FordRomanQI and ThetaAudit constraint entries are missing from evaluator constraints; synthesized unknown diagnostics.
+- missingSignals: none
+- notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
+- g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
+- g4Reasons: lhs=-321623359840581200 bound=-18 curvature=unknown; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=61.34470445000966 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
+- g4ReasonCodes: none
 - reproducibility.gateAgreement: NOT_READY
 
 ### Wave B
@@ -66,8 +67,9 @@ Per-wave gate status snapshots:
 - G8: NOT_APPLICABLE
 - missingSignals: none
 - notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
-- g4Diagnostics: FordRomanQI=unknown, ThetaAudit=unknown, source=evaluator_constraints
-- g4Reasons: FordRomanQI missing from evaluator output; defaulted to unknown for deterministic payload completeness. | ThetaAudit missing from evaluator output; defaulted to unknown for deterministic payload completeness.
+- g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
+- g4Reasons: lhs=-321623359840581200 bound=-18 curvature=unknown; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=61.34470445000966 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
+- g4ReasonCodes: none
 - reproducibility.gateAgreement: NOT_READY
 
 ### Wave C
@@ -82,8 +84,9 @@ Per-wave gate status snapshots:
 - G8: NOT_APPLICABLE
 - missingSignals: none
 - notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
-- g4Diagnostics: FordRomanQI=unknown, ThetaAudit=unknown, source=evaluator_constraints
-- g4Reasons: FordRomanQI missing from evaluator output; defaulted to unknown for deterministic payload completeness. | ThetaAudit missing from evaluator output; defaulted to unknown for deterministic payload completeness.
+- g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
+- g4Reasons: lhs=-321623359840581200 bound=-18 curvature=unknown; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=61.34470445000966 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
+- g4ReasonCodes: none
 - reproducibility.gateAgreement: PASS
 
 ### Wave D
@@ -98,8 +101,9 @@ Per-wave gate status snapshots:
 - G8: PASS
 - missingSignals: none
 - notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
-- g4Diagnostics: FordRomanQI=unknown, ThetaAudit=unknown, source=evaluator_constraints
-- g4Reasons: FordRomanQI missing from evaluator output; defaulted to unknown for deterministic payload completeness. | ThetaAudit missing from evaluator output; defaulted to unknown for deterministic payload completeness.
+- g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
+- g4Reasons: lhs=-321623359840581200 bound=-18 curvature=unknown; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=61.34470445000966 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
+- g4ReasonCodes: none
 - reproducibility.gateAgreement: PASS
 
 ## Decision output
