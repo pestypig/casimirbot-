@@ -8,5 +8,7 @@
   "llm_model": null,
   "llm_http_status": null,
   "llm_routed_via": null,
-  "llm_calls": null
+  "llm_calls": null,
+  "top_usage": null,
+  "top_model": null
 }
