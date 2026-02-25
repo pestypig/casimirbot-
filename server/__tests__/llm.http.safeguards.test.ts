@@ -46,4 +46,34 @@ describe("llm.http safeguards", () => {
 
     await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow(/HULL_MODE: blocked outbound/);
   });
+
+  it("returns deterministic provider metadata and correlation headers on success", async () => {
+    process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
+    process.env.LLM_HTTP_API_KEY = "k";
+    process.env.LLM_HTTP_RETRY_COUNT = "0";
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: "ok" } }], usage: { total_tokens: 5 } }),
+    } as Response) as unknown as typeof fetch;
+    __setLlmHttpFetchForTests(fetchMock);
+
+    const result = (await llmHttpHandler(
+      { prompt: "a", traceId: "t1", sessionId: "s1", tenantId: "tenant-7" },
+      {},
+    )) as Record<string, unknown>;
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect((init as RequestInit)?.headers).toMatchObject({
+      "X-Trace-Id": "t1",
+      "X-Session-Id": "s1",
+      "X-Tenant-Id": "tenant-7",
+      "X-Customer-Id": "tenant-7",
+    });
+    expect(result.__llm_backend).toBe("http");
+    expect(result.__llm_provider_called).toBe(true);
+    expect(result.__llm_provider).toBe("openai_compatible");
+    expect(result.__llm_routed_via).toBe("llm.http.generate");
+  });
 });

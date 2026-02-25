@@ -63,7 +63,7 @@ import { summarizeConsoleTelemetry } from "../services/console-telemetry/summari
 import { ensureCasimirTelemetry } from "../services/casimir/telemetry";
 import { buildWhyBelongs } from "../services/planner/why-belongs";
 import { getTool, listTools, registerTool } from "../skills";
-import { llmLocalHandler, llmLocalSpec } from "../skills/llm.local";
+import { llmLocalHandler, llmLocalSpec, resolveLlmLocalBackend, type LocalLlmBackend } from "../skills/llm.local";
 import { lumaGenerateHandler, lumaGenerateSpec } from "../skills/luma.generate";
 import {
   noiseGenCoverHandler,
@@ -13360,6 +13360,86 @@ type HelixAskOverflowOptions = {
   label?: string;
 };
 
+type HelixAskLlmCallMeta = {
+  stage: string;
+  backend: LocalLlmBackend;
+  providerCalled: boolean;
+  model?: string;
+  status?: number;
+  routedVia?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  startedAtIso: string;
+  endedAtIso: string;
+  durationMs: number;
+};
+
+const resolveLlmHttpBaseHost = (): string | null => {
+  const base = process.env.LLM_HTTP_BASE?.trim();
+  if (!base) return null;
+  try {
+    return new URL(base).host || null;
+  } catch {
+    return null;
+  }
+};
+
+const parseHelixAskLlmErrorCode = (message: string | undefined): string | undefined => {
+  if (!message) return undefined;
+  const normalized = String(message).trim();
+  const known = normalized.match(/(llm_http_[a-z0-9:_-]+)/i)?.[1];
+  if (known) return known.toLowerCase();
+  if (/llm_backend_unavailable/i.test(normalized)) return "llm_backend_unavailable";
+  if (/aborterror/i.test(normalized)) return "abort_error";
+  if (/timeout/i.test(normalized)) return "timeout";
+  return undefined;
+};
+
+const extractHelixAskLlmCallMetaFromResult = (
+  result: LocalAskResult | null | undefined,
+  args: {
+    stage: string;
+    startedAtMs: number;
+    endedAtMs: number;
+  },
+): HelixAskLlmCallMeta => {
+  const endedAtMs = Number.isFinite(args.endedAtMs) ? Math.max(args.startedAtMs, args.endedAtMs) : Date.now();
+  const backendCandidate = typeof result?.__llm_backend === "string" ? result.__llm_backend : undefined;
+  const backend: LocalLlmBackend =
+    backendCandidate === "http" || backendCandidate === "spawn" || backendCandidate === "none"
+      ? backendCandidate
+      : resolveLlmLocalBackend();
+  const providerCalledCandidate = result?.__llm_provider_called;
+  const providerCalled =
+    typeof providerCalledCandidate === "boolean" ? providerCalledCandidate : backend === "http";
+  const statusCandidate = result?.status;
+  const status =
+    typeof statusCandidate === "number" && Number.isFinite(statusCandidate)
+      ? Math.floor(statusCandidate)
+      : undefined;
+  const model =
+    typeof result?.model === "string" && result.model.trim().length > 0
+      ? result.model.trim()
+      : undefined;
+  const routedVia =
+    typeof result?.__llm_routed_via === "string" && result.__llm_routed_via.trim().length > 0
+      ? result.__llm_routed_via.trim()
+      : undefined;
+  const startedAtIso = new Date(args.startedAtMs).toISOString();
+  const endedAtIso = new Date(endedAtMs).toISOString();
+  return {
+    stage: args.stage || "answer",
+    backend,
+    providerCalled,
+    model,
+    status,
+    routedVia,
+    startedAtIso,
+    endedAtIso,
+    durationMs: Math.max(0, endedAtMs - args.startedAtMs),
+  };
+};
+
 const OVERFLOW_CONTEXT_MARKERS = new Set([
   "context:",
   "prompt context:",
@@ -13455,7 +13535,7 @@ const runHelixAskLocalWithOverflowRetry = async (
     onToken?: (chunk: string) => void;
   },
   options: HelixAskOverflowOptions = {},
-): Promise<{ result: LocalAskResult; overflow?: HelixAskOverflowMeta }> => {
+): Promise<{ result: LocalAskResult; overflow?: HelixAskOverflowMeta; llm?: HelixAskLlmCallMeta }> => {
   const steps = parseOverflowPolicy(HELIX_ASK_OVERFLOW_RETRY_POLICY);
   const fallbackMaxTokens = Math.max(1, Math.floor(options.fallbackMaxTokens ?? 256));
   let prompt = input.prompt;
@@ -13487,6 +13567,7 @@ const runHelixAskLocalWithOverflowRetry = async (
 
   while (true) {
     attempts += 1;
+    const invokeStartedAtMs = Date.now();
     try {
       const result = (await llmLocalHandler(
         {
@@ -13498,6 +13579,7 @@ const runHelixAskLocalWithOverflowRetry = async (
         },
         ctx,
       )) as LocalAskResult;
+      const invokeEndedAtMs = Date.now();
       const promptTokens = estimateTokenCount(prompt);
       const overflow =
         appliedSteps.length > 0
@@ -13509,11 +13591,28 @@ const runHelixAskLocalWithOverflowRetry = async (
               maxTokens: maxTokens ?? fallbackMaxTokens,
             }
           : undefined;
-      return { result, overflow };
+      const llm = extractHelixAskLlmCallMetaFromResult(result, {
+        stage: options.label ?? "answer",
+        startedAtMs: invokeStartedAtMs,
+        endedAtMs: invokeEndedAtMs,
+      });
+      return { result, overflow, llm };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const overflowError = HELIX_ASK_OVERFLOW_RETRY && OVERFLOW_ERROR_RE.test(message);
       if (!overflowError || steps.length === 0) {
+        if (error && typeof error === "object") {
+          (error as Record<string, unknown>).__llm_call = {
+            stage: options.label ?? "answer",
+            backend: resolveLlmLocalBackend(),
+            providerCalled: resolveLlmLocalBackend() === "http",
+            startedAtIso: new Date(invokeStartedAtMs).toISOString(),
+            endedAtIso: new Date().toISOString(),
+            durationMs: Math.max(0, Date.now() - invokeStartedAtMs),
+            errorCode: parseHelixAskLlmErrorCode(message),
+            errorMessage: message,
+          } satisfies HelixAskLlmCallMeta;
+        }
         throw error;
       }
       const nextStep = steps[appliedSteps.length];
@@ -17585,6 +17684,36 @@ const executeHelixAsk = async ({
       answer_model_error?: string;
       answer_fallback_used?: boolean;
       answer_fallback_reason?: string;
+      llm_route_expected_backend?: LocalLlmBackend;
+      llm_backend_used?: LocalLlmBackend;
+      llm_provider_called?: boolean;
+      llm_model?: string;
+      llm_http_status?: number;
+      llm_routed_via?: string;
+      llm_runtime_env?: string | null;
+      llm_policy_env?: string | null;
+      llm_http_base_present?: boolean;
+      llm_http_base_host?: string | null;
+      llm_api_key_present?: boolean;
+      llm_call_stage?: string;
+      llm_invoke_started_at?: string;
+      llm_invoke_ended_at?: string;
+      llm_invoke_duration_ms?: number;
+      llm_error_code?: string;
+      llm_error_message?: string;
+      llm_calls?: Array<{
+        stage: string;
+        backend: LocalLlmBackend;
+        providerCalled: boolean;
+        model?: string;
+        status?: number;
+        routedVia?: string;
+        startedAtIso: string;
+        endedAtIso: string;
+        durationMs: number;
+        errorCode?: string;
+        errorMessage?: string;
+      }>;
       plan_directives?: HelixAskPlanDirectives;
       slot_plan?: Array<{
         id: string;
@@ -17913,7 +18042,31 @@ const executeHelixAsk = async ({
       if (askSessionId) {
         debugPayload.session_id = askSessionId;
       }
+      debugPayload.llm_route_expected_backend = resolveLlmLocalBackend();
+      debugPayload.llm_runtime_env = process.env.LLM_RUNTIME?.trim() || null;
+      debugPayload.llm_policy_env = process.env.LLM_POLICY?.trim() || null;
+      debugPayload.llm_http_base_present = Boolean(process.env.LLM_HTTP_BASE?.trim());
+      debugPayload.llm_http_base_host = resolveLlmHttpBaseHost();
+      debugPayload.llm_api_key_present = Boolean(
+        process.env.LLM_HTTP_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim(),
+      );
     }
+    const appendLlmCallDebug = (meta: HelixAskLlmCallMeta | undefined): void => {
+      if (!debugPayload || !meta) return;
+      debugPayload.llm_backend_used = meta.backend;
+      debugPayload.llm_provider_called = meta.providerCalled;
+      debugPayload.llm_model = meta.model;
+      debugPayload.llm_http_status = meta.status;
+      debugPayload.llm_routed_via = meta.routedVia;
+      debugPayload.llm_call_stage = meta.stage;
+      debugPayload.llm_invoke_started_at = meta.startedAtIso;
+      debugPayload.llm_invoke_ended_at = meta.endedAtIso;
+      debugPayload.llm_invoke_duration_ms = meta.durationMs;
+      if (meta.errorCode) debugPayload.llm_error_code = meta.errorCode;
+      if (meta.errorMessage) debugPayload.llm_error_message = meta.errorMessage;
+      const prev = Array.isArray(debugPayload.llm_calls) ? debugPayload.llm_calls : [];
+      debugPayload.llm_calls = [...prev, meta].slice(-16);
+    };
     const agentLoopEnabled = HELIX_ASK_AGENT_LOOP;
     const runtimeContract = loadRuntimeFrameContract();
     const agentLoopMaxSteps = Math.max(1, Math.min(HELIX_ASK_AGENT_LOOP_MAX_STEPS, runtimeContract.clockA.max_plan_steps));
@@ -25757,7 +25910,7 @@ const executeHelixAsk = async ({
         } else if (fastQualityMode && !answerHelperBudget.ok) {
           answerGenerationFailed = true;
         } else {
-        const { result: answerResult, overflow: answerOverflow } =
+        const { result: answerResult, overflow: answerOverflow, llm: answerLlm } =
           await runHelixAskLocalWithOverflowRetry(
             {
               prompt,
@@ -25779,6 +25932,7 @@ const executeHelixAsk = async ({
             },
           );
         recordOverflow("answer", answerOverflow);
+        appendLlmCallDebug(answerLlm);
         answerText = (answerResult as LocalAskResult)?.text ?? "";
         answerMeta = isShortAnswer(answerText, verbosity);
         resultForAnswer = answerResult as LocalAskResult;
@@ -25819,7 +25973,7 @@ const executeHelixAsk = async ({
               },
             );
             try {
-              const { result: retryResult, overflow: retryOverflow } =
+              const { result: retryResult, overflow: retryOverflow, llm: retryLlm } =
                 await runHelixAskLocalWithOverflowRetry(
                   {
                     prompt,
@@ -25841,6 +25995,7 @@ const executeHelixAsk = async ({
                   },
                 );
               recordOverflow("answer_retry", retryOverflow);
+              appendLlmCallDebug(retryLlm);
               logStepEnd(
                 "LLM answer retry",
                 "done",
@@ -25887,6 +26042,26 @@ const executeHelixAsk = async ({
       } catch (error) {
         answerGenerationFailed = true;
         const message = error instanceof Error ? error.message : String(error);
+        const llmCall = (error as { __llm_call?: HelixAskLlmCallMeta } | null | undefined)?.__llm_call;
+        const fallbackBackend = resolveLlmLocalBackend();
+        appendLlmCallDebug(
+          llmCall
+            ? {
+                ...llmCall,
+                errorCode: llmCall.errorCode ?? parseHelixAskLlmErrorCode(message),
+                errorMessage: llmCall.errorMessage ?? message,
+              }
+            : {
+                stage: "answer",
+                backend: fallbackBackend,
+                providerCalled: fallbackBackend === "http",
+                startedAtIso: new Date().toISOString(),
+                endedAtIso: new Date().toISOString(),
+                durationMs: 0,
+                errorCode: parseHelixAskLlmErrorCode(message),
+                errorMessage: message,
+              },
+        );
         if (llmAnswerStarted) {
           logStepEnd(
             "LLM answer",

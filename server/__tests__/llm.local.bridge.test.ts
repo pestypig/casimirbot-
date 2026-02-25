@@ -45,6 +45,15 @@ describe("llm.local bridge routing", () => {
     );
   });
 
+  it("returns deterministic stub metadata in test mode when strict-no-stub is disabled", async () => {
+    const result = (await llmLocalHandler({ prompt: "hello" }, {})) as Record<string, unknown>;
+    expect(result.text).toBe("llm.local stub result");
+    expect(result.__llm_backend).toBe("none");
+    expect(result.__llm_provider_called).toBe(false);
+    expect(result.__llm_routed_via).toBe("llm.local.generate");
+    expect(result.__llm_stub).toBe(true);
+  });
+
   it("routes through llm.http.generate bridge when only HTTP backend exists", async () => {
     process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
     process.env.LLM_HTTP_API_KEY = "test-key";
@@ -66,7 +75,11 @@ describe("llm.local bridge routing", () => {
       "X-Trace-Id": "trace-1",
       "X-Session-Id": "sess-1",
       "X-Tenant-Id": "t-1",
+      "X-Customer-Id": "t-1",
     });
     expect((result as any).usage).toMatchObject({ total_tokens: 3 });
+    expect((result as any).__llm_backend).toBe("http");
+    expect((result as any).__llm_provider_called).toBe(true);
+    expect((result as any).__llm_routed_via).toBe("llm.local.generate");
   });
 });

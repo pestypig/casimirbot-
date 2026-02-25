@@ -266,5 +266,18 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
     essenceId = env.header.id;
   }
 
-  return { text, usage, model, essence_id: essenceId, status: responseStatus || 200 };
+  return {
+    text,
+    usage,
+    model,
+    essence_id: essenceId,
+    status: responseStatus || 200,
+    __llm_backend: "http",
+    __llm_provider_called: true,
+    __llm_provider: "openai_compatible",
+    __llm_routed_via:
+      typeof ctx?.routedVia === "string" && ctx.routedVia.trim()
+        ? ctx.routedVia.trim()
+        : "llm.http.generate",
+  };
 };
