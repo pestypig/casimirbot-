@@ -171,6 +171,37 @@ describe("Helix Ask llm debug skip metadata", () => {
     expect((payload.debug?.llm_calls ?? []).length).toBeGreaterThan(0);
   }, 45000);
 
+  it("blocks concept preintent short-circuit for explicit repo-evidence prompts", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question:
+          "In this repo, how does Feedback Loop Hygiene map to server/routes/agi.plan.ts? Cite file paths.",
+        debug: true,
+        verbosity: "brief",
+        sessionId: "llm-repo-explicit-no-concept-short-circuit",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      debug?: {
+        llm_invoke_attempted?: boolean;
+        llm_skip_reason?: string;
+        llm_skip_reason_detail?: string;
+        llm_backend_used?: string;
+        llm_provider_called?: boolean;
+        llm_calls?: Array<unknown>;
+      };
+    };
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_skip_reason).toBeUndefined();
+    expect(payload.debug?.llm_skip_reason_detail).toBeUndefined();
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect((payload.debug?.llm_calls ?? []).length).toBeGreaterThan(0);
+  }, 45000);
+
   it("allows debug forceLlmProbe to bypass short-circuit and record an LLM attempt", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",

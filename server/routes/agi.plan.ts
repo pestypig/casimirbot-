@@ -19284,7 +19284,8 @@ const executeHelixAsk = async ({
     if (
       HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH &&
       isConceptMatchAvailable &&
-      reportDecision.reason !== "explicit_report_request"
+      reportDecision.reason !== "explicit_report_request" &&
+      !explicitRepoExpectation
     ) {
       if (!earlyIdeologyConceptMatch) {
         conceptMatch = null;
@@ -19312,6 +19313,16 @@ const executeHelixAsk = async ({
         }
         answerPath.push("concept_fast_path:preintent");
       }
+    } else if (
+      HELIX_ASK_IDEOLOGY_CONCEPT_FAST_PATH &&
+      isConceptMatchAvailable &&
+      explicitRepoExpectation
+    ) {
+      if (debugPayload) {
+        debugPayload.concept_fast_path_blocked_reason = "explicit_repo_expectation";
+      }
+      answerPath.push("concept_fast_path:preintent:blocked_explicit_repo");
+      logEvent("Concept fast path", "preintent_skipped", "explicit_repo_expectation");
     }
     const repoNativeTags = new Set([
         "helix_ask",
@@ -20553,6 +20564,7 @@ const executeHelixAsk = async ({
       intentDomain === "repo" &&
       HELIX_ASK_CONCEPT_FAST_PATH_INTENTS.has(intentProfile.id) &&
       reportDecision.reason !== "explicit_report_request" &&
+      !explicitRepoExpectation &&
       (intentProfile.id === "repo.ideology_reference"
         ? !isIdeologyNarrativeQuery
         : !graphResolverPreferred);

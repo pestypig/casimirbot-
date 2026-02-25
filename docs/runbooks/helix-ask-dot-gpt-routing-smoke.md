@@ -24,10 +24,31 @@ npm run helix:ask:dot:debug-loop -- --base-url http://127.0.0.1:5050
 
 This writes `artifacts/helix-ask-dot-lane-summary.json` with:
 - preflight env snapshot (presence-only),
+- preflight/hull readiness checks (machine-evaluable),
 - `/api/hull/status`,
 - lane A/B/C request payload + strict `debug.llm_*` fields,
 - deterministic A/B/C classification,
+- direct OpenAI control probe (`/v1/models`) without exposing keys,
+- falsifiable hypothesis table (`expected`, `observed`, `pass`, `falsified`),
 - GO/NO-GO target verdict.
+
+## Falsifiable Hypotheses (now encoded in script output)
+
+The debug loop now evaluates these hypotheses directly:
+
+- `H0_preflight_ready`: env preflight satisfies HTTP prerequisites.
+- `H0b_hull_ready`: hull status confirms OpenAI host is allowed.
+- `H1_laneA_short_circuit_control`: lane A intentionally short-circuits.
+- `H2_laneB_invoke`: lane B invokes LLM (not skipped).
+- `H3_laneB_http_success`: lane B reaches provider success.
+- `H4_laneC_invoke`: lane C jobs flow invokes LLM.
+- `H5_laneC_http_success`: lane C jobs flow reaches provider success.
+- `H6_probe_vs_lane_consistency`: direct OpenAI probe agrees with lane failure class (success/auth/transport).
+
+Interpretation rule:
+
+- If a hypothesis `pass=false`, it is explicitly falsified for that run.
+- Use `falsifiedHypotheses` in the summary as the canonical failure list.
 
 ## Single Copy/Paste Prompt (Codex Cloud)
 
@@ -197,3 +218,24 @@ curl -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/trainin
   - rate limit; lower concurrency and rerun
 - `llm_error_code=llm_http_api_key` (often with `provider_called=true` and missing `llm_http_status`):
   - backend routing reached HTTP lane, but call was blocked before network due to missing `OPENAI_API_KEY`/`LLM_HTTP_API_KEY`
+
+## Key Discrepancy Note (Important)
+
+Do not mark a key as broken from a single failed run.
+
+- The same key can fail in one run and succeed in another when:
+  - the app process was started without the full HTTP env (`LLM_POLICY/LLM_RUNTIME/LLM_HTTP_BASE`),
+  - the wrong runtime/environment was used (local shell vs Codex Cloud task container),
+  - stale process state was reused.
+- Always attribute from the request debug fields for that exact run.
+- Treat key validity as proven only when a live ask shows:
+  - `llm_backend_used=http`
+  - `llm_provider_called=true`
+  - `llm_http_status=200`
+
+Recommended loop discipline:
+
+1. Capture preflight (`base`, `policy`, `runtime`, key presence).
+2. Capture `/api/hull/status`.
+3. Capture one lane B ask with strict `debug.llm_*` fields.
+4. Classify using this runbook. Do not reuse older classifications.
