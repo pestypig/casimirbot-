@@ -112,7 +112,7 @@ describe("Helix Ask jobs endpoint regression", () => {
       jobId?: string;
       status?: string;
       traceId?: string;
-      result?: { debug?: { llm_invoke_attempted?: boolean; llm_backend_used?: string; llm_http_status?: number } };
+      result?: { debug?: { llm_invoke_attempted?: boolean; llm_backend_used?: string; llm_http_status?: number; llm_provider_called?: boolean; llm_skip_reason?: string; llm_skip_reason_detail?: string } };
     } = {};
     for (let attempt = 0; attempt < 80; attempt += 1) {
       const getResponse = await fetch(`${baseUrl}/api/agi/ask/jobs/${payload.jobId}`);
@@ -128,5 +128,8 @@ describe("Helix Ask jobs endpoint regression", () => {
     expect(jobPayload.result?.debug?.llm_invoke_attempted).toBe(true);
     expect(jobPayload.result?.debug?.llm_backend_used).toBe("http");
     expect(jobPayload.result?.debug?.llm_http_status).toBe(200);
+    expect(jobPayload.result?.debug?.llm_provider_called).toBe(true);
+    expect(jobPayload.result?.debug?.llm_skip_reason).toBeUndefined();
+    expect(jobPayload.result?.debug?.llm_skip_reason_detail).toBeUndefined();
   }, 120000);
 });
