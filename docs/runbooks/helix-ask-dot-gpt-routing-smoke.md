@@ -174,3 +174,5 @@ curl -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/trainin
   - credentials or project permissions issue
 - `llm_http_status=429`:
   - rate limit; lower concurrency and rerun
+- `llm_error_code=llm_http_api_key` (often with `provider_called=true` and missing `llm_http_status`):
+  - backend routing reached HTTP lane, but call was blocked before network due to missing `OPENAI_API_KEY`/`LLM_HTTP_API_KEY`
