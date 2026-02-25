@@ -168,6 +168,94 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.marginRatio).toBe(2);
     expect(diagnostics.metricContractStatus).toBe('missing');
   });
+
+  it('treats null snapshot numerics as missing instead of coercing to 0', () => {
+    const diagnostics = deriveG4Diagnostics({
+      evaluation: {
+        constraints: [
+          {
+            id: 'FordRomanQI',
+            status: 'fail',
+            note: 'lhs_Jm3=-9;bound_Jm3=-3;marginRatio=3;K=7;safetySigma_Jm3=11',
+          },
+          { id: 'ThetaAudit', status: 'pass', note: 'theta ok' },
+        ],
+      },
+      certificate: {
+        payload: {
+          snapshot: {
+            qi_lhs_Jm3: null,
+            qi_bound_Jm3: null,
+            qi_margin_ratio: null,
+            qi_bound_K: null,
+            qi_safetySigma_Jm3: null,
+          },
+        },
+      },
+    } as any);
+
+    expect(diagnostics.lhs_Jm3).toBe(-9);
+    expect(diagnostics.bound_Jm3).toBe(-3);
+    expect(diagnostics.marginRatio).toBe(3);
+    expect(diagnostics.K).toBe(7);
+    expect(diagnostics.safetySigma_Jm3).toBe(11);
+  });
+
+  it('treats undefined and placeholder snapshot numerics as missing without coercion', () => {
+    const diagnostics = deriveG4Diagnostics({
+      evaluation: {
+        constraints: [
+          {
+            id: 'FordRomanQI',
+            status: 'fail',
+            note: 'marginRatio=2;K=13;safetySigma_Jm3=17',
+          },
+          { id: 'ThetaAudit', status: 'pass', note: 'theta ok' },
+        ],
+      },
+      certificate: {
+        payload: {
+          snapshot: {
+            qi_margin_ratio: undefined,
+            qi_bound_K: 'unknown',
+            qi_safetySigma_Jm3: 'n/a',
+            qi_bound_tau_s: '',
+          },
+        },
+      },
+    } as any);
+
+    expect(diagnostics.marginRatio).toBe(2);
+    expect(diagnostics.K).toBe(13);
+    expect(diagnostics.safetySigma_Jm3).toBe(17);
+    expect(diagnostics.tau_s).toBeUndefined();
+  });
+
+  it('preserves deterministic reasonCode ordering when extracted from notes', () => {
+    const diagnostics = deriveG4Diagnostics({
+      evaluation: {
+        constraints: [
+          {
+            id: 'FordRomanQI',
+            status: 'fail',
+            note: 'reasonCode=G4_QI_MARGIN_EXCEEDED;reasonCode=G4_QI_SOURCE_NOT_METRIC',
+          },
+          {
+            id: 'ThetaAudit',
+            status: 'unknown',
+            note: 'reasonCode=G4_QI_SIGNAL_MISSING;reasonCode=G4_QI_MARGIN_EXCEEDED',
+          },
+        ],
+      },
+    } as any);
+
+    expect(diagnostics.reasonCode).toEqual([
+      'G4_QI_SIGNAL_MISSING',
+      'G4_QI_SOURCE_NOT_METRIC',
+      'G4_QI_MARGIN_EXCEEDED',
+    ]);
+  });
+
   it('does not emit generic synthesized fallback when source values are available', () => {
     const diagnostics = deriveG4Diagnostics({
       evaluation: {

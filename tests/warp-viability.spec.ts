@@ -534,6 +534,32 @@ describe("warp viability congruence wiring", () => {
     expect(cl3?.details ?? "").toContain("contract=");
   });
 
+  it("keeps non-finite QI snapshot numerics undefined (no null placeholders)", async () => {
+    runtime.pipeline = makePipeline({
+      qiGuardrail: {
+        marginRatio: Number.NaN,
+        marginRatioRaw: Number.NaN,
+        lhs_Jm3: Number.NaN,
+        bound_Jm3: Number.NaN,
+        curvatureRatio: Number.NaN,
+        rhoSource: "warp.metric.T00.natario.shift",
+      },
+      qi: {
+        boundK: Number.NaN,
+        safetySigma_Jm3: Number.POSITIVE_INFINITY,
+      },
+    });
+
+    const result = await evaluateWarpViability({});
+    expect((result.snapshot as any).qi_lhs_Jm3).toBeUndefined();
+    expect((result.snapshot as any).qi_bound_Jm3).toBeUndefined();
+    expect((result.snapshot as any).qi_margin_ratio).toBeUndefined();
+    expect((result.snapshot as any).qi_margin_ratio_raw).toBeUndefined();
+    expect((result.snapshot as any).qi_curvature_ratio).toBeUndefined();
+    expect((result.snapshot as any).qi_bound_K).toBeUndefined();
+    expect((result.snapshot as any).qi_safetySigma_Jm3).toBeUndefined();
+  });
+
   it("prevents certified promotion when QI applicability is not PASS", async () => {
     runtime.pipeline = makePipeline({
       qiGuardrail: {
