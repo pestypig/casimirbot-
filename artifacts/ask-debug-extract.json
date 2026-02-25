@@ -1,23 +1,12 @@
 {
-  "llm_route_expected_backend": "none",
-  "llm_policy_env": "http",
-  "llm_invoke_attempted": true,
+  "llm_route_expected_backend": null,
+  "llm_policy_env": null,
+  "llm_invoke_attempted": null,
   "llm_skip_reason": null,
-  "llm_backend_used": "none",
-  "llm_provider_called": false,
+  "llm_backend_used": null,
+  "llm_provider_called": null,
   "llm_model": null,
   "llm_http_status": null,
   "llm_routed_via": null,
-  "llm_calls": [
-    {
-      "stage": "answer",
-      "backend": "none",
-      "providerCalled": false,
-      "startedAtIso": "2026-02-25T01:57:24.965Z",
-      "endedAtIso": "2026-02-25T01:57:24.966Z",
-      "durationMs": 1,
-      "errorCode": "llm_http_base",
-      "errorMessage": "llm_backend_unavailable: configure local spawn or LLM_HTTP_BASE"
-    }
-  ]
+  "llm_calls": null
 }
