@@ -17688,6 +17688,7 @@ const executeHelixAsk = async ({
       llm_provider_called?: boolean;
       llm_invoke_attempted?: boolean;
       llm_skip_reason?: string;
+      llm_skip_reason_detail?: string;
       llm_model?: string;
       llm_http_status?: number;
       llm_routed_via?: string;
@@ -18053,6 +18054,7 @@ const executeHelixAsk = async ({
       );
       debugPayload.llm_invoke_attempted = false;
       debugPayload.llm_skip_reason = "not_attempted";
+      debugPayload.llm_skip_reason_detail = "";
     }
     const markLlmSkipDebug = (reason: string | null | undefined, detail?: string | null): void => {
       if (!debugPayload) return;
@@ -18060,7 +18062,8 @@ const executeHelixAsk = async ({
       const normalized = typeof reason === "string" ? reason.trim() : "";
       if (!normalized) return;
       const normalizedDetail = typeof detail === "string" ? detail.trim() : "";
-      debugPayload.llm_skip_reason = normalizedDetail ? `${normalized}:${normalizedDetail}` : normalized;
+      debugPayload.llm_skip_reason = normalized;
+      debugPayload.llm_skip_reason_detail = normalizedDetail;
     };
     const appendLlmCallDebug = (meta: HelixAskLlmCallMeta | undefined): void => {
       if (!debugPayload || !meta) return;
@@ -18077,6 +18080,7 @@ const executeHelixAsk = async ({
       if (meta.errorCode) debugPayload.llm_error_code = meta.errorCode;
       if (meta.errorMessage) debugPayload.llm_error_message = meta.errorMessage;
       delete debugPayload.llm_skip_reason;
+      delete debugPayload.llm_skip_reason_detail;
       const prev = Array.isArray(debugPayload.llm_calls) ? debugPayload.llm_calls : [];
       debugPayload.llm_calls = [...prev, meta].slice(-16);
     };

@@ -124,13 +124,14 @@ describe("Helix Ask llm debug skip metadata", () => {
         llm_route_expected_backend?: string;
         llm_invoke_attempted?: boolean;
         llm_skip_reason?: string;
+        llm_skip_reason_detail?: string;
         llm_calls?: Array<unknown>;
       };
     };
     expect(payload.debug?.llm_route_expected_backend).toBe("http");
     expect(payload.debug?.llm_invoke_attempted).toBe(false);
-    expect(typeof payload.debug?.llm_skip_reason).toBe("string");
-    expect((payload.debug?.llm_skip_reason ?? "").length).toBeGreaterThan(0);
+    expect(payload.debug?.llm_skip_reason).toBe("short_circuit_forced_answer");
+    expect(payload.debug?.llm_skip_reason_detail).toBe("forcedAnswer:math_solver");
     expect((payload.debug?.llm_calls ?? []).length).toBe(0);
   }, 45000);
   it("invokes HTTP LLM for non-deterministic repo questions", async () => {
@@ -149,6 +150,7 @@ describe("Helix Ask llm debug skip metadata", () => {
         llm_route_expected_backend?: string;
         llm_invoke_attempted?: boolean;
         llm_skip_reason?: string;
+        llm_skip_reason_detail?: string;
         llm_calls?: Array<{
           backend?: string;
           status?: number;
@@ -159,6 +161,7 @@ describe("Helix Ask llm debug skip metadata", () => {
     expect(payload.debug?.llm_route_expected_backend).toBe("http");
     expect(payload.debug?.llm_invoke_attempted).toBe(true);
     expect(payload.debug?.llm_skip_reason).toBeUndefined();
+    expect(payload.debug?.llm_skip_reason_detail).toBeUndefined();
     expect((payload.debug?.llm_calls ?? []).length).toBeGreaterThan(0);
     expect(payload.debug?.llm_calls?.[0]?.backend).toBe("http");
     expect(payload.debug?.llm_calls?.[0]?.providerCalled).toBe(true);
