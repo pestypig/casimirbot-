@@ -84,6 +84,10 @@ describe("Helix Ask llm debug skip metadata", () => {
         llm_invoke_attempted?: boolean;
         llm_skip_reason?: string;
         llm_skip_reason_detail?: string;
+        intent_domain?: string;
+        requires_repo_evidence?: boolean;
+        llm_backend_used?: string;
+        llm_provider_called?: boolean;
         llm_short_circuit_rule?: string;
         llm_short_circuit_reason?: string;
         llm_short_circuit_bypassed?: boolean;
@@ -103,6 +107,38 @@ describe("Helix Ask llm debug skip metadata", () => {
     expect(payload.debug?.llm_force_probe_requested).toBe(false);
     expect(payload.debug?.llm_force_probe_enabled).toBe(false);
     expect((payload.debug?.llm_calls ?? []).length).toBe(0);
+  }, 45000);
+
+  it("keeps conversational ideology prompts on invoke path without forced short-circuit", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "How does Feedback Loop Hygiene affect society?",
+        debug: true,
+        verbosity: "brief",
+        sessionId: "llm-ideology-open-world",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      debug?: {
+        intent_domain?: string;
+        requires_repo_evidence?: boolean;
+        llm_invoke_attempted?: boolean;
+        llm_skip_reason?: string;
+        llm_skip_reason_detail?: string;
+        llm_backend_used?: string;
+        llm_provider_called?: boolean;
+        llm_calls?: Array<unknown>;
+      };
+    };
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_skip_reason).toBeUndefined();
+    expect(payload.debug?.llm_skip_reason_detail).toBeUndefined();
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect((payload.debug?.llm_calls ?? []).length).toBeGreaterThan(0);
   }, 45000);
 
   it("allows debug forceLlmProbe to bypass short-circuit and record an LLM attempt", async () => {

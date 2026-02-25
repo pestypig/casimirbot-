@@ -19708,8 +19708,30 @@ const executeHelixAsk = async ({
         intentReasonBase = `${intentReasonBase}|relation:warp_ethos`;
       }
     }
-    const isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
+    let isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
     const isIdeologyConversationalMode = isIdeologyReferenceIntent && ideologyConversationalMode;
+    const ideologyConversationalOpenWorldMode =
+      ideologyConversationalMode &&
+      !explicitRepoExpectation &&
+      !hasFilePathHints &&
+      !HELIX_ASK_REPO_FORCE.test(baseQuestion);
+    if (ideologyConversationalOpenWorldMode) {
+      const fallbackProfile = resolveFallbackIntentProfile("general");
+      intentProfile = fallbackProfile;
+      intentReasonBase = `${intentReasonBase}|ideology_open_world`;
+      requiresRepoEvidence = false;
+      hasRepoHints = false;
+      repoExpectationLevel = "low";
+      if (!repoExpectationSignals.includes("ideology_open_world")) {
+        repoExpectationSignals.push("ideology_open_world");
+      }
+      isIdeologyReferenceIntent = false;
+      logEvent("Fallback", "ideology_chat -> general", "open_world_mode");
+      if (debugPayload) {
+        debugPayload.repo_expectation_level = repoExpectationLevel;
+        debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
+      }
+    }
     const mandatorySecurityGuardrailRetrieval =
       isSecurityRiskPrompt(baseQuestion) || topicTags.includes("security");
     if (mandatorySecurityGuardrailRetrieval) {
@@ -19731,7 +19753,12 @@ const executeHelixAsk = async ({
         reason: "ideology_chat_mode",
       };
     }
-    if (requiresRepoEvidence && intentProfile.domain === "general" && !isIdeologyReferenceIntent) {
+    if (
+      requiresRepoEvidence &&
+      intentProfile.domain === "general" &&
+      !isIdeologyReferenceIntent &&
+      !ideologyConversationalOpenWorldMode
+    ) {
       const fallbackProfile = resolveFallbackIntentProfile("hybrid");
       intentProfile = fallbackProfile;
       intentReasonBase = `${intentReasonBase}|obligation:repo_required`;
@@ -19741,7 +19768,8 @@ const executeHelixAsk = async ({
       !requiresRepoEvidence &&
       repoExpectationLevel !== "low" &&
       intentProfile.domain === "general" &&
-      !isIdeologyReferenceIntent
+      !isIdeologyReferenceIntent &&
+      !ideologyConversationalOpenWorldMode
     ) {
       const fallbackProfile = resolveFallbackIntentProfile("hybrid");
       intentProfile = fallbackProfile;
@@ -20102,20 +20130,31 @@ const executeHelixAsk = async ({
       }
       if (conceptMatch) {
         answerPath.push(`concept:${conceptMatch.card.id}`);
-        if (repoExpectationScore < 2) {
-          repoExpectationScore = 2;
+        const conceptEscalatesRepoExpectation =
+          explicitRepoExpectation ||
+          hasFilePathHints ||
+          intentDomain !== "general" ||
+          isIdeologyReferenceIntent;
+        if (conceptEscalatesRepoExpectation) {
+          if (repoExpectationScore < 2) {
+            repoExpectationScore = 2;
+          }
+          if (!repoExpectationSignals.includes("concept_match")) {
+            repoExpectationSignals.push("concept_match");
+          }
+          repoExpectationLevel =
+            repoExpectationScore >= 3
+              ? "high"
+              : repoExpectationScore >= 2
+                ? "medium"
+                : "low";
+          hasRepoHints = true;
         }
-        if (!repoExpectationSignals.includes("concept_match")) {
-          repoExpectationSignals.push("concept_match");
-        }
-        repoExpectationLevel =
-          repoExpectationScore >= 3
-            ? "high"
-            : repoExpectationScore >= 2
-              ? "medium"
-              : "low";
-        hasRepoHints = true;
-        if (intentStrategy !== "constraint_report") {
+        const conceptForcesRepoEvidence =
+          !ideologyConversationalOpenWorldMode &&
+          intentStrategy !== "constraint_report" &&
+          conceptEscalatesRepoExpectation;
+        if (conceptForcesRepoEvidence) {
           requiresRepoEvidence = true;
           if (!isRepoQuestion) {
             isRepoQuestion = true;
@@ -25331,9 +25370,40 @@ const executeHelixAsk = async ({
     };
     const shouldShortCircuitAnswer =
       Boolean(fallbackAnswer) &&
-      (forcedAnswerIsHard || (!prompt && !isIdeologyReferenceIntent));
+      (() => {
+        const forcedRule = answerPath.find((entry) => entry.startsWith("forcedAnswer:")) ?? null;
+        const hasClarifyOrFailClosedPath = answerPath.some(
+          (entry) => entry.startsWith("clarify:") || entry.startsWith("failClosed:"),
+        );
+        const hardForcedShortCircuitRules = new Set([
+          "forcedAnswer:math_solver",
+          "forcedAnswer:constraint_report",
+          "forcedAnswer:helix_pipeline",
+        ]);
+        const hardForcedShortCircuit =
+          forcedAnswerIsHard &&
+          !hasClarifyOrFailClosedPath &&
+          (!forcedRule || hardForcedShortCircuitRules.has(forcedRule));
+        return hardForcedShortCircuit || (!prompt && !isIdeologyReferenceIntent);
+      })();
+    const forcedRule = answerPath.find((entry) => entry.startsWith("forcedAnswer:")) ?? null;
+    const hasClarifyOrFailClosedPath = answerPath.some(
+      (entry) => entry.startsWith("clarify:") || entry.startsWith("failClosed:"),
+    );
+    const hardForcedShortCircuitRules = new Set([
+      "forcedAnswer:math_solver",
+      "forcedAnswer:constraint_report",
+      "forcedAnswer:helix_pipeline",
+    ]);
+    const forcedAnswerShortCircuitEligible =
+      forcedAnswerIsHard &&
+      !hasClarifyOrFailClosedPath &&
+      (!forcedRule || hardForcedShortCircuitRules.has(forcedRule));
     const shortCircuitReasonTokens: string[] = [];
     if (forcedAnswerIsHard) shortCircuitReasonTokens.push("forced_answer_hard");
+    if (forcedAnswerIsHard && !forcedAnswerShortCircuitEligible) {
+      shortCircuitReasonTokens.push("forced_answer_softened");
+    }
     if (!prompt && !isIdeologyReferenceIntent) shortCircuitReasonTokens.push("missing_prompt_non_ideology");
     const shortCircuitReason = shortCircuitReasonTokens.length > 0
       ? shortCircuitReasonTokens.join("+")
@@ -25352,7 +25422,6 @@ const executeHelixAsk = async ({
       String(verbosity ?? "").trim().length > 0;
     let answerContractPrimaryUsed = false;
     if (shouldShortCircuitAnswer && !bypassShortCircuit) {
-      const forcedRule = answerPath.find((entry) => entry.startsWith("forcedAnswer:")) ?? null;
       markLlmSkipDebug("short_circuit_forced_answer", forcedRule);
       const forcedRawText = stripPromptEchoFromAnswer(fallbackAnswer, baseQuestion).trim();
       const forcedCleanText = stripTruncationMarkers(formatHelixAskAnswer(forcedRawText));

@@ -14,6 +14,21 @@ Use this runbook to prove whether `/api/agi/ask` actually called the HTTP LLM pr
   - `HULL_MODE=1`
   - `HULL_ALLOW_HOSTS=api.openai.com`
 
+## One-command strict debug loop
+
+If the server is already running, use:
+
+```bash
+npm run helix:ask:dot:debug-loop -- --base-url http://127.0.0.1:5050
+```
+
+This writes `artifacts/helix-ask-dot-lane-summary.json` with:
+- preflight env snapshot (presence-only),
+- `/api/hull/status`,
+- lane A/B/C request payload + strict `debug.llm_*` fields,
+- deterministic A/B/C classification,
+- GO/NO-GO target verdict.
+
 ## Single Copy/Paste Prompt (Codex Cloud)
 
 ```text
