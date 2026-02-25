@@ -16798,6 +16798,7 @@ const executeHelixAsk = async ({
     logEvent(stage, ok ? "done" : "error", detail, startedAt, ok, meta);
   };
   const streamEmitter = createHelixAskStreamEmitter({ sessionId: askSessionId, traceId: askTraceId, onChunk: streamChunk });
+  let debugPayloadForFallback: Record<string, unknown> | undefined;
   try {
     logDebug("executeHelixAsk START", {
       traceId: askTraceId,
@@ -18050,6 +18051,9 @@ const executeHelixAsk = async ({
     } | undefined = debugEnabled
       ? { two_pass: false, micro_pass: false }
       : undefined;
+    if (debugPayload && typeof debugPayload === "object") {
+      debugPayloadForFallback = debugPayload as Record<string, unknown>;
+    }
     if (debugPayload) {
       debugPayload.trace_id = askTraceId;
       if (askSessionId) {
@@ -28617,8 +28621,8 @@ const executeHelixAsk = async ({
       reportScaffoldGuardTriggered?: boolean;
     }): Record<string, unknown> => {
       const baseDebug =
-        debugPayload && typeof debugPayload === "object"
-          ? ({ ...(debugPayload as Record<string, unknown>) } as Record<string, unknown>)
+        debugPayloadForFallback && typeof debugPayloadForFallback === "object"
+          ? ({ ...debugPayloadForFallback } as Record<string, unknown>)
           : {};
       return {
         ...baseDebug,
