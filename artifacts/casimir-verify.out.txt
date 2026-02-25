@@ -3,8 +3,8 @@
 > tsx cli/casimir-verify.ts --url http://127.0.0.1:5050/api/agi/adapter/run --pack repo-convergence --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci
 
 {
-  "traceId": "adapter:d0b10575-016b-4e58-b921-dac56af8cbfd",
-  "runId": "2",
+  "traceId": "adapter:e97e097c-c65b-4653-8872-a1b9bc2385e1",
+  "runId": "1",
   "verdict": "PASS",
   "pass": true,
   "firstFail": null,
@@ -23,11 +23,11 @@
     },
     {
       "kind": "training-trace-id",
-      "ref": "2"
+      "ref": "1"
     },
     {
       "kind": "training-trace-url",
-      "ref": "/api/agi/training-trace/2"
+      "ref": "/api/agi/training-trace/1"
     },
     {
       "kind": "training-trace-export",
