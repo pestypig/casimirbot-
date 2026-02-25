@@ -1,5 +1,4 @@
 import express from "express";
-import http from "http";
 import type { Server } from "http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +7,7 @@ const ENV_KEYS = [
   "HELIX_ASK_MICRO_PASS",
   "HELIX_ASK_MICRO_PASS_AUTO",
   "HELIX_ASK_TWO_PASS",
+  "HELIX_ASK_ALLOW_FORCE_LLM_PROBE",
   "LLM_RUNTIME",
   "LLM_HTTP_BASE",
   "LLM_HTTP_API_KEY",
@@ -16,9 +16,7 @@ const ENV_KEYS = [
 
 describe("Helix Ask llm debug skip metadata", () => {
   let server: Server;
-  let mockLlmServer: Server;
   let baseUrl = "http://127.0.0.1:0";
-  let mockLlmBase = "http://127.0.0.1:0";
   const previousEnv: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
   beforeAll(async () => {
@@ -29,43 +27,11 @@ describe("Helix Ask llm debug skip metadata", () => {
     process.env.HELIX_ASK_MICRO_PASS = "0";
     process.env.HELIX_ASK_MICRO_PASS_AUTO = "0";
     process.env.HELIX_ASK_TWO_PASS = "0";
+    process.env.HELIX_ASK_ALLOW_FORCE_LLM_PROBE = "1";
     process.env.LLM_RUNTIME = "http";
+    process.env.LLM_HTTP_BASE = "http://127.0.0.1:9";
     process.env.LLM_HTTP_API_KEY = "test-key";
     process.env.HULL_MODE = "0";
-
-    mockLlmServer = http.createServer((req, res) => {
-      if (req.method !== "POST" || req.url !== "/v1/chat/completions") {
-        res.statusCode = 404;
-        res.end("not found");
-        return;
-      }
-      let body = "";
-      req.on("data", (chunk) => {
-        body += chunk.toString();
-      });
-      req.on("end", () => {
-        res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify({
-            id: "chatcmpl-test",
-            object: "chat.completion",
-            choices: [{ index: 0, message: { role: "assistant", content: "Mock HTTP response." } }],
-            usage: { prompt_tokens: 4, completion_tokens: 3, total_tokens: 7 },
-            model: "gpt-4o-mini",
-          }),
-        );
-      });
-    });
-    await new Promise<void>((resolve) => {
-      mockLlmServer.listen(0, "127.0.0.1", () => {
-        const address = mockLlmServer.address();
-        if (address && typeof address === "object") {
-          mockLlmBase = `http://127.0.0.1:${address.port}`;
-        }
-        resolve();
-      });
-    });
-    process.env.LLM_HTTP_BASE = mockLlmBase;
 
     vi.resetModules();
     const { planRouter } = await import("../server/routes/agi.plan");
@@ -87,13 +53,6 @@ describe("Helix Ask llm debug skip metadata", () => {
     await new Promise<void>((resolve) => {
       if (server) {
         server.close(() => resolve());
-      } else {
-        resolve();
-      }
-    });
-    await new Promise<void>((resolve) => {
-      if (mockLlmServer) {
-        mockLlmServer.close(() => resolve());
       } else {
         resolve();
       }
@@ -125,6 +84,11 @@ describe("Helix Ask llm debug skip metadata", () => {
         llm_invoke_attempted?: boolean;
         llm_skip_reason?: string;
         llm_skip_reason_detail?: string;
+        llm_short_circuit_rule?: string;
+        llm_short_circuit_reason?: string;
+        llm_short_circuit_bypassed?: boolean;
+        llm_force_probe_requested?: boolean;
+        llm_force_probe_enabled?: boolean;
         llm_calls?: Array<unknown>;
       };
     };
@@ -132,41 +96,44 @@ describe("Helix Ask llm debug skip metadata", () => {
     expect(payload.debug?.llm_invoke_attempted).toBe(false);
     expect(payload.debug?.llm_skip_reason).toBe("short_circuit_forced_answer");
     expect(payload.debug?.llm_skip_reason_detail).toBe("forcedAnswer:math_solver");
+    expect(payload.debug?.llm_short_circuit_rule).toBe("fallback_answer_short_circuit_v1");
+    expect(typeof payload.debug?.llm_short_circuit_reason).toBe("string");
+    expect((payload.debug?.llm_short_circuit_reason ?? "").length).toBeGreaterThan(0);
+    expect(payload.debug?.llm_short_circuit_bypassed).toBe(false);
+    expect(payload.debug?.llm_force_probe_requested).toBe(false);
+    expect(payload.debug?.llm_force_probe_enabled).toBe(false);
     expect((payload.debug?.llm_calls ?? []).length).toBe(0);
   }, 45000);
-  it("invokes HTTP LLM for non-deterministic repo questions", async () => {
+
+  it("allows debug forceLlmProbe to bypass short-circuit and record an LLM attempt", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        question: "Summarize one implementation detail from server/routes/agi.plan.ts.",
+        question: "What is 2 + 2?",
         debug: true,
-        sessionId: "llm-http-proof",
+        forceLlmProbe: true,
+        sessionId: "llm-probe-proof",
       }),
     });
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
       debug?: {
-        llm_route_expected_backend?: string;
         llm_invoke_attempted?: boolean;
         llm_skip_reason?: string;
         llm_skip_reason_detail?: string;
-        llm_calls?: Array<{
-          backend?: string;
-          status?: number;
-          providerCalled?: boolean;
-        }>;
+        llm_short_circuit_bypassed?: boolean;
+        llm_force_probe_requested?: boolean;
+        llm_force_probe_enabled?: boolean;
+        llm_calls?: Array<unknown>;
       };
     };
-    expect(payload.debug?.llm_route_expected_backend).toBe("http");
+    expect(payload.debug?.llm_force_probe_requested).toBe(true);
+    expect(payload.debug?.llm_force_probe_enabled).toBe(true);
+    expect(payload.debug?.llm_short_circuit_bypassed).toBe(true);
     expect(payload.debug?.llm_invoke_attempted).toBe(true);
     expect(payload.debug?.llm_skip_reason).toBeUndefined();
     expect(payload.debug?.llm_skip_reason_detail).toBeUndefined();
     expect((payload.debug?.llm_calls ?? []).length).toBeGreaterThan(0);
-    expect(payload.debug?.llm_calls?.[0]?.backend).toBe("http");
-    expect(payload.debug?.llm_calls?.[0]?.providerCalled).toBe(true);
-    expect(payload.debug?.llm_calls?.[0]?.status).toBe(200);
   }, 45000);
-
 });
-

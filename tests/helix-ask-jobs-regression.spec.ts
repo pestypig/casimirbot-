@@ -22,7 +22,9 @@ describe("Helix Ask jobs endpoint regression", () => {
   const previousEnv: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
   beforeAll(async () => {
-    for (const key of ENV_KEYS) previousEnv[key] = process.env[key];
+    for (const key of ENV_KEYS) {
+      previousEnv[key] = process.env[key];
+    }
     process.env.ENABLE_AGI = "1";
     process.env.HELIX_ASK_MICRO_PASS = "0";
     process.env.HELIX_ASK_MICRO_PASS_AUTO = "0";
@@ -54,7 +56,9 @@ describe("Helix Ask jobs endpoint regression", () => {
     await new Promise<void>((resolve) => {
       mockLlmServer.listen(0, "127.0.0.1", () => {
         const address = mockLlmServer.address();
-        if (address && typeof address === "object") mockLlmBase = `http://127.0.0.1:${address.port}`;
+        if (address && typeof address === "object") {
+          mockLlmBase = `http://127.0.0.1:${address.port}`;
+        }
         resolve();
       });
     });
@@ -87,8 +91,11 @@ describe("Helix Ask jobs endpoint regression", () => {
     });
     for (const key of ENV_KEYS) {
       const value = previousEnv[key];
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
     }
   });
 
@@ -112,7 +119,17 @@ describe("Helix Ask jobs endpoint regression", () => {
       jobId?: string;
       status?: string;
       traceId?: string;
-      result?: { debug?: { llm_invoke_attempted?: boolean; llm_backend_used?: string; llm_http_status?: number; llm_provider_called?: boolean; llm_skip_reason?: string; llm_skip_reason_detail?: string } };
+      result?: {
+        debug?: {
+          llm_invoke_attempted?: boolean;
+          llm_backend_used?: string;
+          llm_http_status?: number;
+          llm_provider_called?: boolean;
+          llm_model?: string;
+          llm_skip_reason?: string;
+          llm_skip_reason_detail?: string;
+        };
+      };
     } = {};
     for (let attempt = 0; attempt < 80; attempt += 1) {
       const getResponse = await fetch(`${baseUrl}/api/agi/ask/jobs/${payload.jobId}`);
@@ -129,6 +146,7 @@ describe("Helix Ask jobs endpoint regression", () => {
     expect(jobPayload.result?.debug?.llm_backend_used).toBe("http");
     expect(jobPayload.result?.debug?.llm_http_status).toBe(200);
     expect(jobPayload.result?.debug?.llm_provider_called).toBe(true);
+    expect(jobPayload.result?.debug?.llm_model).toBe("gpt-4o-mini");
     expect(jobPayload.result?.debug?.llm_skip_reason).toBeUndefined();
     expect(jobPayload.result?.debug?.llm_skip_reason_detail).toBeUndefined();
   }, 120000);

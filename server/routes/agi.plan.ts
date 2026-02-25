@@ -13104,6 +13104,7 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
       })
       .optional(),
     debug: z.boolean().optional(),
+    forceLlmProbe: z.boolean().optional(),
     dryRun: z.boolean().optional(),
     verbosity: z.enum(["brief", "normal", "extended"]).optional(),
     searchQuery: z.string().optional(),
@@ -16603,6 +16604,11 @@ const executeHelixAsk = async ({
   const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
   const dryRun = parsed.data.dryRun === true;
   const debugEnabled = parsed.data.debug === true;
+  const forceLlmProbeRequested = parsed.data.forceLlmProbe === true;
+  const forceLlmProbeAllowed =
+    process.env.HELIX_ASK_ALLOW_FORCE_LLM_PROBE === "1" ||
+    process.env.NODE_ENV !== "production";
+  const forceLlmProbe = forceLlmProbeRequested && debugEnabled && forceLlmProbeAllowed;
   const skipReportModeEffective = Boolean(skipReportMode || HELIX_ASK_SINGLE_LLM);
   const debugLogsEnabled = process.env.HELIX_ASK_DEBUG === "1";
   const logDebug = (message: string, detail?: Record<string, unknown>): void => {
@@ -17689,6 +17695,11 @@ const executeHelixAsk = async ({
       llm_invoke_attempted?: boolean;
       llm_skip_reason?: string;
       llm_skip_reason_detail?: string;
+      llm_short_circuit_rule?: string;
+      llm_short_circuit_reason?: string;
+      llm_short_circuit_bypassed?: boolean;
+      llm_force_probe_requested?: boolean;
+      llm_force_probe_enabled?: boolean;
       llm_model?: string;
       llm_http_status?: number;
       llm_routed_via?: string;
@@ -18054,7 +18065,8 @@ const executeHelixAsk = async ({
       );
       debugPayload.llm_invoke_attempted = false;
       debugPayload.llm_skip_reason = "not_attempted";
-      debugPayload.llm_skip_reason_detail = "";
+      debugPayload.llm_force_probe_requested = forceLlmProbeRequested;
+      debugPayload.llm_force_probe_enabled = forceLlmProbe;
     }
     const markLlmSkipDebug = (reason: string | null | undefined, detail?: string | null): void => {
       if (!debugPayload) return;
@@ -18063,7 +18075,11 @@ const executeHelixAsk = async ({
       if (!normalized) return;
       const normalizedDetail = typeof detail === "string" ? detail.trim() : "";
       debugPayload.llm_skip_reason = normalized;
-      debugPayload.llm_skip_reason_detail = normalizedDetail;
+      if (normalizedDetail) {
+        debugPayload.llm_skip_reason_detail = normalizedDetail;
+      } else {
+        delete debugPayload.llm_skip_reason_detail;
+      }
     };
     const appendLlmCallDebug = (meta: HelixAskLlmCallMeta | undefined): void => {
       if (!debugPayload || !meta) return;
@@ -25309,13 +25325,21 @@ const executeHelixAsk = async ({
       });
       return { text: next, reasons };
     };
-    const forcedAnswerClarifyGate = answerPath.some((entry) => entry.startsWith("clarify:"));
-    const forcedAnswerFailClosedGate = answerPath.some((entry) => entry.startsWith("failClosed:"));
     const shouldShortCircuitAnswer =
       Boolean(fallbackAnswer) &&
-      forcedAnswerIsHard &&
-      !forcedAnswerClarifyGate &&
-      !forcedAnswerFailClosedGate;
+      (forcedAnswerIsHard || (!prompt && !isIdeologyReferenceIntent));
+    const shortCircuitReasonTokens: string[] = [];
+    if (forcedAnswerIsHard) shortCircuitReasonTokens.push("forced_answer_hard");
+    if (!prompt && !isIdeologyReferenceIntent) shortCircuitReasonTokens.push("missing_prompt_non_ideology");
+    const shortCircuitReason = shortCircuitReasonTokens.length > 0
+      ? shortCircuitReasonTokens.join("+")
+      : "fallback_answer_present";
+    const bypassShortCircuit = shouldShortCircuitAnswer && forceLlmProbe;
+    if (debugPayload && shouldShortCircuitAnswer) {
+      debugPayload.llm_short_circuit_rule = "fallback_answer_short_circuit_v1";
+      debugPayload.llm_short_circuit_reason = shortCircuitReason;
+      debugPayload.llm_short_circuit_bypassed = bypassShortCircuit;
+    }
     const shouldFastPathFinalize =
       shouldShortCircuitAnswer &&
       isIdeologyReferenceIntent &&
@@ -25323,7 +25347,7 @@ const executeHelixAsk = async ({
       forcedAnswerIsHard &&
       String(verbosity ?? "").trim().length > 0;
     let answerContractPrimaryUsed = false;
-    if (shouldShortCircuitAnswer) {
+    if (shouldShortCircuitAnswer && !bypassShortCircuit) {
       const forcedRule = answerPath.find((entry) => entry.startsWith("forcedAnswer:")) ?? null;
       markLlmSkipDebug("short_circuit_forced_answer", forcedRule);
       const forcedRawText = stripPromptEchoFromAnswer(fallbackAnswer, baseQuestion).trim();
