@@ -133,7 +133,7 @@ describe("Helix Ask llm debug skip metadata", () => {
     expect((payload.debug?.llm_skip_reason ?? "").length).toBeGreaterThan(0);
     expect((payload.debug?.llm_calls ?? []).length).toBe(0);
   }, 45000);
-  it("invokes HTTP LLM for fail-closed clarify routes instead of short-circuiting", async () => {
+  it("invokes HTTP LLM for non-deterministic repo questions", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
