@@ -26228,14 +26228,31 @@ const executeHelixAsk = async ({
 
       const fallbackNeeded = !resultForAnswer || !resultForAnswer.text?.trim();
       if (answerGenerationFailed || fallbackNeeded) {
-        if (!fallbackAnswer) {
+        const repoRuntimeFallbackMessage =
+          "Runtime fallback: Unable to complete a repo-grounded LLM pass. Verify LLM_HTTP_BASE and API key wiring, then retry with the exact file path(s) you want analyzed.";
+        const useRepoRuntimeFallback =
+          answerGenerationFailed &&
+          (isRepoQuestion ||
+            requiresRepoEvidence ||
+            explicitRepoExpectation ||
+            hasFilePathHints ||
+            intentDomain === "repo" ||
+            intentDomain === "hybrid");
+        const selectedFallback = useRepoRuntimeFallback
+          ? repoRuntimeFallbackMessage
+          : fallbackAnswer;
+        if (!selectedFallback) {
           throw new Error("No answer text available");
         }
-        result = { text: fallbackAnswer } as LocalAskResult;
+        result = { text: selectedFallback } as LocalAskResult;
         resultForAnswer = result;
-        answerText = fallbackAnswer;
+        answerText = selectedFallback;
         answerMeta = isShortAnswer(answerText, verbosity);
-        answerPath.push("answer:fallback");
+        answerPath.push(useRepoRuntimeFallback ? "answer:fallback_runtime_repo" : "answer:fallback");
+        if (debugPayload && useRepoRuntimeFallback) {
+          debugPayload.answer_runtime_fallback = true;
+          debugPayload.answer_runtime_fallback_reason = "repo_llm_unavailable";
+        }
       } else {
         result = resultForAnswer as LocalAskResult;
       }
@@ -28064,12 +28081,24 @@ const executeHelixAsk = async ({
         }
       }
 
+      const runtimeFallbackPinned =
+        answerPath.includes("answer:fallback_runtime_repo") ||
+        Boolean(debugPayload?.answer_runtime_fallback);
+      if (debugPayload) {
+        debugPayload.answer_runtime_fallback_pinned = runtimeFallbackPinned;
+      }
+      if (runtimeFallbackPinned) {
+        answerPath.push("fallback:runtime_repo_preserve");
+      }
       const weakEvidenceForDeterministicFallback =
-        !evidenceGateOk ||
-        claimGateFailed ||
-        selectedMove === "retrieve_more" ||
-        selectedMove === "clarify" ||
-        selectedMove === "fail_closed";
+        !runtimeFallbackPinned &&
+        (
+          !evidenceGateOk ||
+          claimGateFailed ||
+          selectedMove === "retrieve_more" ||
+          selectedMove === "clarify" ||
+          selectedMove === "fail_closed"
+        );
       if (weakEvidenceForDeterministicFallback) {
         const allowed = normalizeCitations([
           ...extractFilePathsFromText(evidenceText),
@@ -28114,6 +28143,7 @@ const executeHelixAsk = async ({
         }
       }
       const placeholderFallbackEligible =
+        !runtimeFallbackPinned &&
         hasModelPlaceholderOrStub(cleaned) &&
         (HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
           intentDomain === "repo" ||
@@ -28178,12 +28208,15 @@ const executeHelixAsk = async ({
         intentDomain !== "repo" &&
         intentProfile.id !== "repo.warp_definition_docs_first";
       const qualityFloorEligible =
-        HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
-        intentDomain === "repo" ||
-        intentDomain === "hybrid" ||
-        relationQueryForFinalize ||
-        requiresRepoEvidence ||
-        openWorldExplainer;
+        !runtimeFallbackPinned &&
+        (
+          HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
+          intentDomain === "repo" ||
+          intentDomain === "hybrid" ||
+          relationQueryForFinalize ||
+          requiresRepoEvidence ||
+          openWorldExplainer
+        );
       const clockASnapshot = {
         budget_ms: Math.max(0, runtimeContract.clockA.budget_ms ?? 0),
         complete_contract_on_budget: true,
@@ -28482,7 +28515,7 @@ const executeHelixAsk = async ({
       }
       const genericScaffoldDetected =
         hasModelPlaceholderOrStub(cleaned) || isUnverifiedScaffoldScientificReport(cleaned.trim());
-      if (genericScaffoldDetected) {
+      if (genericScaffoldDetected && !runtimeFallbackPinned) {
         const emergencyFallback = RenderPlatonicFallback({
           prompt: baseQuestion,
           anchors: contextFiles,
