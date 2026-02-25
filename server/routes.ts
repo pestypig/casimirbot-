@@ -236,7 +236,6 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/analysis", analysisLoopRouter);
     app.use(noiseGensRouter);
     app.use("/api/ai", aiPlanRouter);
-    app.use("/api/hull/status", hullStatusRouter);
     if (flagEnabled(process.env.ENABLE_STAR_SERVICE ?? process.env.ENABLE_STAR, true)) {
       app.use("/api/star", starRouter);
       app.use("/api/neuro", neuroRouter);
@@ -316,6 +315,10 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/agi", planRouter);
     app.use("/api/agi/eval", evalRouter);
   }
+
+  // Mount hull status after AGI route initialization so readiness checks that
+  // depend on /api/hull/status imply AGI endpoints are also attached.
+  app.use("/api/hull/status", hullStatusRouter);
 
   const enableSmallLlmRoutes = !fastBoot && flagEnabled(process.env.ENABLE_SMALL_LLM, true);
   if (enableSmallLlmRoutes) {
@@ -1498,4 +1501,3 @@ export const routes = [
   { path: '/inspector', name: 'inspector' }
 ];
 export default routes;
-
