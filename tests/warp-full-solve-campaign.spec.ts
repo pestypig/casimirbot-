@@ -144,6 +144,33 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.reason.join(' | ')).not.toContain('synthesized unknown diagnostics');
   });
 
+  it('flags synthesized_unknown when both G4 entries are absent', () => {
+    const diagnostics = deriveG4Diagnostics({
+      evaluation: {
+        constraints: [{ id: 'OtherConstraint', status: 'pass', note: 'not part of G4' }],
+      },
+    } as any);
+    expect(diagnostics.fordRomanStatus).toBe('missing');
+    expect(diagnostics.thetaAuditStatus).toBe('missing');
+    expect(diagnostics.source).toBe('synthesized_unknown');
+    expect(diagnostics.reasonCode).toEqual([
+      'G4_MISSING_SOURCE_FORD_ROMAN_QI',
+      'G4_MISSING_SOURCE_THETA_AUDIT',
+    ]);
+  });
+
+  it('flags synthesized_unknown for partial G4 payloads without false evaluator attribution', () => {
+    const diagnostics = deriveG4Diagnostics({
+      evaluation: {
+        constraints: [{ id: 'ThetaAudit', status: 'pass', note: 'ThetaAudit evaluated from warp viability.' }],
+      },
+    } as any);
+    expect(diagnostics.fordRomanStatus).toBe('missing');
+    expect(diagnostics.thetaAuditStatus).toBe('pass');
+    expect(diagnostics.source).toBe('synthesized_unknown');
+    expect(diagnostics.reasonCode).toEqual(['G4_MISSING_SOURCE_FORD_ROMAN_QI']);
+  });
+
   it('derives deterministic first-fail from canonical gate order', () => {
     const gateMap = {
       G0: { status: 'PASS', reason: 'ok', source: 'x' },

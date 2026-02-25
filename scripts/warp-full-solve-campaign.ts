@@ -758,9 +758,18 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
     return m?.[1] ?? null;
   };
   const hasSynthesizedTag = [ford, theta].some((entry) => typeof entry?.note === 'string' && entry.note.includes('source=synthesized_unknown'));
-  const source: EvidencePack['g4Diagnostics']['source'] = hasSynthesizedTag ? 'synthesized_unknown' : 'evaluator_constraints';
+  const missingAnyHardSource = !ford || !theta;
+  const source: EvidencePack['g4Diagnostics']['source'] = hasSynthesizedTag || missingAnyHardSource ? 'synthesized_unknown' : 'evaluator_constraints';
   const reason = [readReason(ford), readReason(theta)].filter((msg): msg is string => typeof msg === 'string');
   const reasonCode = [readReasonCode(ford), readReasonCode(theta)].filter((code): code is string => typeof code === 'string');
+  if (!ford && !reasonCode.includes('G4_MISSING_SOURCE_FORD_ROMAN_QI')) {
+    reasonCode.push('G4_MISSING_SOURCE_FORD_ROMAN_QI');
+    reason.push('source=synthesized_unknown;reasonCode=G4_MISSING_SOURCE_FORD_ROMAN_QI;FordRomanQI missing from evaluation constraints.');
+  }
+  if (!theta && !reasonCode.includes('G4_MISSING_SOURCE_THETA_AUDIT')) {
+    reasonCode.push('G4_MISSING_SOURCE_THETA_AUDIT');
+    reason.push('source=synthesized_unknown;reasonCode=G4_MISSING_SOURCE_THETA_AUDIT;ThetaAudit missing from evaluation constraints.');
+  }
   return {
     fordRomanStatus: toStatus(ford),
     thetaAuditStatus: toStatus(theta),
