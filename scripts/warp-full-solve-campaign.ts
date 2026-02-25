@@ -804,12 +804,21 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
     const m = ford.note.match(new RegExp(`${escaped}=([^;|]+)`));
     return m?.[1]?.trim() ?? null;
   };
-  const parseNumberField = (key: string): number | null => {
-    const parsed = parseFordField(key);
-    if (parsed == null || parsed.toLowerCase() === 'n/a' || parsed.toLowerCase() === 'unknown') return null;
-    const n = Number(parsed);
-    return Number.isFinite(n) ? n : null;
+  const parseStrictNumber = (value: unknown): number | undefined => {
+    if (value == null) return undefined;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+    if (typeof value !== 'string') return undefined;
+    const text = value.trim();
+    if (text.length === 0) return undefined;
+    const lowered = text.toLowerCase();
+    if (lowered === 'n/a' || lowered === 'unknown' || lowered === 'undefined' || lowered === 'null' || lowered === 'nan' || lowered === 'infinity' || lowered === '+infinity' || lowered === '-infinity') {
+      return undefined;
+    }
+    const n = Number(text);
+    return Number.isFinite(n) ? n : undefined;
   };
+  const parseNumberField = (key: string): number | undefined => parseStrictNumber(parseFordField(key));
+  const parseSnapshotNumber = (value: unknown): number | undefined => parseStrictNumber(value);
   const hasSynthesizedTag = [ford, theta].some((entry) => typeof entry?.note === 'string' && entry.note.includes('source=synthesized_unknown'));
   const missingAnyHardSource = !ford || !theta;
   const source: EvidencePack['g4Diagnostics']['source'] = hasSynthesizedTag || missingAnyHardSource ? 'synthesized_unknown' : 'evaluator_constraints';
@@ -825,16 +834,10 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
     source,
     reason,
     reasonCode: orderReasonCodes(reasonCode),
-    lhs_Jm3:
-      Number.isFinite(Number(snapshot?.qi_lhs_Jm3)) ? Number(snapshot.qi_lhs_Jm3) : parseNumberField('lhs_Jm3'),
-    bound_Jm3:
-      Number.isFinite(Number(snapshot?.qi_bound_Jm3)) ? Number(snapshot.qi_bound_Jm3) : parseNumberField('bound_Jm3'),
-    marginRatio:
-      Number.isFinite(Number(snapshot?.qi_margin_ratio)) ? Number(snapshot.qi_margin_ratio) : parseNumberField('marginRatio'),
-    marginRatioRaw:
-      Number.isFinite(Number(snapshot?.qi_margin_ratio_raw))
-        ? Number(snapshot.qi_margin_ratio_raw)
-        : parseNumberField('marginRatioRaw'),
+    lhs_Jm3: parseSnapshotNumber(snapshot?.qi_lhs_Jm3) ?? parseNumberField('lhs_Jm3'),
+    bound_Jm3: parseSnapshotNumber(snapshot?.qi_bound_Jm3) ?? parseNumberField('bound_Jm3'),
+    marginRatio: parseSnapshotNumber(snapshot?.qi_margin_ratio) ?? parseNumberField('marginRatio'),
+    marginRatioRaw: parseSnapshotNumber(snapshot?.qi_margin_ratio_raw) ?? parseNumberField('marginRatioRaw'),
     rhoSource:
       typeof snapshot?.qi_rho_source === 'string'
         ? snapshot.qi_rho_source
@@ -855,10 +858,7 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
           : parseFordField('curvatureOk') === 'false'
             ? false
             : undefined,
-    curvatureRatio:
-      Number.isFinite(Number(snapshot?.qi_curvature_ratio))
-        ? Number(snapshot.qi_curvature_ratio)
-        : parseNumberField('curvatureRatio'),
+    curvatureRatio: parseSnapshotNumber(snapshot?.qi_curvature_ratio) ?? parseNumberField('curvatureRatio'),
     curvatureEnforced:
       typeof snapshot?.qi_curvature_enforced === 'boolean'
         ? snapshot.qi_curvature_enforced
@@ -867,12 +867,9 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
           : parseFordField('curvatureEnforced') === 'false'
             ? false
             : undefined,
-    tau_s: Number.isFinite(Number(snapshot?.qi_bound_tau_s)) ? Number(snapshot.qi_bound_tau_s) : parseNumberField('tau_s'),
-    K: Number.isFinite(Number(snapshot?.qi_bound_K)) ? Number(snapshot.qi_bound_K) : parseNumberField('K'),
-    safetySigma_Jm3:
-      Number.isFinite(Number(snapshot?.qi_safetySigma_Jm3))
-        ? Number(snapshot.qi_safetySigma_Jm3)
-        : parseNumberField('safetySigma_Jm3'),
+    tau_s: parseSnapshotNumber(snapshot?.qi_bound_tau_s) ?? parseNumberField('tau_s'),
+    K: parseSnapshotNumber(snapshot?.qi_bound_K) ?? parseNumberField('K'),
+    safetySigma_Jm3: parseSnapshotNumber(snapshot?.qi_safetySigma_Jm3) ?? parseNumberField('safetySigma_Jm3'),
   };
 };
 

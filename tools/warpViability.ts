@@ -88,6 +88,11 @@ const toFinite = (value: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+const finiteOrUndefined = (value: unknown): number | undefined => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+};
+
 const resolveVdbDerivativeMaxAbs = (
   region: any,
   minKey: "bprime_min" | "bdouble_min",
@@ -1015,22 +1020,22 @@ export async function evaluateWarpViability(
     zetaRaw: (pipeline as any).zetaRaw,
     qiGuardrail: qiGuard?.marginRatio,
     qi_applicability_status: qiGuard?.applicabilityStatus,
-    qi_lhs_Jm3: qiGuard?.lhs_Jm3,
-    qi_bound_Jm3: qiGuard?.bound_Jm3,
-    qi_margin_ratio: qiGuard?.marginRatio,
-    qi_margin_ratio_raw: qiGuard?.marginRatioRaw,
+    qi_lhs_Jm3: finiteOrUndefined(qiGuard?.lhs_Jm3),
+    qi_bound_Jm3: finiteOrUndefined(qiGuard?.bound_Jm3),
+    qi_margin_ratio: finiteOrUndefined(qiGuard?.marginRatio),
+    qi_margin_ratio_raw: finiteOrUndefined(qiGuard?.marginRatioRaw),
     qi_rho_source: qiGuard?.rhoSource,
     qi_metric_contract_status:
       qiGuard?.metricContractOk == null ? undefined : qiGuard.metricContractOk ? "ok" : "missing",
     qi_curvature_ok: qiGuard?.curvatureOk,
-    qi_curvature_ratio: qiGuard?.curvatureRatio,
+    qi_curvature_ratio: finiteOrUndefined(qiGuard?.curvatureRatio),
     qi_curvature_enforced: qiGuard?.curvatureEnforced,
     qi_bound_tau_s:
       Number.isFinite((pipeline as any).qi?.tau_s_ms) && Number((pipeline as any).qi?.tau_s_ms) > 0
         ? Number((pipeline as any).qi?.tau_s_ms) / 1000
         : undefined,
-    qi_bound_K: Number((pipeline as any).qi?.boundK),
-    qi_safetySigma_Jm3: Number((pipeline as any).qi?.safetySigma_Jm3),
+    qi_bound_K: finiteOrUndefined((pipeline as any).qi?.boundK),
+    qi_safetySigma_Jm3: finiteOrUndefined((pipeline as any).qi?.safetySigma_Jm3),
     qi_provenance_class: qiProvenanceClass,
     qi_confidence_band: qiConfidenceBand,
     warp_mechanics_provenance_class: warpMechanicsProvenanceClass,
