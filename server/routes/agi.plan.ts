@@ -17687,6 +17687,8 @@ const executeHelixAsk = async ({
       llm_route_expected_backend?: LocalLlmBackend;
       llm_backend_used?: LocalLlmBackend;
       llm_provider_called?: boolean;
+      llm_invoke_attempted?: boolean;
+      llm_skip_reason?: string;
       llm_model?: string;
       llm_http_status?: number;
       llm_routed_via?: string;
@@ -18050,9 +18052,19 @@ const executeHelixAsk = async ({
       debugPayload.llm_api_key_present = Boolean(
         process.env.LLM_HTTP_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim(),
       );
+      debugPayload.llm_invoke_attempted = false;
+      debugPayload.llm_skip_reason = "not_attempted";
     }
+    const markLlmSkipDebug = (reason: string | null | undefined): void => {
+      if (!debugPayload) return;
+      if (debugPayload.llm_invoke_attempted) return;
+      const normalized = typeof reason === "string" ? reason.trim() : "";
+      if (!normalized) return;
+      debugPayload.llm_skip_reason = normalized;
+    };
     const appendLlmCallDebug = (meta: HelixAskLlmCallMeta | undefined): void => {
       if (!debugPayload || !meta) return;
+      debugPayload.llm_invoke_attempted = true;
       debugPayload.llm_backend_used = meta.backend;
       debugPayload.llm_provider_called = meta.providerCalled;
       debugPayload.llm_model = meta.model;
@@ -18064,6 +18076,7 @@ const executeHelixAsk = async ({
       debugPayload.llm_invoke_duration_ms = meta.durationMs;
       if (meta.errorCode) debugPayload.llm_error_code = meta.errorCode;
       if (meta.errorMessage) debugPayload.llm_error_message = meta.errorMessage;
+      delete debugPayload.llm_skip_reason;
       const prev = Array.isArray(debugPayload.llm_calls) ? debugPayload.llm_calls : [];
       debugPayload.llm_calls = [...prev, meta].slice(-16);
     };
@@ -25303,6 +25316,7 @@ const executeHelixAsk = async ({
       String(verbosity ?? "").trim().length > 0;
     let answerContractPrimaryUsed = false;
     if (shouldShortCircuitAnswer) {
+      markLlmSkipDebug("short_circuit_forced_answer");
       const forcedRawText = stripPromptEchoFromAnswer(fallbackAnswer, baseQuestion).trim();
       const forcedCleanText = stripTruncationMarkers(formatHelixAskAnswer(forcedRawText));
       const forcedMeta = isShortAnswer(forcedCleanText, verbosity);
@@ -25431,6 +25445,7 @@ const executeHelixAsk = async ({
         debugPayload.answer_token_reason = answerBudget.reason;
       }
       if (fastQualityMode && getAskElapsedMs() >= FAST_QUALITY_FINALIZE_BY_MS) {
+        markLlmSkipDebug("fast_quality_finalize_deadline");
         const clarifyLine =
           "Repo evidence was insufficient within fast mode SLA. Please point me to the most relevant file or symbol so I can answer precisely.";
         const fastQuality = applyImmediateQualityFloor(clarifyLine);
@@ -25542,6 +25557,7 @@ const executeHelixAsk = async ({
             (deterministicSanitizedContract.claims?.length ?? 0) >= 2 &&
             (deterministicSanitizedContract.sources?.length ?? 0) >= 2));
         if (deterministicQualityOk) {
+          markLlmSkipDebug("deterministic_pre_llm_contract");
           primaryContractResult = { text: JSON.stringify(deterministicSanitizedContract) };
           answerContractPrimaryUsed = true;
           answerPath.push("answerContract:deterministic_pre_llm");
@@ -25904,10 +25920,12 @@ const executeHelixAsk = async ({
       let resultForAnswer: LocalAskResult | null = null;
       try {
         if (primaryContractResult?.text?.trim()) {
+          markLlmSkipDebug("primary_contract_result");
           resultForAnswer = primaryContractResult;
           answerText = primaryContractResult.text;
           answerMeta = isShortAnswer(answerText, verbosity);
         } else if (fastQualityMode && !answerHelperBudget.ok) {
+          markLlmSkipDebug("fast_quality_answer_budget");
           answerGenerationFailed = true;
         } else {
         const { result: answerResult, overflow: answerOverflow, llm: answerLlm } =

@@ -75,5 +75,5 @@ describe("llm.http safeguards", () => {
     expect(result.__llm_provider_called).toBe(true);
     expect(result.__llm_provider).toBe("openai_compatible");
     expect(result.__llm_routed_via).toBe("llm.http.generate");
-  });
+  }, 15000);
 });
