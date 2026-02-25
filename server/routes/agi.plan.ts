@@ -18054,12 +18054,13 @@ const executeHelixAsk = async ({
       debugPayload.llm_invoke_attempted = false;
       debugPayload.llm_skip_reason = "not_attempted";
     }
-    const markLlmSkipDebug = (reason: string | null | undefined): void => {
+    const markLlmSkipDebug = (reason: string | null | undefined, detail?: string | null): void => {
       if (!debugPayload) return;
       if (debugPayload.llm_invoke_attempted) return;
       const normalized = typeof reason === "string" ? reason.trim() : "";
       if (!normalized) return;
-      debugPayload.llm_skip_reason = normalized;
+      const normalizedDetail = typeof detail === "string" ? detail.trim() : "";
+      debugPayload.llm_skip_reason = normalizedDetail ? `${normalized}:${normalizedDetail}` : normalized;
     };
     const appendLlmCallDebug = (meta: HelixAskLlmCallMeta | undefined): void => {
       if (!debugPayload || !meta) return;
@@ -25319,7 +25320,8 @@ const executeHelixAsk = async ({
       String(verbosity ?? "").trim().length > 0;
     let answerContractPrimaryUsed = false;
     if (shouldShortCircuitAnswer) {
-      markLlmSkipDebug("short_circuit_forced_answer");
+      const forcedRule = answerPath.find((entry) => entry.startsWith("forcedAnswer:")) ?? null;
+      markLlmSkipDebug("short_circuit_forced_answer", forcedRule);
       const forcedRawText = stripPromptEchoFromAnswer(fallbackAnswer, baseQuestion).trim();
       const forcedCleanText = stripTruncationMarkers(formatHelixAskAnswer(forcedRawText));
       const forcedMeta = isShortAnswer(forcedCleanText, verbosity);
@@ -25560,7 +25562,10 @@ const executeHelixAsk = async ({
             (deterministicSanitizedContract.claims?.length ?? 0) >= 2 &&
             (deterministicSanitizedContract.sources?.length ?? 0) >= 2));
         if (deterministicQualityOk) {
-          markLlmSkipDebug("deterministic_pre_llm_contract");
+          markLlmSkipDebug(
+            "deterministic_pre_llm_contract",
+            strongDeterministicContractSignals ? "strong_repo_evidence" : "relation_question_fastpath",
+          );
           primaryContractResult = { text: JSON.stringify(deterministicSanitizedContract) };
           answerContractPrimaryUsed = true;
           answerPath.push("answerContract:deterministic_pre_llm");
