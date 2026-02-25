@@ -292,6 +292,7 @@ import { stableJsonStringify } from "../utils/stable-json";
 import { sha256Hex } from "../utils/information-boundary";
 import { ensureSpecialistsRegistered } from "../specialists/bootstrap";
 import { hullModeEnabled, shouldRegisterExternalAdapter } from "../security/hull-guard";
+import { applyHullModeLlmPolicyDefault } from "../services/llm/policy-default";
 import { readKnowledgeConfig } from "../config/knowledge";
 import { resolveLocalRuntimeCaps } from "../services/llm/local-runtime";
 import { kvGetSessionTokensApprox } from "../services/llm/kv-budgeter";
@@ -2224,9 +2225,7 @@ async function rehydratePlanRecord(traceId: string): Promise<PlanRecord | null> 
 const contains = (value: string, pattern: RegExp) => pattern.test(value.toLowerCase());
 
 const hullMode = hullModeEnabled();
-if (hullMode) {
-  process.env.LLM_POLICY = "local";
-}
+applyHullModeLlmPolicyDefault(process.env, hullMode);
 
 const localRuntimeCaps = resolveLocalRuntimeCaps();
 const applyKnowledgeCaps = (config: ReturnType<typeof readKnowledgeConfig>) => {
