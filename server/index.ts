@@ -269,6 +269,30 @@ app.get("/version", (_req, res) => {
   res.status(200).json(versionPayload());
 });
 
+// During deferred/bootstrap startup, API routes may not yet be mounted.
+// Return deterministic JSON 503 instead of Express default HTML 404 so
+// probes can classify readiness reliably.
+app.use("/api", (req, res, next) => {
+  if (appReady) {
+    return next();
+  }
+  const method = (req.method ?? "GET").toUpperCase();
+  const target = getPathname(req.originalUrl ?? req.url);
+  if (method === "GET" || method === "HEAD") {
+    if (target === "/api/ready" || target === "/api/ready/") {
+      return next();
+    }
+  }
+  return res.status(503).json({
+    error: "api_bootstrapping",
+    message: "API routes are still mounting. Retry shortly.",
+    ready: appReady,
+    healthReady,
+    artifactsReady,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 const headerValue = (value: string | string[] | undefined): string => {
   if (!value) return "";
   return Array.isArray(value) ? value.join(",") : value;
