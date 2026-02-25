@@ -2,13 +2,39 @@ import micromatch from "micromatch";
 
 const DEFAULT_ALLOW = ["127.0.0.1", "::1", "localhost", "*.hull"] as const;
 
+const normalizeAllowPattern = (value: string): string => {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const withoutScheme = trimmed.replace(/^https?:\/\//i, "");
+  const hostToken = (withoutScheme.split(/[/?#]/)[0] ?? "").trim();
+  if (!hostToken) return "";
+
+  // If a port was included for a concrete host, drop it because target matching
+  // is host-based (URL hostname) and does not include ports.
+  if (!hostToken.includes("*") && !hostToken.includes("?")) {
+    if (hostToken.startsWith("[")) {
+      const end = hostToken.indexOf("]");
+      if (end !== -1) {
+        return hostToken.slice(1, end);
+      }
+      return hostToken;
+    }
+    const colon = hostToken.indexOf(":");
+    if (colon !== -1) {
+      return hostToken.slice(0, colon);
+    }
+  }
+  return hostToken;
+};
+
 const toPatterns = (raw: string | undefined): string[] => {
   if (!raw) {
     return [...DEFAULT_ALLOW];
   }
   return raw
     .split(",")
-    .map((item) => item.trim())
+    .map((item) => normalizeAllowPattern(item))
     .filter(Boolean);
 };
 

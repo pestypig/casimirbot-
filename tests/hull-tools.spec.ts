@@ -21,4 +21,11 @@ describe("hull tool gating", () => {
     const localGate = shouldRegisterExternalAdapter("http://127.0.0.1:8080");
     expect(localGate.allowed).toBe(true);
   });
+
+  it("normalizes scheme-qualified allowlist entries", () => {
+    process.env.HULL_MODE = "1";
+    process.env.HULL_ALLOW_HOSTS = "https://api.example.com";
+    const gate = shouldRegisterExternalAdapter("https://api.example.com");
+    expect(gate.allowed).toBe(true);
+  });
 });

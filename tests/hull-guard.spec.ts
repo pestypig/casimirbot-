@@ -27,4 +27,13 @@ describe("hull guard", () => {
       expect(typed.policy?.capability).toBe("network_access");
     }
   });
+
+  it("accepts scheme-qualified allowlist entries by normalizing them to hosts", () => {
+    process.env.HULL_MODE = "1";
+    process.env.HULL_ALLOW_HOSTS =
+      "https://api.openai.com,https://*.hull,https://127.0.0.1:11434";
+    expect(isHullAllowed("https://api.openai.com")).toBe(true);
+    expect(isHullAllowed("https://alpha.hull")).toBe(true);
+    expect(isHullAllowed("http://127.0.0.1:8080")).toBe(true);
+  });
 });
