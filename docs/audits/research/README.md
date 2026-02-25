@@ -31,3 +31,7 @@ Each research artifact should include:
 For reusable GPT Pro style standalone research prompts, use:
 - `docs/architecture/helix-ask-natural-philosophy-gap-closure-playbook.md`
 - Section: `Standalone GPT Pro research prompt standard`
+
+## Additional reference dossiers
+
+- `docs/audits/research/auntie-dot-halo-reach-capability-dossier-2026-02-25.md`
