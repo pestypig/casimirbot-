@@ -70,21 +70,34 @@ export const extractG4ConstraintDiagnostics = (constraints: GrEvaluation["constr
     if (status === "pass" || status === "fail" || status === "unknown") return status;
     return "unknown";
   };
+  const hasSynthesizedTag = [ford, theta].some(
+    (entry) => typeof entry?.note === "string" && entry.note.includes(SYNTHESIZED_SOURCE_PREFIX),
+  );
+  const missingAnyHardSource = !ford || !theta;
+  const source: G4ConstraintDiagnostics["source"] =
+    hasSynthesizedTag || missingAnyHardSource ? "synthesized_unknown" : "evaluator_constraints";
+  const reason = [readConstraintMessage(ford), readConstraintMessage(theta)].filter(
+    (entry): entry is string => Boolean(entry && entry.trim()),
+  );
+  const reasonCode = [readConstraintReasonCode(ford), readConstraintReasonCode(theta)].filter(
+    (entry): entry is string => Boolean(entry),
+  );
+
+  if (!ford && !reasonCode.includes(G4_REASON_CODES.missingFordRomanSource)) {
+    reasonCode.push(G4_REASON_CODES.missingFordRomanSource);
+    reason.push(`${SYNTHESIZED_SOURCE_PREFIX};reasonCode=${G4_REASON_CODES.missingFordRomanSource};FordRomanQI missing from evaluation constraints.`);
+  }
+  if (!theta && !reasonCode.includes(G4_REASON_CODES.missingThetaSource)) {
+    reasonCode.push(G4_REASON_CODES.missingThetaSource);
+    reason.push(`${SYNTHESIZED_SOURCE_PREFIX};reasonCode=${G4_REASON_CODES.missingThetaSource};ThetaAudit missing from evaluation constraints.`);
+  }
+
   return {
     fordRomanStatus: normalize(ford?.status),
     thetaAuditStatus: normalize(theta?.status),
-    source:
-      [ford, theta].some(
-        (entry) => typeof entry?.note === "string" && entry.note.includes(SYNTHESIZED_SOURCE_PREFIX),
-      )
-        ? "synthesized_unknown"
-        : "evaluator_constraints",
-    reason: [readConstraintMessage(ford), readConstraintMessage(theta)].filter(
-      (entry): entry is string => Boolean(entry && entry.trim()),
-    ),
-    reasonCode: [readConstraintReasonCode(ford), readConstraintReasonCode(theta)].filter(
-      (entry): entry is string => Boolean(entry),
-    ),
+    source,
+    reason,
+    reasonCode,
   };
 };
 
