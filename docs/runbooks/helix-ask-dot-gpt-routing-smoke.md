@@ -180,6 +180,12 @@ curl -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/trainin
 
 ## Quick Triage
 
+- Attribution guard (do this first, before blaming keys):
+  - if `debug.llm_invoke_attempted=false` and `debug.llm_skip_reason` is set, this is a short-circuit path issue, not an API-key auth failure
+  - if `debug.llm_invoke_attempted=true` and `debug.llm_error_code` is `llm_http_401` or `llm_http_403`, this is auth/permission
+  - if `debug.llm_invoke_attempted=true` and `debug.llm_error_code` is `llm_http_transport:*` or `llm_http_circuit_open`, this is network/transport or breaker state
+  - if `debug.llm_invoke_attempted=true`, `debug.llm_backend_used=http`, `debug.llm_provider_called=true`, and `debug.llm_http_status=200`, HTTP lane is working
+
 - `expected_backend=http` but `backend_used` missing:
   - request likely never reached answer LLM stage (fallback path)
 - `backend_used=http` and `provider_called=true` but no token usage visible:
