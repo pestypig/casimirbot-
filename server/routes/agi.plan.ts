@@ -25304,9 +25304,13 @@ const executeHelixAsk = async ({
       });
       return { text: next, reasons };
     };
+    const forcedAnswerClarifyGate = answerPath.some((entry) => entry.startsWith("clarify:"));
+    const forcedAnswerFailClosedGate = answerPath.some((entry) => entry.startsWith("failClosed:"));
     const shouldShortCircuitAnswer =
       Boolean(fallbackAnswer) &&
-      (forcedAnswerIsHard || (!prompt && !isIdeologyReferenceIntent));
+      forcedAnswerIsHard &&
+      !forcedAnswerClarifyGate &&
+      !forcedAnswerFailClosedGate;
     const shouldFastPathFinalize =
       shouldShortCircuitAnswer &&
       isIdeologyReferenceIntent &&
