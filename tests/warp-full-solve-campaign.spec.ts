@@ -8,6 +8,8 @@ import {
   aggregateGateStatusAcrossWaves,
   buildGateMap,
   buildGateMissingSignalMap,
+  buildNotReadyClassification,
+  deriveG4Diagnostics,
   collectRequiredSignals,
   computeReproducibility,
   deriveCampaignDecision,
@@ -68,6 +70,38 @@ describe('warp-full-solve-campaign runner', () => {
     expect(scoreboard.counts).toEqual({ PASS: 1, FAIL: 1, UNKNOWN: 1, NOT_READY: 1, NOT_APPLICABLE: 1 });
     expect(scoreboard.reconciled).toBe(true);
     expect(scoreboard.total).toBe(scoreboard.gateCount);
+  });
+
+
+  it('classifies NOT_READY gate causes by timeout and missing signals', () => {
+    const gateMap = {
+      G0: { status: 'NOT_READY', reason: 'timeout', source: 'campaign.timeout' },
+      G1: { status: 'NOT_READY', reason: 'missing initial', source: 'gr-agent-loop.attempt.initial.status' },
+      G5: { status: 'NOT_APPLICABLE', reason: 'n/a', source: 'campaign.policy.reduced-order' },
+    } as any;
+    const classification = buildNotReadyClassification(
+      gateMap,
+      { G1: ['initial_solver_status'] },
+      { kind: 'wave_timeout', timeoutMs: 1000, elapsedMs: 1000, wave: 'A' },
+    );
+    expect(classification.gateCauseClass.G0).toBe('timeout_budget');
+    expect(classification.gateCauseClass.G1).toBe('timeout_budget');
+    expect(classification.notReadyClassCounts.timeout_budget).toBe(2);
+  });
+
+  it('derives explicit G4 diagnostics from evaluator constraints', () => {
+    const diagnostics = deriveG4Diagnostics({
+      evaluation: {
+        constraints: [
+          { id: 'FordRomanQI', status: 'fail', message: 'FordRoman hard fail' },
+          { id: 'ThetaAudit', status: 'pass', message: 'Theta ok' },
+        ],
+      },
+    } as any);
+    expect(diagnostics.fordRomanStatus).toBe('fail');
+    expect(diagnostics.thetaAuditStatus).toBe('pass');
+    expect(diagnostics.source).toBe('evaluator_constraints');
+    expect(diagnostics.reason.join(' | ')).toContain('FordRoman hard fail');
   });
 
   it('derives deterministic first-fail from canonical gate order', () => {

@@ -29,6 +29,27 @@ export type GrEvaluationResult = {
   integrityOk: boolean;
 };
 
+export type G4ConstraintDiagnostics = {
+  fordRomanStatus: "pass" | "fail" | "unknown" | "missing";
+  thetaAuditStatus: "pass" | "fail" | "unknown" | "missing";
+  reason: string[];
+};
+
+export const extractG4ConstraintDiagnostics = (constraints: GrEvaluation["constraints"]): G4ConstraintDiagnostics => {
+  const ford = constraints.find((entry) => entry.id === "FordRomanQI");
+  const theta = constraints.find((entry) => entry.id === "ThetaAudit");
+  const normalize = (status: string | undefined): G4ConstraintDiagnostics["fordRomanStatus"] => {
+    if (!status) return "missing";
+    if (status === "pass" || status === "fail" || status === "unknown") return status;
+    return "unknown";
+  };
+  return {
+    fordRomanStatus: normalize(ford?.status),
+    thetaAuditStatus: normalize(theta?.status),
+    reason: [ford?.message, theta?.message].filter((entry): entry is string => Boolean(entry && entry.trim())),
+  };
+};
+
 
 const normalizeConstraintStatus = (status: string | undefined): "pass" | "fail" | "unknown" => {
   if (status === "pass" || status === "fail" || status === "unknown") return status;
@@ -150,6 +171,10 @@ export async function runGrEvaluation(
         : { code: "ERROR", message: "GR constraint gate failed" };
 
       const completeConstraints = ensureHardConstraintEntries(gateEval.constraints);
+      const g4Diagnostics = extractG4ConstraintDiagnostics(completeConstraints);
+      if (g4Diagnostics.reason.length > 0) {
+        notes.push(`G4 diagnostics: FordRomanQI=${g4Diagnostics.fordRomanStatus}, ThetaAudit=${g4Diagnostics.thetaAuditStatus}. ${g4Diagnostics.reason.join(" | ")}`);
+      }
 
       const evaluation: GrEvaluation = {
         kind: "gr-evaluation",

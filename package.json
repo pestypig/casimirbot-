@@ -112,7 +112,9 @@
     "voice:verify-weights-manifest": "python scripts/voice/verify_weights_manifest.py configs/voice/weights-manifest.example.json",
     "warp:full-solve:campaign": "tsx scripts/warp-full-solve-campaign-cli.ts",
     "warp:publication:bundle": "tsx scripts/warp-publication-bundle.ts",
-    "validate:helix-dottie-docs-schema": "tsx scripts/validate-helix-dottie-docs-schema.ts"
+    "validate:helix-dottie-docs-schema": "tsx scripts/validate-helix-dottie-docs-schema.ts",
+    "warp:full-solve:budget-stress": "npm run warp:full-solve:campaign -- --wave all --ci --wave-timeout-ms 6000 --campaign-timeout-ms 24000",
+    "warp:full-solve:readiness": "npm run warp:full-solve:campaign -- --wave all --ci --ci-fast-path --wave-timeout-ms 120000 --campaign-timeout-ms 600000"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",
