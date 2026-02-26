@@ -20,6 +20,13 @@ import type { HullSurfaceVoxelVolume } from "@/lib/lattice-surface";
 import type { LatticeFrame, LatticeProfileTag, LatticeQualityPreset } from "@/lib/lattice-frame";
 import { LATTICE_PROFILE_PERF, estimateLatticeUploadBytes } from "@/lib/lattice-perf";
 import { buildFluxStreamlines, type FluxStreamlineSettings, type FluxVectorField } from "@/lib/flux-streamlines";
+import {
+  OBSERVER_ROBUST_SELECTION_CHANNEL,
+  buildObserverFrameField,
+  type ObserverConditionKey,
+  type ObserverFrameKey,
+  type ObserverRobustSelection,
+} from "@/lib/stress-energy-brick";
 import { metricModeFromWarpFieldType, type MetricModeId } from "@shared/metric-eval";
 import type { WarpFieldType } from "@shared/schema";
 
@@ -8459,6 +8466,7 @@ export class Hull3DRenderer {
   private curvatureBusId: string | null = null;
   private t00BusId: string | null = null;
   private fluxBusId: string | null = null;
+  private observerSelectionBusId: string | null = null;
 
 
 
@@ -8807,6 +8815,17 @@ export class Hull3DRenderer {
     range: [1e-12, 1e-12] as [number, number],
   };
   private t00StampWarned = false;
+  private observerSelection: ObserverRobustSelection = { condition: "nec", frame: "Eulerian" };
+  private t00Raw: {
+    dims: [number, number, number];
+    t00: Float32Array;
+    min?: number;
+    max?: number;
+    stats?: any;
+    meta?: any;
+    version: number;
+    updatedAt: number;
+  } | null = null;
   private fluxField: (FluxVectorField & { version: number; updatedAt: number; avgMag?: number }) | null = null;
 
   private fallbackTex2D: WebGLTexture | null = null;
@@ -9726,6 +9745,20 @@ export class Hull3DRenderer {
     });
     this.fluxBusId = subscribe("hull3d:flux", (payload: any) => {
       this.handleFluxBrick(payload);
+    });
+    this.observerSelectionBusId = subscribe(OBSERVER_ROBUST_SELECTION_CHANNEL, (payload: any) => {
+      const conditionRaw = typeof payload?.condition === "string" ? payload.condition.toLowerCase() : "nec";
+      const frameRaw = typeof payload?.frame === "string" ? payload.frame : "Eulerian";
+      const condition: ObserverConditionKey =
+        conditionRaw === "nec" || conditionRaw === "wec" || conditionRaw === "sec" || conditionRaw === "dec"
+          ? conditionRaw
+          : "nec";
+      const frame: ObserverFrameKey =
+        frameRaw === "Eulerian" || frameRaw === "Robust" || frameRaw === "Delta" || frameRaw === "Missed"
+          ? frameRaw
+          : "Eulerian";
+      this.observerSelection = { condition, frame };
+      this.refreshT00FieldTexture();
     });
 
 
@@ -19548,32 +19581,68 @@ export class Hull3DRenderer {
 
     const upload = data.length === expected ? data : data.subarray(0, expected);
 
-    // Track absolute span for quick normalization
     const minRaw = Number((payload as any).min ?? (t00Payload as any)?.min);
     const maxRaw = Number((payload as any).max ?? (t00Payload as any)?.max);
-    let absSpan = 1e-12;
-    if (Number.isFinite(minRaw) || Number.isFinite(maxRaw)) {
-      const a = Math.abs(Number.isFinite(minRaw) ? (minRaw as number) : 0);
-      const b = Math.abs(Number.isFinite(maxRaw) ? (maxRaw as number) : 0);
-      absSpan = Math.max(a, b, 1e-12);
-    }
-    this.t00.range = [absSpan, absSpan];
+    this.t00Raw = {
+      dims,
+      t00: upload,
+      min: Number.isFinite(minRaw) ? minRaw : undefined,
+      max: Number.isFinite(maxRaw) ? maxRaw : undefined,
+      stats: (payload as any).stats,
+      meta: (payload as any).meta,
+      version: versionRaw,
+      updatedAt: Number((payload as any).updatedAt ?? Date.now()),
+    };
+    this.refreshT00FieldTexture();
+    this.t00.dims = dims;
+    this.t00.version = versionRaw;
+    this.t00.updatedAt = Number((payload as any).updatedAt ?? Date.now());
+    this.t00.hasData = true;
+  }
 
+  private refreshT00FieldTexture() {
+    if (!this.t00Raw) return;
+    const dims = this.t00Raw.dims;
+    const expected = dims[0] * dims[1] * dims[2];
+    const t00 = this.t00Raw.t00.length === expected ? this.t00Raw.t00 : this.t00Raw.t00.subarray(0, expected);
+    let upload = t00;
+    let min = Number.isFinite(this.t00Raw.min) ? Number(this.t00Raw.min) : Number.POSITIVE_INFINITY;
+    let max = Number.isFinite(this.t00Raw.max) ? Number(this.t00Raw.max) : Number.NEGATIVE_INFINITY;
+    const observerRobust = this.t00Raw.stats?.observerRobust;
+
+    if (observerRobust && this.fluxField && this.fluxField.dims.join("x") === dims.join("x")) {
+      const field = buildObserverFrameField(
+        {
+          dims,
+          t00: { data: t00, min, max },
+          flux: {
+            Sx: { data: this.fluxField.Sx, min: -this.fluxField.maxMag, max: this.fluxField.maxMag },
+            Sy: { data: this.fluxField.Sy, min: -this.fluxField.maxMag, max: this.fluxField.maxMag },
+            Sz: { data: this.fluxField.Sz, min: -this.fluxField.maxMag, max: this.fluxField.maxMag },
+            divS: { data: new Float32Array(expected), min: 0, max: 0 },
+          },
+          stats: { observerRobust } as any,
+        } as any,
+        this.observerSelection,
+      );
+      if (field) {
+        upload = field.data;
+        min = field.min;
+        max = field.max;
+      }
+    }
+
+    const absSpan = Math.max(Math.abs(Number.isFinite(min) ? min : 0), Math.abs(Number.isFinite(max) ? max : 0), 1e-12);
+    this.t00.range = [absSpan, absSpan];
     this.ensureT00Textures();
     const back = this.t00.front === 0 ? this.t00.texB : this.t00.texA;
     if (!back) return;
-
     const { gl } = this;
     gl.bindTexture(gl.TEXTURE_3D, back);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage3D(gl.TEXTURE_3D, 0, gl.R32F, dims[0], dims[1], dims[2], 0, gl.RED, gl.FLOAT, upload);
     gl.bindTexture(gl.TEXTURE_3D, null);
-
     this.t00.front = (this.t00.front ^ 1) as 0 | 1;
-    this.t00.dims = dims;
-    this.t00.version = versionRaw;
-    this.t00.updatedAt = Number((payload as any).updatedAt ?? Date.now());
-    this.t00.hasData = true;
   }
 
   private handleFluxBrick(payload: any) {
@@ -19660,6 +19729,7 @@ export class Hull3DRenderer {
       updatedAt: Number((payload as any).updatedAt ?? Date.now()),
       ...(avgMag !== undefined ? { avgMag } : {}),
     };
+    this.refreshT00FieldTexture();
     this.overlayCache.fluxStreamKey = "";
   }
 
@@ -25349,6 +25419,10 @@ export class Hull3DRenderer {
       unsubscribe(this.fluxBusId);
       this.fluxBusId = null;
     }
+    if (this.observerSelectionBusId) {
+      unsubscribe(this.observerSelectionBusId);
+      this.observerSelectionBusId = null;
+    }
 
 
 
@@ -26340,9 +26414,6 @@ const buildRingLUT = (params: RingParams): RingLUTResult => {
 
 
 };
-
-
-
 
 
 

@@ -69,6 +69,15 @@ export interface StressEnergyMappingStats {
 }
 
 export type ObserverMarginSource = "algebraic_type_i" | "capped_search";
+export type ObserverConditionKey = "nec" | "wec" | "sec" | "dec";
+export type ObserverFrameKey = "Eulerian" | "Robust" | "Delta" | "Missed";
+
+export const OBSERVER_ROBUST_SELECTION_CHANNEL = "hull3d:observer-robust-selection";
+
+export interface ObserverRobustSelection {
+  condition: ObserverConditionKey;
+  frame: ObserverFrameKey;
+}
 
 export interface ObserverConditionSummary {
   eulerianMin: number;
@@ -128,6 +137,253 @@ export interface StressEnergyBrickDecoded {
     metricT00Source?: string;
   };
 }
+
+export interface ObserverFrameField {
+  data: Float32Array;
+  min: number;
+  max: number;
+}
+
+const EPS = 1e-9;
+
+type Vec3 = [number, number, number];
+
+const normalize = (v: Vec3): Vec3 => {
+  const mag = Math.hypot(v[0], v[1], v[2]);
+  if (!Number.isFinite(mag) || mag <= 0) return [0, 0, 0];
+  return [v[0] / mag, v[1] / mag, v[2] / mag];
+};
+
+const safeDirection = (value: Vec3 | null | undefined, fallback: Vec3 = [1, 0, 0]): Vec3 => {
+  if (!value) return normalize(fallback);
+  const n = normalize(value);
+  if (Math.hypot(n[0], n[1], n[2]) > 0) return n;
+  return normalize(fallback);
+};
+
+const cross = (a: Vec3, b: Vec3): Vec3 => ([
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+]);
+
+const orthogonalDirection = (direction: Vec3): Vec3 => {
+  const base = Math.abs(direction[0]) < 0.9 ? ([1, 0, 0] as Vec3) : ([0, 1, 0] as Vec3);
+  return safeDirection(cross(direction, base), [0, 0, 1]);
+};
+
+const clampBeta = (value: number, cap: number): number => {
+  const finiteCap = Number.isFinite(cap) ? Math.max(0, Math.min(0.999999999, cap)) : 0;
+  const finiteValue = Number.isFinite(value) ? value : 0;
+  return Math.max(0, Math.min(finiteCap, finiteValue));
+};
+
+const evaluateWecMargin = (rho: number, pressure: number, fluxMag: number, beta: number): number => {
+  const b = Math.max(0, Math.min(0.999999999, beta));
+  const oneMinus = Math.max(1e-12, 1 - b * b);
+  return (rho - 2 * fluxMag * b + pressure * b * b) / oneMinus;
+};
+
+const optimizeWecMargin = (
+  rho: number,
+  pressure: number,
+  fluxMag: number,
+  betaCap: number,
+): { margin: number; beta: number } => {
+  const cap = clampBeta(betaCap, betaCap);
+  let bestBeta = 0;
+  let bestMargin = evaluateWecMargin(rho, pressure, fluxMag, 0);
+  const consider = (candidate: number) => {
+    if (!Number.isFinite(candidate)) return;
+    const b = clampBeta(candidate, cap);
+    const margin = evaluateWecMargin(rho, pressure, fluxMag, b);
+    if (margin < bestMargin) {
+      bestMargin = margin;
+      bestBeta = b;
+    }
+  };
+
+  consider(cap);
+  if (fluxMag > EPS) {
+    const discriminant = (rho + pressure) * (rho + pressure) - 4 * fluxMag * fluxMag;
+    if (discriminant >= 0) {
+      const root = Math.sqrt(discriminant);
+      const denom = 2 * fluxMag;
+      consider((rho + pressure - root) / denom);
+      consider((rho + pressure + root) / denom);
+    }
+  }
+  return { margin: bestMargin, beta: bestBeta };
+};
+
+const evaluateDecMargin = (
+  rho: number,
+  pressure: number,
+  sx: number,
+  sy: number,
+  sz: number,
+  direction: Vec3,
+  beta: number,
+): number => {
+  const dir = safeDirection(direction, [1, 0, 0]);
+  const b = Math.max(0, Math.min(0.999999999, beta));
+  const oneMinus = Math.max(1e-12, 1 - b * b);
+  const gamma = 1 / Math.sqrt(oneMinus);
+  const gamma2 = 1 / oneMinus;
+  const dotSn = sx * dir[0] + sy * dir[1] + sz * dir[2];
+  const energy = gamma2 * (rho + 2 * b * dotSn + pressure * b * b);
+  const j0 = gamma * (rho + b * dotSn);
+  const jx = -gamma * (sx + pressure * b * dir[0]);
+  const jy = -gamma * (sy + pressure * b * dir[1]);
+  const jz = -gamma * (sz + pressure * b * dir[2]);
+  const u0 = gamma;
+  const ux = gamma * b * dir[0];
+  const uy = gamma * b * dir[1];
+  const uz = gamma * b * dir[2];
+  const q0 = j0 - energy * u0;
+  const qx = jx - energy * ux;
+  const qy = jy - energy * uy;
+  const qz = jz - energy * uz;
+  let qNormSq = -q0 * q0 + qx * qx + qy * qy + qz * qz;
+  if (qNormSq < 0 && qNormSq > -1e-9) qNormSq = 0;
+  if (qNormSq < 0) qNormSq = 0;
+  return energy - Math.sqrt(qNormSq);
+};
+
+const optimizeDecMargin = (args: {
+  rho: number;
+  pressure: number;
+  sx: number;
+  sy: number;
+  sz: number;
+  fluxDir: Vec3;
+  canonicalDir: Vec3;
+  betaCap: number;
+  betaHint: number;
+}): number => {
+  const cap = clampBeta(args.betaCap, args.betaCap);
+  const fluxDir = safeDirection(args.fluxDir, args.canonicalDir);
+  const canonicalDir = safeDirection(args.canonicalDir, [1, 0, 0]);
+  const antiFluxDir: Vec3 = [-fluxDir[0], -fluxDir[1], -fluxDir[2]];
+  const parallelFluxDir: Vec3 = [fluxDir[0], fluxDir[1], fluxDir[2]];
+  const orthoDir = orthogonalDirection(fluxDir);
+  const directionCandidates = [antiFluxDir, canonicalDir, parallelFluxDir, orthoDir];
+  const betaCandidates = [0, cap * 0.5, cap, args.betaHint];
+
+  let bestMargin = Number.POSITIVE_INFINITY;
+  for (const direction of directionCandidates) {
+    for (const beta of betaCandidates) {
+      const margin = evaluateDecMargin(args.rho, args.pressure, args.sx, args.sy, args.sz, direction, beta);
+      if (margin < bestMargin) bestMargin = margin;
+    }
+  }
+  if (Number.isFinite(bestMargin)) return bestMargin;
+  const fallback = evaluateDecMargin(args.rho, args.pressure, args.sx, args.sy, args.sz, antiFluxDir, 0);
+  return Number.isFinite(fallback) ? fallback : args.rho - Math.hypot(args.sx, args.sy, args.sz);
+};
+
+const resolveTypeISlacks = (rho: number, pressure: number, fluxMag: number, tolerance: number) => {
+  const discriminant = (rho + pressure) * (rho + pressure) - 4 * fluxMag * fluxMag;
+  if (discriminant < -Math.max(0, tolerance)) return { isTypeI: false as const };
+  const sqrtDisc = Math.sqrt(Math.max(0, discriminant));
+  const sign = rho + pressure >= 0 ? 1 : -1;
+  const lambdaTime = 0.5 * (pressure - rho - sign * sqrtDisc);
+  const lambdaLongitudinal = 0.5 * (pressure - rho + sign * sqrtDisc);
+  const epsilon = -lambdaTime;
+  const pParallel = lambdaLongitudinal;
+  const pPerp = pressure;
+  const nec = Math.min(epsilon + pParallel, epsilon + pPerp);
+  const wec = Math.min(epsilon, nec);
+  const sec = Math.min(epsilon + pParallel, epsilon + pPerp, epsilon + pParallel + 2 * pPerp);
+  const dec = Math.min(epsilon, epsilon - Math.abs(pParallel), epsilon - Math.abs(pPerp));
+  if (!Number.isFinite(nec) || !Number.isFinite(wec) || !Number.isFinite(sec) || !Number.isFinite(dec)) {
+    return { isTypeI: false as const };
+  }
+  return { isTypeI: true as const, nec, wec, sec, dec };
+};
+
+export const buildObserverFrameField = (
+  brick: StressEnergyBrickDecoded,
+  selection: ObserverRobustSelection,
+): ObserverFrameField | null => {
+  if (!brick.stats.observerRobust) return null;
+  const total = Math.min(brick.t00.data.length, brick.flux.Sx.data.length, brick.flux.Sy.data.length, brick.flux.Sz.data.length);
+  if (total <= 0) return null;
+  const data = new Float32Array(total);
+  const pressureFactor = Number.isFinite(brick.stats.observerRobust.pressureFactor) ? brick.stats.observerRobust.pressureFactor : -1;
+  const betaCap = Number.isFinite(brick.stats.observerRobust.rapidityCapBeta)
+    ? Math.max(0, Math.min(0.999999999, brick.stats.observerRobust.rapidityCapBeta))
+    : Math.tanh(Math.max(0, brick.stats.observerRobust.rapidityCap ?? 0));
+  const typeITolerance = Number.isFinite(brick.stats.observerRobust.typeI?.tolerance)
+    ? Math.max(0, brick.stats.observerRobust.typeI.tolerance)
+    : 1e-9;
+  const canonicalNullDir: Vec3 = [1, 0, 0];
+
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < total; i += 1) {
+    const rho = Number.isFinite(brick.t00.data[i]) ? brick.t00.data[i] : 0;
+    const sx = Number.isFinite(brick.flux.Sx.data[i]) ? brick.flux.Sx.data[i] : 0;
+    const sy = Number.isFinite(brick.flux.Sy.data[i]) ? brick.flux.Sy.data[i] : 0;
+    const sz = Number.isFinite(brick.flux.Sz.data[i]) ? brick.flux.Sz.data[i] : 0;
+    const pressure = rho * pressureFactor;
+    const trace = -rho + 3 * pressure;
+    const fluxMag = Math.hypot(sx, sy, sz);
+    const fluxDir = fluxMag > EPS ? ([sx / fluxMag, sy / fluxMag, sz / fluxMag] as Vec3) : canonicalNullDir;
+    const canonicalFluxProjection = sx * canonicalNullDir[0] + sy * canonicalNullDir[1] + sz * canonicalNullDir[2];
+    const eulerianByCondition = {
+      nec: rho + pressure + 2 * canonicalFluxProjection,
+      wec: rho,
+      sec: rho + 0.5 * trace,
+      dec: rho - fluxMag,
+    } as const;
+
+    const typeI = resolveTypeISlacks(rho, pressure, fluxMag, typeITolerance);
+    const robustByCondition = typeI.isTypeI
+      ? { nec: typeI.nec, wec: typeI.wec, sec: typeI.sec, dec: typeI.dec }
+      : (() => {
+          const wecOptimized = optimizeWecMargin(rho, pressure, fluxMag, betaCap);
+          return {
+            nec: rho + pressure - 2 * fluxMag,
+            wec: wecOptimized.margin,
+            sec: wecOptimized.margin + 0.5 * trace,
+            dec: optimizeDecMargin({
+              rho,
+              pressure,
+              sx,
+              sy,
+              sz,
+              fluxDir,
+              canonicalDir: canonicalNullDir,
+              betaCap,
+              betaHint: wecOptimized.beta,
+            }),
+          };
+        })();
+
+    const eulerian = eulerianByCondition[selection.condition];
+    const robust = robustByCondition[selection.condition];
+    const value =
+      selection.frame === "Eulerian"
+        ? eulerian
+        : selection.frame === "Robust"
+          ? robust
+          : selection.frame === "Delta"
+            ? robust - eulerian
+            : robust < 0 && eulerian >= 0
+              ? robust
+              : 0;
+    data[i] = value;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+
+  return {
+    data,
+    min: Number.isFinite(min) ? min : 0,
+    max: Number.isFinite(max) ? max : 0,
+  };
+};
 
 const BRICK_FORMAT = "raw";
 const BINARY_CONTENT_TYPES = ["application/octet-stream", "application/x-helix-brick"];
