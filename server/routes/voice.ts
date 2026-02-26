@@ -254,6 +254,13 @@ const buildOperatorCalloutCandidate = (payload: VoiceRequest, textCertainty: Cer
   },
 });
 
+const suppressionEnvelope = (reason: string) => ({
+  reason,
+  suppression_reason: reason,
+  // TODO(M5): remove legacy suppressionReason alias
+  suppressionReason: reason,
+});
+
 voiceRouter.options("/speak", (_req, res) => {
   setCors(res);
   res.status(200).end();
@@ -283,7 +290,9 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     classification: payload.priority,
   });
   if (!contextEligibility.emitVoice) {
-    return res.status(200).json({ ok: true, suppressed: true, reason: "voice_context_ineligible", traceId: payload.traceId ?? null });
+    return res
+      .status(200)
+      .json({ ok: true, suppressed: true, ...suppressionEnvelope("voice_context_ineligible"), traceId: payload.traceId ?? null });
   }
   const repoAttributedEffective = payload.repoAttributed ?? Boolean(payload.missionId && payload.mode === "callout");
   const textCertainty = payload.textCertainty ?? PRIORITY_TO_CERTAINTY[payload.priority];
@@ -299,8 +308,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     return res.status(200).json({
       ok: true,
       suppressed: true,
-      reason: parity.reason,
-      suppressionReason: parity.reason,
+      ...suppressionEnvelope(parity.reason),
       traceId: payload.traceId ?? null,
       replayMeta: parity.metadata,
     });
@@ -313,8 +321,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     return res.status(200).json({
       ok: true,
       suppressed: true,
-      reason: "contract_violation",
-      suppression_reason: "contract_violation",
+      ...suppressionEnvelope("contract_violation"),
       traceId: payload.traceId ?? null,
       debug: {
         validator_failed: true,
@@ -421,7 +428,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     return res.status(200).json({
       ok: true,
       suppressed: true,
-      reason: "dedupe_cooldown",
+      ...suppressionEnvelope("dedupe_cooldown"),
       traceId,
       missionId: payload.missionId,
       eventId: payload.eventId,
