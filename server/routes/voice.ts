@@ -3,6 +3,10 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { enforceCalloutParity, type CertaintyClass } from "../../shared/helix-dottie-callout-contract";
 import { evaluateCalloutEligibility as evaluateSharedEligibility } from "../../shared/callout-eligibility";
+import {
+  OPERATOR_CALLOUT_V1_KIND,
+  validateOperatorCalloutV1,
+} from "../services/helix-ask/operator-contract-v1";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
@@ -236,6 +240,20 @@ const dedupeSuppressed = (payload: VoiceRequest, nowMs: number): boolean => {
   return false;
 };
 
+const buildOperatorCalloutCandidate = (payload: VoiceRequest, textCertainty: CertaintyClass, voiceCertainty: CertaintyClass) => ({
+  kind: OPERATOR_CALLOUT_V1_KIND,
+  deterministic: payload.deterministic ?? true,
+  suppressed: false,
+  text: {
+    certainty: textCertainty,
+    message: payload.text,
+  },
+  voice: {
+    certainty: voiceCertainty,
+    message: payload.text,
+  },
+});
+
 voiceRouter.options("/speak", (_req, res) => {
   setCors(res);
   res.status(200).end();
@@ -287,6 +305,26 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
       replayMeta: parity.metadata,
     });
   }
+
+  const operatorCalloutCandidate = buildOperatorCalloutCandidate(payload, textCertainty, voiceCertainty);
+  const operatorCalloutValidation = validateOperatorCalloutV1(operatorCalloutCandidate);
+  if (!operatorCalloutValidation.ok) {
+    const firstError = operatorCalloutValidation.errors[0];
+    return res.status(200).json({
+      ok: true,
+      suppressed: true,
+      reason: "contract_violation",
+      suppression_reason: "contract_violation",
+      traceId: payload.traceId ?? null,
+      debug: {
+        validator_failed: true,
+        validator_error_count: operatorCalloutValidation.errors.length,
+        first_validator_error_code: firstError?.code ?? "UNKNOWN",
+        first_validator_error_path: firstError?.path ?? "unknown",
+      },
+    });
+  }
+
   const traceId = payload.traceId?.trim() || undefined;
   const tenantId =
     (req.header("x-tenant-id") ?? req.header("x-customer-id") ?? "single-tenant").trim().toLowerCase() ||
