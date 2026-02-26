@@ -23,6 +23,30 @@ describe("validateOperatorCalloutV1", () => {
     expect(result.ok).toBe(true);
   });
 
+
+  it("omits suppression_reason key when suppressed is false", () => {
+    const result = validateOperatorCalloutV1({
+      kind: OPERATOR_CALLOUT_V1_KIND,
+      deterministic: true,
+      suppressed: false,
+      text: {
+        certainty: "reasoned",
+        message: "Text callout certainty is reasoned.",
+      },
+      voice: {
+        certainty: "reasoned",
+        message: "Voice mirrors text certainty.",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("expected successful validation");
+    }
+
+    expect("suppression_reason" in result.value).toBe(false);
+  });
+
   it("fails deterministically when required fields are missing", () => {
     const result = validateOperatorCalloutV1({
       kind: OPERATOR_CALLOUT_V1_KIND,
