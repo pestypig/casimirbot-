@@ -1,0 +1,115 @@
+Known-good local startup env (baseline)
+Use this exact local baseline when it works well:
+
+$env:PORT="5050"
+$env:NODE_ENV="development"
+$env:ENABLE_AGI="1"
+$env:LLM_POLICY="http"
+$env:LLM_RUNTIME="http"
+$env:HULL_MODE="1"
+$env:HULL_ALLOW_HOSTS="api.openai.com"
+$env:LLM_HTTP_BASE="https://api.openai.com"
+$env:LLM_HTTP_MODEL="gpt-4o-mini"
+$env:OPENAI_API_KEY="YOUR_KEY"
+$env:LLM_HTTP_API_KEY="YOUR_KEY"
+npm run dev
+Copy/paste prompt for Replit agent
+
+Read AGENTS.md and WARP_AGENTS.md first.
+
+Goal:
+Find why Replit preview gives deterministic scaffold/fallback style answers (e.g., “Evidence is limited... Mechanism...”) while local baseline gives normal LLM answers.
+
+Rules:
+- Phase 1: no code changes.
+- Capture artifacts under artifacts/replit-diff/*
+- If code/config change is needed in Phase 2, keep minimal and run Casimir verify PASS.
+
+Phase 1 — Diagnose only
+
+1) Env inventory (presence + key Helix flags)
+- Print:
+  ENV_MARKER, NODE_ENV, PORT, ENABLE_AGI, LLM_POLICY, LLM_RUNTIME, HULL_MODE, HULL_ALLOW_HOSTS, LLM_HTTP_BASE, LLM_HTTP_MODEL
+  HELIX_ASK_FORCE_FULL_ANSWERS
+  HELIX_ASK_ANSWER_CONTRACT_PRIMARY
+  HELIX_ASK_REPORT_MODE
+  HELIX_ASK_TWO_PASS
+  HELIX_ASK_MICRO_PASS
+  HELIX_ASK_MICRO_PASS_AUTO
+  HELIX_ASK_DEFAULT_VERBOSITY
+  HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR
+- Also show key presence only:
+  hasOpenAIKey, hasHttpKey, keySource
+
+2) Direct provider connectivity (same runtime)
+- curl https://api.openai.com/v1/models with OPENAI_API_KEY
+- node fetch same endpoint
+- Save status/errors.
+- Classify:
+  INFRA_BLOCKED vs HTTP_REACHABLE
+
+3) Start app exactly as Replit preview uses
+- node dist/index.js
+- wait for /api/ready ready=true and appReady=true
+- capture /api/hull/status JSON
+
+4) Run probes (debug=true)
+A: What is 2 + 2?
+B: What is the Natario solve?
+C: How does Feedback Loop Hygiene affect society?
+J: same as C through /api/agi/ask/jobs (poll to completed)
+
+5) Extract strict fields for each lane
+- debug.llm_route_expected_backend
+- debug.llm_invoke_attempted
+- debug.llm_skip_reason
+- debug.llm_skip_reason_detail
+- debug.llm_backend_used
+- debug.llm_provider_called
+- debug.llm_http_status
+- debug.llm_model
+- debug.llm_calls
+- debug.llm_error_code
+- debug.llm_error_message
+- debug.answer_path
+- debug.answer_quality_floor_applied
+- debug.answer_quality_floor_reasons
+- debug.answer_contract_primary_applied
+- debug.answer_contract_primary_fallback_used
+- debug.answer_rescue_attempted
+- debug.answer_rescue_applied
+- debug.answer_rescue_reason
+
+6) Classification
+- A_short_circuit
+- B_invoked_or_config_fail
+- C_http_success
+- D_invoked_but_quality_floor_rewrite
+
+7) If B/C are not C_http_success, run env-toggle matrix (no code change)
+For each run: restart app, rerun probe B only, capture same debug fields.
+Toggle sets:
+T0 = current env
+T1 = HELIX_ASK_REPORT_MODE=0
+T2 = HELIX_ASK_TWO_PASS=0, HELIX_ASK_MICRO_PASS=0, HELIX_ASK_MICRO_PASS_AUTO=0
+T3 = HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR=0
+T4 = T1+T2+T3
+T5 = T4 + HELIX_ASK_DEFAULT_VERBOSITY=brief
+Goal: find minimal set that removes deterministic rewrite behavior while preserving invoke path.
+
+8) Report
+Return:
+- env table
+- direct OpenAI connectivity verdict
+- hull-status core JSON
+- lane table A/B/C/J with strict fields and classification
+- toggle matrix results
+- minimal env patch recommendation for .replit
+- GO/NO-GO: “Replit preview now matches local invoke behavior for Natario prompt”
+
+Phase 2 — only if requested
+- Apply minimal .replit env patch from matrix winner.
+- Re-run probes.
+- Run Casimir verify:
+  verdict, firstFail, certificateHash, integrityOk
+- Export training trace.

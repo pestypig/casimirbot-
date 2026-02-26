@@ -15,6 +15,10 @@ run = ["bash", "-lc", "node dist/index.js"]
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 5001
+externalPort = 3000
+
 [env]
 REPLIT_KEEP_PACKAGE_DEV_DEPENDENCIES = "1"
 PORT = "5000"
@@ -160,3 +164,16 @@ HELIX_ASK_DEBUG = "1"
 HELIX_ASK_TWO_PASS = "1"
 HELIX_ASK_MICRO_PASS = "1"
 HELIX_ASK_MICRO_PASS_AUTO = "1"
+ENABLE_AGI = "1"
+ENABLE_ESSENCE = "1"
+LLM_POLICY = "http"
+ENABLE_AGI_AUTH = "0"
+AGI_TENANT_REQUIRED = "0"
+VOICE_PROXY_DRY_RUN = "1"
+MISSION_BOARD_STORE_STRICT = "0"
+LLM_RUNTIME = "http"
+HULL_MODE = "1"
+HULL_ALLOW_HOSTS = "api.openai.com"
+ENV_MARKER = "cloud-openai-proof-v2"
+LLM_HTTP_BASE = "https://api.openai.com"
+LLM_HTTP_MODEL = "gpt-4o-mini"
