@@ -102,6 +102,22 @@ const classifyCase = (
   return { classification: scanClass, mismatchReason };
 };
 
+
+const classifyScanAggregate = (args: {
+  hasCases: boolean;
+  scanCandidatePassFound: boolean;
+  scanAnyApplicabilityPass: boolean;
+  scanMinMarginRatioRawAmongApplicabilityPass: number | null;
+}): CaseResult['classification'] => {
+  if (!args.hasCases) return 'evidence_path_blocked';
+  if (args.scanCandidatePassFound) return 'candidate_pass_found';
+  if (args.scanAnyApplicabilityPass) {
+    const minRaw = args.scanMinMarginRatioRawAmongApplicabilityPass ?? Number.POSITIVE_INFINITY;
+    return minRaw >= 1 ? 'margin_limited' : 'candidate_pass_found';
+  }
+  return 'applicability_limited';
+};
+
 type GuardSummary = {
   marginRatioRaw?: number | null;
   applicabilityStatus?: string | null;
@@ -284,11 +300,22 @@ export async function run() {
     },
   };
   fs.writeFileSync(OUT_PATH, `${JSON.stringify(sortDeep(payload), null, 2)}\n`);
-  const best = influence.rankedEffects[0] ?? null;
-  const decisionClass = (() => {
-    if (!best) return 'evidence_path_blocked';
-    return classifyCanonicalSemantics(best.marginRatioRaw, best.applicabilityStatus);
-  })();
+  const scanCandidatePassFound = influence.rankedEffects.some(
+    (entry) => entry.applicabilityStatus === 'PASS' && (entry.marginRatioRaw ?? Number.POSITIVE_INFINITY) < 1,
+  );
+  const scanAnyApplicabilityPass = influence.rankedEffects.some((entry) => entry.applicabilityStatus === 'PASS');
+  const passMargins = influence.rankedEffects
+    .filter((entry) => entry.applicabilityStatus === 'PASS')
+    .map((entry) => entry.marginRatioRaw)
+    .filter((entry): entry is number => typeof entry === 'number' && Number.isFinite(entry));
+  const scanMinMarginRatioRawAmongApplicabilityPass =
+    passMargins.length > 0 ? Math.min(...passMargins) : null;
+  const scanDecisionClass = classifyScanAggregate({
+    hasCases: influence.rankedEffects.length > 0,
+    scanCandidatePassFound,
+    scanAnyApplicabilityPass,
+    scanMinMarginRatioRawAmongApplicabilityPass,
+  });
   const influencePayload = {
     runId: `g4-influence-scan-${SEED}-2026-02-26`,
     seed: SEED,
@@ -296,8 +323,10 @@ export async function run() {
     baseline: influence.baseline,
     rankedEffects: influence.rankedEffects,
     decision: {
-      classification: decisionClass,
-      bestCase: best,
+      classification: scanDecisionClass,
+      scanCandidatePassFound,
+      scanAnyApplicabilityPass,
+      scanMinMarginRatioRawAmongApplicabilityPass,
     },
   };
   fs.writeFileSync(INFLUENCE_OUT_PATH, `${JSON.stringify(sortDeep(influencePayload), null, 2)}\n`);

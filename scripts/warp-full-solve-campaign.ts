@@ -98,6 +98,10 @@ type EvidencePack = {
     bound_Jm3?: number;
     boundComputed_Jm3?: number;
     boundFloor_Jm3?: number;
+    boundPolicyFloor_Jm3?: number;
+    boundEnvFloor_Jm3?: number;
+    boundDefaultFloor_Jm3?: number;
+    boundFallbackAbs_Jm3?: number;
     boundUsed_Jm3?: number;
     boundFloorApplied?: boolean;
     marginRatio?: number;
@@ -143,6 +147,10 @@ type QiForensicsArtifact = {
   bound_Jm3: number | null;
   boundComputed_Jm3: number | null;
   boundFloor_Jm3: number | null;
+  boundPolicyFloor_Jm3: number | null;
+  boundEnvFloor_Jm3: number | null;
+  boundDefaultFloor_Jm3: number | null;
+  boundFallbackAbs_Jm3: number | null;
   boundUsed_Jm3: number | null;
   boundFloorApplied: boolean | null;
   marginRatioRaw: number | null;
@@ -972,8 +980,16 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
     lhs_Jm3: readCanonicalNumber(snapshot?.qi_lhs_Jm3, 'lhs_Jm3'),
     bound_Jm3: readCanonicalNumber(snapshot?.qi_bound_Jm3, 'bound_Jm3'),
     boundComputed_Jm3: readCanonicalNumber(snapshot?.qi_bound_computed_Jm3, 'boundComputed_Jm3'),
-    boundFloor_Jm3: readCanonicalNumber(snapshot?.qi_bound_floor_Jm3, 'boundFloor_Jm3'),
-    boundUsed_Jm3: readCanonicalNumber(snapshot?.qi_bound_used_Jm3, 'boundUsed_Jm3'),
+    boundFloor_Jm3: readCanonicalNumber(snapshot?.qi_bound_floor_Jm3, 'boundFloor_Jm3') ?? parseNumberField('boundFloor_Jm3'),
+    boundPolicyFloor_Jm3:
+      readCanonicalNumber(snapshot?.qi_bound_policy_floor_Jm3, 'boundPolicyFloor_Jm3') ?? parseNumberField('boundPolicyFloor_Jm3'),
+    boundEnvFloor_Jm3:
+      readCanonicalNumber(snapshot?.qi_bound_env_floor_Jm3, 'boundEnvFloor_Jm3') ?? parseNumberField('boundEnvFloor_Jm3'),
+    boundDefaultFloor_Jm3:
+      readCanonicalNumber(snapshot?.qi_bound_default_floor_Jm3, 'boundDefaultFloor_Jm3') ?? parseNumberField('boundDefaultFloor_Jm3'),
+    boundFallbackAbs_Jm3:
+      readCanonicalNumber(snapshot?.qi_bound_fallback_abs_Jm3, 'boundFallbackAbs_Jm3') ?? parseNumberField('boundFallbackAbs_Jm3'),
+    boundUsed_Jm3: readCanonicalNumber(snapshot?.qi_bound_used_Jm3, 'boundUsed_Jm3') ?? parseNumberField('boundUsed_Jm3'),
     marginRatio: readCanonicalNumber(snapshot?.qi_margin_ratio, 'marginRatio'),
     marginRatioRaw: readCanonicalNumber(snapshot?.qi_margin_ratio_raw, 'marginRatioRaw'),
     rhoSource: readSnapshotString(snapshot?.qi_rho_source) ?? (parseFordField('rhoSource') ?? undefined),
@@ -1029,6 +1045,10 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
     bound_Jm3: finiteOrNull(pack.g4Diagnostics?.bound_Jm3),
     boundComputed_Jm3: finiteOrNull(pack.g4Diagnostics?.boundComputed_Jm3),
     boundFloor_Jm3: finiteOrNull(pack.g4Diagnostics?.boundFloor_Jm3),
+    boundPolicyFloor_Jm3: finiteOrNull(pack.g4Diagnostics?.boundPolicyFloor_Jm3),
+    boundEnvFloor_Jm3: finiteOrNull(pack.g4Diagnostics?.boundEnvFloor_Jm3),
+    boundDefaultFloor_Jm3: finiteOrNull(pack.g4Diagnostics?.boundDefaultFloor_Jm3),
+    boundFallbackAbs_Jm3: finiteOrNull(pack.g4Diagnostics?.boundFallbackAbs_Jm3),
     boundUsed_Jm3: finiteOrNull(pack.g4Diagnostics?.boundUsed_Jm3),
     boundFloorApplied: booleanOrNull(pack.g4Diagnostics?.boundFloorApplied),
     marginRatioRaw: finiteOrNull(pack.g4Diagnostics?.marginRatioRaw),
@@ -1376,12 +1396,15 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
       const bound = Number.isFinite(d.bound_Jm3) ? d.bound_Jm3 : 'n/a';
       const boundComputed = Number.isFinite(d.boundComputed_Jm3) ? d.boundComputed_Jm3 : 'n/a';
       const boundFloor = Number.isFinite(d.boundFloor_Jm3) ? d.boundFloor_Jm3 : 'n/a';
+      const boundPolicyFloor = Number.isFinite(d.boundPolicyFloor_Jm3) ? d.boundPolicyFloor_Jm3 : 'n/a';
+      const boundEnvFloor = Number.isFinite(d.boundEnvFloor_Jm3) ? d.boundEnvFloor_Jm3 : 'n/a';
+      const boundDefaultFloor = Number.isFinite(d.boundDefaultFloor_Jm3) ? d.boundDefaultFloor_Jm3 : 'n/a';
       const boundUsed = Number.isFinite(d.boundUsed_Jm3) ? d.boundUsed_Jm3 : bound;
       const boundFloorApplied = typeof d.boundFloorApplied === 'boolean' ? d.boundFloorApplied : 'n/a';
       const raw = Number.isFinite(d.marginRatioRaw) ? d.marginRatioRaw : Number.isFinite(d.marginRatio) ? d.marginRatio : 'n/a';
       const rho = typeof d.rhoSource === 'string' && d.rhoSource.length > 0 ? d.rhoSource : 'unknown';
       const applicability = typeof d.applicabilityStatus === 'string' && d.applicabilityStatus.length > 0 ? d.applicabilityStatus : 'UNKNOWN';
-      return `| ${pack.wave} | ${lhs} | ${boundComputed} | ${boundFloor} | ${boundUsed} | ${boundFloorApplied} | ${raw} | ${rho} | ${applicability} |`;
+      return `| ${pack.wave} | ${lhs} | ${boundComputed} | ${boundFloor} | ${boundPolicyFloor} | ${boundEnvFloor} | ${boundDefaultFloor} | ${boundUsed} | ${boundFloorApplied} | ${raw} | ${rho} | ${applicability} |`;
     })
     .join('\n');
   const bestCasePack = packs.reduce<EvidencePack | null>((best, current) => {
@@ -1450,8 +1473,8 @@ ${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
 - reproducibility.gateAgreement: ${pack.reproducibility?.repeatedRunGateAgreement?.status ?? 'NOT_READY'}`).join('\n\n')}
 
 ## Per-wave G4 evidence table
-| Wave | lhs_Jm3 | boundComputed_Jm3 | boundFloor_Jm3 | boundUsed_Jm3 | boundFloorApplied | marginRatioRaw | rhoSource | applicabilityStatus |
-| --- | ---: | ---: | ---: | ---: | --- | ---: | --- | --- |
+| Wave | lhs_Jm3 | boundComputed_Jm3 | boundFloor_Jm3 | boundPolicyFloor_Jm3 | boundEnvFloor_Jm3 | boundDefaultFloor_Jm3 | boundUsed_Jm3 | boundFloorApplied | marginRatioRaw | rhoSource | applicabilityStatus |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- | --- |
 ${g4WaveRows}
 
 ## Best-case G4 summary

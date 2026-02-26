@@ -377,6 +377,11 @@ describe("evaluateQiGuardrail", () => {
 
       expect(guard.marginRatioRaw).toBeLessThanOrEqual(0.5000001);
       expect(guard.bound_Jm3).toBeLessThan(0);
+      expect(guard.boundPolicyFloor_Jm3).not.toBeNull();
+      expect(guard.boundEnvFloor_Jm3).toBeNull();
+      expect(guard.boundDefaultFloor_Jm3).toBeLessThan(0);
+      expect(guard.boundFallbackAbs_Jm3).toBeGreaterThan(0);
+      expect(guard.boundFloorApplied).toBe(guard.boundUsed_Jm3 !== guard.boundComputed_Jm3);
     } finally {
       process.env.QI_BOUND_FLOOR_ABS = prevFloor;
     }
