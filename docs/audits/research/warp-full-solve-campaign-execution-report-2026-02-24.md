@@ -7,6 +7,7 @@
 - Executive translation: `docs/audits/research/warp-gates-executive-translation-2026-02-24.md`
 
 ## Lane provenance
+- sourceArtifactRoot: **artifacts/research/full-solve**
 - Artifact lane: **readiness**
 - Budget-stress lane can legitimately emit timeout-driven NOT_READY outcomes due to strict runtime budgets.
 - Readiness lane (`--ci-fast-path`) is the source of gate evaluability and canonical campaign artifacts.

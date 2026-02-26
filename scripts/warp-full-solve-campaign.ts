@@ -176,6 +176,7 @@ const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
 
 const DATE_STAMP = '2026-02-24';
+const CANONICAL_ARTIFACT_ROOT = path.join('artifacts', 'research', 'full-solve');
 const EXECUTIVE_TRANSLATION_DOC = `docs/audits/research/warp-gates-executive-translation-${DATE_STAMP}.md`;
 const ALLOWED_WAVES: readonly WaveArg[] = ['A', 'B', 'C', 'D', 'all'] as const;
 const FIRST_FAIL_ORDER = ['G0', 'G1', 'G2', 'G3', 'G4', 'G6', 'G7', 'G8'] as const;
@@ -1430,8 +1431,15 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
     return 'candidate_pass_found';
   })();
 
+  const sourceArtifactRoot = outDir.replace(/\\/g, '/');
+  const canonicalArtifactRoot = CANONICAL_ARTIFACT_ROOT.replace(/\\/g, '/');
+  const reportPath =
+    sourceArtifactRoot === canonicalArtifactRoot
+      ? path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.md`)
+      : path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.${lane}.md`);
+
   writeMd(
-    path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.md`),
+    reportPath,
     `# Warp Full-Solve Campaign Execution Report (${DATE_STAMP})
 
 ## Executive verdict
@@ -1441,6 +1449,7 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
 - Executive translation: \`${EXECUTIVE_TRANSLATION_DOC}\`
 
 ## Lane provenance
+- sourceArtifactRoot: **${sourceArtifactRoot}**
 - Artifact lane: **${lane}**
 - Budget-stress lane can legitimately emit timeout-driven NOT_READY outcomes due to strict runtime budgets.
 - Readiness lane (\`--ci-fast-path\`) is the source of gate evaluability and canonical campaign artifacts.
