@@ -52,4 +52,18 @@ describe("stress-energy brick builder", () => {
     expect(Number.isFinite(brick.stats.mapping?.rho_avg ?? NaN)).toBe(true);
     expect(brick.stats.mapping?.proxy).toBe(true);
   });
+
+  it("computes observer-robust energy-condition margins", () => {
+    const brick = buildStressEnergyBrick(baseParams);
+    const robust = brick.stats.observerRobust;
+    expect(robust).toBeDefined();
+    expect(robust?.pressureModel).toBe("isotropic_pressure");
+    expect(robust?.rapidityCap).toBeGreaterThan(0);
+    expect(Number.isFinite(robust?.typeI.fraction ?? NaN)).toBe(true);
+    expect((robust?.nec.robustMin ?? 0) <= (robust?.nec.eulerianMin ?? 0) + 1e-8).toBe(true);
+    expect((robust?.wec.robustMin ?? 0) <= (robust?.wec.eulerianMin ?? 0) + 1e-8).toBe(true);
+    expect((robust?.sec.robustMin ?? 0) <= (robust?.sec.eulerianMin ?? 0) + 1e-8).toBe(true);
+    expect((robust?.dec.robustMin ?? 0) <= (robust?.dec.eulerianMin ?? 0) + 1e-8).toBe(true);
+    expect(robust?.consistency.robustNotGreaterThanEulerian).toBe(true);
+  });
 });

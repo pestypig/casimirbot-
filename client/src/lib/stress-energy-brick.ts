@@ -3,7 +3,10 @@ import type { CurvatureBrickRequest } from "@/lib/curvature-brick";
 
 declare const Buffer: undefined | { from(input: string, encoding: string): { buffer: ArrayBufferLike; byteOffset: number; byteLength: number } };
 
-export type StressEnergyBrickRequest = CurvatureBrickRequest;
+export type StressEnergyBrickRequest = CurvatureBrickRequest & {
+  observerRapidityCap?: number;
+  observerTypeITolerance?: number;
+};
 
 export interface StressEnergyBrickChannel {
   data: Float32Array;
@@ -35,6 +38,7 @@ export interface StressEnergyBrickStats {
   };
   conservation?: StressEnergyConservationStats;
   mapping?: StressEnergyMappingStats;
+  observerRobust?: ObserverRobustDiagnostics;
 }
 
 export interface StressEnergyConservationStats {
@@ -62,6 +66,48 @@ export interface StressEnergyMappingStats {
   pressureSource?: "pipeline" | "proxy" | "override";
   source?: "pipeline" | "defaults" | "metric";
   proxy: boolean;
+}
+
+export type ObserverMarginSource = "algebraic_type_i" | "capped_search";
+
+export interface ObserverConditionSummary {
+  eulerianMin: number;
+  eulerianMean: number;
+  robustMin: number;
+  robustMean: number;
+  eulerianViolationFraction: number;
+  robustViolationFraction: number;
+  missedViolationFraction: number;
+  severityGainMin: number;
+  severityGainMean: number;
+  maxRobustMinusEulerian: number;
+  worstCase: {
+    index: number;
+    value: number;
+    direction: [number, number, number];
+    rapidity: number | null;
+    source: ObserverMarginSource;
+  };
+}
+
+export interface ObserverRobustDiagnostics {
+  pressureModel: "isotropic_pressure";
+  pressureFactor: number;
+  rapidityCap: number;
+  rapidityCapBeta: number;
+  typeI: {
+    count: number;
+    fraction: number;
+    tolerance: number;
+  };
+  nec: ObserverConditionSummary;
+  wec: ObserverConditionSummary;
+  sec: ObserverConditionSummary;
+  dec: ObserverConditionSummary;
+  consistency: {
+    robustNotGreaterThanEulerian: boolean;
+    maxRobustMinusEulerian: number;
+  };
 }
 
 export interface StressEnergyBrickDecoded {
@@ -248,6 +294,69 @@ const normalizeMappingStats = (
   };
 };
 
+const normalizeObserverConditionSummary = (raw: any): ObserverConditionSummary | undefined => {
+  if (!raw || typeof raw !== "object") return undefined;
+  const directionRaw = Array.isArray(raw.worstCase?.direction) ? raw.worstCase.direction : [];
+  const sourceRaw = typeof raw.worstCase?.source === "string" ? raw.worstCase.source : "capped_search";
+  const source: ObserverMarginSource =
+    sourceRaw === "algebraic_type_i" || sourceRaw === "capped_search"
+      ? sourceRaw
+      : "capped_search";
+  return {
+    eulerianMin: Number(raw.eulerianMin ?? 0),
+    eulerianMean: Number(raw.eulerianMean ?? 0),
+    robustMin: Number(raw.robustMin ?? 0),
+    robustMean: Number(raw.robustMean ?? 0),
+    eulerianViolationFraction: Number(raw.eulerianViolationFraction ?? 0),
+    robustViolationFraction: Number(raw.robustViolationFraction ?? 0),
+    missedViolationFraction: Number(raw.missedViolationFraction ?? 0),
+    severityGainMin: Number(raw.severityGainMin ?? 0),
+    severityGainMean: Number(raw.severityGainMean ?? 0),
+    maxRobustMinusEulerian: Number(raw.maxRobustMinusEulerian ?? 0),
+    worstCase: {
+      index: Number(raw.worstCase?.index ?? -1),
+      value: Number(raw.worstCase?.value ?? 0),
+      direction: [
+        Number(directionRaw[0] ?? 0),
+        Number(directionRaw[1] ?? 0),
+        Number(directionRaw[2] ?? 0),
+      ],
+      rapidity: Number.isFinite(Number(raw.worstCase?.rapidity))
+        ? Number(raw.worstCase?.rapidity)
+        : null,
+      source,
+    },
+  };
+};
+
+const normalizeObserverRobustStats = (raw: any): ObserverRobustDiagnostics | undefined => {
+  if (!raw || typeof raw !== "object") return undefined;
+  const nec = normalizeObserverConditionSummary(raw.nec);
+  const wec = normalizeObserverConditionSummary(raw.wec);
+  const sec = normalizeObserverConditionSummary(raw.sec);
+  const dec = normalizeObserverConditionSummary(raw.dec);
+  if (!nec || !wec || !sec || !dec) return undefined;
+  return {
+    pressureModel: "isotropic_pressure",
+    pressureFactor: Number(raw.pressureFactor ?? 0),
+    rapidityCap: Number(raw.rapidityCap ?? 0),
+    rapidityCapBeta: Number(raw.rapidityCapBeta ?? 0),
+    typeI: {
+      count: Number(raw.typeI?.count ?? 0),
+      fraction: Number(raw.typeI?.fraction ?? 0),
+      tolerance: Number(raw.typeI?.tolerance ?? 0),
+    },
+    nec,
+    wec,
+    sec,
+    dec,
+    consistency: {
+      robustNotGreaterThanEulerian: raw.consistency?.robustNotGreaterThanEulerian === true,
+      maxRobustMinusEulerian: Number(raw.consistency?.maxRobustMinusEulerian ?? 0),
+    },
+  };
+};
+
 const normalizeStats = (raw: any, fallbackDutyFR: number): StressEnergyBrickStats => ({
   totalEnergy_J: Number(raw?.totalEnergy_J ?? 0),
   invariantMass_kg: Number.isFinite(Number(raw?.invariantMass_kg))
@@ -268,6 +377,7 @@ const normalizeStats = (raw: any, fallbackDutyFR: number): StressEnergyBrickStat
   natario: normalizeNatarioStats(raw?.natario),
   conservation: normalizeConservationStats(raw?.conservation),
   mapping: normalizeMappingStats(raw?.mapping, fallbackDutyFR),
+  observerRobust: normalizeObserverRobustStats(raw?.observerRobust),
 });
 
 const decodeStressEnergyBrickBinary = (
@@ -371,6 +481,14 @@ const buildQuery = (request: StressEnergyBrickRequest) => {
   params.set("gammaVdB", request.gammaVdB.toString());
   params.set("ampBase", request.ampBase.toString());
   params.set("zeta", request.zeta.toString());
+  const observerRapidityCap = Number((request as any).observerRapidityCap);
+  if (Number.isFinite(observerRapidityCap)) {
+    params.set("observerRapidityCap", observerRapidityCap.toString());
+  }
+  const observerTypeITolerance = Number((request as any).observerTypeITolerance);
+  if (Number.isFinite(observerTypeITolerance)) {
+    params.set("observerTypeITolerance", observerTypeITolerance.toString());
+  }
   params.set("format", BRICK_FORMAT);
   return params.toString();
 };

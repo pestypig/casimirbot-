@@ -6699,6 +6699,14 @@ export function getStressEnergyBrick(req: Request, res: Response) {
     const gammaVdB = parseNumberParam(query.gammaVdB ?? state.gammaVanDenBroeck, state.gammaVanDenBroeck ?? 1e5);
     const ampBase = parseNumberParam(query.ampBase, 0);
     const zeta = parseNumberParam(query.zeta, 0.84);
+    const observerRapidityCap = parseNumberParam(
+      query.observerRapidityCap ?? query.rapidityCap,
+      parseNumberParam((state as any).observerRapidityCap, 2.5),
+    );
+    const observerTypeITolerance = parseNumberParam(
+      query.observerTypeITolerance ?? query.typeITol,
+      parseNumberParam((state as any).observerTypeITolerance, 1e-9),
+    );
     const overrideDriveDir = parseVec3ParamOptional(query.driveDir);
     const stateDriveDir = parseVec3ParamOptional((state as any)?.driveDir);
     const driveDir = normalizeVec3OrNull(overrideDriveDir ?? stateDriveDir);
@@ -6719,6 +6727,8 @@ export function getStressEnergyBrick(req: Request, res: Response) {
       gammaVdB,
       ampBase,
       zeta,
+      observerRapidityCap: Math.max(0, observerRapidityCap),
+      observerTypeITolerance: Math.max(0, observerTypeITolerance),
       driveDir: driveDir ?? undefined,
     };
 
