@@ -112,4 +112,115 @@ describe("validateOperatorCalloutV1", () => {
       ],
     });
   });
+
+  it("fails when suppression_reason is present while suppressed is false", () => {
+    const result = validateOperatorCalloutV1({
+      kind: OPERATOR_CALLOUT_V1_KIND,
+      deterministic: true,
+      suppressed: false,
+      suppression_reason: "operator_noise_filter",
+      text: {
+        certainty: "reasoned",
+        message: "Unsuppressed payload.",
+      },
+      voice: {
+        certainty: "reasoned",
+        message: "Unsuppressed voice payload.",
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        {
+          code: "INVALID_FIELD_VALUE",
+          path: "suppression_reason",
+          message: "suppression_reason must be undefined when suppressed is false",
+        },
+      ],
+    });
+  });
+
+  it("fails when payload is an array", () => {
+    const result = validateOperatorCalloutV1([]);
+
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        {
+          code: "INVALID_FIELD_TYPE",
+          path: "payload",
+          message: "payload must be an object",
+        },
+      ],
+    });
+  });
+
+  it("fails when text is an array", () => {
+    const result = validateOperatorCalloutV1({
+      kind: OPERATOR_CALLOUT_V1_KIND,
+      deterministic: true,
+      suppressed: false,
+      text: [],
+      voice: {
+        certainty: "reasoned",
+        message: "Voice payload.",
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        {
+          code: "INVALID_FIELD_TYPE",
+          path: "text",
+          message: "text must be an object",
+        },
+        {
+          code: "MISSING_REQUIRED_FIELD",
+          path: "text.certainty",
+          message: "text.certainty must be one of unknown, hypothesis, reasoned, confirmed",
+        },
+        {
+          code: "MISSING_REQUIRED_FIELD",
+          path: "text.message",
+          message: "text.message must be a non-empty string",
+        },
+      ],
+    });
+  });
+
+  it("fails when voice is an array", () => {
+    const result = validateOperatorCalloutV1({
+      kind: OPERATOR_CALLOUT_V1_KIND,
+      deterministic: true,
+      suppressed: false,
+      text: {
+        certainty: "reasoned",
+        message: "Text payload.",
+      },
+      voice: [],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        {
+          code: "INVALID_FIELD_TYPE",
+          path: "voice",
+          message: "voice must be an object",
+        },
+        {
+          code: "MISSING_REQUIRED_FIELD",
+          path: "voice.certainty",
+          message: "voice.certainty must be one of unknown, hypothesis, reasoned, confirmed",
+        },
+        {
+          code: "MISSING_REQUIRED_FIELD",
+          path: "voice.message",
+          message: "voice.message must be a non-empty string",
+        },
+      ],
+    });
+  });
 });
