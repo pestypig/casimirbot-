@@ -106,6 +106,12 @@ Per-wave gate status snapshots:
 - g4ReasonCodes: G4_QI_APPLICABILITY_NOT_PASS | G4_QI_MARGIN_EXCEEDED
 - reproducibility.gateAgreement: PASS
 
+## Operator translation
+- What failed: G4 (Aggregated from waves: A,B,C,D)
+- Why it failed: hard gate and/or required signal deficits are fail-closed; see per-wave reason codes and missing-signal maps.
+- What changed in this run: lane=readiness; timeout_budget=0; missing_required_signals=0.
+- Can code fixes alone resolve it?: only if failures are signal/contract/scaling defects; true margin exceedance requires physics-side improvement.
+
 ## Decision output
 - Final decision label: **INADMISSIBLE**
 - Claim posture: diagnostic/reduced-order (fail-closed on hard evidence gaps).

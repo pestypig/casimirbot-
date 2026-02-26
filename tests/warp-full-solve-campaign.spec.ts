@@ -12,6 +12,7 @@ import {
   deriveG4Diagnostics,
   collectRequiredSignals,
   computeReproducibility,
+  buildQiForensicsArtifact,
   deriveCampaignDecision,
   deriveFirstFail,
   parseArgs,
@@ -294,6 +295,88 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.thetaAuditStatus).toBe('pass');
     expect(diagnostics.source).toBe('synthesized_unknown');
     expect(diagnostics.reasonCode).toEqual(['G4_QI_SIGNAL_MISSING']);
+  });
+
+
+
+  it('keeps canonical snapshot values when fallback note text is non-numeric', () => {
+    const diagnostics = deriveG4Diagnostics({
+      evaluation: {
+        constraints: [
+          {
+            id: 'FordRomanQI',
+            status: 'fail',
+            note: 'marginRatioRaw=unknown;marginRatio=n/a;applicabilityStatus=NOT_APPLICABLE;rhoSource=proxy',
+          },
+          { id: 'ThetaAudit', status: 'pass', note: 'theta ok' },
+        ],
+      },
+      certificate: {
+        payload: {
+          snapshot: {
+            qi_margin_ratio_raw: 0.75,
+            qi_margin_ratio: 0.5,
+            qi_applicability_status: 'PASS',
+            qi_rho_source: 'gr.rho_constraint',
+          },
+        },
+      },
+    } as any);
+    expect(diagnostics.marginRatioRaw).toBe(0.75);
+    expect(diagnostics.marginRatio).toBe(0.5);
+    expect(diagnostics.applicabilityStatus).toBe('PASS');
+    expect(diagnostics.rhoSource).toBe('gr.rho_constraint');
+  });
+
+  it('builds qi-forensics payload with finite-or-null numeric hygiene', () => {
+    const pack = {
+      runId: 'run-1',
+      wave: 'A',
+      seed: 7,
+      completedAt: '2026-02-24T00:00:00.000Z',
+      g4Diagnostics: {
+        lhs_Jm3: Number.NaN,
+        bound_Jm3: -2,
+        marginRatioRaw: Infinity,
+        marginRatio: 0.5,
+        tau_s: undefined,
+        K: 12,
+        safetySigma_Jm3: Number.NaN,
+        curvatureRatio: 1,
+        curvatureEnforced: true,
+        curvatureOk: false,
+        applicabilityStatus: 'FAIL',
+        rhoSource: 'gr.rho_constraint',
+        reasonCode: ['G4_QI_MARGIN_EXCEEDED'],
+      },
+    } as any;
+    const attempt = {
+      certificate: {
+        payload: {
+          snapshot: {
+            qi_metric_derived: true,
+            qi_metric_contract_ok: false,
+            qi_curvature_scalar: Number.NaN,
+            qi_curvature_radius_m: 4,
+            qiGuardrail: {
+              effectiveRho: Number.NaN,
+              rhoOn: -1,
+              sampler: 'gaussian',
+              fieldType: 'em',
+            },
+          },
+        },
+      },
+    } as any;
+    const artifact = buildQiForensicsArtifact(pack, attempt);
+    expect(artifact.lhs_Jm3).toBeNull();
+    expect(artifact.bound_Jm3).toBe(-2);
+    expect(artifact.marginRatioRaw).toBeNull();
+    expect(artifact.marginRatioClamped).toBe(0.5);
+    expect(artifact.effectiveRho_SI_Jm3).toBeNull();
+    expect(artifact.rhoOn_SI_Jm3).toBe(-1);
+    expect(artifact.curvatureScalar).toBeNull();
+    expect(artifact.curvatureRadius_m).toBe(4);
   });
 
   it('derives deterministic first-fail from canonical gate order', () => {
