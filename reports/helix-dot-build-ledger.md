@@ -38,3 +38,21 @@
   - Lane routing logic remains unchanged.
 - known_risks_next_step:
   - Contract strictness increases may reject previously accepted malformed payloads, requiring any non-conformant emitters to be updated.
+
+## Milestone M3 — Operator Contract v1 Output Shape Tightening
+- milestone_id: `M3-operator-contract-v1-output-shape`
+- files_changed:
+  - `server/services/helix-ask/operator-contract-v1.ts`
+  - `server/__tests__/operator-contract-v1.spec.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run server/__tests__/operator-contract-v1.spec.ts tests/helix-ask-llm-debug-skip.spec.ts tests/helix-ask-jobs-regression.spec.ts`
+  - `npm run helix:ask:dot:debug-loop -- --base-url http://127.0.0.1:5050`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Updated successful validator output construction to include `suppression_reason` only when defined.
+  - Added regression coverage confirming `suppression_reason` is absent from successful unsuppressed payloads.
+  - Preserved M2 validation rules and deterministic error behavior.
+- known_risks_next_step:
+  - Downstream consumers that assumed `suppression_reason` key presence with `undefined` value must read by key existence semantics.

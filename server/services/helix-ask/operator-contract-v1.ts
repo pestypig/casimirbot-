@@ -187,7 +187,9 @@ export function validateOperatorCalloutV1(payload: unknown): OperatorCalloutV1Va
       kind: OPERATOR_CALLOUT_V1_KIND,
       deterministic: deterministic as boolean,
       suppressed: suppressed as boolean,
-      suppression_reason: suppressionReason as SuppressionReason | undefined,
+      ...(suppressionReason === undefined
+        ? {}
+        : { suppression_reason: suppressionReason as SuppressionReason }),
       text: {
         certainty: textCertaintyParsed.data,
         message: textMessage as string,
