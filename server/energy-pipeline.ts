@@ -7307,6 +7307,10 @@ export function evaluateQiGuardrail(
   bound_Jm3: number;
   boundComputed_Jm3: number;
   boundFloor_Jm3: number | null;
+  boundPolicyFloor_Jm3: number | null;
+  boundEnvFloor_Jm3: number | null;
+  boundDefaultFloor_Jm3: number;
+  boundFallbackAbs_Jm3: number;
   boundUsed_Jm3: number;
   boundFloorApplied: boolean;
   marginRatio: number;
@@ -7443,18 +7447,19 @@ export function evaluateQiGuardrail(
   const envFloorAbs = Number.isFinite(envFloorAbsRaw)
     ? Math.abs(envFloorAbsRaw as number)
     : 0;
+  const defaultFloorAbs = Math.abs(DEFAULT_QI_BOUND_SCALAR);
   const fallbackAbs = Math.max(
-    Math.abs(DEFAULT_QI_BOUND_SCALAR),
+    defaultFloorAbs,
     envFloorAbs,
     policyFloorAbs,
     1e-12,
   );
-  const boundFloor_Jm3 = policyFloorAbs > 0 ? -Math.abs(policyFloorAbs) : null;
+  const boundPolicyFloor_Jm3 = policyFloorAbs > 0 ? -Math.abs(policyFloorAbs) : null;
+  const boundEnvFloor_Jm3 = envFloorAbs > 0 ? -Math.abs(envFloorAbs) : null;
+  const boundDefaultFloor_Jm3 = -defaultFloorAbs;
+  const boundFloor_Jm3 = -fallbackAbs;
   const bound_Jm3 = clampNegativeBound(boundComputed_Jm3, -fallbackAbs);
-  const boundFloorApplied =
-    Number.isFinite(boundFloor_Jm3) &&
-    Number.isFinite(boundComputed_Jm3) &&
-    (boundComputed_Jm3 as number) > (boundFloor_Jm3 as number);
+  const boundFloorApplied = Number.isFinite(bound_Jm3) && Number.isFinite(boundComputed_Jm3) && bound_Jm3 !== boundComputed_Jm3;
   const rawRatio =
     bound_Jm3 < 0 && Number.isFinite(bound_Jm3) ? Math.abs(lhs) / Math.abs(bound_Jm3) : Infinity;
   const marginRatio = QI_POLICY_ENFORCE ? Math.min(rawRatio, policyMaxZeta) : rawRatio;
@@ -7534,6 +7539,10 @@ export function evaluateQiGuardrail(
     bound_Jm3,
     boundComputed_Jm3,
     boundFloor_Jm3,
+    boundPolicyFloor_Jm3,
+    boundEnvFloor_Jm3,
+    boundDefaultFloor_Jm3,
+    boundFallbackAbs_Jm3: fallbackAbs,
     boundUsed_Jm3: bound_Jm3,
     boundFloorApplied,
     marginRatio: Number.isFinite(marginRatio) ? marginRatio : Infinity,

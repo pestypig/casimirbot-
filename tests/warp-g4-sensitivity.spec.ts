@@ -104,6 +104,16 @@ describe('warp-g4-sensitivity', () => {
     expect(negInfMargin).toContain('G4_QI_MARGIN_EXCEEDED');
   });
 
+
+  it('derives scan decision from aggregate scan outcomes', () => {
+    const influencePath = path.join('artifacts/research/full-solve', 'g4-influence-scan-2026-02-26.json');
+    const data = JSON.parse(fs.readFileSync(influencePath, 'utf8'));
+    expect(typeof data.decision.classification).toBe('string');
+    expect(typeof data.decision.scanCandidatePassFound).toBe('boolean');
+    expect(typeof data.decision.scanAnyApplicabilityPass).toBe('boolean');
+    expect(data.decision).toHaveProperty('scanMinMarginRatioRawAmongApplicabilityPass');
+  });
+
   it('keeps display ratio faithful for small finite values', async () => {
     const [single] = await runSensitivityCases(
       [{ tau_s: 0.01, sampler: 'gaussian', fieldType: 'em', QI_POLICY_MAX_ZETA: 1 }],
