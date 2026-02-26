@@ -8820,7 +8820,13 @@ export class Hull3DRenderer {
   };
   private t00StampWarned = false;
   private observerSelection: ObserverRobustSelection = { condition: "nec", frame: "Eulerian" };
-  private observerDirectionOverlay: ObserverDirectionOverlayConfig = { enabled: false, stride: 4 };
+  private observerDirectionOverlay: ObserverDirectionOverlayConfig = {
+    enabled: false,
+    stride: 4,
+    decDirectionMode: "local",
+    maskMode: "violating",
+    minMagnitude: 0,
+  };
   private t00Raw: {
     dims: [number, number, number];
     t00: Float32Array;
@@ -9776,7 +9782,12 @@ export class Hull3DRenderer {
       const enabled = payload?.enabled === true;
       const strideRaw = Number(payload?.stride ?? 4);
       const stride = Number.isFinite(strideRaw) ? Math.max(1, Math.min(32, Math.round(strideRaw))) : 4;
-      this.observerDirectionOverlay = { enabled, stride };
+      const decDirectionMode = payload?.decDirectionMode === "global" ? "global" : "local";
+      const maskModeRaw = typeof payload?.maskMode === "string" ? payload.maskMode.toLowerCase() : "violating";
+      const maskMode = maskModeRaw === "all" || maskModeRaw === "missed" ? maskModeRaw : "violating";
+      const minMagnitudeRaw = Number(payload?.minMagnitude ?? 0);
+      const minMagnitude = Number.isFinite(minMagnitudeRaw) ? Math.max(0, minMagnitudeRaw) : 0;
+      this.observerDirectionOverlay = { enabled, stride, decDirectionMode, maskMode, minMagnitude };
       this.overlayCache.observerDirectionKey = "";
     });
 
@@ -13635,7 +13646,22 @@ export class Hull3DRenderer {
     }
 
     const stride = Math.max(1, Math.round(this.observerDirectionOverlay.stride ?? 4));
-    const key = [this.t00Raw.version, this.fluxField.version, this.observerSelection.condition, stride, dims.join("x")].join("|");
+    const decDirectionMode = this.observerDirectionOverlay.decDirectionMode === "global" ? "global" : "local";
+    const maskMode = this.observerDirectionOverlay.maskMode === "all" || this.observerDirectionOverlay.maskMode === "missed"
+      ? this.observerDirectionOverlay.maskMode
+      : "violating";
+    const minMagnitudeRaw = Number(this.observerDirectionOverlay.minMagnitude ?? 0);
+    const minMagnitude = Number.isFinite(minMagnitudeRaw) ? Math.max(0, minMagnitudeRaw) : 0;
+    const key = [
+      this.t00Raw.version,
+      this.fluxField.version,
+      this.observerSelection.condition,
+      stride,
+      decDirectionMode,
+      maskMode,
+      minMagnitude.toFixed(6),
+      dims.join("x"),
+    ].join("|");
     if (this.overlayCache.observerDirectionKey === key) return;
     this.overlayCache.observerDirectionKey = key;
 
@@ -13653,6 +13679,13 @@ export class Hull3DRenderer {
         stats: { observerRobust } as any,
       } as any,
       this.observerSelection.condition,
+      {
+        enabled: true,
+        stride,
+        decDirectionMode,
+        maskMode,
+        minMagnitude,
+      },
     );
     if (!directionField) {
       this.overlay.observerDirectionCount = 0;
@@ -26560,6 +26593,4 @@ const buildRingLUT = (params: RingParams): RingLUTResult => {
 
 
 };
-
-
 

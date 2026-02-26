@@ -201,7 +201,7 @@ describe("buildObserverDirectionField", () => {
       sz: [0],
       pressureFactor: 0,
     });
-    const field = buildObserverDirectionField(brick, "wec");
+    const field = buildObserverDirectionField(brick, "wec", { maskMode: "all" });
     expect(field).not.toBeNull();
     expect(field!.directions[0]).toBeCloseTo(-1, 6);
     expect(Math.abs(field!.directions[1])).toBeLessThan(1e-9);
@@ -218,7 +218,7 @@ describe("buildObserverDirectionField", () => {
       pressureFactor: Number.POSITIVE_INFINITY,
       rapidityCapBeta: Number.NaN,
     });
-    const field = buildObserverDirectionField(brick, "sec");
+    const field = buildObserverDirectionField(brick, "sec", { maskMode: "all" });
     expect(field).not.toBeNull();
     for (const value of field!.directions) {
       expect(Number.isFinite(value)).toBe(true);
@@ -238,12 +238,100 @@ describe("buildObserverDirectionField", () => {
       typeITolerance: 1e-12,
       decWorstCaseDirection: [0, 1, 0],
     });
-    const nec = buildObserverDirectionField(brick, "nec");
-    const dec = buildObserverDirectionField(brick, "dec");
+    const nec = buildObserverDirectionField(brick, "nec", { maskMode: "all" });
+    const dec = buildObserverDirectionField(brick, "dec", { maskMode: "all", decDirectionMode: "global" });
     expect(nec).not.toBeNull();
     expect(dec).not.toBeNull();
     expect(nec!.directions[0]).toBeCloseTo(-1, 6);
     expect(Math.abs(nec!.directions[1])).toBeLessThan(1e-9);
     expect(dec!.directions[1]).toBeCloseTo(1, 6);
+  });
+
+  it("DEC local mode varies direction per voxel for varying flux", () => {
+    const brick = createBrick({
+      t00: [0, 0],
+      sx: [1, 0],
+      sy: [0, 1],
+      sz: [0, 0],
+      pressureFactor: 0,
+      typeITolerance: 0,
+      decWorstCaseDirection: [1, 0, 0],
+    });
+    const field = buildObserverDirectionField(brick, "dec", { decDirectionMode: "local", maskMode: "all" });
+    expect(field).not.toBeNull();
+    const out = field!;
+    expect(out.mask?.[0]).toBe(1);
+    expect(out.mask?.[1]).toBe(1);
+    expect(Math.abs(out.directions[0])).toBeGreaterThan(0.9);
+    expect(Math.abs(out.directions[4])).toBeGreaterThan(0.9);
+    expect(Math.abs(out.directions[0] - out.directions[3]) + Math.abs(out.directions[1] - out.directions[4])).toBeGreaterThan(0.5);
+  });
+
+  it("DEC global mode uses one provided global direction", () => {
+    const brick = createBrick({
+      t00: [0, 0],
+      sx: [1, 0],
+      sy: [0, 1],
+      sz: [0, 0],
+      pressureFactor: 0,
+      typeITolerance: 0,
+      decWorstCaseDirection: [0, 1, 0],
+    });
+    const field = buildObserverDirectionField(brick, "dec", { decDirectionMode: "global", maskMode: "all" });
+    expect(field).not.toBeNull();
+    const out = field!;
+    expect(out.mask?.[0]).toBe(1);
+    expect(out.mask?.[1]).toBe(1);
+    expect(Math.abs(out.directions[1])).toBeCloseTo(1, 6);
+    expect(Math.abs(out.directions[4])).toBeCloseTo(1, 6);
+  });
+
+  it("maskMode violating filters by robust < 0", () => {
+    const brick = createBrick({
+      t00: [1, 1],
+      sx: [0, 1.1],
+      sy: [0, 0],
+      sz: [0, 0],
+      pressureFactor: 0,
+    });
+    const field = buildObserverDirectionField(brick, "nec", { maskMode: "violating", decDirectionMode: "local" });
+    expect(field).not.toBeNull();
+    expect(Array.from(field!.mask ?? [])).toEqual([0, 1]);
+  });
+
+  it("maskMode missed filters by robust < 0 && eulerian >= 0", () => {
+    const brick = createBrick({
+      t00: [0.25, 1],
+      sx: [0.5, 1],
+      sy: [0, 0],
+      sz: [0, 0],
+      pressureFactor: 0,
+    });
+    const field = buildObserverDirectionField(brick, "nec", { maskMode: "missed", decDirectionMode: "local" });
+    expect(field).not.toBeNull();
+    expect(Array.from(field!.mask ?? [])).toEqual([1, 0]);
+  });
+
+  it("keeps finite outputs for directions mask and magnitude", () => {
+    const brick = createBrick({
+      t00: [Number.NaN, Number.POSITIVE_INFINITY, 0],
+      sx: [Number.NaN, Number.POSITIVE_INFINITY, -1],
+      sy: [Number.NaN, Number.NEGATIVE_INFINITY, 0],
+      sz: [Number.NaN, Number.NaN, 1],
+      pressureFactor: Number.POSITIVE_INFINITY,
+      rapidityCapBeta: Number.NaN,
+      typeITolerance: Number.NaN,
+    });
+    const field = buildObserverDirectionField(brick, "dec", {
+      decDirectionMode: "local",
+      maskMode: "all",
+      minMagnitude: 0,
+    });
+    expect(field).not.toBeNull();
+    for (const value of field!.directions) expect(Number.isFinite(value)).toBe(true);
+    for (const value of field!.mask ?? []) expect(Number.isFinite(value)).toBe(true);
+    for (const value of field!.magnitude ?? []) expect(Number.isFinite(value)).toBe(true);
+    expect(Number.isFinite(field!.minMagnitude)).toBe(true);
+    expect(Number.isFinite(field!.maxMagnitude)).toBe(true);
   });
 });
