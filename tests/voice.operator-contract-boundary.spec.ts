@@ -10,6 +10,13 @@ const buildApp = async () => {
   return { app, resetVoiceRouteState };
 };
 
+const expectSuppressionShape = (body: Record<string, unknown>, expectedReason: string) => {
+  expect(body.suppressed).toBe(true);
+  expect(body.reason).toBe(expectedReason);
+  expect(body.suppression_reason).toBe(expectedReason);
+  expect(body.suppressionReason).toBe(expectedReason);
+};
+
 describe("voice operator contract boundary", () => {
   afterEach(async () => {
     vi.resetAllMocks();
@@ -39,7 +46,43 @@ describe("voice operator contract boundary", () => {
     resetVoiceRouteState();
   });
 
-  it("suppresses deterministically when operator contract validation fails", async () => {
+  it("uses normalized suppression keys for context ineligible", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const { app, resetVoiceRouteState } = await buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Context ineligible boundary",
+      mode: "callout",
+      priority: "info",
+      contextTier: "tier0",
+      traceId: "trace-context-ineligible",
+    });
+
+    expect(res.status).toBe(200);
+    expectSuppressionShape(res.body, "voice_context_ineligible");
+    resetVoiceRouteState();
+  });
+
+  it("uses normalized suppression keys for parity disallow", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const { app, resetVoiceRouteState } = await buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Parity disallow boundary",
+      mode: "callout",
+      priority: "warn",
+      textCertainty: "hypothesis",
+      voiceCertainty: "confirmed",
+      deterministic: true,
+      traceId: "trace-parity-disallow",
+    });
+
+    expect(res.status).toBe(200);
+    expectSuppressionShape(res.body, "contract_violation");
+    resetVoiceRouteState();
+  });
+
+  it("uses normalized suppression keys for contract validation failures", async () => {
     vi.doMock("../server/services/helix-ask/operator-contract-v1", async () => {
       const actual = await vi.importActual<typeof import("../server/services/helix-ask/operator-contract-v1")>(
         "../server/services/helix-ask/operator-contract-v1",
@@ -73,15 +116,47 @@ describe("voice operator contract boundary", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.body.suppressed).toBe(true);
-    expect(res.body.reason).toBe("contract_violation");
-    expect(res.body.suppression_reason).toBe("contract_violation");
+    expectSuppressionShape(res.body, "contract_violation");
     expect(res.body.debug).toEqual({
       validator_failed: true,
       validator_error_count: 1,
       first_validator_error_code: "INVALID_FIELD_VALUE",
       first_validator_error_path: "voice.certainty",
     });
+    resetVoiceRouteState();
+  });
+
+  it("uses normalized suppression keys for dedupe suppression", async () => {
+    vi.doMock("../server/services/helix-ask/operator-contract-v1", async () => {
+      const actual = await vi.importActual<typeof import("../server/services/helix-ask/operator-contract-v1")>(
+        "../server/services/helix-ask/operator-contract-v1",
+      );
+      return {
+        ...actual,
+        validateOperatorCalloutV1: () => ({ ok: true as const, errors: [] }),
+      };
+    });
+
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const { app, resetVoiceRouteState } = await buildApp();
+
+    const payload = {
+      text: "Dedupe suppression boundary",
+      mode: "callout",
+      priority: "action",
+      missionId: "mission-dedupe-boundary",
+      dedupe_key: "dedupe-boundary-key",
+      deterministic: true,
+      evidenceRefs: ["docs/helix-ask-flow.md#L1"],
+      traceId: "trace-dedupe-boundary",
+    };
+
+    const first = await request(app).post("/api/voice/speak").send(payload);
+    expect(first.status).toBe(200);
+
+    const second = await request(app).post("/api/voice/speak").send(payload);
+    expect(second.status).toBe(200);
+    expectSuppressionShape(second.body, "dedupe_cooldown");
     resetVoiceRouteState();
   });
 });

@@ -76,3 +76,22 @@
   - Casimir verification returned PASS with certificate hash and integrity OK.
 - known_risks_next_step:
   - Boundary candidate currently mirrors voice message from text payload; future wiring to richer voice templates should retain validator gate before emission.
+
+## Milestone M4.1 — Voice Suppression Contract Key Normalization
+- milestone_id: `M4.1-voice-suppression-key-normalization`
+- files_changed:
+  - `server/routes/voice.ts`
+  - `tests/voice.operator-contract-boundary.spec.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run server/__tests__/operator-contract-v1.spec.ts tests/helix-ask-llm-debug-skip.spec.ts tests/helix-ask-jobs-regression.spec.ts tests/voice.operator-contract-boundary.spec.ts`
+  - `PORT=5050 NODE_ENV=development ENABLE_AGI=1 npm run dev`
+  - `npm run helix:ask:dot:debug-loop -- --base-url http://127.0.0.1:5050`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Normalized `/api/voice/speak` suppression responses to always include canonical `suppression_reason` while preserving `reason` and deterministic values/status codes.
+  - Added one-milestone legacy alias `suppressionReason` across suppression branches with explicit `TODO(M5)` removal note.
+  - Expanded boundary coverage for context ineligible, parity disallow, operator contract validation failure, and dedupe suppression key-shape consistency.
+- known_risks_next_step:
+  - Legacy `suppressionReason` alias should be removed in M5 after downstream consumers migrate to `suppression_reason`.
