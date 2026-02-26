@@ -6825,6 +6825,8 @@ type QiCurvatureInfo = {
   source?: string;
   note?: string;
   scalar?: number;
+  signalState?: "available" | "missing";
+  reasonCode?: "G4_QI_CURVATURE_WINDOW_FAIL" | "G4_QI_SIGNAL_MISSING";
 };
 
 function pickInvariantScalar(
@@ -6842,7 +6844,7 @@ function resolveQiCurvature(
   tau_ms: number,
 ): QiCurvatureInfo {
   const invariants = state.gr?.invariants;
-  if (!invariants) return {};
+  if (!invariants) return { signalState: "missing", reasonCode: "G4_QI_SIGNAL_MISSING", note: "missing curvature invariants" };
 
   const kretschmann = pickInvariantScalar(invariants.kretschmann);
   const ricci4 = pickInvariantScalar(invariants.ricci4);
@@ -6854,23 +6856,34 @@ function resolveQiCurvature(
       : undefined;
 
   if (scalar == null) {
-    return { source, note: "missing curvature invariants" };
+    return { source, signalState: "missing", reasonCode: "G4_QI_SIGNAL_MISSING", note: "missing curvature invariants" };
   }
   if (!(scalar > 0)) {
-    return { source, scalar, note: "non-positive curvature scalar" };
+    return { source, scalar, signalState: "available", reasonCode: "G4_QI_CURVATURE_WINDOW_FAIL", note: "non-positive curvature scalar" };
   }
 
   const radius_m = Math.pow(1 / scalar, 0.25);
   if (!Number.isFinite(radius_m) || radius_m <= 0) {
-    return { source, scalar, note: "non-finite curvature radius" };
+    return { source, scalar, signalState: "available", reasonCode: "G4_QI_CURVATURE_WINDOW_FAIL", note: "non-finite curvature radius" };
   }
 
   const tau_s = Math.max(0, tau_ms) / 1000;
   const tau_m = C * tau_s;
   const ratio = tau_m / radius_m;
-  const ok = Number.isFinite(ratio) ? ratio <= DEFAULT_QI_CURVATURE_RATIO_MAX : undefined;
+  if (!Number.isFinite(ratio)) {
+    return { source, scalar, radius_m, ratio, signalState: "available", reasonCode: "G4_QI_CURVATURE_WINDOW_FAIL", note: "non-finite curvature ratio" };
+  }
+  const ok = ratio <= DEFAULT_QI_CURVATURE_RATIO_MAX;
 
-  return { radius_m, ratio, ok, source, scalar };
+  return {
+    radius_m,
+    ratio,
+    ok,
+    source,
+    scalar,
+    signalState: "available",
+    ...(ok ? {} : { reasonCode: "G4_QI_CURVATURE_WINDOW_FAIL" as const }),
+  };
 }
 
 function estimateEffectiveRhoFromState(state: EnergyPipelineState, debug?: EffectiveRhoDebug): number {
@@ -7290,6 +7303,7 @@ export function evaluateQiGuardrail(
   curvatureNote?: string;
   curvatureEnforced?: boolean;
   applicabilityStatus?: "PASS" | "FAIL" | "NOT_APPLICABLE" | "UNKNOWN";
+  applicabilityReasonCode?: "G4_QI_CURVATURE_WINDOW_FAIL" | "G4_QI_SIGNAL_MISSING";
   strictMode?: boolean;
   metricContractOk?: boolean;
   metricDerived?: boolean;
@@ -7350,14 +7364,15 @@ export function evaluateQiGuardrail(
   const curvatureOk = curvatureInfo.ok;
   const curvatureNote = curvatureInfo.note;
   const curvatureEnforced = QI_CURVATURE_ENFORCE;
+  const applicabilityReasonCode = curvatureInfo.reasonCode;
   const applicabilityStatus: "PASS" | "FAIL" | "NOT_APPLICABLE" | "UNKNOWN" =
-    curvatureRatio == null
+    curvatureInfo.signalState === "missing"
       ? "UNKNOWN"
       : curvatureOk === false
         ? "NOT_APPLICABLE"
         : curvatureOk === true
           ? "PASS"
-          : "UNKNOWN";
+          : "NOT_APPLICABLE";
   const dt_s = pattern.dt_s;
   const sumWindowDt = pattern.window.reduce((acc, v) => acc + v * dt_s, 0);
   let lhs = 0;
@@ -7498,6 +7513,7 @@ export function evaluateQiGuardrail(
     curvatureNote,
     curvatureEnforced,
     applicabilityStatus,
+    applicabilityReasonCode,
     strictMode,
     metricContractOk,
     metricDerived,

@@ -439,6 +439,7 @@ describe("deriveQiStatus", () => {
     );
     expect(guard.curvatureOk).toBe(false);
     expect(guard.applicabilityStatus).toBe("NOT_APPLICABLE");
+    expect(guard.applicabilityReasonCode).toBe("G4_QI_CURVATURE_WINDOW_FAIL");
   });
 
   test("reports PASS applicability when curvature-window assumptions are satisfied", () => {
@@ -453,10 +454,12 @@ describe("deriveQiStatus", () => {
     );
     expect(guard.curvatureOk).toBe(true);
     expect(guard.applicabilityStatus).toBe("PASS");
+    expect(guard.applicabilityReasonCode).toBeUndefined();
   });
 
   test("reports UNKNOWN applicability when curvature invariants are unavailable", () => {
     const guard = evaluateQiGuardrail(makeState({ dutyCycle: 5, dutyShip: 5, dutyEffective_FR: 5 }), { tau_ms: 1 });
     expect(guard.applicabilityStatus).toBe("UNKNOWN");
+    expect(guard.applicabilityReasonCode).toBe("G4_QI_SIGNAL_MISSING");
   });
 });

@@ -35,6 +35,9 @@ export type G4ConstraintDiagnostics = {
   source: "evaluator_constraints" | "synthesized_unknown";
   reason: string[];
   reasonCode: string[];
+  applicabilityStatus?: string;
+  curvatureOk?: boolean;
+  curvatureRatio?: number;
 };
 
 const G4_REASON_CODES = {
@@ -73,6 +76,22 @@ const readConstraintReasonCode = (
   return Array.from(note.matchAll(/reasonCode=([A-Z0-9_]+)/g)).map((m) => m[1]);
 };
 
+
+const parseFordField = (entry: { note?: string } | undefined, key: string): string | undefined => {
+  if (typeof entry?.note !== "string") return undefined;
+  const segments = entry.note.split(/[;|]/g).map((segment) => segment.trim());
+  const match = segments.find((segment) => segment.startsWith(`${key}=`));
+  if (!match) return undefined;
+  const value = match.slice(key.length + 1).trim();
+  return value.length > 0 ? value : undefined;
+};
+
+const parseFinite = (value: string | undefined): number | undefined => {
+  if (!value) return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+};
+
 const orderReasonCodes = (codes: string[]): string[] => {
   const unique = Array.from(new Set(codes));
   return unique.sort((a, b) => {
@@ -108,12 +127,25 @@ export const extractG4ConstraintDiagnostics = (constraints: GrEvaluation["constr
     reason.push(`${SYNTHESIZED_SOURCE_PREFIX};reasonCode=${G4_REASON_CODES.signalMissing};G4 hard-source payload incomplete in evaluation constraints.`);
   }
 
+  const applicabilityStatus = parseFordField(ford, "applicabilityStatus");
+  const curvatureOkRaw = parseFordField(ford, "curvatureOk");
+  const curvatureOk =
+    curvatureOkRaw === "true"
+      ? true
+      : curvatureOkRaw === "false"
+        ? false
+        : undefined;
+  const curvatureRatio = parseFinite(parseFordField(ford, "curvatureRatio"));
+
   return {
     fordRomanStatus: normalize(ford?.status),
     thetaAuditStatus: normalize(theta?.status),
     source,
     reason,
     reasonCode: orderReasonCodes(reasonCode),
+    applicabilityStatus,
+    curvatureOk,
+    curvatureRatio,
   };
 };
 
