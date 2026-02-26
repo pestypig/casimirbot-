@@ -17,6 +17,7 @@ type CaseResult = {
   };
   marginRatioRaw: number | null;
   marginRatio: number | null;
+  marginRatioDisplay: number | null;
   applicabilityStatus: string;
   g4ReasonCodes: string[];
   classification: 'physics_limited' | 'applicability_limited' | 'scaling_suspect';
@@ -24,6 +25,11 @@ type CaseResult = {
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const quantizeLarge = (n: number | null): number | null => (n == null ? null : Math.round(n / 1e10) * 1e10);
+
+export const isMetricRhoSource = (rhoSource: unknown): boolean => {
+  const src = String(rhoSource ?? '').toLowerCase();
+  return src.startsWith('warp.metric') || src.startsWith('gr.rho_constraint') || src.startsWith('gr.metric');
+};
 
 const sortDeep = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(sortDeep);
@@ -42,6 +48,22 @@ const classifyCase = (marginRaw: number | null, applicabilityStatus: string, rea
   return 'scaling_suspect';
 };
 
+type GuardSummary = {
+  marginRatioRaw?: number | null;
+  applicabilityStatus?: string | null;
+  rhoSource?: string | null;
+};
+
+export const deriveSensitivityReasonCodes = (guard: GuardSummary): string[] => {
+  const marginRaw = finiteOrNull(guard.marginRatioRaw);
+  const applicabilityStatus = String(guard.applicabilityStatus ?? 'UNKNOWN').toUpperCase();
+  const reasonCodes: string[] = [];
+  if (applicabilityStatus !== 'PASS') reasonCodes.push('G4_QI_APPLICABILITY_NOT_PASS');
+  if ((marginRaw ?? 0) >= 1) reasonCodes.push('G4_QI_MARGIN_EXCEEDED');
+  if (!isMetricRhoSource(guard.rhoSource)) reasonCodes.push('G4_QI_SOURCE_NOT_METRIC');
+  return reasonCodes;
+};
+
 const baseCases = [
   { tau_s: 0.01, sampler: 'gaussian', fieldType: 'em', QI_POLICY_MAX_ZETA: 1 },
   { tau_s: 0.02, sampler: 'hann', fieldType: 'scalar', QI_POLICY_MAX_ZETA: 2 },
@@ -54,13 +76,17 @@ const secondaryCases = [
   { gap_nm: 5, casimirModel: 'lifshitz' },
 ] as const;
 
-async function run() {
+export async function runSensitivityCases(
+  caseBases = baseCases,
+  caseSecondary = secondaryCases,
+): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   let idx = 0;
-  for (const base of baseCases) {
-    for (const secondary of secondaryCases) {
+  const baseline = structuredClone(getGlobalPipelineState());
+  for (const base of caseBases) {
+    for (const secondary of caseSecondary) {
       idx += 1;
-      const initial = getGlobalPipelineState();
+      const initial = structuredClone(baseline);
       const next = await updateParameters(initial, {
         gap_nm: secondary.gap_nm,
         casimirModel: secondary.casimirModel as any,
@@ -74,14 +100,13 @@ async function run() {
       const guard = evaluateQiGuardrail(next, {
         tau_ms: base.tau_s * 1000,
         sampler: base.sampler as any,
+        qiPolicyMaxZeta: base.QI_POLICY_MAX_ZETA,
       });
-      const marginRaw = quantizeLarge(finiteOrNull(guard.marginRatioRaw));
-      const marginClamped = marginRaw == null ? null : Math.min(marginRaw, base.QI_POLICY_MAX_ZETA);
+      const marginRaw = finiteOrNull(guard.marginRatioRaw);
+      const marginRatio = finiteOrNull(guard.marginRatio);
+      const marginRatioDisplay = quantizeLarge(marginRatio);
       const applicabilityStatus = String(guard.applicabilityStatus ?? 'UNKNOWN').toUpperCase();
-      const reasonCodes: string[] = [];
-      if (applicabilityStatus !== 'PASS') reasonCodes.push('G4_QI_APPLICABILITY_NOT_PASS');
-      if ((marginRaw ?? 0) >= 1) reasonCodes.push('G4_QI_MARGIN_EXCEEDED');
-      if (String(guard.rhoSource ?? '').toLowerCase().startsWith('gr.') === false) reasonCodes.push('G4_QI_SOURCE_NOT_METRIC');
+      const reasonCodes = deriveSensitivityReasonCodes(guard);
       results.push({
         inputs: {
           tau_s: base.tau_s,
@@ -92,7 +117,8 @@ async function run() {
           casimirModel: secondary.casimirModel,
         },
         marginRatioRaw: marginRaw,
-        marginRatio: marginClamped,
+        marginRatio,
+        marginRatioDisplay,
         applicabilityStatus,
         g4ReasonCodes: reasonCodes,
         classification: classifyCase(marginRaw, applicabilityStatus, reasonCodes),
@@ -101,7 +127,11 @@ async function run() {
     }
     if (idx >= 8) break;
   }
+  return results;
+}
 
+export async function run() {
+  const results = await runSensitivityCases();
   fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
   const payload = {
     runId: `g4-sensitivity-${SEED}-${DATE_STAMP}`,
@@ -114,7 +144,9 @@ async function run() {
   process.exit(0);
 }
 
-run().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  run().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

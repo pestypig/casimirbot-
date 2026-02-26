@@ -7257,7 +7257,13 @@ export function deriveQiStatus(
 
 export function evaluateQiGuardrail(
   state: EnergyPipelineState,
-  opts: { schedule?: PhaseSchedule; sectorPeriod_ms?: number; sampler?: SamplingKind; tau_ms?: number } = {},
+  opts: {
+    schedule?: PhaseSchedule;
+    sectorPeriod_ms?: number;
+    sampler?: SamplingKind;
+    tau_ms?: number;
+    qiPolicyMaxZeta?: number;
+  } = {},
 ): {
   lhs_Jm3: number;
   bound_Jm3: number;
@@ -7379,8 +7385,12 @@ export function evaluateQiGuardrail(
     kernelType: sampler,
   });
   const candidateBound = boundResult.bound_Jm3 - Math.abs(boundResult.safetySigma_Jm3);
+  const policyMaxZeta =
+    Number.isFinite(opts.qiPolicyMaxZeta) && (opts.qiPolicyMaxZeta as number) > 0
+      ? Math.max(1e-12, Number(opts.qiPolicyMaxZeta))
+      : QI_POLICY_MAX_ZETA;
   const policyFloorAbs =
-    QI_POLICY_ENFORCE && QI_POLICY_MAX_ZETA > 0 ? Math.abs(lhs) / QI_POLICY_MAX_ZETA : 0;
+    QI_POLICY_ENFORCE && policyMaxZeta > 0 ? Math.abs(lhs) / policyMaxZeta : 0;
   const fallbackAbs = Math.max(
     Math.abs(DEFAULT_QI_BOUND_SCALAR),
     Math.abs(Number(process.env.QI_BOUND_FLOOR_ABS) ?? 0),
@@ -7390,7 +7400,7 @@ export function evaluateQiGuardrail(
   const bound_Jm3 = clampNegativeBound(candidateBound, -fallbackAbs);
   const rawRatio =
     bound_Jm3 < 0 && Number.isFinite(bound_Jm3) ? Math.abs(lhs) / Math.abs(bound_Jm3) : Infinity;
-  const marginRatio = QI_POLICY_ENFORCE ? Math.min(rawRatio, QI_POLICY_MAX_ZETA) : rawRatio;
+  const marginRatio = QI_POLICY_ENFORCE ? Math.min(rawRatio, policyMaxZeta) : rawRatio;
 
   const rhoNote = [rhoDebug.note ?? rhoDebug.reason, curvatureNote].filter(Boolean).join("; ") || undefined;
   const timingMetricDerived = Boolean(
@@ -7467,7 +7477,7 @@ export function evaluateQiGuardrail(
     bound_Jm3,
     marginRatio: Number.isFinite(marginRatio) ? marginRatio : Infinity,
     marginRatioRaw: Number.isFinite(rawRatio) ? rawRatio : Infinity,
-    policyLimit: QI_POLICY_ENFORCE ? QI_POLICY_MAX_ZETA : undefined,
+    policyLimit: QI_POLICY_ENFORCE ? policyMaxZeta : undefined,
     window_ms: pattern.window_ms,
     sampler,
     fieldType: String(fieldType ?? "em"),
