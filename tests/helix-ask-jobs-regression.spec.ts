@@ -252,6 +252,10 @@ describe("Helix Ask jobs endpoint regression", () => {
     if (payload.debug?.answer_quality_floor_bypassed) {
       expect(payload.debug?.answer_quality_floor_bypass_reason).toBe("open_world_provider_success");
     }
+    const text = payload.text ?? "";
+    expect(text).not.toMatch(/\[server\/routes\/agi\.plan\.ts\]/i);
+    expect(text).not.toMatch(/Sources:\s*server\/routes\/agi\.plan\.ts/i);
+    expect(text).not.toMatch(/Sources:\s*docs\/helix-ask-flow\.md/i);
   }, 120000);
 
   it("runs a bounded second LLM rescue pass before deterministic fallback on weak-evidence placeholders", async () => {

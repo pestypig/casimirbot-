@@ -212,3 +212,24 @@
   - Expanded quality-floor bypass to include successful security open-world answers in general domain (same policy class as open-world provider-success bypass).
 - known_risks_next_step:
   - Source relevance can still drift for repo-grounded summaries (for example path mismatch in P4); next step is a citation relevance gate that scores answer claims against retrieved anchor paths before allowing final source injection.
+
+## Milestone M11 - Open-World Citation Enforcement Scope Guard
+- milestone_id: `M11-open-world-citation-scope-guard`
+- files_changed:
+  - `server/routes/agi.plan.ts`
+  - `tests/helix-ask-jobs-regression.spec.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run tests/helix-ask-jobs-regression.spec.ts tests/helix-ask-llm-debug-skip.spec.ts`
+  - `npx vitest run tests/helix-ask-llm-debug-skip.spec.ts tests/helix-ask-jobs-regression.spec.ts server/__tests__/operator-contract-v1.spec.ts tests/voice.operator-contract-boundary.spec.ts`
+  - `powershell -ExecutionPolicy Bypass -File artifacts/retry-loop.ps1`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl.exe -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Added `citationLinkingRequired` guard so citation persistence/linking logic only runs for repo/hybrid/relation/strict-provenance flows instead of all open-world answers.
+  - Preserved deterministic citation behavior for repo-required prompts while preventing unconditional source injection in general-domain post-processing paths.
+  - Added adaptive rescue trigger reason `requested_path_citation_missing` and fed explicit requested repo paths into rescue evidence snippet for file-path prompts.
+  - Added regression assertion ensuring open-world HTTP bypass path does not force fallback sources like `server/routes/agi.plan.ts` / `docs/helix-ask-flow.md`.
+  - Focused and full targeted vitest suites passed (29/29).
+- known_risks_next_step:
+  - Live local quality verification in this shell is currently infra-blocked by `llm_http_401` / circuit-open responses, so runtime answer-quality validation must be rerun from the user’s valid-key server session.

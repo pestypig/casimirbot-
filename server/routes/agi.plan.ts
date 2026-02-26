@@ -12025,6 +12025,7 @@ const HELIX_ASK_ADAPTIVE_RESCUE_REASONS = new Set<string>([
   "security_actionable_missing",
   "citation_only_body",
   "generic_fallback_citation_only",
+  "requested_path_citation_missing",
 ]);
 
 
@@ -19304,6 +19305,9 @@ const executeHelixAsk = async ({
       HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
       HELIX_ASK_REPO_EXPECTS.test(baseQuestion) ||
       explicitRepoApiCue;
+    const explicitRequestedRepoPaths = explicitRepoExpectation
+      ? filterExistingEvidencePaths(extractFilePathsFromText(baseQuestion))
+      : [];
     const warpEthosRelationQuery = warpEthosRelationReportQuery;
     if (warpEthosRelationQuery) {
       relationToolCapBonus = 1;
@@ -19474,6 +19478,7 @@ const executeHelixAsk = async ({
       debugPayload.repo_expectation_score = repoExpectationScore;
       debugPayload.repo_expectation_level = repoExpectationLevel;
       debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
+      debugPayload.explicit_repo_paths = explicitRequestedRepoPaths.slice(0, 8);
     }
     if (explicitRepoExpectation) {
       logEvent("Obligation", "requires_repo", baseQuestion);
@@ -27113,7 +27118,13 @@ const executeHelixAsk = async ({
       } else {
         answerPath.push("citationRepair:skipped(contract_mode)");
       }
-      if (extractFilePathsFromText(cleaned).length === 0) {
+      const citationLinkingRequired =
+        requiresRepoEvidence ||
+        intentDomain === "repo" ||
+        intentDomain === "hybrid" ||
+        strictConceptProvenance ||
+        isRelationIntentRequested();
+      if (citationLinkingRequired && extractFilePathsFromText(cleaned).length === 0) {
         const evidencePaths = extractFilePathsFromText(evidenceText).slice(0, 6);
         if (evidencePaths.length) {
           cleaned = `${cleaned}\n\nSources: ${evidencePaths.join(", ")}`;
@@ -28167,11 +28178,7 @@ const executeHelixAsk = async ({
         }
       }
       cleaned = stripRunawayAnswerArtifacts(cleaned);
-      const citationPersistenceGuardEligible =
-        HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
-        intentDomain === "repo" ||
-        intentDomain === "hybrid" ||
-        relationDeterministicGuardEligible;
+      const citationPersistenceGuardEligible = citationLinkingRequired;
       if (citationPersistenceGuardEligible) {
         const citationGuardAllowedPaths = filterExistingEvidencePaths(Array.from(
           new Set([
@@ -28438,6 +28445,11 @@ const executeHelixAsk = async ({
       const adaptiveCitationPaths = extractFilePathsFromText(cleaned).map((entry) =>
         String(normalizeEvidenceRef(entry) ?? entry).replace(/\\/g, "/").toLowerCase(),
       );
+      const requestedRepoPathSet = new Set(
+        explicitRequestedRepoPaths.map((entry) =>
+          String(normalizeEvidenceRef(entry) ?? entry).replace(/\\/g, "/").toLowerCase(),
+        ),
+      );
       const genericFallbackCitationPaths = new Set<string>([
         "server/routes/agi.plan.ts",
         "docs/helix-ask-flow.md",
@@ -28451,6 +28463,13 @@ const executeHelixAsk = async ({
         genericFallbackCitationOnly
       ) {
         adaptiveRescueReasons.push("generic_fallback_citation_only");
+      }
+      if (
+        HELIX_ASK_ADAPTIVE_RESCUE_PASS &&
+        requestedRepoPathSet.size > 0 &&
+        !adaptiveCitationPaths.some((entry) => requestedRepoPathSet.has(entry))
+      ) {
+        adaptiveRescueReasons.push("requested_path_citation_missing");
       }
       const weakEvidenceRescueEligible =
         weakEvidenceForDeterministicFallback &&
@@ -28510,8 +28529,11 @@ const executeHelixAsk = async ({
             160,
             rescueTokenCap,
           );
+          const rescueEvidenceBase = appendEvidenceSources(evidenceText, contextFiles, 8, contextText);
           const rescueEvidenceSnippet = clipAskText(
-            appendEvidenceSources(evidenceText, contextFiles, 8, contextText),
+            explicitRequestedRepoPaths.length > 0
+              ? `${rescueEvidenceBase}\nRequested repo paths: ${explicitRequestedRepoPaths.slice(0, 4).join(", ")}`
+              : rescueEvidenceBase,
             HELIX_ASK_SCAFFOLD_CONTEXT_CHARS,
           );
           const rescuePrompt = buildHelixAskAnswerRescuePrompt({
@@ -29032,7 +29054,7 @@ const executeHelixAsk = async ({
         ...extractCitationTokensFromText(evidenceText),
         ...(topicProfile?.mustIncludeFiles ?? []),
       ]);
-      if (contractCitationTokens.length > 0 && !hasSourcesLine(cleaned)) {
+      if (citationLinkingRequired && contractCitationTokens.length > 0 && !hasSourcesLine(cleaned)) {
         cleaned = `${cleaned}\n\nSources: ${contractCitationTokens.slice(0, 8).join(", ")}`.trim();
         answerPath.push("citationContract:append_sources");
         if (debugPayload) {
@@ -29128,7 +29150,9 @@ const executeHelixAsk = async ({
           ...extractFilePathsFromText(evidenceText),
           ...extractCitationTokensFromText(evidenceText),
         ])[0] ?? "server/routes/agi.plan.ts";
-      cleaned = enforceCitationLinkedClaims(cleaned, fallbackCitationAnchor);
+      if (citationLinkingRequired) {
+        cleaned = enforceCitationLinkedClaims(cleaned, fallbackCitationAnchor);
+      }
       const finalNonReportGuard = enforceNonReportModeGuard(
         cleaned,
         reportDecision.enabled,
