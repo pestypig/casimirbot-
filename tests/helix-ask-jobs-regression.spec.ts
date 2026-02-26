@@ -8,6 +8,7 @@ const ENV_KEYS = [
   "HELIX_ASK_MICRO_PASS",
   "HELIX_ASK_MICRO_PASS_AUTO",
   "HELIX_ASK_TWO_PASS",
+  "HELIX_ASK_ALLOW_FORCE_LLM_PROBE",
   "LLM_RUNTIME",
   "LLM_HTTP_BASE",
   "LLM_HTTP_API_KEY",
@@ -29,6 +30,7 @@ describe("Helix Ask jobs endpoint regression", () => {
     process.env.HELIX_ASK_MICRO_PASS = "0";
     process.env.HELIX_ASK_MICRO_PASS_AUTO = "0";
     process.env.HELIX_ASK_TWO_PASS = "0";
+    process.env.HELIX_ASK_ALLOW_FORCE_LLM_PROBE = "1";
     process.env.LLM_RUNTIME = "http";
     process.env.LLM_HTTP_API_KEY = "test-key";
     process.env.HULL_MODE = "0";
@@ -46,10 +48,15 @@ describe("Helix Ask jobs endpoint regression", () => {
       req.on("end", () => {
         const rescuePassPrompt = /Rescue pass:/i.test(rawBody);
         const rescueTriggerPrompt = /rescue-trigger-open-world-test/i.test(rawBody);
+        const rescueSecurityTriggerPrompt = /rescue-trigger-security-test/i.test(rawBody);
+        const rescueSecurityPassPrompt =
+          rescuePassPrompt && /secure a home wi-?fi network/i.test(rawBody);
         const content =
           rescuePassPrompt
-            ? "Systems thinking improves incident response by clarifying feedback loops, tightening handoffs, and reducing rework in crisis coordination."
-            : rescueTriggerPrompt
+            ? rescueSecurityPassPrompt
+              ? "Use WPA3 if available, set a long unique router admin password, disable WPS, and enable automatic firmware updates. Turn on a guest network for IoT devices, enable DNS filtering, and review connected-device alerts weekly."
+              : "Systems thinking improves incident response by clarifying feedback loops, tightening handoffs, and reducing rework in crisis coordination."
+            : rescueTriggerPrompt || rescueSecurityTriggerPrompt
               ? "llm.local stub result"
               : "Mock HTTP response.";
         res.setHeader("Content-Type", "application/json");
@@ -284,6 +291,54 @@ describe("Helix Ask jobs endpoint regression", () => {
     expect((payload.debug?.answer_path ?? []).includes("answer_rescue:llm_second_pass")).toBe(true);
     expect((payload.debug?.answer_path ?? []).includes("fallback:RenderPlatonicFallback")).toBe(false);
     expect((payload.text ?? "").toLowerCase()).toContain("systems thinking improves incident response");
+  }, 120000);
+
+  it("runs rescue pass for security prompts when initial output hits quality-risk signals", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "rescue-trigger-security-test: Give practical steps to secure a home Wi-Fi network.",
+        sessionId: "security-answer-rescue",
+        debug: true,
+        forceLlmProbe: true,
+        verbosity: "brief",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text?: string;
+      debug?: {
+        llm_invoke_attempted?: boolean;
+        llm_backend_used?: string;
+        llm_http_status?: number;
+        llm_provider_called?: boolean;
+        answer_path?: string[];
+        answer_rescue_eligible?: boolean;
+        answer_rescue_attempted?: boolean;
+        answer_rescue_applied?: boolean;
+        answer_rescue_reason?: string;
+        answer_rescue_trigger?: string;
+      };
+    };
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_http_status).toBe(200);
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect(payload.debug?.answer_rescue_eligible).toBe(true);
+    expect(payload.debug?.answer_rescue_attempted).toBe(true);
+    expect(payload.debug?.answer_rescue_applied).toBe(true);
+    expect(payload.debug?.answer_rescue_trigger).toBe("weak_evidence");
+    expect(
+      ["security_weak_evidence", "explicit_repo_mapping_weak_evidence"].includes(
+        String(payload.debug?.answer_rescue_reason ?? ""),
+      ),
+    ).toBe(true);
+    expect((payload.debug?.answer_path ?? []).includes("answer_rescue:llm_second_pass")).toBe(true);
+    expect((payload.debug?.answer_path ?? []).includes("fallback:RenderPlatonicFallback")).toBe(false);
+    const lower = (payload.text ?? "").toLowerCase();
+    expect(lower).toContain("wpa3");
+    expect(lower).toContain("disable wps");
   }, 120000);
 
   it("keeps endpoint guard in warn-only mode for successful explicit repo-api prompts", async () => {

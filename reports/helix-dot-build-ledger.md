@@ -191,3 +191,24 @@
   - Added regression coverage to ensure security self-protection prompts remain out of forced repo retrieval in debug telemetry.
 - known_risks_next_step:
   - Security prompts may still pick hybrid at initial intent-match stage in some contexts; next step is explicit intent-profile split between `security_open_world` and `security_repo_mapping`.
+
+## Milestone M10 - Adaptive Rescue for Quality-Risk Outputs
+- milestone_id: `M10-adaptive-rescue-quality-risk`
+- files_changed:
+  - `server/routes/agi.plan.ts`
+  - `tests/helix-ask-jobs-regression.spec.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run tests/helix-ask-llm-debug-skip.spec.ts tests/helix-ask-jobs-regression.spec.ts server/__tests__/operator-contract-v1.spec.ts tests/voice.operator-contract-boundary.spec.ts`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File artifacts/retry-loop.ps1`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl.exe -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Extended existing `answer_rescue` second pass with adaptive quality-risk triggers (not only weak-evidence fallback), while preserving deterministic lane-A short-circuit behavior.
+  - Added `HELIX_ASK_ADAPTIVE_RESCUE_PASS` feature flag (default enabled) and deterministic debug fields: `answer_rescue_trigger` and `answer_rescue_quality_reasons`.
+  - Added safety trigger for open-world/security answers that cite only generic fallback files (`server/routes/agi.plan.ts`, `docs/helix-ask-flow.md`) so rescue can attempt a direct answer.
+  - Fixed security prompt runtime error by moving `hasExplicitRepoSignals` initialization before security guardrail checks.
+  - Added regression coverage that forces a security low-quality first response and verifies rescue pass activation and application.
+  - Expanded quality-floor bypass to include successful security open-world answers in general domain (same policy class as open-world provider-success bypass).
+- known_risks_next_step:
+  - Source relevance can still drift for repo-grounded summaries (for example path mismatch in P4); next step is a citation relevance gate that scores answer claims against retrieved anchor paths before allowing final source injection.

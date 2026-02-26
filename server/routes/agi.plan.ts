@@ -2809,6 +2809,8 @@ const HELIX_ASK_TWO_PASS =
     .trim() === "1";
 const HELIX_ASK_SINGLE_LLM =
   String(process.env.HELIX_ASK_SINGLE_LLM ?? "1").trim() !== "0";
+const HELIX_ASK_ADAPTIVE_RESCUE_PASS =
+  String(process.env.HELIX_ASK_ADAPTIVE_RESCUE_PASS ?? "1").trim() !== "0";
 const HELIX_ASK_ANSWER_CONTRACT_PRIMARY =
   String(process.env.HELIX_ASK_ANSWER_CONTRACT_PRIMARY ?? "1").trim() !== "0";
 const HELIX_ASK_EVIDENCE_CARDS_LLM =
@@ -12009,6 +12011,21 @@ const GENERIC_GROUNDED_RE = /^answer grounded in retrieved evidence\.?$/i;
 const HELIX_ASK_MECHANISM_SENTENCE_RE = /\bMechanism:\s*.+->.+->.+/i;
 const HELIX_ASK_MATURITY_LABEL_RE = /\bMaturity\s*\((?:exploratory|reduced-order|diagnostic|certified)\)\s*:/i;
 const HELIX_ASK_MISSING_EVIDENCE_RE = /\bMissing evidence:\s*[^\n]{12,}/i;
+const HELIX_ASK_ADAPTIVE_RESCUE_REASONS = new Set<string>([
+  "placeholder",
+  "stub_text",
+  "generic_grounding_scaffold",
+  "metadata_noise",
+  "code_noise",
+  "citation_missing",
+  "text_too_short",
+  "semantic_density_low",
+  "open_world_claim_floor",
+  "open_world_mechanism_missing",
+  "security_actionable_missing",
+  "citation_only_body",
+  "generic_fallback_citation_only",
+]);
 
 
 const hasModelPlaceholderOrStub = (value: string): boolean => {
@@ -19896,6 +19913,11 @@ const executeHelixAsk = async ({
         debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
       }
     }
+    const hasExplicitRepoSignals =
+      explicitRepoExpectation ||
+      hasFilePathHints ||
+      endpointHints.length > 0 ||
+      repoExpectationLevel === "high";
     const securityGuardrailPrompt =
       isSecurityRiskPrompt(baseQuestion) || topicTags.includes("security");
     const mandatorySecurityGuardrailRetrieval =
@@ -20127,11 +20149,6 @@ const executeHelixAsk = async ({
         }
         return false;
       });
-    const hasExplicitRepoSignals =
-      explicitRepoExpectation ||
-      hasFilePathHints ||
-      endpointHints.length > 0 ||
-      repoExpectationLevel === "high";
     const openWorldAutoPromoteBlocked =
       isOpenWorldExplainerQuestion(baseQuestion) &&
       !hasExplicitRepoSignals;
@@ -28385,7 +28402,12 @@ const executeHelixAsk = async ({
       const providerDeliveredUsableAnswer =
         providerHttpSuccess && hasConcreteAnswerText && !answerLooksPlaceholder;
       const rescueAllowRepoHints =
-        explicitRepoExpectation && !relationIntentActive && intentStrategy !== "constraint_report";
+        (explicitRepoExpectation ||
+          requiresRepoEvidence ||
+          intentDomain === "repo" ||
+          intentDomain === "hybrid") &&
+        !relationIntentActive &&
+        intentStrategy !== "constraint_report";
       let weakEvidenceForDeterministicFallback =
         !runtimeFallbackPinned &&
         !providerDeliveredUsableAnswer &&
@@ -28397,14 +28419,60 @@ const executeHelixAsk = async ({
           selectedMove === "clarify" ||
           selectedMove === "fail_closed"
         );
-      const answerRescueEligible =
+      const openWorldExplainerForRescue =
+        isOpenWorldExplainerQuestion(baseQuestion) &&
+        intentDomain !== "repo" &&
+        intentProfile.id !== "repo.warp_definition_docs_first";
+      const adaptiveRescueReasons = HELIX_ASK_ADAPTIVE_RESCUE_PASS
+        ? detectRepoAnswerQualityFloorReasons({
+            text: cleaned,
+            relationQuery: isRelationIntentRequested(),
+            relationPacket: Boolean(relationPacket),
+            requiresRepoEvidence,
+            intentDomain,
+            openWorldExplainer: openWorldExplainerForRescue,
+            securityRiskPrompt,
+            enforceGlobalFloor: HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR,
+          }).filter((reason) => HELIX_ASK_ADAPTIVE_RESCUE_REASONS.has(reason))
+        : [];
+      const adaptiveCitationPaths = extractFilePathsFromText(cleaned).map((entry) =>
+        String(normalizeEvidenceRef(entry) ?? entry).replace(/\\/g, "/").toLowerCase(),
+      );
+      const genericFallbackCitationPaths = new Set<string>([
+        "server/routes/agi.plan.ts",
+        "docs/helix-ask-flow.md",
+      ]);
+      const genericFallbackCitationOnly =
+        adaptiveCitationPaths.length > 0 &&
+        adaptiveCitationPaths.every((entry) => genericFallbackCitationPaths.has(entry));
+      if (
+        HELIX_ASK_ADAPTIVE_RESCUE_PASS &&
+        (openWorldExplainerForRescue || securityRiskPrompt) &&
+        genericFallbackCitationOnly
+      ) {
+        adaptiveRescueReasons.push("generic_fallback_citation_only");
+      }
+      const weakEvidenceRescueEligible =
         weakEvidenceForDeterministicFallback &&
-        !securityRiskPrompt &&
         !relationIntentActive &&
         debugPayload?.llm_invoke_attempted === true &&
-        (intentDomain === "general" || rescueAllowRepoHints);
+        (intentDomain === "general" || rescueAllowRepoHints || securityRiskPrompt);
+      const adaptiveRescueEligible =
+        !runtimeFallbackPinned &&
+        !weakEvidenceRescueEligible &&
+        !relationIntentActive &&
+        debugPayload?.llm_invoke_attempted === true &&
+        !debugPayload?.llm_error_code &&
+        adaptiveRescueReasons.length > 0;
+      const answerRescueEligible = weakEvidenceRescueEligible || adaptiveRescueEligible;
       if (debugPayload) {
         (debugPayload as Record<string, unknown>).answer_rescue_eligible = answerRescueEligible;
+        (debugPayload as Record<string, unknown>).answer_rescue_trigger = weakEvidenceRescueEligible
+          ? "weak_evidence"
+          : adaptiveRescueEligible
+            ? "adaptive_quality_risk"
+            : "none";
+        (debugPayload as Record<string, unknown>).answer_rescue_quality_reasons = adaptiveRescueReasons.slice(0, 8);
       }
       if (answerRescueEligible) {
         if (debugPayload) {
@@ -28535,21 +28603,23 @@ const executeHelixAsk = async ({
                 cleaned = rescueText;
                 weakEvidenceForDeterministicFallback = false;
                 answerPath.push("answer_rescue:llm_second_pass");
+                const rescueReason = weakEvidenceRescueEligible
+                  ? (rescueAllowRepoHints
+                      ? "explicit_repo_mapping_weak_evidence"
+                      : securityRiskPrompt
+                        ? "security_weak_evidence"
+                        : "general_weak_evidence")
+                  : "adaptive_quality_risk";
                 logEvent(
                   "Answer rescue",
                   "applied",
-                  rescueAllowRepoHints
-                    ? "explicit_repo_mapping"
-                    : "general_weak_evidence",
+                  rescueReason,
                   answerStart,
                 );
                 if (debugPayload) {
                   (debugPayload as Record<string, unknown>).answer_rescue_attempted = true;
                   (debugPayload as Record<string, unknown>).answer_rescue_applied = true;
-                  (debugPayload as Record<string, unknown>).answer_rescue_reason =
-                    rescueAllowRepoHints
-                      ? "explicit_repo_mapping_weak_evidence"
-                      : "general_weak_evidence";
+                  (debugPayload as Record<string, unknown>).answer_rescue_reason = rescueReason;
                 }
               } else if (debugPayload) {
                 (debugPayload as Record<string, unknown>).answer_rescue_attempted = true;
@@ -28702,13 +28772,10 @@ const executeHelixAsk = async ({
       }
       const relationQueryForFinalize = isRelationIntentRequested();
       const answerRescuePinned = answerPath.includes("answer_rescue:llm_second_pass");
-      const openWorldExplainer =
-        isOpenWorldExplainerQuestion(baseQuestion) &&
-        intentDomain !== "repo" &&
-        intentProfile.id !== "repo.warp_definition_docs_first";
+      const openWorldExplainer = openWorldExplainerForRescue;
       const openWorldProviderQualityFloorBypass =
         llmHttpSuccess &&
-        openWorldExplainer &&
+        (openWorldExplainer || securityRiskPrompt) &&
         intentDomain === "general" &&
         !explicitRepoExpectation &&
         !relationQueryForFinalize;
