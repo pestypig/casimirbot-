@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildObserverDirectionField,
   buildObserverFrameField,
   type ObserverConditionKey,
   type ObserverFrameKey,
@@ -14,6 +15,7 @@ const createBrick = (args: {
   pressureFactor?: number;
   rapidityCapBeta?: number;
   typeITolerance?: number;
+  decWorstCaseDirection?: [number, number, number];
 }): StressEnergyBrickDecoded => {
   const total = args.t00.length;
   const zeros = Array.from({ length: total }, () => 0);
@@ -100,7 +102,7 @@ const createBrick = (args: {
           severityGainMin: 0,
           severityGainMean: 0,
           maxRobustMinusEulerian: 0,
-          worstCase: { index: -1, value: 0, direction: [1, 0, 0], rapidity: null, source: "algebraic_type_i" },
+          worstCase: { index: -1, value: 0, direction: args.decWorstCaseDirection ?? [1, 0, 0], rapidity: null, source: "algebraic_type_i" },
         },
         consistency: {
           robustNotGreaterThanEulerian: true,
@@ -161,5 +163,87 @@ describe("buildObserverFrameField", () => {
       expect(Number.isFinite(field.min)).toBe(true);
       expect(Number.isFinite(field.max)).toBe(true);
     }
+  });
+});
+
+describe("buildObserverDirectionField", () => {
+  it("returns finite normalized vectors (or zero vectors)", () => {
+    const brick = createBrick({
+      t00: [1, 1, 1],
+      sx: [1, 0, -1],
+      sy: [0, 0, 0],
+      sz: [0, 0, 1],
+      pressureFactor: 0,
+    });
+    const field = buildObserverDirectionField(brick, "nec");
+    expect(field).not.toBeNull();
+    const out = field!;
+    for (let i = 0; i < out.totalCount; i += 1) {
+      const b = i * 3;
+      const x = out.directions[b];
+      const y = out.directions[b + 1];
+      const z = out.directions[b + 2];
+      expect(Number.isFinite(x)).toBe(true);
+      expect(Number.isFinite(y)).toBe(true);
+      expect(Number.isFinite(z)).toBe(true);
+      const n = Math.hypot(x, y, z);
+      expect(n === 0 || Math.abs(n - 1) < 1e-5).toBe(true);
+    }
+    expect(Number.isFinite(out.minMagnitude)).toBe(true);
+    expect(Number.isFinite(out.maxMagnitude)).toBe(true);
+  });
+
+  it("uses stable fallback for near-zero flux", () => {
+    const brick = createBrick({
+      t00: [1],
+      sx: [0],
+      sy: [0],
+      sz: [0],
+      pressureFactor: 0,
+    });
+    const field = buildObserverDirectionField(brick, "wec");
+    expect(field).not.toBeNull();
+    expect(field!.directions[0]).toBeCloseTo(-1, 6);
+    expect(Math.abs(field!.directions[1])).toBeLessThan(1e-9);
+    expect(Math.abs(field!.directions[2])).toBeLessThan(1e-9);
+    expect(field!.mask?.[0]).toBe(1);
+  });
+
+  it("coerces non-finite inputs to safe finite vectors", () => {
+    const brick = createBrick({
+      t00: [Number.NaN, Number.POSITIVE_INFINITY],
+      sx: [Number.NaN, Number.POSITIVE_INFINITY],
+      sy: [Number.NaN, Number.NEGATIVE_INFINITY],
+      sz: [Number.NaN, Number.NaN],
+      pressureFactor: Number.POSITIVE_INFINITY,
+      rapidityCapBeta: Number.NaN,
+    });
+    const field = buildObserverDirectionField(brick, "sec");
+    expect(field).not.toBeNull();
+    for (const value of field!.directions) {
+      expect(Number.isFinite(value)).toBe(true);
+    }
+    for (const value of field!.magnitude ?? []) {
+      expect(Number.isFinite(value)).toBe(true);
+    }
+  });
+
+  it("condition selection changes direction output for DEC search-direction fallback", () => {
+    const brick = createBrick({
+      t00: [0],
+      sx: [1],
+      sy: [0],
+      sz: [0],
+      pressureFactor: 0,
+      typeITolerance: 1e-12,
+      decWorstCaseDirection: [0, 1, 0],
+    });
+    const nec = buildObserverDirectionField(brick, "nec");
+    const dec = buildObserverDirectionField(brick, "dec");
+    expect(nec).not.toBeNull();
+    expect(dec).not.toBeNull();
+    expect(nec!.directions[0]).toBeCloseTo(-1, 6);
+    expect(Math.abs(nec!.directions[1])).toBeLessThan(1e-9);
+    expect(dec!.directions[1]).toBeCloseTo(1, 6);
   });
 });
