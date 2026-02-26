@@ -427,7 +427,8 @@ const resolveFidelity = (
       evolveDt_s,
       evolveIterations: Math.min(evolveIterations, 1),
       evolveTolerance: base.evolveTolerance ?? 0,
-      includeExtra: false,
+      // Keep extra channels available so invariants can be materialized for G4 applicability.
+      includeExtra: true,
       includeMatter: false,
       includeKij: false,
       // Preserve curvature applicability observability even in fast CI mode.

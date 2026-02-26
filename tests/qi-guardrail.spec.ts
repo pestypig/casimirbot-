@@ -343,6 +343,40 @@ describe("evaluateQiGuardrail", () => {
     expect(Number.isFinite(guard.effectiveRho)).toBe(false);
     expect(guard.marginRatioRaw).toBe(Infinity);
   });
+
+  test("applies policy floor even when QI bound env floor is non-finite", () => {
+    const prevFloor = process.env.QI_BOUND_FLOOR_ABS;
+    process.env.QI_BOUND_FLOOR_ABS = "not-a-number";
+    try {
+      const sectorPeriod_ms = 1;
+      const tau_ms = 1;
+      const schedule = makeSchedule(1, [0], sectorPeriod_ms, tau_ms);
+      const scheduleGuard: PhaseSchedule = {
+        phi_deg_by_sector: schedule.phi_deg_by_sector,
+        negSectors: schedule.negSectors,
+        posSectors: schedule.posSectors,
+        weights: schedule.weights ?? Array.from({ length: schedule.N }, () => 1),
+      };
+      const guard = evaluateQiGuardrail(
+        makeState({
+          dutyCycle: 64,
+          dutyShip: 64,
+          dutyEffective_FR: 64,
+          sectorCount: 1,
+          concurrentSectors: 1,
+          sectorStrobing: 1,
+          negativeFraction: 1,
+          phaseSchedule: schedule,
+        }),
+        { schedule: scheduleGuard, sectorPeriod_ms, tau_ms, qiPolicyMaxZeta: 0.5 },
+      );
+
+      expect(guard.marginRatioRaw).toBeLessThanOrEqual(0.5000001);
+      expect(guard.bound_Jm3).toBeLessThan(0);
+    } finally {
+      process.env.QI_BOUND_FLOOR_ABS = prevFloor;
+    }
+  });
 });
 
 afterAll(() => {

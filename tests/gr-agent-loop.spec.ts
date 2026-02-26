@@ -174,7 +174,7 @@ describe("gr agent loop gate", () => {
     });
     expect(mockBuildGrEvolveBrick).toHaveBeenCalledWith(
       expect.objectContaining({
-        includeExtra: false,
+        includeExtra: true,
         includeMatter: false,
         includeKij: false,
         includeInvariants: true,

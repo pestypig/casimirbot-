@@ -7410,9 +7410,13 @@ export function evaluateQiGuardrail(
       : QI_POLICY_MAX_ZETA;
   const policyFloorAbs =
     QI_POLICY_ENFORCE && policyMaxZeta > 0 ? Math.abs(lhs) / policyMaxZeta : 0;
+  const envFloorAbsRaw = Number(process.env.QI_BOUND_FLOOR_ABS);
+  const envFloorAbs = Number.isFinite(envFloorAbsRaw)
+    ? Math.abs(envFloorAbsRaw as number)
+    : 0;
   const fallbackAbs = Math.max(
     Math.abs(DEFAULT_QI_BOUND_SCALAR),
-    Math.abs(Number(process.env.QI_BOUND_FLOOR_ABS) ?? 0),
+    envFloorAbs,
     policyFloorAbs,
     1e-12,
   );
