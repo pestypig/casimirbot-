@@ -286,4 +286,40 @@ describe("Helix Ask jobs endpoint regression", () => {
       expect(payload.debug?.endpoint_anchor_warning).toBe(true);
     }
   }, 120000);
+
+  it("does not force fail-closed doc-slot fallback for explicit file-path repo mapping prompts", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "Summarize one implementation detail from server/routes/voice.ts with source context.",
+        sessionId: "repo-filepath-explicit-mapping",
+        debug: true,
+        verbosity: "brief",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      debug?: {
+        intent_id?: string;
+        llm_invoke_attempted?: boolean;
+        llm_backend_used?: string;
+        llm_http_status?: number;
+        llm_provider_called?: boolean;
+        fallback_reason?: string;
+        doc_slot_fail_closed_bypassed?: string;
+        answer_path?: string[];
+      };
+    };
+    expect(payload.debug?.intent_id).toBe("repo.repo_api_lookup");
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_http_status).toBe(200);
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect(String(payload.debug?.fallback_reason ?? "")).not.toBe("fail_closed:doc_slot_missing");
+    expect(payload.debug?.doc_slot_fail_closed_bypassed).toBe("explicit_repo_mapping_prefers_llm");
+    expect((payload.debug?.answer_path ?? []).includes("qualityFloor:deterministic_contract")).toBe(
+      false,
+    );
+  }, 120000);
 });

@@ -115,3 +115,21 @@
   - Preserved lane routing behavior, suppression reasons, and status-code determinism.
 - known_risks_next_step:
   - Any client still reading `suppressionReason` must migrate to `suppression_reason`.
+
+## Milestone M6 - Explicit Repo Mapping Doc-Slot Fail-Close Bypass
+- milestone_id: `M6-explicit-repo-mapping-doc-slot-bypass`
+- files_changed:
+  - `server/routes/agi.plan.ts`
+  - `tests/helix-ask-jobs-regression.spec.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run tests/helix-ask-jobs-regression.spec.ts tests/helix-ask-llm-debug-skip.spec.ts`
+  - `npx vitest run server/__tests__/operator-contract-v1.spec.ts tests/voice.operator-contract-boundary.spec.ts`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Added explicit bypass for `doc_slot_missing` fail-closed state when explicit repo mapping is in LLM-first mode.
+  - Prevented doc-slot fail-close from forcing deterministic scaffold fallback for direct file-path repo mapping prompts.
+  - Added regression coverage for `server/routes/voice.ts` explicit path prompts to ensure HTTP invocation remains active and fallback is not tagged `fail_closed:doc_slot_missing`.
+- known_risks_next_step:
+  - This bypass is intentionally scoped to `doc_slot_missing`; other fail-closed reasons still apply and should remain deterministic.

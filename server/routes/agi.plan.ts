@@ -24968,6 +24968,16 @@ const executeHelixAsk = async ({
         explicitRepoExpectation &&
         !relationQuery &&
         intentStrategy !== "constraint_report";
+      if (preferLlmFirstForExplicitRepoMapping && failClosedReason === "doc_slot_missing") {
+        // For explicit repo/path mapping prompts, keep LLM-first behavior and avoid
+        // propagating docs-first slot misses as deterministic fail-closed fallbacks.
+        failClosedReason = null;
+        failClosedRepoEvidence = false;
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).doc_slot_fail_closed_bypassed =
+            "explicit_repo_mapping_prefers_llm";
+        }
+      }
       if (!forcedAnswer && relationAnchorsRequired && relationAnchorMissing) {
         forcedAnswer = `Relation topology is missing anchors: ${relationTopology.missingAnchors.join(", ")}. Please provide files from both warp and mission-ethos domains.`;
         forcedAnswerIsHard = true;
