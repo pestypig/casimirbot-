@@ -5,6 +5,7 @@ import { evaluateQiGuardrail, getGlobalPipelineState, updateParameters } from '.
 
 const DATE_STAMP = new Date().toISOString().slice(0, 10);
 const OUT_PATH = path.join('artifacts/research/full-solve', `g4-sensitivity-${DATE_STAMP}.json`);
+const INFLUENCE_OUT_PATH = path.join('artifacts/research/full-solve', 'g4-influence-scan-2026-02-26.json');
 const SEED = 424242;
 
 type CaseResult = {
@@ -25,6 +26,31 @@ type CaseResult = {
   classification: 'physics_limited' | 'applicability_limited' | 'scaling_suspect';
 };
 
+type InfluenceCase = {
+  id: string;
+  family: string;
+  changed: Record<string, string | number | boolean>;
+};
+
+type InfluenceResult = {
+  id: string;
+  family: string;
+  changed: Record<string, string | number | boolean>;
+  lhs_Jm3: number | null;
+  bound_Jm3: number | null;
+  marginRatioRaw: number | null;
+  applicabilityStatus: string;
+  applicabilityReasonCode: string | null;
+  rhoSource: string | null;
+  metricT00Ref: string | null;
+  metricContractOk: boolean | null;
+  metricContractStatus: string | null;
+  metricDerived: boolean | null;
+  metricDerivedSource: string | null;
+  metricDerivedReason: string | null;
+  absLhsDelta: number | null;
+};
+
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const normalizeDisplay = (n: number | null): number | null => (n == null ? null : Number(n.toPrecision(12)));
 
@@ -42,6 +68,11 @@ const sortDeep = (value: unknown): unknown => {
       .map((k) => [k, sortDeep((value as Record<string, unknown>)[k])]),
   );
 };
+
+const numberOrNull = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+const stringOrNull = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim().length > 0 ? String(value) : null;
+const boolOrNull = (value: unknown): boolean | null => (typeof value === 'boolean' ? value : null);
 
 const classifyCase = (marginRaw: number | null, applicabilityStatus: string, reasonCodes: string[]): CaseResult['classification'] => {
   if (reasonCodes.includes('G4_QI_APPLICABILITY_NOT_PASS') || applicabilityStatus !== 'PASS') return 'applicability_limited';
@@ -155,8 +186,67 @@ export async function runSensitivityCases(
   return results;
 }
 
+const influenceCases: InfluenceCase[] = [
+  { id: 'warpFieldType_natario_sdf', family: 'warpFieldType', changed: { warpFieldType: 'natario_sdf' } },
+  { id: 'warpFieldType_irrotational', family: 'warpFieldType', changed: { warpFieldType: 'irrotational' } },
+  { id: 'gammaGeo_low', family: 'gammaGeo', changed: { gammaGeo: 4 } },
+  { id: 'gammaGeo_high', family: 'gammaGeo', changed: { gammaGeo: 120 } },
+  { id: 'duty_low', family: 'duty', changed: { dutyCycle: 0.02, dutyShip: 0.02, dutyEffective_FR: 0.02 } },
+  { id: 'duty_high', family: 'duty', changed: { dutyCycle: 0.45, dutyShip: 0.45, dutyEffective_FR: 0.45 } },
+  { id: 'gammaVdB_low', family: 'gammaVanDenBroeck', changed: { gammaVanDenBroeck: 0.8 } },
+  { id: 'gammaVdB_high', family: 'gammaVanDenBroeck', changed: { gammaVanDenBroeck: 2000 } },
+  { id: 'qCavity_low', family: 'qCavity', changed: { qCavity: 1e7 } },
+  { id: 'qCavity_high', family: 'qCavity', changed: { qCavity: 1e12 } },
+  { id: 'qSpoiling_low', family: 'qSpoilingFactor', changed: { qSpoilingFactor: 0.2 } },
+  { id: 'qSpoiling_high', family: 'qSpoilingFactor', changed: { qSpoilingFactor: 4 } },
+  { id: 'gap_tight_nm', family: 'gap_nm', changed: { gap_nm: 0.4 } },
+  { id: 'gap_wide_nm', family: 'gap_nm', changed: { gap_nm: 8 } },
+  { id: 'shipRadius_small', family: 'shipRadius_m', changed: { shipRadius_m: 2 } },
+  { id: 'shipRadius_large', family: 'shipRadius_m', changed: { shipRadius_m: 40 } },
+];
+
+export async function runInfluenceScan(): Promise<{ baseline: InfluenceResult; rankedEffects: InfluenceResult[] }> {
+  const baselineState = await updateParameters(structuredClone(getGlobalPipelineState()), {} as any);
+  const baselineGuard = evaluateQiGuardrail(baselineState);
+  const baselineAbs = Math.abs(numberOrNull(baselineGuard.lhs_Jm3) ?? 0);
+
+  const toResult = (id: string, family: string, changed: Record<string, string | number | boolean>, state: any, guard: any): InfluenceResult => {
+    const lhs = numberOrNull(guard.lhs_Jm3);
+    const absLhs = lhs == null ? null : Math.abs(lhs);
+    return {
+      id,
+      family,
+      changed,
+      lhs_Jm3: lhs,
+      bound_Jm3: numberOrNull(guard.bound_Jm3),
+      marginRatioRaw: numberOrNull(guard.marginRatioRaw),
+      applicabilityStatus: String(guard.applicabilityStatus ?? 'UNKNOWN').toUpperCase(),
+      applicabilityReasonCode: stringOrNull(guard.applicabilityReasonCode)?.toUpperCase() ?? null,
+      rhoSource: stringOrNull(guard.rhoSource),
+      metricT00Ref: stringOrNull((state as any)?.warp?.metricT00Ref ?? (state as any)?.metricT00Ref),
+      metricContractOk: boolOrNull(guard.metricContractOk),
+      metricContractStatus: stringOrNull((state as any)?.warp?.metricT00Contract?.status ?? (state as any)?.warp?.metricT00ContractStatus),
+      metricDerived: boolOrNull(guard.metricDerived),
+      metricDerivedSource: stringOrNull(guard.metricDerivedSource),
+      metricDerivedReason: stringOrNull(guard.metricDerivedReason),
+      absLhsDelta: absLhs == null ? null : absLhs - baselineAbs,
+    };
+  };
+
+  const baseline = toResult('baseline', 'baseline', {}, baselineState as any, baselineGuard as any);
+  const effects: InfluenceResult[] = [];
+  for (const scanCase of influenceCases) {
+    const next = await updateParameters(structuredClone(getGlobalPipelineState()), scanCase.changed as any);
+    const guard = evaluateQiGuardrail(next);
+    effects.push(toResult(scanCase.id, scanCase.family, scanCase.changed, next as any, guard as any));
+  }
+  effects.sort((a, b) => (a.absLhsDelta ?? Number.POSITIVE_INFINITY) - (b.absLhsDelta ?? Number.POSITIVE_INFINITY));
+  return { baseline, rankedEffects: effects };
+}
+
 export async function run() {
   const results = await runSensitivityCases();
+  const influence = await runInfluenceScan();
   fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
   const payload = {
     runId: `g4-sensitivity-${SEED}-${DATE_STAMP}`,
@@ -165,7 +255,26 @@ export async function run() {
     cases: results,
   };
   fs.writeFileSync(OUT_PATH, `${JSON.stringify(sortDeep(payload), null, 2)}\n`);
-  console.log(JSON.stringify({ ok: true, out: OUT_PATH, cases: results.length }));
+  const best = influence.rankedEffects[0] ?? null;
+  const decisionClass = (() => {
+    if (!best) return 'evidence_path_blocked';
+    if (best.applicabilityStatus !== 'PASS') return 'applicability_limited';
+    if ((best.marginRatioRaw ?? Number.POSITIVE_INFINITY) >= 1) return 'margin_limited';
+    return 'candidate_pass_found';
+  })();
+  const influencePayload = {
+    runId: `g4-influence-scan-${SEED}-2026-02-26`,
+    seed: SEED,
+    generatedAt: new Date().toISOString(),
+    baseline: influence.baseline,
+    rankedEffects: influence.rankedEffects,
+    decision: {
+      classification: decisionClass,
+      bestCase: best,
+    },
+  };
+  fs.writeFileSync(INFLUENCE_OUT_PATH, `${JSON.stringify(sortDeep(influencePayload), null, 2)}\n`);
+  console.log(JSON.stringify({ ok: true, out: OUT_PATH, influenceOut: INFLUENCE_OUT_PATH, cases: results.length }));
   process.exit(0);
 }
 
