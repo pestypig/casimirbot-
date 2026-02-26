@@ -81,6 +81,8 @@ import { resolveHullBasis, type HullBasisResolved } from "@shared/hull-basis";
 import type { VizIntent } from "@/lib/nav/nav-dynamics";
 import { resolveHullDimsEffective } from "@/lib/resolve-hull-dims";
 import { VIEWER_WIREFRAME_BUDGETS } from "@/lib/resolve-wireframe-overlay";
+import { useStressEnergyBrick } from "@/hooks/useStressEnergyBrick";
+import { OBSERVER_ROBUST_SELECTION_CHANNEL, type ObserverConditionKey, type ObserverFrameKey } from "@/lib/stress-energy-brick";
 import { buildCardSignatures, ensureCardRecipeSchemaVersion } from "@/lib/card-signatures";
 import { buildCardExportSidecar } from "@/lib/card-export-sidecar";
 import { buildLatticeTextureExports, extractCardLatticeMetadata } from "@/lib/lattice-export";
@@ -1187,6 +1189,8 @@ export default function HelixCore() {
   }, [helixPanelParam]);
 
   const [devMockStatus, setDevMockStatus] = useState(getDevMockStatus());
+  const [observerCondition, setObserverCondition] = useState<ObserverConditionKey>("nec");
+  const [observerFrame, setObserverFrame] = useState<ObserverFrameKey>("Eulerian");
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onMockUsed = (event: Event) => {
@@ -1280,6 +1284,8 @@ useEffect(() => {
     refetchOnWindowFocus: false,
   });
   const switchMode = useSwitchMode();
+  const stressBrickQuery = useStressEnergyBrick({ quality: "medium", refetchMs: 400 });
+  const observerRobustStats = stressBrickQuery.data?.stats?.observerRobust;
   const updatePipeline = useUpdatePipeline();
   const [autoApplyPreview, setAutoApplyPreview] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
@@ -1322,6 +1328,13 @@ useEffect(() => {
     (window as any).__energyLive = pipeline;
   }, [pipeline]);
 
+  useEffect(() => {
+    publish(OBSERVER_ROBUST_SELECTION_CHANNEL, {
+      condition: observerCondition,
+      frame: observerFrame,
+    });
+  }, [observerCondition, observerFrame]);
+
   const focusAlcubierrePanel = useCallback(() => {
     const node = alcubierreRef.current;
     if (!node) return;
@@ -1331,6 +1344,16 @@ useEffect(() => {
       node.scrollIntoView();
     }
   }, []);
+
+  const observerConditionSummary = observerRobustStats
+    ? observerCondition === "nec"
+      ? observerRobustStats.nec
+      : observerCondition === "wec"
+        ? observerRobustStats.wec
+        : observerCondition === "sec"
+          ? observerRobustStats.sec
+          : observerRobustStats.dec
+    : null;
 
   const dispatchAutoViewEvent = useCallback((detail: any) => {
     if (typeof window === "undefined") return;
@@ -5046,6 +5069,54 @@ useEffect(() => {
 
           {/* ====== SECONDARY GRID (rest of the panels) ====== */}
           <div className="grid grid-cols-1 gap-4">
+            {observerRobustStats && (
+              <Card className="bg-slate-900/50 border-slate-800">
+                <CardHeader>
+                  <CardTitle className="text-sm">Observer-Robust Diagnostics</CardTitle>
+                  <CardDescription>Condition/frame overlays for stress-energy diagnostics</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label className="text-xs text-slate-300">Condition</Label>
+                      <Select value={observerCondition.toUpperCase()} onValueChange={(value) => setObserverCondition(value.toLowerCase() as ObserverConditionKey)}>
+                        <SelectTrigger className="mt-1 border-slate-700 bg-slate-900/70 text-slate-100">
+                          <SelectValue placeholder="Condition" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 text-slate-100">
+                          <SelectItem value="NEC">NEC</SelectItem>
+                          <SelectItem value="WEC">WEC</SelectItem>
+                          <SelectItem value="SEC">SEC</SelectItem>
+                          <SelectItem value="DEC">DEC</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-300">Frame</Label>
+                      <Select value={observerFrame} onValueChange={(value) => setObserverFrame(value as ObserverFrameKey)}>
+                        <SelectTrigger className="mt-1 border-slate-700 bg-slate-900/70 text-slate-100">
+                          <SelectValue placeholder="Frame" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 text-slate-100">
+                          <SelectItem value="Eulerian">Eulerian</SelectItem>
+                          <SelectItem value="Robust">Robust</SelectItem>
+                          <SelectItem value="Delta">Delta</SelectItem>
+                          <SelectItem value="Missed">Missed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="border-slate-600 text-slate-200">rapidity cap: {observerRobustStats.rapidityCap.toFixed(3)}</Badge>
+                    <Badge variant="outline" className="border-slate-600 text-slate-200">Type-I: {(observerRobustStats.typeI.fraction * 100).toFixed(2)}%</Badge>
+                    <Badge variant="outline" className="border-slate-600 text-slate-200">source mix: alg {(observerConditionSummary ? (observerConditionSummary.worstCase.source === "algebraic_type_i" ? "active" : "mixed") : "n/a")}</Badge>
+                    <Badge className={observerRobustStats.consistency.robustNotGreaterThanEulerian ? "bg-green-500/20 text-green-300" : "bg-amber-500/20 text-amber-300"}>
+                      robust≤eulerian: {observerRobustStats.consistency.robustNotGreaterThanEulerian ? "true" : "false"}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             {/* Left column: Compliance, Quantum Inequality, Shift Vector */}
             <div className="space-y-4">
               {/* Metric Compliance HUD */}
