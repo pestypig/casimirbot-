@@ -579,6 +579,36 @@ describe('warp-full-solve-campaign runner', () => {
     expect(String(evidence.executiveTranslationRef)).toContain('docs/audits/research/warp-gates-executive-translation-2026-02-24.md');
   }, 50_000);
 
+  it('temp --out campaign run does not mutate canonical readiness report', async () => {
+    const cliPath = path.resolve('scripts/warp-full-solve-campaign-cli.ts');
+    const tsxCli = path.resolve('node_modules/tsx/dist/cli.mjs');
+    const canonicalReport = path.resolve('docs/audits/research/warp-full-solve-campaign-execution-report-2026-02-24.md');
+    const before = fs.readFileSync(canonicalReport, 'utf8');
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-noncanonical-report-'));
+    const outDir = path.join(tempRoot, 'out');
+
+    await execFileAsync(process.execPath, [
+      tsxCli,
+      cliPath,
+      '--wave',
+      'A',
+      '--out',
+      outDir,
+      '--ci',
+      '--wave-timeout-ms',
+      '1000',
+      '--campaign-timeout-ms',
+      '5000',
+    ], {
+      timeout: 45_000,
+      maxBuffer: 1024 * 1024,
+    });
+
+    const after = fs.readFileSync(canonicalReport, 'utf8');
+    expect(after).toBe(before);
+  }, 50_000);
+
+
   it('residualTrend is FAIL when non-decreasing and PASS when strictly decreasing', () => {
     const nonDecreasing = computeReproducibility([
       { attempts: [{ initial: { residual: 1 }, evaluation: { gate: { status: 'pass' }, constraints: [] } }] },
