@@ -125,6 +125,34 @@ type EvidencePack = {
   boundaryStatement: string;
 };
 
+type QiForensicsArtifact = {
+  runId: string;
+  wave: Wave;
+  seed: number;
+  timestamp: string;
+  rhoSource: string | null;
+  metricDerived: boolean | null;
+  metricContractOk: boolean | null;
+  effectiveRho_SI_Jm3: number | null;
+  rhoOn_SI_Jm3: number | null;
+  lhs_Jm3: number | null;
+  bound_Jm3: number | null;
+  marginRatioRaw: number | null;
+  marginRatioClamped: number | null;
+  tau_s: number | null;
+  sampler: string | null;
+  fieldType: string | null;
+  K: number | null;
+  safetySigma_Jm3: number | null;
+  curvatureScalar: number | null;
+  curvatureRadius_m: number | null;
+  curvatureRatio: number | null;
+  curvatureEnforced: boolean | null;
+  curvatureOk: boolean | null;
+  applicabilityStatus: string | null;
+  g4ReasonCodes: string[];
+};
+
 type TimeoutKind = 'wave_timeout' | 'campaign_timeout';
 type NotReadyClass = 'timeout_budget' | 'missing_required_signals' | 'policy_not_applicable_misuse' | 'other';
 
@@ -231,6 +259,10 @@ const writeMd = (p: string, body: string) => {
   mkdirp(path.dirname(p));
   fs.writeFileSync(p, body);
 };
+const finiteOrNull = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+const stringOrNull = (value: unknown): string | null => (typeof value === 'string' && value.trim().length > 0 ? value : null);
+const booleanOrNull = (value: unknown): boolean | null => (typeof value === 'boolean' ? value : null);
 const hashId = (src: string) => Buffer.from(src).toString('hex').slice(0, 16);
 const resolveTsxRunner = () => path.resolve(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
 const resolveSingleRunCli = () => path.resolve(process.cwd(), 'scripts', 'warp-full-solve-single-runner.ts');
@@ -819,6 +851,10 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
   };
   const parseNumberField = (key: string): number | undefined => parseStrictNumber(parseFordField(key));
   const parseSnapshotNumber = (value: unknown): number | undefined => parseStrictNumber(value);
+  const readCanonicalNumber = (snapshotValue: unknown, fordKey: string): number | undefined =>
+    parseSnapshotNumber(snapshotValue) ?? parseNumberField(fordKey);
+  const readSnapshotString = (snapshotValue: unknown): string | undefined =>
+    typeof snapshotValue === 'string' ? snapshotValue : undefined;
   const hasSynthesizedTag = [ford, theta].some((entry) => typeof entry?.note === 'string' && entry.note.includes('source=synthesized_unknown'));
   const missingAnyHardSource = !ford || !theta;
   const source: EvidencePack['g4Diagnostics']['source'] = hasSynthesizedTag || missingAnyHardSource ? 'synthesized_unknown' : 'evaluator_constraints';
@@ -834,22 +870,15 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
     source,
     reason,
     reasonCode: orderReasonCodes(reasonCode),
-    lhs_Jm3: parseSnapshotNumber(snapshot?.qi_lhs_Jm3) ?? parseNumberField('lhs_Jm3'),
-    bound_Jm3: parseSnapshotNumber(snapshot?.qi_bound_Jm3) ?? parseNumberField('bound_Jm3'),
-    marginRatio: parseSnapshotNumber(snapshot?.qi_margin_ratio) ?? parseNumberField('marginRatio'),
-    marginRatioRaw: parseSnapshotNumber(snapshot?.qi_margin_ratio_raw) ?? parseNumberField('marginRatioRaw'),
-    rhoSource:
-      typeof snapshot?.qi_rho_source === 'string'
-        ? snapshot.qi_rho_source
-        : (parseFordField('rhoSource') ?? undefined),
+    lhs_Jm3: readCanonicalNumber(snapshot?.qi_lhs_Jm3, 'lhs_Jm3'),
+    bound_Jm3: readCanonicalNumber(snapshot?.qi_bound_Jm3, 'bound_Jm3'),
+    marginRatio: readCanonicalNumber(snapshot?.qi_margin_ratio, 'marginRatio'),
+    marginRatioRaw: readCanonicalNumber(snapshot?.qi_margin_ratio_raw, 'marginRatioRaw'),
+    rhoSource: readSnapshotString(snapshot?.qi_rho_source) ?? (parseFordField('rhoSource') ?? undefined),
     metricContractStatus:
-      typeof snapshot?.qi_metric_contract_status === 'string'
-        ? snapshot.qi_metric_contract_status
-        : (parseFordField('metricContractStatus') ?? undefined),
+      readSnapshotString(snapshot?.qi_metric_contract_status) ?? (parseFordField('metricContractStatus') ?? undefined),
     applicabilityStatus:
-      typeof snapshot?.qi_applicability_status === 'string'
-        ? snapshot.qi_applicability_status
-        : (parseFordField('applicabilityStatus') ?? undefined),
+      readSnapshotString(snapshot?.qi_applicability_status) ?? (parseFordField('applicabilityStatus') ?? undefined),
     curvatureOk:
       typeof snapshot?.qi_curvature_ok === 'boolean'
         ? snapshot.qi_curvature_ok
@@ -858,7 +887,7 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
           : parseFordField('curvatureOk') === 'false'
             ? false
             : undefined,
-    curvatureRatio: parseSnapshotNumber(snapshot?.qi_curvature_ratio) ?? parseNumberField('curvatureRatio'),
+    curvatureRatio: readCanonicalNumber(snapshot?.qi_curvature_ratio, 'curvatureRatio'),
     curvatureEnforced:
       typeof snapshot?.qi_curvature_enforced === 'boolean'
         ? snapshot.qi_curvature_enforced
@@ -867,9 +896,41 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
           : parseFordField('curvatureEnforced') === 'false'
             ? false
             : undefined,
-    tau_s: parseSnapshotNumber(snapshot?.qi_bound_tau_s) ?? parseNumberField('tau_s'),
-    K: parseSnapshotNumber(snapshot?.qi_bound_K) ?? parseNumberField('K'),
-    safetySigma_Jm3: parseSnapshotNumber(snapshot?.qi_safetySigma_Jm3) ?? parseNumberField('safetySigma_Jm3'),
+    tau_s: readCanonicalNumber(snapshot?.qi_bound_tau_s, 'tau_s'),
+    K: readCanonicalNumber(snapshot?.qi_bound_K, 'K'),
+    safetySigma_Jm3: readCanonicalNumber(snapshot?.qi_safetySigma_Jm3, 'safetySigma_Jm3'),
+  };
+};
+
+export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoopAttempt | null): QiForensicsArtifact => {
+  const snapshot = (attempt as any)?.certificate?.payload?.snapshot ?? {};
+  const guard = snapshot?.qiGuardrail ?? {};
+  return {
+    runId: pack.runId,
+    wave: pack.wave,
+    seed: pack.seed,
+    timestamp: pack.completedAt,
+    rhoSource: stringOrNull(pack.g4Diagnostics?.rhoSource),
+    metricDerived: booleanOrNull(snapshot?.qi_metric_derived),
+    metricContractOk: booleanOrNull(snapshot?.qi_metric_contract_ok),
+    effectiveRho_SI_Jm3: finiteOrNull(guard?.effectiveRho),
+    rhoOn_SI_Jm3: finiteOrNull(guard?.rhoOn),
+    lhs_Jm3: finiteOrNull(pack.g4Diagnostics?.lhs_Jm3),
+    bound_Jm3: finiteOrNull(pack.g4Diagnostics?.bound_Jm3),
+    marginRatioRaw: finiteOrNull(pack.g4Diagnostics?.marginRatioRaw),
+    marginRatioClamped: finiteOrNull(pack.g4Diagnostics?.marginRatio),
+    tau_s: finiteOrNull(pack.g4Diagnostics?.tau_s),
+    sampler: stringOrNull(guard?.sampler),
+    fieldType: stringOrNull(guard?.fieldType),
+    K: finiteOrNull(pack.g4Diagnostics?.K),
+    safetySigma_Jm3: finiteOrNull(pack.g4Diagnostics?.safetySigma_Jm3),
+    curvatureScalar: finiteOrNull(snapshot?.qi_curvature_scalar),
+    curvatureRadius_m: finiteOrNull(snapshot?.qi_curvature_radius_m),
+    curvatureRatio: finiteOrNull(pack.g4Diagnostics?.curvatureRatio),
+    curvatureEnforced: booleanOrNull(pack.g4Diagnostics?.curvatureEnforced),
+    curvatureOk: booleanOrNull(pack.g4Diagnostics?.curvatureOk),
+    applicabilityStatus: stringOrNull(pack.g4Diagnostics?.applicabilityStatus),
+    g4ReasonCodes: Array.isArray(pack.g4Diagnostics?.reasonCode) ? pack.g4Diagnostics.reasonCode.slice() : [],
   };
 };
 
@@ -1124,6 +1185,7 @@ const runWave = async (
   };
 
   writeJson(path.join(base, 'evidence-pack.json'), { ...pack, runErrors });
+  writeJson(path.join(base, 'qi-forensics.json'), buildQiForensicsArtifact(pack, latestAttempt));
   writeJson(path.join(base, 'first-fail-map.json'), {
     wave,
     globalFirstFail: firstFail.firstFail,
@@ -1234,6 +1296,12 @@ ${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
 - g4Diagnostics: FordRomanQI=${pack.g4Diagnostics?.fordRomanStatus ?? 'missing'}, ThetaAudit=${pack.g4Diagnostics?.thetaAuditStatus ?? 'missing'}, source=${pack.g4Diagnostics?.source ?? 'synthesized_unknown'}
 - g4Reasons: ${(pack.g4Diagnostics?.reason ?? []).join(' | ') || 'none'}\n- g4ReasonCodes: ${(pack.g4Diagnostics?.reasonCode ?? []).join(' | ') || 'none'}
 - reproducibility.gateAgreement: ${pack.reproducibility?.repeatedRunGateAgreement?.status ?? 'NOT_READY'}`).join('\n\n')}
+
+## Operator translation
+- What failed: ${aggregateFirstFail.firstFail} (${aggregateFirstFail.reason})
+- Why it failed: hard gate and/or required signal deficits are fail-closed; see per-wave reason codes and missing-signal maps.
+- What changed in this run: lane=${lane}; timeout_budget=${campaignNotReadyClassCounts.timeout_budget}; missing_required_signals=${campaignNotReadyClassCounts.missing_required_signals}.
+- Can code fixes alone resolve it?: only if failures are signal/contract/scaling defects; true margin exceedance requires physics-side improvement.
 
 ## Decision output
 - Final decision label: **${decision}**
