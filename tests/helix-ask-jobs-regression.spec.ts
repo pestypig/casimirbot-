@@ -39,14 +39,25 @@ describe("Helix Ask jobs endpoint regression", () => {
         res.end("not found");
         return;
       }
-      req.on("data", () => undefined);
+      let rawBody = "";
+      req.on("data", (chunk) => {
+        rawBody += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
+      });
       req.on("end", () => {
+        const rescuePassPrompt = /Rescue pass:/i.test(rawBody);
+        const rescueTriggerPrompt = /rescue-trigger-open-world-test/i.test(rawBody);
+        const content =
+          rescuePassPrompt
+            ? "Systems thinking improves incident response by clarifying feedback loops, tightening handoffs, and reducing rework in crisis coordination."
+            : rescueTriggerPrompt
+              ? "llm.local stub result"
+              : "Mock HTTP response.";
         res.setHeader("Content-Type", "application/json");
         res.end(
           JSON.stringify({
             id: "chatcmpl-test",
             object: "chat.completion",
-            choices: [{ index: 0, message: { role: "assistant", content: "Mock HTTP response." } }],
+            choices: [{ index: 0, message: { role: "assistant", content } }],
             usage: { prompt_tokens: 4, completion_tokens: 3, total_tokens: 7 },
             model: "gpt-4o-mini",
           }),
@@ -234,6 +245,45 @@ describe("Helix Ask jobs endpoint regression", () => {
     if (payload.debug?.answer_quality_floor_bypassed) {
       expect(payload.debug?.answer_quality_floor_bypass_reason).toBe("open_world_provider_success");
     }
+  }, 120000);
+
+  it("runs a bounded second LLM rescue pass before deterministic fallback on weak-evidence placeholders", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "rescue-trigger-open-world-test: How does systems thinking improve incident response?",
+        sessionId: "open-world-answer-rescue",
+        debug: true,
+        verbosity: "brief",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text?: string;
+      debug?: {
+        llm_invoke_attempted?: boolean;
+        llm_backend_used?: string;
+        llm_http_status?: number;
+        llm_provider_called?: boolean;
+        answer_path?: string[];
+        answer_rescue_eligible?: boolean;
+        answer_rescue_attempted?: boolean;
+        answer_rescue_applied?: boolean;
+        answer_rescue_reason?: string;
+      };
+    };
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_http_status).toBe(200);
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect(payload.debug?.answer_rescue_eligible).toBe(true);
+    expect(payload.debug?.answer_rescue_attempted).toBe(true);
+    expect(payload.debug?.answer_rescue_applied).toBe(true);
+    expect(payload.debug?.answer_rescue_reason).toBe("general_weak_evidence");
+    expect((payload.debug?.answer_path ?? []).includes("answer_rescue:llm_second_pass")).toBe(true);
+    expect((payload.debug?.answer_path ?? []).includes("fallback:RenderPlatonicFallback")).toBe(false);
+    expect((payload.text ?? "").toLowerCase()).toContain("systems thinking improves incident response");
   }, 120000);
 
   it("keeps endpoint guard in warn-only mode for successful explicit repo-api prompts", async () => {

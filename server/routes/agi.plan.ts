@@ -11563,6 +11563,75 @@ function buildGeneralAskSynthesisPrompt(
   return lines.join("\n");
 }
 
+function buildHelixAskAnswerRescuePrompt(args: {
+  question: string;
+  draft: string;
+  format: HelixAskFormat;
+  stageTags: boolean;
+  verbosity: HelixAskVerbosity;
+  allowRepoHints: boolean;
+  evidenceSnippet?: string;
+}): string {
+  const { question, draft, format, stageTags, verbosity, allowRepoHints, evidenceSnippet } = args;
+  const lines = [
+    "You are Helix Ask.",
+    "Rescue pass: produce a direct, useful answer to the user question.",
+    "Do not emit policy scaffolds, fallback labels, or gate diagnostics.",
+    "Do not output phrases like 'Answer grounded in retrieved evidence', 'Mechanism:', 'Maturity (', or 'Missing evidence:'.",
+  ];
+  if (allowRepoHints) {
+    lines.push("If repo hints are present, cite only paths explicitly listed in the evidence snippet.");
+    lines.push("If implementation details are uncertain, say that they are not confirmed from current evidence.");
+  } else {
+    lines.push("Use general knowledge and do not claim repo implementation details.");
+  }
+  const spec = resolveHelixAskVerbositySpec(verbosity);
+  const paragraphDescriptor = verbosity === "brief" ? "short " : "";
+  const twoParagraphContract = hasTwoParagraphContract(question);
+  if (format === "steps") {
+    lines.push(
+      `Start directly with a numbered list using \`1.\` style; use ${spec.steps.count} steps and no preamble.`,
+    );
+    lines.push(`Each step should be ${spec.steps.sentences} sentences.`);
+    if (stageTags) {
+      lines.push("Include stage tags only if already requested in the user question.");
+    } else {
+      lines.push("Do not add stage tags or parenthetical labels.");
+    }
+  } else if (format === "compare") {
+    lines.push(
+      twoParagraphContract
+        ? `Answer in exactly two ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each.`
+        : `Answer in ${spec.paragraphs.count} ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each.`,
+    );
+    lines.push(`If comparative, include a short bullet list (${spec.compareBullets} items).`);
+  } else {
+    lines.push(
+      twoParagraphContract
+        ? `Answer in exactly two ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each.`
+        : `Answer in ${spec.paragraphs.count} ${paragraphDescriptor}paragraphs with ${spec.paragraphs.sentences} sentences each.`,
+    );
+  }
+  lines.push("Avoid repetition and keep causal links concrete.");
+  lines.push(`Respond with only the answer between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
+  lines.push("");
+  lines.push(`Question: ${question}`);
+  if (draft.trim()) {
+    lines.push("");
+    lines.push("Previous draft to improve:");
+    lines.push(draft.trim());
+  }
+  if (evidenceSnippet?.trim()) {
+    lines.push("");
+    lines.push("Evidence snippet:");
+    lines.push(evidenceSnippet.trim());
+  }
+  lines.push("");
+  lines.push(HELIX_ASK_ANSWER_START);
+  lines.push(HELIX_ASK_ANSWER_END);
+  return lines.join("\n");
+}
+
 function buildHelixAskConstraintPrompt(
   question: string,
   evidence: string,
@@ -28282,16 +28351,226 @@ const executeHelixAsk = async ({
         debugPayload?.llm_http_status === 200 &&
         !debugPayload?.llm_error_code;
       const hasConcreteAnswerText = typeof cleaned === "string" && cleaned.trim().length > 0;
-      const weakEvidenceForDeterministicFallback =
+      const answerLooksPlaceholder =
+        hasModelPlaceholderOrStub(cleaned) || isUnverifiedScaffoldScientificReport(cleaned.trim());
+      const providerDeliveredUsableAnswer =
+        providerHttpSuccess && hasConcreteAnswerText && !answerLooksPlaceholder;
+      const rescueAllowRepoHints =
+        explicitRepoExpectation && !relationIntentActive && intentStrategy !== "constraint_report";
+      let weakEvidenceForDeterministicFallback =
         !runtimeFallbackPinned &&
-        !(providerHttpSuccess && hasConcreteAnswerText) &&
+        !providerDeliveredUsableAnswer &&
         (
+          answerLooksPlaceholder ||
           !evidenceGateOk ||
           claimGateFailed ||
           selectedMove === "retrieve_more" ||
           selectedMove === "clarify" ||
           selectedMove === "fail_closed"
         );
+      const answerRescueEligible =
+        weakEvidenceForDeterministicFallback &&
+        !securityRiskPrompt &&
+        !relationIntentActive &&
+        debugPayload?.llm_invoke_attempted === true &&
+        (intentDomain === "general" || rescueAllowRepoHints);
+      if (debugPayload) {
+        (debugPayload as Record<string, unknown>).answer_rescue_eligible = answerRescueEligible;
+      }
+      if (answerRescueEligible) {
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).answer_rescue_attempted = true;
+          (debugPayload as Record<string, unknown>).answer_rescue_applied = false;
+          (debugPayload as Record<string, unknown>).answer_rescue_reason = "pending";
+        }
+        const rescueBudgetCheck = canStartFastHelper(
+          "answer_rescue",
+          fastQualityBudgets.helperMinMs,
+          fastStageDeadlines.finalize,
+        );
+        if (fastQualityMode && !rescueBudgetCheck.ok) {
+          recordFastDecision(
+            "answer_rescue",
+            "skip_llm",
+            rescueBudgetCheck.reason ?? "min_budget_not_met",
+            rescueBudgetCheck.remainingMs,
+            fastStageDeadlines.finalize,
+          );
+          if (debugPayload) {
+            (debugPayload as Record<string, unknown>).answer_rescue_attempted = false;
+            (debugPayload as Record<string, unknown>).answer_rescue_applied = false;
+            (debugPayload as Record<string, unknown>).answer_rescue_reason =
+              rescueBudgetCheck.reason ?? "min_budget_not_met";
+          }
+        } else {
+          const rescueTokenCap = clampNumber(
+            parsed.data.max_tokens ?? HELIX_ASK_ANSWER_MAX_TOKENS,
+            192,
+            HELIX_ASK_ANSWER_MAX_TOKENS,
+          );
+          const rescueTokens = clampNumber(
+            Math.min(Math.max(192, Math.round(rescueTokenCap * 0.85)), rescueTokenCap),
+            160,
+            rescueTokenCap,
+          );
+          const rescueEvidenceSnippet = clipAskText(
+            appendEvidenceSources(evidenceText, contextFiles, 8, contextText),
+            HELIX_ASK_SCAFFOLD_CONTEXT_CHARS,
+          );
+          const rescuePrompt = buildHelixAskAnswerRescuePrompt({
+            question: baseQuestion,
+            draft: cleaned,
+            format: formatSpec.format,
+            stageTags: formatSpec.stageTags,
+            verbosity,
+            allowRepoHints: rescueAllowRepoHints,
+            evidenceSnippet: rescueAllowRepoHints ? rescueEvidenceSnippet : undefined,
+          });
+          const rescueStart = logStepStart(
+            "LLM answer rescue",
+            `tokens=${rescueTokens}`,
+            {
+              maxTokens: rescueTokens,
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "answer_rescue",
+              prompt: "buildHelixAskAnswerRescuePrompt",
+            },
+          );
+          try {
+            const rescueHelperResult = await runHelperWithRuntimeGuard(
+              "answer_rescue",
+              FAST_QUALITY_FINALIZE_BY_MS,
+              () =>
+                runHelixAskLocalWithOverflowRetry(
+                  {
+                    prompt: rescuePrompt,
+                    max_tokens: rescueTokens,
+                    temperature: Math.min(parsed.data.temperature ?? 0.2, 0.45),
+                    seed: parsed.data.seed,
+                    stop: parsed.data.stop,
+                  },
+                  {
+                    personaId,
+                    sessionId: parsed.data.sessionId,
+                    traceId: askTraceId,
+                  },
+                  {
+                    fallbackMaxTokens: rescueTokens,
+                    allowContextDrop: true,
+                    label: "answer_rescue",
+                  },
+                ),
+            );
+            if (!rescueHelperResult) {
+              logStepEnd(
+                "LLM answer rescue",
+                "timeout",
+                rescueStart,
+                false,
+                {
+                  fn: "runHelixAskLocalWithOverflowRetry",
+                  label: "answer_rescue",
+                  error: "helper_timeout_fallback",
+                },
+              );
+              if (debugPayload) {
+                (debugPayload as Record<string, unknown>).answer_rescue_attempted = true;
+                (debugPayload as Record<string, unknown>).answer_rescue_applied = false;
+                (debugPayload as Record<string, unknown>).answer_rescue_reason = "helper_timeout_fallback";
+              }
+            } else {
+              const { result: rescueResult, overflow: rescueOverflow, llm: rescueLlm } = rescueHelperResult;
+              recordOverflow("answer_rescue", rescueOverflow);
+              appendLlmCallDebug(rescueLlm);
+              let rescueText = formatHelixAskAnswer(
+                stripPromptEchoFromAnswer(rescueResult.text ?? "", baseQuestion).trim(),
+              );
+              rescueText = stripInlineJsonArtifacts(stripTruncationMarkers(rescueText));
+              rescueText = stripRunawayAnswerArtifacts(rescueText).trim();
+              const rescueUsable =
+                rescueText.length > 0 &&
+                !hasModelPlaceholderOrStub(rescueText) &&
+                !isUnverifiedScaffoldScientificReport(rescueText);
+              logStepEnd(
+                "LLM answer rescue",
+                rescueUsable ? "applied" : "rejected",
+                rescueStart,
+                true,
+                {
+                  textLength: rescueText.length,
+                  fn: "runHelixAskLocalWithOverflowRetry",
+                  label: "answer_rescue",
+                },
+              );
+              if (rescueUsable) {
+                cleaned = rescueText;
+                weakEvidenceForDeterministicFallback = false;
+                answerPath.push("answer_rescue:llm_second_pass");
+                logEvent(
+                  "Answer rescue",
+                  "applied",
+                  rescueAllowRepoHints
+                    ? "explicit_repo_mapping"
+                    : "general_weak_evidence",
+                  answerStart,
+                );
+                if (debugPayload) {
+                  (debugPayload as Record<string, unknown>).answer_rescue_attempted = true;
+                  (debugPayload as Record<string, unknown>).answer_rescue_applied = true;
+                  (debugPayload as Record<string, unknown>).answer_rescue_reason =
+                    rescueAllowRepoHints
+                      ? "explicit_repo_mapping_weak_evidence"
+                      : "general_weak_evidence";
+                }
+              } else if (debugPayload) {
+                (debugPayload as Record<string, unknown>).answer_rescue_attempted = true;
+                (debugPayload as Record<string, unknown>).answer_rescue_applied = false;
+                (debugPayload as Record<string, unknown>).answer_rescue_reason =
+                  rescueText.length === 0 ? "empty" : "placeholder_or_scaffold";
+              }
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const llmCall = (error as { __llm_call?: HelixAskLlmCallMeta } | null | undefined)?.__llm_call;
+            appendLlmCallDebug(
+              llmCall
+                ? {
+                    ...llmCall,
+                    errorCode: llmCall.errorCode ?? parseHelixAskLlmErrorCode(message),
+                    errorMessage: llmCall.errorMessage ?? message,
+                  }
+                : {
+                    stage: "answer_rescue",
+                    backend: resolveLlmLocalBackend(),
+                    providerCalled: resolveLlmLocalBackend() === "http",
+                    startedAtIso: new Date().toISOString(),
+                    endedAtIso: new Date().toISOString(),
+                    durationMs: 0,
+                    errorCode: parseHelixAskLlmErrorCode(message),
+                    errorMessage: message,
+                  },
+            );
+            logStepEnd(
+              "LLM answer rescue",
+              "error",
+              rescueStart,
+              false,
+              {
+                fn: "runHelixAskLocalWithOverflowRetry",
+                label: "answer_rescue",
+                error: message,
+              },
+            );
+            if (debugPayload) {
+              (debugPayload as Record<string, unknown>).answer_rescue_attempted = true;
+              (debugPayload as Record<string, unknown>).answer_rescue_applied = false;
+              (debugPayload as Record<string, unknown>).answer_rescue_reason = "model_error";
+            }
+          }
+        }
+      } else if (debugPayload) {
+        (debugPayload as Record<string, unknown>).answer_rescue_attempted = false;
+      }
       if (weakEvidenceForDeterministicFallback) {
         const allowed = normalizeCitations([
           ...extractFilePathsFromText(evidenceText),
@@ -28393,6 +28672,7 @@ const executeHelixAsk = async ({
         }
       }
       const relationQueryForFinalize = isRelationIntentRequested();
+      const answerRescuePinned = answerPath.includes("answer_rescue:llm_second_pass");
       const openWorldExplainer =
         isOpenWorldExplainerQuestion(baseQuestion) &&
         intentDomain !== "repo" &&
@@ -28405,6 +28685,7 @@ const executeHelixAsk = async ({
         !relationQueryForFinalize;
       const qualityFloorEligible =
         !runtimeFallbackPinned &&
+        !answerRescuePinned &&
         !openWorldProviderQualityFloorBypass &&
         (
           HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR ||
@@ -28427,9 +28708,15 @@ const executeHelixAsk = async ({
       if (debugPayload) {
         (debugPayload as Record<string, unknown>).runtime_clock_a = clockASnapshot;
         (debugPayload as Record<string, unknown>).runtime_clock_b = clockBSnapshot;
+        if (answerRescuePinned) {
+          debugPayload.answer_rescue_pinned = true;
+        }
         if (openWorldProviderQualityFloorBypass) {
           debugPayload.answer_quality_floor_bypassed = true;
           debugPayload.answer_quality_floor_bypass_reason = "open_world_provider_success";
+        } else if (answerRescuePinned) {
+          debugPayload.answer_quality_floor_bypassed = true;
+          debugPayload.answer_quality_floor_bypass_reason = "answer_rescue_pinned";
         }
       }
       const qualityFloorReasons = qualityFloorEligible

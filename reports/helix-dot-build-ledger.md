@@ -133,3 +133,22 @@
   - Added regression coverage for `server/routes/voice.ts` explicit path prompts to ensure HTTP invocation remains active and fallback is not tagged `fail_closed:doc_slot_missing`.
 - known_risks_next_step:
   - This bypass is intentionally scoped to `doc_slot_missing`; other fail-closed reasons still apply and should remain deterministic.
+
+## Milestone M7 - Bounded Answer Rescue Second Pass
+- milestone_id: `M7-bounded-answer-rescue-second-pass`
+- files_changed:
+  - `server/routes/agi.plan.ts`
+  - `tests/helix-ask-jobs-regression.spec.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run tests/helix-ask-jobs-regression.spec.ts tests/helix-ask-llm-debug-skip.spec.ts`
+  - `npx vitest run server/__tests__/operator-contract-v1.spec.ts tests/voice.operator-contract-boundary.spec.ts`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Added `buildHelixAskAnswerRescuePrompt(...)` and a bounded second LLM pass (`answer_rescue`) before deterministic fallback.
+  - Rescue is gated to weak-evidence scenarios and only for safe lanes (`intentDomain=general` or explicit repo-mapping LLM-first mode), while keeping deterministic fallback as backup.
+  - Added deterministic debug fields (`answer_rescue_eligible`, `answer_rescue_attempted`, `answer_rescue_applied`, `answer_rescue_reason`) and a path token (`answer_rescue:llm_second_pass`).
+  - Added regression coverage that forces a placeholder first response and verifies the rescue pass is applied instead of `RenderPlatonicFallback`.
+- known_risks_next_step:
+  - Rescue pass is intentionally narrow; if quality remains constrained for additional intent lanes, expand gating with explicit policy tests rather than broadening globally.
