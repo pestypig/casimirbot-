@@ -13,11 +13,25 @@ describe('warp-g4-sensitivity', () => {
   it('is deterministic under fixed seed', () => {
     const tsxCli = path.resolve('node_modules/tsx/dist/cli.mjs');
     const script = path.resolve('scripts/warp-g4-sensitivity.ts');
-    execFileSync(process.execPath, [tsxCli, script], { stdio: 'ignore' });
     const outPath = path.join('artifacts/research/full-solve', `g4-sensitivity-${new Date().toISOString().slice(0, 10)}.json`);
-    const a = fs.readFileSync(outPath, 'utf8');
+
+    if (fs.existsSync(outPath)) {
+      fs.unlinkSync(outPath);
+    }
+
     execFileSync(process.execPath, [tsxCli, script], { stdio: 'ignore' });
+    expect(fs.existsSync(outPath)).toBe(true);
+    const firstStat = fs.statSync(outPath);
+    const a = fs.readFileSync(outPath, 'utf8');
+
+    execFileSync(process.execPath, [tsxCli, script], { stdio: 'ignore' });
+    expect(fs.existsSync(outPath)).toBe(true);
+    const secondStat = fs.statSync(outPath);
     const b = fs.readFileSync(outPath, 'utf8');
+
+    expect(secondStat.mtimeMs).toBeGreaterThanOrEqual(firstStat.mtimeMs);
+    expect(secondStat.mtimeMs > firstStat.mtimeMs || b !== a).toBe(true);
+
     const pa = JSON.parse(a);
     const pb = JSON.parse(b);
     expect(pa.seed).toBe(424242);
@@ -77,5 +91,16 @@ describe('warp-g4-sensitivity', () => {
 
     expect(below).not.toContain('G4_QI_MARGIN_EXCEEDED');
     expect(above).toContain('G4_QI_MARGIN_EXCEEDED');
+  });
+
+
+  it('treats non-finite raw margins as exceeded fail-closed', () => {
+    const nanMargin = deriveSensitivityReasonCodes({ marginRatioRaw: Number.NaN, applicabilityStatus: 'PASS', rhoSource: 'gr.metric' });
+    const infMargin = deriveSensitivityReasonCodes({ marginRatioRaw: Number.POSITIVE_INFINITY, applicabilityStatus: 'PASS', rhoSource: 'gr.metric' });
+    const negInfMargin = deriveSensitivityReasonCodes({ marginRatioRaw: Number.NEGATIVE_INFINITY, applicabilityStatus: 'PASS', rhoSource: 'gr.metric' });
+
+    expect(nanMargin).toContain('G4_QI_MARGIN_EXCEEDED');
+    expect(infMargin).toContain('G4_QI_MARGIN_EXCEEDED');
+    expect(negInfMargin).toContain('G4_QI_MARGIN_EXCEEDED');
   });
 });
