@@ -208,7 +208,26 @@ const REQUIRED_SIGNAL_KEYS = [
 const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOptions }> = {
   A: {
     runCount: 1,
-    options: { maxIterations: 1, commitAccepted: false, useLiveSnapshot: false, proposals: [{ label: 'wave-a-baseline', params: {} }] },
+    options: {
+      maxIterations: 1,
+      commitAccepted: false,
+      useLiveSnapshot: false,
+      proposals: [
+        {
+          label: 'wave-a-natario-baseline',
+          params: {
+            warpFieldType: 'natario',
+            dutyCycle: 0.14,
+            gammaGeo: 26,
+            gammaVanDenBroeck: 38.3,
+            qCavity: 1e9,
+            qSpoilingFactor: 1,
+            gap_nm: 1,
+            shipRadius_m: 10,
+          },
+        },
+      ],
+    },
   },
   B: {
     runCount: 1,
@@ -216,7 +235,23 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
       maxIterations: 2,
       commitAccepted: false,
       useLiveSnapshot: false,
-      proposals: [{ label: 'wave-b-duty-lower', params: { dutyCycle: 0.09 } }],
+      proposals: [
+        {
+          label: 'wave-b-natario-sdf',
+          params: {
+            warpFieldType: 'natario_sdf',
+            dutyCycle: 0.09,
+            dutyShip: 0.09,
+            dutyEffective_FR: 0.09,
+            gammaGeo: 18,
+            gammaVanDenBroeck: 64,
+            qCavity: 5e8,
+            qSpoilingFactor: 0.8,
+            gap_nm: 0.7,
+            shipRadius_m: 8,
+          },
+        },
+      ],
     },
   },
   C: {
@@ -226,8 +261,36 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
       commitAccepted: false,
       useLiveSnapshot: false,
       proposals: [
-        { label: 'wave-c-seed-profile', params: { dutyCycle: 0.08, gammaGeo: 1.95 } },
-        { label: 'wave-c-perturb', params: { dutyCycle: 0.085, gammaGeo: 1.9 } },
+        {
+          label: 'wave-c-irrotational-low-duty',
+          params: {
+            warpFieldType: 'irrotational',
+            dutyCycle: 0.04,
+            dutyShip: 0.04,
+            dutyEffective_FR: 0.04,
+            gammaGeo: 8,
+            gammaVanDenBroeck: 12,
+            qCavity: 2e9,
+            qSpoilingFactor: 1.6,
+            gap_nm: 2,
+            shipRadius_m: 6,
+          },
+        },
+        {
+          label: 'wave-c-irrotational-perturb',
+          params: {
+            warpFieldType: 'irrotational',
+            dutyCycle: 0.05,
+            dutyShip: 0.05,
+            dutyEffective_FR: 0.05,
+            gammaGeo: 7.5,
+            gammaVanDenBroeck: 10,
+            qCavity: 1.5e9,
+            qSpoilingFactor: 1.8,
+            gap_nm: 2.5,
+            shipRadius_m: 6,
+          },
+        },
       ],
     },
   },
@@ -238,8 +301,36 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
       commitAccepted: false,
       useLiveSnapshot: false,
       proposals: [
-        { label: 'wave-d-replica-a', params: { dutyCycle: 0.075, gammaGeo: 1.85 } },
-        { label: 'wave-d-replica-b', params: { dutyCycle: 0.075, gammaGeo: 1.85 } },
+        {
+          label: 'wave-d-natario-sdf-high-q',
+          params: {
+            warpFieldType: 'natario_sdf',
+            dutyCycle: 0.22,
+            dutyShip: 0.22,
+            dutyEffective_FR: 0.22,
+            gammaGeo: 55,
+            gammaVanDenBroeck: 220,
+            qCavity: 8e10,
+            qSpoilingFactor: 0.4,
+            gap_nm: 0.45,
+            shipRadius_m: 14,
+          },
+        },
+        {
+          label: 'wave-d-natario-sdf-replica',
+          params: {
+            warpFieldType: 'natario_sdf',
+            dutyCycle: 0.2,
+            dutyShip: 0.2,
+            dutyEffective_FR: 0.2,
+            gammaGeo: 50,
+            gammaVanDenBroeck: 180,
+            qCavity: 1e11,
+            qSpoilingFactor: 0.5,
+            gap_nm: 0.5,
+            shipRadius_m: 16,
+          },
+        },
       ],
     },
   },
@@ -1255,6 +1346,40 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
     },
   });
 
+  const g4WaveRows = packs
+    .map((pack) => {
+      const d = pack.g4Diagnostics ?? ({} as any);
+      const lhs = Number.isFinite(d.lhs_Jm3) ? d.lhs_Jm3 : 'n/a';
+      const bound = Number.isFinite(d.bound_Jm3) ? d.bound_Jm3 : 'n/a';
+      const raw = Number.isFinite(d.marginRatioRaw) ? d.marginRatioRaw : Number.isFinite(d.marginRatio) ? d.marginRatio : 'n/a';
+      const rho = typeof d.rhoSource === 'string' && d.rhoSource.length > 0 ? d.rhoSource : 'unknown';
+      const applicability = typeof d.applicabilityStatus === 'string' && d.applicabilityStatus.length > 0 ? d.applicabilityStatus : 'UNKNOWN';
+      return `| ${pack.wave} | ${lhs} | ${bound} | ${raw} | ${rho} | ${applicability} |`;
+    })
+    .join('\n');
+  const bestCasePack = packs.reduce<EvidencePack | null>((best, current) => {
+    const currentRaw = Number.isFinite(current.g4Diagnostics?.marginRatioRaw)
+      ? Number(current.g4Diagnostics?.marginRatioRaw)
+      : Number.isFinite(current.g4Diagnostics?.marginRatio)
+        ? Number(current.g4Diagnostics?.marginRatio)
+        : Number.POSITIVE_INFINITY;
+    if (!best) return current;
+    const bestRaw = Number.isFinite(best.g4Diagnostics?.marginRatioRaw)
+      ? Number(best.g4Diagnostics?.marginRatioRaw)
+      : Number.isFinite(best.g4Diagnostics?.marginRatio)
+        ? Number(best.g4Diagnostics?.marginRatio)
+        : Number.POSITIVE_INFINITY;
+    return currentRaw < bestRaw ? current : best;
+  }, null);
+  const bestCaseStatus = (() => {
+    if (!bestCasePack) return 'evidence_path_blocked';
+    const d = bestCasePack.g4Diagnostics ?? ({} as any);
+    const raw = Number.isFinite(d.marginRatioRaw) ? Number(d.marginRatioRaw) : Number.POSITIVE_INFINITY;
+    if (String(d.applicabilityStatus ?? 'UNKNOWN').toUpperCase() !== 'PASS') return 'applicability_limited';
+    if (raw >= 1) return 'margin_limited';
+    return 'candidate_pass_found';
+  })();
+
   writeMd(
     path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.md`),
     `# Warp Full-Solve Campaign Execution Report (${DATE_STAMP})
@@ -1296,6 +1421,20 @@ ${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
 - g4Diagnostics: FordRomanQI=${pack.g4Diagnostics?.fordRomanStatus ?? 'missing'}, ThetaAudit=${pack.g4Diagnostics?.thetaAuditStatus ?? 'missing'}, source=${pack.g4Diagnostics?.source ?? 'synthesized_unknown'}
 - g4Reasons: ${(pack.g4Diagnostics?.reason ?? []).join(' | ') || 'none'}\n- g4ReasonCodes: ${(pack.g4Diagnostics?.reasonCode ?? []).join(' | ') || 'none'}
 - reproducibility.gateAgreement: ${pack.reproducibility?.repeatedRunGateAgreement?.status ?? 'NOT_READY'}`).join('\n\n')}
+
+## Per-wave G4 evidence table
+| Wave | lhs_Jm3 | bound_Jm3 | marginRatioRaw | rhoSource | applicabilityStatus |
+| --- | ---: | ---: | ---: | --- | --- |
+${g4WaveRows}
+
+## Best-case G4 summary
+- classification: ${bestCaseStatus}
+- wave: ${bestCasePack?.wave ?? 'n/a'}
+- lhs_Jm3: ${bestCasePack?.g4Diagnostics?.lhs_Jm3 ?? 'n/a'}
+- bound_Jm3: ${bestCasePack?.g4Diagnostics?.bound_Jm3 ?? 'n/a'}
+- marginRatioRaw: ${bestCasePack?.g4Diagnostics?.marginRatioRaw ?? bestCasePack?.g4Diagnostics?.marginRatio ?? 'n/a'}
+- applicabilityStatus: ${bestCasePack?.g4Diagnostics?.applicabilityStatus ?? 'UNKNOWN'}
+- rhoSource: ${bestCasePack?.g4Diagnostics?.rhoSource ?? 'unknown'}
 
 ## Operator translation
 - What failed: ${aggregateFirstFail.firstFail} (${aggregateFirstFail.reason})
