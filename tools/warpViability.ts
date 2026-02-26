@@ -1103,6 +1103,12 @@ export async function evaluateWarpViability(
     if (curvatureOk === false) g4ReasonCodes.push(G4_QI_REASON_CODES.curvatureWindowFail);
     if (applicabilityStatus !== "PASS") g4ReasonCodes.push(G4_QI_REASON_CODES.applicabilityNotPass);
     if (qiGuard.marginRatio >= 1) g4ReasonCodes.push(G4_QI_REASON_CODES.marginExceeded);
+    if (qiGuard.applicabilityReasonCode === G4_QI_REASON_CODES.signalMissing) {
+      g4ReasonCodes.push(G4_QI_REASON_CODES.signalMissing);
+    }
+    if (qiGuard.applicabilityReasonCode === G4_QI_REASON_CODES.curvatureWindowFail) {
+      g4ReasonCodes.push(G4_QI_REASON_CODES.curvatureWindowFail);
+    }
     const orderedReasonCodes = orderG4ReasonCodes(g4ReasonCodes);
     const curvatureDetail =
       curvatureOk === undefined
@@ -1140,6 +1146,7 @@ export async function evaluateWarpViability(
           `rhoSource=${qiGuard.rhoSource ?? "unknown"}`,
           `metricContractStatus=${contractPass ? "ok" : "missing"}`,
           `applicabilityStatus=${applicabilityStatus}`,
+          `applicabilityReasonCode=${qiGuard.applicabilityReasonCode ?? "none"}`,
           `curvatureOk=${qiGuard.curvatureOk ?? "unknown"}`,
           `curvatureRatio=${qiGuard.curvatureRatio ?? "n/a"}`,
           `curvatureEnforced=${curvatureEnforced}`,

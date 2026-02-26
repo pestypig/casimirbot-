@@ -631,4 +631,36 @@ describe('warp-full-solve-campaign runner', () => {
     expect(requiredSignals.provenance_unit_system.present).toBe(true);
     expect(missingSignals).not.toEqual(expect.arrayContaining(['provenance_chart', 'provenance_observer', 'provenance_normalization', 'provenance_unit_system']));
   });
+  it('campaign export includes curvature applicability fields for waves A/B/C/D', async () => {
+    const cliPath = path.resolve('scripts/warp-full-solve-campaign-cli.ts');
+    const tsxCli = path.resolve('node_modules/tsx/dist/cli.mjs');
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-wave-all-applicability-'));
+    const outDir = path.join(tempRoot, 'out');
+    await execFileAsync(process.execPath, [
+      tsxCli,
+      cliPath,
+      '--wave',
+      'all',
+      '--out',
+      outDir,
+      '--ci',
+      '--ci-fast-path',
+      '--wave-timeout-ms',
+      '3000',
+      '--campaign-timeout-ms',
+      '15000',
+    ], {
+      timeout: 90_000,
+      maxBuffer: 1024 * 1024,
+    });
+    for (const wave of ['A', 'B', 'C', 'D']) {
+      const qifPath = path.join(outDir, wave, 'qi-forensics.json');
+      expect(fs.existsSync(qifPath)).toBe(true);
+      const qif = JSON.parse(fs.readFileSync(qifPath, 'utf8'));
+      expect(qif).toHaveProperty('applicabilityStatus');
+      expect(qif).toHaveProperty('curvatureOk');
+      expect(qif).toHaveProperty('curvatureRatio');
+    }
+  }, 100_000);
+
 });

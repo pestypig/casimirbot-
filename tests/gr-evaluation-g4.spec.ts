@@ -55,4 +55,21 @@ describe('gr-evaluation G4 diagnostics provenance', () => {
     expect(result.reasonCode).toEqual(['G4_QI_SIGNAL_MISSING']);
   });
 
+  it('extracts deterministic applicability fields when curvature data is present', () => {
+    const result = extractG4ConstraintDiagnostics([
+      {
+        id: 'FordRomanQI',
+        severity: 'HARD',
+        status: 'fail',
+        note: 'applicabilityStatus=NOT_APPLICABLE;curvatureOk=false;curvatureRatio=2.5;reasonCode=G4_QI_CURVATURE_WINDOW_FAIL',
+      },
+      { id: 'ThetaAudit', severity: 'HARD', status: 'pass', note: 'theta ok' },
+    ] as any);
+
+    expect(result.applicabilityStatus).toBe('NOT_APPLICABLE');
+    expect(result.curvatureOk).toBe(false);
+    expect(result.curvatureRatio).toBe(2.5);
+    expect(result.reasonCode).toContain('G4_QI_CURVATURE_WINDOW_FAIL');
+  });
+
 });
