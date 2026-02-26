@@ -82,7 +82,12 @@ import type { VizIntent } from "@/lib/nav/nav-dynamics";
 import { resolveHullDimsEffective } from "@/lib/resolve-hull-dims";
 import { VIEWER_WIREFRAME_BUDGETS } from "@/lib/resolve-wireframe-overlay";
 import { useStressEnergyBrick } from "@/hooks/useStressEnergyBrick";
-import { OBSERVER_ROBUST_SELECTION_CHANNEL, type ObserverConditionKey, type ObserverFrameKey } from "@/lib/stress-energy-brick";
+import {
+  OBSERVER_DIRECTION_OVERLAY_CHANNEL,
+  OBSERVER_ROBUST_SELECTION_CHANNEL,
+  type ObserverConditionKey,
+  type ObserverFrameKey,
+} from "@/lib/stress-energy-brick";
 import { buildCardSignatures, ensureCardRecipeSchemaVersion } from "@/lib/card-signatures";
 import { buildCardExportSidecar } from "@/lib/card-export-sidecar";
 import { buildLatticeTextureExports, extractCardLatticeMetadata } from "@/lib/lattice-export";
@@ -1191,6 +1196,8 @@ export default function HelixCore() {
   const [devMockStatus, setDevMockStatus] = useState(getDevMockStatus());
   const [observerCondition, setObserverCondition] = useState<ObserverConditionKey>("nec");
   const [observerFrame, setObserverFrame] = useState<ObserverFrameKey>("Eulerian");
+  const [observerDirectionOverlay, setObserverDirectionOverlay] = useState<"Off" | "On">("Off");
+  const [observerDirectionStride, setObserverDirectionStride] = useState<number>(4);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onMockUsed = (event: Event) => {
@@ -1334,6 +1341,13 @@ useEffect(() => {
       frame: observerFrame,
     });
   }, [observerCondition, observerFrame]);
+
+  useEffect(() => {
+    publish(OBSERVER_DIRECTION_OVERLAY_CHANNEL, {
+      enabled: observerDirectionOverlay === "On",
+      stride: observerDirectionStride,
+    });
+  }, [observerDirectionOverlay, observerDirectionStride]);
 
   const focusAlcubierrePanel = useCallback(() => {
     const node = alcubierreRef.current;
@@ -5104,6 +5118,29 @@ useEffect(() => {
                           <SelectItem value="Missed">Missed</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-300">Direction Overlay</Label>
+                      <Select value={observerDirectionOverlay} onValueChange={(value) => setObserverDirectionOverlay(value as "Off" | "On") }>
+                        <SelectTrigger className="mt-1 border-slate-700 bg-slate-900/70 text-slate-100">
+                          <SelectValue placeholder="Direction Overlay" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 text-slate-100">
+                          <SelectItem value="Off">Off</SelectItem>
+                          <SelectItem value="On">On</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-300">Direction Stride: {observerDirectionStride}</Label>
+                      <Slider
+                        className="mt-2"
+                        min={1}
+                        max={10}
+                        step={1}
+                        value={[observerDirectionStride]}
+                        onValueChange={(value) => setObserverDirectionStride(Math.max(1, Math.round(value[0] ?? 4)))}
+                      />
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">

@@ -73,6 +73,7 @@ export type ObserverConditionKey = "nec" | "wec" | "sec" | "dec";
 export type ObserverFrameKey = "Eulerian" | "Robust" | "Delta" | "Missed";
 
 export const OBSERVER_ROBUST_SELECTION_CHANNEL = "hull3d:observer-robust-selection";
+export const OBSERVER_DIRECTION_OVERLAY_CHANNEL = "hull3d:observer-direction-overlay";
 
 export interface ObserverRobustSelection {
   condition: ObserverConditionKey;
@@ -144,6 +145,21 @@ export interface ObserverFrameField {
   max: number;
 }
 
+export interface ObserverDirectionOverlayConfig {
+  enabled: boolean;
+  stride?: number;
+}
+
+export interface ObserverDirectionField {
+  directions: Float32Array;
+  mask?: Float32Array;
+  magnitude?: Float32Array;
+  minMagnitude: number;
+  maxMagnitude: number;
+  activeCount: number;
+  totalCount: number;
+}
+
 const EPS = 1e-9;
 
 type Vec3 = [number, number, number];
@@ -152,6 +168,12 @@ const normalize = (v: Vec3): Vec3 => {
   const mag = Math.hypot(v[0], v[1], v[2]);
   if (!Number.isFinite(mag) || mag <= 0) return [0, 0, 0];
   return [v[0] / mag, v[1] / mag, v[2] / mag];
+};
+
+const hasFiniteDirection = (value: Vec3 | null | undefined): boolean => {
+  if (!value) return false;
+  if (!Number.isFinite(value[0]) || !Number.isFinite(value[1]) || !Number.isFinite(value[2])) return false;
+  return Math.hypot(value[0], value[1], value[2]) > EPS;
 };
 
 const safeDirection = (value: Vec3 | null | undefined, fallback: Vec3 = [1, 0, 0]): Vec3 => {
@@ -282,6 +304,40 @@ const optimizeDecMargin = (args: {
   return Number.isFinite(fallback) ? fallback : args.rho - Math.hypot(args.sx, args.sy, args.sz);
 };
 
+const optimizeDecDirection = (args: {
+  rho: number;
+  pressure: number;
+  sx: number;
+  sy: number;
+  sz: number;
+  fluxDir: Vec3;
+  canonicalDir: Vec3;
+  betaCap: number;
+  betaHint: number;
+}): Vec3 => {
+  const cap = clampBeta(args.betaCap, args.betaCap);
+  const fluxDir = safeDirection(args.fluxDir, args.canonicalDir);
+  const canonicalDir = safeDirection(args.canonicalDir, [1, 0, 0]);
+  const antiFluxDir: Vec3 = [-fluxDir[0], -fluxDir[1], -fluxDir[2]];
+  const parallelFluxDir: Vec3 = [fluxDir[0], fluxDir[1], fluxDir[2]];
+  const orthoDir = orthogonalDirection(fluxDir);
+  const directionCandidates = [antiFluxDir, canonicalDir, parallelFluxDir, orthoDir];
+  const betaCandidates = [0, cap * 0.5, cap, args.betaHint];
+
+  let bestMargin = Number.POSITIVE_INFINITY;
+  let bestDirection = antiFluxDir;
+  for (const direction of directionCandidates) {
+    for (const beta of betaCandidates) {
+      const margin = evaluateDecMargin(args.rho, args.pressure, args.sx, args.sy, args.sz, direction, beta);
+      if (margin < bestMargin) {
+        bestMargin = margin;
+        bestDirection = direction;
+      }
+    }
+  }
+  return safeDirection(bestDirection, antiFluxDir);
+};
+
 const resolveTypeISlacks = (rho: number, pressure: number, fluxMag: number, tolerance: number) => {
   const discriminant = (rho + pressure) * (rho + pressure) - 4 * fluxMag * fluxMag;
   if (discriminant < -Math.max(0, tolerance)) return { isTypeI: false as const };
@@ -383,6 +439,102 @@ export const buildObserverFrameField = (
     data,
     min: Number.isFinite(min) ? min : 0,
     max: Number.isFinite(max) ? max : 0,
+  };
+};
+
+export const buildObserverDirectionField = (
+  brick: StressEnergyBrickDecoded,
+  condition: ObserverConditionKey,
+): ObserverDirectionField | null => {
+  if (!brick.stats.observerRobust) return null;
+  const total = Math.min(brick.t00.data.length, brick.flux.Sx.data.length, brick.flux.Sy.data.length, brick.flux.Sz.data.length);
+  if (total <= 0) return null;
+
+  const directions = new Float32Array(total * 3);
+  const magnitude = new Float32Array(total);
+  const mask = new Float32Array(total);
+
+  const pressureFactor = Number.isFinite(brick.stats.observerRobust.pressureFactor) ? brick.stats.observerRobust.pressureFactor : -1;
+  const betaCap = Number.isFinite(brick.stats.observerRobust.rapidityCapBeta)
+    ? Math.max(0, Math.min(0.999999999, brick.stats.observerRobust.rapidityCapBeta))
+    : Math.tanh(Math.max(0, brick.stats.observerRobust.rapidityCap ?? 0));
+  const typeITolerance = Number.isFinite(brick.stats.observerRobust.typeI?.tolerance)
+    ? Math.max(0, brick.stats.observerRobust.typeI.tolerance)
+    : 1e-9;
+  const canonicalDir: Vec3 = [1, 0, 0];
+  const decSearchDirectionRaw = brick.stats.observerRobust.dec?.worstCase?.direction as Vec3 | undefined;
+  const decSearchDirection = safeDirection(decSearchDirectionRaw, canonicalDir);
+  const hasDecSearchDirection = hasFiniteDirection(decSearchDirectionRaw);
+
+  let minMagnitude = Number.POSITIVE_INFINITY;
+  let maxMagnitude = Number.NEGATIVE_INFINITY;
+  let activeCount = 0;
+
+  for (let i = 0; i < total; i += 1) {
+    const rho = Number.isFinite(brick.t00.data[i]) ? brick.t00.data[i] : 0;
+    const sx = Number.isFinite(brick.flux.Sx.data[i]) ? brick.flux.Sx.data[i] : 0;
+    const sy = Number.isFinite(brick.flux.Sy.data[i]) ? brick.flux.Sy.data[i] : 0;
+    const sz = Number.isFinite(brick.flux.Sz.data[i]) ? brick.flux.Sz.data[i] : 0;
+    const fluxMag = Math.hypot(sx, sy, sz);
+    const fluxDir = fluxMag > EPS ? ([sx / fluxMag, sy / fluxMag, sz / fluxMag] as Vec3) : canonicalDir;
+    const antiFluxDir: Vec3 = [-fluxDir[0], -fluxDir[1], -fluxDir[2]];
+    const pressure = rho * pressureFactor;
+
+    const typeI = resolveTypeISlacks(rho, pressure, fluxMag, typeITolerance);
+    const direction = typeI.isTypeI
+      ? safeDirection(antiFluxDir, canonicalDir)
+      : condition === "dec"
+        ? (() => {
+            if (hasDecSearchDirection) return decSearchDirection;
+            const decOptimized = optimizeDecDirection({
+              rho,
+              pressure,
+              sx,
+              sy,
+              sz,
+              fluxDir,
+              canonicalDir,
+              betaCap,
+              betaHint: optimizeWecMargin(rho, pressure, fluxMag, betaCap).beta,
+            });
+            return fluxMag > EPS ? decOptimized : safeDirection(antiFluxDir, canonicalDir);
+          })()
+        : safeDirection(antiFluxDir, canonicalDir);
+
+    const x = Number.isFinite(direction[0]) ? direction[0] : 0;
+    const y = Number.isFinite(direction[1]) ? direction[1] : 0;
+    const z = Number.isFinite(direction[2]) ? direction[2] : 0;
+    const norm = Math.hypot(x, y, z);
+    const isActive = Number.isFinite(norm) && norm > 1e-8;
+    const base = i * 3;
+    if (isActive) {
+      directions[base] = x / norm;
+      directions[base + 1] = y / norm;
+      directions[base + 2] = z / norm;
+      magnitude[i] = fluxMag;
+      mask[i] = 1;
+      activeCount += 1;
+      if (fluxMag < minMagnitude) minMagnitude = fluxMag;
+      if (fluxMag > maxMagnitude) maxMagnitude = fluxMag;
+    } else {
+      directions[base] = 0;
+      directions[base + 1] = 0;
+      directions[base + 2] = 0;
+      magnitude[i] = 0;
+      mask[i] = 0;
+      if (0 < minMagnitude) minMagnitude = 0;
+      if (0 > maxMagnitude) maxMagnitude = 0;
+    }
+  }
+
+  return {
+    directions,
+    magnitude,
+    mask,
+    minMagnitude: Number.isFinite(minMagnitude) ? minMagnitude : 0,
+    maxMagnitude: Number.isFinite(maxMagnitude) ? maxMagnitude : 0,
+    activeCount,
+    totalCount: total,
   };
 };
 

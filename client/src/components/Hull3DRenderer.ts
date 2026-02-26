@@ -21,8 +21,11 @@ import type { LatticeFrame, LatticeProfileTag, LatticeQualityPreset } from "@/li
 import { LATTICE_PROFILE_PERF, estimateLatticeUploadBytes } from "@/lib/lattice-perf";
 import { buildFluxStreamlines, type FluxStreamlineSettings, type FluxVectorField } from "@/lib/flux-streamlines";
 import {
+  OBSERVER_DIRECTION_OVERLAY_CHANNEL,
   OBSERVER_ROBUST_SELECTION_CHANNEL,
+  buildObserverDirectionField,
   buildObserverFrameField,
+  type ObserverDirectionOverlayConfig,
   type ObserverConditionKey,
   type ObserverFrameKey,
   type ObserverRobustSelection,
@@ -8467,6 +8470,7 @@ export class Hull3DRenderer {
   private t00BusId: string | null = null;
   private fluxBusId: string | null = null;
   private observerSelectionBusId: string | null = null;
+  private observerDirectionOverlayBusId: string | null = null;
 
 
 
@@ -8816,6 +8820,7 @@ export class Hull3DRenderer {
   };
   private t00StampWarned = false;
   private observerSelection: ObserverRobustSelection = { condition: "nec", frame: "Eulerian" };
+  private observerDirectionOverlay: ObserverDirectionOverlayConfig = { enabled: false, stride: 4 };
   private t00Raw: {
     dims: [number, number, number];
     t00: Float32Array;
@@ -9265,6 +9270,11 @@ export class Hull3DRenderer {
     fluxStreamCount: 0,
     fluxStreamAlpha: 0,
     fluxStreamColor: [0.36, 0.9, 0.95] as [number, number, number],
+    observerDirectionVao: null as WebGLVertexArrayObject | null,
+    observerDirectionVbo: null as WebGLBuffer | null,
+    observerDirectionCount: 0,
+    observerDirectionAlpha: 0,
+    observerDirectionColor: [0.95, 0.7, 0.2] as [number, number, number],
 
 
 
@@ -9350,6 +9360,7 @@ export class Hull3DRenderer {
     spaceGridKey: "",
     demoGridNodeKey: "",
     fluxStreamKey: "",
+    observerDirectionKey: "",
 
 
 
@@ -9759,6 +9770,14 @@ export class Hull3DRenderer {
           : "Eulerian";
       this.observerSelection = { condition, frame };
       this.refreshT00FieldTexture();
+      this.overlayCache.observerDirectionKey = "";
+    });
+    this.observerDirectionOverlayBusId = subscribe(OBSERVER_DIRECTION_OVERLAY_CHANNEL, (payload: any) => {
+      const enabled = payload?.enabled === true;
+      const strideRaw = Number(payload?.stride ?? 4);
+      const stride = Number.isFinite(strideRaw) ? Math.max(1, Math.min(32, Math.round(strideRaw))) : 4;
+      this.observerDirectionOverlay = { enabled, stride };
+      this.overlayCache.observerDirectionKey = "";
     });
 
 
@@ -10984,6 +11003,7 @@ export class Hull3DRenderer {
 
     this.ensureOverlayGeometry(nextState);
     this.ensureFluxStreamlines(nextState);
+    this.ensureObserverDirectionOverlay(nextState);
 
 
 
@@ -13569,8 +13589,6 @@ export class Hull3DRenderer {
     const strength = maxMag > 0 ? clamp(avgMag / maxMag, 0, 1) : 0;
     this.overlay.fluxStreamAlpha = clamp(0.12 + strength * 0.8, 0.06, 0.85);
 
-    this.disposed = true;
-
     const { gl } = this;
     if (!this.overlay.fluxStreamVao || !this.overlay.fluxStreamVbo) {
       const vao = gl.createVertexArray();
@@ -13592,6 +13610,109 @@ export class Hull3DRenderer {
     }
 
     this.overlay.fluxStreamCount = result.vertexCount;
+  }
+
+  private ensureObserverDirectionOverlay(state: Hull3DRendererState) {
+    const enabled = this.observerDirectionOverlay.enabled === true;
+    if (!enabled || !this.t00Raw || !this.fluxField) {
+      this.overlay.observerDirectionCount = 0;
+      this.overlay.observerDirectionAlpha = 0;
+      if (!enabled) this.overlayCache.observerDirectionKey = "";
+      return;
+    }
+
+    const dims = this.t00Raw.dims;
+    if (this.fluxField.dims.join("x") !== dims.join("x")) {
+      this.overlay.observerDirectionCount = 0;
+      this.overlay.observerDirectionAlpha = 0;
+      return;
+    }
+    const observerRobust = this.t00Raw.stats?.observerRobust;
+    if (!observerRobust) {
+      this.overlay.observerDirectionCount = 0;
+      this.overlay.observerDirectionAlpha = 0;
+      return;
+    }
+
+    const stride = Math.max(1, Math.round(this.observerDirectionOverlay.stride ?? 4));
+    const key = [this.t00Raw.version, this.fluxField.version, this.observerSelection.condition, stride, dims.join("x")].join("|");
+    if (this.overlayCache.observerDirectionKey === key) return;
+    this.overlayCache.observerDirectionKey = key;
+
+    const expected = dims[0] * dims[1] * dims[2];
+    const directionField = buildObserverDirectionField(
+      {
+        dims,
+        t00: { data: this.t00Raw.t00, min: this.t00Raw.min ?? 0, max: this.t00Raw.max ?? 0 },
+        flux: {
+          Sx: { data: this.fluxField.Sx, min: -this.fluxField.maxMag, max: this.fluxField.maxMag },
+          Sy: { data: this.fluxField.Sy, min: -this.fluxField.maxMag, max: this.fluxField.maxMag },
+          Sz: { data: this.fluxField.Sz, min: -this.fluxField.maxMag, max: this.fluxField.maxMag },
+          divS: { data: new Float32Array(expected), min: 0, max: 0 },
+        },
+        stats: { observerRobust } as any,
+      } as any,
+      this.observerSelection.condition,
+    );
+    if (!directionField) {
+      this.overlay.observerDirectionCount = 0;
+      this.overlay.observerDirectionAlpha = 0;
+      return;
+    }
+
+    const [ax, ay, az] = state.axes;
+    const shellScale = Math.max(1e-4, Math.abs(state.R ?? 1));
+    const shellAxes: [number, number, number] = [
+      Math.max(1e-4, Math.abs(ax) * shellScale),
+      Math.max(1e-4, Math.abs(ay) * shellScale),
+      Math.max(1e-4, Math.abs(az) * shellScale),
+    ];
+    const nx = dims[0]; const ny = dims[1]; const nz = dims[2];
+    const segments: number[] = [];
+    for (let z = 0; z < nz; z += stride) {
+      for (let y = 0; y < ny; y += stride) {
+        for (let x = 0; x < nx; x += stride) {
+          const i = x + y * nx + z * nx * ny;
+          const m = directionField.mask?.[i] ?? 0;
+          if (!(m > 0.5)) continue;
+          const base = i * 3;
+          const dx = directionField.directions[base];
+          const dy = directionField.directions[base + 1];
+          const dz = directionField.directions[base + 2];
+          if (!Number.isFinite(dx) || !Number.isFinite(dy) || !Number.isFinite(dz)) continue;
+          const mag = Math.hypot(dx, dy, dz);
+          if (!(mag > 1e-6)) continue;
+          const px = ((x / Math.max(1, nx - 1)) * 2 - 1) * shellAxes[0];
+          const py = ((y / Math.max(1, ny - 1)) * 2 - 1) * shellAxes[1];
+          const pz = ((z / Math.max(1, nz - 1)) * 2 - 1) * shellAxes[2];
+          const len = 0.08 * Math.min(shellAxes[0], shellAxes[1], shellAxes[2]);
+          segments.push(px, py, pz, px + dx * len, py + dy * len, pz + dz * len);
+        }
+      }
+    }
+    const data = new Float32Array(segments);
+    this.overlay.observerDirectionAlpha = segments.length > 0 ? 0.72 : 0;
+
+    const { gl } = this;
+    if (!this.overlay.observerDirectionVao || !this.overlay.observerDirectionVbo) {
+      const vao = gl.createVertexArray();
+      const vbo = gl.createBuffer();
+      if (vao && vbo) {
+        gl.bindVertexArray(vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+        gl.bindVertexArray(null);
+        this.overlay.observerDirectionVao = vao;
+        this.overlay.observerDirectionVbo = vbo;
+      }
+    } else {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.overlay.observerDirectionVbo);
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+    this.overlay.observerDirectionCount = data.length / 3;
   }
 
   private updateMeshWireColors(state: Hull3DRendererState, meshWire: WireframeOverlayBuffers) {
@@ -14555,6 +14676,8 @@ export class Hull3DRenderer {
       gl.deleteBuffer(this.overlay.demoGridNodeFalloffVbo);
     if (this.overlay.fluxStreamVao) gl.deleteVertexArray(this.overlay.fluxStreamVao);
     if (this.overlay.fluxStreamVbo) gl.deleteBuffer(this.overlay.fluxStreamVbo);
+    if (this.overlay.observerDirectionVao) gl.deleteVertexArray(this.overlay.observerDirectionVao);
+    if (this.overlay.observerDirectionVbo) gl.deleteBuffer(this.overlay.observerDirectionVbo);
     this.overlay.spaceGridVao = null;
     this.overlay.spaceGridVbo = null;
     this.overlay.spaceGridColorVbo = null;
@@ -24025,6 +24148,25 @@ export class Hull3DRenderer {
       gl.disable(gl.BLEND);
     }
 
+    const observerDirectionReady =
+      this.observerDirectionOverlay.enabled === true &&
+      !!this.overlay.observerDirectionVao &&
+      this.overlay.observerDirectionCount > 1 &&
+      this.overlay.observerDirectionAlpha > 1e-4;
+    if (observerDirectionReady) {
+      const [r, g, b] = this.overlay.observerDirectionColor;
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+      if (loc.u_spaceGridWarpEnabled) gl.uniform1i(loc.u_spaceGridWarpEnabled, 0);
+      if (loc.u_useColor) gl.uniform1i(loc.u_useColor, 0);
+      if (loc.u_color) gl.uniform3f(loc.u_color, r, g, b);
+      if (loc.u_alpha) gl.uniform1f(loc.u_alpha, this.overlay.observerDirectionAlpha);
+      gl.bindVertexArray(this.overlay.observerDirectionVao);
+      gl.drawArrays(gl.LINES, 0, this.overlay.observerDirectionCount);
+      gl.bindVertexArray(null);
+      gl.disable(gl.BLEND);
+    }
+
     if ((this._diag.state === 'holding' || !this._diag.lastOk) && this._diag.message) {
 
 
@@ -25423,6 +25565,10 @@ export class Hull3DRenderer {
       unsubscribe(this.observerSelectionBusId);
       this.observerSelectionBusId = null;
     }
+    if (this.observerDirectionOverlayBusId) {
+      unsubscribe(this.observerDirectionOverlayBusId);
+      this.observerDirectionOverlayBusId = null;
+    }
 
 
 
@@ -26414,10 +26560,6 @@ const buildRingLUT = (params: RingParams): RingLUTResult => {
 
 
 };
-
-
-
-
 
 
 
