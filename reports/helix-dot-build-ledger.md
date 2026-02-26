@@ -152,3 +152,23 @@
   - Added regression coverage that forces a placeholder first response and verifies the rescue pass is applied instead of `RenderPlatonicFallback`.
 - known_risks_next_step:
   - Rescue pass is intentionally narrow; if quality remains constrained for additional intent lanes, expand gating with explicit policy tests rather than broadening globally.
+
+## Milestone M8 - Open-World Auto-Promotion Guard
+- milestone_id: `M8-open-world-auto-promotion-guard`
+- files_changed:
+  - `server/routes/agi.plan.ts`
+  - `tests/helix-ask-llm-debug-skip.spec.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run tests/helix-ask-llm-debug-skip.spec.ts`
+  - `npx vitest run tests/helix-ask-llm-debug-skip.spec.ts tests/helix-ask-jobs-regression.spec.ts server/__tests__/operator-contract-v1.spec.ts tests/voice.operator-contract-boundary.spec.ts`
+  - `npm run helix:ask:dot:debug-loop -- --base-url http://127.0.0.1:5050 --out artifacts/helix-dot-loop.latest.json`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Blocked implicit repo/hybrid promotion for open-world explainer prompts unless explicit repo signals are present (`file hints`, endpoint references, explicit repo expectation, or high repo expectation level).
+  - Scoped preflight retrieval upgrade to the same explicit-signal rule so incidental code hits no longer hijack open-world prompts.
+  - Added ambiguity-gate bypass (`open_world_explainer_mode`) for open-world prompts when repo signals are absent, preventing clarify scaffolds from overriding direct explanation attempts.
+  - Added regression coverage to assert open-world prompts remain out of repo auto-promotion in the LLM debug skip suite.
+- known_risks_next_step:
+  - Security prompts without explicit repo hints can still resolve to hybrid via intent/profile heuristics; next step is to decouple security user-intent utility from repo-evidence defaults in a dedicated intent policy pass.

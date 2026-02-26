@@ -183,6 +183,37 @@ describe("Helix Ask llm debug skip metadata", () => {
     ).toBe(true);
   }, 45000);
 
+  it("keeps open-world explainers out of repo auto-promotion without explicit repo hints", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "How does the universe produce life?",
+        debug: true,
+        verbosity: "brief",
+        sessionId: "llm-open-world-no-auto-repo",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      debug?: {
+        intent_domain?: string;
+        is_repo_question?: boolean;
+        preflight_retrieval_upgrade?: boolean;
+        ambiguity_gate_applied?: boolean;
+        ambiguity_resolver_bypassed?: string;
+      };
+    };
+    expect(payload.debug?.preflight_retrieval_upgrade).not.toBe(true);
+    expect(payload.debug?.is_repo_question).not.toBe(true);
+    expect(payload.debug?.intent_domain).not.toBe("repo");
+    expect(payload.debug?.intent_domain).not.toBe("hybrid");
+    expect(payload.debug?.ambiguity_gate_applied).not.toBe(true);
+    if (payload.debug?.ambiguity_resolver_bypassed) {
+      expect(payload.debug?.ambiguity_resolver_bypassed).toBe("open_world_explainer_mode");
+    }
+  }, 45000);
+
   it("treats endpoint plus tool-id prompts as explicit repo lookup (not ideology open-world)", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",

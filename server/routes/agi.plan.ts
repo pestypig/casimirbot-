@@ -20113,12 +20113,20 @@ const executeHelixAsk = async ({
         }
         return false;
       });
+    const hasExplicitRepoSignals =
+      explicitRepoExpectation ||
+      hasFilePathHints ||
+      endpointHints.length > 0 ||
+      repoExpectationLevel === "high";
+    const openWorldAutoPromoteBlocked =
+      isOpenWorldExplainerQuestion(baseQuestion) &&
+      !hasExplicitRepoSignals;
     const shouldPromoteRepoFromEvidence = (paths: string[]): boolean => {
       if (intentStrategy === "constraint_report") return false;
       if (ideologyConversationalOpenWorldMode && !explicitRepoExpectation) return false;
-      if (explicitRepoExpectation || hasFilePathHints || endpointHints.length > 0) return true;
+      if (openWorldAutoPromoteBlocked) return false;
+      if (hasExplicitRepoSignals) return true;
       if (intentDomain === "repo" || intentDomain === "hybrid") return true;
-      if (repoExpectationLevel === "high") return true;
       return hasRepoCodeEvidencePaths(paths);
     };
     let isRepoQuestion =
@@ -20999,11 +21007,8 @@ const executeHelixAsk = async ({
             intentDomain === "general" &&
             preflightSignalsOk &&
             (
-              explicitRepoExpectation ||
-              hasFilePathHints ||
-              endpointHints.length > 0 ||
-              repoExpectationLevel === "high" ||
-              hasRepoCodeEvidencePaths(preflightFiles)
+              hasExplicitRepoSignals ||
+              (!openWorldAutoPromoteBlocked && hasRepoCodeEvidencePaths(preflightFiles))
             );
           if (retrievalUpgradeEligible) {
             const fallbackProfile = resolveFallbackIntentProfile("hybrid");
@@ -24903,6 +24908,16 @@ const executeHelixAsk = async ({
         ambiguityTerms = [];
         if (debugPayload) {
           debugPayload.ambiguity_resolver_bypassed = "ideology_open_world_mode";
+        }
+      }
+      const openWorldAmbiguityBypass =
+        isOpenWorldExplainerQuestion(baseQuestion) &&
+        !isRepoQuestion &&
+        !hasExplicitRepoSignals;
+      if (openWorldAmbiguityBypass && ambiguityTerms.length > 0) {
+        ambiguityTerms = [];
+        if (debugPayload) {
+          debugPayload.ambiguity_resolver_bypassed = "open_world_explainer_mode";
         }
       }
       if (debugPayload && ambiguityTerms.length > 0) {
