@@ -138,7 +138,7 @@ describe('warp-full-solve-campaign runner', () => {
           {
             id: 'FordRomanQI',
             status: 'fail',
-            note: 'reasonCode=G4_QI_SOURCE_NOT_METRIC;reasonCode=G4_QI_MARGIN_EXCEEDED;lhs_Jm3=-2;bound_Jm3=-1;boundComputed_Jm3=-0.75;boundFloor_Jm3=-1;boundUsed_Jm3=-1;boundFloorApplied=true;marginRatio=2',
+            note: 'reasonCode=G4_QI_SOURCE_NOT_METRIC;reasonCode=G4_QI_MARGIN_EXCEEDED;lhs_Jm3=-2;bound_Jm3=-1;boundComputed_Jm3=-0.75;boundFloor_Jm3=-1;boundUsed_Jm3=-1;boundFloorApplied=true;marginRatio=2;metricT00Ref=warp.metric.T00.natario.shift;metricT00Geom=-0.25;metricT00GeomSource=direct_metric_pipeline;metricT00Si=-2.2;metricT00SiFromGeom=-2.2;metricT00SiRelError=0',
           },
           { id: 'ThetaAudit', status: 'pass', note: 'theta ok' },
         ],
@@ -186,6 +186,12 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.marginRatio).toBe(2);
     expect(diagnostics.marginRatioRawComputed).toBeCloseTo(2.6666666667);
     expect(diagnostics.metricContractStatus).toBe('missing');
+    expect(diagnostics.metricT00Ref).toBe('warp.metric.T00.natario.shift');
+    expect(diagnostics.metricT00Geom).toBe(-0.25);
+    expect(diagnostics.metricT00GeomSource).toBe('direct_metric_pipeline');
+    expect(diagnostics.metricT00Si).toBe(-2.2);
+    expect(diagnostics.metricT00SiFromGeom).toBe(-2.2);
+    expect(diagnostics.metricT00SiRelError).toBe(0);
   });
 
   it('treats null snapshot numerics as missing instead of coercing to 0', () => {
@@ -363,6 +369,12 @@ describe('warp-full-solve-campaign runner', () => {
         tau_s: undefined,
         K: 12,
         safetySigma_Jm3: Number.NaN,
+        metricT00Ref: 'warp.metric.T00.natario.shift',
+        metricT00Geom: 1.5,
+        metricT00GeomSource: 'direct_metric_pipeline',
+        metricT00Si: Number.NaN,
+        metricT00SiFromGeom: 2.5,
+        metricT00SiRelError: 0.01,
         curvatureRatio: 1,
         curvatureEnforced: true,
         curvatureOk: false,
@@ -397,6 +409,12 @@ describe('warp-full-solve-campaign runner', () => {
     expect(artifact.marginRatioClamped).toBe(0.5);
     expect(artifact.effectiveRho_SI_Jm3).toBeNull();
     expect(artifact.rhoOn_SI_Jm3).toBe(-1);
+    expect(artifact.metricT00Ref).toBe('warp.metric.T00.natario.shift');
+    expect(artifact.metricT00Geom_GeomStress).toBe(1.5);
+    expect(artifact.metricT00GeomSource).toBe('direct_metric_pipeline');
+    expect(artifact.metricT00Si_Jm3).toBeNull();
+    expect(artifact.metricT00SiFromGeom_Jm3).toBe(2.5);
+    expect(artifact.metricT00SiRelError).toBe(0.01);
     expect(artifact.curvatureScalar).toBeNull();
     expect(artifact.curvatureRadius_m).toBe(4);
   });

@@ -924,6 +924,27 @@ export async function evaluateWarpViability(
   const warpMetricContractStatus = metricT00Ref.contractStatus;
   const warpMetricContractReason = metricT00Ref.contractReason;
   const warpMetricContractOk = metricT00Ref.contractOk === true;
+  const warpMetricT00SiObserved =
+    toFinite((pipeline as any)?.warp?.metricT00) ?? toFinite(qiGuard?.effectiveRho);
+  const warpMetricT00GeomDirect = warpMetricT00Geom;
+  const warpMetricT00GeomForAudit =
+    warpMetricT00GeomDirect != null
+      ? warpMetricT00GeomDirect
+      : warpMetricT00SiObserved != null
+      ? warpMetricT00SiObserved * SI_TO_GEOM_STRESS
+      : undefined;
+  const warpMetricT00GeomSource =
+    warpMetricT00GeomDirect != null
+      ? "direct_metric_pipeline"
+      : warpMetricT00SiObserved != null
+      ? "derived_from_si"
+      : undefined;
+  const warpMetricT00SiFromGeom =
+    warpMetricT00GeomDirect != null ? warpMetricT00GeomDirect / SI_TO_GEOM_STRESS : undefined;
+  const warpMetricT00SiRelError =
+    warpMetricT00SiObserved != null && warpMetricT00SiFromGeom != null
+      ? relDelta(warpMetricT00SiObserved, warpMetricT00SiFromGeom)
+      : undefined;
   const thetaChartContractStatus =
     typeof (pipeline as any)?.warp?.metricAdapter?.chart?.contractStatus === "string"
       ? String((pipeline as any).warp.metricAdapter.chart.contractStatus)
@@ -1038,6 +1059,14 @@ export async function evaluateWarpViability(
     qi_margin_ratio_raw: finiteOrUndefined(qiGuard?.marginRatioRaw),
     qi_margin_ratio_raw_computed: finiteOrUndefined((qiGuard as any)?.marginRatioRawComputed),
     qi_rho_source: qiGuard?.rhoSource,
+    qi_metric_t00_ref:
+      warpMetricSource ??
+      (typeof qiGuard?.rhoSource === "string" && qiGuard.rhoSource.length > 0 ? qiGuard.rhoSource : undefined),
+    qi_metric_t00_geom: finiteOrUndefined(warpMetricT00GeomForAudit),
+    qi_metric_t00_geom_source: warpMetricT00GeomSource,
+    qi_metric_t00_si: finiteOrUndefined(warpMetricT00SiObserved),
+    qi_metric_t00_si_from_geom: finiteOrUndefined(warpMetricT00SiFromGeom),
+    qi_metric_t00_si_rel_error: finiteOrUndefined(warpMetricT00SiRelError),
     qi_metric_contract_status:
       qiGuard?.metricContractOk == null ? undefined : qiGuard.metricContractOk ? "ok" : "missing",
     qi_curvature_ok: qiGuard?.curvatureOk,
@@ -1174,6 +1203,12 @@ export async function evaluateWarpViability(
           `marginRatioRaw=${qiGuard.marginRatioRaw ?? "n/a"}`,
           `marginRatioRawComputed=${(qiGuard as any).marginRatioRawComputed ?? "n/a"}`,
           `rhoSource=${qiGuard.rhoSource ?? "unknown"}`,
+          `metricT00Ref=${warpMetricSource ?? "n/a"}`,
+          `metricT00Geom=${warpMetricT00GeomForAudit ?? "n/a"}`,
+          `metricT00GeomSource=${warpMetricT00GeomSource ?? "n/a"}`,
+          `metricT00Si=${warpMetricT00SiObserved ?? "n/a"}`,
+          `metricT00SiFromGeom=${warpMetricT00SiFromGeom ?? "n/a"}`,
+          `metricT00SiRelError=${warpMetricT00SiRelError ?? "n/a"}`,
           `metricContractStatus=${contractPass ? "ok" : "missing"}`,
           `applicabilityStatus=${applicabilityStatus}`,
           `applicabilityReasonCode=${qiGuard.applicabilityReasonCode ?? "none"}`,

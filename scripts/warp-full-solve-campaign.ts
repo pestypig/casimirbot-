@@ -108,6 +108,12 @@ type EvidencePack = {
     marginRatioRaw?: number;
     marginRatioRawComputed?: number;
     rhoSource?: string;
+    metricT00Ref?: string;
+    metricT00Geom?: number;
+    metricT00GeomSource?: string;
+    metricT00Si?: number;
+    metricT00SiFromGeom?: number;
+    metricT00SiRelError?: number;
     metricContractStatus?: string;
     applicabilityStatus?: string;
     curvatureOk?: boolean;
@@ -144,6 +150,12 @@ type QiForensicsArtifact = {
   metricContractOk: boolean | null;
   effectiveRho_SI_Jm3: number | null;
   rhoOn_SI_Jm3: number | null;
+  metricT00Ref: string | null;
+  metricT00Geom_GeomStress: number | null;
+  metricT00GeomSource: string | null;
+  metricT00Si_Jm3: number | null;
+  metricT00SiFromGeom_Jm3: number | null;
+  metricT00SiRelError: number | null;
   lhs_Jm3: number | null;
   bound_Jm3: number | null;
   boundComputed_Jm3: number | null;
@@ -999,6 +1011,14 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
       readCanonicalNumber(snapshot?.qi_margin_ratio_raw_computed, 'marginRatioRawComputed') ??
       parseNumberField('marginRatioRawComputed'),
     rhoSource: readSnapshotString(snapshot?.qi_rho_source) ?? (parseFordField('rhoSource') ?? undefined),
+    metricT00Ref:
+      readSnapshotString(snapshot?.qi_metric_t00_ref) ?? (parseFordField('metricT00Ref') ?? undefined),
+    metricT00Geom: readCanonicalNumber(snapshot?.qi_metric_t00_geom, 'metricT00Geom'),
+    metricT00GeomSource:
+      readSnapshotString(snapshot?.qi_metric_t00_geom_source) ?? (parseFordField('metricT00GeomSource') ?? undefined),
+    metricT00Si: readCanonicalNumber(snapshot?.qi_metric_t00_si, 'metricT00Si'),
+    metricT00SiFromGeom: readCanonicalNumber(snapshot?.qi_metric_t00_si_from_geom, 'metricT00SiFromGeom'),
+    metricT00SiRelError: readCanonicalNumber(snapshot?.qi_metric_t00_si_rel_error, 'metricT00SiRelError'),
     metricContractStatus:
       readSnapshotString(snapshot?.qi_metric_contract_status) ?? (parseFordField('metricContractStatus') ?? undefined),
     applicabilityStatus:
@@ -1047,6 +1067,12 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
     metricContractOk: booleanOrNull(snapshot?.qi_metric_contract_ok),
     effectiveRho_SI_Jm3: finiteOrNull(guard?.effectiveRho),
     rhoOn_SI_Jm3: finiteOrNull(guard?.rhoOn),
+    metricT00Ref: stringOrNull(pack.g4Diagnostics?.metricT00Ref),
+    metricT00Geom_GeomStress: finiteOrNull(pack.g4Diagnostics?.metricT00Geom),
+    metricT00GeomSource: stringOrNull(pack.g4Diagnostics?.metricT00GeomSource),
+    metricT00Si_Jm3: finiteOrNull(pack.g4Diagnostics?.metricT00Si),
+    metricT00SiFromGeom_Jm3: finiteOrNull(pack.g4Diagnostics?.metricT00SiFromGeom),
+    metricT00SiRelError: finiteOrNull(pack.g4Diagnostics?.metricT00SiRelError),
     lhs_Jm3: finiteOrNull(pack.g4Diagnostics?.lhs_Jm3),
     bound_Jm3: finiteOrNull(pack.g4Diagnostics?.bound_Jm3),
     boundComputed_Jm3: finiteOrNull(pack.g4Diagnostics?.boundComputed_Jm3),
@@ -1503,6 +1529,12 @@ ${g4WaveRows}
 - marginRatioRawComputed: ${bestCasePack?.g4Diagnostics?.marginRatioRawComputed ?? 'n/a'}
 - applicabilityStatus: ${bestCasePack?.g4Diagnostics?.applicabilityStatus ?? 'UNKNOWN'}
 - rhoSource: ${bestCasePack?.g4Diagnostics?.rhoSource ?? 'unknown'}
+- metricT00Ref: ${bestCasePack?.g4Diagnostics?.metricT00Ref ?? 'unknown'}
+- metricT00Geom: ${bestCasePack?.g4Diagnostics?.metricT00Geom ?? 'n/a'}
+- metricT00GeomSource: ${bestCasePack?.g4Diagnostics?.metricT00GeomSource ?? 'unknown'}
+- metricT00Si: ${bestCasePack?.g4Diagnostics?.metricT00Si ?? 'n/a'}
+- metricT00SiFromGeom: ${bestCasePack?.g4Diagnostics?.metricT00SiFromGeom ?? 'n/a'}
+- metricT00SiRelError: ${bestCasePack?.g4Diagnostics?.metricT00SiRelError ?? 'n/a'}
 
 ## Operator translation
 - What failed: ${aggregateFirstFail.firstFail} (${aggregateFirstFail.reason})
