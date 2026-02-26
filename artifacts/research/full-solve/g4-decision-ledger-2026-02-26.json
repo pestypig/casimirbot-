@@ -16,6 +16,7 @@
   "canonicalDecisionClass": "margin_limited",
   "scanDecisionClass": "applicability_limited",
   "finalDecisionClass": "margin_limited",
+  "canonicalMissingWaves": [],
   "classificationMismatch": true,
   "classificationMismatchReason": "canonical_authoritative_override: canonical=margin_limited;scan=applicability_limited",
   "influenceScan": {

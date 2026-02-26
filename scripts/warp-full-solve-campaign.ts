@@ -1433,13 +1433,11 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
 
   const sourceArtifactRoot = outDir.replace(/\\/g, '/');
   const canonicalArtifactRoot = CANONICAL_ARTIFACT_ROOT.replace(/\\/g, '/');
-  const reportPath =
-    sourceArtifactRoot === canonicalArtifactRoot
-      ? path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.md`)
-      : path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.${lane}.md`);
+  const reportPath = path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.md`);
 
-  writeMd(
-    reportPath,
+  if (sourceArtifactRoot === canonicalArtifactRoot) {
+    writeMd(
+      reportPath,
     `# Warp Full-Solve Campaign Execution Report (${DATE_STAMP})
 
 ## Executive verdict
@@ -1512,6 +1510,7 @@ ${g4WaveRows}
 ${BOUNDARY_STATEMENT}
 `,
   );
+  }
 
   return { counts: scoreboard.counts, decision, reconciled: scoreboard.reconciled };
 };
