@@ -462,4 +462,19 @@ describe("deriveQiStatus", () => {
     expect(guard.applicabilityStatus).toBe("UNKNOWN");
     expect(guard.applicabilityReasonCode).toBe("G4_QI_SIGNAL_MISSING");
   });
+
+  test("reports deterministic curvature-window fail when scalar is non-positive", () => {
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 5,
+        dutyShip: 5,
+        dutyEffective_FR: 5,
+        gr: { invariants: { kretschmann: { p98: 0 } } },
+      }),
+      { tau_ms: 1 },
+    );
+    expect(guard.applicabilityStatus).toBe("NOT_APPLICABLE");
+    expect(guard.applicabilityReasonCode).toBe("G4_QI_CURVATURE_WINDOW_FAIL");
+    expect(guard.curvatureOk).toBeUndefined();
+  });
 });

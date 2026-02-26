@@ -6835,8 +6835,7 @@ function pickInvariantScalar(
   if (!stats) return undefined;
   const candidate = firstFinite(stats.p98, stats.max, stats.mean);
   if (!Number.isFinite(candidate)) return undefined;
-  const absVal = Math.abs(candidate as number);
-  return absVal > 0 ? absVal : undefined;
+  return Math.abs(candidate as number);
 }
 
 function resolveQiCurvature(
