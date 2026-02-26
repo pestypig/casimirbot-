@@ -94,6 +94,7 @@ export type GrAgentLoopFidelity = {
   includeExtra: boolean;
   includeMatter: boolean;
   includeKij: boolean;
+  includeInvariants: boolean;
 };
 
 export type GrAgentLoopTiming = {
@@ -114,6 +115,7 @@ export type GrAgentLoopGrParams = {
   includeExtra?: boolean;
   includeMatter?: boolean;
   includeKij?: boolean;
+  includeInvariants?: boolean;
   initialIterations?: number;
   initialTolerance?: number;
   evolveSteps?: number;
@@ -402,6 +404,12 @@ const resolveFidelity = (
       iteration >= escalation.includeExtraAfter);
   const includeMatter = base.includeMatter ?? includeExtra;
   const includeKij = base.includeKij ?? includeExtra;
+  const includeInvariantsBase = base.includeInvariants ?? includeExtra;
+  const includeInvariants =
+    includeInvariantsBase ||
+    (escalation.enabled &&
+      escalation.includeExtraAfter >= 0 &&
+      iteration >= escalation.includeExtraAfter);
   const evolveDt_s = resolveEvolveDtSeconds(
     bounds,
     dims,
@@ -422,6 +430,8 @@ const resolveFidelity = (
       includeExtra: false,
       includeMatter: false,
       includeKij: false,
+      // Preserve curvature applicability observability even in fast CI mode.
+      includeInvariants: true,
     };
   }
 
@@ -438,6 +448,7 @@ const resolveFidelity = (
     includeExtra,
     includeMatter,
     includeKij,
+    includeInvariants,
   };
 };
 
@@ -541,6 +552,7 @@ export async function runGrAgentLoop(
           includeExtra: fidelity.includeExtra,
           includeMatter: fidelity.includeMatter,
           includeKij: fidelity.includeKij,
+          includeInvariants: fidelity.includeInvariants,
           initialState: initial.state,
           matter: initial.matter ?? null,
           sourceParams,
@@ -557,6 +569,7 @@ export async function runGrAgentLoop(
           thresholds: options.thresholds,
           policy: options.policy,
           useLiveSnapshot: options.useLiveSnapshot,
+          useDiagnosticsSnapshot: true,
         });
         const evaluationMs = Date.now() - evaluationStart;
 
