@@ -276,3 +276,25 @@
   - Extended regressions to validate breaker snapshot behavior, hull status payload shape, and security open-world source-append suppression.
 - known_risks_next_step:
   - Open-world suppression now avoids repo-style source padding, but output quality still depends on rescue prompt quality and intent routing; continue with answer-quality harnessing per prompt family.
+
+## Milestone M14 - HTTP Runtime Lock + Local Artifact Hydration Guard
+- milestone_id: `M14-http-runtime-lock-local-hydration-guard`
+- files_changed:
+  - `server/services/llm/local-runtime.ts`
+  - `server/skills/llm.local.ts`
+  - `server/services/llm/runtime-artifacts.ts`
+  - `server/__tests__/llm.local-runtime.test.ts`
+  - `server/__tests__/llm.local.bridge.test.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run --pool=forks --maxWorkers=1 server/__tests__/llm.local-runtime.test.ts server/__tests__/llm.local.bridge.test.ts tests/helix-ask-llm-debug-skip.spec.ts tests/helix-ask-jobs-regression.spec.ts`
+  - `npm run helix:ask:dot:debug-loop -- --base-url http://127.0.0.1:5050`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl.exe -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Added an explicit HTTP lock (`LLM_POLICY=http` or `LLM_RUNTIME=http|openai`) so local runtime mode is disabled even when `ENABLE_LLM_LOCAL_SPAWN=1`.
+  - Updated `resolveLlmLocalBackend()` to fail closed in explicit HTTP mode when `LLM_HTTP_BASE` is missing (`none`), instead of silently falling back to spawn.
+  - Added runtime artifact guard: in explicit HTTP mode, local LLM artifacts (model/llama-cli/lora) are skipped unless `LLM_HYDRATE_LOCAL_ARTIFACTS_IN_HTTP_MODE=1`.
+  - Added regression coverage for runtime lock behavior and backend resolution (`spawn` fallback blocked under explicit HTTP mode).
+- known_risks_next_step:
+  - The debug-loop preflight script still reads shell env values, which can differ from active server env; keep using lane debug fields and hull status as runtime truth when this mismatch appears.

@@ -269,12 +269,25 @@ const describeEnv = (value?: string | null, max = 12): string => {
   return `${safe} (len ${trimmed.length})`;
 };
 
+const isHttpRuntimeLocked = (): boolean => {
+  const policy = (process.env.LLM_POLICY ?? "").trim().toLowerCase();
+  if (policy === "http") return true;
+  const runtime = (process.env.LLM_RUNTIME ?? "").trim().toLowerCase();
+  return runtime === "http" || runtime === "openai";
+};
+
+const shouldHydrateLocalLlmArtifacts = (): boolean => {
+  if (!isHttpRuntimeLocked()) return true;
+  return process.env.LLM_HYDRATE_LOCAL_ARTIFACTS_IN_HTTP_MODE === "1";
+};
+
 export const getRuntimeArtifactStatuses = (): RuntimeArtifactStatus[] =>
   artifactStatuses.map((entry) => ({ ...entry, provenance: { ...entry.provenance } }));
 
 export const hydrateRuntimeArtifacts = async (): Promise<void> => {
   artifactStatuses = [];
   const artifacts: ArtifactSpec[] = [];
+  const hydrateLocalLlmArtifacts = shouldHydrateLocalLlmArtifacts();
   console.log(
     `[runtime] env LLM_LOCAL_CMD_OBJECT_KEY=${describeEnv(process.env.LLM_LOCAL_CMD_OBJECT_KEY)} ` +
       `LLM_LOCAL_CMD_SHA256=${describeEnv(process.env.LLM_LOCAL_CMD_SHA256, 16)} ` +
@@ -286,9 +299,12 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
       `LLM_LOCAL_INDEX_OBJECT_KEY=${describeEnv(process.env.LLM_LOCAL_INDEX_OBJECT_KEY)}`,
   );
   console.log(`[runtime] cwd=${process.cwd()}`);
+  if (!hydrateLocalLlmArtifacts) {
+    console.log("[runtime] explicit HTTP mode detected; skipping local LLM artifact hydration");
+  }
 
   const cmdKey = normalizeObjectKey(process.env.LLM_LOCAL_CMD_OBJECT_KEY);
-  if (cmdKey) {
+  if (hydrateLocalLlmArtifacts && cmdKey) {
     const cmdPath =
       process.env.LLM_LOCAL_CMD?.trim() ??
       ".cache/llm/llama-build/bin/llama-cli";
@@ -319,7 +335,7 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
   }
 
   const loraKey = normalizeObjectKey(process.env.LLM_LOCAL_LORA_OBJECT_KEY);
-  if (loraKey) {
+  if (hydrateLocalLlmArtifacts && loraKey) {
     const loraPath =
       process.env.LLM_LOCAL_LORA_PATH ?? "./models/lora.safetensors";
     if (!process.env.LLM_LOCAL_LORA_PATH) {
@@ -334,7 +350,7 @@ export const hydrateRuntimeArtifacts = async (): Promise<void> => {
   }
 
   const modelKey = normalizeObjectKey(process.env.LLM_LOCAL_MODEL_OBJECT_KEY);
-  if (modelKey) {
+  if (hydrateLocalLlmArtifacts && modelKey) {
     artifacts.push({
       label: "model",
       objectKey: modelKey,

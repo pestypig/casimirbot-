@@ -1,6 +1,6 @@
 import { type ToolHandler, type ToolSpecShape } from "@shared/skills";
 import { beginLlMJob } from "../services/hardware/gpu-scheduler";
-import { isLocalRuntime } from "../services/llm/local-runtime";
+import { isHttpRuntimeLocked, isLocalRuntime } from "../services/llm/local-runtime";
 
 const DEFAULT_LLM_LOCAL_RPM = Math.max(1, Number(process.env.LLM_LOCAL_RPM ?? 60));
 
@@ -27,26 +27,28 @@ const attachLlmBridgeMeta = (
 
 /**
  * Deterministic routing order for Helix Ask local tool bridge:
- * 1) explicit runtime override:
- *    - LLM_RUNTIME=http|openai => prefer HTTP when configured
- *    - LLM_RUNTIME=local|llama.cpp|replit => prefer spawn when available
- * 2) default preference: HTTP when configured
- * 3) fallback to spawn runtime (explicit enable, local runtime, or local command)
- * 4) no backend
+ * 1) explicit local mode (LLM_POLICY=local or local runtime) => spawn
+ * 2) explicit HTTP mode (LLM_POLICY=http or runtime http/openai) => HTTP only (fail-closed if missing base)
+ * 3) default preference: HTTP when configured
+ * 4) fallback to spawn runtime (explicit enable or local command)
+ * 5) no backend
  */
 export const resolveLlmLocalBackend = (): LocalLlmBackend => {
   const runtime = (process.env.LLM_RUNTIME ?? "").trim().toLowerCase();
+  const policy = (process.env.LLM_POLICY ?? "").trim().toLowerCase();
   const hasHttp = Boolean(process.env.LLM_HTTP_BASE?.trim());
   const useSpawn =
     process.env.ENABLE_LLM_LOCAL_SPAWN === "1" ||
     isLocalRuntime() ||
     Boolean(process.env.LLM_LOCAL_CMD?.trim());
+  const explicitLocal = policy === "local" || runtime === "local" || runtime === "llama.cpp" || runtime === "replit";
+  const explicitHttp = isHttpRuntimeLocked();
 
-  if ((runtime === "http" || runtime === "openai") && hasHttp) {
-    return "http";
-  }
-  if ((runtime === "local" || runtime === "llama.cpp" || runtime === "replit") && useSpawn) {
+  if (explicitLocal && useSpawn) {
     return "spawn";
+  }
+  if (explicitHttp) {
+    return hasHttp ? "http" : "none";
   }
 
   if (hasHttp) {

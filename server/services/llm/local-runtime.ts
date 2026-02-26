@@ -34,11 +34,22 @@ const parsePositiveInt = (raw: string | number | undefined, fallback: number): n
   return Math.floor(parsed);
 };
 
+const normalizeLower = (value: string | undefined): string => (value ?? "").trim().toLowerCase();
+
+export const isHttpRuntimeLocked = (): boolean => {
+  const policy = normalizeLower(process.env.LLM_POLICY);
+  if (policy === "http") return true;
+  const runtime = normalizeLower(process.env.LLM_RUNTIME);
+  return runtime === "http" || runtime === "openai";
+};
+
 export const isLocalRuntime = (): boolean => {
-  const policy = (process.env.LLM_POLICY ?? "").trim().toLowerCase();
+  const policy = normalizeLower(process.env.LLM_POLICY);
   if (policy === "local") return true;
-  const runtime = (process.env.LLM_RUNTIME ?? "").trim().toLowerCase();
+  if (policy === "http") return false;
+  const runtime = normalizeLower(process.env.LLM_RUNTIME);
   if (runtime === "local" || runtime === "llama.cpp" || runtime === "replit") return true;
+  if (runtime === "http" || runtime === "openai") return false;
   return process.env.ENABLE_LLM_LOCAL_SPAWN === "1";
 };
 

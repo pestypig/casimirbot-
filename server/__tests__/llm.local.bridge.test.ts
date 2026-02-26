@@ -38,6 +38,20 @@ describe("llm.local bridge routing", () => {
     expect(resolveLlmLocalBackend()).toBe("spawn");
   });
 
+  it("does not fall back to spawn when runtime is explicitly http and base is missing", () => {
+    process.env.LLM_RUNTIME = "http";
+    process.env.ENABLE_LLM_LOCAL_SPAWN = "1";
+    process.env.LLM_LOCAL_CMD = "./llama";
+    expect(resolveLlmLocalBackend()).toBe("none");
+  });
+
+  it("does not fall back to spawn when policy is explicitly http and base is missing", () => {
+    process.env.LLM_POLICY = "http";
+    process.env.ENABLE_LLM_LOCAL_SPAWN = "1";
+    process.env.LLM_LOCAL_CMD = "./llama";
+    expect(resolveLlmLocalBackend()).toBe("none");
+  });
+
   it("fails deterministically when no backend is configured", async () => {
     process.env.LLM_LOCAL_STRICT_NO_STUB = "1";
     await expect(llmLocalHandler({ prompt: "hello" }, {})).rejects.toThrow(
