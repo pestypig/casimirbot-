@@ -363,7 +363,7 @@ export const buildObserverFrameField = (
 
     const eulerian = eulerianByCondition[selection.condition];
     const robust = robustByCondition[selection.condition];
-    const value =
+    const rawValue =
       selection.frame === "Eulerian"
         ? eulerian
         : selection.frame === "Robust"
@@ -371,8 +371,9 @@ export const buildObserverFrameField = (
           : selection.frame === "Delta"
             ? robust - eulerian
             : robust < 0 && eulerian >= 0
-              ? robust
+              ? 1
               : 0;
+    const value = Number.isFinite(rawValue) ? rawValue : 0;
     data[i] = value;
     if (value < min) min = value;
     if (value > max) max = value;

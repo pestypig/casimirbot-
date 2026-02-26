@@ -5109,7 +5109,7 @@ useEffect(() => {
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline" className="border-slate-600 text-slate-200">rapidity cap: {observerRobustStats.rapidityCap.toFixed(3)}</Badge>
                     <Badge variant="outline" className="border-slate-600 text-slate-200">Type-I: {(observerRobustStats.typeI.fraction * 100).toFixed(2)}%</Badge>
-                    <Badge variant="outline" className="border-slate-600 text-slate-200">source mix: alg {(observerConditionSummary ? (observerConditionSummary.worstCase.source === "algebraic_type_i" ? "active" : "mixed") : "n/a")}</Badge>
+                    <Badge variant="outline" className="border-slate-600 text-slate-200">worst-case source: {observerConditionSummary ? observerConditionSummary.worstCase.source : "n/a"}</Badge>
                     <Badge className={observerRobustStats.consistency.robustNotGreaterThanEulerian ? "bg-green-500/20 text-green-300" : "bg-amber-500/20 text-amber-300"}>
                       robust≤eulerian: {observerRobustStats.consistency.robustNotGreaterThanEulerian ? "true" : "false"}
                     </Badge>
