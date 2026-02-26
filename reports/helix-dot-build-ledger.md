@@ -19,3 +19,22 @@
   - Validation execution: vitest command passed, debug loop classifications were A=`A_short_circuit`, B=`B_invoked_or_config_fail`, C=`B_invoked_or_config_fail`, and Casimir verify returned PASS with certificate integrity OK.
 - known_risks_next_step:
   - Validator is introduced without changing lane routing behavior; integration wiring into additional pipelines can be done in a follow-up milestone.
+
+## Milestone M2 — Operator Contract v1 Strictness Tightening
+- milestone_id: `M2-operator-contract-v1-strictness`
+- files_changed:
+  - `server/services/helix-ask/operator-contract-v1.ts`
+  - `server/__tests__/operator-contract-v1.spec.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run server/__tests__/operator-contract-v1.spec.ts tests/helix-ask-llm-debug-skip.spec.ts tests/helix-ask-jobs-regression.spec.ts`
+  - `npm run helix:ask:dot:debug-loop -- --base-url http://127.0.0.1:5050`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Tightened suppression rule to reject `suppression_reason` when `suppressed` is false while keeping required stable reason enforcement when true.
+  - Replaced generic object checks with plain-object checks to reject arrays at payload/text/voice boundaries.
+  - Added regression tests for suppression mismatch and array payload/text/voice invalid cases.
+  - Lane routing logic remains unchanged.
+- known_risks_next_step:
+  - Contract strictness increases may reject previously accepted malformed payloads, requiring any non-conformant emitters to be updated.

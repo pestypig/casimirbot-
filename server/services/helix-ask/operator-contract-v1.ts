@@ -44,14 +44,14 @@ const CERTAINTY_RANK: Record<CertaintyClass, number> = {
   confirmed: 3,
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return Boolean(value) && typeof value === "object";
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 };
 
 export function validateOperatorCalloutV1(payload: unknown): OperatorCalloutV1ValidationResult {
   const errors: OperatorCalloutV1ValidationError[] = [];
 
-  if (!isRecord(payload)) {
+  if (!isPlainObject(payload)) {
     return {
       ok: false,
       errors: [
@@ -92,7 +92,7 @@ export function validateOperatorCalloutV1(payload: unknown): OperatorCalloutV1Va
   }
 
   const text = payload.text;
-  if (!isRecord(text)) {
+  if (!isPlainObject(text)) {
     errors.push({
       code: text === undefined ? "MISSING_REQUIRED_FIELD" : "INVALID_FIELD_TYPE",
       path: "text",
@@ -101,7 +101,7 @@ export function validateOperatorCalloutV1(payload: unknown): OperatorCalloutV1Va
   }
 
   const voice = payload.voice;
-  if (!isRecord(voice)) {
+  if (!isPlainObject(voice)) {
     errors.push({
       code: voice === undefined ? "MISSING_REQUIRED_FIELD" : "INVALID_FIELD_TYPE",
       path: "voice",
@@ -109,7 +109,7 @@ export function validateOperatorCalloutV1(payload: unknown): OperatorCalloutV1Va
     });
   }
 
-  const textCertaintyRaw = isRecord(text) ? text.certainty : undefined;
+  const textCertaintyRaw = isPlainObject(text) ? text.certainty : undefined;
   const textCertaintyParsed = certaintyClassSchema.safeParse(textCertaintyRaw);
   if (!textCertaintyParsed.success) {
     errors.push({
@@ -119,7 +119,7 @@ export function validateOperatorCalloutV1(payload: unknown): OperatorCalloutV1Va
     });
   }
 
-  const voiceCertaintyRaw = isRecord(voice) ? voice.certainty : undefined;
+  const voiceCertaintyRaw = isPlainObject(voice) ? voice.certainty : undefined;
   const voiceCertaintyParsed = certaintyClassSchema.safeParse(voiceCertaintyRaw);
   if (!voiceCertaintyParsed.success) {
     errors.push({
@@ -129,7 +129,7 @@ export function validateOperatorCalloutV1(payload: unknown): OperatorCalloutV1Va
     });
   }
 
-  const textMessage = isRecord(text) ? text.message : undefined;
+  const textMessage = isPlainObject(text) ? text.message : undefined;
   if (typeof textMessage !== "string" || textMessage.trim().length === 0) {
     errors.push({
       code: textMessage === undefined ? "MISSING_REQUIRED_FIELD" : "INVALID_FIELD_VALUE",
@@ -138,7 +138,7 @@ export function validateOperatorCalloutV1(payload: unknown): OperatorCalloutV1Va
     });
   }
 
-  const voiceMessage = isRecord(voice) ? voice.message : undefined;
+  const voiceMessage = isPlainObject(voice) ? voice.message : undefined;
   if (typeof voiceMessage !== "string" || voiceMessage.trim().length === 0) {
     errors.push({
       code: voiceMessage === undefined ? "MISSING_REQUIRED_FIELD" : "INVALID_FIELD_VALUE",
@@ -157,6 +157,12 @@ export function validateOperatorCalloutV1(payload: unknown): OperatorCalloutV1Va
         message: "suppression_reason must be a stable suppression reason when suppressed is true",
       });
     }
+  } else if (suppressed === false && suppressionReason !== undefined) {
+    errors.push({
+      code: "INVALID_FIELD_VALUE",
+      path: "suppression_reason",
+      message: "suppression_reason must be undefined when suppressed is false",
+    });
   }
 
   if (textCertaintyParsed.success && voiceCertaintyParsed.success) {
