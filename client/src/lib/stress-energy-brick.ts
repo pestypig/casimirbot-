@@ -148,6 +148,9 @@ export interface ObserverFrameField {
 export interface ObserverDirectionOverlayConfig {
   enabled: boolean;
   stride?: number;
+  decDirectionMode?: "local" | "global";
+  maskMode?: "all" | "violating" | "missed";
+  minMagnitude?: number;
 }
 
 export interface ObserverDirectionField {
@@ -445,6 +448,7 @@ export const buildObserverFrameField = (
 export const buildObserverDirectionField = (
   brick: StressEnergyBrickDecoded,
   condition: ObserverConditionKey,
+  config?: ObserverDirectionOverlayConfig,
 ): ObserverDirectionField | null => {
   if (!brick.stats.observerRobust) return null;
   const total = Math.min(brick.t00.data.length, brick.flux.Sx.data.length, brick.flux.Sy.data.length, brick.flux.Sz.data.length);
@@ -462,6 +466,10 @@ export const buildObserverDirectionField = (
     ? Math.max(0, brick.stats.observerRobust.typeI.tolerance)
     : 1e-9;
   const canonicalDir: Vec3 = [1, 0, 0];
+  const decDirectionMode = config?.decDirectionMode === "global" ? "global" : "local";
+  const maskMode = config?.maskMode === "all" || config?.maskMode === "missed" ? config.maskMode : "violating";
+  const minMagnitudeThresholdRaw = Number(config?.minMagnitude ?? 0);
+  const minMagnitudeThreshold = Number.isFinite(minMagnitudeThresholdRaw) ? Math.max(0, minMagnitudeThresholdRaw) : 0;
   const decSearchDirectionRaw = brick.stats.observerRobust.dec?.worstCase?.direction as Vec3 | undefined;
   const decSearchDirection = safeDirection(decSearchDirectionRaw, canonicalDir);
   const hasDecSearchDirection = hasFiniteDirection(decSearchDirectionRaw);
@@ -479,13 +487,37 @@ export const buildObserverDirectionField = (
     const fluxDir = fluxMag > EPS ? ([sx / fluxMag, sy / fluxMag, sz / fluxMag] as Vec3) : canonicalDir;
     const antiFluxDir: Vec3 = [-fluxDir[0], -fluxDir[1], -fluxDir[2]];
     const pressure = rho * pressureFactor;
+    const canonicalFluxProjection = sx * canonicalDir[0] + sy * canonicalDir[1] + sz * canonicalDir[2];
+    const wecOptimized = optimizeWecMargin(rho, pressure, fluxMag, betaCap);
+    const robustByCondition = {
+      nec: Math.min(rho + pressure + 2 * canonicalFluxProjection, rho + pressure - 2 * fluxMag * betaCap),
+      wec: wecOptimized.margin,
+      sec: Math.min(rho + pressure + 2 * canonicalFluxProjection, rho + pressure - 2 * fluxMag * betaCap) + 2 * pressure,
+      dec: optimizeDecMargin({
+        rho,
+        pressure,
+        sx,
+        sy,
+        sz,
+        fluxDir,
+        canonicalDir,
+        betaCap,
+        betaHint: wecOptimized.beta,
+      }),
+    };
+    const eulerianByCondition = {
+      nec: rho + pressure + 2 * canonicalFluxProjection,
+      wec: rho,
+      sec: rho + 3 * pressure,
+      dec: rho - Math.hypot(sx, sy, sz),
+    };
 
     const typeI = resolveTypeISlacks(rho, pressure, fluxMag, typeITolerance);
     const direction = typeI.isTypeI
       ? safeDirection(antiFluxDir, canonicalDir)
       : condition === "dec"
         ? (() => {
-            if (hasDecSearchDirection) return decSearchDirection;
+            if (decDirectionMode === "global" && hasDecSearchDirection) return decSearchDirection;
             const decOptimized = optimizeDecDirection({
               rho,
               pressure,
@@ -495,7 +527,7 @@ export const buildObserverDirectionField = (
               fluxDir,
               canonicalDir,
               betaCap,
-              betaHint: optimizeWecMargin(rho, pressure, fluxMag, betaCap).beta,
+              betaHint: wecOptimized.beta,
             });
             return fluxMag > EPS ? decOptimized : safeDirection(antiFluxDir, canonicalDir);
           })()
@@ -505,7 +537,17 @@ export const buildObserverDirectionField = (
     const y = Number.isFinite(direction[1]) ? direction[1] : 0;
     const z = Number.isFinite(direction[2]) ? direction[2] : 0;
     const norm = Math.hypot(x, y, z);
-    const isActive = Number.isFinite(norm) && norm > 1e-8;
+    const robust = robustByCondition[condition];
+    const eulerian = eulerianByCondition[condition];
+    const robustViolation = robust < 0;
+    const missed = robustViolation && eulerian >= 0;
+    const maskEnabled =
+      maskMode === "all"
+        ? true
+        : maskMode === "violating"
+          ? robustViolation
+          : missed;
+    const isActive = Number.isFinite(norm) && norm > 1e-8 && maskEnabled && fluxMag >= minMagnitudeThreshold;
     const base = i * 3;
     if (isActive) {
       directions[base] = x / norm;
