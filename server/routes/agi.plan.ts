@@ -25906,6 +25906,8 @@ const executeHelixAsk = async ({
         Boolean(relationPacket) &&
         relationPacket.bridge_claims.length >= 2;
       const deterministicConceptualQuestion = !isImplementationQuestion(baseQuestion);
+      const primaryContractDirectSkipEligible =
+        relationQuestionFastPath || explicitRepoExpectation || strictConceptProvenance;
       if (
         HELIX_ASK_ANSWER_CONTRACT_PRIMARY &&
         !HELIX_ASK_SINGLE_LLM &&
@@ -26077,9 +26079,13 @@ const executeHelixAsk = async ({
               },
             );
           } else {
-            const { result: contractPrimaryCall, overflow: contractPrimaryOverflow } =
-              contractPrimaryHelperResult;
+            const {
+              result: contractPrimaryCall,
+              overflow: contractPrimaryOverflow,
+              llm: contractPrimaryLlm,
+            } = contractPrimaryHelperResult;
             recordOverflow("answer_contract_primary", contractPrimaryOverflow);
+            appendLlmCallDebug(contractPrimaryLlm);
             const parsedPrimaryContract = parseHelixAskAnswerContractPayload(
               contractPrimaryCall.text ?? "",
             );
@@ -26175,9 +26181,13 @@ const executeHelixAsk = async ({
                     },
                   );
                 } else {
-                  const { result: contractRepairCall, overflow: contractRepairOverflow } =
-                    contractRepairHelperResult;
+                  const {
+                    result: contractRepairCall,
+                    overflow: contractRepairOverflow,
+                    llm: contractRepairLlm,
+                  } = contractRepairHelperResult;
                   recordOverflow("answer_contract_primary_repair", contractRepairOverflow);
+                  appendLlmCallDebug(contractRepairLlm);
                   const repairedPrimaryContract = parseHelixAskAnswerContractPayload(
                     contractRepairCall.text ?? "",
                   );
@@ -26320,8 +26330,24 @@ const executeHelixAsk = async ({
       let answerMeta = isShortAnswer(answerText, verbosity);
       let resultForAnswer: LocalAskResult | null = null;
       try {
-        if (primaryContractResult?.text?.trim()) {
-          markLlmSkipDebug("primary_contract_result");
+        const hasPrimaryContractText = Boolean(primaryContractResult?.text?.trim());
+        if (hasPrimaryContractText && primaryContractDirectSkipEligible) {
+          const existingSkipReason =
+            typeof debugPayload?.llm_skip_reason === "string"
+              ? debugPayload.llm_skip_reason.trim()
+              : "";
+          if (!existingSkipReason || existingSkipReason === "not_attempted") {
+            markLlmSkipDebug(
+              "primary_contract_result",
+              relationQuestionFastPath
+                ? "relation_question_fastpath"
+                : explicitRepoExpectation
+                  ? "explicit_repo_expectation"
+                  : strictConceptProvenance
+                    ? "strict_concept_provenance"
+                    : undefined,
+            );
+          }
           resultForAnswer = primaryContractResult;
           answerText = primaryContractResult.text;
           answerMeta = isShortAnswer(answerText, verbosity);
@@ -26503,7 +26529,22 @@ const executeHelixAsk = async ({
       }
 
       const fallbackNeeded = !resultForAnswer || !resultForAnswer.text?.trim();
-      if (answerGenerationFailed || fallbackNeeded) {
+      if ((answerGenerationFailed || fallbackNeeded) && primaryContractResult?.text?.trim()) {
+        result = { text: primaryContractResult.text } as LocalAskResult;
+        resultForAnswer = result;
+        answerText = primaryContractResult.text;
+        answerMeta = isShortAnswer(answerText, verbosity);
+        answerPath.push(
+          answerGenerationFailed
+            ? "answer:primary_contract_fallback_error"
+            : "answer:primary_contract_fallback_empty",
+        );
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).answer_contract_primary_fallback_used = true;
+          (debugPayload as Record<string, unknown>).answer_contract_primary_fallback_reason =
+            answerGenerationFailed ? "llm_error" : "empty_answer";
+        }
+      } else if (answerGenerationFailed || fallbackNeeded) {
         const repoRuntimeFallbackMessage =
           "Runtime fallback: Unable to complete a repo-grounded LLM pass. Verify LLM_HTTP_BASE and API key wiring, then retry with the exact file path(s) you want analyzed.";
         const useRepoRuntimeFallback =

@@ -183,6 +183,36 @@ describe("Helix Ask llm debug skip metadata", () => {
     ).toBe(true);
   }, 45000);
 
+  it("keeps conceptual repo-term prompts on invoke path without primary contract short-circuit", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "What is the natario solve?",
+        debug: true,
+        verbosity: "brief",
+        sessionId: "llm-natario-open-world",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      debug?: {
+        llm_invoke_attempted?: boolean;
+        llm_skip_reason?: string;
+        llm_skip_reason_detail?: string;
+        llm_backend_used?: string;
+        llm_provider_called?: boolean;
+        llm_calls?: Array<unknown>;
+      };
+    };
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_skip_reason).toBeUndefined();
+    expect(payload.debug?.llm_skip_reason_detail).toBeUndefined();
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect((payload.debug?.llm_calls ?? []).length).toBeGreaterThan(0);
+  }, 45000);
+
   it("keeps open-world explainers out of repo auto-promotion without explicit repo hints", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",
