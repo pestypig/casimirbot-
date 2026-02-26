@@ -83,6 +83,11 @@ const isRetryableError = (error: unknown): boolean => {
   return /llm_http_timeout|llm_http_transport|llm_http_5xx|llm_http_429/i.test(message);
 };
 
+const isBreakerTransientError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  return /llm_http_timeout|llm_http_transport|llm_http_5xx|llm_http_429/i.test(message);
+};
+
 async function getFetch(): Promise<typeof fetch> {
   if (fetchImpl) {
     return fetchImpl;
@@ -201,7 +206,12 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
         await new Promise((resolve) => setTimeout(resolve, retryBackoffMs * (attempt + 1)));
         continue;
       }
-      noteBreakerFailure();
+      if (isBreakerTransientError(error)) {
+        noteBreakerFailure();
+      } else {
+        // Do not keep the transport circuit open on auth/config errors.
+        resetBreaker();
+      }
       throw error;
     }
   }

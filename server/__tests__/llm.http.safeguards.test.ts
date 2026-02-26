@@ -76,4 +76,22 @@ describe("llm.http safeguards", () => {
     expect(result.__llm_provider).toBe("openai_compatible");
     expect(result.__llm_routed_via).toBe("llm.http.generate");
   }, 15000);
+
+  it("does not open breaker on repeated auth failures (401)", async () => {
+    process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
+    process.env.LLM_HTTP_API_KEY = "k";
+    process.env.LLM_HTTP_RETRY_COUNT = "0";
+    process.env.LLM_HTTP_BREAKER_THRESHOLD = "1";
+    process.env.LLM_HTTP_BREAKER_COOLDOWN_MS = "60000";
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({}),
+    } as Response) as unknown as typeof fetch;
+    __setLlmHttpFetchForTests(fetchMock);
+
+    await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow("llm_http_401");
+    await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow("llm_http_401");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

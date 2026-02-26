@@ -233,3 +233,22 @@
   - Focused and full targeted vitest suites passed (29/29).
 - known_risks_next_step:
   - Live local quality verification in this shell is currently infra-blocked by `llm_http_401` / circuit-open responses, so runtime answer-quality validation must be rerun from the user’s valid-key server session.
+
+## Milestone M12 - HTTP Breaker Robustness (Transient-Only Trip)
+- milestone_id: `M12-http-breaker-transient-only`
+- files_changed:
+  - `server/skills/llm.http.ts`
+  - `server/__tests__/llm.http.safeguards.test.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run server/__tests__/llm.http.safeguards.test.ts server/__tests__/llm.local.bridge.test.ts tests/helix-ask-llm-debug-skip.spec.ts tests/helix-ask-jobs-regression.spec.ts`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl.exe -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+  - `powershell -ExecutionPolicy Bypass -File artifacts/retry-loop.ps1`
+- result_summary:
+  - Changed `llm.http.generate` circuit behavior so only transient upstream failures (`timeout`, `transport`, `429`, `5xx`) increment/open the breaker.
+  - Non-transient auth/config errors (`401/403/4xx`) no longer poison the breaker state; breaker is reset on those terminal classes.
+  - Added regression test proving repeated `401` responses do not produce `llm_http_circuit_open`.
+  - Runtime probe confirms consecutive calls remain on HTTP invoke path without breaker escalation; full retry-loop returned lane classifications A=`A_short_circuit`, P2/P3/P4/P5/J1=`C_http_success`.
+- known_risks_next_step:
+  - This patch hardens uptime behavior but does not independently solve source-relevance drift for repo-specific prompts; retain planned citation relevance gating for repo lanes.
