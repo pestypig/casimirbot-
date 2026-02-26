@@ -216,8 +216,10 @@ Allowed paths:
 
 Requirements:
 1) Implement scope/subsystem/coupling/test/uncertainty components.
-2) Keep functions pure and deterministic.
-3) Emit stable output ordering.
+2) Add deterministic interaction-matrix projection (`W * q`) and hotspot score output.
+3) Keep functions pure and deterministic.
+4) Emit stable output ordering.
+5) Record matrix config version/hash with every momentum artifact.
 
 Checks:
 - npx vitest run tests/evolution.momentum.spec.ts
@@ -325,7 +327,8 @@ Allowed paths:
 Requirements:
 1) Add runbook for local and CI execution.
 2) Add optional report-only CI step for evolution gate artifact.
-3) Do not change baseline Casimir required behavior.
+3) Document operator-facing force-field panel semantics (simulate/clear/draw cycle, hotspot classes).
+4) Do not change baseline Casimir required behavior.
 
 Checks:
 - casimir verify command

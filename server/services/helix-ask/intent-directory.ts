@@ -443,6 +443,26 @@ const INTENT_PROFILES: HelixAskIntentProfile[] = [
     priority: 36,
   },
   {
+    id: "falsifiable.frontier_consciousness_theory_lens",
+    label: "Frontier consciousness theory lens",
+    domain: "falsifiable",
+    tier: "F3",
+    strategy: "hybrid_explain",
+    formatPolicy: "brief",
+    stageTags: "falsifiable_only",
+    evidencePolicy: {
+      allowRepoCitations: true,
+      requireCitations: true,
+      allowedEvidenceKinds: ["repo_chunk", "prompt_chunk", "gate_json"],
+    },
+    matchers: [
+      /\b(conscious|consciousness|sentient|sentience)\b/i,
+      /\b(orch(?:estrated)?\s*objective\s*reduction|orch[-\s]?or|penrose|hameroff|microtubule|stellar consciousness|sun|stellar|star)\b/i,
+    ],
+    requiresAllMatchers: true,
+    priority: 58,
+  },
+  {
     id: "falsifiable.constraints.gr_viability_certificate",
     label: "GR viability",
     domain: "falsifiable",

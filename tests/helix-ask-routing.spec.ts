@@ -152,6 +152,15 @@ const cases: IntentCase[] = [
     expectedFormat: "compare",
   },
   {
+    question: "Is the sun conscious under Orch-OR style reasoning?",
+    hasRepoHints: false,
+    hasFilePathHints: false,
+    expectedId: "falsifiable.frontier_consciousness_theory_lens",
+    expectedDomain: "falsifiable",
+    expectedFormat: "brief",
+    expectStageTags: false,
+  },
+  {
     question: "Define the Ford-Roman quantum inequality.",
     hasRepoHints: false,
     hasFilePathHints: false,

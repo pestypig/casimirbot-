@@ -41,6 +41,24 @@ Tasks:
 Adversarial:
 - claim references unknown evidence id and must be blocked deterministically
 
+## Batch 2B
+
+Goal: add a variational inference/ELBO uncertainty lane for probabilistic training paths.
+
+Constraints:
+- additive-only and optional per lane
+- ELBO gains are diagnostic, not certification by themselves
+- deterministic fail reasons for posterior collapse and calibration regressions
+
+Tasks:
+1. add VI/ELBO metrics to run manifests and training traces (`elbo_total`, `elbo_reconstruction`, `elbo_kl`)
+2. add calibration metrics capture for probabilistic outputs (for example ECE/Brier where applicable)
+3. add deterministic gates for posterior collapse and ELBO-regression vs baseline tolerance
+4. surface VI/ELBO status in promotion review outputs
+
+Adversarial:
+- ELBO improves while calibration worsens past threshold and promotion must remain blocked with typed reason
+
 ## Batch 3
 
 Goal: certified-only promotion and production publish gate.
@@ -70,4 +88,3 @@ Tasks:
 
 Adversarial:
 - one-byte mutation in bundle evidence must trigger deterministic integrity failure
-

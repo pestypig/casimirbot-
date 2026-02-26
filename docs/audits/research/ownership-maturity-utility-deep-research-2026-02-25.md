@@ -111,6 +111,12 @@ Promotion requirement:
 
 - certified stage + integrity OK where applicable
 
+VI/ELBO extension for probabilistic lanes:
+
+- add explicit trace fields for `elbo_total`, `elbo_reconstruction`, `elbo_kl`, and calibration metrics (for example ECE/Brier where applicable)
+- require posterior collapse checks and deterministic rejection reason when collapse threshold is breached
+- treat ELBO gains as diagnostic-only evidence unless repeatability and certified promotion gates pass
+
 ### UI/operator loop
 
 Add operator-visible ownership controls:
@@ -174,6 +180,17 @@ Adversarial:
 
 - unknown evidence id blocks claim/promotion attempt deterministically
 
+### Batch 2B - Probabilistic uncertainty lane (VI/ELBO)
+
+- add an optional VI/ELBO diagnostics lane for modalities that model latent uncertainty
+- emit ELBO decomposition metrics into training traces and run manifests
+- add posterior-collapse and ELBO-regression checks with deterministic fail reasons
+- bind probabilistic metrics to promotion review so non-repeatable ELBO improvements cannot promote
+
+Adversarial:
+
+- ELBO improves while calibration worsens beyond threshold, and promotion must be blocked deterministically
+
 ### Batch 3 - Verified promotion gate
 
 - implement propose/verify/promote lifecycle
@@ -196,6 +213,7 @@ Adversarial:
 - certified-only promotion compliance = 100%
 - typed deterministic rejection coverage = 100%
 - replay determinism threshold met before hardening rollout
+- probabilistic lanes publish ELBO decomposition and calibration metrics before promotion review
 
 ## Risk and kill criteria
 
@@ -229,4 +247,3 @@ Differentiator for this objective:
 
 - `reports/ownership-maturity-decision-matrix-2026-02-25.json`
 - `reports/ownership-maturity-batch-prompts-2026-02-25.md`
-

@@ -3451,6 +3451,36 @@ const HELIX_ASK_SCIENTIFIC_CLARIFY =
   String(process.env.HELIX_ASK_SCIENTIFIC_CLARIFY ?? "1").trim() !== "0";
 const HELIX_ASK_HYPOTHESIS =
   String(process.env.HELIX_ASK_HYPOTHESIS ?? "0").trim() === "1";
+const HELIX_ASK_FRONTIER_CONTRACT =
+  String(process.env.HELIX_ASK_FRONTIER_CONTRACT ?? "1").trim() !== "0";
+const HELIX_ASK_FRONTIER_COVE =
+  String(process.env.HELIX_ASK_FRONTIER_COVE ?? "1").trim() !== "0";
+const HELIX_ASK_TELEMETRY_LEAK_GATE =
+  String(process.env.HELIX_ASK_TELEMETRY_LEAK_GATE ?? "1").trim() !== "0";
+const HELIX_ASK_FRONTIER_INTENT_ID = "falsifiable.frontier_consciousness_theory_lens";
+const HELIX_ASK_FRONTIER_LENS_RE =
+  /\b(conscious|consciousness|sentient|sentience|orch(?:estrated)?\s*objective\s*reduction|orch[-\s]?or|penrose|hameroff|microtubule|stellar consciousness|sun conscious|is the sun conscious)\b/i;
+const HELIX_ASK_FRONTIER_REQUIRED_SLOTS = [
+  "definitions",
+  "baseline",
+  "hypothesis",
+  "anti_hypothesis",
+  "falsifiers",
+  "uncertainty_band",
+  "claim_tier",
+] as const;
+type HelixAskFrontierRequiredSlot = (typeof HELIX_ASK_FRONTIER_REQUIRED_SLOTS)[number];
+const HELIX_ASK_FRONTIER_SLOT_PATTERNS: Record<HelixAskFrontierRequiredSlot, RegExp[]> = {
+  definitions: [/^\s*(definitions?|terms)\s*:/im],
+  baseline: [/^\s*(baseline|mainstream baseline|confirmed)\s*:/im],
+  hypothesis: [/^\s*(hypothesis|lens hypothesis)\s*:/im],
+  anti_hypothesis: [/^\s*(anti-hypothesis|null hypothesis)\s*:/im],
+  falsifiers: [/^\s*(falsifiers?|predictions?)\s*:/im],
+  uncertainty_band: [/^\s*(uncertainty(?:\s+band)?|confidence band)\s*:/im],
+  claim_tier: [/^\s*(claim tier|tier)\s*:/im],
+};
+const HELIX_ASK_TELEMETRY_LEAK_RE =
+  /\b(execution log|ask debug|helix ask:|duration:\s*\d+ms|two-pass:|micro-pass:|prompt ingest:|graph congruence:)\b/i;
 const HELIX_ASK_HYPOTHESIS_STYLE = (() => {
   const raw = String(process.env.HELIX_ASK_HYPOTHESIS_STYLE ?? "conservative")
     .trim()
@@ -5711,8 +5741,12 @@ function buildVerificationAnchorHints(question: string): string[] {
 
 function buildHelixAskQueryPrompt(
   question: string,
-  options?: { conceptSkeleton?: string[]; anchorHints?: string[] },
+  options?: { conceptSkeleton?: string[]; anchorHints?: string[]; requiredSlots?: string[] },
 ): string {
+  const requiredSlotLine =
+    options?.requiredSlots?.length
+      ? `required_slots: ${options.requiredSlots.join(", ")}`
+      : "required_slots: definition, repo_mapping, verification, failure_path";
   const lines = [
     "You are Helix Ask query planner.",
     `Return up to ${HELIX_ASK_QUERY_HINTS_MAX} short search queries or file path hints.`,
@@ -5724,7 +5758,7 @@ function buildHelixAskQueryPrompt(
     "avoid_surfaces: tokamak, qi",
     "must_include_globs: docs/ethos/**, docs/knowledge/**",
     "Only emit must_include_globs if you can name real repo paths (docs/, server/, client/, modules/, shared/, apps/, tools/, scripts/, cli/, packages/, warp-web/, .github/).",
-    "required_slots: definition, repo_mapping, verification, failure_path",
+    requiredSlotLine,
     "concept_slots: <slot-id-1>, <slot-id-2>",
     "evidence_criteria: <slot-id> => short evidence phrases/headings that would prove the slot",
     "clarify: <one short question if evidence is likely missing>",
@@ -14159,6 +14193,150 @@ const buildScientificMicroReport = (args: {
   };
 };
 
+type HelixAskFrontierSlotSummary = {
+  required: HelixAskFrontierRequiredSlot[];
+  present: HelixAskFrontierRequiredSlot[];
+  missing: HelixAskFrontierRequiredSlot[];
+  ratio: number;
+};
+
+type HelixAskFrontierVerification = {
+  claims: string[];
+  questions: string[];
+  supportedClaims: string[];
+  unsupportedClaims: string[];
+  supportRatio: number;
+};
+
+const evaluateFrontierScientificSlots = (
+  text: string,
+  required: readonly HelixAskFrontierRequiredSlot[] = HELIX_ASK_FRONTIER_REQUIRED_SLOTS,
+): HelixAskFrontierSlotSummary => {
+  const present: HelixAskFrontierRequiredSlot[] = [];
+  for (const slot of required) {
+    const patterns = HELIX_ASK_FRONTIER_SLOT_PATTERNS[slot] ?? [];
+    if (patterns.some((pattern) => pattern.test(text))) {
+      present.push(slot);
+    }
+  }
+  const missing = required.filter((slot) => !present.includes(slot));
+  return {
+    required: Array.from(required),
+    present,
+    missing,
+    ratio: required.length > 0 ? present.length / required.length : 1,
+  };
+};
+
+const buildFrontierVerificationQuestions = (claims: string[]): string[] =>
+  claims.slice(0, 6).map((claim) => `What evidence supports: ${ensureSentence(claim)}`);
+
+const runFrontierVerificationPass = (
+  draft: string,
+  evidenceContext: string,
+): HelixAskFrontierVerification => {
+  const claims = extractClaimCandidates(draft, 6);
+  const questions = buildFrontierVerificationQuestions(claims);
+  if (claims.length === 0) {
+    return {
+      claims,
+      questions,
+      supportedClaims: [],
+      unsupportedClaims: [],
+      supportRatio: 0,
+    };
+  }
+  const coverage = evaluateClaimCoverage(claims, evidenceContext, {
+    minTokens: Math.max(1, HELIX_ASK_EVIDENCE_CLAIM_MIN_TOKENS),
+    minRatio: Math.max(0.15, HELIX_ASK_EVIDENCE_CLAIM_MIN_RATIO),
+    minSupportRatio: Math.max(0.35, HELIX_ASK_EVIDENCE_CLAIM_SUPPORT_RATIO),
+  });
+  const unsupported = new Set(coverage.unsupported ?? []);
+  return {
+    claims,
+    questions,
+    supportedClaims: claims.filter((claim) => !unsupported.has(claim)),
+    unsupportedClaims: claims.filter((claim) => unsupported.has(claim)),
+    supportRatio: coverage.supportRatio,
+  };
+};
+
+const stripTelemetryLeakArtifacts = (
+  text: string,
+): { text: string; detected: boolean; reasons: string[] } => {
+  let next = text;
+  const reasons: string[] = [];
+  if (/(?:^|\n)\s*(Execution log|Ask debug)\b/i.test(next)) {
+    next = next.replace(/(?:^|\n)\s*(Execution log|Ask debug)\b[\s\S]*$/i, "").trim();
+    reasons.push("debug_section");
+  }
+  const linePatterns: RegExp[] = [
+    /^Helix Ask:.*$/gim,
+    /^Duration:\s*\d+ms.*$/gim,
+    /^Two-pass:.*$/gim,
+    /^Micro-pass:.*$/gim,
+    /^Prompt ingest:.*$/gim,
+    /^Graph congruence:.*$/gim,
+  ];
+  for (const pattern of linePatterns) {
+    if (pattern.test(next)) {
+      next = next.replace(pattern, "").trim();
+      reasons.push(`line:${pattern.source}`);
+    }
+  }
+  next = next.replace(/\n{3,}/g, "\n\n").trim();
+  return { text: next, detected: reasons.length > 0, reasons };
+};
+
+const renderFrontierScientificContract = (args: {
+  verification: HelixAskFrontierVerification;
+  slotSummary: HelixAskFrontierSlotSummary;
+  planClarify?: string;
+  nextEvidence?: string[];
+}): string => {
+  const baselineLine =
+    args.verification.supportedClaims[0] ??
+    "Mainstream baseline: no certified evidence currently establishes solar subjective awareness.";
+  const hypothesisLine =
+    args.verification.unsupportedClaims[0] ??
+    "Orch-OR-inspired stellar consciousness remains a hypothesis that requires dedicated falsifier tests.";
+  const antiHypothesisLine =
+    "Null hypothesis: observed stellar coherence/collapse dynamics are non-conscious physical processes.";
+  const evidenceHints = (args.nextEvidence ?? []).slice(0, 3);
+  if (!evidenceHints.length && args.planClarify) {
+    evidenceHints.push(args.planClarify);
+  }
+  if (!evidenceHints.length) {
+    evidenceHints.push("Add explicit prediction vs observation checks tied to repo evidence paths.");
+  }
+  const uncertaintyLine = `Support ratio=${args.verification.supportRatio.toFixed(
+    2,
+  )}; missing slots=${args.slotSummary.missing.join(", ") || "none"}.`;
+  const lines = [
+    "Definitions:",
+    "- Consciousness: subjective first-person awareness with reportable internal states.",
+    "",
+    "Baseline:",
+    `- ${ensureSentence(baselineLine)}`,
+    "",
+    "Hypothesis:",
+    `- ${ensureSentence(hypothesisLine)}`,
+    "",
+    "Anti-hypothesis:",
+    `- ${ensureSentence(antiHypothesisLine)}`,
+    "",
+    "Falsifiers:",
+    ...evidenceHints.map((hint) => `- ${ensureSentence(hint)}`),
+    "",
+    "Uncertainty band:",
+    `- ${ensureSentence(uncertaintyLine)}`,
+    "",
+    "Claim tier:",
+    "- diagnostic (frontier hypothesis mode; not certified)",
+  ];
+  return lines.join("\n").trim();
+};
+
 const resolveClusterKey = (filePath: string): string => {
   const normalized = normalizeEvidencePath(filePath) ?? filePath;
   const parts = normalized.split("/").filter(Boolean);
@@ -19826,6 +20004,19 @@ const executeHelixAsk = async ({
     const originalIntentProfile = intentMatch.profile;
     let intentProfile = intentMatch.profile;
     let intentReasonBase = intentMatch.reason;
+    const frontierTheoryLensRequested = HELIX_ASK_FRONTIER_LENS_RE.test(baseQuestion);
+    const frontierProfile = frontierTheoryLensRequested
+      ? getHelixAskIntentProfileById(HELIX_ASK_FRONTIER_INTENT_ID)
+      : null;
+    if (frontierTheoryLensRequested && frontierProfile && intentProfile.domain === "general") {
+      intentProfile = frontierProfile;
+      intentReasonBase = `${intentReasonBase}|frontier_theory_lens`;
+      logEvent(
+        "Fallback",
+        "frontier_lens -> falsifiable",
+        `profile=${frontierProfile.id}`,
+      );
+    }
     let compositeApplied = false;
     let compositeRequiredFiles: string[] = [];
     if (compositeRequest.enabled) {
@@ -20086,6 +20277,14 @@ const executeHelixAsk = async ({
       updateIntentDebug();
     };
     applyIntentProfile(intentProfile);
+    const isFrontierTheoryLensActive = (): boolean =>
+      intentProfile.id === HELIX_ASK_FRONTIER_INTENT_ID || frontierTheoryLensRequested;
+    if (debugPayload) {
+      const debugRecord = debugPayload as Record<string, unknown>;
+      debugRecord.frontier_theory_lens_requested = frontierTheoryLensRequested;
+      debugRecord.frontier_theory_lens_active = isFrontierTheoryLensActive();
+      debugRecord.frontier_required_slots = Array.from(HELIX_ASK_FRONTIER_REQUIRED_SLOTS);
+    }
     const isRelationIntentRequested = (): boolean => {
       if (isWarpEthosRelationQuestion(baseQuestion)) return true;
       if (intentProfile.id === "hybrid.warp_ethos_relation") return true;
@@ -20167,7 +20366,7 @@ const executeHelixAsk = async ({
     };
     let isRepoQuestion =
       intentProfile.evidencePolicy.allowRepoCitations &&
-      (intentDomain === "repo" || intentDomain === "hybrid");
+      (intentDomain === "repo" || intentDomain === "hybrid" || intentDomain === "falsifiable");
     if (intentStrategy === "constraint_report") {
       isRepoQuestion = false;
     }
@@ -21635,6 +21834,9 @@ const executeHelixAsk = async ({
               const queryPrompt = buildHelixAskQueryPrompt(baseQuestion, {
                 conceptSkeleton,
                 anchorHints: verificationAnchorRequired ? verificationAnchorHints : [],
+                requiredSlots: isFrontierTheoryLensActive()
+                  ? Array.from(HELIX_ASK_FRONTIER_REQUIRED_SLOTS)
+                  : undefined,
               });
               const queryMaxTokens = blockScoped ? HELIX_ASK_QUERY_TOKENS_BLOCK : HELIX_ASK_QUERY_TOKENS;
               const queryRuntimeBudgetMs = fastQualityMode
@@ -21712,7 +21914,18 @@ const executeHelixAsk = async ({
                 const { result: queryResult, overflow: queryOverflow } = queryHelperResult;
                 recordOverflow("query_hints", queryOverflow);
                 const planParse = parsePlanDirectives(queryResult.text ?? "");
-              planDirectives = planParse.directives;
+                planDirectives = planParse.directives;
+                if (isFrontierTheoryLensActive()) {
+                  const mergedFrontierSlots = new Set<string>();
+                  for (const slot of HELIX_ASK_FRONTIER_REQUIRED_SLOTS) {
+                    mergedFrontierSlots.add(slot);
+                  }
+                  for (const slot of planDirectives.requiredSlots ?? []) {
+                    const normalized = normalizeSlotName(slot);
+                    if (normalized) mergedFrontierSlots.add(normalized);
+                  }
+                  planDirectives.requiredSlots = Array.from(mergedFrontierSlots);
+                }
               queryHints = filterSlotHintTerms(planParse.queryHints, { maxTokens: 8, maxChars: 90 })
                 .slice(0, HELIX_ASK_QUERY_HINTS_MAX);
               if (verificationAnchorHints.length > 0) {
@@ -21787,6 +22000,21 @@ const executeHelixAsk = async ({
               }
             }
           }
+        }
+        if (isFrontierTheoryLensActive()) {
+          planDirectives = planDirectives ?? {
+            preferredSurfaces: [],
+            avoidSurfaces: [],
+            mustIncludeGlobs: [],
+            requiredSlots: [],
+            conceptSlots: [],
+            evidenceCriteria: {},
+          };
+          const mergedFrontierSlots = new Set<string>(planDirectives.requiredSlots ?? []);
+          for (const slot of HELIX_ASK_FRONTIER_REQUIRED_SLOTS) {
+            mergedFrontierSlots.add(slot);
+          }
+          planDirectives.requiredSlots = Array.from(mergedFrontierSlots);
         }
         if (debugPayload && queryHints.length > 0) {
           debugPayload.query_hints = queryHints;
@@ -23869,11 +24097,21 @@ const executeHelixAsk = async ({
         const isIdeologyIntent = intentProfile.id === "repo.ideology_reference";
         const isExplicitRepoApiIntent =
           explicitRepoApiCue && intentProfile.id === "repo.repo_api_lookup";
-        const arbiterMode =
+        let arbiterMode =
           (isIdeologyIntent || isExplicitRepoApiIntent) && rawArbiterMode !== "repo_grounded"
             ? "repo_grounded"
             : rawArbiterMode;
-        const arbiterReason = arbiterDecision.reason;
+        let arbiterReason = arbiterDecision.reason;
+        if (isFrontierTheoryLensActive() && arbiterMode === "general") {
+          arbiterMode = "clarify";
+          arbiterReason = "frontier_lens_non_general_guard";
+          logEvent("Fallback", "frontier guard", "general->clarify");
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.frontier_route_guard_applied = true;
+            debugRecord.frontier_route_guard_reason = "FRONTIER_LENS_NON_GENERAL_GUARD";
+          }
+        }
         const arbiterStrictness = arbiterDecision.strictness;
         const arbiterRepoOk = arbiterDecision.repoOk;
         const arbiterHybridOk = arbiterDecision.hybridOk;
@@ -27383,6 +27621,125 @@ const executeHelixAsk = async ({
             debugPayload.endpoint_anchor_guard_mode = endpointGuardWarnOnly ? "warn_only" : "enforce";
             debugPayload.endpoint_anchor_warning = endpointGuardWarned;
           }
+        }
+      }
+      const frontierTheoryLensActive = isFrontierTheoryLensActive();
+      let frontierVerification: HelixAskFrontierVerification | null = null;
+      let frontierSlotSummary = frontierTheoryLensActive
+        ? evaluateFrontierScientificSlots(cleaned)
+        : null;
+      if (frontierTheoryLensActive && HELIX_ASK_FRONTIER_COVE) {
+        const verificationEvidenceContext = [
+          evidenceText,
+          contextText,
+          promptContextText,
+          repoScaffold,
+          generalScaffold,
+          promptScaffold,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+        frontierVerification = runFrontierVerificationPass(cleaned, verificationEvidenceContext);
+        const frontierNeedsRevision =
+          frontierVerification.unsupportedClaims.length > 0 &&
+          frontierVerification.supportRatio < 0.6;
+        if (frontierNeedsRevision) {
+          const frontierNextEvidence = buildNextEvidenceHints({
+            question: baseQuestion,
+            missingSlots: frontierSlotSummary?.missing,
+            slotPlan,
+            anchorFiles: contextFiles,
+            searchedTerms: retrievalQueries,
+            searchedFiles: retrievalFilesSnapshot,
+            includeSearchSummary: true,
+            planClarify: planDirectives?.clarifyQuestion,
+            headingSeedSlots: slotPlanHeadingSeedSlots.length ? slotPlanHeadingSeedSlots : headingSeedSlots,
+            limit: 3,
+          });
+          cleaned = renderFrontierScientificContract({
+            verification: frontierVerification,
+            slotSummary:
+              frontierSlotSummary ??
+              evaluateFrontierScientificSlots(cleaned, HELIX_ASK_FRONTIER_REQUIRED_SLOTS),
+            planClarify: planDirectives?.clarifyQuestion,
+            nextEvidence: frontierNextEvidence,
+          });
+          frontierSlotSummary = evaluateFrontierScientificSlots(cleaned, HELIX_ASK_FRONTIER_REQUIRED_SLOTS);
+        }
+      }
+      if (frontierTheoryLensActive && HELIX_ASK_FRONTIER_CONTRACT) {
+        frontierSlotSummary =
+          frontierSlotSummary ?? evaluateFrontierScientificSlots(cleaned, HELIX_ASK_FRONTIER_REQUIRED_SLOTS);
+        if (frontierSlotSummary.missing.length > 0) {
+          const fallbackVerification =
+            frontierVerification ??
+            runFrontierVerificationPass(cleaned, [evidenceText, contextText].filter(Boolean).join("\n\n"));
+          const frontierNextEvidence = buildNextEvidenceHints({
+            question: baseQuestion,
+            missingSlots: frontierSlotSummary.missing,
+            slotPlan,
+            anchorFiles: contextFiles,
+            searchedTerms: retrievalQueries,
+            searchedFiles: retrievalFilesSnapshot,
+            includeSearchSummary: true,
+            planClarify: planDirectives?.clarifyQuestion,
+            headingSeedSlots: slotPlanHeadingSeedSlots.length ? slotPlanHeadingSeedSlots : headingSeedSlots,
+            limit: 3,
+          });
+          cleaned = renderFrontierScientificContract({
+            verification: fallbackVerification,
+            slotSummary: frontierSlotSummary,
+            planClarify: planDirectives?.clarifyQuestion,
+            nextEvidence: frontierNextEvidence,
+          });
+          frontierSlotSummary = evaluateFrontierScientificSlots(cleaned, HELIX_ASK_FRONTIER_REQUIRED_SLOTS);
+          if (frontierSlotSummary.missing.length > 0) {
+            strictReadyFailReason = strictReadyFailReason ?? "SCIENTIFIC_METHOD_MISSING_SLOT";
+            if (debugPayload) {
+              const debugRecord = debugPayload as Record<string, unknown>;
+              debugRecord.arbiter_fail_reason = strictReadyFailReason;
+              debugRecord.helix_ask_fail_reason = strictReadyFailReason;
+              debugRecord.helix_ask_fail_class = "evidence_contract";
+            }
+          }
+        }
+      }
+      if (HELIX_ASK_TELEMETRY_LEAK_GATE && HELIX_ASK_TELEMETRY_LEAK_RE.test(cleaned)) {
+        const telemetryLeak = stripTelemetryLeakArtifacts(cleaned);
+        if (telemetryLeak.detected) {
+          cleaned = telemetryLeak.text;
+          strictReadyFailReason = strictReadyFailReason ?? "TELEMETRY_LEAK_IN_ANSWER";
+          logEvent("Telemetry gate", "applied", telemetryLeak.reasons.join(", "));
+          answerPath.push("gate:telemetry_leak");
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.telemetry_gate_applied = true;
+            debugRecord.telemetry_gate_reasons = telemetryLeak.reasons;
+            debugRecord.telemetry_leak_rate = 1;
+            debugRecord.arbiter_fail_reason = strictReadyFailReason;
+            debugRecord.helix_ask_fail_reason = strictReadyFailReason;
+            debugRecord.helix_ask_fail_class = "runtime_contract";
+          }
+        }
+      }
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.frontier_theory_lens_active = frontierTheoryLensActive;
+        if (frontierVerification) {
+          debugRecord.frontier_verification_questions = frontierVerification.questions.slice(0, 6);
+          debugRecord.frontier_verified_claim_count = frontierVerification.supportedClaims.length;
+          debugRecord.frontier_unsupported_claim_count = frontierVerification.unsupportedClaims.length;
+          debugRecord.frontier_unsupported_claim_rate =
+            frontierVerification.claims.length > 0
+              ? frontierVerification.unsupportedClaims.length / frontierVerification.claims.length
+              : 0;
+        }
+        if (frontierSlotSummary) {
+          debugRecord.frontier_slot_required = frontierSlotSummary.required;
+          debugRecord.frontier_slot_present = frontierSlotSummary.present;
+          debugRecord.frontier_slot_missing = frontierSlotSummary.missing;
+          debugRecord.frontier_slot_completeness_rate = frontierSlotSummary.ratio;
+          debugRecord.frontier_scientific_gate_applied = frontierSlotSummary.missing.length > 0;
         }
       }
       const platonicDomain: HelixAskDomain =
