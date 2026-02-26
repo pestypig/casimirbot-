@@ -1,0 +1,87 @@
+{
+  "meta": {
+    "repo": "pestypig/casimirbot-",
+    "as_of_date": "2026-02-25",
+    "anchor_doc": "docs/ownership-maturity-ladder-v1.md",
+    "category": "objective-context",
+    "goal": "operational ownership utility",
+    "constraints": {
+      "local_first": true,
+      "deterministic_reasons": true,
+      "verification_gated_promotion": true,
+      "no_overclaiming": true
+    }
+  },
+  "levels": [
+    "Trainable",
+    "Repeatable",
+    "Portable",
+    "Ownable"
+  ],
+  "promotion_stages": [
+    "exploratory",
+    "reduced-order",
+    "diagnostic",
+    "certified"
+  ],
+  "state_matrix": {
+    "backend": {
+      "voice_policy_determinism": "exists_now",
+      "mission_board_deterministic_fold": "exists_now",
+      "training_trace_jsonl_export": "exists_now",
+      "essence_verify_and_remix_hardening": "partial_or_stub",
+      "certified_only_publish_gate": "missing"
+    },
+    "compute": {
+      "run_manifest_contract": "missing",
+      "dependency_lock_by_lane": "missing",
+      "repeatability_breach_gate": "missing",
+      "portable_bundle_import_export": "missing"
+    },
+    "ui": {
+      "tier_and_voice_controls": "exists_now",
+      "structured_objective_gap_projection": "partial_or_stub",
+      "promotion_review_and_maturity_hud": "missing"
+    }
+  },
+  "batches": [
+    {
+      "id": "batch_one",
+      "goal": "manifest and policy decision logging",
+      "adversarial": "fixed replay timestamp yields stable suppression result"
+    },
+    {
+      "id": "batch_two",
+      "goal": "evidence envelope and claim node ops",
+      "adversarial": "unknown evidence id fails closed deterministically"
+    },
+    {
+      "id": "batch_three",
+      "goal": "certified-only promotion gate",
+      "adversarial": "diagnostic tier promotion request is rejected deterministically"
+    },
+    {
+      "id": "hardening",
+      "goal": "bundle integrity import/export",
+      "condition": "run after deterministic KPI threshold is met",
+      "adversarial": "tampered bundle import is blocked with integrity mismatch reason"
+    }
+  ],
+  "kpis": {
+    "parity_violations": {
+      "target": 0,
+      "hard_gate": true
+    },
+    "suppression_reason_stability": {
+      "target": 0.999
+    },
+    "certified_only_promotion_compliance": {
+      "target": 1.0,
+      "hard_gate": true
+    },
+    "replay_determinism_rate": {
+      "target": 0.99
+    }
+  }
+}
+

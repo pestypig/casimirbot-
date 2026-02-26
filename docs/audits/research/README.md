@@ -36,3 +36,4 @@ For reusable GPT Pro style standalone research prompts, use:
 
 - `docs/audits/research/auntie-dot-halo-reach-capability-dossier-2026-02-25.md`
 - `docs/audits/research/helix-ask-dot-behavior-gap-closure-codex-cloud-autorun-batch-prompt-pack-2026-02-25.md`
+- `docs/audits/research/ownership-maturity-utility-deep-research-2026-02-25.md` (objective-context: ownership maturity utility)
