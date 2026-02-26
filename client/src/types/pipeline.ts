@@ -1,7 +1,8 @@
 export interface QiGuardrail {
   lhs_Jm3?: number; // numerator (J/m^3)
   bound_Jm3?: number; // Ford-Roman bound (J/m^3, negative)
-  marginRatioRaw?: number; // |lhs|/|bound| (unclamped)
+  marginRatioRaw?: number; // |lhs|/|boundUsed| after bound-floor policy
+  marginRatioRawComputed?: number; // |lhs|/|boundComputed| before bound-floor policy
   marginRatio?: number; // policy-clamped
   window_ms?: number; // integration window
   sampler?: "gaussian" | "lorentzian" | "compact" | string;

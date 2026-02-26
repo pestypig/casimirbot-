@@ -109,6 +109,7 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
       boundUsed_Jm3: finiteOrNull(d.boundUsed_Jm3),
       boundFloorApplied: typeof d.boundFloorApplied === 'boolean' ? d.boundFloorApplied : null,
       marginRatioRaw: finiteOrNull(d.marginRatioRaw),
+      marginRatioRawComputed: finiteOrNull(d.marginRatioRawComputed),
       applicabilityStatus: stringOrNull(d.applicabilityStatus) ?? 'UNKNOWN',
       reasonCode: Array.isArray(d.reasonCode) ? d.reasonCode : [],
       rhoSource: stringOrNull(d.rhoSource),

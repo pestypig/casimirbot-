@@ -1036,6 +1036,7 @@ export async function evaluateWarpViability(
     qi_bound_floor_applied: qiGuard?.boundFloorApplied === true,
     qi_margin_ratio: finiteOrUndefined(qiGuard?.marginRatio),
     qi_margin_ratio_raw: finiteOrUndefined(qiGuard?.marginRatioRaw),
+    qi_margin_ratio_raw_computed: finiteOrUndefined((qiGuard as any)?.marginRatioRawComputed),
     qi_rho_source: qiGuard?.rhoSource,
     qi_metric_contract_status:
       qiGuard?.metricContractOk == null ? undefined : qiGuard.metricContractOk ? "ok" : "missing",
@@ -1171,6 +1172,7 @@ export async function evaluateWarpViability(
           `boundFloorApplied=${qiGuard.boundFloorApplied === true}`,
           `marginRatio=${qiGuard.marginRatio ?? "n/a"}`,
           `marginRatioRaw=${qiGuard.marginRatioRaw ?? "n/a"}`,
+          `marginRatioRawComputed=${(qiGuard as any).marginRatioRawComputed ?? "n/a"}`,
           `rhoSource=${qiGuard.rhoSource ?? "unknown"}`,
           `metricContractStatus=${contractPass ? "ok" : "missing"}`,
           `applicabilityStatus=${applicabilityStatus}`,

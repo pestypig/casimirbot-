@@ -106,6 +106,7 @@ type EvidencePack = {
     boundFloorApplied?: boolean;
     marginRatio?: number;
     marginRatioRaw?: number;
+    marginRatioRawComputed?: number;
     rhoSource?: string;
     metricContractStatus?: string;
     applicabilityStatus?: string;
@@ -154,6 +155,7 @@ type QiForensicsArtifact = {
   boundUsed_Jm3: number | null;
   boundFloorApplied: boolean | null;
   marginRatioRaw: number | null;
+  marginRatioRawComputed: number | null;
   marginRatioClamped: number | null;
   tau_s: number | null;
   sampler: string | null;
@@ -993,6 +995,9 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
     boundUsed_Jm3: readCanonicalNumber(snapshot?.qi_bound_used_Jm3, 'boundUsed_Jm3') ?? parseNumberField('boundUsed_Jm3'),
     marginRatio: readCanonicalNumber(snapshot?.qi_margin_ratio, 'marginRatio'),
     marginRatioRaw: readCanonicalNumber(snapshot?.qi_margin_ratio_raw, 'marginRatioRaw'),
+    marginRatioRawComputed:
+      readCanonicalNumber(snapshot?.qi_margin_ratio_raw_computed, 'marginRatioRawComputed') ??
+      parseNumberField('marginRatioRawComputed'),
     rhoSource: readSnapshotString(snapshot?.qi_rho_source) ?? (parseFordField('rhoSource') ?? undefined),
     metricContractStatus:
       readSnapshotString(snapshot?.qi_metric_contract_status) ?? (parseFordField('metricContractStatus') ?? undefined),
@@ -1053,6 +1058,7 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
     boundUsed_Jm3: finiteOrNull(pack.g4Diagnostics?.boundUsed_Jm3),
     boundFloorApplied: booleanOrNull(pack.g4Diagnostics?.boundFloorApplied),
     marginRatioRaw: finiteOrNull(pack.g4Diagnostics?.marginRatioRaw),
+    marginRatioRawComputed: finiteOrNull(pack.g4Diagnostics?.marginRatioRawComputed),
     marginRatioClamped: finiteOrNull(pack.g4Diagnostics?.marginRatio),
     tau_s: finiteOrNull(pack.g4Diagnostics?.tau_s),
     sampler: stringOrNull(guard?.sampler),
@@ -1403,9 +1409,10 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
       const boundUsed = Number.isFinite(d.boundUsed_Jm3) ? d.boundUsed_Jm3 : bound;
       const boundFloorApplied = typeof d.boundFloorApplied === 'boolean' ? d.boundFloorApplied : 'n/a';
       const raw = Number.isFinite(d.marginRatioRaw) ? d.marginRatioRaw : Number.isFinite(d.marginRatio) ? d.marginRatio : 'n/a';
+      const rawComputed = Number.isFinite(d.marginRatioRawComputed) ? d.marginRatioRawComputed : 'n/a';
       const rho = typeof d.rhoSource === 'string' && d.rhoSource.length > 0 ? d.rhoSource : 'unknown';
       const applicability = typeof d.applicabilityStatus === 'string' && d.applicabilityStatus.length > 0 ? d.applicabilityStatus : 'UNKNOWN';
-      return `| ${pack.wave} | ${lhs} | ${boundComputed} | ${boundFloor} | ${boundPolicyFloor} | ${boundEnvFloor} | ${boundDefaultFloor} | ${boundUsed} | ${boundFloorApplied} | ${raw} | ${rho} | ${applicability} |`;
+      return `| ${pack.wave} | ${lhs} | ${boundComputed} | ${boundFloor} | ${boundPolicyFloor} | ${boundEnvFloor} | ${boundDefaultFloor} | ${boundUsed} | ${boundFloorApplied} | ${raw} | ${rawComputed} | ${rho} | ${applicability} |`;
     })
     .join('\n');
   const bestCasePack = packs.reduce<EvidencePack | null>((best, current) => {
@@ -1480,8 +1487,8 @@ ${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
 - reproducibility.gateAgreement: ${pack.reproducibility?.repeatedRunGateAgreement?.status ?? 'NOT_READY'}`).join('\n\n')}
 
 ## Per-wave G4 evidence table
-| Wave | lhs_Jm3 | boundComputed_Jm3 | boundFloor_Jm3 | boundPolicyFloor_Jm3 | boundEnvFloor_Jm3 | boundDefaultFloor_Jm3 | boundUsed_Jm3 | boundFloorApplied | marginRatioRaw | rhoSource | applicabilityStatus |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- | --- |
+| Wave | lhs_Jm3 | boundComputed_Jm3 | boundFloor_Jm3 | boundPolicyFloor_Jm3 | boundEnvFloor_Jm3 | boundDefaultFloor_Jm3 | boundUsed_Jm3 | boundFloorApplied | marginRatioRaw | marginRatioRawComputed | rhoSource | applicabilityStatus |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- | --- |
 ${g4WaveRows}
 
 ## Best-case G4 summary
@@ -1493,6 +1500,7 @@ ${g4WaveRows}
 - boundUsed_Jm3: ${bestCasePack?.g4Diagnostics?.boundUsed_Jm3 ?? bestCasePack?.g4Diagnostics?.bound_Jm3 ?? 'n/a'}
 - boundFloorApplied: ${bestCasePack?.g4Diagnostics?.boundFloorApplied ?? 'n/a'}
 - marginRatioRaw: ${bestCasePack?.g4Diagnostics?.marginRatioRaw ?? bestCasePack?.g4Diagnostics?.marginRatio ?? 'n/a'}
+- marginRatioRawComputed: ${bestCasePack?.g4Diagnostics?.marginRatioRawComputed ?? 'n/a'}
 - applicabilityStatus: ${bestCasePack?.g4Diagnostics?.applicabilityStatus ?? 'UNKNOWN'}
 - rhoSource: ${bestCasePack?.g4Diagnostics?.rhoSource ?? 'unknown'}
 

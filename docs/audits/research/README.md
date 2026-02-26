@@ -38,3 +38,5 @@ For reusable GPT Pro style standalone research prompts, use:
 - `docs/audits/research/helix-ask-dot-behavior-gap-closure-codex-cloud-autorun-batch-prompt-pack-2026-02-25.md`
 - `docs/audits/research/ownership-maturity-utility-deep-research-2026-02-25.md` (objective-context: ownership maturity utility)
 - `docs/audits/research/helix-ask-ownership-evolution-unified-deep-research-prompt-2026-02-26.md` (standalone prompt: ownership + evolution + patch momentum + uncertainty lanes)
+- `docs/audits/research/helix-ask-unified-ownership-evolution-operating-model-and-roadmap-2026-02-26.md` (research: unified operating model and roadmap)
+- `docs/audits/research/helix-ask-direct-codex-build-execution-readiness-deep-research-prompt-2026-02-26.md` (standalone prompt: direct codex build execution readiness)

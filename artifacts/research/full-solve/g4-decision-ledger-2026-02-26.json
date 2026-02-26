@@ -1,6 +1,6 @@
 {
   "date": "2026-02-26",
-  "commitHash": "de4b35bb92ed8f1ba3eee9a446a2c3a4799441a0",
+  "commitHash": "3b118c9649cf50c70a09e103321181e49ed90c76",
   "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
   "canonical": {
     "counts": {
@@ -64,14 +64,15 @@
   "waves": {
     "A": {
       "lhs_Jm3": -24064720231109177000,
-      "boundComputed_Jm3": null,
-      "boundPolicyFloor_Jm3": null,
+      "boundComputed_Jm3": -18,
+      "boundPolicyFloor_Jm3": -24064720231109177000,
       "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": null,
-      "boundFloor_Jm3": null,
-      "boundUsed_Jm3": null,
-      "boundFloorApplied": null,
+      "boundDefaultFloor_Jm3": -18,
+      "boundFloor_Jm3": -24064720231109177000,
+      "boundUsed_Jm3": -24064720231109177000,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
+      "marginRatioRawComputed": 1336928901728287700,
       "applicabilityStatus": "PASS",
       "reasonCode": [
         "G4_QI_MARGIN_EXCEEDED"
@@ -80,14 +81,15 @@
     },
     "B": {
       "lhs_Jm3": -37601125453291720000,
-      "boundComputed_Jm3": null,
-      "boundPolicyFloor_Jm3": null,
+      "boundComputed_Jm3": -18,
+      "boundPolicyFloor_Jm3": -37601125453291720000,
       "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": null,
-      "boundFloor_Jm3": null,
-      "boundUsed_Jm3": null,
-      "boundFloorApplied": null,
+      "boundDefaultFloor_Jm3": -18,
+      "boundFloor_Jm3": -37601125453291720000,
+      "boundUsed_Jm3": -37601125453291720000,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
+      "marginRatioRawComputed": 2088951414071762000,
       "applicabilityStatus": "PASS",
       "reasonCode": [
         "G4_QI_MARGIN_EXCEEDED"
@@ -96,14 +98,15 @@
     },
     "C": {
       "lhs_Jm3": -66846445350679880000,
-      "boundComputed_Jm3": null,
-      "boundPolicyFloor_Jm3": null,
+      "boundComputed_Jm3": -18,
+      "boundPolicyFloor_Jm3": -66846445350679880000,
       "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": null,
-      "boundFloor_Jm3": null,
-      "boundUsed_Jm3": null,
-      "boundFloorApplied": null,
+      "boundDefaultFloor_Jm3": -18,
+      "boundFloor_Jm3": -66846445350679880000,
+      "boundUsed_Jm3": -66846445350679880000,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
+      "marginRatioRawComputed": 3713691408371104300,
       "applicabilityStatus": "PASS",
       "reasonCode": [
         "G4_QI_MARGIN_EXCEEDED"
@@ -112,14 +115,15 @@
     },
     "D": {
       "lhs_Jm3": -12277918379371434000,
-      "boundComputed_Jm3": null,
-      "boundPolicyFloor_Jm3": null,
+      "boundComputed_Jm3": -18,
+      "boundPolicyFloor_Jm3": -12277918379371434000,
       "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": null,
-      "boundFloor_Jm3": null,
-      "boundUsed_Jm3": null,
-      "boundFloorApplied": null,
+      "boundDefaultFloor_Jm3": -18,
+      "boundFloor_Jm3": -12277918379371434000,
+      "boundUsed_Jm3": -12277918379371434000,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
+      "marginRatioRawComputed": 682106576631746300,
       "applicabilityStatus": "PASS",
       "reasonCode": [
         "G4_QI_MARGIN_EXCEEDED"

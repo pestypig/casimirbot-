@@ -18,6 +18,7 @@ type CaseResult = {
     casimirModel?: string;
   };
   marginRatioRaw: number | null;
+  marginRatioRawComputed: number | null;
   marginRatio: number | null;
   marginRatioDisplay: number | null;
   applicabilityStatus: string;
@@ -40,6 +41,7 @@ type InfluenceResult = {
   lhs_Jm3: number | null;
   bound_Jm3: number | null;
   marginRatioRaw: number | null;
+  marginRatioRawComputed: number | null;
   applicabilityStatus: string;
   applicabilityReasonCode: string | null;
   rhoSource: string | null;
@@ -120,6 +122,7 @@ const classifyScanAggregate = (args: {
 
 type GuardSummary = {
   marginRatioRaw?: number | null;
+  marginRatioRawComputed?: number | null;
   applicabilityStatus?: string | null;
   applicabilityReasonCode?: string | null;
   rhoSource?: string | null;
@@ -191,6 +194,7 @@ export async function runSensitivityCases(
         qiPolicyMaxZeta: base.QI_POLICY_MAX_ZETA,
       });
       const marginRaw = finiteOrNull(guard.marginRatioRaw);
+      const marginRawComputed = finiteOrNull((guard as any).marginRatioRawComputed);
       const marginRatio = finiteOrNull(guard.marginRatio);
       const marginRatioDisplay = normalizeDisplay(marginRatio);
       const applicabilityStatus = String(guard.applicabilityStatus ?? 'UNKNOWN').toUpperCase();
@@ -210,6 +214,7 @@ export async function runSensitivityCases(
           casimirModel: secondary.casimirModel,
         },
         marginRatioRaw: marginRaw,
+        marginRatioRawComputed: marginRawComputed,
         marginRatio,
         marginRatioDisplay,
         applicabilityStatus,
@@ -259,6 +264,7 @@ export async function runInfluenceScan(): Promise<{ baseline: InfluenceResult; r
       lhs_Jm3: lhs,
       bound_Jm3: numberOrNull(guard.bound_Jm3),
       marginRatioRaw: numberOrNull(guard.marginRatioRaw),
+      marginRatioRawComputed: numberOrNull((guard as any).marginRatioRawComputed),
       applicabilityStatus: String(guard.applicabilityStatus ?? 'UNKNOWN').toUpperCase(),
       applicabilityReasonCode: stringOrNull(guard.applicabilityReasonCode)?.toUpperCase() ?? null,
       rhoSource: stringOrNull(guard.rhoSource),

@@ -376,6 +376,7 @@ describe("evaluateQiGuardrail", () => {
       );
 
       expect(guard.marginRatioRaw).toBeLessThanOrEqual(0.5000001);
+      expect(guard.marginRatioRawComputed).toBeGreaterThan(guard.marginRatioRaw);
       expect(guard.bound_Jm3).toBeLessThan(0);
       expect(guard.boundPolicyFloor_Jm3).not.toBeNull();
       expect(guard.boundEnvFloor_Jm3).toBeNull();

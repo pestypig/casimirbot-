@@ -158,6 +158,7 @@ describe('warp-full-solve-campaign runner', () => {
             qi_bound_floor_applied: true,
             qi_margin_ratio: 2,
             qi_margin_ratio_raw: 2,
+            qi_margin_ratio_raw_computed: 2.6666666667,
             qi_rho_source: 'proxy',
             qi_metric_contract_status: 'missing',
             qi_applicability_status: 'PASS',
@@ -183,6 +184,7 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.boundUsed_Jm3).toBe(-1);
     expect(diagnostics.boundFloorApplied).toBe(true);
     expect(diagnostics.marginRatio).toBe(2);
+    expect(diagnostics.marginRatioRawComputed).toBeCloseTo(2.6666666667);
     expect(diagnostics.metricContractStatus).toBe('missing');
   });
 
@@ -331,6 +333,7 @@ describe('warp-full-solve-campaign runner', () => {
         payload: {
           snapshot: {
             qi_margin_ratio_raw: 0.75,
+            qi_margin_ratio_raw_computed: 1.25,
             qi_margin_ratio: 0.5,
             qi_applicability_status: 'PASS',
             qi_rho_source: 'gr.rho_constraint',
@@ -339,6 +342,7 @@ describe('warp-full-solve-campaign runner', () => {
       },
     } as any);
     expect(diagnostics.marginRatioRaw).toBe(0.75);
+    expect(diagnostics.marginRatioRawComputed).toBe(1.25);
     expect(diagnostics.marginRatio).toBe(0.5);
     expect(diagnostics.applicabilityStatus).toBe('PASS');
     expect(diagnostics.rhoSource).toBe('gr.rho_constraint');
@@ -354,6 +358,7 @@ describe('warp-full-solve-campaign runner', () => {
         lhs_Jm3: Number.NaN,
         bound_Jm3: -2,
         marginRatioRaw: Infinity,
+        marginRatioRawComputed: 3.25,
         marginRatio: 0.5,
         tau_s: undefined,
         K: 12,
@@ -388,6 +393,7 @@ describe('warp-full-solve-campaign runner', () => {
     expect(artifact.lhs_Jm3).toBeNull();
     expect(artifact.bound_Jm3).toBe(-2);
     expect(artifact.marginRatioRaw).toBeNull();
+    expect(artifact.marginRatioRawComputed).toBe(3.25);
     expect(artifact.marginRatioClamped).toBe(0.5);
     expect(artifact.effectiveRho_SI_Jm3).toBeNull();
     expect(artifact.rhoOn_SI_Jm3).toBe(-1);

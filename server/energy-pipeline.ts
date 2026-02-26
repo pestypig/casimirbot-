@@ -5364,6 +5364,7 @@ export async function calculateEnergyPipeline(
   qiGuard = qiGuardPost ?? qiGuard;
   state.zeta = qiGuard.marginRatio;
   (state as any).zetaRaw = qiGuard.marginRatioRaw;
+  (state as any).zetaRawComputed = qiGuard.marginRatioRawComputed;
   (state as any).qiGuardrail = qiGuard;
 
   const tsLog = {
@@ -6159,6 +6160,7 @@ export async function calculateEnergyPipeline(
   if (qiGuardLate) {
     state.zeta = qiGuardLate.marginRatio;
     (state as any).zetaRaw = qiGuardLate.marginRatioRaw;
+    (state as any).zetaRawComputed = qiGuardLate.marginRatioRawComputed;
     (state as any).qiGuardrail = qiGuardLate;
     const qiStatusLate = deriveQiStatus({
       zetaRaw: qiGuardLate.marginRatioRaw,
@@ -6218,6 +6220,7 @@ export async function calculateEnergyPipeline(
     state.qi.boundTight_Jm3 = guardForStats.bound_Jm3;
     state.qi.marginRatio = guardForStats.marginRatio;
     state.qi.marginRatioRaw = guardForStats.marginRatioRaw;
+    (state.qi as any).marginRatioRawComputed = guardForStats.marginRatioRawComputed;
     state.qi.policyLimit = guardForStats.policyLimit;
   }
 
@@ -6268,6 +6271,7 @@ function emitQiGuardLog(state: EnergyPipelineState, qiGuard: any): void {
   const guardLog = {
     margin: qiGuard.marginRatio,
     marginRaw: qiGuard.marginRatioRaw,
+    marginRawComputed: qiGuard.marginRatioRawComputed,
     lhs_Jm3: qiGuard.lhs_Jm3,
     bound_Jm3: qiGuard.bound_Jm3,
     boundComputed_Jm3: qiGuard.boundComputed_Jm3,
@@ -7315,6 +7319,7 @@ export function evaluateQiGuardrail(
   boundFloorApplied: boolean;
   marginRatio: number;
   marginRatioRaw: number;
+  marginRatioRawComputed: number;
   policyLimit?: number;
   window_ms: number;
   sampler: SamplingKind;
@@ -7462,6 +7467,10 @@ export function evaluateQiGuardrail(
   const boundFloorApplied = Number.isFinite(bound_Jm3) && Number.isFinite(boundComputed_Jm3) && bound_Jm3 !== boundComputed_Jm3;
   const rawRatio =
     bound_Jm3 < 0 && Number.isFinite(bound_Jm3) ? Math.abs(lhs) / Math.abs(bound_Jm3) : Infinity;
+  const rawRatioComputed =
+    boundComputed_Jm3 < 0 && Number.isFinite(boundComputed_Jm3)
+      ? Math.abs(lhs) / Math.abs(boundComputed_Jm3)
+      : Infinity;
   const marginRatio = QI_POLICY_ENFORCE ? Math.min(rawRatio, policyMaxZeta) : rawRatio;
 
   const rhoNote = [rhoDebug.note ?? rhoDebug.reason, curvatureNote].filter(Boolean).join("; ") || undefined;
@@ -7547,6 +7556,7 @@ export function evaluateQiGuardrail(
     boundFloorApplied,
     marginRatio: Number.isFinite(marginRatio) ? marginRatio : Infinity,
     marginRatioRaw: Number.isFinite(rawRatio) ? rawRatio : Infinity,
+    marginRatioRawComputed: Number.isFinite(rawRatioComputed) ? rawRatioComputed : Infinity,
     policyLimit: QI_POLICY_ENFORCE ? policyMaxZeta : undefined,
     window_ms: pattern.window_ms,
     sampler,

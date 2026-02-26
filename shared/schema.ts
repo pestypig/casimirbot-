@@ -615,6 +615,7 @@ export const qiStatsSchema = z.object({
   boundTight_Jm3: z.number().optional(),
   marginRatio: z.number().optional(),
   marginRatioRaw: z.number().optional(),
+  marginRatioRawComputed: z.number().optional(),
   policyLimit: z.number().optional(),
   window_ms: z.number().nonnegative(),
   samples: z.number().int().nonnegative(),
