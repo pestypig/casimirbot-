@@ -6270,6 +6270,10 @@ function emitQiGuardLog(state: EnergyPipelineState, qiGuard: any): void {
     marginRaw: qiGuard.marginRatioRaw,
     lhs_Jm3: qiGuard.lhs_Jm3,
     bound_Jm3: qiGuard.bound_Jm3,
+    boundComputed_Jm3: qiGuard.boundComputed_Jm3,
+    boundFloor_Jm3: qiGuard.boundFloor_Jm3,
+    boundUsed_Jm3: qiGuard.boundUsed_Jm3,
+    boundFloorApplied: qiGuard.boundFloorApplied,
     sampler: qiGuard.sampler,
     fieldType: qiGuard.fieldType,
     window_ms: qiGuard.window_ms,
@@ -7301,6 +7305,10 @@ export function evaluateQiGuardrail(
 ): {
   lhs_Jm3: number;
   bound_Jm3: number;
+  boundComputed_Jm3: number;
+  boundFloor_Jm3: number | null;
+  boundUsed_Jm3: number;
+  boundFloorApplied: boolean;
   marginRatio: number;
   marginRatioRaw: number;
   policyLimit?: number;
@@ -7325,6 +7333,10 @@ export function evaluateQiGuardrail(
   curvatureEnforced?: boolean;
   applicabilityStatus?: "PASS" | "FAIL" | "NOT_APPLICABLE" | "UNKNOWN";
   applicabilityReasonCode?: "G4_QI_CURVATURE_WINDOW_FAIL" | "G4_QI_SIGNAL_MISSING";
+  K: number | null;
+  KNullReason?: string;
+  safetySigma_Jm3: number | null;
+  safetySigmaNullReason?: string;
   strictMode?: boolean;
   metricContractOk?: boolean;
   metricDerived?: boolean;
@@ -7420,7 +7432,7 @@ export function evaluateQiGuardrail(
     fieldType,
     kernelType: sampler,
   });
-  const candidateBound = boundResult.bound_Jm3 - Math.abs(boundResult.safetySigma_Jm3);
+  const boundComputed_Jm3 = boundResult.bound_Jm3 - Math.abs(boundResult.safetySigma_Jm3);
   const policyMaxZeta =
     Number.isFinite(opts.qiPolicyMaxZeta) && (opts.qiPolicyMaxZeta as number) > 0
       ? Math.max(1e-12, Number(opts.qiPolicyMaxZeta))
@@ -7437,7 +7449,12 @@ export function evaluateQiGuardrail(
     policyFloorAbs,
     1e-12,
   );
-  const bound_Jm3 = clampNegativeBound(candidateBound, -fallbackAbs);
+  const boundFloor_Jm3 = policyFloorAbs > 0 ? -Math.abs(policyFloorAbs) : null;
+  const bound_Jm3 = clampNegativeBound(boundComputed_Jm3, -fallbackAbs);
+  const boundFloorApplied =
+    Number.isFinite(boundFloor_Jm3) &&
+    Number.isFinite(boundComputed_Jm3) &&
+    (boundComputed_Jm3 as number) > (boundFloor_Jm3 as number);
   const rawRatio =
     bound_Jm3 < 0 && Number.isFinite(bound_Jm3) ? Math.abs(lhs) / Math.abs(bound_Jm3) : Infinity;
   const marginRatio = QI_POLICY_ENFORCE ? Math.min(rawRatio, policyMaxZeta) : rawRatio;
@@ -7515,6 +7532,10 @@ export function evaluateQiGuardrail(
   return {
     lhs_Jm3: lhs,
     bound_Jm3,
+    boundComputed_Jm3,
+    boundFloor_Jm3,
+    boundUsed_Jm3: bound_Jm3,
+    boundFloorApplied,
     marginRatio: Number.isFinite(marginRatio) ? marginRatio : Infinity,
     marginRatioRaw: Number.isFinite(rawRatio) ? rawRatio : Infinity,
     policyLimit: QI_POLICY_ENFORCE ? policyMaxZeta : undefined,
@@ -7539,6 +7560,12 @@ export function evaluateQiGuardrail(
     curvatureEnforced,
     applicabilityStatus,
     applicabilityReasonCode,
+    K: Number.isFinite(boundResult.K) ? boundResult.K : null,
+    KNullReason: Number.isFinite(boundResult.K) ? undefined : 'non_finite_bound_K',
+    safetySigma_Jm3: Number.isFinite(boundResult.safetySigma_Jm3) ? boundResult.safetySigma_Jm3 : null,
+    safetySigmaNullReason: Number.isFinite(boundResult.safetySigma_Jm3)
+      ? undefined
+      : 'non_finite_safety_sigma',
     strictMode,
     metricContractOk,
     metricDerived,

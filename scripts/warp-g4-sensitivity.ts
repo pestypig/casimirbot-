@@ -23,7 +23,8 @@ type CaseResult = {
   applicabilityStatus: string;
   applicabilityReasonCode: string | null;
   g4ReasonCodes: string[];
-  classification: 'physics_limited' | 'applicability_limited' | 'scaling_suspect';
+  classification: 'candidate_pass_found' | 'margin_limited' | 'applicability_limited' | 'evidence_path_blocked';
+  classificationMismatchReason: string | null;
 };
 
 type InfluenceCase = {
@@ -74,11 +75,31 @@ const stringOrNull = (value: unknown): string | null =>
   typeof value === 'string' && value.trim().length > 0 ? String(value) : null;
 const boolOrNull = (value: unknown): boolean | null => (typeof value === 'boolean' ? value : null);
 
-const classifyCase = (marginRaw: number | null, applicabilityStatus: string, reasonCodes: string[]): CaseResult['classification'] => {
-  if (reasonCodes.includes('G4_QI_APPLICABILITY_NOT_PASS') || applicabilityStatus !== 'PASS') return 'applicability_limited';
-  if (reasonCodes.includes('G4_QI_SOURCE_NOT_METRIC') || reasonCodes.includes('G4_QI_CONTRACT_MISSING')) return 'scaling_suspect';
-  if ((marginRaw ?? 0) >= 1 || reasonCodes.includes('G4_QI_MARGIN_EXCEEDED')) return 'physics_limited';
-  return 'scaling_suspect';
+const classifyCanonicalSemantics = (
+  marginRaw: number | null,
+  applicabilityStatus: string,
+): CaseResult['classification'] => {
+  if (applicabilityStatus !== 'PASS') return 'applicability_limited';
+  if ((marginRaw ?? Number.POSITIVE_INFINITY) >= 1) return 'margin_limited';
+  return 'candidate_pass_found';
+};
+
+const classifyCase = (
+  marginRaw: number | null,
+  applicabilityStatus: string,
+  reasonCodes: string[],
+): { classification: CaseResult['classification']; mismatchReason: string | null } => {
+  const canonical = classifyCanonicalSemantics(marginRaw, applicabilityStatus);
+  let scanClass: CaseResult['classification'];
+  if (reasonCodes.includes('G4_QI_SIGNAL_MISSING')) scanClass = 'evidence_path_blocked';
+  else if (reasonCodes.includes('G4_QI_APPLICABILITY_NOT_PASS') || applicabilityStatus !== 'PASS') scanClass = 'applicability_limited';
+  else if ((marginRaw ?? Number.POSITIVE_INFINITY) >= 1 || reasonCodes.includes('G4_QI_MARGIN_EXCEEDED')) scanClass = 'margin_limited';
+  else scanClass = 'candidate_pass_found';
+  const mismatchReason =
+    scanClass === canonical
+      ? null
+      : `canonical=${canonical};scan=${scanClass};applicabilityStatus=${applicabilityStatus};marginRatioRaw=${marginRaw ?? 'null'}`;
+  return { classification: scanClass, mismatchReason };
 };
 
 type GuardSummary = {
@@ -162,6 +183,7 @@ export async function runSensitivityCases(
           ? guard.applicabilityReasonCode.trim().toUpperCase()
           : null;
       const reasonCodes = deriveSensitivityReasonCodes(guard);
+      const classificationOutcome = classifyCase(marginRaw, applicabilityStatus, reasonCodes);
       results.push({
         inputs: {
           tau_s: base.tau_s,
@@ -177,7 +199,8 @@ export async function runSensitivityCases(
         applicabilityStatus,
         applicabilityReasonCode,
         g4ReasonCodes: reasonCodes,
-        classification: classifyCase(marginRaw, applicabilityStatus, reasonCodes),
+        classification: classificationOutcome.classification,
+        classificationMismatchReason: classificationOutcome.mismatchReason,
       });
       if (idx >= 8) break;
     }
@@ -248,19 +271,23 @@ export async function run() {
   const results = await runSensitivityCases();
   const influence = await runInfluenceScan();
   fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
+  const mismatches = results.filter((entry) => entry.classificationMismatchReason != null);
   const payload = {
     runId: `g4-sensitivity-${SEED}-${DATE_STAMP}`,
     seed: SEED,
     generatedAt: new Date().toISOString(),
     cases: results,
+    parity: {
+      canonicalSemantics: 'classification=applicability_limited when applicabilityStatus!=PASS; else margin_limited when marginRatioRaw>=1; else candidate_pass_found',
+      mismatchCount: mismatches.length,
+      mismatchReasons: mismatches.map((entry) => entry.classificationMismatchReason),
+    },
   };
   fs.writeFileSync(OUT_PATH, `${JSON.stringify(sortDeep(payload), null, 2)}\n`);
   const best = influence.rankedEffects[0] ?? null;
   const decisionClass = (() => {
     if (!best) return 'evidence_path_blocked';
-    if (best.applicabilityStatus !== 'PASS') return 'applicability_limited';
-    if ((best.marginRatioRaw ?? Number.POSITIVE_INFINITY) >= 1) return 'margin_limited';
-    return 'candidate_pass_found';
+    return classifyCanonicalSemantics(best.marginRatioRaw, best.applicabilityStatus);
   })();
   const influencePayload = {
     runId: `g4-influence-scan-${SEED}-2026-02-26`,

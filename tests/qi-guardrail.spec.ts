@@ -113,6 +113,10 @@ describe("evaluateQiGuardrail", () => {
 
     expect(guard.effectiveRho).toBeCloseTo(-Math.abs(dutyCycle), 9);
     expect(guard.lhs_Jm3).toBeCloseTo(guard.effectiveRho, 9);
+    expect(guard.boundUsed_Jm3).toBe(guard.bound_Jm3);
+    expect(guard.boundComputed_Jm3).toBeLessThan(0);
+    expect(guard.K).not.toBeNull();
+    expect(guard.safetySigma_Jm3).not.toBeNull();
   });
 
   test("duty-weighted masks still integrate back to effective rho", () => {

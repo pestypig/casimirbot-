@@ -1,0 +1,120 @@
+{
+  "branchRationale": "No influence case achieved applicabilityStatus=PASS with marginRatioRaw<1; best absLhsDelta case remained applicabilityStatus=UNKNOWN with G4_QI_SIGNAL_MISSING.",
+  "canonical": {
+    "counts": {
+      "FAIL": 1,
+      "NOT_APPLICABLE": 1,
+      "NOT_READY": 0,
+      "PASS": 7,
+      "UNKNOWN": 0
+    },
+    "decision": "INADMISSIBLE",
+    "firstFail": "G4"
+  },
+  "commitHash": "e57285e50454b5712dde124dd9eb82317bff00ce",
+  "date": "2026-02-26",
+  "finalDecisionClass": "applicability_limited",
+  "influenceScan": {
+    "candidatePassFound": false,
+    "classification": "applicability_limited",
+    "topLeversByAbsLhsDelta": [
+      {
+        "absLhsDelta": -74986501034936690,
+        "applicabilityStatus": "UNKNOWN",
+        "family": "warpFieldType",
+        "id": "warpFieldType_natario_sdf",
+        "marginRatioRaw": 1
+      },
+      {
+        "absLhsDelta": 0,
+        "applicabilityStatus": "UNKNOWN",
+        "family": "warpFieldType",
+        "id": "warpFieldType_irrotational",
+        "marginRatioRaw": 1
+      },
+      {
+        "absLhsDelta": 0,
+        "applicabilityStatus": "UNKNOWN",
+        "family": "gammaGeo",
+        "id": "gammaGeo_low",
+        "marginRatioRaw": 1
+      },
+      {
+        "absLhsDelta": 0,
+        "applicabilityStatus": "UNKNOWN",
+        "family": "gammaGeo",
+        "id": "gammaGeo_high",
+        "marginRatioRaw": 1
+      },
+      {
+        "absLhsDelta": 0,
+        "applicabilityStatus": "UNKNOWN",
+        "family": "duty",
+        "id": "duty_low",
+        "marginRatioRaw": 1
+      }
+    ]
+  },
+  "waves": {
+    "A": {
+      "applicabilityStatus": "PASS",
+      "boundComputed_Jm3": -18,
+      "boundFloorApplied": true,
+      "boundFloor_Jm3": -24064720231109177000,
+      "boundUsed_Jm3": -24064720231109177000,
+      "curvatureOk": true,
+      "curvatureRatio": 0,
+      "lhs_Jm3": -24064720231109177000,
+      "marginRatioRaw": 1,
+      "reasonCode": [
+        "G4_QI_MARGIN_EXCEEDED"
+      ],
+      "rhoSource": "warp.metric.T00.natario.shift"
+    },
+    "B": {
+      "applicabilityStatus": "PASS",
+      "boundComputed_Jm3": -18,
+      "boundFloorApplied": true,
+      "boundFloor_Jm3": -37601125453291720000,
+      "boundUsed_Jm3": -37601125453291720000,
+      "curvatureOk": true,
+      "curvatureRatio": 0,
+      "lhs_Jm3": -37601125453291720000,
+      "marginRatioRaw": 1,
+      "reasonCode": [
+        "G4_QI_MARGIN_EXCEEDED"
+      ],
+      "rhoSource": "warp.metric.T00.natario.shift"
+    },
+    "C": {
+      "applicabilityStatus": "PASS",
+      "boundComputed_Jm3": -18,
+      "boundFloorApplied": true,
+      "boundFloor_Jm3": -66846445350679880000,
+      "boundUsed_Jm3": -66846445350679880000,
+      "curvatureOk": true,
+      "curvatureRatio": 0,
+      "lhs_Jm3": -66846445350679880000,
+      "marginRatioRaw": 1,
+      "reasonCode": [
+        "G4_QI_MARGIN_EXCEEDED"
+      ],
+      "rhoSource": "warp.metric.T00.natario.shift"
+    },
+    "D": {
+      "applicabilityStatus": "PASS",
+      "boundComputed_Jm3": -18,
+      "boundFloorApplied": true,
+      "boundFloor_Jm3": -12277918379371434000,
+      "boundUsed_Jm3": -12277918379371434000,
+      "curvatureOk": true,
+      "curvatureRatio": 0,
+      "lhs_Jm3": -12277918379371434000,
+      "marginRatioRaw": 1,
+      "reasonCode": [
+        "G4_QI_MARGIN_EXCEEDED"
+      ],
+      "rhoSource": "warp.metric.T00.natario.shift"
+    }
+  }
+}

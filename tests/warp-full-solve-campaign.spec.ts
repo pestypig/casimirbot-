@@ -138,7 +138,7 @@ describe('warp-full-solve-campaign runner', () => {
           {
             id: 'FordRomanQI',
             status: 'fail',
-            note: 'reasonCode=G4_QI_SOURCE_NOT_METRIC;reasonCode=G4_QI_MARGIN_EXCEEDED;lhs_Jm3=-2;bound_Jm3=-1;marginRatio=2',
+            note: 'reasonCode=G4_QI_SOURCE_NOT_METRIC;reasonCode=G4_QI_MARGIN_EXCEEDED;lhs_Jm3=-2;bound_Jm3=-1;boundComputed_Jm3=-0.75;boundFloor_Jm3=-1;boundUsed_Jm3=-1;boundFloorApplied=true;marginRatio=2',
           },
           { id: 'ThetaAudit', status: 'pass', note: 'theta ok' },
         ],
@@ -148,6 +148,10 @@ describe('warp-full-solve-campaign runner', () => {
           snapshot: {
             qi_lhs_Jm3: -2,
             qi_bound_Jm3: -1,
+            qi_bound_computed_Jm3: -0.75,
+            qi_bound_floor_Jm3: -1,
+            qi_bound_used_Jm3: -1,
+            qi_bound_floor_applied: true,
             qi_margin_ratio: 2,
             qi_margin_ratio_raw: 2,
             qi_rho_source: 'proxy',
@@ -166,6 +170,10 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.reasonCode).toEqual(['G4_QI_SOURCE_NOT_METRIC', 'G4_QI_MARGIN_EXCEEDED']);
     expect(diagnostics.lhs_Jm3).toBe(-2);
     expect(diagnostics.bound_Jm3).toBe(-1);
+    expect(diagnostics.boundComputed_Jm3).toBe(-0.75);
+    expect(diagnostics.boundFloor_Jm3).toBe(-1);
+    expect(diagnostics.boundUsed_Jm3).toBe(-1);
+    expect(diagnostics.boundFloorApplied).toBe(true);
     expect(diagnostics.marginRatio).toBe(2);
     expect(diagnostics.metricContractStatus).toBe('missing');
   });
