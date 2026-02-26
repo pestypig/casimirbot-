@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   __resetLlmHttpBreakerForTests,
   __setLlmHttpFetchForTests,
+  getLlmHttpBreakerSnapshot,
   llmHttpHandler,
 } from "../skills/llm.http";
 
@@ -37,6 +38,10 @@ describe("llm.http safeguards", () => {
 
     await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow(/llm_http_transport/);
     await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow("llm_http_circuit_open");
+    const breaker = getLlmHttpBreakerSnapshot();
+    expect(breaker.open).toBe(true);
+    expect(breaker.consecutive_failures).toBeGreaterThanOrEqual(1);
+    expect(breaker.remaining_ms).toBeGreaterThan(0);
   });
 
   it("keeps Hull allowlist enforcement on HTTP path", async () => {
@@ -93,5 +98,9 @@ describe("llm.http safeguards", () => {
     await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow("llm_http_401");
     await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow("llm_http_401");
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    const breaker = getLlmHttpBreakerSnapshot();
+    expect(breaker.open).toBe(false);
+    expect(breaker.consecutive_failures).toBe(0);
+    expect(breaker.opened_at).toBeNull();
   });
 });

@@ -33,6 +33,40 @@ const resetBreaker = (): void => {
   llmHttpBreakerOpenedAt = 0;
 };
 
+const refreshBreakerWindow = (): void => {
+  if (!llmHttpBreakerOpenedAt) {
+    return;
+  }
+  const elapsedMs = Date.now() - llmHttpBreakerOpenedAt;
+  if (elapsedMs >= getBreakerCooldownMs()) {
+    resetBreaker();
+  }
+};
+
+export const getLlmHttpBreakerSnapshot = (): {
+  open: boolean;
+  consecutive_failures: number;
+  threshold: number;
+  cooldown_ms: number;
+  opened_at: string | null;
+  remaining_ms: number;
+} => {
+  refreshBreakerWindow();
+  const threshold = getBreakerThreshold();
+  const cooldownMs = getBreakerCooldownMs();
+  const open = llmHttpBreakerOpenedAt > 0;
+  const elapsedMs = open ? Date.now() - llmHttpBreakerOpenedAt : 0;
+  const remainingMs = open ? Math.max(0, cooldownMs - elapsedMs) : 0;
+  return {
+    open,
+    consecutive_failures: llmHttpBreakerConsecutiveFailures,
+    threshold,
+    cooldown_ms: cooldownMs,
+    opened_at: open ? new Date(llmHttpBreakerOpenedAt).toISOString() : null,
+    remaining_ms: remainingMs,
+  };
+};
+
 export const __resetLlmHttpBreakerForTests = (): void => {
   resetBreaker();
 };
@@ -49,14 +83,8 @@ const noteBreakerFailure = (): void => {
 };
 
 const ensureBreakerClosed = (): void => {
-  if (!llmHttpBreakerOpenedAt) {
-    return;
-  }
-  const elapsedMs = Date.now() - llmHttpBreakerOpenedAt;
-  if (elapsedMs >= getBreakerCooldownMs()) {
-    resetBreaker();
-    return;
-  }
+  refreshBreakerWindow();
+  if (!llmHttpBreakerOpenedAt) return;
   throw new Error("llm_http_circuit_open");
 };
 

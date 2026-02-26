@@ -258,6 +258,46 @@ describe("Helix Ask jobs endpoint regression", () => {
     expect(text).not.toMatch(/Sources:\s*docs\/helix-ask-flow\.md/i);
   }, 120000);
 
+  it("skips repo-style source appends for security open-world prompts without explicit repo cues", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "Give practical steps to secure a home Wi-Fi network.",
+        sessionId: "security-open-world-no-repo-sources",
+        debug: true,
+        verbosity: "brief",
+        forceLlmProbe: true,
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text?: string;
+      debug?: {
+        llm_invoke_attempted?: boolean;
+        llm_backend_used?: string;
+        llm_http_status?: number;
+        llm_provider_called?: boolean;
+        answer_path?: string[];
+        citation_append_suppressed?: boolean;
+        citation_append_suppressed_reason?: string;
+      };
+    };
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_backend_used).toBe("http");
+    expect(payload.debug?.llm_http_status).toBe(200);
+    expect(payload.debug?.llm_provider_called).toBe(true);
+    expect((payload.debug?.answer_path ?? []).includes("qualityFloor:append_sources")).toBe(false);
+    const text = payload.text ?? "";
+    expect(text).not.toMatch(/Sources:\s*server\/routes\/agi\.plan\.ts/i);
+    expect(text).not.toMatch(/Sources:\s*docs\/helix-ask-flow\.md/i);
+    if (payload.debug?.citation_append_suppressed) {
+      expect(payload.debug?.citation_append_suppressed_reason).toBe(
+        "open_world_or_security_non_repo",
+      );
+    }
+  }, 120000);
+
   it("runs a bounded second LLM rescue pass before deterministic fallback on weak-evidence placeholders", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",

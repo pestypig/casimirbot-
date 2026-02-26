@@ -4,6 +4,7 @@ import { getGpuThermals } from "../services/hardware/gpu-scheduler";
 import { getToolLogs } from "../services/observability/tool-log-store";
 import { resolveLocalContextTokens } from "../services/llm/local-runtime";
 import { getLocalRuntimeStats } from "../services/llm/local-runtime-stats";
+import { getLlmHttpBreakerSnapshot } from "../skills/llm.http";
 import { getHullAllowList, hullModeEnabled, isHullAllowed } from "../security/hull-guard";
 
 type EndpointStatus = { url: string; allowed: boolean } | null;
@@ -64,6 +65,7 @@ hullStatusRouter.get("/", (_req, res) => {
       stats: localStats,
     },
     llm_http: describeEndpoint(process.env.LLM_HTTP_BASE),
+    llm_http_breaker: getLlmHttpBreakerSnapshot(),
     stt_http: describeEndpoint(process.env.WHISPER_HTTP_URL),
     diff_http: describeEndpoint(process.env.DIFF_HTTP_URL),
     gpu: {

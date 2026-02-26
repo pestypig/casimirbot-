@@ -252,3 +252,27 @@
   - Runtime probe confirms consecutive calls remain on HTTP invoke path without breaker escalation; full retry-loop returned lane classifications A=`A_short_circuit`, P2/P3/P4/P5/J1=`C_http_success`.
 - known_risks_next_step:
   - This patch hardens uptime behavior but does not independently solve source-relevance drift for repo-specific prompts; retain planned citation relevance gating for repo lanes.
+
+## Milestone M13 - Open-World Source Append Guard + Breaker Observability
+- milestone_id: `M13-open-world-source-guard-breaker-observability`
+- files_changed:
+  - `server/routes/agi.plan.ts`
+  - `server/skills/llm.http.ts`
+  - `server/routes/hull.status.ts`
+  - `server/__tests__/llm.http.safeguards.test.ts`
+  - `tests/hull-status.spec.ts`
+  - `tests/helix-ask-jobs-regression.spec.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run server/__tests__/llm.http.safeguards.test.ts tests/hull-status.spec.ts tests/helix-ask-llm-debug-skip.spec.ts tests/helix-ask-jobs-regression.spec.ts`
+  - `npm run helix:ask:dot:debug-loop -- --base-url http://127.0.0.1:5050`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl.exe -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Added a repo-style citation append guard in `agi.plan` quality-floor post-processing so open-world/security prompts without repo expectation do not get forced `Sources:` injection from fallback anchors.
+  - Added deterministic debug breadcrumbs for suppressed source append decisions (`qualityFloor:append_sources_skipped_non_repo`, `citation_append_suppressed_reason`).
+  - Added `getLlmHttpBreakerSnapshot()` in `llm.http` with cooldown-aware state refresh for deterministic observability (`open`, `consecutive_failures`, `threshold`, `cooldown_ms`, `opened_at`, `remaining_ms`).
+  - Exposed breaker state through `/api/hull/status` via `llm_http_breaker`.
+  - Extended regressions to validate breaker snapshot behavior, hull status payload shape, and security open-world source-append suppression.
+- known_risks_next_step:
+  - Open-world suppression now avoids repo-style source padding, but output quality still depends on rescue prompt quality and intent routing; continue with answer-quality harnessing per prompt family.

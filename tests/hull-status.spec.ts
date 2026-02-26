@@ -55,6 +55,13 @@ describe("hull status route", () => {
     expect(typeof response.body.queue_depth).toBe("number");
     expect(response.body.queue_depth).toBeGreaterThan(0);
     expect(response.body.approvals_outstanding).toBeGreaterThanOrEqual(1);
+    expect(response.body.llm_http_breaker).toMatchObject({
+      open: false,
+      threshold: expect.any(Number),
+      cooldown_ms: expect.any(Number),
+    });
+    expect(typeof response.body.llm_http_breaker.consecutive_failures).toBe("number");
+    expect(typeof response.body.llm_http_breaker.remaining_ms).toBe("number");
 
     if (releaseJob) {
       releaseJob();

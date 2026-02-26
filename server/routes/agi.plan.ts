@@ -29012,6 +29012,7 @@ const executeHelixAsk = async ({
         const finalPaths = filterExistingEvidencePaths(
           Array.from(new Set([...allowedSourcePaths, ...contextFiles, ...extractFilePathsFromText(evidenceText)])),
         );
+        const repoStyleSourceAppendAllowed = citationLinkingRequired || explicitRepoExpectation;
         let finalFallbackTokens = normalizeCitations([
           ...allowedSourcePaths,
           ...contextFiles,
@@ -29031,6 +29032,7 @@ const executeHelixAsk = async ({
         ]);
         const finalCitationTokens = finalTokens.length > 0 ? finalTokens : finalFallbackTokens;
         if (
+          repoStyleSourceAppendAllowed &&
           (extractFilePathsFromText(cleaned).length === 0 && !hasSourcesLine(cleaned)) &&
           finalCitationTokens.length > 0
         ) {
@@ -29044,6 +29046,13 @@ const executeHelixAsk = async ({
               new Set([...existingReasons, "citation_missing_appended"]),
             );
             debugPayload.answer_quality_floor_applied = true;
+          }
+        } else if (!repoStyleSourceAppendAllowed) {
+          answerPath.push("qualityFloor:append_sources_skipped_non_repo");
+          if (debugPayload) {
+            (debugPayload as Record<string, unknown>).citation_append_suppressed = true;
+            (debugPayload as Record<string, unknown>).citation_append_suppressed_reason =
+              "open_world_or_security_non_repo";
           }
         }
       }
