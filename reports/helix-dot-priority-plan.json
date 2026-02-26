@@ -1,0 +1,101 @@
+{
+  "contract_version": "helix.operator_callout.v1",
+  "phases": [
+    {
+      "name": "near_term",
+      "acceptance_gates": [
+        "callout_contract_conformance>=0.98",
+        "voice_certainty_parity=PASS",
+        "suppressed_callouts_have_reason=1.0",
+        "http_lane_proof_runbook_still_passes"
+      ],
+      "tasks": [
+        {
+          "title": "Operator Contract v1 serializer+validator",
+          "owner_type": "backend",
+          "estimate": "M",
+          "dependency": null,
+          "risk": "medium",
+          "done_criteria": "Validator rejects nonconforming payloads; tests added"
+        },
+        {
+          "title": "Suppression ledger (dedupe+cooldown)",
+          "owner_type": "backend",
+          "estimate": "M",
+          "dependency": "Operator Contract v1 serializer+validator",
+          "risk": "medium",
+          "done_criteria": "Replay determinism test passes"
+        },
+        {
+          "title": "Wire ask live-events to mission-board events",
+          "owner_type": "backend",
+          "estimate": "L",
+          "dependency": "Suppression ledger (dedupe+cooldown)",
+          "risk": "high",
+          "done_criteria": "Mission board displays events with evidenceRefs"
+        },
+        {
+          "title": "Surface suppression reasons in UI",
+          "owner_type": "frontend",
+          "estimate": "S",
+          "dependency": "Suppression ledger (dedupe+cooldown)",
+          "risk": "low",
+          "done_criteria": "Suppressed events show reason and cooldown"
+        },
+        {
+          "title": "Voice projection-only enforcement + parity tests",
+          "owner_type": "backend",
+          "estimate": "M",
+          "dependency": "Operator Contract v1 serializer+validator",
+          "risk": "medium",
+          "done_criteria": "Property tests ensure voice<=text certainty"
+        }
+      ]
+    },
+    {
+      "name": "mid_term",
+      "acceptance_gates": [
+        "lane_c_degradation_regression_pack_exists",
+        "missing_evidence_suppression_rate_decreases_without_precision_loss",
+        "replay_determinism>=0.99",
+        "callout_latency_p95<=1500ms_for_critical_action"
+      ],
+      "tasks": [
+        {
+          "title": "Lane C degradation harness + regression prompts",
+          "owner_type": "eval",
+          "estimate": "L",
+          "dependency": "Wire ask live-events to mission-board events",
+          "risk": "high",
+          "done_criteria": "Repro prompts + metrics pipeline merged"
+        },
+        {
+          "title": "Provenance minimums per classification",
+          "owner_type": "backend",
+          "estimate": "M",
+          "dependency": "Operator Contract v1 serializer+validator",
+          "risk": "medium",
+          "done_criteria": "Action/critical require evidenceRefs or suppress"
+        }
+      ]
+    },
+    {
+      "name": "later",
+      "acceptance_gates": [
+        "suppression_false_positives<0.10",
+        "operator_trust_calibration_proxy_improves",
+        "mission_overwatch_slo_gate_enabled"
+      ],
+      "tasks": [
+        {
+          "title": "Mission-grade SLO gates for overwatch/voice",
+          "owner_type": "ops",
+          "estimate": "M",
+          "dependency": "Lane C degradation harness + regression prompts",
+          "risk": "medium",
+          "done_criteria": "SLO thresholds gate voice normal mode default"
+        }
+      ]
+    }
+  ]
+}
