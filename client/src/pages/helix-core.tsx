@@ -1198,6 +1198,9 @@ export default function HelixCore() {
   const [observerFrame, setObserverFrame] = useState<ObserverFrameKey>("Eulerian");
   const [observerDirectionOverlay, setObserverDirectionOverlay] = useState<"Off" | "On">("Off");
   const [observerDirectionStride, setObserverDirectionStride] = useState<number>(4);
+  const [observerDecDirectionMode, setObserverDecDirectionMode] = useState<"local" | "global">("local");
+  const [observerDirectionMaskMode, setObserverDirectionMaskMode] = useState<"all" | "violating" | "missed">("violating");
+  const [observerDirectionMinMagnitude, setObserverDirectionMinMagnitude] = useState<number>(0);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onMockUsed = (event: Event) => {
@@ -1346,8 +1349,11 @@ useEffect(() => {
     publish(OBSERVER_DIRECTION_OVERLAY_CHANNEL, {
       enabled: observerDirectionOverlay === "On",
       stride: observerDirectionStride,
+      decDirectionMode: observerDecDirectionMode,
+      maskMode: observerDirectionMaskMode,
+      minMagnitude: observerDirectionMinMagnitude,
     });
-  }, [observerDirectionOverlay, observerDirectionStride]);
+  }, [observerDirectionOverlay, observerDirectionStride, observerDecDirectionMode, observerDirectionMaskMode, observerDirectionMinMagnitude]);
 
   const focusAlcubierrePanel = useCallback(() => {
     const node = alcubierreRef.current;
@@ -5132,6 +5138,31 @@ useEffect(() => {
                       </Select>
                     </div>
                     <div>
+                      <Label className="text-xs text-slate-300">DEC Direction Mode (diagnostic)</Label>
+                      <Select value={observerDecDirectionMode} onValueChange={(value) => setObserverDecDirectionMode(value as "local" | "global")}>
+                        <SelectTrigger className="mt-1 border-slate-700 bg-slate-900/70 text-slate-100">
+                          <SelectValue placeholder="DEC Direction Mode" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 text-slate-100">
+                          <SelectItem value="local">Local</SelectItem>
+                          <SelectItem value="global">Global</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-300">Direction Mask (diagnostic)</Label>
+                      <Select value={observerDirectionMaskMode} onValueChange={(value) => setObserverDirectionMaskMode(value as "all" | "violating" | "missed") }>
+                        <SelectTrigger className="mt-1 border-slate-700 bg-slate-900/70 text-slate-100">
+                          <SelectValue placeholder="Direction Mask" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 text-slate-100">
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="violating">Violating</SelectItem>
+                          <SelectItem value="missed">Missed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
                       <Label className="text-xs text-slate-300">Direction Stride: {observerDirectionStride}</Label>
                       <Slider
                         className="mt-2"
@@ -5140,6 +5171,28 @@ useEffect(() => {
                         step={1}
                         value={[observerDirectionStride]}
                         onValueChange={(value) => setObserverDirectionStride(Math.max(1, Math.round(value[0] ?? 4)))}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-300">Min Magnitude (diagnostic): {observerDirectionMinMagnitude.toFixed(2)}</Label>
+                      <Slider
+                        className="mt-2"
+                        min={0}
+                        max={10}
+                        step={0.1}
+                        value={[observerDirectionMinMagnitude]}
+                        onValueChange={(value) => setObserverDirectionMinMagnitude(Math.max(0, value[0] ?? 0))}
+                      />
+                      <Input
+                        className="mt-2 h-8 border-slate-700 bg-slate-900/70 text-slate-100"
+                        type="number"
+                        min={0}
+                        step={0.1}
+                        value={observerDirectionMinMagnitude}
+                        onChange={(event) => {
+                          const next = Number(event.target.value);
+                          setObserverDirectionMinMagnitude(Number.isFinite(next) ? Math.max(0, next) : 0);
+                        }}
                       />
                     </div>
                   </div>
