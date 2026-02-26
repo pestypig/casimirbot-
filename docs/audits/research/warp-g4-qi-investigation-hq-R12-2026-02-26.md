@@ -128,3 +128,33 @@ Minimum for G4 closure pathway:
 - Casimir verify remains PASS after change
 
 "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim."
+
+## Iteration Log — R13 (2026-02-26)
+
+- Patch wave ID: R13
+- Code surfaces changed:
+  - `server/energy-pipeline.ts`
+  - `tools/warpViability.ts`
+  - `scripts/warp-g4-sensitivity.ts`
+  - `scripts/warp-full-solve-campaign.ts`
+  - `tests/qi-guardrail.spec.ts`
+  - `tests/warp-full-solve-campaign.spec.ts`
+- Baseline before:
+  - Campaign counts: `PASS=7, FAIL=1, UNKNOWN=0, NOT_READY=0, NOT_APPLICABLE=1`
+  - Decision: `INADMISSIBLE`
+  - First fail: `G4`
+- Baseline after:
+  - Campaign counts: `PASS=7, FAIL=1, UNKNOWN=0, NOT_READY=0, NOT_APPLICABLE=1`
+  - Decision: `INADMISSIBLE`
+  - First fail: `G4`
+- G4 class after run (`evidence_path_blocked|applicability_limited|margin_limited|candidate_pass`): `applicability_limited`
+- Per-wave delta (lhs, bound, raw ratio, applicability):
+  - A: `lhs=-2.4064720231109177e+19`, `boundComputed=-18`, `boundFloor=-2.4064720231109177e+19`, `boundUsed=-2.4064720231109177e+19`, `marginRatioRaw=1`, `applicability=PASS`
+  - B: `lhs=-3.760112545329172e+19`, `boundComputed=-18`, `boundFloor=-3.760112545329172e+19`, `boundUsed=-3.760112545329172e+19`, `marginRatioRaw=1`, `applicability=PASS`
+  - C: `lhs=-6.684644535067988e+19`, `boundComputed=-18`, `boundFloor=-6.684644535067988e+19`, `boundUsed=-6.684644535067988e+19`, `marginRatioRaw=1`, `applicability=PASS`
+  - D: `lhs=-1.2277918379371434e+19`, `boundComputed=-18`, `boundFloor=-1.2277918379371434e+19`, `boundUsed=-1.2277918379371434e+19`, `marginRatioRaw=1`, `applicability=PASS`
+- Casimir verify: verdict / certificateHash / integrityOk / traceId / runId
+  - `PASS / 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 / true / adapter:4fe60624-7b05-438d-8e4e-eccd91443d34 / 1`
+- Decision: continue (bookkeeping now supports policy-floor vs computed-bound decomposition and deterministic sensitivity parity diagnostics)
+
+“This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.”

@@ -1026,6 +1026,10 @@ export async function evaluateWarpViability(
     qi_applicability_status: qiGuard?.applicabilityStatus,
     qi_lhs_Jm3: finiteOrUndefined(qiGuard?.lhs_Jm3),
     qi_bound_Jm3: finiteOrUndefined(qiGuard?.bound_Jm3),
+    qi_bound_computed_Jm3: finiteOrUndefined(qiGuard?.boundComputed_Jm3),
+    qi_bound_floor_Jm3: finiteOrUndefined(qiGuard?.boundFloor_Jm3),
+    qi_bound_used_Jm3: finiteOrUndefined(qiGuard?.boundUsed_Jm3),
+    qi_bound_floor_applied: qiGuard?.boundFloorApplied === true,
     qi_margin_ratio: finiteOrUndefined(qiGuard?.marginRatio),
     qi_margin_ratio_raw: finiteOrUndefined(qiGuard?.marginRatioRaw),
     qi_rho_source: qiGuard?.rhoSource,
@@ -1038,8 +1042,16 @@ export async function evaluateWarpViability(
       Number.isFinite((pipeline as any).qi?.tau_s_ms) && Number((pipeline as any).qi?.tau_s_ms) > 0
         ? Number((pipeline as any).qi?.tau_s_ms) / 1000
         : undefined,
-    qi_bound_K: finiteOrUndefined((pipeline as any).qi?.boundK),
-    qi_safetySigma_Jm3: finiteOrUndefined((pipeline as any).qi?.safetySigma_Jm3),
+    qi_bound_K: finiteOrUndefined(qiGuard?.K),
+    qi_bound_K_null_reason:
+      typeof qiGuard?.KNullReason === "string" && qiGuard.KNullReason.length > 0
+        ? qiGuard.KNullReason
+        : undefined,
+    qi_safetySigma_Jm3: finiteOrUndefined(qiGuard?.safetySigma_Jm3),
+    qi_safetySigma_null_reason:
+      typeof qiGuard?.safetySigmaNullReason === "string" && qiGuard.safetySigmaNullReason.length > 0
+        ? qiGuard.safetySigmaNullReason
+        : undefined,
     qi_provenance_class: qiProvenanceClass,
     qi_confidence_band: qiConfidenceBand,
     warp_mechanics_provenance_class: warpMechanicsProvenanceClass,
@@ -1145,6 +1157,10 @@ export async function evaluateWarpViability(
           orderedReasonCodes.map((code) => `reasonCode=${code}`).join(";"),
           `lhs_Jm3=${qiGuard.lhs_Jm3 ?? "n/a"}`,
           `bound_Jm3=${qiGuard.bound_Jm3 ?? "n/a"}`,
+          `boundComputed_Jm3=${qiGuard.boundComputed_Jm3 ?? "n/a"}`,
+          `boundFloor_Jm3=${qiGuard.boundFloor_Jm3 ?? "n/a"}`,
+          `boundUsed_Jm3=${qiGuard.boundUsed_Jm3 ?? "n/a"}`,
+          `boundFloorApplied=${qiGuard.boundFloorApplied === true}`,
           `marginRatio=${qiGuard.marginRatio ?? "n/a"}`,
           `marginRatioRaw=${qiGuard.marginRatioRaw ?? "n/a"}`,
           `rhoSource=${qiGuard.rhoSource ?? "unknown"}`,
@@ -1155,8 +1171,10 @@ export async function evaluateWarpViability(
           `curvatureRatio=${qiGuard.curvatureRatio ?? "n/a"}`,
           `curvatureEnforced=${curvatureEnforced}`,
           `tau_s=${Number.isFinite((pipeline as any).qi?.tau_s_ms) ? Number((pipeline as any).qi?.tau_s_ms) / 1000 : "n/a"}`,
-          `K=${Number.isFinite(Number((pipeline as any).qi?.boundK)) ? Number((pipeline as any).qi?.boundK) : "n/a"}`,
-          `safetySigma_Jm3=${Number.isFinite(Number((pipeline as any).qi?.safetySigma_Jm3)) ? Number((pipeline as any).qi?.safetySigma_Jm3) : "n/a"}`,
+          `K=${qiGuard.K ?? "n/a"}`,
+          `KNullReason=${qiGuard.KNullReason ?? "none"}`,
+          `safetySigma_Jm3=${qiGuard.safetySigma_Jm3 ?? "n/a"}`,
+          `safetySigmaNullReason=${qiGuard.safetySigmaNullReason ?? "none"}`,
           curvatureNote,
         ].join("; "),
         !sourcePass
