@@ -36,7 +36,10 @@
       "run_manifest_contract": "missing",
       "dependency_lock_by_lane": "missing",
       "repeatability_breach_gate": "missing",
-      "portable_bundle_import_export": "missing"
+      "portable_bundle_import_export": "missing",
+      "vi_elbo_diagnostic_lane": "missing",
+      "elbo_metric_capture_in_traces": "missing",
+      "posterior_collapse_gate": "missing"
     },
     "ui": {
       "tier_and_voice_controls": "exists_now",
@@ -54,6 +57,11 @@
       "id": "batch_two",
       "goal": "evidence envelope and claim node ops",
       "adversarial": "unknown evidence id fails closed deterministically"
+    },
+    {
+      "id": "batch_two_b",
+      "goal": "vi/elbo diagnostic uncertainty lane",
+      "adversarial": "elbo improves while calibration degrades beyond threshold and promotion remains blocked deterministically"
     },
     {
       "id": "batch_three",
@@ -79,9 +87,14 @@
       "target": 1.0,
       "hard_gate": true
     },
+    "elbo_metric_coverage": {
+      "target": 1.0
+    },
+    "posterior_collapse_detection_coverage": {
+      "target": 1.0
+    },
     "replay_determinism_rate": {
       "target": 0.99
     }
   }
 }
-

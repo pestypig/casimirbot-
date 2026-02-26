@@ -6,6 +6,8 @@ export const HELIX_ASK_TYPED_FAIL_REASONS = [
   "GENERIC_COLLAPSE",
   "LOW_EVIDENCE_UTILIZATION",
   "TIMEOUT",
+  "SCIENTIFIC_METHOD_MISSING_SLOT",
+  "TELEMETRY_LEAK_IN_ANSWER",
 ] as const;
 
 export type HelixAskTypedFailReason = (typeof HELIX_ASK_TYPED_FAIL_REASONS)[number];

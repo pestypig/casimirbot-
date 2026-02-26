@@ -229,6 +229,33 @@ describe("Helix Ask strict fail-reason ledger", () => {
 
     expect(ledger).toBeNull();
   });
+
+  it("categorizes scientific-slot and telemetry-leak fail reasons deterministically", () => {
+    const ledger = buildHelixAskStrictFailReasonLedger({
+      strictEnabled: true,
+      payload: {
+        fail_reason: "SCIENTIFIC_METHOD_MISSING_SLOT",
+        debug: {
+          helix_ask_fail_reason: "TELEMETRY_LEAK_IN_ANSWER",
+        },
+      },
+    });
+
+    expect(ledger?.entries).toEqual([
+      {
+        ordinal: 1,
+        stage: "response",
+        fail_reason: "SCIENTIFIC_METHOD_MISSING_SLOT",
+        category: "evidence_contract",
+      },
+      {
+        ordinal: 2,
+        stage: "runtime",
+        fail_reason: "TELEMETRY_LEAK_IN_ANSWER",
+        category: "runtime_contract",
+      },
+    ]);
+  });
 });
 
 

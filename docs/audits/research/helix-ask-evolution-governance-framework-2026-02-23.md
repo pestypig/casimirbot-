@@ -116,6 +116,71 @@ theta_t = arccos( (x_t . g) / (|x_t| * |g| + epsilon) )
 
 Where intent vector `g` is versioned config (not LLM inferred), e.g. `configs/evolution-intent.v1.json`.
 
+### Interaction-matrix transform model (patch-life analogue)
+
+Treat subsystem evolution as a deterministic force field, not literal physics.
+This is a control metaphor for operator visibility and training calibration.
+
+Define:
+- `K` subsystems from deterministic path partition.
+- patch pressure vector `q(p) in R^K`, where `q_i(p)` is normalized patch activity for subsystem `s_i`.
+- asymmetric interaction matrix `W in R^(KxK)` where `W_ij` models how activity in `s_j` pushes or pulls `s_i`.
+
+Per patch:
+
+```text
+F(p) = W * q(p)
+v_t = beta * v_{t-1} + (1 - beta) * F(p_t)
+z_t = z_{t-1} + eta * v_t
+```
+
+Where:
+- `v_t` is momentum velocity by subsystem,
+- `z_t` is projected subsystem trajectory state,
+- `beta` and `eta` are versioned deterministic config parameters.
+
+Risk-weighted hotspot score (where evolution is likely to occur next):
+
+```text
+h_i(t) =
+  softplus(
+    |v_i(t)|
+    + lambda_u * uncertainty_i(t)
+    + lambda_c * coupling_i(t)
+    + lambda_m * misalignment_i(t, g)
+  )
+```
+
+Deterministic operator classes:
+- `hot`: `h_i >= tau_hot`
+- `warm`: `tau_warm <= h_i < tau_hot`
+- `cold`: `h_i < tau_warm`
+
+Calibration controls:
+- matrix lock toggle (`W` frozen for replay comparability),
+- preset matrix profiles (`stability`, `exploration`, `hardening`),
+- explicit config version and hash stored with every momentum/congruence artifact.
+
+### Three-pass operator pipeline (simulate -> clear -> draw)
+
+Adopt the same simple rhythm each evaluation tick:
+1. Simulate pass:
+   - ingest patch/evidence,
+   - compute `q`, `F`, `v`, `z`, `h`,
+   - emit deterministic momentum artifact.
+2. Clear pass:
+   - expire stale hotspot markers by deterministic TTL,
+   - remove duplicate unresolved alerts for same `(subsystem, reason)`.
+3. Draw pass:
+   - render subsystem heatmap,
+   - render asymmetric `W` matrix view,
+   - render top hotspot list with typed reasons and linked evidence artifacts.
+
+This keeps the UI expressive without changing gate semantics:
+- Casimir verify remains required baseline.
+- Congruence gate remains additive.
+- Matrix UI is advisory unless tied to explicit typed gate thresholds.
+
 ## Section C: Congruence gate design
 
 ### Congruence definition
@@ -155,6 +220,7 @@ Soft FAIL / WARN:
 - `COUPLING_SPIKE`
 - `UNCERTAINTY_SPIKE`
 - `DEBT_TREND_UP`
+- `MOMENTUM_HOTSPOT_SPIKE`
 
 PASS:
 - no hard fails and:
@@ -295,6 +361,7 @@ Given same `(repo state, base/head, config version, artifacts)`, outputs are ide
 - implement checklist addendum generator
 - implement report-only congruence gate
 - record congruence outputs in training-trace
+- implement deterministic force-field projection (`W`, `q`, `F`, `h`) in report-only mode
 
 ### 60 days
 
@@ -302,12 +369,14 @@ Given same `(repo state, base/head, config version, artifacts)`, outputs are ide
 - add trajectory endpoint and hotspot ranking
 - integrate CI artifacts into patch records
 - begin threshold calibration with labeled outcomes
+- add matrix lock/preset support and hotspot class thresholds (`hot|warm|cold`)
 
 ### 90 days
 
 - enforce selected hard-fails on high-risk surfaces
 - add operator surface MVP (trajectory/hotspots/risks/artifacts)
 - optional mission-board narrative mapping for drift hotspots
+- add force-matrix panel to operator surface (asymmetric matrix, hotspot map, evidence links)
 
 ## Section H: Risks, tradeoffs, rejected alternatives, leadership decisions
 

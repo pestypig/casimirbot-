@@ -66,11 +66,13 @@ Acceptance gates:
 - Replay-safe traces are emitted for each run.
 - Post-run verification is automated.
 - Governance checks fail closed with deterministic reason codes.
+- Probabilistic lanes log uncertainty metrics (for example ELBO total/reconstruction/KL) with declared tolerances.
 
 Required artifacts:
 - enriched `run_manifest.json` with SHA, env lock, input hashes, metrics
 - trace export bundle (for replay and comparison)
 - verification report and certificate metadata
+- uncertainty calibration report when a lane publishes probabilistic confidence claims
 
 Adversarial check:
 - Repeatability breach blocks promotion and records both traces for diff.
@@ -140,6 +142,15 @@ Claims move through:
 Policy:
 - only certified claims with integrity OK are promotion-eligible for production surfaces
 - lower-tier claims remain non-promoted context
+
+## Probabilistic learning note (VI/ELBO)
+Variational Inference and ELBO are valid implementation options for uncertainty-aware lanes, but they do not replace ownership gates.
+
+Minimum contract for VI/ELBO-enabled lanes:
+- record `elbo_total`, `elbo_reconstruction`, and `elbo_kl` in trace/manifests
+- record posterior collapse checks and explicit fail reasons when collapse is detected
+- block promotion on repeatability breaches even when ELBO appears improved
+- treat ELBO improvement as diagnostic signal only unless certified verification gates pass
 
 ## Helix Ask and mission-overwatch linkage
 Objective-first situational awareness is treated as an ownership feature, not only UX behavior.

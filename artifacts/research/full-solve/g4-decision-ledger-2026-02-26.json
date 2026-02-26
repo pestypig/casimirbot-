@@ -1,6 +1,6 @@
 {
   "date": "2026-02-26",
-  "commitHash": "0d68bffc1dedfd6526f9a509f4b2068e0afb2f68",
+  "commitHash": "de4b35bb92ed8f1ba3eee9a446a2c3a4799441a0",
   "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
   "canonical": {
     "counts": {
@@ -63,13 +63,13 @@
   "waves": {
     "A": {
       "lhs_Jm3": -24064720231109177000,
-      "boundComputed_Jm3": -18,
+      "boundComputed_Jm3": null,
       "boundPolicyFloor_Jm3": null,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": null,
-      "boundFloor_Jm3": -24064720231109177000,
-      "boundUsed_Jm3": -24064720231109177000,
-      "boundFloorApplied": true,
+      "boundFloor_Jm3": null,
+      "boundUsed_Jm3": null,
+      "boundFloorApplied": null,
       "marginRatioRaw": 1,
       "applicabilityStatus": "PASS",
       "reasonCode": [
@@ -79,13 +79,13 @@
     },
     "B": {
       "lhs_Jm3": -37601125453291720000,
-      "boundComputed_Jm3": -18,
+      "boundComputed_Jm3": null,
       "boundPolicyFloor_Jm3": null,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": null,
-      "boundFloor_Jm3": -37601125453291720000,
-      "boundUsed_Jm3": -37601125453291720000,
-      "boundFloorApplied": true,
+      "boundFloor_Jm3": null,
+      "boundUsed_Jm3": null,
+      "boundFloorApplied": null,
       "marginRatioRaw": 1,
       "applicabilityStatus": "PASS",
       "reasonCode": [
@@ -95,13 +95,13 @@
     },
     "C": {
       "lhs_Jm3": -66846445350679880000,
-      "boundComputed_Jm3": -18,
+      "boundComputed_Jm3": null,
       "boundPolicyFloor_Jm3": null,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": null,
-      "boundFloor_Jm3": -66846445350679880000,
-      "boundUsed_Jm3": -66846445350679880000,
-      "boundFloorApplied": true,
+      "boundFloor_Jm3": null,
+      "boundUsed_Jm3": null,
+      "boundFloorApplied": null,
       "marginRatioRaw": 1,
       "applicabilityStatus": "PASS",
       "reasonCode": [
@@ -111,13 +111,13 @@
     },
     "D": {
       "lhs_Jm3": -12277918379371434000,
-      "boundComputed_Jm3": -18,
+      "boundComputed_Jm3": null,
       "boundPolicyFloor_Jm3": null,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": null,
-      "boundFloor_Jm3": -12277918379371434000,
-      "boundUsed_Jm3": -12277918379371434000,
-      "boundFloorApplied": true,
+      "boundFloor_Jm3": null,
+      "boundUsed_Jm3": null,
+      "boundFloorApplied": null,
       "marginRatioRaw": 1,
       "applicabilityStatus": "PASS",
       "reasonCode": [
