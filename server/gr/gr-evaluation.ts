@@ -5,6 +5,7 @@ import type {
   GrConstraintThresholds,
   GrEvaluation,
 } from "../../shared/schema.js";
+import type { PipelineSnapshot } from "../../types/pipeline.js";
 import type { WarpConfig, WarpViabilityCertificate } from "../../types/warpViability.js";
 import type { GrPipelineDiagnostics } from "../energy-pipeline.js";
 import {
@@ -21,6 +22,7 @@ export type GrEvaluationInput = {
   policy?: Partial<GrConstraintPolicy>;
   semiclassical?: SemiclassicalPolicyHooks;
   useLiveSnapshot?: boolean;
+  useDiagnosticsSnapshot?: boolean;
 };
 
 export type GrEvaluationResult = {
@@ -227,7 +229,12 @@ export async function runGrEvaluation(
       );
       const certificate = await issueWarpViabilityCertificate(
         input.warpConfig ?? {},
-        { useLiveSnapshot: input.useLiveSnapshot },
+        {
+          useLiveSnapshot: input.useLiveSnapshot,
+          ...(input.useDiagnosticsSnapshot && diagnostics
+            ? { snapshot: ({ gr: diagnostics } as unknown as PipelineSnapshot) }
+            : {}),
+        },
       );
       const integrityOk = verifyCertificateIntegrity(certificate);
       const authenticity = verifyPhysicsCertificate(certificate, {

@@ -694,6 +694,10 @@ export async function evaluateWarpViability(
   };
 
   const pipelineState = buildPipelineState(config);
+  if (liveSnapshot?.gr && typeof liveSnapshot.gr === "object") {
+    (pipelineState as any).grEnabled = true;
+    (pipelineState as any).gr = liveSnapshot.gr;
+  }
   let pipeline = await calculateEnergyPipeline(pipelineState);
 
   const dutyEffective = extractDutyEffective(pipeline);

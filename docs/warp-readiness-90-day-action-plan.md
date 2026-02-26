@@ -12,3 +12,4 @@ Maturity posture: **diagnostic -> reduced-order -> certified-as-governance-only*
 8. Add audience mode so public outputs avoid speculative/internal proxy language.
 9. Standardize pre-brief reviewer rubric with issue mapping.
 10. Keep lunar logistics and warp research framing explicitly separated.
+11. After full-solve reaches `REDUCED_ORDER_ADMISSIBLE`, rederive all QI-facing UI panels (`DriveGuardsPanel`, `WarpProofPanel`/`FrontProofsLedger`, `WarpExperimentLadderPanel`) from one canonical QI contract (`marginRatioRaw`, `marginRatio`, `applicabilityStatus`, `reasonCode[]`, provenance fields), with a parity test that fails on drift.

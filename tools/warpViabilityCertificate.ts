@@ -7,6 +7,7 @@ import type {
   WarpViabilityCertificate,
   WarpViabilityPayload,
 } from "../types/warpViability";
+import type { PipelineSnapshot } from "../types/pipeline.js";
 import { withSpan } from "../server/services/observability/otel-tracing.js";
 
 // Canonical JSON to make hashes stable and deterministic across runtimes.
@@ -46,6 +47,7 @@ function makeHeader(kind: "warp-viability"): PhysicsCertificateHeader {
 type CertOpts = {
   useLiveSnapshot?: boolean;
   livePull?: LivePullOpts;
+  snapshot?: PipelineSnapshot;
 };
 
 const envUseLiveSnapshot = () => {
@@ -67,11 +69,12 @@ export async function issueWarpViabilityCertificate(
       },
     },
     async (span) => {
-      const shouldUseLive = opts.useLiveSnapshot ?? envUseLiveSnapshot();
+      const explicitSnapshot = opts.snapshot;
+      const shouldUseLive = explicitSnapshot ? false : opts.useLiveSnapshot ?? envUseLiveSnapshot();
       const live = shouldUseLive ? await pullSettledSnapshot(opts.livePull) : null;
       const viability = await evaluateWarpViability(config, {
-        snapshot: live?.snap,
-        telemetrySource: live ? "pipeline-live" : "solver",
+        snapshot: explicitSnapshot ?? live?.snap,
+        telemetrySource: explicitSnapshot ? "gr-diagnostics" : live ? "pipeline-live" : "solver",
         telemetryHeaders: live?.meta,
       });
 

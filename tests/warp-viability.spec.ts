@@ -574,6 +574,30 @@ describe("warp viability congruence wiring", () => {
     expect((result.snapshot as any).warp_mechanics_claim_tier).toBe("diagnostic");
     expect((result.snapshot as any).qi_applicability_status).toBe("NOT_APPLICABLE");
   });
+
+  it("uses provided snapshot gr invariants to resolve QI applicability", async () => {
+    runtime.pipeline = makePipeline({
+      gr: {},
+    });
+    const grSnapshot = {
+      invariants: {
+        kretschmann: { p98: 1e-32 },
+      },
+    };
+    const result = await evaluateWarpViability(
+      {},
+      {
+        snapshot: {
+          gr: grSnapshot,
+        } as any,
+      },
+    );
+    expect(result.snapshot).toBeTruthy();
+    expect(mocks.calculateEnergyPipeline).toHaveBeenCalled();
+    const seededState = mocks.calculateEnergyPipeline.mock.calls[0]?.[0] as any;
+    expect(seededState?.grEnabled).toBe(true);
+    expect(seededState?.gr).toEqual(grSnapshot);
+  });
 afterAll(() => {
     process.env.WARP_STRICT_CONGRUENCE = strictEnv;
   });

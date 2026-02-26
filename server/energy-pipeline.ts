@@ -6833,9 +6833,14 @@ function pickInvariantScalar(
   stats?: import("./gr-evolve-brick").GrInvariantStats,
 ): number | undefined {
   if (!stats) return undefined;
-  const candidate = firstFinite(stats.p98, stats.max, stats.mean);
-  if (!Number.isFinite(candidate)) return undefined;
-  return Math.abs(candidate as number);
+  const candidates = [stats.p98, stats.max, stats.mean]
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+    .map((value) => Math.abs(value));
+  if (candidates.length === 0) return undefined;
+  const positive = candidates.find((value) => value > 0);
+  if (positive !== undefined) return positive;
+  return 0;
 }
 
 function resolveQiCurvature(

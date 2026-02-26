@@ -165,6 +165,28 @@ describe("gr agent loop gate", () => {
     );
   });
 
+  it("keeps invariants enabled in ci fast-path for applicability diagnostics", async () => {
+    await runGrAgentLoop({
+      maxIterations: 1,
+      proposals: [{ label: "baseline", params: {} }],
+      commitAccepted: false,
+      ciFastPath: true,
+    });
+    expect(mockBuildGrEvolveBrick).toHaveBeenCalledWith(
+      expect.objectContaining({
+        includeExtra: false,
+        includeMatter: false,
+        includeKij: false,
+        includeInvariants: true,
+      }),
+    );
+    expect(mockRunGrEvaluation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        useDiagnosticsSnapshot: true,
+      }),
+    );
+  });
+
   it("rejects when evaluation fails", async () => {
     mockRunGrEvaluation.mockResolvedValueOnce({
       evaluation: makeEvaluation(false),

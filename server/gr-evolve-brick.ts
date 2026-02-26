@@ -47,6 +47,7 @@ export interface GrEvolveBrickParams {
   includeExtra?: boolean;
   includeMatter?: boolean;
   includeKij?: boolean;
+  includeInvariants?: boolean;
   invariantWallFraction?: number;
   invariantBandFraction?: number;
   invariantSampleMax?: number;
@@ -769,7 +770,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   const includeExtra = input.includeExtra ?? false;
   const includeMatter = input.includeMatter ?? includeExtra;
   const includeKij = input.includeKij ?? includeExtra;
-  const includeInvariants = includeExtra;
+  const includeInvariants = input.includeInvariants ?? includeExtra;
   const invariantWallFraction = Math.min(
     1,
     Math.max(
