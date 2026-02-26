@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { evaluateQiGuardrail, getGlobalPipelineState, updateParameters } from '../server/energy-pipeline.js';
 
 const DATE_STAMP = new Date().toISOString().slice(0, 10);
@@ -55,11 +56,13 @@ type GuardSummary = {
 };
 
 export const deriveSensitivityReasonCodes = (guard: GuardSummary): string[] => {
-  const marginRaw = finiteOrNull(guard.marginRatioRaw);
+  const rawMargin = guard.marginRatioRaw;
+  const marginRaw = finiteOrNull(rawMargin);
+  const marginUnknownOrNonFinite = typeof rawMargin !== 'number' || !Number.isFinite(rawMargin);
   const applicabilityStatus = String(guard.applicabilityStatus ?? 'UNKNOWN').toUpperCase();
   const reasonCodes: string[] = [];
   if (applicabilityStatus !== 'PASS') reasonCodes.push('G4_QI_APPLICABILITY_NOT_PASS');
-  if ((marginRaw ?? 0) >= 1) reasonCodes.push('G4_QI_MARGIN_EXCEEDED');
+  if ((marginRaw != null && marginRaw >= 1) || marginUnknownOrNonFinite) reasonCodes.push('G4_QI_MARGIN_EXCEEDED');
   if (!isMetricRhoSource(guard.rhoSource)) reasonCodes.push('G4_QI_SOURCE_NOT_METRIC');
   return reasonCodes;
 };
@@ -144,7 +147,7 @@ export async function run() {
   process.exit(0);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   run().catch((error) => {
     console.error(error);
     process.exit(1);
