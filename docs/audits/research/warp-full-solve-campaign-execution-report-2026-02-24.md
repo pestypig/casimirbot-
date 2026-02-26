@@ -51,8 +51,8 @@ Per-wave gate status snapshots:
 - missingSignals: none
 - notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
 - g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
-- g4Reasons: reasonCode=G4_QI_CURVATURE_WINDOW_FAIL;reasonCode=G4_QI_APPLICABILITY_NOT_PASS;reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-24064720231109177000; bound_Jm3=-24064720231109177000; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=NOT_APPLICABLE; applicabilityReasonCode=G4_QI_CURVATURE_WINDOW_FAIL; curvatureOk=unknown; curvatureRatio=n/a; curvatureEnforced=true; tau_s=0.005; K=n/a; safetySigma_Jm3=n/a; curvature=unknown; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=2.41126348155575 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
-- g4ReasonCodes: G4_QI_CURVATURE_WINDOW_FAIL | G4_QI_APPLICABILITY_NOT_PASS | G4_QI_MARGIN_EXCEEDED
+- g4Reasons: reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-24064720231109177000; bound_Jm3=-24064720231109177000; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=PASS; applicabilityReasonCode=none; curvatureOk=true; curvatureRatio=0; curvatureEnforced=true; tau_s=0.005; K=n/a; safetySigma_Jm3=n/a; curvature_ok=true; curvature_ratio=0; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=2.41126348155575 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
+- g4ReasonCodes: G4_QI_MARGIN_EXCEEDED
 - reproducibility.gateAgreement: NOT_READY
 
 ### Wave B
@@ -68,8 +68,8 @@ Per-wave gate status snapshots:
 - missingSignals: none
 - notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
 - g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
-- g4Reasons: reasonCode=G4_QI_CURVATURE_WINDOW_FAIL;reasonCode=G4_QI_APPLICABILITY_NOT_PASS;reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-37601125453291720000; bound_Jm3=-37601125453291720000; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=NOT_APPLICABLE; applicabilityReasonCode=G4_QI_CURVATURE_WINDOW_FAIL; curvatureOk=unknown; curvatureRatio=n/a; curvatureEnforced=true; tau_s=0.005; K=n/a; safetySigma_Jm3=n/a; curvature=unknown; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=1.7253504350554831 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
-- g4ReasonCodes: G4_QI_CURVATURE_WINDOW_FAIL | G4_QI_APPLICABILITY_NOT_PASS | G4_QI_MARGIN_EXCEEDED
+- g4Reasons: reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-37601125453291720000; bound_Jm3=-37601125453291720000; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=PASS; applicabilityReasonCode=none; curvatureOk=true; curvatureRatio=0; curvatureEnforced=true; tau_s=0.005; K=n/a; safetySigma_Jm3=n/a; curvature_ok=true; curvature_ratio=0; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=1.7253504350554831 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
+- g4ReasonCodes: G4_QI_MARGIN_EXCEEDED
 - reproducibility.gateAgreement: NOT_READY
 
 ### Wave C
@@ -85,8 +85,8 @@ Per-wave gate status snapshots:
 - missingSignals: none
 - notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
 - g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
-- g4Reasons: reasonCode=G4_QI_CURVATURE_WINDOW_FAIL;reasonCode=G4_QI_APPLICABILITY_NOT_PASS;reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-66846445350679880000; bound_Jm3=-66846445350679880000; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=NOT_APPLICABLE; applicabilityReasonCode=G4_QI_CURVATURE_WINDOW_FAIL; curvatureOk=unknown; curvatureRatio=n/a; curvatureEnforced=true; tau_s=0.005; K=n/a; safetySigma_Jm3=n/a; curvature=unknown; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=1.1206379531178468 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
-- g4ReasonCodes: G4_QI_CURVATURE_WINDOW_FAIL | G4_QI_APPLICABILITY_NOT_PASS | G4_QI_MARGIN_EXCEEDED
+- g4Reasons: reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-66846445350679880000; bound_Jm3=-66846445350679880000; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=PASS; applicabilityReasonCode=none; curvatureOk=true; curvatureRatio=0; curvatureEnforced=true; tau_s=0.005; K=n/a; safetySigma_Jm3=n/a; curvature_ok=true; curvature_ratio=0; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=1.1206379531178468 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
+- g4ReasonCodes: G4_QI_MARGIN_EXCEEDED
 - reproducibility.gateAgreement: PASS
 
 ### Wave D
@@ -102,25 +102,25 @@ Per-wave gate status snapshots:
 - missingSignals: none
 - notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
 - g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
-- g4Reasons: reasonCode=G4_QI_CURVATURE_WINDOW_FAIL;reasonCode=G4_QI_APPLICABILITY_NOT_PASS;reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-12277918379371434000; bound_Jm3=-12277918379371434000; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=NOT_APPLICABLE; applicabilityReasonCode=G4_QI_CURVATURE_WINDOW_FAIL; curvatureOk=unknown; curvatureRatio=n/a; curvatureEnforced=true; tau_s=0.005; K=n/a; safetySigma_Jm3=n/a; curvature=unknown; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=3.9942881057551096 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
-- g4ReasonCodes: G4_QI_CURVATURE_WINDOW_FAIL | G4_QI_APPLICABILITY_NOT_PASS | G4_QI_MARGIN_EXCEEDED
+- g4Reasons: reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-12277918379371434000; bound_Jm3=-12277918379371434000; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=PASS; applicabilityReasonCode=none; curvatureOk=true; curvatureRatio=0; curvatureEnforced=true; tau_s=0.005; K=n/a; safetySigma_Jm3=n/a; curvature_ok=true; curvature_ratio=0; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=3.9942881057551096 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
+- g4ReasonCodes: G4_QI_MARGIN_EXCEEDED
 - reproducibility.gateAgreement: PASS
 
 ## Per-wave G4 evidence table
 | Wave | lhs_Jm3 | bound_Jm3 | marginRatioRaw | rhoSource | applicabilityStatus |
 | --- | ---: | ---: | ---: | --- | --- |
-| A | -24064720231109177000 | -24064720231109177000 | 1 | warp.metric.T00.natario.shift | NOT_APPLICABLE |
-| B | -37601125453291720000 | -37601125453291720000 | 1 | warp.metric.T00.natario.shift | NOT_APPLICABLE |
-| C | -66846445350679880000 | -66846445350679880000 | 1 | warp.metric.T00.natario.shift | NOT_APPLICABLE |
-| D | -12277918379371434000 | -12277918379371434000 | 1 | warp.metric.T00.natario.shift | NOT_APPLICABLE |
+| A | -24064720231109177000 | -24064720231109177000 | 1 | warp.metric.T00.natario.shift | PASS |
+| B | -37601125453291720000 | -37601125453291720000 | 1 | warp.metric.T00.natario.shift | PASS |
+| C | -66846445350679880000 | -66846445350679880000 | 1 | warp.metric.T00.natario.shift | PASS |
+| D | -12277918379371434000 | -12277918379371434000 | 1 | warp.metric.T00.natario.shift | PASS |
 
 ## Best-case G4 summary
-- classification: applicability_limited
+- classification: margin_limited
 - wave: A
 - lhs_Jm3: -24064720231109177000
 - bound_Jm3: -24064720231109177000
 - marginRatioRaw: 1
-- applicabilityStatus: NOT_APPLICABLE
+- applicabilityStatus: PASS
 - rhoSource: warp.metric.T00.natario.shift
 
 ## Operator translation

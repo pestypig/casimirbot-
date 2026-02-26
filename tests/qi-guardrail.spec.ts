@@ -491,7 +491,7 @@ describe("deriveQiStatus", () => {
     expect(guard.applicabilityReasonCode).toBeUndefined();
   });
 
-  test("treats zero curvature invariant signals as available (not missing)", () => {
+  test("treats zero curvature invariant signals as PASS applicability", () => {
     const guard = evaluateQiGuardrail(
       makeState({
         dutyCycle: 5,
@@ -501,8 +501,10 @@ describe("deriveQiStatus", () => {
       }),
       { tau_ms: 1 },
     );
-    expect(guard.applicabilityStatus).toBe("NOT_APPLICABLE");
-    expect(guard.applicabilityReasonCode).toBe("G4_QI_CURVATURE_WINDOW_FAIL");
+    expect(guard.applicabilityStatus).toBe("PASS");
+    expect(guard.applicabilityReasonCode).toBeUndefined();
+    expect(guard.curvatureOk).toBe(true);
+    expect(guard.curvatureRatio).toBe(0);
   });
 
   test("reports UNKNOWN applicability when curvature invariants are unavailable", () => {
@@ -511,7 +513,7 @@ describe("deriveQiStatus", () => {
     expect(guard.applicabilityReasonCode).toBe("G4_QI_SIGNAL_MISSING");
   });
 
-  test("reports deterministic curvature-window fail when scalar is non-positive", () => {
+  test("reports deterministic PASS when scalar is exactly zero", () => {
     const guard = evaluateQiGuardrail(
       makeState({
         dutyCycle: 5,
@@ -521,8 +523,9 @@ describe("deriveQiStatus", () => {
       }),
       { tau_ms: 1 },
     );
-    expect(guard.applicabilityStatus).toBe("NOT_APPLICABLE");
-    expect(guard.applicabilityReasonCode).toBe("G4_QI_CURVATURE_WINDOW_FAIL");
-    expect(guard.curvatureOk).toBeUndefined();
+    expect(guard.applicabilityStatus).toBe("PASS");
+    expect(guard.applicabilityReasonCode).toBeUndefined();
+    expect(guard.curvatureOk).toBe(true);
+    expect(guard.curvatureRatio).toBe(0);
   });
 });

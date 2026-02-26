@@ -6862,8 +6862,25 @@ function resolveQiCurvature(
   if (scalar == null) {
     return { source, signalState: "missing", reasonCode: "G4_QI_SIGNAL_MISSING", note: "missing curvature invariants" };
   }
+  if (scalar === 0) {
+    return {
+      source,
+      scalar,
+      radius_m: Number.POSITIVE_INFINITY,
+      ratio: 0,
+      ok: true,
+      signalState: "available",
+      note: "zero curvature scalar",
+    };
+  }
   if (!(scalar > 0)) {
-    return { source, scalar, signalState: "available", reasonCode: "G4_QI_CURVATURE_WINDOW_FAIL", note: "non-positive curvature scalar" };
+    return {
+      source,
+      scalar,
+      signalState: "available",
+      reasonCode: "G4_QI_CURVATURE_WINDOW_FAIL",
+      note: "non-positive curvature scalar",
+    };
   }
 
   const radius_m = Math.pow(1 / scalar, 0.25);
