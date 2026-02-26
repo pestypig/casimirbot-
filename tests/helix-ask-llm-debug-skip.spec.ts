@@ -214,6 +214,39 @@ describe("Helix Ask llm debug skip metadata", () => {
     }
   }, 45000);
 
+  it("keeps security self-protection prompts out of forced repo retrieval without explicit repo hints", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "How can I protect myself from AI-driven financial fraud?",
+        debug: true,
+        verbosity: "brief",
+        sessionId: "llm-security-open-world-no-auto-repo",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      debug?: {
+        intent_domain?: string;
+        is_repo_question?: boolean;
+        preflight_retrieval_upgrade?: boolean;
+        security_guardrail_retrieval_required?: boolean;
+        ambiguity_gate_applied?: boolean;
+        ambiguity_resolver_bypassed?: string;
+      };
+    };
+    expect(payload.debug?.security_guardrail_retrieval_required).not.toBe(true);
+    expect(payload.debug?.preflight_retrieval_upgrade).not.toBe(true);
+    expect(payload.debug?.is_repo_question).not.toBe(true);
+    expect(payload.debug?.intent_domain).not.toBe("repo");
+    expect(payload.debug?.intent_domain).not.toBe("hybrid");
+    expect(payload.debug?.ambiguity_gate_applied).not.toBe(true);
+    if (payload.debug?.ambiguity_resolver_bypassed) {
+      expect(payload.debug?.ambiguity_resolver_bypassed).toBe("security_open_world_query");
+    }
+  }, 45000);
+
   it("treats endpoint plus tool-id prompts as explicit repo lookup (not ideology open-world)", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",

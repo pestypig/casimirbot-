@@ -172,3 +172,22 @@
   - Added regression coverage to assert open-world prompts remain out of repo auto-promotion in the LLM debug skip suite.
 - known_risks_next_step:
   - Security prompts without explicit repo hints can still resolve to hybrid via intent/profile heuristics; next step is to decouple security user-intent utility from repo-evidence defaults in a dedicated intent policy pass.
+
+## Milestone M9 - Security Prompt Repo-Guardrail Decoupling
+- milestone_id: `M9-security-open-world-guardrail-decoupling`
+- files_changed:
+  - `server/routes/agi.plan.ts`
+  - `tests/helix-ask-llm-debug-skip.spec.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run tests/helix-ask-llm-debug-skip.spec.ts`
+  - `npx vitest run tests/helix-ask-llm-debug-skip.spec.ts tests/helix-ask-jobs-regression.spec.ts server/__tests__/operator-contract-v1.spec.ts tests/voice.operator-contract-boundary.spec.ts`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Security prompts no longer force repo evidence/retrieval unless explicit repo signals are present.
+  - Added security-specific ambiguity bypass (`security_open_world_query`) for open-world self-protection prompts without repo cues.
+  - Preserved explicit repo behavior for security prompts that include endpoint/file/repo hints.
+  - Added regression coverage to ensure security self-protection prompts remain out of forced repo retrieval in debug telemetry.
+- known_risks_next_step:
+  - Security prompts may still pick hybrid at initial intent-match stage in some contexts; next step is explicit intent-profile split between `security_open_world` and `security_repo_mapping`.

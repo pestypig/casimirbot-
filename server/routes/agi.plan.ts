@@ -19729,6 +19729,10 @@ const executeHelixAsk = async ({
         (repoExpectationLevel === "low" || repoExpectationLevel === "medium") &&
         HELIX_ASK_OPEN_WORLD_EXPLAIN_RE.test(baseQuestion) &&
         HELIX_ASK_OPEN_WORLD_DOMAIN_RE.test(baseQuestion);
+      const securityOpenWorldClarifyBypass =
+        !(explicitRepoExpectation || hasFilePathHints || endpointHints.length > 0 || repoExpectationLevel === "high") &&
+        isSecurityRiskPrompt(baseQuestion) &&
+        HELIX_ASK_OPEN_WORLD_EXPLAIN_RE.test(baseQuestion);
       const repoCodeClarifyBypass =
         !isSecurityRiskPrompt(baseQuestion) &&
         (explicitRepoExpectation ||
@@ -19739,6 +19743,7 @@ const executeHelixAsk = async ({
         ambiguityResolution.shouldClarify &&
         !warpEthosRelationQuery &&
         !openWorldClarifyBypass &&
+        !securityOpenWorldClarifyBypass &&
         !repoCodeClarifyBypass;
       if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
         debugPayload.ambiguity_resolver_applied = shouldApplyPreIntentClarify;
@@ -19772,6 +19777,11 @@ const executeHelixAsk = async ({
         logEvent("Ambiguity resolver", "bypass_open_world", "low_repo_explainer");
         if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
           debugPayload.ambiguity_resolver_bypassed = "open_world_query";
+        }
+      } else if (ambiguityResolution.shouldClarify && securityOpenWorldClarifyBypass) {
+        logEvent("Ambiguity resolver", "bypass_security_open_world", "security_explainer");
+        if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
+          debugPayload.ambiguity_resolver_bypassed = "security_open_world_query";
         }
       } else if (ambiguityResolution.shouldClarify && repoCodeClarifyBypass) {
         logEvent("Ambiguity resolver", "bypass_repo_code", "explicit_repo_or_code_query");
@@ -19886,8 +19896,10 @@ const executeHelixAsk = async ({
         debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
       }
     }
-    const mandatorySecurityGuardrailRetrieval =
+    const securityGuardrailPrompt =
       isSecurityRiskPrompt(baseQuestion) || topicTags.includes("security");
+    const mandatorySecurityGuardrailRetrieval =
+      securityGuardrailPrompt && hasExplicitRepoSignals;
     if (mandatorySecurityGuardrailRetrieval) {
       requiresRepoEvidence = true;
       hasRepoHints = true;
@@ -19895,6 +19907,8 @@ const executeHelixAsk = async ({
       if (debugPayload) {
         debugPayload.security_guardrail_retrieval_required = true;
       }
+    } else if (debugPayload && securityGuardrailPrompt) {
+      debugPayload.security_guardrail_retrieval_required = false;
     }
     if (
       isIdeologyConversationalMode &&
