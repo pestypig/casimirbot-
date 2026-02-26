@@ -103,4 +103,28 @@ describe('warp-g4-sensitivity', () => {
     expect(infMargin).toContain('G4_QI_MARGIN_EXCEEDED');
     expect(negInfMargin).toContain('G4_QI_MARGIN_EXCEEDED');
   });
+
+  it('keeps display ratio faithful for small finite values', async () => {
+    const [single] = await runSensitivityCases(
+      [{ tau_s: 0.01, sampler: 'gaussian', fieldType: 'em', QI_POLICY_MAX_ZETA: 1 }],
+      [{ gap_nm: 0.5, casimirModel: 'ideal_retarded' }],
+    );
+    expect(single.marginRatio).toBeGreaterThanOrEqual(1);
+    expect(single.marginRatioDisplay).toBe(single.marginRatio);
+  });
+
+  it('emits deterministic canonical reason ordering with applicability reason passthrough', () => {
+    const reasonCodes = deriveSensitivityReasonCodes({
+      applicabilityReasonCode: 'G4_QI_SIGNAL_MISSING',
+      applicabilityStatus: 'UNKNOWN',
+      marginRatioRaw: 2,
+      rhoSource: 'proxy',
+    });
+    expect(reasonCodes).toEqual([
+      'G4_QI_SIGNAL_MISSING',
+      'G4_QI_APPLICABILITY_NOT_PASS',
+      'G4_QI_MARGIN_EXCEEDED',
+      'G4_QI_SOURCE_NOT_METRIC',
+    ]);
+  });
 });

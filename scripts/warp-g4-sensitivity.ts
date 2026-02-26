@@ -20,12 +20,13 @@ type CaseResult = {
   marginRatio: number | null;
   marginRatioDisplay: number | null;
   applicabilityStatus: string;
+  applicabilityReasonCode: string | null;
   g4ReasonCodes: string[];
   classification: 'physics_limited' | 'applicability_limited' | 'scaling_suspect';
 };
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
-const quantizeLarge = (n: number | null): number | null => (n == null ? null : Math.round(n / 1e10) * 1e10);
+const normalizeDisplay = (n: number | null): number | null => (n == null ? null : Number(n.toPrecision(12)));
 
 export const isMetricRhoSource = (rhoSource: unknown): boolean => {
   const src = String(rhoSource ?? '').toLowerCase();
@@ -52,6 +53,7 @@ const classifyCase = (marginRaw: number | null, applicabilityStatus: string, rea
 type GuardSummary = {
   marginRatioRaw?: number | null;
   applicabilityStatus?: string | null;
+  applicabilityReasonCode?: string | null;
   rhoSource?: string | null;
 };
 
@@ -60,11 +62,26 @@ export const deriveSensitivityReasonCodes = (guard: GuardSummary): string[] => {
   const marginRaw = finiteOrNull(rawMargin);
   const marginUnknownOrNonFinite = typeof rawMargin !== 'number' || !Number.isFinite(rawMargin);
   const applicabilityStatus = String(guard.applicabilityStatus ?? 'UNKNOWN').toUpperCase();
-  const reasonCodes: string[] = [];
-  if (applicabilityStatus !== 'PASS') reasonCodes.push('G4_QI_APPLICABILITY_NOT_PASS');
-  if ((marginRaw != null && marginRaw >= 1) || marginUnknownOrNonFinite) reasonCodes.push('G4_QI_MARGIN_EXCEEDED');
-  if (!isMetricRhoSource(guard.rhoSource)) reasonCodes.push('G4_QI_SOURCE_NOT_METRIC');
-  return reasonCodes;
+  const applicabilityReason = String(guard.applicabilityReasonCode ?? '').trim().toUpperCase();
+  const reasonCodes = new Set<string>();
+  if (applicabilityReason) reasonCodes.add(applicabilityReason);
+  if (applicabilityStatus !== 'PASS') reasonCodes.add('G4_QI_APPLICABILITY_NOT_PASS');
+  if ((marginRaw != null && marginRaw >= 1) || marginUnknownOrNonFinite) reasonCodes.add('G4_QI_MARGIN_EXCEEDED');
+  if (!isMetricRhoSource(guard.rhoSource)) reasonCodes.add('G4_QI_SOURCE_NOT_METRIC');
+  const order = [
+    'G4_QI_SIGNAL_MISSING',
+    'G4_QI_CURVATURE_WINDOW_FAIL',
+    'G4_QI_APPLICABILITY_NOT_PASS',
+    'G4_QI_MARGIN_EXCEEDED',
+    'G4_QI_SOURCE_NOT_METRIC',
+  ];
+  return Array.from(reasonCodes).sort((a, b) => {
+    const ai = order.indexOf(a);
+    const bi = order.indexOf(b);
+    const av = ai === -1 ? Number.MAX_SAFE_INTEGER : ai;
+    const bv = bi === -1 ? Number.MAX_SAFE_INTEGER : bi;
+    return av === bv ? a.localeCompare(b) : av - bv;
+  });
 };
 
 const baseCases = [
@@ -107,8 +124,12 @@ export async function runSensitivityCases(
       });
       const marginRaw = finiteOrNull(guard.marginRatioRaw);
       const marginRatio = finiteOrNull(guard.marginRatio);
-      const marginRatioDisplay = quantizeLarge(marginRatio);
+      const marginRatioDisplay = normalizeDisplay(marginRatio);
       const applicabilityStatus = String(guard.applicabilityStatus ?? 'UNKNOWN').toUpperCase();
+      const applicabilityReasonCode =
+        typeof guard.applicabilityReasonCode === 'string' && guard.applicabilityReasonCode.trim().length > 0
+          ? guard.applicabilityReasonCode.trim().toUpperCase()
+          : null;
       const reasonCodes = deriveSensitivityReasonCodes(guard);
       results.push({
         inputs: {
@@ -123,6 +144,7 @@ export async function runSensitivityCases(
         marginRatio,
         marginRatioDisplay,
         applicabilityStatus,
+        applicabilityReasonCode,
         g4ReasonCodes: reasonCodes,
         classification: classifyCase(marginRaw, applicabilityStatus, reasonCodes),
       });
