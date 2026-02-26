@@ -14,7 +14,7 @@ const expectSuppressionShape = (body: Record<string, unknown>, expectedReason: s
   expect(body.suppressed).toBe(true);
   expect(body.reason).toBe(expectedReason);
   expect(body.suppression_reason).toBe(expectedReason);
-  expect(body.suppressionReason).toBe(expectedReason);
+  expect(body).not.toHaveProperty("suppressionReason");
 };
 
 describe("voice operator contract boundary", () => {

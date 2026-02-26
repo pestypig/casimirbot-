@@ -95,3 +95,23 @@
   - Expanded boundary coverage for context ineligible, parity disallow, operator contract validation failure, and dedupe suppression key-shape consistency.
 - known_risks_next_step:
   - Legacy `suppressionReason` alias should be removed in M5 after downstream consumers migrate to `suppression_reason`.
+
+## Milestone M5 — Voice Suppression Contract Finalization
+- milestone_id: `M5-voice-suppression-contract-finalization`
+- files_changed:
+  - `server/routes/voice.ts`
+  - `tests/voice.operator-contract-boundary.spec.ts`
+  - `reports/helix-dot-build-ledger.md`
+- tests_run:
+  - `npx vitest run server/__tests__/operator-contract-v1.spec.ts tests/helix-ask-llm-debug-skip.spec.ts tests/helix-ask-jobs-regression.spec.ts tests/voice.operator-contract-boundary.spec.ts`
+  - `PORT=5050 NODE_ENV=development ENABLE_AGI=1 npm run dev`
+  - `npm run helix:ask:dot:debug-loop -- --base-url http://127.0.0.1:5050`
+  - `npm run casimir:verify -- --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.validation.jsonl --trace-limit 200 --ci`
+  - `curl -sS http://127.0.0.1:5050/api/agi/training-trace/export > artifacts/training-trace.export.jsonl`
+- result_summary:
+  - Finalized `/api/voice/speak` suppression response shape to canonical keys `reason` and `suppression_reason` only.
+  - Removed temporary legacy alias `suppressionReason` and corresponding M5 TODO note.
+  - Updated boundary assertions to require canonical parity and absence of the legacy alias across context ineligible, parity disallow, contract validation failure, and dedupe suppression branches.
+  - Preserved lane routing behavior, suppression reasons, and status-code determinism.
+- known_risks_next_step:
+  - Any client still reading `suppressionReason` must migrate to `suppression_reason`.

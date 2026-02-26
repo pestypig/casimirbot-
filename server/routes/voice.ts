@@ -257,8 +257,6 @@ const buildOperatorCalloutCandidate = (payload: VoiceRequest, textCertainty: Cer
 const suppressionEnvelope = (reason: string) => ({
   reason,
   suppression_reason: reason,
-  // TODO(M5): remove legacy suppressionReason alias
-  suppressionReason: reason,
 });
 
 voiceRouter.options("/speak", (_req, res) => {
