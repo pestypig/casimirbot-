@@ -1,9 +1,7 @@
 {
   "date": "2026-02-26",
-  "commitHash": "942a274bfcf4e651b8516897ff22fe0ec11ba2e1",
+  "commitHash": "0d68bffc1dedfd6526f9a509f4b2068e0afb2f68",
   "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
-  "canonicalContext": "authoritative",
-  "scanContext": "exploratory_noncanonical",
   "canonical": {
     "counts": {
       "FAIL": 1,
@@ -15,7 +13,6 @@
     "decision": "INADMISSIBLE",
     "firstFail": "G4"
   },
-  "canonicalMissingWaves": [],
   "canonicalDecisionClass": "margin_limited",
   "scanDecisionClass": "applicability_limited",
   "finalDecisionClass": "margin_limited",
@@ -67,10 +64,9 @@
     "A": {
       "lhs_Jm3": -24064720231109177000,
       "boundComputed_Jm3": -18,
-      "boundPolicyFloor_Jm3": -24064720231109177000,
+      "boundPolicyFloor_Jm3": null,
       "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": -18,
-      "boundFallbackAbs_Jm3": 24064720231109177000,
+      "boundDefaultFloor_Jm3": null,
       "boundFloor_Jm3": -24064720231109177000,
       "boundUsed_Jm3": -24064720231109177000,
       "boundFloorApplied": true,
@@ -84,10 +80,9 @@
     "B": {
       "lhs_Jm3": -37601125453291720000,
       "boundComputed_Jm3": -18,
-      "boundPolicyFloor_Jm3": -37601125453291720000,
+      "boundPolicyFloor_Jm3": null,
       "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": -18,
-      "boundFallbackAbs_Jm3": 37601125453291720000,
+      "boundDefaultFloor_Jm3": null,
       "boundFloor_Jm3": -37601125453291720000,
       "boundUsed_Jm3": -37601125453291720000,
       "boundFloorApplied": true,
@@ -101,10 +96,9 @@
     "C": {
       "lhs_Jm3": -66846445350679880000,
       "boundComputed_Jm3": -18,
-      "boundPolicyFloor_Jm3": -66846445350679880000,
+      "boundPolicyFloor_Jm3": null,
       "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": -18,
-      "boundFallbackAbs_Jm3": 66846445350679880000,
+      "boundDefaultFloor_Jm3": null,
       "boundFloor_Jm3": -66846445350679880000,
       "boundUsed_Jm3": -66846445350679880000,
       "boundFloorApplied": true,
@@ -118,10 +112,9 @@
     "D": {
       "lhs_Jm3": -12277918379371434000,
       "boundComputed_Jm3": -18,
-      "boundPolicyFloor_Jm3": -12277918379371434000,
+      "boundPolicyFloor_Jm3": null,
       "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": -18,
-      "boundFallbackAbs_Jm3": 12277918379371434000,
+      "boundDefaultFloor_Jm3": null,
       "boundFloor_Jm3": -12277918379371434000,
       "boundUsed_Jm3": -12277918379371434000,
       "boundFloorApplied": true,

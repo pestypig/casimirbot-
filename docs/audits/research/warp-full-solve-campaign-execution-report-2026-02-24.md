@@ -1,7 +1,7 @@
 # Warp Full-Solve Campaign Execution Report (2026-02-24)
 
 ## Executive verdict
-**INADMISSIBLE**
+**NOT_READY**
 
 ## Required companion
 - Executive translation: `docs/audits/research/warp-gates-executive-translation-2026-02-24.md`
@@ -13,128 +13,128 @@
 - Readiness lane (`--ci-fast-path`) is the source of gate evaluability and canonical campaign artifacts.
 
 ## Gate scoreboard (G0..G8)
-- PASS: 7
-- FAIL: 1
+- PASS: 0
+- FAIL: 0
 - UNKNOWN: 0
-- NOT_READY: 0
+- NOT_READY: 8
 - NOT_APPLICABLE: 1
 - Total gates: 9
 - Reconciled: true
 
 ## NOT_READY cause classes
-- timeout_budget: 0
+- timeout_budget: 27
 - missing_required_signals: 0
 - policy_not_applicable_misuse: 0
 - other: 0
 
 Cross-wave aggregate gate status:
-- G0: PASS
-- G1: PASS
-- G2: PASS
-- G3: PASS
-- G4: FAIL
+- G0: NOT_READY
+- G1: NOT_READY
+- G2: NOT_READY
+- G3: NOT_READY
+- G4: NOT_READY
 - G5: NOT_APPLICABLE
-- G6: PASS
-- G7: PASS
-- G8: PASS
+- G6: NOT_READY
+- G7: NOT_READY
+- G8: NOT_READY
 
 Per-wave gate status snapshots:
 ### Wave A
-- G0: PASS
-- G1: PASS
-- G2: PASS
-- G3: PASS
-- G4: FAIL
+- G0: NOT_READY
+- G1: NOT_READY
+- G2: NOT_READY
+- G3: NOT_READY
+- G4: NOT_READY
 - G5: NOT_APPLICABLE
-- G6: PASS
+- G6: NOT_READY
 - G7: NOT_APPLICABLE
 - G8: NOT_APPLICABLE
-- missingSignals: none
-- notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
-- g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
-- g4Reasons: reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-24064720231109177000; bound_Jm3=-24064720231109177000; boundComputed_Jm3=-18; boundFloor_Jm3=-24064720231109177000; boundPolicyFloor_Jm3=-24064720231109177000; boundEnvFloor_Jm3=n/a; boundDefaultFloor_Jm3=-18; boundFallbackAbs_Jm3=24064720231109177000; boundUsed_Jm3=-24064720231109177000; boundFloorApplied=true; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=PASS; applicabilityReasonCode=none; curvatureOk=true; curvatureRatio=0; curvatureEnforced=true; tau_s=0.005; K=2.9e-30; KNullReason=none; safetySigma_Jm3=18; safetySigmaNullReason=none; curvature_ok=true; curvature_ratio=0; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=2.41126348155575 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
-- g4ReasonCodes: G4_QI_MARGIN_EXCEEDED
+- missingSignals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system
+- notReadyClassCounts: timeout_budget=6, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
+- g4Diagnostics: FordRomanQI=missing, ThetaAudit=missing, source=synthesized_unknown
+- g4Reasons: source=synthesized_unknown;reasonCode=G4_QI_SIGNAL_MISSING;G4 hard-source payload incomplete in evaluation constraints.
+- g4ReasonCodes: G4_QI_SIGNAL_MISSING
 - reproducibility.gateAgreement: NOT_READY
 
 ### Wave B
-- G0: PASS
-- G1: PASS
-- G2: PASS
-- G3: PASS
-- G4: FAIL
+- G0: NOT_READY
+- G1: NOT_READY
+- G2: NOT_READY
+- G3: NOT_READY
+- G4: NOT_READY
 - G5: NOT_APPLICABLE
-- G6: PASS
+- G6: NOT_READY
 - G7: NOT_APPLICABLE
 - G8: NOT_APPLICABLE
-- missingSignals: none
-- notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
-- g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
-- g4Reasons: reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-37601125453291720000; bound_Jm3=-37601125453291720000; boundComputed_Jm3=-18; boundFloor_Jm3=-37601125453291720000; boundPolicyFloor_Jm3=-37601125453291720000; boundEnvFloor_Jm3=n/a; boundDefaultFloor_Jm3=-18; boundFallbackAbs_Jm3=37601125453291720000; boundUsed_Jm3=-37601125453291720000; boundFloorApplied=true; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=PASS; applicabilityReasonCode=none; curvatureOk=true; curvatureRatio=0; curvatureEnforced=true; tau_s=0.005; K=2.9e-30; KNullReason=none; safetySigma_Jm3=18; safetySigmaNullReason=none; curvature_ok=true; curvature_ratio=0; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=1.7253504350554831 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
-- g4ReasonCodes: G4_QI_MARGIN_EXCEEDED
+- missingSignals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system
+- notReadyClassCounts: timeout_budget=6, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
+- g4Diagnostics: FordRomanQI=missing, ThetaAudit=missing, source=synthesized_unknown
+- g4Reasons: source=synthesized_unknown;reasonCode=G4_QI_SIGNAL_MISSING;G4 hard-source payload incomplete in evaluation constraints.
+- g4ReasonCodes: G4_QI_SIGNAL_MISSING
 - reproducibility.gateAgreement: NOT_READY
 
 ### Wave C
-- G0: PASS
-- G1: PASS
-- G2: PASS
-- G3: PASS
-- G4: FAIL
+- G0: NOT_READY
+- G1: NOT_READY
+- G2: NOT_READY
+- G3: NOT_READY
+- G4: NOT_READY
 - G5: NOT_APPLICABLE
-- G6: PASS
-- G7: PASS
+- G6: NOT_READY
+- G7: NOT_READY
 - G8: NOT_APPLICABLE
-- missingSignals: none
-- notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
-- g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
-- g4Reasons: reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-66846445350679880000; bound_Jm3=-66846445350679880000; boundComputed_Jm3=-18; boundFloor_Jm3=-66846445350679880000; boundPolicyFloor_Jm3=-66846445350679880000; boundEnvFloor_Jm3=n/a; boundDefaultFloor_Jm3=-18; boundFallbackAbs_Jm3=66846445350679880000; boundUsed_Jm3=-66846445350679880000; boundFloorApplied=true; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=PASS; applicabilityReasonCode=none; curvatureOk=true; curvatureRatio=0; curvatureEnforced=true; tau_s=0.005; K=2.9e-30; KNullReason=none; safetySigma_Jm3=18; safetySigmaNullReason=none; curvature_ok=true; curvature_ratio=0; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=1.1206379531178468 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
-- g4ReasonCodes: G4_QI_MARGIN_EXCEEDED
-- reproducibility.gateAgreement: PASS
+- missingSignals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system
+- notReadyClassCounts: timeout_budget=7, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
+- g4Diagnostics: FordRomanQI=missing, ThetaAudit=missing, source=synthesized_unknown
+- g4Reasons: source=synthesized_unknown;reasonCode=G4_QI_SIGNAL_MISSING;G4 hard-source payload incomplete in evaluation constraints.
+- g4ReasonCodes: G4_QI_SIGNAL_MISSING
+- reproducibility.gateAgreement: NOT_READY
 
 ### Wave D
-- G0: PASS
-- G1: PASS
-- G2: PASS
-- G3: PASS
-- G4: FAIL
+- G0: NOT_READY
+- G1: NOT_READY
+- G2: NOT_READY
+- G3: NOT_READY
+- G4: NOT_READY
 - G5: NOT_APPLICABLE
-- G6: PASS
-- G7: PASS
-- G8: PASS
-- missingSignals: none
-- notReadyClassCounts: timeout_budget=0, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
-- g4Diagnostics: FordRomanQI=fail, ThetaAudit=pass, source=evaluator_constraints
-- g4Reasons: reasonCode=G4_QI_MARGIN_EXCEEDED; lhs_Jm3=-12277918379371434000; bound_Jm3=-12277918379371434000; boundComputed_Jm3=-18; boundFloor_Jm3=-12277918379371434000; boundPolicyFloor_Jm3=-12277918379371434000; boundEnvFloor_Jm3=n/a; boundDefaultFloor_Jm3=-18; boundFallbackAbs_Jm3=12277918379371434000; boundUsed_Jm3=-12277918379371434000; boundFloorApplied=true; marginRatio=1; marginRatioRaw=1; rhoSource=warp.metric.T00.natario.shift; metricContractStatus=ok; applicabilityStatus=PASS; applicabilityReasonCode=none; curvatureOk=true; curvatureRatio=0; curvatureEnforced=true; tau_s=0.005; K=2.9e-30; KNullReason=none; safetySigma_Jm3=18; safetySigmaNullReason=none; curvature_ok=true; curvature_ratio=0; rho_source=warp.metric.T00.natario.shift; metric_source=true; metric_contract=true; metric_contract_status=ok; curvature_enforced | |theta|=3.9942881057551096 max=1000000000000 source=warp.metricAdapter.betaDiagnostics.thetaMax strict=true geometryTheta=true chartContract=ok metricReason=metric_adapter_divergence
-- g4ReasonCodes: G4_QI_MARGIN_EXCEEDED
-- reproducibility.gateAgreement: PASS
+- G6: NOT_READY
+- G7: NOT_READY
+- G8: NOT_READY
+- missingSignals: certificate_hash, certificate_integrity, evaluation_gate_status, hard_constraint_ford_roman_qi, hard_constraint_theta_audit, initial_solver_status, provenance_chart, provenance_normalization, provenance_observer, provenance_unit_system
+- notReadyClassCounts: timeout_budget=8, missing_required_signals=0, policy_not_applicable_misuse=0, other=0
+- g4Diagnostics: FordRomanQI=missing, ThetaAudit=missing, source=synthesized_unknown
+- g4Reasons: source=synthesized_unknown;reasonCode=G4_QI_SIGNAL_MISSING;G4 hard-source payload incomplete in evaluation constraints.
+- g4ReasonCodes: G4_QI_SIGNAL_MISSING
+- reproducibility.gateAgreement: NOT_READY
 
 ## Per-wave G4 evidence table
 | Wave | lhs_Jm3 | boundComputed_Jm3 | boundFloor_Jm3 | boundPolicyFloor_Jm3 | boundEnvFloor_Jm3 | boundDefaultFloor_Jm3 | boundUsed_Jm3 | boundFloorApplied | marginRatioRaw | rhoSource | applicabilityStatus |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- | --- |
-| A | -24064720231109177000 | -18 | -24064720231109177000 | -24064720231109177000 | n/a | -18 | -24064720231109177000 | true | 1 | warp.metric.T00.natario.shift | PASS |
-| B | -37601125453291720000 | -18 | -37601125453291720000 | -37601125453291720000 | n/a | -18 | -37601125453291720000 | true | 1 | warp.metric.T00.natario.shift | PASS |
-| C | -66846445350679880000 | -18 | -66846445350679880000 | -66846445350679880000 | n/a | -18 | -66846445350679880000 | true | 1 | warp.metric.T00.natario.shift | PASS |
-| D | -12277918379371434000 | -18 | -12277918379371434000 | -12277918379371434000 | n/a | -18 | -12277918379371434000 | true | 1 | warp.metric.T00.natario.shift | PASS |
+| A | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | unknown | UNKNOWN |
+| B | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | unknown | UNKNOWN |
+| C | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | unknown | UNKNOWN |
+| D | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | unknown | UNKNOWN |
 
 ## Best-case G4 summary
-- classification: margin_limited
+- classification: applicability_limited
 - wave: A
-- lhs_Jm3: -24064720231109177000
-- boundComputed_Jm3: -18
-- boundFloor_Jm3: -24064720231109177000
-- boundUsed_Jm3: -24064720231109177000
-- boundFloorApplied: true
-- marginRatioRaw: 1
-- applicabilityStatus: PASS
-- rhoSource: warp.metric.T00.natario.shift
+- lhs_Jm3: n/a
+- boundComputed_Jm3: n/a
+- boundFloor_Jm3: n/a
+- boundUsed_Jm3: n/a
+- boundFloorApplied: n/a
+- marginRatioRaw: n/a
+- applicabilityStatus: UNKNOWN
+- rhoSource: unknown
 
 ## Operator translation
-- What failed: G4 (Aggregated from waves: A,B,C,D)
+- What failed: G0 (Aggregated from waves: A,B,C,D)
 - Why it failed: hard gate and/or required signal deficits are fail-closed; see per-wave reason codes and missing-signal maps.
-- What changed in this run: lane=readiness; timeout_budget=0; missing_required_signals=0.
+- What changed in this run: lane=readiness; timeout_budget=27; missing_required_signals=0.
 - Can code fixes alone resolve it?: only if failures are signal/contract/scaling defects; true margin exceedance requires physics-side improvement.
 
 ## Decision output
-- Final decision label: **INADMISSIBLE**
+- Final decision label: **NOT_READY**
 - Claim posture: diagnostic/reduced-order (fail-closed on hard evidence gaps).
 
 ## Boundary statement
