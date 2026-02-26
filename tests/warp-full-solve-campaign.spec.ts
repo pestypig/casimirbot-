@@ -150,6 +150,10 @@ describe('warp-full-solve-campaign runner', () => {
             qi_bound_Jm3: -1,
             qi_bound_computed_Jm3: -0.75,
             qi_bound_floor_Jm3: -1,
+            qi_bound_policy_floor_Jm3: -1,
+            qi_bound_env_floor_Jm3: -0.9,
+            qi_bound_default_floor_Jm3: -0.5,
+            qi_bound_fallback_abs_Jm3: 1,
             qi_bound_used_Jm3: -1,
             qi_bound_floor_applied: true,
             qi_margin_ratio: 2,
@@ -172,6 +176,10 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.bound_Jm3).toBe(-1);
     expect(diagnostics.boundComputed_Jm3).toBe(-0.75);
     expect(diagnostics.boundFloor_Jm3).toBe(-1);
+    expect(diagnostics.boundPolicyFloor_Jm3).toBe(-1);
+    expect(diagnostics.boundEnvFloor_Jm3).toBe(-0.9);
+    expect(diagnostics.boundDefaultFloor_Jm3).toBe(-0.5);
+    expect(diagnostics.boundFallbackAbs_Jm3).toBe(1);
     expect(diagnostics.boundUsed_Jm3).toBe(-1);
     expect(diagnostics.boundFloorApplied).toBe(true);
     expect(diagnostics.marginRatio).toBe(2);
