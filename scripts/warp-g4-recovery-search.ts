@@ -20,6 +20,7 @@ type RecoveryCase = {
   lhs_Jm3: number | null;
   boundComputed_Jm3: number | null;
   boundUsed_Jm3: number | null;
+  boundFloorApplied: boolean;
   marginRatioRaw: number | null;
   marginRatioRawComputed: number | null;
   applicabilityStatus: string;
@@ -46,18 +47,25 @@ const classify = (applicabilityStatus: string, marginRatioRawComputed: number | 
 
 const REQUIRED_CANONICAL_SIGNALS = ['lhs_Jm3', 'boundComputed_Jm3', 'boundUsed_Jm3', 'marginRatioRaw', 'marginRatioRawComputed'] as const;
 const CONTRACT_REASON_CODES = new Set(['G4_QI_SOURCE_NOT_METRIC', 'G4_QI_CONTRACT_MISSING']);
+const MISSING_SIGNAL_REASON_CODES = new Set(['G4_QI_SIGNAL_MISSING']);
 
-const classifyComparability = (entry: {
+export const classifyComparability = (entry: {
   lhs_Jm3: number | null;
   boundComputed_Jm3: number | null;
   boundUsed_Jm3: number | null;
+  boundFloorApplied?: boolean | null;
   marginRatioRaw: number | null;
   marginRatioRawComputed: number | null;
+  applicabilityStatus?: string;
   rhoSource: string | null;
   reasonCode: string[];
 }): ComparabilityClass => {
   const missingSignals = REQUIRED_CANONICAL_SIGNALS.some((field) => entry[field] == null);
   if (missingSignals) return 'non_comparable_missing_signals';
+  const missingSignalReason = entry.reasonCode.some((code) => MISSING_SIGNAL_REASON_CODES.has(code));
+  if (missingSignalReason || String(entry.applicabilityStatus ?? 'UNKNOWN').toUpperCase() === 'UNKNOWN') {
+    return 'non_comparable_missing_signals';
+  }
   const contractMismatch = entry.reasonCode.some((code) => CONTRACT_REASON_CODES.has(code));
   if (contractMismatch || !entry.rhoSource?.startsWith('warp.metric')) return 'non_comparable_contract_mismatch';
   return 'comparable_canonical';
@@ -151,6 +159,7 @@ const deriveDeterministicWalk = (seed: number, total: number): { start: number; 
 
 export async function runRecoverySearch(opts: {
   outPath?: string;
+  stepASummaryPath?: string;
   seed?: number;
   maxCases?: number;
   topN?: number;
@@ -164,6 +173,11 @@ export async function runRecoverySearch(opts: {
     1_000,
     Math.floor(Number.isFinite(opts.runtimeCapMs) ? Number(opts.runtimeCapMs) : DEFAULT_RUNTIME_CAP_MS),
   );
+  const stepASummaryPath =
+    opts.stepASummaryPath ??
+    (path.resolve(outPath) === path.resolve(DEFAULT_OUT_PATH)
+      ? STEP_A_SUMMARY_PATH
+      : path.join(path.dirname(outPath), 'g4-stepA-summary.json'));
 
   const startedAt = Date.now();
   const baseline = structuredClone(getGlobalPipelineState());
@@ -207,6 +221,7 @@ export async function runRecoverySearch(opts: {
     const lhs_Jm3 = finiteOrNull(guard.lhs_Jm3);
     const boundComputed_Jm3 = finiteOrNull(guard.boundComputed_Jm3);
     const boundUsed_Jm3 = finiteOrNull(guard.boundUsed_Jm3);
+    const boundFloorApplied = Boolean(guard.boundFloorApplied);
     const marginRatioRaw = finiteOrNull(guard.marginRatioRaw);
     const marginRatioRawComputed = finiteOrNull(guard.marginRatioRawComputed);
     const reasonCode = deriveReasonCodes(guard);
@@ -217,6 +232,7 @@ export async function runRecoverySearch(opts: {
       lhs_Jm3,
       boundComputed_Jm3,
       boundUsed_Jm3,
+      boundFloorApplied,
       marginRatioRaw,
       marginRatioRawComputed,
       applicabilityStatus,
@@ -227,8 +243,10 @@ export async function runRecoverySearch(opts: {
         lhs_Jm3,
         boundComputed_Jm3,
         boundUsed_Jm3,
+        boundFloorApplied,
         marginRatioRaw,
         marginRatioRawComputed,
+        applicabilityStatus,
         rhoSource,
         reasonCode,
       }),
@@ -338,9 +356,9 @@ export async function runRecoverySearch(opts: {
       commitHash,
     },
   };
-  fs.mkdirSync(path.dirname(STEP_A_SUMMARY_PATH), { recursive: true });
-  fs.writeFileSync(STEP_A_SUMMARY_PATH, `${JSON.stringify(stepASummary, null, 2)}\n`);
-  return { ok: true, outPath, caseCount: results.length, candidatePassFound, bestCandidate };
+  fs.mkdirSync(path.dirname(stepASummaryPath), { recursive: true });
+  fs.writeFileSync(stepASummaryPath, `${JSON.stringify(stepASummary, null, 2)}\n`);
+  return { ok: true, outPath, stepASummaryPath, caseCount: results.length, candidatePassFound, bestCandidate };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

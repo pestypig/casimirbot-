@@ -13,6 +13,7 @@ const BOUNDARY_STATEMENT =
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const str = (value: unknown): string => (typeof value === 'string' ? value : String(value ?? 'UNKNOWN'));
+const boolOrNull = (value: unknown): boolean | null => (typeof value === 'boolean' ? value : null);
 const numEq = (a: number | null, b: number | null, absEps = 1e-12, relEps = 1e-9) => {
   if (a == null && b == null) return true;
   if (a == null || b == null) return false;
@@ -35,6 +36,7 @@ const COMPARABILITY_CLASSES: ComparabilityClass[] = [
   'non_comparable_contract_mismatch',
   'non_comparable_other',
 ];
+const MISSING_SIGNAL_REASON_CODES = new Set(['G4_QI_SIGNAL_MISSING']);
 
 const classifyComparability = (entry: any): ComparabilityClass => {
   const existing = typeof entry?.comparabilityClass === 'string' ? entry.comparabilityClass : null;
@@ -44,6 +46,12 @@ const classifyComparability = (entry: any): ComparabilityClass => {
   const required = [entry?.lhs_Jm3, entry?.boundComputed_Jm3, entry?.boundUsed_Jm3, entry?.marginRatioRaw, entry?.marginRatioRawComputed];
   if (required.some((value) => !Number.isFinite(value))) return 'non_comparable_missing_signals';
   const reasonCode = Array.isArray(entry?.reasonCode) ? entry.reasonCode.map((code: unknown) => str(code).toUpperCase()) : [];
+  if (
+    reasonCode.some((code: string) => MISSING_SIGNAL_REASON_CODES.has(code)) ||
+    str(entry?.applicabilityStatus).toUpperCase() === 'UNKNOWN'
+  ) {
+    return 'non_comparable_missing_signals';
+  }
   if (reasonCode.includes('G4_QI_SOURCE_NOT_METRIC') || reasonCode.includes('G4_QI_CONTRACT_MISSING')) {
     return 'non_comparable_contract_mismatch';
   }
@@ -78,7 +86,7 @@ const classifyMismatch = (scan: any, parity: any): { parityStatus: 'match' | 'mi
   if (!numEq(scan.boundUsed_Jm3, parity.boundUsed_Jm3)) {
     return { parityStatus: 'mismatch', mismatchReason: 'bound_used_mismatch' };
   }
-  if (scan.boundFloorApplied !== parity.boundFloorApplied) {
+  if (scan.boundFloorApplied != null && scan.boundFloorApplied !== parity.boundFloorApplied) {
     return { parityStatus: 'mismatch', mismatchReason: 'bound_floor_applied_mismatch' };
   }
   return { parityStatus: 'match', mismatchReason: 'none' };
@@ -163,7 +171,7 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
       marginRatioRawComputed: finiteOrNull(entry?.marginRatioRawComputed),
       boundComputed_Jm3: finiteOrNull(entry?.boundComputed_Jm3),
       boundUsed_Jm3: finiteOrNull(entry?.boundUsed_Jm3),
-      boundFloorApplied: Boolean(entry?.boundFloorApplied),
+      boundFloorApplied: boolOrNull(entry?.boundFloorApplied),
     };
     const parity = {
       applicabilityStatus: str(guard?.applicabilityStatus).toUpperCase(),

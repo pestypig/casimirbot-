@@ -1,6 +1,6 @@
 {
   "runId": "g4-recovery-search-20260227-2026-02-27",
-  "generatedAt": "2026-02-27T03:36:31.095Z",
+  "generatedAt": "2026-02-27T07:04:41.803Z",
   "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
   "deterministicSearch": {
     "seed": 20260227,
@@ -9,7 +9,7 @@
     "attemptedCaseUniverse": 4976640,
     "executedCaseCount": 160,
     "evaluatedCaseCount": 160,
-    "elapsedMs": 5507,
+    "elapsedMs": 2388,
     "deterministicWalk": {
       "start": 353667,
       "step": 2314057
@@ -48,6 +48,7 @@
     "lhs_Jm3": -35955474.008891776,
     "boundComputed_Jm3": -24,
     "boundUsed_Jm3": -35955474.008891776,
+    "boundFloorApplied": true,
     "marginRatioRaw": 1,
     "marginRatioRawComputed": 1498144.7503704906,
     "applicabilityStatus": "UNKNOWN",
@@ -57,10 +58,11 @@
       "G4_QI_SIGNAL_MISSING"
     ],
     "rhoSource": "warp.metric.T00.natario_sdf.shift",
-    "classificationTag": "applicability_limited"
+    "classificationTag": "applicability_limited",
+    "comparabilityClass": "non_comparable_missing_signals"
   },
   "provenance": {
-    "commitHash": "54a6693744819aace34072e4453ebd44f31d7cb4",
+    "commitHash": "20aa39ed64ca25101891baf3b2fc6f4b5a64c423",
     "freshnessSource": "git.head"
   },
   "topRankedApplicabilityPassCases": [],
@@ -87,6 +89,7 @@
       "lhs_Jm3": -74986501070892160,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986501070892160,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124437544620506.5,
       "applicabilityStatus": "UNKNOWN",
@@ -96,7 +99,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0002",
@@ -120,6 +124,7 @@
       "lhs_Jm3": -74986531823297220,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986531823297220,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877651941435,
       "applicabilityStatus": "UNKNOWN",
@@ -129,7 +134,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0003",
@@ -153,6 +159,7 @@
       "lhs_Jm3": -74986496303036860,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986496303036860,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356178307359776,
       "applicabilityStatus": "UNKNOWN",
@@ -162,7 +169,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0004",
@@ -186,6 +194,7 @@
       "lhs_Jm3": -35955490.89632291,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955490.89632291,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.4540134547,
       "applicabilityStatus": "UNKNOWN",
@@ -195,7 +204,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0005",
@@ -219,6 +229,7 @@
       "lhs_Jm3": -74986499878954400,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986499878954400,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356178562782457,
       "applicabilityStatus": "UNKNOWN",
@@ -228,7 +239,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0006",
@@ -252,6 +264,7 @@
       "lhs_Jm3": -35955491.040596195,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -35955491.040596195,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2996290.9200496827,
       "applicabilityStatus": "UNKNOWN",
@@ -261,7 +274,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0007",
@@ -285,6 +299,7 @@
       "lhs_Jm3": -74986501070892160,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986501070892160,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165916726160675.5,
       "applicabilityStatus": "UNKNOWN",
@@ -294,7 +309,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0008",
@@ -318,6 +334,7 @@
       "lhs_Jm3": -35955490.89632291,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955490.89632291,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.4540134547,
       "applicabilityStatus": "UNKNOWN",
@@ -327,7 +344,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0009",
@@ -351,6 +369,7 @@
       "lhs_Jm3": -74986496303036860,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986496303036860,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356178307359776,
       "applicabilityStatus": "UNKNOWN",
@@ -360,7 +379,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0010",
@@ -384,6 +404,7 @@
       "lhs_Jm3": -35955491.8726998,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955491.8726998,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.4946958248,
       "applicabilityStatus": "UNKNOWN",
@@ -393,7 +414,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0011",
@@ -417,6 +439,7 @@
       "lhs_Jm3": -74986525604542700,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986525604542700,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918089141261.5,
       "applicabilityStatus": "UNKNOWN",
@@ -426,7 +449,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0012",
@@ -450,6 +474,7 @@
       "lhs_Jm3": -74986533570720340,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986533570720340,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180969337167,
       "applicabilityStatus": "UNKNOWN",
@@ -459,7 +484,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0013",
@@ -483,6 +509,7 @@
       "lhs_Jm3": -74986524403322670,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986524403322670,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438516805111.5,
       "applicabilityStatus": "UNKNOWN",
@@ -492,7 +519,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0014",
@@ -516,6 +544,7 @@
       "lhs_Jm3": -74986533522554080,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986533522554080,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438896773086.5,
       "applicabilityStatus": "UNKNOWN",
@@ -525,7 +554,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0015",
@@ -549,6 +579,7 @@
       "lhs_Jm3": -74986525304238690,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986525304238690,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877108686557,
       "applicabilityStatus": "UNKNOWN",
@@ -558,7 +589,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0016",
@@ -582,6 +614,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180968477182,
       "applicabilityStatus": "UNKNOWN",
@@ -591,7 +624,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0017",
@@ -615,6 +649,7 @@
       "lhs_Jm3": -74986525604542700,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986525604542700,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438566855946,
       "applicabilityStatus": "UNKNOWN",
@@ -624,7 +659,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0018",
@@ -648,6 +684,7 @@
       "lhs_Jm3": -74986533522554080,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986533522554080,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180965896720,
       "applicabilityStatus": "UNKNOWN",
@@ -657,7 +694,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0019",
@@ -681,6 +719,7 @@
       "lhs_Jm3": -35955487.4827724,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -35955487.4827724,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2996290.6235643667,
       "applicabilityStatus": "UNKNOWN",
@@ -690,7 +729,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0020",
@@ -714,6 +754,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918531037808,
       "applicabilityStatus": "UNKNOWN",
@@ -723,7 +764,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0021",
@@ -747,6 +789,7 @@
       "lhs_Jm3": -35955487.91475511,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955487.91475511,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.3297814631,
       "applicabilityStatus": "UNKNOWN",
@@ -756,7 +799,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0022",
@@ -780,6 +824,7 @@
       "lhs_Jm3": -74986501070892160,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986501070892160,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356178647920869,
       "applicabilityStatus": "UNKNOWN",
@@ -789,7 +834,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0023",
@@ -813,6 +859,7 @@
       "lhs_Jm3": -35955490.89632291,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955490.89632291,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.4540134547,
       "applicabilityStatus": "UNKNOWN",
@@ -822,7 +869,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0024",
@@ -846,6 +894,7 @@
       "lhs_Jm3": -74986496303036860,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986496303036860,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165916461279826,
       "applicabilityStatus": "UNKNOWN",
@@ -855,7 +904,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0025",
@@ -879,6 +929,7 @@
       "lhs_Jm3": -74986531748076480,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986531748076480,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180839148320,
       "applicabilityStatus": "UNKNOWN",
@@ -888,7 +939,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0026",
@@ -912,6 +964,7 @@
       "lhs_Jm3": -74986499878954400,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986499878954400,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124437494956433.5,
       "applicabilityStatus": "UNKNOWN",
@@ -921,7 +974,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0027",
@@ -945,6 +999,7 @@
       "lhs_Jm3": -74986531823297220,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986531823297220,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438825970717.5,
       "applicabilityStatus": "UNKNOWN",
@@ -954,7 +1009,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0028",
@@ -978,6 +1034,7 @@
       "lhs_Jm3": -74986496303036860,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986496303036860,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248874691919739,
       "applicabilityStatus": "UNKNOWN",
@@ -987,7 +1044,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0029",
@@ -1011,6 +1069,7 @@
       "lhs_Jm3": -74986531522410910,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986531522410910,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180823029351,
       "applicabilityStatus": "UNKNOWN",
@@ -1020,7 +1079,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0030",
@@ -1044,6 +1104,7 @@
       "lhs_Jm3": -74986499878954400,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986499878954400,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124437494956433.5,
       "applicabilityStatus": "UNKNOWN",
@@ -1053,7 +1114,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0031",
@@ -1077,6 +1139,7 @@
       "lhs_Jm3": -74986531748076480,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986531748076480,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180839148320,
       "applicabilityStatus": "UNKNOWN",
@@ -1086,7 +1149,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0032",
@@ -1110,6 +1174,7 @@
       "lhs_Jm3": -35955476.29504308,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -35955476.29504308,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2996289.69125359,
       "applicabilityStatus": "UNKNOWN",
@@ -1119,7 +1184,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0033",
@@ -1143,6 +1209,7 @@
       "lhs_Jm3": -74986531522410910,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986531522410910,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918417911717.5,
       "applicabilityStatus": "UNKNOWN",
@@ -1152,7 +1219,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0034",
@@ -1176,6 +1244,7 @@
       "lhs_Jm3": -35955487.4827724,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955487.4827724,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.3117821834,
       "applicabilityStatus": "UNKNOWN",
@@ -1185,7 +1254,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0035",
@@ -1209,6 +1279,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180968477182,
       "applicabilityStatus": "UNKNOWN",
@@ -1218,7 +1289,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0036",
@@ -1242,6 +1314,7 @@
       "lhs_Jm3": -35955487.91475511,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955487.91475511,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.3297814631,
       "applicabilityStatus": "UNKNOWN",
@@ -1251,7 +1324,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0037",
@@ -1275,6 +1349,7 @@
       "lhs_Jm3": -74986533570720340,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986533570720340,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918531706685.5,
       "applicabilityStatus": "UNKNOWN",
@@ -1284,7 +1359,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0038",
@@ -1308,6 +1384,7 @@
       "lhs_Jm3": -35955487.4827724,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955487.4827724,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568249.1059123143,
       "applicabilityStatus": "UNKNOWN",
@@ -1317,7 +1394,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0039",
@@ -1341,6 +1419,7 @@
       "lhs_Jm3": -74986533522554080,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986533522554080,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180965896720,
       "applicabilityStatus": "UNKNOWN",
@@ -1350,7 +1429,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0040",
@@ -1374,6 +1454,7 @@
       "lhs_Jm3": -74986525304238690,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986525304238690,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438554343278.5,
       "applicabilityStatus": "UNKNOWN",
@@ -1383,7 +1464,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0041",
@@ -1407,6 +1489,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877796556712,
       "applicabilityStatus": "UNKNOWN",
@@ -1416,7 +1499,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0042",
@@ -1440,6 +1524,7 @@
       "lhs_Jm3": -74986525604542700,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986525604542700,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180400324479,
       "applicabilityStatus": "UNKNOWN",
@@ -1449,7 +1534,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0043",
@@ -1473,6 +1559,7 @@
       "lhs_Jm3": -74986533522554080,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986533522554080,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438896773086.5,
       "applicabilityStatus": "UNKNOWN",
@@ -1482,7 +1569,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0044",
@@ -1506,6 +1594,7 @@
       "lhs_Jm3": -74986524403322670,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986524403322670,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180314523048,
       "applicabilityStatus": "UNKNOWN",
@@ -1515,7 +1604,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0045",
@@ -1539,6 +1629,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877796556712,
       "applicabilityStatus": "UNKNOWN",
@@ -1548,7 +1639,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0046",
@@ -1572,6 +1664,7 @@
       "lhs_Jm3": -74986531748076480,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986531748076480,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918430448693.5,
       "applicabilityStatus": "UNKNOWN",
@@ -1581,7 +1674,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0047",
@@ -1605,6 +1699,7 @@
       "lhs_Jm3": -35955476.29504308,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955476.29504308,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498144.845626795,
       "applicabilityStatus": "UNKNOWN",
@@ -1614,7 +1709,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0048",
@@ -1638,6 +1734,7 @@
       "lhs_Jm3": -74986531522410910,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986531522410910,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180823029351,
       "applicabilityStatus": "UNKNOWN",
@@ -1647,7 +1744,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0049",
@@ -1671,6 +1769,7 @@
       "lhs_Jm3": -35955474.008891776,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955474.008891776,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498144.7503704906,
       "applicabilityStatus": "UNKNOWN",
@@ -1680,7 +1779,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0050",
@@ -1704,6 +1804,7 @@
       "lhs_Jm3": -74986531748076480,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986531748076480,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918430448693.5,
       "applicabilityStatus": "UNKNOWN",
@@ -1713,7 +1814,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0051",
@@ -1737,6 +1839,7 @@
       "lhs_Jm3": -35955475.723518,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955475.723518,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568248.265965571,
       "applicabilityStatus": "UNKNOWN",
@@ -1746,7 +1849,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0052",
@@ -1770,6 +1874,7 @@
       "lhs_Jm3": -74986531823297220,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986531823297220,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180844521230,
       "applicabilityStatus": "UNKNOWN",
@@ -1779,7 +1884,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0053",
@@ -1803,6 +1909,7 @@
       "lhs_Jm3": -35955474.008891776,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955474.008891776,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498144.7503704906,
       "applicabilityStatus": "UNKNOWN",
@@ -1812,7 +1919,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0054",
@@ -1836,6 +1944,7 @@
       "lhs_Jm3": -74986531522410910,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986531522410910,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877626867576,
       "applicabilityStatus": "UNKNOWN",
@@ -1845,7 +1954,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0055",
@@ -1869,6 +1979,7 @@
       "lhs_Jm3": -74986499878954400,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986499878954400,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356178562782457,
       "applicabilityStatus": "UNKNOWN",
@@ -1878,7 +1989,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0056",
@@ -1902,6 +2014,7 @@
       "lhs_Jm3": -74986531748076480,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986531748076480,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438822836520,
       "applicabilityStatus": "UNKNOWN",
@@ -1911,7 +2024,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0057",
@@ -1935,6 +2049,7 @@
       "lhs_Jm3": -74986501070892160,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986501070892160,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356178647920869,
       "applicabilityStatus": "UNKNOWN",
@@ -1944,7 +2059,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0058",
@@ -1968,6 +2084,7 @@
       "lhs_Jm3": -74986533522554080,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986533522554080,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877793546173,
       "applicabilityStatus": "UNKNOWN",
@@ -1977,7 +2094,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0059",
@@ -2001,6 +2119,7 @@
       "lhs_Jm3": -74986524403322670,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986524403322670,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918022406815,
       "applicabilityStatus": "UNKNOWN",
@@ -2010,7 +2129,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0060",
@@ -2034,6 +2154,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438898278356,
       "applicabilityStatus": "UNKNOWN",
@@ -2043,7 +2164,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0061",
@@ -2067,6 +2189,7 @@
       "lhs_Jm3": -74986525304238690,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986525304238690,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180378874192,
       "applicabilityStatus": "UNKNOWN",
@@ -2076,7 +2199,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0062",
@@ -2100,6 +2224,7 @@
       "lhs_Jm3": -35955491.87847187,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955491.87847187,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.4949363281,
       "applicabilityStatus": "UNKNOWN",
@@ -2109,7 +2234,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0063",
@@ -2133,6 +2259,7 @@
       "lhs_Jm3": -74986524403322670,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986524403322670,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918022406815,
       "applicabilityStatus": "UNKNOWN",
@@ -2142,7 +2269,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0064",
@@ -2166,6 +2294,7 @@
       "lhs_Jm3": -35955491.85537667,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955491.85537667,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568249.4182411907,
       "applicabilityStatus": "UNKNOWN",
@@ -2175,7 +2304,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0065",
@@ -2199,6 +2329,7 @@
       "lhs_Jm3": -74986525304238690,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986525304238690,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180378874192,
       "applicabilityStatus": "UNKNOWN",
@@ -2208,7 +2339,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0066",
@@ -2232,6 +2364,7 @@
       "lhs_Jm3": -35955491.8726998,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955491.8726998,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.4946958248,
       "applicabilityStatus": "UNKNOWN",
@@ -2241,7 +2374,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0067",
@@ -2265,6 +2399,7 @@
       "lhs_Jm3": -74986525604542700,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986525604542700,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877133711892,
       "applicabilityStatus": "UNKNOWN",
@@ -2274,7 +2409,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0068",
@@ -2298,6 +2434,7 @@
       "lhs_Jm3": -74986533570720340,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986533570720340,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180969337167,
       "applicabilityStatus": "UNKNOWN",
@@ -2307,7 +2444,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0069",
@@ -2331,6 +2469,7 @@
       "lhs_Jm3": -74986524403322670,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986524403322670,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438516805111.5,
       "applicabilityStatus": "UNKNOWN",
@@ -2340,7 +2479,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0070",
@@ -2364,6 +2504,7 @@
       "lhs_Jm3": -74986499878954400,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986499878954400,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356178562782457,
       "applicabilityStatus": "UNKNOWN",
@@ -2373,7 +2514,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0071",
@@ -2397,6 +2539,7 @@
       "lhs_Jm3": -74986531748076480,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986531748076480,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877645673040,
       "applicabilityStatus": "UNKNOWN",
@@ -2406,7 +2549,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0072",
@@ -2430,6 +2574,7 @@
       "lhs_Jm3": -74986501070892160,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986501070892160,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165916726160675.5,
       "applicabilityStatus": "UNKNOWN",
@@ -2439,7 +2584,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0073",
@@ -2463,6 +2609,7 @@
       "lhs_Jm3": -74986531823297220,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986531823297220,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438825970717.5,
       "applicabilityStatus": "UNKNOWN",
@@ -2472,7 +2619,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0074",
@@ -2496,6 +2644,7 @@
       "lhs_Jm3": -74986496303036860,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986496303036860,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356178307359776,
       "applicabilityStatus": "UNKNOWN",
@@ -2505,7 +2654,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0075",
@@ -2529,6 +2679,7 @@
       "lhs_Jm3": -35955491.004527956,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955491.004527956,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.4585219983,
       "applicabilityStatus": "UNKNOWN",
@@ -2538,7 +2689,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0076",
@@ -2562,6 +2714,7 @@
       "lhs_Jm3": -74986499878954400,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986499878954400,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165916659941911,
       "applicabilityStatus": "UNKNOWN",
@@ -2571,7 +2724,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0077",
@@ -2595,6 +2749,7 @@
       "lhs_Jm3": -35955491.040596195,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955491.040596195,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568249.3600425855,
       "applicabilityStatus": "UNKNOWN",
@@ -2604,7 +2759,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0078",
@@ -2628,6 +2784,7 @@
       "lhs_Jm3": -74986501070892160,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986501070892160,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356178647920869,
       "applicabilityStatus": "UNKNOWN",
@@ -2637,7 +2794,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0079",
@@ -2661,6 +2819,7 @@
       "lhs_Jm3": -35955490.89632291,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955490.89632291,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.4540134547,
       "applicabilityStatus": "UNKNOWN",
@@ -2670,7 +2829,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0080",
@@ -2694,6 +2854,7 @@
       "lhs_Jm3": -74986499878954400,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986499878954400,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248874989912867,
       "applicabilityStatus": "UNKNOWN",
@@ -2703,7 +2864,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0081",
@@ -2727,6 +2889,7 @@
       "lhs_Jm3": -35955491.004527956,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955491.004527956,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568249.357466283,
       "applicabilityStatus": "UNKNOWN",
@@ -2736,7 +2899,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0082",
@@ -2760,6 +2924,7 @@
       "lhs_Jm3": -74986525604542700,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986525604542700,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438566855946,
       "applicabilityStatus": "UNKNOWN",
@@ -2769,7 +2934,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0083",
@@ -2793,6 +2959,7 @@
       "lhs_Jm3": -74986533570720340,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986533570720340,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438898780014,
       "applicabilityStatus": "UNKNOWN",
@@ -2802,7 +2969,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0084",
@@ -2826,6 +2994,7 @@
       "lhs_Jm3": -74986524403322670,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986524403322670,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877033610223,
       "applicabilityStatus": "UNKNOWN",
@@ -2835,7 +3004,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0085",
@@ -2859,6 +3029,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918531037808,
       "applicabilityStatus": "UNKNOWN",
@@ -2868,7 +3039,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0086",
@@ -2892,6 +3064,7 @@
       "lhs_Jm3": -74986525304238690,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986525304238690,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438554343278.5,
       "applicabilityStatus": "UNKNOWN",
@@ -2901,7 +3074,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0087",
@@ -2925,6 +3099,7 @@
       "lhs_Jm3": -74986533570720340,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986533570720340,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180969337167,
       "applicabilityStatus": "UNKNOWN",
@@ -2934,7 +3109,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0088",
@@ -2958,6 +3134,7 @@
       "lhs_Jm3": -74986525604542700,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986525604542700,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438566855946,
       "applicabilityStatus": "UNKNOWN",
@@ -2967,7 +3144,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0089",
@@ -2991,6 +3169,7 @@
       "lhs_Jm3": -74986533522554080,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986533522554080,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918529030782,
       "applicabilityStatus": "UNKNOWN",
@@ -3000,7 +3179,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0090",
@@ -3024,6 +3204,7 @@
       "lhs_Jm3": -35955487.91475511,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955487.91475511,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568249.1367682223,
       "applicabilityStatus": "UNKNOWN",
@@ -3033,7 +3214,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0091",
@@ -3057,6 +3239,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180968477182,
       "applicabilityStatus": "UNKNOWN",
@@ -3066,7 +3249,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0092",
@@ -3090,6 +3274,7 @@
       "lhs_Jm3": -35955488.05874865,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955488.05874865,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.3357811936,
       "applicabilityStatus": "UNKNOWN",
@@ -3099,7 +3284,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0093",
@@ -3123,6 +3309,7 @@
       "lhs_Jm3": -74986533570720340,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986533570720340,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877797560028,
       "applicabilityStatus": "UNKNOWN",
@@ -3132,7 +3319,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0094",
@@ -3156,6 +3344,7 @@
       "lhs_Jm3": -35955490.89632291,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955490.89632291,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568249.349737351,
       "applicabilityStatus": "UNKNOWN",
@@ -3165,7 +3354,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0095",
@@ -3189,6 +3379,7 @@
       "lhs_Jm3": -74986499878954400,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986499878954400,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124437494956433.5,
       "applicabilityStatus": "UNKNOWN",
@@ -3198,7 +3389,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0096",
@@ -3222,6 +3414,7 @@
       "lhs_Jm3": -74986531748076480,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986531748076480,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438822836520,
       "applicabilityStatus": "UNKNOWN",
@@ -3231,7 +3424,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0097",
@@ -3255,6 +3449,7 @@
       "lhs_Jm3": -74986501070892160,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986501070892160,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248875089241013,
       "applicabilityStatus": "UNKNOWN",
@@ -3264,7 +3459,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0098",
@@ -3288,6 +3484,7 @@
       "lhs_Jm3": -74986531823297220,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986531823297220,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918434627623,
       "applicabilityStatus": "UNKNOWN",
@@ -3297,7 +3494,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0099",
@@ -3321,6 +3519,7 @@
       "lhs_Jm3": -74986496303036860,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986496303036860,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124437345959869.5,
       "applicabilityStatus": "UNKNOWN",
@@ -3330,7 +3529,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0100",
@@ -3354,6 +3554,7 @@
       "lhs_Jm3": -74986531748076480,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986531748076480,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180839148320,
       "applicabilityStatus": "UNKNOWN",
@@ -3363,7 +3564,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0101",
@@ -3387,6 +3589,7 @@
       "lhs_Jm3": -74986499878954400,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986499878954400,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124437494956433.5,
       "applicabilityStatus": "UNKNOWN",
@@ -3396,7 +3599,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0102",
@@ -3420,6 +3624,7 @@
       "lhs_Jm3": -74986531823297220,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986531823297220,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918434627623,
       "applicabilityStatus": "UNKNOWN",
@@ -3429,7 +3634,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0103",
@@ -3453,6 +3659,7 @@
       "lhs_Jm3": -35955476.29504308,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955476.29504308,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568248.3067887914,
       "applicabilityStatus": "UNKNOWN",
@@ -3462,7 +3669,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0104",
@@ -3486,6 +3694,7 @@
       "lhs_Jm3": -74986531522410910,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986531522410910,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180823029351,
       "applicabilityStatus": "UNKNOWN",
@@ -3495,7 +3704,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0105",
@@ -3519,6 +3729,7 @@
       "lhs_Jm3": -35955475.723518,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955475.723518,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498144.82181325,
       "applicabilityStatus": "UNKNOWN",
@@ -3528,7 +3739,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0106",
@@ -3552,6 +3764,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877796556712,
       "applicabilityStatus": "UNKNOWN",
@@ -3561,7 +3774,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0107",
@@ -3585,6 +3799,7 @@
       "lhs_Jm3": -35955488.05874865,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955488.05874865,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568249.147053475,
       "applicabilityStatus": "UNKNOWN",
@@ -3594,7 +3809,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0108",
@@ -3618,6 +3834,7 @@
       "lhs_Jm3": -74986533570720340,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986533570720340,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438898780014,
       "applicabilityStatus": "UNKNOWN",
@@ -3627,7 +3844,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0109",
@@ -3651,6 +3869,7 @@
       "lhs_Jm3": -35955487.4827724,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955487.4827724,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.3117821834,
       "applicabilityStatus": "UNKNOWN",
@@ -3660,7 +3879,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0110",
@@ -3684,6 +3904,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877796556712,
       "applicabilityStatus": "UNKNOWN",
@@ -3693,7 +3914,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0111",
@@ -3717,6 +3939,7 @@
       "lhs_Jm3": -74986525304238690,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986525304238690,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918072457705,
       "applicabilityStatus": "UNKNOWN",
@@ -3726,7 +3949,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0112",
@@ -3750,6 +3974,7 @@
       "lhs_Jm3": -74986533570720340,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986533570720340,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438898780014,
       "applicabilityStatus": "UNKNOWN",
@@ -3759,7 +3984,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0113",
@@ -3783,6 +4009,7 @@
       "lhs_Jm3": -74986525604542700,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986525604542700,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180400324479,
       "applicabilityStatus": "UNKNOWN",
@@ -3792,7 +4019,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0114",
@@ -3816,6 +4044,7 @@
       "lhs_Jm3": -74986533522554080,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986533522554080,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877793546173,
       "applicabilityStatus": "UNKNOWN",
@@ -3825,7 +4054,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0115",
@@ -3849,6 +4079,7 @@
       "lhs_Jm3": -74986525304238690,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986525304238690,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918072457705,
       "applicabilityStatus": "UNKNOWN",
@@ -3858,7 +4089,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0116",
@@ -3882,6 +4114,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180968477182,
       "applicabilityStatus": "UNKNOWN",
@@ -3891,7 +4124,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0117",
@@ -3915,6 +4149,7 @@
       "lhs_Jm3": -74986525604542700,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986525604542700,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180400324479,
       "applicabilityStatus": "UNKNOWN",
@@ -3924,7 +4159,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0118",
@@ -3948,6 +4184,7 @@
       "lhs_Jm3": -35955476.29504308,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955476.29504308,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498144.845626795,
       "applicabilityStatus": "UNKNOWN",
@@ -3957,7 +4194,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0119",
@@ -3981,6 +4219,7 @@
       "lhs_Jm3": -74986531522410910,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986531522410910,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877626867576,
       "applicabilityStatus": "UNKNOWN",
@@ -3990,7 +4229,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0120",
@@ -4014,6 +4254,7 @@
       "lhs_Jm3": -35955474.008891776,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955474.008891776,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568248.14349227,
       "applicabilityStatus": "UNKNOWN",
@@ -4023,7 +4264,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0121",
@@ -4047,6 +4289,7 @@
       "lhs_Jm3": -74986531748076480,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986531748076480,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438822836520,
       "applicabilityStatus": "UNKNOWN",
@@ -4056,7 +4299,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0122",
@@ -4080,6 +4324,7 @@
       "lhs_Jm3": -35955476.29504308,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955476.29504308,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498144.845626795,
       "applicabilityStatus": "UNKNOWN",
@@ -4089,7 +4334,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0123",
@@ -4113,6 +4359,7 @@
       "lhs_Jm3": -74986531823297220,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986531823297220,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877651941435,
       "applicabilityStatus": "UNKNOWN",
@@ -4122,7 +4369,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0124",
@@ -4146,6 +4394,7 @@
       "lhs_Jm3": -35955474.008891776,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -35955474.008891776,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1997526.333827321,
       "applicabilityStatus": "UNKNOWN",
@@ -4155,7 +4404,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0125",
@@ -4179,6 +4429,7 @@
       "lhs_Jm3": -74986531522410910,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986531522410910,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438813433788,
       "applicabilityStatus": "UNKNOWN",
@@ -4188,7 +4439,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0126",
@@ -4212,6 +4464,7 @@
       "lhs_Jm3": -74986499878954400,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986499878954400,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356178562782457,
       "applicabilityStatus": "UNKNOWN",
@@ -4221,7 +4474,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0127",
@@ -4245,6 +4499,7 @@
       "lhs_Jm3": -74986531823297220,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986531823297220,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877651941435,
       "applicabilityStatus": "UNKNOWN",
@@ -4254,7 +4509,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0128",
@@ -4278,6 +4534,7 @@
       "lhs_Jm3": -74986501070892160,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986501070892160,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165916726160675.5,
       "applicabilityStatus": "UNKNOWN",
@@ -4287,7 +4544,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0129",
@@ -4311,6 +4569,7 @@
       "lhs_Jm3": -74986531522410910,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986531522410910,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180823029351,
       "applicabilityStatus": "UNKNOWN",
@@ -4320,7 +4579,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0130",
@@ -4344,6 +4604,7 @@
       "lhs_Jm3": -74986524403322670,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986524403322670,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180314523048,
       "applicabilityStatus": "UNKNOWN",
@@ -4353,7 +4614,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0131",
@@ -4377,6 +4639,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438898278356,
       "applicabilityStatus": "UNKNOWN",
@@ -4386,7 +4649,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0132",
@@ -4410,6 +4674,7 @@
       "lhs_Jm3": -74986525604542700,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986525604542700,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877133711892,
       "applicabilityStatus": "UNKNOWN",
@@ -4419,7 +4684,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0133",
@@ -4443,6 +4709,7 @@
       "lhs_Jm3": -35955491.87847187,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955491.87847187,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568249.419890848,
       "applicabilityStatus": "UNKNOWN",
@@ -4452,7 +4719,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0134",
@@ -4476,6 +4744,7 @@
       "lhs_Jm3": -74986524403322670,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986524403322670,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438516805111.5,
       "applicabilityStatus": "UNKNOWN",
@@ -4485,7 +4754,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0135",
@@ -4509,6 +4779,7 @@
       "lhs_Jm3": -35955491.85537667,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955491.85537667,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.493974028,
       "applicabilityStatus": "UNKNOWN",
@@ -4518,7 +4789,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0136",
@@ -4542,6 +4814,7 @@
       "lhs_Jm3": -74986525304238690,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986525304238690,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877108686557,
       "applicabilityStatus": "UNKNOWN",
@@ -4551,7 +4824,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0137",
@@ -4575,6 +4849,7 @@
       "lhs_Jm3": -35955491.87847187,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -35955491.87847187,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1997527.3265817708,
       "applicabilityStatus": "UNKNOWN",
@@ -4584,7 +4859,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0138",
@@ -4608,6 +4884,7 @@
       "lhs_Jm3": -74986525604542700,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986525604542700,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438566855946,
       "applicabilityStatus": "UNKNOWN",
@@ -4617,7 +4894,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0139",
@@ -4641,6 +4919,7 @@
       "lhs_Jm3": -74986533522554080,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986533522554080,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180965896720,
       "applicabilityStatus": "UNKNOWN",
@@ -4650,7 +4929,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0140",
@@ -4674,6 +4954,7 @@
       "lhs_Jm3": -74986524403322670,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986524403322670,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248877033610223,
       "applicabilityStatus": "UNKNOWN",
@@ -4683,7 +4964,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0141",
@@ -4707,6 +4989,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918531037808,
       "applicabilityStatus": "UNKNOWN",
@@ -4716,7 +4999,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0142",
@@ -4740,6 +5024,7 @@
       "lhs_Jm3": -74986531823297220,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986531823297220,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180844521230,
       "applicabilityStatus": "UNKNOWN",
@@ -4749,7 +5034,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0143",
@@ -4773,6 +5059,7 @@
       "lhs_Jm3": -74986501070892160,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986501070892160,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356178647920869,
       "applicabilityStatus": "UNKNOWN",
@@ -4782,7 +5069,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0144",
@@ -4806,6 +5094,7 @@
       "lhs_Jm3": -74986531522410910,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986531522410910,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438813433788,
       "applicabilityStatus": "UNKNOWN",
@@ -4815,7 +5104,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0145",
@@ -4839,6 +5129,7 @@
       "lhs_Jm3": -74986496303036860,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986496303036860,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248874691919739,
       "applicabilityStatus": "UNKNOWN",
@@ -4848,7 +5139,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0146",
@@ -4872,6 +5164,7 @@
       "lhs_Jm3": -35955491.004527956,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955491.004527956,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568249.357466283,
       "applicabilityStatus": "UNKNOWN",
@@ -4881,7 +5174,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0147",
@@ -4905,6 +5199,7 @@
       "lhs_Jm3": -74986501070892160,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986501070892160,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124437544620506.5,
       "applicabilityStatus": "UNKNOWN",
@@ -4914,7 +5209,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0148",
@@ -4938,6 +5234,7 @@
       "lhs_Jm3": -35955491.040596195,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -35955491.040596195,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498145.4600248414,
       "applicabilityStatus": "UNKNOWN",
@@ -4947,7 +5244,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0149",
@@ -4971,6 +5269,7 @@
       "lhs_Jm3": -74986496303036860,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986496303036860,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248874691919739,
       "applicabilityStatus": "UNKNOWN",
@@ -4980,7 +5279,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0150",
@@ -5004,6 +5304,7 @@
       "lhs_Jm3": -35955490.89632291,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -35955490.89632291,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1997527.2720179397,
       "applicabilityStatus": "UNKNOWN",
@@ -5013,7 +5314,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0151",
@@ -5037,6 +5339,7 @@
       "lhs_Jm3": -74986499878954400,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986499878954400,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124437494956433.5,
       "applicabilityStatus": "UNKNOWN",
@@ -5046,7 +5349,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0152",
@@ -5070,6 +5374,7 @@
       "lhs_Jm3": -35955491.040596195,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -35955491.040596195,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2568249.3600425855,
       "applicabilityStatus": "UNKNOWN",
@@ -5079,7 +5384,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0153",
@@ -5103,6 +5409,7 @@
       "lhs_Jm3": -74986501070892160,
       "boundComputed_Jm3": -12,
       "boundUsed_Jm3": -74986501070892160,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 6248875089241013,
       "applicabilityStatus": "UNKNOWN",
@@ -5112,7 +5419,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0154",
@@ -5136,6 +5444,7 @@
       "lhs_Jm3": -74986533522554080,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986533522554080,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918529030782,
       "applicabilityStatus": "UNKNOWN",
@@ -5145,7 +5454,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0155",
@@ -5169,6 +5479,7 @@
       "lhs_Jm3": -74986524403322670,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986524403322670,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180314523048,
       "applicabilityStatus": "UNKNOWN",
@@ -5178,7 +5489,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0156",
@@ -5202,6 +5514,7 @@
       "lhs_Jm3": -74986533558680540,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986533558680540,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180968477182,
       "applicabilityStatus": "UNKNOWN",
@@ -5211,7 +5524,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0157",
@@ -5235,6 +5549,7 @@
       "lhs_Jm3": -74986525604542700,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986525604542700,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438566855946,
       "applicabilityStatus": "UNKNOWN",
@@ -5244,7 +5559,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0158",
@@ -5268,6 +5584,7 @@
       "lhs_Jm3": -74986533570720340,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -74986533570720340,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 4165918531706685.5,
       "applicabilityStatus": "UNKNOWN",
@@ -5277,7 +5594,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0159",
@@ -5301,6 +5619,7 @@
       "lhs_Jm3": -74986524403322670,
       "boundComputed_Jm3": -14,
       "boundUsed_Jm3": -74986524403322670,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 5356180314523048,
       "applicabilityStatus": "UNKNOWN",
@@ -5310,7 +5629,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     },
     {
       "id": "case_0160",
@@ -5334,6 +5654,7 @@
       "lhs_Jm3": -74986533522554080,
       "boundComputed_Jm3": -24,
       "boundUsed_Jm3": -74986533522554080,
+      "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3124438896773086.5,
       "applicabilityStatus": "UNKNOWN",
@@ -5343,7 +5664,8 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
-      "classificationTag": "applicability_limited"
+      "classificationTag": "applicability_limited",
+      "comparabilityClass": "non_comparable_missing_signals"
     }
   ]
 }

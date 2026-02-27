@@ -87,13 +87,13 @@ describe('warp-g4-recovery-search', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-recovery-stepa-'));
     const outA = path.join(root, 'stepa-a.json');
     const outB = path.join(root, 'stepa-b.json');
-    const summaryPath = path.resolve('artifacts/research/full-solve/g4-stepA-summary.json');
+    const summaryPath = path.join(root, 'g4-stepA-summary.json');
 
-    await runRecoverySearch({ outPath: outA, seed: 42, maxCases: 16, topN: 4, runtimeCapMs: 10_000 });
+    await runRecoverySearch({ outPath: outA, stepASummaryPath: summaryPath, seed: 42, maxCases: 16, topN: 4, runtimeCapMs: 10_000 });
     const summaryA = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
     const payloadA = JSON.parse(fs.readFileSync(outA, 'utf8'));
 
-    await runRecoverySearch({ outPath: outB, seed: 42, maxCases: 16, topN: 4, runtimeCapMs: 10_000 });
+    await runRecoverySearch({ outPath: outB, stepASummaryPath: summaryPath, seed: 42, maxCases: 16, topN: 4, runtimeCapMs: 10_000 });
     const summaryB = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
     const payloadB = JSON.parse(fs.readFileSync(outB, 'utf8'));
 
@@ -109,11 +109,16 @@ describe('warp-g4-recovery-search', () => {
 
   it('does not mutate canonical artifact during temp output runs', async () => {
     const canonical = path.resolve('artifacts/research/full-solve/g4-recovery-search-2026-02-27.json');
+    const canonicalStepASummary = path.resolve('artifacts/research/full-solve/g4-stepA-summary.json');
     const before = fs.existsSync(canonical) ? fs.readFileSync(canonical, 'utf8') : null;
+    const beforeSummary = fs.existsSync(canonicalStepASummary) ? fs.readFileSync(canonicalStepASummary, 'utf8') : null;
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-recovery-'));
     const out = path.join(root, 'temp.json');
-    await runRecoverySearch({ outPath: out, seed: 7, maxCases: 6, runtimeCapMs: 10_000 });
+    const summary = path.join(root, 'g4-stepA-summary.json');
+    await runRecoverySearch({ outPath: out, stepASummaryPath: summary, seed: 7, maxCases: 6, runtimeCapMs: 10_000 });
     const after = fs.existsSync(canonical) ? fs.readFileSync(canonical, 'utf8') : null;
+    const afterSummary = fs.existsSync(canonicalStepASummary) ? fs.readFileSync(canonicalStepASummary, 'utf8') : null;
     expect(after).toBe(before);
+    expect(afterSummary).toBe(beforeSummary);
   });
 });

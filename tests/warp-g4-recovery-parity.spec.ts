@@ -134,7 +134,7 @@ describe('warp g4 recovery parity', () => {
             {
               id: 'case_cmp',
               params: { sampler: 'gaussian', tau_s_ms: 5 },
-              applicabilityStatus: 'UNKNOWN',
+              applicabilityStatus: 'FAIL',
               marginRatioRawComputed: 2,
               marginRatioRaw: 2,
               lhs_Jm3: -5,
@@ -186,6 +186,45 @@ describe('warp g4 recovery parity', () => {
       non_comparable_contract_mismatch: 1,
       non_comparable_other: 0,
     });
+  });
+
+  it('treats UNKNOWN applicability as non-comparable missing-signals even when numeric fields are present', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-parity-unknown-'));
+    const recoveryPath = path.join(tmpDir, 'recovery.json');
+    const outPath = path.join(tmpDir, 'parity.json');
+
+    fs.writeFileSync(
+      recoveryPath,
+      `${JSON.stringify(
+        {
+          provenance: { commitHash: 'deadbeef' },
+          cases: [
+            {
+              id: 'case_unknown',
+              params: { sampler: 'gaussian', tau_s_ms: 5 },
+              applicabilityStatus: 'UNKNOWN',
+              marginRatioRawComputed: 2,
+              marginRatioRaw: 2,
+              lhs_Jm3: -5,
+              boundComputed_Jm3: -2,
+              boundUsed_Jm3: -5,
+              rhoSource: 'warp.metric.T00.natario.shift',
+              reasonCode: [],
+            },
+          ],
+        },
+        null,
+        2,
+      )}
+`,
+    );
+
+    const result = await runRecoveryParity({ topN: 1, recoveryPath, outPath });
+    expect(result.ok).toBe(true);
+
+    const payload = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+    expect(payload.comparability.canonicalComparableCaseCount).toBe(0);
+    expect(payload.comparability.nonComparableBuckets.non_comparable_missing_signals).toBe(1);
   });
 
   it('treats tiny relative numeric drift as a parity match for large magnitudes', async () => {
