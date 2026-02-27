@@ -5,6 +5,7 @@ import { readKnowledgeConfig } from "../config/knowledge";
 import { persistKnowledgeBundles } from "../services/knowledge/corpus";
 import { buildKnowledgeValidator, KnowledgeValidationError } from "../services/knowledge/validation";
 import { evaluateKnowledgePromotionGate } from "../services/knowledge/promotion-gate";
+import { getTrainingTraceById } from "../services/observability/training-trace-store";
 
 const DEFAULT_FILES = [
   "docs/V0.1-SIGNOFF.md",
@@ -131,19 +132,19 @@ knowledgeRouter.post("/projects/sync", async (req, res) => {
 
 knowledgeRouter.post("/projects/promote", (req, res) => {
   const claimTier = typeof req.body?.claimTier === "string" ? req.body.claimTier : "diagnostic";
-  const casimirVerdict = req.body?.casimirVerdict === "PASS" || req.body?.casimirVerdict === "FAIL"
-    ? req.body.casimirVerdict
-    : undefined;
-  const certificateHash = typeof req.body?.certificateHash === "string" ? req.body.certificateHash : null;
-  const certificateIntegrityOk = req.body?.certificateIntegrityOk === true;
+  const evidenceRef = typeof req.body?.evidenceRef === "string" ? req.body.evidenceRef.trim() : "";
   const enforceCertifiedOnly = req.body?.enforceCertifiedOnly !== false;
+
+  const trace = evidenceRef ? getTrainingTraceById(evidenceRef) : null;
 
   const decision = evaluateKnowledgePromotionGate({
     enforceCertifiedOnly,
     claimTier,
-    casimirVerdict,
-    certificateHash,
-    certificateIntegrityOk,
+    evidenceRef,
+    evidenceResolved: Boolean(trace),
+    casimirVerdict: trace?.pass ? "PASS" : "FAIL",
+    certificateHash: trace?.certificate?.certificateHash ?? null,
+    certificateIntegrityOk: trace?.certificate?.integrityOk === true,
   });
 
   if (!decision.ok) {
@@ -163,6 +164,9 @@ knowledgeRouter.post("/projects/promote", (req, res) => {
         message: decision.message,
       },
       mode: "report-only",
+      promotion: {
+        status: "not-promoted",
+      },
     });
   }
 
@@ -172,6 +176,7 @@ knowledgeRouter.post("/projects/promote", (req, res) => {
     promotion: {
       status: "promoted",
       claimTier: "certified",
+      evidenceRef,
     },
   });
 });

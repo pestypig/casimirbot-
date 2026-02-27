@@ -1,6 +1,8 @@
 export type KnowledgePromotionTier = "diagnostic" | "reduced-order" | "certified";
 
 export type KnowledgePromotionRejectCode =
+  | "KNOWLEDGE_PROMOTION_MISSING_EVIDENCE_REF"
+  | "KNOWLEDGE_PROMOTION_UNRESOLVED_EVIDENCE_REF"
   | "KNOWLEDGE_PROMOTION_CERTIFIED_ONLY_REQUIRED"
   | "KNOWLEDGE_PROMOTION_MISSING_CASIMIR_VERIFICATION"
   | "KNOWLEDGE_PROMOTION_CERTIFICATE_INTEGRITY_REQUIRED";
@@ -20,6 +22,8 @@ export type KnowledgePromotionDecision =
 export type KnowledgePromotionGateInput = {
   enforceCertifiedOnly: boolean;
   claimTier: KnowledgePromotionTier;
+  evidenceRef?: string;
+  evidenceResolved: boolean;
   casimirVerdict?: "PASS" | "FAIL";
   certificateHash?: string | null;
   certificateIntegrityOk?: boolean;
@@ -36,6 +40,24 @@ export function evaluateKnowledgePromotionGate(
       enforcement,
       code: "KNOWLEDGE_PROMOTION_CERTIFIED_ONLY_REQUIRED",
       message: "Production promotion requires claimTier=certified.",
+    };
+  }
+
+  if (!input.evidenceRef) {
+    return {
+      ok: false,
+      enforcement,
+      code: "KNOWLEDGE_PROMOTION_MISSING_EVIDENCE_REF",
+      message: "Production promotion requires a server-verifiable evidenceRef.",
+    };
+  }
+
+  if (!input.evidenceResolved) {
+    return {
+      ok: false,
+      enforcement,
+      code: "KNOWLEDGE_PROMOTION_UNRESOLVED_EVIDENCE_REF",
+      message: "Promotion evidenceRef could not be resolved to a server trace record.",
     };
   }
 
