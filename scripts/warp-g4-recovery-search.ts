@@ -11,6 +11,7 @@ const DEFAULT_TOP_N = 12;
 const DEFAULT_RUNTIME_CAP_MS = 45_000;
 const DEFAULT_OUT_PATH = path.join('artifacts/research/full-solve', `g4-recovery-search-${DATE_STAMP}.json`);
 const STEP_A_SUMMARY_PATH = path.join('artifacts/research/full-solve', 'g4-stepA-summary.json');
+const STEP_B_SUMMARY_PATH = path.join('artifacts/research/full-solve', 'g4-stepB-summary.json');
 const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
 
@@ -97,7 +98,7 @@ const leverFamilies: Record<string, Array<string | number>> = {
   fieldType: ['em', 'scalar'],
   qCavity: [1e5, 1e7, 1e9],
   qSpoilingFactor: [1, 1.5, 3],
-  tau_s_ms: [5, 10, 20, 50],
+  tau_s_ms: [2, 5, 8, 10, 20, 35, 50],
   gap_nm: [0.4, 1, 5, 8],
   shipRadius_m: [2, 10, 40],
 };
@@ -157,9 +158,35 @@ const deriveDeterministicWalk = (seed: number, total: number): { start: number; 
   return { start, step };
 };
 
+const summarizeInfluence = (cases: RecoveryCase[]) =>
+  LEVER_ORDER.map((family) => {
+    const grouped = new Map<string, number[]>();
+    for (const entry of cases) {
+      if (entry.lhs_Jm3 == null) continue;
+      const key = String(entry.params[family]);
+      const bucket = grouped.get(key) ?? [];
+      bucket.push(entry.lhs_Jm3);
+      grouped.set(key, bucket);
+    }
+    const means = [...grouped.values()].map((values) => values.reduce((acc, v) => acc + v, 0) / values.length);
+    const measuredImpact = means.length >= 2 ? Math.max(...means) - Math.min(...means) : 0;
+    return {
+      family,
+      measuredImpactAbsLhsDelta: Math.abs(measuredImpact),
+      sampledValueCount: means.length,
+      noOpByAbsLhsDelta: Math.abs(measuredImpact) <= 1e-18,
+    };
+  }).sort((a, b) => b.measuredImpactAbsLhsDelta - a.measuredImpactAbsLhsDelta || a.family.localeCompare(b.family));
+
+const writeStepBSummary = (summaryPath: string, payload: Record<string, unknown>) => {
+  fs.mkdirSync(path.dirname(summaryPath), { recursive: true });
+  fs.writeFileSync(summaryPath, `${JSON.stringify(payload, null, 2)}\n`);
+};
+
 export async function runRecoverySearch(opts: {
   outPath?: string;
   stepASummaryPath?: string;
+  stepBSummaryPath?: string;
   seed?: number;
   maxCases?: number;
   topN?: number;
@@ -178,20 +205,84 @@ export async function runRecoverySearch(opts: {
     (path.resolve(outPath) === path.resolve(DEFAULT_OUT_PATH)
       ? STEP_A_SUMMARY_PATH
       : path.join(path.dirname(outPath), 'g4-stepA-summary.json'));
+  const stepBSummaryPath =
+    opts.stepBSummaryPath ??
+    (path.resolve(outPath) === path.resolve(DEFAULT_OUT_PATH)
+      ? STEP_B_SUMMARY_PATH
+      : path.join(path.dirname(outPath), 'g4-stepB-summary.json'));
 
   const startedAt = Date.now();
   const baseline = structuredClone(getGlobalPipelineState());
   const attemptedCaseUniverse = universeSize();
   const { start, step } = deriveDeterministicWalk(seed, attemptedCaseUniverse);
   const commitHash = execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  if (!fs.existsSync(stepASummaryPath)) {
+    writeStepBSummary(stepBSummaryPath, {
+      boundaryStatement: BOUNDARY_STATEMENT,
+      executedCaseCount: 0,
+      canonicalComparableCaseCount: 0,
+      candidatePassFoundCanonicalComparable: false,
+      minMarginRatioRawComputedComparable: null,
+      topComparableCandidates: [],
+      leverInfluenceRanking: [],
+      blockedReason: 'missing_stepA_summary',
+      blockerDiagnostics: {
+        stepASummaryPath,
+        message: 'Step A summary artifact is required before Step B search can run.',
+      },
+      provenance: { commitHash },
+    });
+    return { ok: false, blockedReason: 'missing_stepA_summary', stepBSummaryPath, outPath };
+  }
+  const stepASummary = JSON.parse(fs.readFileSync(stepASummaryPath, 'utf8')) as any;
+  if (Number(stepASummary?.canonicalComparableCaseCount ?? 0) === 0) {
+    writeStepBSummary(stepBSummaryPath, {
+      boundaryStatement: BOUNDARY_STATEMENT,
+      executedCaseCount: 0,
+      canonicalComparableCaseCount: 0,
+      candidatePassFoundCanonicalComparable: false,
+      minMarginRatioRawComputedComparable: null,
+      topComparableCandidates: [],
+      leverInfluenceRanking: [],
+      blockedReason: 'no_canonical_comparable_cases',
+      blockerDiagnostics: {
+        stepASummaryPath,
+        stepACanonicalComparableCaseCount: Number(stepASummary?.canonicalComparableCaseCount ?? 0),
+      },
+      provenance: { commitHash },
+    });
+    return { ok: false, blockedReason: 'no_canonical_comparable_cases', stepBSummaryPath, outPath };
+  }
 
   const results: RecoveryCase[] = [];
   let evaluated = 0;
+  const priorityCases = leverFamilies.tau_s_ms.map((tau) =>
+    JSON.stringify({ ...decodeCase(start), tau_s_ms: tau, dutyShip: decodeCase(start).dutyCycle, dutyEffective_FR: decodeCase(start).dutyCycle }),
+  );
+  const seen = new Set<string>();
+  const stagedRows: Record<string, unknown>[] = [];
+  for (const encoded of priorityCases) {
+    const row = JSON.parse(encoded) as Record<string, unknown>;
+    const key = JSON.stringify(row);
+    if (!seen.has(key)) {
+      seen.add(key);
+      stagedRows.push(row);
+    }
+  }
   for (let visit = 0; visit < attemptedCaseUniverse; visit += 1) {
-    if (results.length >= maxCases) break;
-    if (Date.now() - startedAt > runtimeCapMs) break;
+    if (stagedRows.length >= maxCases) break;
     const idx = (start + visit * step) % attemptedCaseUniverse;
     const row = decodeCase(idx);
+    const key = JSON.stringify(row);
+    if (!seen.has(key)) {
+      seen.add(key);
+      stagedRows.push(row);
+    }
+  }
+
+  for (const row of stagedRows) {
+    if (results.length >= maxCases) break;
+    if (Date.now() - startedAt > runtimeCapMs) break;
     evaluated += 1;
     const next = await updateParameters(structuredClone(baseline), {
       warpFieldType: row.warpFieldType,
@@ -312,6 +403,26 @@ export async function runRecoverySearch(opts: {
         ? 'counterfactual_only'
         : 'no_pass_signal',
   };
+  const rankedComparableCandidates = comparableCases
+    .slice()
+    .sort(
+      (a, b) =>
+        (a.marginRatioRawComputed ?? Number.POSITIVE_INFINITY) - (b.marginRatioRawComputed ?? Number.POSITIVE_INFINITY) ||
+        a.id.localeCompare(b.id),
+    )
+    .slice(0, 10)
+    .map((entry) => ({
+      id: entry.id,
+      params: entry.params,
+      lhs_Jm3: entry.lhs_Jm3,
+      boundComputed_Jm3: entry.boundComputed_Jm3,
+      boundUsed_Jm3: entry.boundUsed_Jm3,
+      marginRatioRaw: entry.marginRatioRaw,
+      marginRatioRawComputed: entry.marginRatioRawComputed,
+      applicabilityStatus: entry.applicabilityStatus,
+      reasonCode: entry.reasonCode,
+    }));
+  const leverInfluenceRanking = summarizeInfluence(comparableCases);
 
   const payload = {
     runId: `g4-recovery-search-${seed}-${DATE_STAMP}`,
@@ -346,7 +457,7 @@ export async function runRecoverySearch(opts: {
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, `${JSON.stringify(payload, null, 2)}\n`);
 
-  const stepASummary = {
+  const stepASummaryOut = {
     canonicalComparableCaseCount: comparableCases.length,
     nonComparableCaseCount: nonComparableCases.length,
     nonComparableBuckets,
@@ -357,8 +468,29 @@ export async function runRecoverySearch(opts: {
     },
   };
   fs.mkdirSync(path.dirname(stepASummaryPath), { recursive: true });
-  fs.writeFileSync(stepASummaryPath, `${JSON.stringify(stepASummary, null, 2)}\n`);
-  return { ok: true, outPath, stepASummaryPath, caseCount: results.length, candidatePassFound, bestCandidate };
+  fs.writeFileSync(stepASummaryPath, `${JSON.stringify(stepASummaryOut, null, 2)}\n`);
+  writeStepBSummary(stepBSummaryPath, {
+    boundaryStatement: BOUNDARY_STATEMENT,
+    executedCaseCount: results.length,
+    canonicalComparableCaseCount: comparableCases.length,
+    candidatePassFoundCanonicalComparable,
+    minMarginRatioRawComputedComparable,
+    topComparableCandidates: rankedComparableCandidates,
+    leverInfluenceRanking,
+    blockedReason: null,
+    provenance: {
+      commitHash,
+    },
+  });
+  return {
+    ok: true,
+    outPath,
+    stepASummaryPath,
+    stepBSummaryPath,
+    caseCount: results.length,
+    candidatePassFound,
+    bestCandidate,
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
