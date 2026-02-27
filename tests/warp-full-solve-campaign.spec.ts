@@ -719,6 +719,14 @@ describe('warp-full-solve-campaign runner', () => {
 
 
 
+
+  it('computes parity freshness from parity provenance commit vs HEAD in report generation logic', () => {
+    const campaignScript = fs.readFileSync(path.resolve('scripts/warp-full-solve-campaign.ts'), 'utf8');
+    expect(campaignScript).toContain(`const recoveryParityProvenanceCommit = typeof recoveryParity?.provenance?.commitHash === 'string' ? recoveryParity.provenance.commitHash : null;`);
+    expect(campaignScript).toContain('const recoveryParityProvenanceFresh = recoveryParityProvenanceCommit != null && recoveryParityProvenanceCommit === recoveryHeadCommit;');
+    expect(campaignScript).not.toContain('recoveryParity?.provenance?.recoveryProvenanceFresh === true');
+  });
+
   it('canonical report includes G4 recovery-search summary section', () => {
     const canonicalReport = path.resolve('docs/audits/research/warp-full-solve-campaign-execution-report-2026-02-24.md');
     const content = fs.readFileSync(canonicalReport, 'utf8');

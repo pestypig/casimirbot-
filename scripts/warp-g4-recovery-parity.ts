@@ -19,6 +19,8 @@ const numEq = (a: number | null, b: number | null, eps = 1e-12) => {
   return Math.abs(a - b) <= eps;
 };
 
+type SelectionPolicy = 'applicability_pass' | 'fallback_global_min_raw_computed';
+
 type MismatchReason =
   | 'none'
   | 'applicability_status_mismatch'
@@ -76,13 +78,23 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
 
   const recovery = JSON.parse(fs.readFileSync(recoveryPath, 'utf8')) as any;
   const recoveryCommitHash = typeof recovery?.provenance?.commitHash === 'string' ? recovery.provenance.commitHash : null;
-  const candidates = Array.isArray(recovery?.topRankedApplicabilityPassCases) && recovery.topRankedApplicabilityPassCases.length > 0
+  const applicabilityPassCandidates = Array.isArray(recovery?.topRankedApplicabilityPassCases) && recovery.topRankedApplicabilityPassCases.length > 0
     ? recovery.topRankedApplicabilityPassCases
     : Array.isArray(recovery?.cases)
       ? recovery.cases.filter((entry: any) => str(entry?.applicabilityStatus).toUpperCase() === 'PASS').sort((a: any, b: any) => str(a?.id).localeCompare(str(b?.id)))
       : [];
 
-  const selected = candidates.slice(0, topN);
+  const fallbackCandidates = Array.isArray(recovery?.cases)
+    ? [...recovery.cases].sort((a: any, b: any) => {
+        const aRawComputed = finiteOrNull(a?.marginRatioRawComputed) ?? Number.POSITIVE_INFINITY;
+        const bRawComputed = finiteOrNull(b?.marginRatioRawComputed) ?? Number.POSITIVE_INFINITY;
+        if (aRawComputed !== bRawComputed) return aRawComputed - bRawComputed;
+        return str(a?.id).localeCompare(str(b?.id));
+      })
+    : [];
+
+  const selectionPolicy: SelectionPolicy = applicabilityPassCandidates.length > 0 ? 'applicability_pass' : 'fallback_global_min_raw_computed';
+  const selected = (selectionPolicy === 'applicability_pass' ? applicabilityPassCandidates : fallbackCandidates).slice(0, topN);
   const baseline = structuredClone(getGlobalPipelineState());
   const rows: any[] = [];
 
@@ -163,6 +175,7 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
     recoveryArtifactPath: recoveryPath,
     topN,
     candidateCountChecked: rows.length,
+    selectionPolicy,
     anyCanonicalPassCandidate,
     anyComputedOnlyPassCandidate,
     dominantFailureMode: dominantFailureMode(rows),
@@ -176,7 +189,14 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, `${JSON.stringify(payload, null, 2)}\n`);
-  return { ok: true, outPath, candidateCountChecked: rows.length, anyCanonicalPassCandidate, anyComputedOnlyPassCandidate };
+  return {
+    ok: true,
+    outPath,
+    candidateCountChecked: rows.length,
+    selectionPolicy,
+    anyCanonicalPassCandidate,
+    anyComputedOnlyPassCandidate,
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

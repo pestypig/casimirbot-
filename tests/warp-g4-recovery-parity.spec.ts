@@ -61,10 +61,60 @@ describe('warp g4 recovery parity', () => {
     payloadB.generatedAt = 'fixed';
 
     expect(payloadA).toEqual(payloadB);
+    expect(payloadA.selectionPolicy).toBe('applicability_pass');
     expect(['match', 'mismatch']).toContain(payloadA.candidates[0].parityStatus);
     expect(typeof payloadA.candidates[0].mismatchReason).toBe('string');
     expect(payloadA.boundaryStatement).toBe(
       'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.',
     );
+  });
+
+  it('falls back deterministically to global minimum computed margin when applicability-pass is empty', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-parity-fallback-'));
+    const recoveryPath = path.join(tmpDir, 'recovery.json');
+    const outPath = path.join(tmpDir, 'parity.json');
+
+    fs.writeFileSync(
+      recoveryPath,
+      `${JSON.stringify(
+        {
+          provenance: { commitHash: 'deadbeef' },
+          cases: [
+            {
+              id: 'case_b',
+              params: { sampler: 'gaussian', tau_s_ms: 5 },
+              applicabilityStatus: 'FAIL',
+              marginRatioRawComputed: 2,
+              marginRatioRaw: 3,
+            },
+            {
+              id: 'case_a',
+              params: { sampler: 'gaussian', tau_s_ms: 5 },
+              applicabilityStatus: 'FAIL',
+              marginRatioRawComputed: 1,
+              marginRatioRaw: 3,
+            },
+            {
+              id: 'case_c',
+              params: { sampler: 'gaussian', tau_s_ms: 5 },
+              applicabilityStatus: 'UNKNOWN',
+              marginRatioRawComputed: 1,
+              marginRatioRaw: 3,
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const result = await runRecoveryParity({ topN: 2, recoveryPath, outPath });
+    expect(result.ok).toBe(true);
+    expect(result.selectionPolicy).toBe('fallback_global_min_raw_computed');
+
+    const payload = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+    expect(payload.selectionPolicy).toBe('fallback_global_min_raw_computed');
+    expect(payload.candidateCountChecked).toBe(2);
+    expect(payload.candidates.map((c: any) => c.id)).toEqual(['case_a', 'case_c']);
   });
 });

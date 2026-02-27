@@ -123,7 +123,9 @@
     "warp:full-solve:g4-decision-ledger": "tsx scripts/generate-g4-decision-ledger.ts",
     "warp:full-solve:g4-governance-matrix": "tsx scripts/warp-g4-governance-matrix.ts",
     "warp:full-solve:g4-recovery-search": "tsx scripts/warp-g4-recovery-search.ts",
-    "warp:full-solve:g4-recovery-parity": "tsx scripts/warp-g4-recovery-parity.ts"
+    "warp:full-solve:g4-recovery-parity": "tsx scripts/warp-g4-recovery-parity.ts",
+    "warp:full-solve:g4-autoloop": "tsx scripts/warp-g4-autoloop.ts",
+    "warp:full-solve:g4-autoloop:status": "npm run warp:full-solve:g4-autoloop -- --mode status"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",
