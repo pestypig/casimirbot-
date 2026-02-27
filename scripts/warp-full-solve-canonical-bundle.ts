@@ -13,6 +13,7 @@ const INITIAL_CANONICAL_COMMANDS = [
 
 const FINALIZATION_COMMANDS = [
   ['run', 'warp:full-solve:g4-recovery-search'],
+  ['run', 'warp:full-solve:g4-recovery-parity'],
   ['run', 'warp:full-solve:g4-governance-matrix'],
   ['run', 'warp:full-solve:g4-decision-ledger'],
   ['run', 'warp:full-solve:canonical'],
@@ -21,6 +22,7 @@ const FINALIZATION_COMMANDS = [
 const LEDGER_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-decision-ledger-2026-02-26.json');
 const MATRIX_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-governance-matrix-2026-02-27.json');
 const RECOVERY_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-recovery-search-2026-02-27.json');
+const PARITY_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-recovery-parity-2026-02-27.json');
 const DEFAULT_COMMAND_TIMEOUT_MS = 8 * 60_000;
 const DEFAULT_MAX_RETRIES = 1;
 
@@ -31,6 +33,7 @@ export type CanonicalBundleResult = {
   ledgerPath: string;
   matrixPath: string;
   recoveryPath: string;
+  parityPath: string;
 };
 
 type RunCommandOptions = {
@@ -92,10 +95,11 @@ export const runCommandWithRetry = (args: readonly string[], options: RunCommand
   }
 };
 
-export const assertBundleProvenanceFresh = (headCommitHash: string, ledger: any, matrix: any, recovery: any) => {
+export const assertBundleProvenanceFresh = (headCommitHash: string, ledger: any, matrix: any, recovery: any, parity: any) => {
   const ledgerCommitHash = readCommitHash(ledger);
   const matrixCommitHash = readCommitHash(matrix);
   const recoveryCommitHash = readCommitHash(recovery);
+  const parityCommitHash = readCommitHash(parity);
 
   if (ledgerCommitHash !== headCommitHash) {
     throw new Error(`Ledger commit hash mismatch: ledger=${String(ledgerCommitHash ?? 'null')} head=${headCommitHash}`);
@@ -108,6 +112,9 @@ export const assertBundleProvenanceFresh = (headCommitHash: string, ledger: any,
       `Recovery artifact provenance commit hash mismatch: recovery=${String(recoveryCommitHash ?? 'null')} head=${headCommitHash}`,
     );
   }
+  if (parityCommitHash !== headCommitHash) {
+    throw new Error(`Recovery parity provenance commit hash mismatch: parity=${String(parityCommitHash ?? 'null')} head=${headCommitHash}`);
+  }
 };
 
 export const runCanonicalBundle = (): CanonicalBundleResult => {
@@ -118,7 +125,8 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
   const ledger = readJson(LEDGER_PATH);
   const matrix = readJson(MATRIX_PATH);
   const recovery = readJson(RECOVERY_PATH);
-  assertBundleProvenanceFresh(headCommitHash, ledger, matrix, recovery);
+  const parity = readJson(PARITY_PATH);
+  assertBundleProvenanceFresh(headCommitHash, ledger, matrix, recovery, parity);
 
   return {
     ok: true,
@@ -127,6 +135,7 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
     ledgerPath: LEDGER_PATH,
     matrixPath: MATRIX_PATH,
     recoveryPath: RECOVERY_PATH,
+    parityPath: PARITY_PATH,
   };
 };
 
