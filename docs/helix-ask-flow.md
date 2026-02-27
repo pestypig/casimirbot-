@@ -116,3 +116,12 @@ This loop does not replace Helix Ask answering flow and does not bypass Casimir 
   - repo-required + alignment FAIL => clarify/fail-closed.
   - open-world-allowed + alignment FAIL => bypass with explicit uncertainty and no fabricated repo citations.
 - Output hygiene strips Tree Walk/Execution log/Ask debug variants before final answer text, while preserving valid `Sources:` lines.
+
+
+## Needle Hull ↔ Natario family relation-proof gate (phase update)
+- For prompts asserting family membership (e.g., “Needle Hull is Natario-family/solution”), Helix Ask now requires explicit relation evidence edges, not alias-only concept matches.
+- Deterministic edge contract currently requires evidence spanning:
+  - `client/src/components/needle-hull-preset.tsx` (`warpFieldType: "natario"`)
+  - `docs/needle-hull-mainframe.md` (Needle Hull + Natário geometry linkage)
+- If repo evidence is required and edges are missing, Helix Ask clarifies/fails closed with deterministic reason `RELATION_EDGE_MISSING_NEEDLE_HULL_NATARIO_FAMILY`.
+- Open-world bypass is only allowed when policy permits non-repo fallback.
