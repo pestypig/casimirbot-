@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "artifact": "helix-ask-direct-codex-build-dependency-dag",
+    "version": 1,
+    "date": "2026-02-27",
+    "repository": "pestypig/casimirbot-",
+    "source_of_truth": true
+  },
+  "nodes": [
+    { "id": "slice0_provenance_lock", "name": "Slice 0 provenance lock", "required": true },
+    { "id": "slice1_dag_and_gates", "name": "Slice 1 dependency DAG + graduation gates", "required": true },
+    { "id": "slice2_conversion_pack", "name": "Slice 2 unified prompt 0..N conversion pack", "required": true },
+    { "id": "slice3_path_bound_enforcement", "name": "Slice 3 path-bounded diff enforcement", "required": true },
+    { "id": "slice4_certified_only_gate", "name": "Slice 4 certified-only runtime promotion gate", "required": true },
+    { "id": "slice5_scorecard_gap_assessment", "name": "Slice 5 scorecard + gap matrix + assessment updates", "required": true },
+    { "id": "slice6_closure", "name": "Slice 6 closure + final verdict", "required": true }
+  ],
+  "edges": [
+    { "from": "slice0_provenance_lock", "to": "slice1_dag_and_gates" },
+    { "from": "slice1_dag_and_gates", "to": "slice2_conversion_pack" },
+    { "from": "slice2_conversion_pack", "to": "slice3_path_bound_enforcement" },
+    { "from": "slice3_path_bound_enforcement", "to": "slice4_certified_only_gate" },
+    { "from": "slice4_certified_only_gate", "to": "slice5_scorecard_gap_assessment" },
+    { "from": "slice5_scorecard_gap_assessment", "to": "slice6_closure" }
+  ],
+  "stop_conditions": [
+    {
+      "id": "STOP_MISSING_CASIMIR_PASS",
+      "severity": "HARD",
+      "description": "Any code/config patch without Casimir PASS blocks progression to downstream slices."
+    },
+    {
+      "id": "STOP_PATH_BOUND_VIOLATION",
+      "severity": "HARD",
+      "description": "Touched file outside active slice allow-path set blocks progression."
+    },
+    {
+      "id": "STOP_CERTIFIED_PROMOTION_GATE_MISSING",
+      "severity": "HARD",
+      "description": "No enforceable certified-only promotion runtime gate with typed reason codes."
+    }
+  ]
+}

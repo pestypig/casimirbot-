@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "date": "2026-02-27",
+    "rubric_scale": "0-5",
+    "weighted_total_max": 100
+  },
+  "rubric": [
+    { "category": "Slice boundedness", "weight": 20, "score": 5, "weighted": 20 },
+    { "category": "Deterministic verification contract", "weight": 20, "score": 4, "weighted": 16 },
+    { "category": "Artifact/reporting completeness", "weight": 15, "score": 5, "weighted": 15 },
+    { "category": "Blocker/recovery protocol", "weight": 15, "score": 4, "weighted": 12 },
+    { "category": "Dependency ordering clarity", "weight": 10, "score": 5, "weighted": 10 },
+    { "category": "CI/local parity", "weight": 10, "score": 3, "weighted": 6 },
+    { "category": "Policy/safety alignment", "weight": 10, "score": 3, "weighted": 6 }
+  ],
+  "weighted_total": 85,
+  "readiness_band": "execute_with_guardrails",
+  "guardrail_note": "Certified-only promotion enforcement is runtime-enforced for knowledge promotion path but not yet proven across every publish/promotion surface."
+}

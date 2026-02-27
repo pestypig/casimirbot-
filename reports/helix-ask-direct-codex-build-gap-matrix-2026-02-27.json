@@ -1,0 +1,37 @@
+{
+  "meta": {
+    "date": "2026-02-27",
+    "subject": "direct_codex_build_execution_readiness"
+  },
+  "blockers": [
+    {
+      "id": "B01_UNIFIED_PROMPT_PACK",
+      "description": "No single unified Prompt 0..N execution pack across ownership + evolution.",
+      "status": "closed",
+      "evidence": [
+        "reports/helix-ask-direct-codex-build-conversion-pack-2026-02-27.md"
+      ]
+    },
+    {
+      "id": "B02_CERTIFIED_ONLY_PROMOTION_ENFORCEMENT",
+      "description": "No proven repo-wide certified-only promotion enforcement.",
+      "status": "partial",
+      "evidence": [
+        "server/services/knowledge/promotion-gate.ts",
+        "server/routes/knowledge.ts",
+        "tests/knowledge-promotion-gate.spec.ts"
+      ],
+      "residual_risk": "Current enforcement is active in knowledge promotion runtime route; not yet globally wired to every promotion surface."
+    },
+    {
+      "id": "B03_DEPENDENCY_DAG_AND_GATES_AUTHORITY",
+      "description": "No machine-readable unified dependency DAG + graduation gates used as execution authority.",
+      "status": "closed",
+      "evidence": [
+        "reports/helix-ask-direct-codex-build-dependency-dag-2026-02-27.json",
+        "reports/helix-ask-direct-codex-build-graduation-gates-2026-02-27.json",
+        "scripts/check-slice-path-bounds.ts"
+      ]
+    }
+  ]
+}
