@@ -7,6 +7,7 @@ export type HelixAskAlignmentGateMetrics = {
   stability_3_rewrites: number;
   contradiction_rate: number;
   lower95_p_align: number;
+  sample_count: number;
 };
 
 export type HelixAskAlignmentGateInput = {
@@ -30,6 +31,8 @@ export type HelixAskOpenWorldBypassPolicyResult = {
 };
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+const clampSigned = (value: number): number =>
+  Math.min(1, Math.max(-1, Number.isFinite(value) ? value : 0));
 
 const lower95Bound = (p: number, n: number): number => {
   const boundedP = clamp01(p);
@@ -41,15 +44,30 @@ const lower95Bound = (p: number, n: number): number => {
   return clamp01((center - spread) / denom);
 };
 
+const resolveLower95Floors = (sampleCount: number): { fail: number; borderline: number } => {
+  if (sampleCount >= 10) {
+    return { fail: 0.45, borderline: 0.58 };
+  }
+  if (sampleCount >= 8) {
+    return { fail: 0.38, borderline: 0.5 };
+  }
+  if (sampleCount >= 5) {
+    return { fail: 0.3, borderline: 0.42 };
+  }
+  return { fail: 0.2, borderline: 0.35 };
+};
+
 export const evaluateHelixAskAlignmentGate = (
   input: HelixAskAlignmentGateInput,
 ): { decision: HelixAskAlignmentGateDecision; metrics: HelixAskAlignmentGateMetrics; failReason?: string } => {
+  const sample_count = Math.max(1, Math.round(Number.isFinite(input.sampleCount ?? NaN) ? input.sampleCount ?? 1 : 1));
   const alignment_real = clamp01(input.alignment_real);
   const alignment_decoy = clamp01(input.alignment_decoy);
   const stability_3_rewrites = clamp01(input.stability_3_rewrites);
   const contradiction_rate = clamp01(input.contradiction_rate);
-  const coincidence_margin = clamp01(alignment_real - alignment_decoy);
-  const lower95_p_align = lower95Bound(alignment_real, input.sampleCount ?? 3);
+  const coincidence_margin = clampSigned(alignment_real - alignment_decoy);
+  const lower95_p_align = lower95Bound(alignment_real, sample_count);
+  const lower95Floors = resolveLower95Floors(sample_count);
   const metrics: HelixAskAlignmentGateMetrics = {
     alignment_real,
     alignment_decoy,
@@ -57,6 +75,7 @@ export const evaluateHelixAskAlignmentGate = (
     stability_3_rewrites,
     contradiction_rate,
     lower95_p_align,
+    sample_count,
   };
 
   if (
@@ -64,7 +83,7 @@ export const evaluateHelixAskAlignmentGate = (
     coincidence_margin < 0.2 ||
     stability_3_rewrites < 0.55 ||
     contradiction_rate > 0.2 ||
-    lower95_p_align < 0.45
+    lower95_p_align < lower95Floors.fail
   ) {
     return { decision: "FAIL", metrics, failReason: "alignment_gate_fail" };
   }
@@ -74,7 +93,7 @@ export const evaluateHelixAskAlignmentGate = (
     coincidence_margin < 0.3 ||
     stability_3_rewrites < 0.7 ||
     contradiction_rate > 0.12 ||
-    lower95_p_align < 0.58
+    lower95_p_align < lower95Floors.borderline
   ) {
     return { decision: "BORDERLINE", metrics };
   }

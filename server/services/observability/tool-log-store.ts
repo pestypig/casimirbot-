@@ -80,9 +80,31 @@ const AUDIT_PERSIST_ENABLED = process.env.TOOL_LOG_PERSIST === "1";
 const AUDIT_LOG_PATH = resolveAuditLogPath();
 const ROTATE_MAX_BYTES = parseRotateMaxBytes();
 const ROTATE_MAX_FILES = parseRotateMaxFiles();
+const HELIX_ASK_HIGH_VOLUME_TOOL_RE =
+  /^helix\.ask\.(event|progress|stream)$/i;
+const compactHighVolumeRecords = process.env.TOOL_LOG_COMPACT_HIGH_VOLUME !== "0";
+const LOG_RECORD_MAX_FIELD_CHARS = (() => {
+  const fallback = 1600;
+  const raw = Number(process.env.TOOL_LOG_RECORD_MAX_FIELD_CHARS ?? fallback);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.min(Math.max(120, Math.floor(raw)), 20000);
+})();
+const LOG_RECORD_HIGH_VOLUME_FIELD_CHARS = (() => {
+  const fallback = 320;
+  const raw = Number(process.env.TOOL_LOG_HIGH_VOLUME_FIELD_CHARS ?? fallback);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.min(Math.max(60, Math.floor(raw)), LOG_RECORD_MAX_FIELD_CHARS);
+})();
 const toolLogBuffer: ToolLogRecord[] = [];
 const listeners = new Set<ToolLogListener>();
 const logToStdout = process.env.TOOL_LOG_STDOUT !== "0";
+const logToStdoutVerbose = process.env.TOOL_LOG_STDOUT_VERBOSE === "1";
+const LOG_STDOUT_MAX_FIELD_CHARS = (() => {
+  const fallback = 1200;
+  const raw = Number(process.env.TOOL_LOG_STDOUT_MAX_FIELD_CHARS ?? fallback);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.min(Math.max(120, Math.floor(raw)), 8000);
+})();
 const logTextEnabled = (): boolean => process.env.ENABLE_LOG_TEXT === "1";      
 let logSequence = 0;
 let persistChain = Promise.resolve();
@@ -96,6 +118,18 @@ export function appendToolLog(event: AppendEvent): ToolLogRecord {
   const promptHash = event.promptHash ?? event.paramsHash;
   const policy = normalizePolicy(event.policy);
   const tenantId = normalizeTenantId(event.tenantId);
+  const highVolumeRecord = compactHighVolumeRecords && isHighVolumeTool(event.tool);
+  const valueMaxChars = highVolumeRecord
+    ? LOG_RECORD_HIGH_VOLUME_FIELD_CHARS
+    : LOG_RECORD_MAX_FIELD_CHARS;
+  const logText = buildLogText(
+    event.text,
+    event.tool,
+    event.durationMs,
+    event.ok,
+    event.error,
+    event.essenceId,
+  );
   const record: ToolLogRecord = {
     id: String(seq),
     seq,
@@ -110,15 +144,15 @@ export function appendToolLog(event: AppendEvent): ToolLogRecord {
     traceId: event.traceId,
     stepId: event.stepId,
     stage: event.stage,
-    detail: event.detail,
-    message: event.message,
-    meta: event.meta,
+    detail: clipRecordField(event.detail, valueMaxChars),
+    message: clipRecordField(event.message, valueMaxChars),
+    meta: highVolumeRecord ? undefined : event.meta,
     seed: normalizeSeed(event.seed),
     ok: event.ok,
-    error: event.error,
+    error: clipRecordField(event.error, valueMaxChars),
     policy,
     essenceId: event.essenceId,
-    text: buildLogText(event.text, event.tool, event.durationMs, event.ok, event.error, event.essenceId),
+    text: clipRecordField(logText, valueMaxChars),
     debateId: event.debateId,
     strategy: event.strategy,
   };
@@ -128,9 +162,9 @@ export function appendToolLog(event: AppendEvent): ToolLogRecord {
     toolLogBuffer.splice(0, toolLogBuffer.length - MAX_BUFFER_SIZE);
   }
   persistAuditRecord(record);
-  if (logToStdout) {
+  if (shouldEmitToStdout(record)) {
     try {
-      console.info(JSON.stringify({ type: "tool_call", ...record }));
+      console.info(JSON.stringify(buildStdoutRecord(record)));
     } catch {
       // ignore serialization failures
     }
@@ -318,6 +352,59 @@ const truncate = (value: string, limit: number): string => {
     return value;
   }
   return `${value.slice(0, Math.max(0, limit - 3))}...`;
+};
+
+const isHighVolumeTool = (tool?: string): boolean =>
+  typeof tool === "string" && HELIX_ASK_HIGH_VOLUME_TOOL_RE.test(tool);
+
+const clipRecordField = (value?: string, limit = LOG_RECORD_MAX_FIELD_CHARS): string | undefined => {
+  if (!value) return value;
+  if (value.length <= limit) return value;
+  return `${value.slice(0, Math.max(0, limit - 3))}...`;
+};
+
+const shouldEmitToStdout = (record: ToolLogRecord): boolean => {
+  if (!logToStdout) return false;
+  if (logToStdoutVerbose) return true;
+  // Keep high-volume Helix Ask traces queryable via store APIs, not stdout spam.
+  return !HELIX_ASK_HIGH_VOLUME_TOOL_RE.test(record.tool);
+};
+
+const clipStdoutField = (value?: string): string | undefined => {
+  if (!value) return value;
+  if (value.length <= LOG_STDOUT_MAX_FIELD_CHARS) return value;
+  return `${value.slice(0, Math.max(0, LOG_STDOUT_MAX_FIELD_CHARS - 3))}...`;
+};
+
+const buildStdoutRecord = (record: ToolLogRecord): Record<string, unknown> => {
+  if (logToStdoutVerbose) {
+    return { type: "tool_call", ...record };
+  }
+  return {
+    type: "tool_call",
+    id: record.id,
+    seq: record.seq,
+    ts: record.ts,
+    tool: record.tool,
+    version: record.version,
+    paramsHash: record.paramsHash,
+    durationMs: record.durationMs,
+    tenantId: record.tenantId,
+    sessionId: record.sessionId,
+    traceId: record.traceId,
+    stepId: record.stepId,
+    stage: record.stage,
+    detail: clipStdoutField(record.detail),
+    message: clipStdoutField(record.message),
+    seed: record.seed,
+    ok: record.ok,
+    error: clipStdoutField(record.error),
+    policy: record.policy,
+    essenceId: record.essenceId,
+    text: clipStdoutField(record.text),
+    debateId: record.debateId,
+    strategy: record.strategy,
+  };
 };
 
 function resolveAuditLogPath(): string {

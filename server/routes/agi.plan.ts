@@ -20094,7 +20094,7 @@ const executeHelixAsk = async ({
         compositeRequiredFiles = collectCompositeMustIncludeFiles(compositeRequest.topics);
       }
     }
-    if (warpEthosRelationQuery) {
+    if (warpEthosRelationQuery && !compositeRequest.enabled) {
       const relationProfile = getHelixAskIntentProfileById("hybrid.warp_ethos_relation");
       if (relationProfile) {
         intentProfile = relationProfile;
@@ -20103,12 +20103,14 @@ const executeHelixAsk = async ({
     }
     let isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
     const isIdeologyConversationalMode = isIdeologyReferenceIntent && ideologyConversationalMode;
+    const explicitIdeologyFileMappingRequested =
+      /\b(map|mapping|which file|where in the code|file paths?|cite files?|endpoint|route|handler|module)\b/i.test(
+        baseQuestion,
+      );
     const explicitRepoIdeologyMappingQuery =
       explicitRepoExpectation &&
       isIdeologyReferenceIntent &&
-      (hasFilePathHints ||
-        HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
-        /\b(map|mapping|which file|where in the code|file paths?|cite files?)\b/i.test(baseQuestion));
+      (hasFilePathHints || explicitIdeologyFileMappingRequested);
     if (explicitRepoIdeologyMappingQuery) {
       const explicitRepoProfile =
         getHelixAskIntentProfileById("repo.repo_api_lookup") ?? resolveFallbackIntentProfile("hybrid");
@@ -20178,6 +20180,31 @@ const executeHelixAsk = async ({
       hasFilePathHints ||
       endpointHints.length > 0 ||
       repoExpectationLevel === "high";
+    if (isSecurityRiskPrompt(baseQuestion) && !hasExplicitRepoSignals) {
+      const securityOpenWorldProfile =
+        getHelixAskIntentProfileById("general.conceptual_define_compare") ??
+        resolveFallbackIntentProfile("general");
+      intentProfile = securityOpenWorldProfile;
+      intentReasonBase = `${intentReasonBase}|security_open_world:${securityOpenWorldProfile.id}`;
+      requiresRepoEvidence = false;
+      hasRepoHints = false;
+      repoExpectationLevel = "low";
+      if (!repoExpectationSignals.includes("security_open_world")) {
+        repoExpectationSignals.push("security_open_world");
+      }
+      isIdeologyReferenceIntent = false;
+      if (debugPayload) {
+        debugPayload.repo_expectation_level = repoExpectationLevel;
+        debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
+        (debugPayload as Record<string, unknown>).security_open_world_profile =
+          securityOpenWorldProfile.id;
+      }
+      logEvent(
+        "Fallback",
+        "security -> general_open_world",
+        `profile=${securityOpenWorldProfile.id}`,
+      );
+    }
     const securityGuardrailPrompt =
       isSecurityRiskPrompt(baseQuestion) || topicTags.includes("security");
     const mandatorySecurityGuardrailRetrieval =
@@ -20219,7 +20246,8 @@ const executeHelixAsk = async ({
       repoExpectationLevel !== "low" &&
       intentProfile.domain === "general" &&
       !isIdeologyReferenceIntent &&
-      !ideologyConversationalOpenWorldMode
+      !ideologyConversationalOpenWorldMode &&
+      !/^\s*(?:what is|what's|define|definition|meaning)\b/i.test(baseQuestion)
     ) {
       const fallbackProfile = resolveFallbackIntentProfile("hybrid");
       intentProfile = fallbackProfile;
@@ -21745,6 +21773,11 @@ const executeHelixAsk = async ({
     let runtimeViabilityMustIncludeOk = true;
     let retrievalConfidence = 0;
     let retrievalDocShare = 0;
+    let alignmentQueryHitCount = 0;
+    let alignmentTopScore = 0;
+    let alignmentScoreGap = 0;
+    let alignmentChannelCoverage = 0;
+    let alignmentContextFileCount = 0;
     let evidenceCoreRequired = false;
     let evidenceCoreGate: EvidenceEligibility = {
       ok: true,
@@ -23258,6 +23291,11 @@ const executeHelixAsk = async ({
           : evidenceGate.matchRatio;
         retrievalConfidence = retrievalEvidenceRatio;
         retrievalDocShare = docShare;
+        alignmentQueryHitCount = queryHitCount;
+        alignmentTopScore = topScore;
+        alignmentScoreGap = scoreGap;
+        alignmentChannelCoverage = channelCoverage;
+        alignmentContextFileCount = contextFilesSnapshot.length;
         if (mustIncludeOk) retrievalConfidence += 0.15;
         if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
         if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
@@ -23642,6 +23680,11 @@ const executeHelixAsk = async ({
             : evidenceGate.matchRatio;
           retrievalConfidence = attemptEvidenceRatio;
           retrievalDocShare = attemptDocShare;
+          alignmentQueryHitCount = attemptQueryHits;
+          alignmentTopScore = attemptTopScore;
+          alignmentScoreGap = attemptScoreGap;
+          alignmentChannelCoverage = attemptChannelCoverage;
+          alignmentContextFileCount = attemptFiles.length;
           if (mustIncludeOk) retrievalConfidence += 0.15;
           if (runtimeViabilityMustIncludeOk) retrievalConfidence += 0.05;
           if (verificationAnchorRequired && verificationAnchorOk) retrievalConfidence += 0.1;
@@ -24083,11 +24126,17 @@ const executeHelixAsk = async ({
           debugPayload.block_doc_slot_targets = docSlotTargets.slice(0, 6);
           debugPayload.block_gate_decision = blockGateDecision;
         }
+        const frontierOpenWorldMode =
+          intentDomain === "falsifiable" &&
+          !explicitRepoExpectation &&
+          !hasFilePathHints &&
+          endpointHints.length === 0 &&
+          (frontierTheoryLensRequested || frontierSessionLensLocked || frontierSessionFollowupRequested);
         requiresRepoEvidence =
           requiresRepoEvidence ||
           intentDomain === "repo" ||
           intentDomain === "hybrid" ||
-          intentDomain === "falsifiable";
+          (intentDomain === "falsifiable" && !frontierOpenWorldMode);
         const userExpectsRepo =
           intentDomain === "falsifiable" || requiresRepoEvidence;
         failClosedReason = null;
@@ -24126,12 +24175,82 @@ const executeHelixAsk = async ({
           failClosedReason = null;
         }
         failClosedRepoEvidence = Boolean(failClosedReason);
+        const alignmentFileCount = Math.max(
+          alignmentContextFileCount,
+          Array.isArray(contextFiles) ? contextFiles.length : 0,
+        );
+        const querySignal = clampRatio(
+          alignmentQueryHitCount >= 2 ? 1 : alignmentQueryHitCount / 2,
+        );
+        const channelSignal = clampRatio(alignmentChannelCoverage);
+        const rankingSignal = clampRatio(
+          Math.max(alignmentTopScore, alignmentScoreGap * 8),
+        );
+        const mustIncludeSignal = mustIncludeOk ? 1 : 0;
+        const verificationSignal = verificationAnchorRequired
+          ? verificationAnchorOk
+            ? 1
+            : 0
+          : 0.6;
+        const docShareSignal = clampRatio(retrievalDocShare);
+        const viabilitySignal = runtimeViabilityMustIncludeOk ? 1 : 0;
+        const alignmentReal = clampRatio(
+          retrievalConfidence * 0.45 +
+            evidenceGate.matchRatio * 0.18 +
+            evidenceCoreGate.matchRatio * 0.16 +
+            mustIncludeSignal * 0.06 +
+            verificationSignal * 0.05 +
+            docShareSignal * 0.04 +
+            channelSignal * 0.03 +
+            querySignal * 0.02 +
+            rankingSignal * 0.01 +
+            viabilitySignal * 0,
+        );
+        const alignmentDecoy = clampRatio(
+          0.08 +
+            (1 - evidenceCoreGate.matchRatio) * 0.28 +
+            (1 - evidenceGate.matchRatio) * 0.18 +
+            (1 - retrievalConfidence) * 0.12 +
+            (1 - channelSignal) * 0.1 +
+            (1 - querySignal) * 0.08 +
+            (1 - rankingSignal) * 0.06 +
+            (mustIncludeOk ? 0 : 0.08) +
+            (verificationAnchorRequired && !verificationAnchorOk ? 0.08 : 0) +
+            (slotCoverageFailed ? 0.08 : 0),
+        );
+        const stability3Rewrites = clampRatio(
+          0.2 +
+            mustIncludeSignal * 0.25 +
+            querySignal * 0.15 +
+            channelSignal * 0.15 +
+            clampRatio(alignmentFileCount / 8) * 0.1 +
+            rankingSignal * 0.05 +
+            verificationSignal * 0.1,
+        );
+        const contradictionRate = clampRatio(
+          (failClosedRepoEvidence ? 0.16 : 0.02) +
+            (slotCoverageFailed ? 0.14 : 0) +
+            (mustIncludeOk ? 0 : 0.08) +
+            (verificationAnchorRequired && !verificationAnchorOk ? 0.06 : 0) +
+            Math.max(0, evidenceGate.matchRatio - evidenceCoreGate.matchRatio) * 0.18 +
+            Math.max(0, 0.2 - alignmentScoreGap) * 0.08,
+        );
+        const alignmentSampleCount = Math.max(
+          8,
+          Math.min(
+            64,
+            evidenceGate.tokenCount +
+              evidenceCoreGate.tokenCount +
+              alignmentFileCount +
+              alignmentQueryHitCount,
+          ),
+        );
         const alignmentGate = evaluateHelixAskAlignmentGate({
-          alignment_real: retrievalConfidence,
-          alignment_decoy: 1 - retrievalConfidence,
-          stability_3_rewrites: mustIncludeOk ? 0.82 : 0.58,
-          contradiction_rate: failClosedRepoEvidence ? 0.24 : 0.05,
-          sampleCount: 3,
+          alignment_real: alignmentReal,
+          alignment_decoy: alignmentDecoy,
+          stability_3_rewrites: stability3Rewrites,
+          contradiction_rate: contradictionRate,
+          sampleCount: alignmentSampleCount,
         });
         alignmentGateDecision = alignmentGate.decision;
         const openWorldBypassPolicy = resolveOpenWorldBypassPolicy({
@@ -24151,10 +24270,30 @@ const executeHelixAsk = async ({
           openWorldBypassMode = "active";
           answerPath.push("openWorldBypass:alignment_fail");
         }
+        if (
+          isSecurityRiskPrompt(baseQuestion) &&
+          !requiresRepoEvidence &&
+          openWorldBypassMode !== "active"
+        ) {
+          openWorldBypassMode = "active";
+          answerPath.push("openWorldBypass:security_guardrail");
+        }
         if (debugPayload) {
           debugPayload.alignment_gate_decision = alignmentGate.decision;
           debugPayload.open_world_bypass_mode = openWorldBypassMode;
           (debugPayload as Record<string, unknown>).alignment_gate_metrics = alignmentGate.metrics;
+          (debugPayload as Record<string, unknown>).alignment_gate_inputs = {
+            alignment_real: Number(alignmentReal.toFixed(4)),
+            alignment_decoy: Number(alignmentDecoy.toFixed(4)),
+            stability_3_rewrites: Number(stability3Rewrites.toFixed(4)),
+            contradiction_rate: Number(contradictionRate.toFixed(4)),
+            sample_count: alignmentSampleCount,
+            query_hits: alignmentQueryHitCount,
+            file_count: alignmentFileCount,
+            channel_coverage: Number(channelSignal.toFixed(4)),
+            score_gap: Number(alignmentScoreGap.toFixed(4)),
+            top_score: Number(alignmentTopScore.toFixed(4)),
+          };
           (debugPayload as Record<string, unknown>).open_world_bypass_policy = openWorldBypassPolicy;
         }
         const hasHighStakesConstraints =
@@ -24302,7 +24441,11 @@ const executeHelixAsk = async ({
             warpEthosRelationQuery
               ? getHelixAskIntentProfileById("hybrid.warp_ethos_relation")
               : null;
-          const fallbackProfile = relationFallbackProfile ?? resolveFallbackIntentProfile("hybrid");
+          const fallbackProfile =
+            relationFallbackProfile ??
+            (intentProfile.domain === "repo" || intentProfile.domain === "falsifiable"
+              ? intentProfile
+              : resolveFallbackIntentProfile("hybrid"));
           intentProfile = fallbackProfile;
           intentDomain = fallbackProfile.domain;
           intentTier = fallbackProfile.tier;
@@ -29700,6 +29843,37 @@ const executeHelixAsk = async ({
       if (citationLinkingRequired) {
         cleaned = enforceCitationLinkedClaims(cleaned, fallbackCitationAnchor);
       }
+      const finalCitationAllowedPaths = filterExistingEvidencePaths(
+        Array.from(
+          new Set([
+            ...allowedSourcePaths,
+            ...contextFiles,
+            ...extractFilePathsFromText(evidenceText),
+            ...(relationPacket ? relationPacket.evidence.map((entry) => entry.path) : []),
+          ]),
+        ),
+      );
+      const suppressGeneralCitations =
+        !citationLinkingRequired &&
+        intentDomain === "general" &&
+        !explicitRepoExpectation &&
+        !strictConceptProvenance;
+      const citationScrubAllowPaths = suppressGeneralCitations
+        ? ["__helix_no_allowed_repo_citations__"]
+        : finalCitationAllowedPaths;
+      const finalCitationScrub = scrubUnsupportedPaths(cleaned, citationScrubAllowPaths);
+      if (finalCitationScrub.removed.length > 0) {
+        cleaned = finalCitationScrub.text;
+        answerPath.push("citationScrub:unsupported_paths_removed");
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).citation_scrub_removed_paths =
+            finalCitationScrub.removed.slice(0, 12);
+        }
+      }
+      if (suppressGeneralCitations) {
+        cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
+        answerPath.push("citationScrub:general_sources_suppressed");
+      }
       const finalNonReportGuard = enforceNonReportModeGuard(
         cleaned,
         reportDecision.enabled,
@@ -29709,6 +29883,19 @@ const executeHelixAsk = async ({
         answerPath.push("policy:non_report_scaffold_guard");
       }
       cleaned = finalNonReportGuard.text;
+      const securityOpenWorldBypassEligible =
+        isSecurityRiskPrompt(baseQuestion) &&
+        intentDomain === "general" &&
+        !explicitRepoExpectation &&
+        !hasFilePathHints &&
+        !requiresRepoEvidence;
+      if (securityOpenWorldBypassEligible && openWorldBypassMode !== "active") {
+        openWorldBypassMode = "active";
+        answerPath.push("openWorldBypass:security_guardrail");
+        if (debugPayload) {
+          debugPayload.open_world_bypass_mode = openWorldBypassMode;
+        }
+      }
       if (openWorldBypassMode === "active") {
         cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
         cleaned = ensureOpenWorldBypassUncertainty(cleaned);

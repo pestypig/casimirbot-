@@ -1,20 +1,20 @@
 {
   "schema_version": "helix_ask_quality_baseline_contract/1",
-  "generated_at": "2026-02-18T21:09:10.813Z",
-  "source_report": "artifacts/helix-ask-sweep.2026-02-18T210910806Z.json",
+  "generated_at": "2026-02-27T07:40:34.181Z",
+  "source_report": "artifacts\\experiments\\helix-ask-forward-facing\\helix-ask-sweep.2026-02-27T074034169Z.json",
   "config": "baseline",
   "summary": {
     "config": "baseline",
-    "total": 8,
-    "ok": 0,
-    "hard_fail": 8,
-    "clarify_rate": 0,
+    "total": 13,
+    "ok": 4,
+    "hard_fail": 9,
+    "clarify_rate": 0.462,
     "prompt_leak_rate": 0,
-    "decorative_citation_rate": 0,
-    "avg_duration_ms": 131,
-    "p50_duration_ms": 100,
-    "p95_duration_ms": 282,
-    "avg_quality_score": 0,
+    "decorative_citation_rate": 0.615,
+    "avg_duration_ms": 11238,
+    "p50_duration_ms": 12800,
+    "p95_duration_ms": 18274,
+    "avg_quality_score": 0.238,
     "quality_rate": 0
   },
   "thresholds": {
@@ -26,10 +26,12 @@
     "min_quality_rate": 0.6
   },
   "evaluation": {
-    "ok_rate": 0,
+    "ok_rate": 0.308,
     "status": "fail",
     "failing_thresholds": [
       "min_ok_rate",
+      "max_clarify_rate",
+      "max_decorative_citation_rate",
       "min_avg_quality_score",
       "min_quality_rate"
     ]

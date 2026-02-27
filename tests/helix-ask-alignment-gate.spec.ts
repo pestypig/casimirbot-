@@ -18,6 +18,19 @@ describe("Helix Ask alignment gate", () => {
     expect(result.metrics.lower95_p_align).toBeGreaterThan(0.58);
   });
 
+  it("does not force FAIL for perfect small-sample inputs", () => {
+    const result = evaluateHelixAskAlignmentGate({
+      alignment_real: 1,
+      alignment_decoy: 0,
+      stability_3_rewrites: 1,
+      contradiction_rate: 0,
+      sampleCount: 3,
+    });
+    expect(result.decision).toBe("PASS");
+    expect(result.metrics.sample_count).toBe(3);
+    expect(result.metrics.lower95_p_align).toBeGreaterThan(0.35);
+  });
+
   it("returns BORDERLINE for mid-confidence coincidence", () => {
     const result = evaluateHelixAskAlignmentGate({
       alignment_real: 0.63,
