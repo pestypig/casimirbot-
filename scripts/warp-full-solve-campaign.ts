@@ -1618,6 +1618,11 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
   const governanceClassResolution = resolveGovernanceCanonicalClass(governanceMatrixPath);
   const governanceCanonicalClass = governanceClassResolution.canonicalClass;
 
+  const recoveryPath = path.join(CANONICAL_ARTIFACT_ROOT, 'g4-recovery-search-2026-02-27.json');
+  const recovery = fs.existsSync(recoveryPath) ? JSON.parse(fs.readFileSync(recoveryPath, 'utf8')) : null;
+  const recoveryBest = recovery?.bestCandidate ?? null;
+  const recoveryCandidateFound = Boolean(recovery?.candidatePassFound);
+
   if (sourceArtifactRoot === canonicalArtifactRoot) {
     writeMd(
       reportPath,
@@ -1695,6 +1700,17 @@ ${g4WaveRows}
 - metricT00Si: ${bestCasePack?.g4Diagnostics?.metricT00Si ?? 'n/a'}
 - metricT00SiFromGeom: ${bestCasePack?.g4Diagnostics?.metricT00SiFromGeom ?? 'n/a'}
 - metricT00SiRelError: ${bestCasePack?.g4Diagnostics?.metricT00SiRelError ?? 'n/a'}
+
+
+## G4 recovery-search summary
+- recovery artifact: ${fs.existsSync(recoveryPath) ? recoveryPath.replace(/\\/g, '/') : 'missing'}
+- candidate found: ${recoveryCandidateFound ? 'yes' : 'no'}
+- case count: ${typeof recovery?.caseCount === 'number' ? recovery.caseCount : 'n/a'}
+- best candidate id: ${recoveryBest?.id ?? 'n/a'}
+- best candidate marginRatioRawComputed: ${recoveryBest?.marginRatioRawComputed ?? 'n/a'}
+- best candidate marginRatioRaw: ${recoveryBest?.marginRatioRaw ?? 'n/a'}
+- best candidate applicabilityStatus: ${recoveryBest?.applicabilityStatus ?? 'UNKNOWN'}
+- canonical decision remains authoritative until wave profiles are promoted and rerun.
 
 ## Operator translation
 - What failed: ${aggregateFirstFail.firstFail} (${aggregateFirstFail.reason})

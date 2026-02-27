@@ -116,11 +116,11 @@ Per-wave gate status snapshots:
 | D | -12277918379371434000 | -18 | -12277918379371434000 | -12277918379371434000 | n/a | -18 | -12277918379371434000 | true | 1 | 682106576631746300 | true | true | true | both | warp.metric.T00.natario.shift | PASS |
 
 ## G4 governance decomposition
-- canonical authoritative class: evidence_path_blocked
-- governance artifact freshness: stale_provenance
-- governance freshness reason: artifactCommitHash=3afc13d96bd3171bc56ed1ab44ba4c31bba31690;headCommitHash=b960e2d33a1922f378d0264f8f2c0543a0b9d1a1;wellFormed=true;resolvable=true
-- governance artifact commit: 3afc13d96bd3171bc56ed1ab44ba4c31bba31690
-- current head commit: b960e2d33a1922f378d0264f8f2c0543a0b9d1a1
+- canonical authoritative class: both
+- governance artifact freshness: fresh
+- governance freshness reason: none
+- governance artifact commit: be25e45f8fc9a20ec280c6956721bca76bdcd703
+- current head commit: be25e45f8fc9a20ec280c6956721bca76bdcd703
 - policy floor dominated: true
 - policy exceeded (marginRatioRaw >= 1): true
 - computed exceeded (marginRatioRawComputed >= 1): true
@@ -143,6 +143,17 @@ Per-wave gate status snapshots:
 - metricT00Si: -60161826919729955000
 - metricT00SiFromGeom: -60161826919729955000
 - metricT00SiRelError: 0
+
+
+## G4 recovery-search summary
+- recovery artifact: artifacts/research/full-solve/g4-recovery-search-2026-02-27.json
+- candidate found: no
+- case count: 160
+- best candidate id: case_0055
+- best candidate marginRatioRawComputed: 1498145.3117821834
+- best candidate marginRatioRaw: 1
+- best candidate applicabilityStatus: UNKNOWN
+- canonical decision remains authoritative until wave profiles are promoted and rerun.
 
 ## Operator translation
 - What failed: G4 (Aggregated from waves: A,B,C,D)
