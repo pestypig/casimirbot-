@@ -6,12 +6,16 @@ import { pathToFileURL } from 'node:url';
 const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
 
-const CANONICAL_COMMANDS = [
+const INITIAL_CANONICAL_COMMANDS = [
   ['run', 'warp:full-solve:canonical'],
   ['run', 'warp:full-solve:g4-sensitivity'],
+] as const;
+
+const FINALIZATION_COMMANDS = [
   ['run', 'warp:full-solve:g4-recovery-search'],
   ['run', 'warp:full-solve:g4-governance-matrix'],
   ['run', 'warp:full-solve:g4-decision-ledger'],
+  ['run', 'warp:full-solve:canonical'],
 ] as const;
 
 const LEDGER_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-decision-ledger-2026-02-26.json');
@@ -43,7 +47,11 @@ const runCommand = (args: readonly string[]) => {
 };
 
 export const runCanonicalBundle = (): CanonicalBundleResult => {
-  for (const args of CANONICAL_COMMANDS) {
+  for (const args of INITIAL_CANONICAL_COMMANDS) {
+    runCommand(args);
+  }
+
+  for (const args of FINALIZATION_COMMANDS) {
     runCommand(args);
   }
 
