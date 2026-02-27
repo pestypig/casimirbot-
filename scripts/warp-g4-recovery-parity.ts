@@ -59,7 +59,7 @@ const classifyComparability = (entry: any): ComparabilityClass => {
   return 'comparable_canonical';
 };
 
-type SelectionPolicy = 'applicability_pass' | 'fallback_global_min_raw_computed';
+type SelectionPolicy = 'comparable_canonical' | 'fallback_no_comparable_canonical';
 
 type MismatchReason =
   | 'none'
@@ -118,23 +118,22 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
 
   const recovery = JSON.parse(fs.readFileSync(recoveryPath, 'utf8')) as any;
   const recoveryCommitHash = typeof recovery?.provenance?.commitHash === 'string' ? recovery.provenance.commitHash : null;
-  const applicabilityPassCandidates = Array.isArray(recovery?.topRankedApplicabilityPassCases) && recovery.topRankedApplicabilityPassCases.length > 0
-    ? recovery.topRankedApplicabilityPassCases
+  const comparableCandidates = Array.isArray(recovery?.topComparableCandidates) && recovery.topComparableCandidates.length > 0
+    ? recovery.topComparableCandidates
     : Array.isArray(recovery?.cases)
-      ? recovery.cases.filter((entry: any) => str(entry?.applicabilityStatus).toUpperCase() === 'PASS').sort((a: any, b: any) => str(a?.id).localeCompare(str(b?.id)))
+      ? recovery.cases
+          .filter((entry: any) => classifyComparability(entry) === 'comparable_canonical')
+          .sort((a: any, b: any) => {
+            const aRawComputed = finiteOrNull(a?.marginRatioRawComputed) ?? Number.POSITIVE_INFINITY;
+            const bRawComputed = finiteOrNull(b?.marginRatioRawComputed) ?? Number.POSITIVE_INFINITY;
+            if (aRawComputed !== bRawComputed) return aRawComputed - bRawComputed;
+            return str(a?.id).localeCompare(str(b?.id));
+          })
       : [];
 
-  const fallbackCandidates = Array.isArray(recovery?.cases)
-    ? [...recovery.cases].sort((a: any, b: any) => {
-        const aRawComputed = finiteOrNull(a?.marginRatioRawComputed) ?? Number.POSITIVE_INFINITY;
-        const bRawComputed = finiteOrNull(b?.marginRatioRawComputed) ?? Number.POSITIVE_INFINITY;
-        if (aRawComputed !== bRawComputed) return aRawComputed - bRawComputed;
-        return str(a?.id).localeCompare(str(b?.id));
-      })
-    : [];
-
-  const selectionPolicy: SelectionPolicy = applicabilityPassCandidates.length > 0 ? 'applicability_pass' : 'fallback_global_min_raw_computed';
-  const selected = (selectionPolicy === 'applicability_pass' ? applicabilityPassCandidates : fallbackCandidates).slice(0, topN);
+  const selectionPolicy: SelectionPolicy =
+    comparableCandidates.length > 0 ? 'comparable_canonical' : 'fallback_no_comparable_canonical';
+  const selected = (selectionPolicy === 'comparable_canonical' ? comparableCandidates : []).slice(0, topN);
   const baseline = structuredClone(getGlobalPipelineState());
   const rows: any[] = [];
 
@@ -210,9 +209,14 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
   );
 
 
-  const comparabilityCounts = rows.reduce<Record<ComparabilityClass, number>>(
-    (acc, row) => {
-      const klass = row.comparabilityClass as ComparabilityClass;
+  const comparabilityCountSource = Array.isArray(recovery?.cases)
+    ? recovery.cases
+    : Array.isArray(recovery?.topComparableCandidates)
+      ? recovery.topComparableCandidates
+      : [];
+  const comparabilityCounts = comparabilityCountSource.reduce<Record<ComparabilityClass, number>>(
+    (acc, row: any) => {
+      const klass = classifyComparability(row);
       acc[klass] += 1;
       return acc;
     },

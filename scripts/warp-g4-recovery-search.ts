@@ -12,6 +12,7 @@ const DEFAULT_RUNTIME_CAP_MS = 45_000;
 const DEFAULT_OUT_PATH = path.join('artifacts/research/full-solve', `g4-recovery-search-${DATE_STAMP}.json`);
 const STEP_A_SUMMARY_PATH = path.join('artifacts/research/full-solve', 'g4-stepA-summary.json');
 const STEP_B_SUMMARY_PATH = path.join('artifacts/research/full-solve', 'g4-stepB-summary.json');
+const STEP_C_SUMMARY_PATH = path.join('artifacts/research/full-solve', 'g4-stepC-summary.json');
 const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
 
@@ -36,6 +37,20 @@ type RecoveryCase = {
 };
 
 type ComparabilityClass = RecoveryCase['comparabilityClass'];
+type BootstrapResult = {
+  attempted: boolean;
+  succeeded: boolean;
+  reason: string;
+  provenance: {
+    profileId: string;
+    params: Record<string, unknown>;
+    comparabilityClass: ComparabilityClass;
+    reasonCode: string[];
+    rhoSource: string | null;
+    applicabilityStatus: string;
+    missingSignals: string[];
+  }[];
+};
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const stringOrNull = (v: unknown): string | null => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : null);
@@ -71,6 +86,14 @@ export const classifyComparability = (entry: {
   if (contractMismatch || !entry.rhoSource?.startsWith('warp.metric')) return 'non_comparable_contract_mismatch';
   return 'comparable_canonical';
 };
+
+const missingSignalFields = (entry: {
+  lhs_Jm3: number | null;
+  boundComputed_Jm3: number | null;
+  boundUsed_Jm3: number | null;
+  marginRatioRaw: number | null;
+  marginRatioRawComputed: number | null;
+}): string[] => REQUIRED_CANONICAL_SIGNALS.filter((field) => entry[field] == null);
 
 const deriveReasonCodes = (guard: any): string[] => {
   const reasons = new Set<string>();
@@ -191,6 +214,7 @@ export async function runRecoverySearch(opts: {
   maxCases?: number;
   topN?: number;
   runtimeCapMs?: number;
+  stepCSummaryPath?: string;
 } = {}) {
   const outPath = opts.outPath ?? DEFAULT_OUT_PATH;
   const seed = Number.isFinite(opts.seed) ? Number(opts.seed) : DEFAULT_SEED;
@@ -210,49 +234,70 @@ export async function runRecoverySearch(opts: {
     (path.resolve(outPath) === path.resolve(DEFAULT_OUT_PATH)
       ? STEP_B_SUMMARY_PATH
       : path.join(path.dirname(outPath), 'g4-stepB-summary.json'));
+  const stepCSummaryPath =
+    opts.stepCSummaryPath ??
+    (path.resolve(outPath) === path.resolve(DEFAULT_OUT_PATH)
+      ? STEP_C_SUMMARY_PATH
+      : path.join(path.dirname(outPath), 'g4-stepC-summary.json'));
 
   const startedAt = Date.now();
   const baseline = structuredClone(getGlobalPipelineState());
   const attemptedCaseUniverse = universeSize();
   const { start, step } = deriveDeterministicWalk(seed, attemptedCaseUniverse);
   const commitHash = execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  if (!fs.existsSync(stepASummaryPath)) {
-    writeStepBSummary(stepBSummaryPath, {
-      boundaryStatement: BOUNDARY_STATEMENT,
-      executedCaseCount: 0,
-      canonicalComparableCaseCount: 0,
-      candidatePassFoundCanonicalComparable: false,
-      minMarginRatioRawComputedComparable: null,
-      topComparableCandidates: [],
-      leverInfluenceRanking: [],
-      blockedReason: 'missing_stepA_summary',
-      blockerDiagnostics: {
-        stepASummaryPath,
-        message: 'Step A summary artifact is required before Step B search can run.',
+  const baselineGuard = evaluateQiGuardrail(structuredClone(baseline), {
+    sampler: baseline.qi?.sampler as any,
+    tau_ms: Number(baseline.qi?.tau_s_ms ?? 5),
+  });
+  const bootstrapProfiles = [
+    { profileId: 'baseline', params: {} },
+    {
+      profileId: 'natario-low-curvature',
+      params: {
+        warpFieldType: 'natario', gammaGeo: 1, dutyCycle: 0.02, dutyShip: 0.02, dutyEffective_FR: 0.02,
+        sectorCount: 80, concurrentSectors: 1, gammaVanDenBroeck: 0.8,
+        qCavity: 1e5, qSpoilingFactor: 1, gap_nm: 0.4, shipRadius_m: 2,
+        qi: { ...(baseline.qi ?? {}), sampler: 'gaussian', fieldType: 'em', tau_s_ms: 5 },
       },
-      provenance: { commitHash },
+    },
+  ];
+  const bootstrapProvenance: BootstrapResult['provenance'] = [];
+  const captureBootstrap = (profileId: string, params: Record<string, unknown>, guard: any) => {
+    const entry = {
+      lhs_Jm3: finiteOrNull(guard?.lhs_Jm3),
+      boundComputed_Jm3: finiteOrNull(guard?.boundComputed_Jm3),
+      boundUsed_Jm3: finiteOrNull(guard?.boundUsed_Jm3),
+      marginRatioRaw: finiteOrNull(guard?.marginRatioRaw),
+      marginRatioRawComputed: finiteOrNull(guard?.marginRatioRawComputed),
+      applicabilityStatus: String(guard?.applicabilityStatus ?? 'UNKNOWN').toUpperCase(),
+      rhoSource: stringOrNull(guard?.rhoSource),
+      reasonCode: deriveReasonCodes(guard),
+    };
+    bootstrapProvenance.push({
+      profileId,
+      params,
+      comparabilityClass: classifyComparability(entry),
+      reasonCode: entry.reasonCode,
+      rhoSource: entry.rhoSource,
+      applicabilityStatus: entry.applicabilityStatus,
+      missingSignals: missingSignalFields(entry),
     });
-    return { ok: false, blockedReason: 'missing_stepA_summary', stepBSummaryPath, outPath };
+  };
+  captureBootstrap('baseline', {}, baselineGuard);
+  for (const profile of bootstrapProfiles.slice(1)) {
+    const next = await updateParameters(structuredClone(baseline), profile.params as any);
+    const guard = evaluateQiGuardrail(next, { sampler: 'gaussian', tau_ms: 5 });
+    captureBootstrap(profile.profileId, profile.params, guard);
   }
-  const stepASummary = JSON.parse(fs.readFileSync(stepASummaryPath, 'utf8')) as any;
-  if (Number(stepASummary?.canonicalComparableCaseCount ?? 0) === 0) {
-    writeStepBSummary(stepBSummaryPath, {
-      boundaryStatement: BOUNDARY_STATEMENT,
-      executedCaseCount: 0,
-      canonicalComparableCaseCount: 0,
-      candidatePassFoundCanonicalComparable: false,
-      minMarginRatioRawComputedComparable: null,
-      topComparableCandidates: [],
-      leverInfluenceRanking: [],
-      blockedReason: 'no_canonical_comparable_cases',
-      blockerDiagnostics: {
-        stepASummaryPath,
-        stepACanonicalComparableCaseCount: Number(stepASummary?.canonicalComparableCaseCount ?? 0),
-      },
-      provenance: { commitHash },
-    });
-    return { ok: false, blockedReason: 'no_canonical_comparable_cases', stepBSummaryPath, outPath };
-  }
+  const bootstrapComparable = bootstrapProvenance.find((entry) => entry.comparabilityClass === 'comparable_canonical');
+  const bootstrap: BootstrapResult = {
+    attempted: true,
+    succeeded: Boolean(bootstrapComparable),
+    reason: bootstrapComparable
+      ? `canonical_signals_available:${bootstrapComparable.profileId}`
+      : 'canonical_signals_unavailable_after_deterministic_profiles',
+    provenance: bootstrapProvenance,
+  };
 
   const results: RecoveryCase[] = [];
   let evaluated = 0;
@@ -371,6 +416,29 @@ export async function runRecoverySearch(opts: {
       non_comparable_other: 0,
     },
   );
+  const nonComparableDiagnostics = new Map<string, number>();
+  for (const entry of nonComparableCases) {
+    if (entry.comparabilityClass === 'non_comparable_missing_signals') {
+      for (const field of missingSignalFields(entry)) {
+        nonComparableDiagnostics.set(`missing_signal:${field}`, (nonComparableDiagnostics.get(`missing_signal:${field}`) ?? 0) + 1);
+      }
+      for (const code of entry.reasonCode) {
+        nonComparableDiagnostics.set(`missing_signal_reason:${code}`, (nonComparableDiagnostics.get(`missing_signal_reason:${code}`) ?? 0) + 1);
+      }
+    } else if (entry.comparabilityClass === 'non_comparable_contract_mismatch') {
+      const contractCodes = entry.reasonCode.filter((code) => CONTRACT_REASON_CODES.has(code) || code === 'G4_QI_SOURCE_NOT_METRIC');
+      if (contractCodes.length === 0) {
+        nonComparableDiagnostics.set(`contract_mismatch:rhoSource:${entry.rhoSource ?? 'null'}`, (nonComparableDiagnostics.get(`contract_mismatch:rhoSource:${entry.rhoSource ?? 'null'}`) ?? 0) + 1);
+      }
+      for (const code of contractCodes) {
+        nonComparableDiagnostics.set(`contract_mismatch_reason:${code}`, (nonComparableDiagnostics.get(`contract_mismatch_reason:${code}`) ?? 0) + 1);
+      }
+    }
+  }
+  const nonComparableDiagnosticsTop = [...nonComparableDiagnostics.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 10)
+    .map(([reason, count]) => ({ reason, count }));
 
   const applicabilityPass = results.filter((entry) => entry.applicabilityStatus === 'PASS');
   const rankedCandidates = applicabilityPass
@@ -477,16 +545,35 @@ export async function runRecoverySearch(opts: {
     minMarginRatioRawComputedComparable,
     topComparableCandidates: rankedComparableCandidates,
     leverInfluenceRanking,
-    blockedReason: null,
+    blockedReason: comparableCases.length === 0 ? 'no_canonical_comparable_cases_after_bootstrap' : null,
     provenance: {
       commitHash,
     },
   });
+  const stepCSummary = {
+    boundaryStatement: BOUNDARY_STATEMENT,
+    bootstrapAttempted: bootstrap.attempted,
+    bootstrapSucceeded: bootstrap.succeeded,
+    bootstrapReason: bootstrap.reason,
+    bootstrapProvenance: bootstrap.provenance,
+    executedCaseCount: results.length,
+    canonicalComparableCaseCount: comparableCases.length,
+    nonComparableBuckets,
+    nonComparableDiagnosticsTop,
+    candidatePassFoundCanonicalComparable,
+    minMarginRatioRawComputedComparable,
+    topComparableCandidates: rankedComparableCandidates,
+    blockedReason: comparableCases.length === 0 ? 'no_canonical_comparable_cases_after_bootstrap' : null,
+    provenance: { commitHash },
+  };
+  fs.mkdirSync(path.dirname(stepCSummaryPath), { recursive: true });
+  fs.writeFileSync(stepCSummaryPath, `${JSON.stringify(stepCSummary, null, 2)}\n`);
   return {
     ok: true,
     outPath,
     stepASummaryPath,
     stepBSummaryPath,
+    stepCSummaryPath,
     caseCount: results.length,
     candidatePassFound,
     bestCandidate,
