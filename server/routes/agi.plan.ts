@@ -266,6 +266,10 @@ import {
   resolveRelationTopologySignal,
   type RelationAssemblyPacket,
 } from "../services/helix-ask/relation-assembly";
+import {
+  NEEDLE_NATARIO_RELATION_FAIL_REASON,
+  evaluateNeedleNatarioRelationProof,
+} from "../services/helix-ask/relation-proof";
 import { buildHelixAskStrictFailReasonLedger } from "../services/helix-ask/strict-fail-reason-ledger";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
@@ -25845,6 +25849,33 @@ const executeHelixAsk = async ({
         relationQuery &&
         ((coverageSlotSummary?.coveredSlots.length ?? 0) < 2 &&
           (docSlotSummary?.coveredSlots.length ?? 0) < 2);
+      const needleNatarioRelationProof = evaluateNeedleNatarioRelationProof({
+        question: baseQuestion,
+        docBlocks,
+        contextFiles,
+        evidenceText,
+        contextText,
+        repoEvidenceRequired: requiresRepoEvidence,
+        openWorldBypassAllowed: openWorldBypassMode === "active",
+      });
+      if (debugPayload) {
+        (debugPayload as Record<string, unknown>).needle_natario_relation_proof = {
+          applicable: needleNatarioRelationProof.applicable,
+          ok: needleNatarioRelationProof.ok,
+          outcome: needleNatarioRelationProof.outcome,
+          matched_edge_ids: needleNatarioRelationProof.matched_edge_ids,
+          missing_edge_ids: needleNatarioRelationProof.missing_edge_ids,
+        };
+      }
+      if (
+        needleNatarioRelationProof.applicable &&
+        !needleNatarioRelationProof.ok &&
+        needleNatarioRelationProof.outcome === "clarify_fail_closed"
+      ) {
+        failClosedReason = NEEDLE_NATARIO_RELATION_FAIL_REASON;
+        failClosedRepoEvidence = true;
+        strictReadyFailReason = strictReadyFailReason ?? NEEDLE_NATARIO_RELATION_FAIL_REASON;
+      }
       const preferLlmFirstForExplicitRepoMapping =
         explicitRepoExpectation &&
         !relationQuery &&
@@ -25862,6 +25893,22 @@ const executeHelixAsk = async ({
       if (!forcedAnswer && relationAnchorsRequired && relationAnchorMissing) {
         forcedAnswer = `Relation topology is missing anchors: ${relationTopology.missingAnchors.join(", ")}. Please provide files from both warp and mission-ethos domains.`;
         forcedAnswerIsHard = true;
+      }
+      if (
+        !forcedAnswer &&
+        needleNatarioRelationProof.applicable &&
+        !needleNatarioRelationProof.ok &&
+        needleNatarioRelationProof.outcome === "clarify_fail_closed"
+      ) {
+        forcedAnswer =
+          needleNatarioRelationProof.clarify_message ??
+          "Repo evidence was required for this relation claim but could not be confirmed. Please point to relevant files.";
+        forcedAnswerIsHard = true;
+        answerPath.push("failClosed:needle_natario_relation_proof");
+        if (debugPayload) {
+          debugPayload.clarify_triggered = true;
+          debugPayload.fallback_reason = NEEDLE_NATARIO_RELATION_FAIL_REASON;
+        }
       }
       const shouldClarifyNow =
         !preferLlmFirstForExplicitRepoMapping &&
