@@ -35,6 +35,17 @@ type RecoveryCase = {
   rhoCoupledShadow_Jm3: number | null;
   couplingResidualRel: number | null;
   couplingComparable: boolean | null;
+  metricT00Ref: string | null;
+  metricT00Derivation: string | null;
+  metricT00ContractStatus: string | null;
+  metricT00Si_Jm3: number | null;
+  metricStressRhoSiMean_Jm3: number | null;
+  metricStressRhoGeomMean_Geom: number | null;
+  metricStressKTraceMean: number | null;
+  metricStressKSquaredMean: number | null;
+  metricStressStep_m: number | null;
+  metricStressScale_m: number | null;
+  metricStressSampleCount: number | null;
   classificationTag: 'candidate_pass_found' | 'margin_limited' | 'applicability_limited' | 'evidence_path_blocked';
   comparabilityClass:
     | 'comparable_canonical'
@@ -208,6 +219,44 @@ const summarizeInfluence = (cases: RecoveryCase[]) =>
       noOpByAbsLhsDelta: Math.abs(measuredImpact) <= 1e-18,
     };
   }).sort((a, b) => b.measuredImpactAbsLhsDelta - a.measuredImpactAbsLhsDelta || a.family.localeCompare(b.family));
+
+const extractMetricDecomposition = (
+  state: Record<string, unknown>,
+  guard: Record<string, unknown>,
+) => {
+  const warp = ((state as any)?.warp ?? {}) as Record<string, unknown>;
+  const natario = ((state as any)?.natario ?? {}) as Record<string, unknown>;
+  const metricDiagnostics =
+    ((warp as any)?.metricStressDiagnostics as Record<string, unknown> | undefined) ??
+    ((natario as any)?.metricStressDiagnostics as Record<string, unknown> | undefined) ??
+    {};
+  const metricT00Contract =
+    ((warp as any)?.metricT00Contract as Record<string, unknown> | undefined) ??
+    ((natario as any)?.metricT00Contract as Record<string, unknown> | undefined);
+
+  return {
+    metricT00Ref: stringOrNull((warp as any)?.metricT00Ref ?? (natario as any)?.metricT00Ref ?? (guard as any)?.rhoSource),
+    metricT00Derivation: stringOrNull((warp as any)?.metricT00Derivation ?? (natario as any)?.metricT00Derivation),
+    metricT00ContractStatus: stringOrNull(
+      (metricT00Contract as any)?.status ??
+      (warp as any)?.metricT00ContractStatus ??
+      (natario as any)?.metricT00ContractStatus,
+    ),
+    metricT00Si_Jm3: finiteOrNull(
+      (warp as any)?.metricT00 ??
+      (natario as any)?.metricT00 ??
+      (warp as any)?.stressEnergyTensor?.T00 ??
+      (natario as any)?.stressEnergyTensor?.T00,
+    ),
+    metricStressRhoSiMean_Jm3: finiteOrNull((metricDiagnostics as any)?.rhoSiMean),
+    metricStressRhoGeomMean_Geom: finiteOrNull((metricDiagnostics as any)?.rhoGeomMean),
+    metricStressKTraceMean: finiteOrNull((metricDiagnostics as any)?.kTraceMean),
+    metricStressKSquaredMean: finiteOrNull((metricDiagnostics as any)?.kSquaredMean),
+    metricStressStep_m: finiteOrNull((metricDiagnostics as any)?.step_m),
+    metricStressScale_m: finiteOrNull((metricDiagnostics as any)?.scale_m),
+    metricStressSampleCount: finiteOrNull((metricDiagnostics as any)?.sampleCount),
+  };
+};
 
 const writeStepBSummary = (summaryPath: string, payload: Record<string, unknown>) => {
   fs.mkdirSync(path.dirname(summaryPath), { recursive: true });
@@ -482,6 +531,7 @@ export async function runRecoverySearch(opts: {
     const couplingResidualRel = finiteOrNull((guard as any).couplingResidualRel);
     const couplingComparable =
       typeof (guard as any).couplingComparable === 'boolean' ? Boolean((guard as any).couplingComparable) : null;
+    const metricDecomposition = extractMetricDecomposition(next as any, guard as any);
     results.push({
       id: `case_${String(results.length + 1).padStart(4, '0')}`,
       params: row,
@@ -501,6 +551,7 @@ export async function runRecoverySearch(opts: {
       rhoCoupledShadow_Jm3,
       couplingResidualRel,
       couplingComparable,
+      ...metricDecomposition,
       classificationTag: classify(applicabilityStatus, marginRatioRawComputed),
       comparabilityClass: classifyComparability({
         lhs_Jm3,
@@ -623,6 +674,17 @@ export async function runRecoverySearch(opts: {
       rhoCoupledShadow_Jm3: entry.rhoCoupledShadow_Jm3,
       couplingResidualRel: entry.couplingResidualRel,
       couplingComparable: entry.couplingComparable,
+      metricT00Ref: entry.metricT00Ref,
+      metricT00Derivation: entry.metricT00Derivation,
+      metricT00ContractStatus: entry.metricT00ContractStatus,
+      metricT00Si_Jm3: entry.metricT00Si_Jm3,
+      metricStressRhoSiMean_Jm3: entry.metricStressRhoSiMean_Jm3,
+      metricStressRhoGeomMean_Geom: entry.metricStressRhoGeomMean_Geom,
+      metricStressKTraceMean: entry.metricStressKTraceMean,
+      metricStressKSquaredMean: entry.metricStressKSquaredMean,
+      metricStressStep_m: entry.metricStressStep_m,
+      metricStressScale_m: entry.metricStressScale_m,
+      metricStressSampleCount: entry.metricStressSampleCount,
     }));
   const leverInfluenceRanking = summarizeInfluence(comparableCases);
 

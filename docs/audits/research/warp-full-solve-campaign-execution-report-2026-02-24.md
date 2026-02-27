@@ -119,8 +119,8 @@ Per-wave gate status snapshots:
 - canonical authoritative class: both
 - governance artifact freshness: fresh
 - governance freshness reason: none
-- governance artifact commit: 6b9adbecd41ca8c3ddf100542dd400a9b5d4a82e
-- current head commit: 6b9adbecd41ca8c3ddf100542dd400a9b5d4a82e
+- governance artifact commit: 9609458b8ec0e3e359ae7cd4e925b50b4d0e1857
+- current head commit: 9609458b8ec0e3e359ae7cd4e925b50b4d0e1857
 - policy floor dominated: true
 - policy exceeded (marginRatioRaw >= 1): true
 - computed exceeded (marginRatioRawComputed >= 1): true
@@ -162,7 +162,7 @@ Per-wave gate status snapshots:
 - best candidate canonical-pass eligible: false
 - best candidate counterfactual-pass eligible: false
 - best candidate semantics class: no_pass_signal
-- recovery provenance commit: 6b9adbecd41ca8c3ddf100542dd400a9b5d4a82e
+- recovery provenance commit: 9609458b8ec0e3e359ae7cd4e925b50b4d0e1857
 - recovery provenance freshness vs HEAD: fresh
 
 ## G4 recovery parity summary
@@ -172,7 +172,7 @@ Per-wave gate status snapshots:
 - dominantFailureMode: applicability_limited
 - selectionPolicy: comparable_canonical
 - parity artifact: artifacts/research/full-solve/g4-recovery-parity-2026-02-27.json
-- parity provenance commit: 6b9adbecd41ca8c3ddf100542dd400a9b5d4a82e
+- parity provenance commit: 9609458b8ec0e3e359ae7cd4e925b50b4d0e1857
 - parity provenance freshness vs HEAD: fresh
 - canonical decision remains authoritative until wave profiles are promoted and rerun.
 

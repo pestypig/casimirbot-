@@ -256,6 +256,24 @@ describe("Helix Ask strict fail-reason ledger", () => {
       },
     ]);
   });
+
+  it("categorizes relation-proof fail reason as evidence_contract", () => {
+    const ledger = buildHelixAskStrictFailReasonLedger({
+      strictEnabled: true,
+      payload: {
+        fail_reason: "RELATION_EDGE_MISSING_NEEDLE_HULL_NATARIO_FAMILY",
+      },
+    });
+
+    expect(ledger?.entries).toEqual([
+      {
+        ordinal: 1,
+        stage: "response",
+        fail_reason: "RELATION_EDGE_MISSING_NEEDLE_HULL_NATARIO_FAMILY",
+        category: "evidence_contract",
+      },
+    ]);
+  });
 });
 
 

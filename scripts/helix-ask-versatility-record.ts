@@ -126,6 +126,10 @@ const SERVER_COMMAND = process.env.HELIX_ASK_VERSATILITY_SERVER_CMD ?? "npm";
 const SERVER_ARGS =
   process.env.HELIX_ASK_VERSATILITY_SERVER_ARGS?.split(/\s+/).filter(Boolean) ?? ["run", "dev:agi:5173"];
 const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_ASK_VERSATILITY_TIMEOUT_MS ?? 15000);
+const PRECHECK_TIMEOUT_MS = Math.max(
+  1000,
+  Number(process.env.HELIX_ASK_VERSATILITY_PRECHECK_TIMEOUT_MS ?? Math.min(10000, REQUEST_TIMEOUT_MS)),
+);
 const MIN_TEXT_CHARS = Number(process.env.HELIX_ASK_VERSATILITY_MIN_TEXT_CHARS ?? 220);
 const MAX_RETRIES = Math.max(0, Number(process.env.HELIX_ASK_VERSATILITY_MAX_RETRIES ?? 3));
 const RETRY_BASE_MS = Math.max(100, Number(process.env.HELIX_ASK_VERSATILITY_RETRY_BASE_MS ?? 900));
@@ -384,7 +388,7 @@ const ensureServerReady = async (timeoutMs = 120000) => {
   }
   await precheckHelixAskAvailability({
     baseUrl: BASE_URL,
-    timeoutMs: Math.min(10000, timeoutMs),
+    timeoutMs: Math.min(PRECHECK_TIMEOUT_MS, timeoutMs),
     label: "server readiness precheck",
   });
 };
@@ -907,7 +911,7 @@ const main = async () => {
   }
   await precheckHelixAskAvailability({
     baseUrl: BASE_URL,
-    timeoutMs: Math.min(10000, REQUEST_TIMEOUT_MS),
+    timeoutMs: PRECHECK_TIMEOUT_MS,
     label: "versatility campaign precheck",
   });
 

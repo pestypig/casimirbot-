@@ -125,6 +125,7 @@
     "warp:full-solve:g4-stepA-summary": "tsx scripts/warp-g4-stepA-summary.ts",
     "warp:full-solve:g4-recovery-search": "tsx scripts/warp-g4-recovery-search.ts",
     "warp:full-solve:g4-recovery-parity": "tsx scripts/warp-g4-recovery-parity.ts",
+    "warp:full-solve:g4-metric-decomp-diff": "tsx scripts/warp-g4-metric-decomp-diff.ts",
     "warp:full-solve:g4-autoloop": "tsx scripts/warp-g4-autoloop.ts",
     "warp:full-solve:g4-autoloop:status": "npm run warp:full-solve:g4-autoloop -- --mode status",
     "warp:full-solve:g4-autoloop:cycle": "tsx scripts/warp-g4-autoloop.ts --mode cycle"

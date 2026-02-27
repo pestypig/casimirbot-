@@ -20,7 +20,7 @@ describe("helix ask relation proof gate (needle hull -> natario family)", () => 
         },
         {
           path: "docs/needle-hull-mainframe.md",
-          block: "Needle Hull Mainframe ... Natário warp geometry presets",
+          block: "Needle Hull Mainframe ... Natario warp geometry presets",
         },
       ],
       repoEvidenceRequired: true,
@@ -32,6 +32,31 @@ describe("helix ask relation proof gate (needle hull -> natario family)", () => 
     expect(result.outcome).toBe("allow");
     expect(result.missing_edge_ids).toEqual([]);
     expect(result.matched_edge_ids.length).toBe(2);
+  });
+
+  it("rejects global-token leakage across edges when only one edge block has all tokens", () => {
+    const result = evaluateNeedleNatarioRelationProof({
+      question: "Is the needle hull a natario solution?",
+      contextFiles: [
+        "client/src/components/needle-hull-preset.tsx",
+        "docs/needle-hull-mainframe.md",
+      ],
+      docBlocks: [
+        {
+          path: "client/src/components/needle-hull-preset.tsx",
+          block: "warpFieldType natario needle hull warp geometry",
+        },
+      ],
+      repoEvidenceRequired: true,
+      openWorldBypassAllowed: false,
+    });
+
+    expect(result.applicable).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.outcome).toBe("clarify_fail_closed");
+    expect(result.fail_reason).toBe(NEEDLE_NATARIO_RELATION_FAIL_REASON);
+    expect(result.matched_edge_ids).toEqual(["needle_preset_sets_natario_field"]);
+    expect(result.missing_edge_ids).toEqual(["needle_mainframe_binds_natario_geometry"]);
   });
 
   it("blocks alias-only relation claim when evidence edges are missing", () => {
@@ -72,6 +97,7 @@ describe("helix ask relation proof gate (needle hull -> natario family)", () => 
 
   it("detects targeted family-membership claims deterministically", () => {
     expect(isNeedleNatarioFamilyClaim("Show evidence edges proving needle hull is natario-family.")).toBe(true);
+    expect(isNeedleNatarioFamilyClaim("Is Needle Hull Natario family?")).toBe(true);
     expect(isNeedleNatarioFamilyClaim("What is Natario zero expansion?")).toBe(false);
   });
 });
