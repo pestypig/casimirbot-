@@ -25,6 +25,7 @@ type HelixAskSessionPrefs = {
   hypothesisEnabled?: boolean;
   verbosity?: string;
   citationsRequired?: boolean;
+  frontierLensLock?: boolean;
 };
 
 export type HelixAskSessionMemory = {

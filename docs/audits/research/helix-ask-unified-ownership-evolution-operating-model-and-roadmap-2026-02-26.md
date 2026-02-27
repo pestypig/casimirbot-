@@ -345,3 +345,14 @@ The unified model is best understood as applying supply-chain provenance, policy
 - **Reproducible builds:** control variance so third parties can reproduce outputs; in your case, "third party" is the operator replay tool. ?cite?turn1search0?turn1search7?  
 - **Transparency logs (Sigstore/Rekor):** append-only auditability with published availability targets; your plan keeps this optional and local-first, but compatible. ?cite?turn0search7?turn0search3?  
 - **Uncertainty + calibration literature:** VI/ELBO provides training diagnostics; calibration must be measured explicitly; neither alone implies certification. ?cite?turn6view0?turn6view1?
+
+## Direct Execution Readiness Linkage (2026-02-26)
+
+Related assessment:
+- `docs/audits/research/helix-ask-direct-codex-build-execution-readiness-assessment-2026-02-26.md`
+
+Adopted findings/proposals for this roadmap:
+- current direct Codex posture is `execute_with_guardrails`
+- prioritize conversion into a single Prompt 0..N unified execution pack before broad enforce-mode rollout
+- add a machine-readable dependency DAG and graduation gates artifact set
+- treat certified-only promotion enforcement as a blocking prerequisite for `execute_now`

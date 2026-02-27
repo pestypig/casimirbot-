@@ -8,6 +8,7 @@ type HelixAskDebug = {
   ambiguity_cluster_count?: number;
   open_world_bypass_mode?: "off" | "active";
   alignment_gate_decision?: "PASS" | "BORDERLINE" | "FAIL";
+  frontier_theory_lens_active?: boolean;
 };
 
 type AskResponse = {
@@ -33,6 +34,18 @@ type RegressionCase = {
   };
 };
 
+type SessionContinuityCase = {
+  label: string;
+  firstQuestion: string;
+  followupQuestion: string;
+  expect: {
+    intent_id: string;
+    intent_domain: string;
+    mustIncludeText?: string[];
+    mustNotIncludeText?: string[];
+  };
+};
+
 const BASE_URL =
   process.env.HELIX_ASK_BASE_URL ??
   process.env.EVAL_BASE_URL ??
@@ -46,6 +59,8 @@ const LIGHT_MODE = process.env.HELIX_ASK_REGRESSION_LIGHT === "1";
 const ONLY_LABEL = process.env.HELIX_ASK_REGRESSION_ONLY?.trim();
 const AMBIGUITY_MODE = process.env.HELIX_ASK_REGRESSION_AMBIGUITY === "1";
 const IDEOLOGY_MODE = process.env.HELIX_ASK_REGRESSION_IDEOLOGY === "1";
+const FRONTIER_CONTINUITY_MODE =
+  process.env.HELIX_ASK_REGRESSION_FRONTIER_CONTINUITY !== "0";
 const normalizeLabel = (value: string): string =>
   value.toLowerCase().replace(/[\s_-]+/g, "_");
 const normalizeToken = (value: string): string =>
@@ -230,6 +245,28 @@ const ideologyNarrativeCases: RegressionCase[] = [
   },
 ];
 
+const frontierContinuityCases: SessionContinuityCase[] = [
+  {
+    label: "frontier continuity followup",
+    firstQuestion: "Is the sun conscious under Orch-OR style reasoning?",
+    followupQuestion: "What in the reasoning ladder should we focus on since this is the case?",
+    expect: {
+      intent_id: "falsifiable.frontier_consciousness_theory_lens",
+      intent_domain: "falsifiable",
+      mustIncludeText: [
+        "Definitions:",
+        "Baseline:",
+        "Hypothesis:",
+        "Anti-hypothesis:",
+        "Falsifiers:",
+        "Uncertainty band:",
+        "Claim tier:",
+      ],
+      mustNotIncludeText: ["Execution log", "Ask debug", "Runtime fallback: fetch failed"],
+    },
+  },
+];
+
 const resolvedCases = LIGHT_MODE ? cases.slice(0, 3) : cases;
 const withAmbiguityCases = AMBIGUITY_MODE ? [...resolvedCases, ...ambiguityCases] : resolvedCases;
 const expandedCases = IDEOLOGY_MODE
@@ -348,12 +385,99 @@ const runCase = async (entry: RegressionCase, sessionId: string): Promise<string
   return failures;
 };
 
+const runSessionContinuityCase = async (
+  entry: SessionContinuityCase,
+): Promise<string[]> => {
+  console.log(`Running: ${entry.label}`);
+  const sessionId = `helix-ask-regression:continuity:${Date.now()}`;
+  const failures: string[] = [];
+  const doAsk = async (question: string): Promise<AskResponse | null> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(ASK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          question,
+          debug: true,
+          verbosity: "extended",
+          sessionId,
+          max_tokens: 256,
+          temperature: 0.2,
+          dryRun: DRY_RUN,
+        }),
+      });
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        failures.push(
+          `${entry.label}: request failed (${response.status})${text ? `: ${text.slice(0, 240)}` : ""}`,
+        );
+        return null;
+      }
+      return (await response.json()) as AskResponse;
+    } catch (error) {
+      const name = (error as { name?: string })?.name ?? "fetch_failed";
+      const message =
+        (error as { message?: string })?.message ??
+        (typeof error === "string" ? error : "");
+      const label = name === "AbortError" ? "timeout" : name;
+      failures.push(`${entry.label}: request failed (${label})${message ? `: ${message}` : ""}`);
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  const first = await doAsk(entry.firstQuestion);
+  if (!first) return failures;
+  const followup = await doAsk(entry.followupQuestion);
+  if (!followup) return failures;
+  if (!followup.debug) {
+    failures.push(`${entry.label}: missing debug payload`);
+    return failures;
+  }
+  if (followup.debug.intent_id !== entry.expect.intent_id) {
+    failures.push(
+      `${entry.label}: intent_id ${followup.debug.intent_id ?? "missing"} !== ${entry.expect.intent_id}`,
+    );
+  }
+  if (followup.debug.intent_domain !== entry.expect.intent_domain) {
+    failures.push(
+      `${entry.label}: intent_domain ${followup.debug.intent_domain ?? "missing"} !== ${entry.expect.intent_domain}`,
+    );
+  }
+  if (followup.debug.frontier_theory_lens_active !== true) {
+    failures.push(`${entry.label}: frontier_theory_lens_active not true on followup`);
+  }
+  const text = followup.text ?? "";
+  const textLower = text.toLowerCase();
+  for (const snippet of entry.expect.mustIncludeText ?? []) {
+    if (!textLower.includes(snippet.toLowerCase())) {
+      failures.push(`${entry.label}: response missing required text snippet "${snippet}"`);
+    }
+  }
+  for (const snippet of entry.expect.mustNotIncludeText ?? []) {
+    if (textLower.includes(snippet.toLowerCase())) {
+      failures.push(`${entry.label}: response included forbidden text snippet "${snippet}"`);
+    }
+  }
+  return failures;
+};
+
 async function main(): Promise<void> {
   const sessionId = `helix-ask-regression:${Date.now()}`;
   const failures: string[] = [];
   for (const entry of finalCases) {
     const caseFailures = await runCase(entry, sessionId);
     failures.push(...caseFailures);
+  }
+  if (FRONTIER_CONTINUITY_MODE) {
+    for (const entry of frontierContinuityCases) {
+      const caseFailures = await runSessionContinuityCase(entry);
+      failures.push(...caseFailures);
+    }
   }
 
   if (failures.length) {

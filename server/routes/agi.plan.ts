@@ -3456,11 +3456,17 @@ const HELIX_ASK_FRONTIER_CONTRACT =
   String(process.env.HELIX_ASK_FRONTIER_CONTRACT ?? "1").trim() !== "0";
 const HELIX_ASK_FRONTIER_COVE =
   String(process.env.HELIX_ASK_FRONTIER_COVE ?? "1").trim() !== "0";
+const HELIX_ASK_FRONTIER_SESSION_LOCK =
+  String(process.env.HELIX_ASK_FRONTIER_SESSION_LOCK ?? "1").trim() !== "0";
 const HELIX_ASK_TELEMETRY_LEAK_GATE =
   String(process.env.HELIX_ASK_TELEMETRY_LEAK_GATE ?? "1").trim() !== "0";
 const HELIX_ASK_FRONTIER_INTENT_ID = "falsifiable.frontier_consciousness_theory_lens";
 const HELIX_ASK_FRONTIER_LENS_RE =
   /\b(conscious|consciousness|sentient|sentience|orch(?:estrated)?\s*objective\s*reduction|orch[-\s]?or|penrose|hameroff|microtubule|stellar consciousness|sun conscious|is the sun conscious)\b/i;
+const HELIX_ASK_FRONTIER_FOLLOWUP_RE =
+  /\b(since this is the case|given this|based on this|what now|what should we focus|reasoning ladder|follow[-\s]?up|continue|in that case|next step)\b/i;
+const HELIX_ASK_FRONTIER_SESSION_RESET_RE =
+  /\b(reset context|new topic|switch topic|different question|ignore previous)\b/i;
 const HELIX_ASK_FRONTIER_REQUIRED_SLOTS = [
   "definitions",
   "baseline",
@@ -3482,6 +3488,10 @@ const HELIX_ASK_FRONTIER_SLOT_PATTERNS: Record<HelixAskFrontierRequiredSlot, Reg
 };
 const HELIX_ASK_TELEMETRY_LEAK_RE =
   /\b(execution log|ask debug|helix ask:|duration:\s*\d+ms|two-pass:|micro-pass:|prompt ingest:|graph congruence:)\b/i;
+const HELIX_ASK_RUNTIME_FALLBACK_NOISE_RE = /\bruntime fallback:\s*fetch failed\.?/gi;
+const HELIX_ASK_RUNTIME_FALLBACK_NOISE_TEST_RE = /\bruntime fallback:\s*fetch failed\.?/i;
+const HELIX_ASK_RUNTIME_FALLBACK_PREFIX_RE = /\bruntime fallback:\s*/gi;
+const HELIX_ASK_RUNTIME_FALLBACK_PREFIX_TEST_RE = /\bruntime fallback:\s*/i;
 const HELIX_ASK_HYPOTHESIS_STYLE = (() => {
   const raw = String(process.env.HELIX_ASK_HYPOTHESIS_STYLE ?? "conservative")
     .trim()
@@ -4468,7 +4478,12 @@ function stripPromptEchoFromAnswer(answer: string, question?: string): string {
 
 const stripDeterministicNoiseArtifacts = (value: string): string => {
   if (!value) return value;
+  const hadRuntimeFallbackNoise =
+    HELIX_ASK_RUNTIME_FALLBACK_NOISE_TEST_RE.test(value) ||
+    HELIX_ASK_RUNTIME_FALLBACK_PREFIX_TEST_RE.test(value);
   let cleaned = value
+    .replace(HELIX_ASK_RUNTIME_FALLBACK_NOISE_RE, " ")
+    .replace(HELIX_ASK_RUNTIME_FALLBACK_PREFIX_RE, "")
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/`{1,3}[^`]+`{1,3}/g, " ")
     .replace(/\b(?:notes?|tags?)\s*:\s*[^\n.]+(?:\.|$)/gi, " ")
@@ -4491,6 +4506,10 @@ const stripDeterministicNoiseArtifacts = (value: string): string => {
       out.push(sentence);
     }
     cleaned = out.join(" ").trim();
+  }
+  if (hadRuntimeFallbackNoise && cleaned.length < 48) {
+    cleaned =
+      "Runtime retrieval failed for this request. Please retry or narrow the prompt to specific repo files.";
   }
   return cleaned;
 };
@@ -20026,17 +20045,39 @@ const executeHelixAsk = async ({
     const originalIntentProfile = intentMatch.profile;
     let intentProfile = intentMatch.profile;
     let intentReasonBase = intentMatch.reason;
-    const frontierTheoryLensRequested = HELIX_ASK_FRONTIER_LENS_RE.test(baseQuestion);
+    const frontierTheoryLensRequestedDirect = HELIX_ASK_FRONTIER_LENS_RE.test(baseQuestion);
+    const frontierSessionLensLocked =
+      HELIX_ASK_FRONTIER_SESSION_LOCK &&
+      Boolean(sessionMemory?.userPrefs?.frontierLensLock);
+    const frontierSessionResetRequested = HELIX_ASK_FRONTIER_SESSION_RESET_RE.test(baseQuestion);
+    const frontierSessionFollowupRequested =
+      frontierSessionLensLocked &&
+      !frontierSessionResetRequested &&
+      !frontierTheoryLensRequestedDirect &&
+      HELIX_ASK_FRONTIER_FOLLOWUP_RE.test(baseQuestion) &&
+      !HELIX_ASK_REPO_FORCE.test(baseQuestion) &&
+      !HELIX_ASK_FILE_HINT.test(baseQuestion);
+    const frontierTheoryLensRequested =
+      frontierTheoryLensRequestedDirect || frontierSessionFollowupRequested;
+    const frontierTheoryLensRequestSource = frontierTheoryLensRequestedDirect
+      ? "direct"
+      : frontierSessionFollowupRequested
+        ? "session_followup"
+        : "none";
     const frontierProfile = frontierTheoryLensRequested
       ? getHelixAskIntentProfileById(HELIX_ASK_FRONTIER_INTENT_ID)
       : null;
-    if (frontierTheoryLensRequested && frontierProfile && intentProfile.domain === "general") {
+    if (
+      frontierTheoryLensRequested &&
+      frontierProfile &&
+      intentProfile.id !== frontierProfile.id
+    ) {
       intentProfile = frontierProfile;
-      intentReasonBase = `${intentReasonBase}|frontier_theory_lens`;
+      intentReasonBase = `${intentReasonBase}|frontier_theory_lens:${frontierTheoryLensRequestSource}`;
       logEvent(
         "Fallback",
         "frontier_lens -> falsifiable",
-        `profile=${frontierProfile.id}`,
+        `profile=${frontierProfile.id};source=${frontierTheoryLensRequestSource}`,
       );
     }
     let compositeApplied = false;
@@ -20111,6 +20152,7 @@ const executeHelixAsk = async ({
     }
     const ideologyConversationalOpenWorldMode =
       ideologyConversationalMode &&
+      !frontierTheoryLensRequested &&
       !explicitRepoExpectation &&
       !hasFilePathHints &&
       !HELIX_ASK_REPO_FORCE.test(baseQuestion);
@@ -20301,11 +20343,32 @@ const executeHelixAsk = async ({
     applyIntentProfile(intentProfile);
     const isFrontierTheoryLensActive = (): boolean =>
       intentProfile.id === HELIX_ASK_FRONTIER_INTENT_ID || frontierTheoryLensRequested;
+    const frontierSessionLockNext = HELIX_ASK_FRONTIER_SESSION_LOCK
+      ? !frontierSessionResetRequested && (frontierTheoryLensRequested || frontierSessionLensLocked)
+      : false;
     if (debugPayload) {
       const debugRecord = debugPayload as Record<string, unknown>;
+      debugRecord.frontier_theory_lens_source = frontierTheoryLensRequestSource;
       debugRecord.frontier_theory_lens_requested = frontierTheoryLensRequested;
       debugRecord.frontier_theory_lens_active = isFrontierTheoryLensActive();
+      debugRecord.frontier_session_lens_locked = frontierSessionLensLocked;
+      debugRecord.frontier_session_followup_requested = frontierSessionFollowupRequested;
+      debugRecord.frontier_session_reset_requested = frontierSessionResetRequested;
+      debugRecord.frontier_session_lock_next = frontierSessionLockNext;
       debugRecord.frontier_required_slots = Array.from(HELIX_ASK_FRONTIER_REQUIRED_SLOTS);
+    }
+    if (
+      HELIX_ASK_SESSION_MEMORY &&
+      parsed.data.sessionId &&
+      HELIX_ASK_FRONTIER_SESSION_LOCK &&
+      (frontierTheoryLensRequested || frontierSessionLensLocked || frontierSessionResetRequested)
+    ) {
+      recordHelixAskSessionMemory({
+        sessionId: parsed.data.sessionId,
+        userPrefs: {
+          frontierLensLock: frontierSessionLockNext,
+        },
+      });
     }
     const isRelationIntentRequested = (): boolean => {
       if (isWarpEthosRelationQuestion(baseQuestion)) return true;
@@ -23976,6 +24039,7 @@ const executeHelixAsk = async ({
             hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
             verbosity: parsed.data.verbosity,
             citationsRequired: requiresRepoEvidence,
+            frontierLensLock: frontierSessionLockNext,
           };
           if (slotsToRecord.length > 0 || contextFiles.length > 0 || resolvedConcepts.length > 0) {
             recordHelixAskSessionMemory({
@@ -24300,6 +24364,20 @@ const executeHelixAsk = async ({
             contextFiles = [];
           }
           logEvent("Fallback", `intent -> ${fallbackProfile.id}`, intentReason);
+        }
+        if (
+          isFrontierTheoryLensActive() &&
+          frontierProfile &&
+          intentDomain === "general"
+        ) {
+          applyIntentProfile(frontierProfile, "frontier_session_intent_guard");
+          isRepoQuestion = true;
+          wantsHybrid = true;
+          logEvent(
+            "Fallback",
+            "frontier_intent_guard",
+            `profile=${frontierProfile.id}`,
+          );
         }
 
         if (compositeConstraintRequested) {
@@ -25486,6 +25564,7 @@ const executeHelixAsk = async ({
               hypothesisEnabled: HELIX_ASK_HYPOTHESIS,
               verbosity: parsed.data.verbosity,
               citationsRequired: requiresRepoEvidence,
+              frontierLensLock: frontierSessionLockNext,
             },
             });
           }
@@ -26013,7 +26092,9 @@ const executeHelixAsk = async ({
     if (shouldShortCircuitAnswer && !bypassShortCircuit) {
       markLlmSkipDebug("short_circuit_forced_answer", forcedRule);
       const forcedRawText = stripPromptEchoFromAnswer(fallbackAnswer, baseQuestion).trim();
-      const forcedCleanText = stripTruncationMarkers(formatHelixAskAnswer(forcedRawText));
+      const forcedCleanText = stripDeterministicNoiseArtifacts(
+        stripTruncationMarkers(formatHelixAskAnswer(forcedRawText)),
+      );
       const forcedMeta = isShortAnswer(forcedCleanText, verbosity);
       result = { text: forcedCleanText } as LocalAskResult;
       if (debugPayload) {
@@ -26024,7 +26105,7 @@ const executeHelixAsk = async ({
       answerPath.push("answer:forced");
       if (shouldFastPathFinalize) {
         const forcedQuality = applyImmediateQualityFloor(forcedCleanText);
-        const forcedFinalText = forcedQuality.text;
+        const forcedFinalText = stripDeterministicNoiseArtifacts(forcedQuality.text);
         if (forcedQuality.reasons.length > 0) {
           answerPath.push("qualityFloor:early_finalize");
         }
@@ -29631,6 +29712,13 @@ const executeHelixAsk = async ({
       if (openWorldBypassMode === "active") {
         cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
         cleaned = ensureOpenWorldBypassUncertainty(cleaned);
+      }
+      const runtimeFallbackNoiseDetected =
+        HELIX_ASK_RUNTIME_FALLBACK_NOISE_TEST_RE.test(cleaned) ||
+        HELIX_ASK_RUNTIME_FALLBACK_PREFIX_TEST_RE.test(cleaned);
+      if (runtimeFallbackNoiseDetected) {
+        cleaned = stripDeterministicNoiseArtifacts(cleaned);
+        answerPath.push("gate:runtime_fallback_noise");
       }
       if (debugPayload && !reportDecision.enabled && intentStrategy !== "constraint_report") {
         debugPayload.report_mode_mismatch = finalNonReportGuard.mismatch;

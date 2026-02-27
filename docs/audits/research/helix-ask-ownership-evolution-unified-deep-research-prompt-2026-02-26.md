@@ -3,6 +3,16 @@
 Use this as a standalone deep research prompt when repository context is attached.
 Scope is Helix Ask ownership utility + evolution governance + patch momentum + force-matrix operator model + VI/ELBO uncertainty lane.
 
+## Companion Assessment
+
+Use with:
+- `docs/audits/research/helix-ask-direct-codex-build-execution-readiness-assessment-2026-02-26.md`
+
+Carry-over constraints from latest findings:
+- default launch posture remains `execute_with_guardrails`
+- require unified Prompt 0..N execution conversion before broad enforce-mode rollout
+- treat certified-only promotion enforcement as a hard readiness prerequisite for `execute_now`
+
 ## Prompt (copy/paste)
 
 ```md

@@ -58,7 +58,17 @@ files before proposing changes:
 - `docs/architecture/voice-service-contract.md`
 - `docs/architecture/mission-go-board-spec.md`
 
-Agent expectations for this surface:
+## Helix Ask readiness debug loop (routing/scaffold/fallback changes)
+When touching Helix Ask routing, frontier scaffolds, fallback behavior, output
+cleaning, or ideology narrative contracts, use:
+- `docs/helix-ask-readiness-debug-loop.md`
+
+Agent expectations for readiness loop:
+- Run contract battery + variety battery and report probability scorecard.
+- Treat Casimir verification as a hard gate for completion claims.
+- Include prompt/output/verdict evidence for representative pass and fail cases.
+
+Mission-control expectations:
 - Keep voice certainty no stronger than text certainty.
 - Favor event-driven low-noise callouts over long narration.
 - Preserve deterministic error/fail reasons for replay and operator trust.

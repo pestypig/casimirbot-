@@ -2,6 +2,19 @@
 
 Use this when repo context is attached and the objective is to decide whether the current plan set is immediately executable by Codex in strict, deterministic build mode.
 
+## Integrated Findings Update (2026-02-26)
+
+Companion assessment:
+- `docs/audits/research/helix-ask-direct-codex-build-execution-readiness-assessment-2026-02-26.md`
+
+Key findings to preserve in follow-on runs:
+- readiness is currently `execute_with_guardrails` (not `execute_now`)
+- strongest execution lane is evolution governance prompt packs with per-slice Casimir discipline
+- highest-priority gaps are:
+  - missing unified ownership+evolution Prompt 0..N execution pack
+  - missing repo-wide proven certified-only promotion enforcement
+  - missing machine-readable dependency DAG for the unified program
+
 ## Prompt (copy/paste)
 
 ```md
