@@ -22,6 +22,35 @@ const numEq = (a: number | null, b: number | null, absEps = 1e-12, relEps = 1e-9
   return diff <= relEps * scale;
 };
 
+
+type ComparabilityClass =
+  | 'comparable_canonical'
+  | 'non_comparable_missing_signals'
+  | 'non_comparable_contract_mismatch'
+  | 'non_comparable_other';
+
+const COMPARABILITY_CLASSES: ComparabilityClass[] = [
+  'comparable_canonical',
+  'non_comparable_missing_signals',
+  'non_comparable_contract_mismatch',
+  'non_comparable_other',
+];
+
+const classifyComparability = (entry: any): ComparabilityClass => {
+  const existing = typeof entry?.comparabilityClass === 'string' ? entry.comparabilityClass : null;
+  if (existing && COMPARABILITY_CLASSES.includes(existing as ComparabilityClass)) {
+    return existing as ComparabilityClass;
+  }
+  const required = [entry?.lhs_Jm3, entry?.boundComputed_Jm3, entry?.boundUsed_Jm3, entry?.marginRatioRaw, entry?.marginRatioRawComputed];
+  if (required.some((value) => !Number.isFinite(value))) return 'non_comparable_missing_signals';
+  const reasonCode = Array.isArray(entry?.reasonCode) ? entry.reasonCode.map((code: unknown) => str(code).toUpperCase()) : [];
+  if (reasonCode.includes('G4_QI_SOURCE_NOT_METRIC') || reasonCode.includes('G4_QI_CONTRACT_MISSING')) {
+    return 'non_comparable_contract_mismatch';
+  }
+  if (!str(entry?.rhoSource).startsWith('warp.metric')) return 'non_comparable_contract_mismatch';
+  return 'comparable_canonical';
+};
+
 type SelectionPolicy = 'applicability_pass' | 'fallback_global_min_raw_computed';
 
 type MismatchReason =
@@ -161,6 +190,7 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
       parity,
       parityStatus: parityResolution.parityStatus,
       mismatchReason: parityResolution.mismatchReason,
+      comparabilityClass: classifyComparability(entry),
     });
   }
 
@@ -169,6 +199,21 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
   );
   const anyComputedOnlyPassCandidate = rows.some(
     (row) => row.parity.applicabilityStatus === 'PASS' && (row.parity.marginRatioRawComputed ?? Number.POSITIVE_INFINITY) < 1,
+  );
+
+
+  const comparabilityCounts = rows.reduce<Record<ComparabilityClass, number>>(
+    (acc, row) => {
+      const klass = row.comparabilityClass as ComparabilityClass;
+      acc[klass] += 1;
+      return acc;
+    },
+    {
+      comparable_canonical: 0,
+      non_comparable_missing_signals: 0,
+      non_comparable_contract_mismatch: 0,
+      non_comparable_other: 0,
+    },
   );
 
   const payload = {
@@ -182,6 +227,18 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
     anyCanonicalPassCandidate,
     anyComputedOnlyPassCandidate,
     dominantFailureMode: dominantFailureMode(rows),
+    comparability: {
+      canonicalComparableCaseCount: comparabilityCounts.comparable_canonical,
+      nonComparableCaseCount:
+        comparabilityCounts.non_comparable_missing_signals +
+        comparabilityCounts.non_comparable_contract_mismatch +
+        comparabilityCounts.non_comparable_other,
+      nonComparableBuckets: {
+        non_comparable_missing_signals: comparabilityCounts.non_comparable_missing_signals,
+        non_comparable_contract_mismatch: comparabilityCounts.non_comparable_contract_mismatch,
+        non_comparable_other: comparabilityCounts.non_comparable_other,
+      },
+    },
     provenance: {
       commitHash: headCommitHash,
       recoveryProvenanceCommitHash: recoveryCommitHash,

@@ -40,6 +40,7 @@ describe('warp-g4-recovery-search', () => {
       expect(row).toHaveProperty('reasonCode');
       expect(row).toHaveProperty('rhoSource');
       expect(row).toHaveProperty('classificationTag');
+      expect(row).toHaveProperty('comparabilityClass');
     }
   });
 
@@ -79,6 +80,31 @@ describe('warp-g4-recovery-search', () => {
     expect(a.deterministicSearch.deterministicWalk).toEqual(b.deterministicSearch.deterministicWalk);
     const overlap = Math.min(a.cases.length, b.cases.length);
     expect(a.cases.slice(0, overlap)).toEqual(b.cases.slice(0, overlap));
+  });
+
+
+  it('classifies comparability deterministically and emits stable Step A bucket accounting', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-recovery-stepa-'));
+    const outA = path.join(root, 'stepa-a.json');
+    const outB = path.join(root, 'stepa-b.json');
+    const summaryPath = path.resolve('artifacts/research/full-solve/g4-stepA-summary.json');
+
+    await runRecoverySearch({ outPath: outA, seed: 42, maxCases: 16, topN: 4, runtimeCapMs: 10_000 });
+    const summaryA = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+    const payloadA = JSON.parse(fs.readFileSync(outA, 'utf8'));
+
+    await runRecoverySearch({ outPath: outB, seed: 42, maxCases: 16, topN: 4, runtimeCapMs: 10_000 });
+    const summaryB = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+    const payloadB = JSON.parse(fs.readFileSync(outB, 'utf8'));
+
+    expect(payloadA.cases.map((row: any) => row.comparabilityClass)).toEqual(
+      payloadB.cases.map((row: any) => row.comparabilityClass),
+    );
+    expect(summaryA).toEqual(summaryB);
+    expect(summaryA.canonicalComparableCaseCount + summaryA.nonComparableCaseCount).toBe(payloadA.caseCount);
+    expect(summaryA.nonComparableBuckets.non_comparable_missing_signals).toBeTypeOf('number');
+    expect(summaryA.nonComparableBuckets.non_comparable_contract_mismatch).toBeTypeOf('number');
+    expect(summaryA.nonComparableBuckets.non_comparable_other).toBeTypeOf('number');
   });
 
   it('does not mutate canonical artifact during temp output runs', async () => {

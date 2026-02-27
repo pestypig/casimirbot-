@@ -10,6 +10,7 @@ const DEFAULT_MAX_CASES = 160;
 const DEFAULT_TOP_N = 12;
 const DEFAULT_RUNTIME_CAP_MS = 45_000;
 const DEFAULT_OUT_PATH = path.join('artifacts/research/full-solve', `g4-recovery-search-${DATE_STAMP}.json`);
+const STEP_A_SUMMARY_PATH = path.join('artifacts/research/full-solve', 'g4-stepA-summary.json');
 const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
 
@@ -25,7 +26,14 @@ type RecoveryCase = {
   reasonCode: string[];
   rhoSource: string | null;
   classificationTag: 'candidate_pass_found' | 'margin_limited' | 'applicability_limited' | 'evidence_path_blocked';
+  comparabilityClass:
+    | 'comparable_canonical'
+    | 'non_comparable_missing_signals'
+    | 'non_comparable_contract_mismatch'
+    | 'non_comparable_other';
 };
+
+type ComparabilityClass = RecoveryCase['comparabilityClass'];
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const stringOrNull = (v: unknown): string | null => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : null);
@@ -34,6 +42,25 @@ const classify = (applicabilityStatus: string, marginRatioRawComputed: number | 
   if (applicabilityStatus !== 'PASS') return 'applicability_limited';
   if (marginRatioRawComputed == null) return 'evidence_path_blocked';
   return marginRatioRawComputed < 1 ? 'candidate_pass_found' : 'margin_limited';
+};
+
+const REQUIRED_CANONICAL_SIGNALS = ['lhs_Jm3', 'boundComputed_Jm3', 'boundUsed_Jm3', 'marginRatioRaw', 'marginRatioRawComputed'] as const;
+const CONTRACT_REASON_CODES = new Set(['G4_QI_SOURCE_NOT_METRIC', 'G4_QI_CONTRACT_MISSING']);
+
+const classifyComparability = (entry: {
+  lhs_Jm3: number | null;
+  boundComputed_Jm3: number | null;
+  boundUsed_Jm3: number | null;
+  marginRatioRaw: number | null;
+  marginRatioRawComputed: number | null;
+  rhoSource: string | null;
+  reasonCode: string[];
+}): ComparabilityClass => {
+  const missingSignals = REQUIRED_CANONICAL_SIGNALS.some((field) => entry[field] == null);
+  if (missingSignals) return 'non_comparable_missing_signals';
+  const contractMismatch = entry.reasonCode.some((code) => CONTRACT_REASON_CODES.has(code));
+  if (contractMismatch || !entry.rhoSource?.startsWith('warp.metric')) return 'non_comparable_contract_mismatch';
+  return 'comparable_canonical';
 };
 
 const deriveReasonCodes = (guard: any): string[] => {
@@ -177,21 +204,64 @@ export async function runRecoverySearch(opts: {
       tau_ms: Number(row.tau_s_ms),
     });
     const applicabilityStatus = String(guard.applicabilityStatus ?? 'UNKNOWN').toUpperCase();
+    const lhs_Jm3 = finiteOrNull(guard.lhs_Jm3);
+    const boundComputed_Jm3 = finiteOrNull(guard.boundComputed_Jm3);
+    const boundUsed_Jm3 = finiteOrNull(guard.boundUsed_Jm3);
+    const marginRatioRaw = finiteOrNull(guard.marginRatioRaw);
     const marginRatioRawComputed = finiteOrNull(guard.marginRatioRawComputed);
+    const reasonCode = deriveReasonCodes(guard);
+    const rhoSource = stringOrNull(guard.rhoSource);
     results.push({
       id: `case_${String(results.length + 1).padStart(4, '0')}`,
       params: row,
-      lhs_Jm3: finiteOrNull(guard.lhs_Jm3),
-      boundComputed_Jm3: finiteOrNull(guard.boundComputed_Jm3),
-      boundUsed_Jm3: finiteOrNull(guard.boundUsed_Jm3),
-      marginRatioRaw: finiteOrNull(guard.marginRatioRaw),
+      lhs_Jm3,
+      boundComputed_Jm3,
+      boundUsed_Jm3,
+      marginRatioRaw,
       marginRatioRawComputed,
       applicabilityStatus,
-      reasonCode: deriveReasonCodes(guard),
-      rhoSource: stringOrNull(guard.rhoSource),
+      reasonCode,
+      rhoSource,
       classificationTag: classify(applicabilityStatus, marginRatioRawComputed),
+      comparabilityClass: classifyComparability({
+        lhs_Jm3,
+        boundComputed_Jm3,
+        boundUsed_Jm3,
+        marginRatioRaw,
+        marginRatioRawComputed,
+        rhoSource,
+        reasonCode,
+      }),
     });
   }
+
+  const comparableCases = results.filter((entry) => entry.comparabilityClass === 'comparable_canonical');
+  const nonComparableCases = results.filter((entry) => entry.comparabilityClass !== 'comparable_canonical');
+  const comparableComputedMargins = comparableCases
+    .map((entry) => entry.marginRatioRawComputed)
+    .filter((value): value is number => value != null)
+    .sort((a, b) => a - b);
+  const minMarginRatioRawComputedComparable = comparableComputedMargins[0] ?? null;
+  const candidatePassFoundCanonicalComparable = comparableCases.some(
+    (entry) => entry.applicabilityStatus === 'PASS' && (entry.marginRatioRaw ?? Number.POSITIVE_INFINITY) < 1,
+  );
+  const nonComparableBuckets = nonComparableCases.reduce<Record<Exclude<ComparabilityClass, 'comparable_canonical'>, number>>(
+    (acc, entry) => {
+      if (entry.comparabilityClass === 'non_comparable_missing_signals') {
+        acc.non_comparable_missing_signals += 1;
+      } else if (entry.comparabilityClass === 'non_comparable_contract_mismatch') {
+        acc.non_comparable_contract_mismatch += 1;
+      } else {
+        acc.non_comparable_other += 1;
+      }
+      return acc;
+    },
+    {
+      non_comparable_missing_signals: 0,
+      non_comparable_contract_mismatch: 0,
+      non_comparable_other: 0,
+    },
+  );
 
   const applicabilityPass = results.filter((entry) => entry.applicabilityStatus === 'PASS');
   const rankedCandidates = applicabilityPass
@@ -257,6 +327,19 @@ export async function runRecoverySearch(opts: {
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, `${JSON.stringify(payload, null, 2)}\n`);
+
+  const stepASummary = {
+    canonicalComparableCaseCount: comparableCases.length,
+    nonComparableCaseCount: nonComparableCases.length,
+    nonComparableBuckets,
+    minMarginRatioRawComputedComparable,
+    candidatePassFoundCanonicalComparable,
+    provenance: {
+      commitHash,
+    },
+  };
+  fs.mkdirSync(path.dirname(STEP_A_SUMMARY_PATH), { recursive: true });
+  fs.writeFileSync(STEP_A_SUMMARY_PATH, `${JSON.stringify(stepASummary, null, 2)}\n`);
   return { ok: true, outPath, caseCount: results.length, candidatePassFound, bestCandidate };
 }
 
