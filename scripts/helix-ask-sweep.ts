@@ -64,6 +64,16 @@ type HelixAskDebug = {
   stage_tags?: boolean;
   context_files?: string[];
   context_files_count?: number;
+  open_world_bypass_mode?: "off" | "active";
+  alignment_gate_decision?: "PASS" | "BORDERLINE" | "FAIL";
+  alignment_gate_metrics?: {
+    alignment_real?: number;
+    alignment_decoy?: number;
+    coincidence_margin?: number;
+    stability_3_rewrites?: number;
+    contradiction_rate?: number;
+    lower95_p_align?: number;
+  };
 };
 
 type CaseQuality = {

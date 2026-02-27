@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { resolveHelixAskArbiter } from "../server/services/helix-ask/arbiter";
+import { resolveOpenWorldBypassPolicy } from "../server/services/helix-ask/alignment-gate";
 
 const baseInput = {
   retrievalConfidence: 0,
@@ -130,6 +131,38 @@ describe("Helix Ask arbiter", () => {
     expect(result.provenance_class).toBe("inferred");
     expect(result.claim_tier).toBe("diagnostic");
     expect(result.certifying).toBe(false);
+  });
+
+  it("integration: repo-required alignment fail stays clarify route", () => {
+    const arbiter = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.2,
+      userExpectsRepo: true,
+      intentDomain: "repo",
+    });
+    const bypass = resolveOpenWorldBypassPolicy({
+      gateDecision: "FAIL",
+      requiresRepoEvidence: true,
+      openWorldAllowed: false,
+    });
+    expect(arbiter.mode).toBe("clarify");
+    expect(bypass.action).toBe("clarify_fail_closed");
+  });
+
+  it("integration: open-world alignment fail permits uncertainty bypass", () => {
+    const arbiter = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.2,
+      userExpectsRepo: false,
+      intentDomain: "general",
+    });
+    const bypass = resolveOpenWorldBypassPolicy({
+      gateDecision: "FAIL",
+      requiresRepoEvidence: false,
+      openWorldAllowed: true,
+    });
+    expect(arbiter.mode).toBe("general");
+    expect(bypass.action).toBe("bypass_with_uncertainty");
   });
 
 

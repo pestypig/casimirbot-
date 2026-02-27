@@ -57,6 +57,36 @@ describe("stripRunawayAnswerArtifacts", () => {
     ].join("\n"));
   });
 
+
+  it("removes Tree Walk heading and Execution log variants while preserving Sources", () => {
+    const input = [
+      "Grounded answer body.",
+      "",
+      "## Tree Walk:",
+      "- node=a",
+      "- node=b",
+      "",
+      "Execution log:",
+      "- internal=1",
+      "",
+      "Sources: server/routes/agi.plan.ts",
+    ].join("\n");
+    const cleaned = stripRunawayAnswerArtifacts(input);
+    expect(cleaned).toBe(["Grounded answer body.", "", "Sources: server/routes/agi.plan.ts"].join("\n"));
+  });
+
+  it("removes Ask debug variant blocks in mid-answer", () => {
+    const input = [
+      "Line one.",
+      "",
+      "### Ask debug - trace",
+      "- foo=bar",
+      "",
+      "Line two.",
+    ].join("\n");
+    const cleaned = stripRunawayAnswerArtifacts(input);
+    expect(cleaned).toBe(["Line one.", "", "Line two."].join("\n"));
+  });
   it("keeps at least one Sources line after artifact stripping", () => {
     const input = [
       "Grounded relation answer body.",
