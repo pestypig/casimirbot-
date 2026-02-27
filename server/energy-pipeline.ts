@@ -6747,9 +6747,129 @@ type EffectiveRhoDebug = {
   reason?: string;
 };
 
+type QiCouplingMode = "off" | "shadow";
+
+type QiCouplingDiagnostics = {
+  mode: QiCouplingMode;
+  alpha: number;
+  metricRho_Jm3?: number;
+  metricSource?: string;
+  proxyRho_Jm3?: number;
+  proxySource?: string;
+  coupledRhoShadow_Jm3?: number;
+  residualRel?: number;
+  comparable: boolean;
+  equationRef: string;
+  semantics: "diagnostic_only_no_gate_override";
+};
+
 function resolveTileTelemetryScale(): number {
   const scale = parseEnvNumber(process.env.QI_TILE_TELEMETRY_SCALE, 1);
   return Math.max(0, Math.abs(scale));
+}
+
+function resolveQiCouplingMode(): QiCouplingMode {
+  const raw = String(process.env.QI_COUPLING_MODE ?? "shadow").trim().toLowerCase();
+  if (raw === "off" || raw === "shadow") return raw;
+  return "shadow";
+}
+
+function resolveQiCouplingAlpha(): number {
+  const raw = Number(process.env.QI_COUPLING_ALPHA);
+  if (!Number.isFinite(raw)) return 0.5;
+  return Math.max(0, Math.min(1, raw));
+}
+
+function resolveQiProxyRhoFromState(
+  state: EnergyPipelineState,
+  debug?: EffectiveRhoDebug,
+): number | undefined {
+  const rhoStatic = Number(state.rho_static);
+  if (Number.isFinite(rhoStatic)) {
+    if (debug) {
+      debug.source = "pipeline.rho_static";
+      debug.value = rhoStatic;
+      debug.note = "pipeline static energy-density proxy";
+    }
+    return rhoStatic;
+  }
+
+  const rhoAvg = Number(state.rho_avg);
+  if (Number.isFinite(rhoAvg)) {
+    if (debug) {
+      debug.source = "pipeline.rho_avg";
+      debug.value = rhoAvg;
+      debug.note = "pipeline average energy-density proxy";
+    }
+    return rhoAvg;
+  }
+
+  const rhoInst = Number(state.rho_inst);
+  if (Number.isFinite(rhoInst)) {
+    if (debug) {
+      debug.source = "pipeline.rho_inst";
+      debug.value = rhoInst;
+      debug.note = "pipeline instantaneous energy-density proxy";
+    }
+    return rhoInst;
+  }
+
+  const tileArea_m2 = Number(state.tileArea_cm2) * CM2_TO_M2;
+  const gap_m = Number(state.gap_nm) * 1e-9;
+  const tileVolume_m3 = tileArea_m2 * gap_m;
+  if (Number.isFinite(state.U_static) && Number.isFinite(tileVolume_m3) && tileVolume_m3 > 0) {
+    const rhoFromStatic = Number(state.U_static) / tileVolume_m3;
+    if (Number.isFinite(rhoFromStatic)) {
+      if (debug) {
+        debug.source = "pipeline.U_static/tile_volume";
+        debug.value = rhoFromStatic;
+        debug.note = "computed proxy from static tile energy density";
+      }
+      return rhoFromStatic;
+    }
+  }
+
+  if (debug) {
+    debug.source = "proxy-missing";
+    debug.value = Number.NaN;
+    debug.reason = "missing_proxy_rho_inputs";
+  }
+  return undefined;
+}
+
+function resolveQiCouplingDiagnostics(state: EnergyPipelineState): QiCouplingDiagnostics {
+  const mode = resolveQiCouplingMode();
+  const alpha = resolveQiCouplingAlpha();
+  const metricDebug: EffectiveRhoDebug = {};
+  const proxyDebug: EffectiveRhoDebug = {};
+  const metricRho = resolveMetricRhoFromState(state, metricDebug, { allowConstraintFallback: false });
+  const proxyRho = resolveQiProxyRhoFromState(state, proxyDebug);
+  const metricFinite = Number.isFinite(metricRho as number);
+  const proxyFinite = Number.isFinite(proxyRho as number);
+  const comparable = metricFinite && proxyFinite;
+  const coupled =
+    mode === "shadow" && comparable
+      ? alpha * Number(metricRho) + (1 - alpha) * Number(proxyRho)
+      : undefined;
+  const residualRel =
+    comparable
+      ? Math.abs(Number(metricRho) - Number(proxyRho)) /
+        Math.max(Math.abs(Number(metricRho)), Math.abs(Number(proxyRho)), 1e-12)
+      : undefined;
+
+  return {
+    mode,
+    alpha,
+    metricRho_Jm3: metricFinite ? Number(metricRho) : undefined,
+    metricSource: metricDebug.source,
+    proxyRho_Jm3: proxyFinite ? Number(proxyRho) : undefined,
+    proxySource: proxyDebug.source,
+    coupledRhoShadow_Jm3: Number.isFinite(coupled as number) ? Number(coupled) : undefined,
+    residualRel: Number.isFinite(residualRel as number) ? Number(residualRel) : undefined,
+    comparable,
+    equationRef: "semiclassical_coupling+atomic_energy_to_energy_density_proxy",
+    semantics: "diagnostic_only_no_gate_override",
+  };
 }
 
 function resolveMetricRhoFromState(
@@ -7356,6 +7476,17 @@ export function evaluateQiGuardrail(
   metricDerivedSource?: string;
   metricDerivedReason?: string;
   metricDerivedChart?: string;
+  couplingMode?: QiCouplingMode;
+  couplingAlpha?: number;
+  rhoMetric_Jm3?: number;
+  rhoMetricSource?: string;
+  rhoProxy_Jm3?: number;
+  rhoProxySource?: string;
+  rhoCoupledShadow_Jm3?: number;
+  couplingResidualRel?: number;
+  couplingComparable?: boolean;
+  couplingEquationRef?: string;
+  couplingSemantics?: string;
 } {
   const sampler = opts.sampler ?? state.phaseSchedule?.sampler ?? state.qi?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
   const tau_ms =
@@ -7403,6 +7534,7 @@ export function evaluateQiGuardrail(
   const duty = patternDuty > 0 ? patternDuty : Math.max(negSectors.length / Math.max(sectorCount, 1), 1e-6);
   const rhoDebug: EffectiveRhoDebug = {};
   const effectiveRho = estimateEffectiveRhoFromState(state, rhoDebug);
+  const couplingDiagnostics = resolveQiCouplingDiagnostics(state);
   const metricRho = rhoSourceIsMetric(rhoDebug);
   const rhoOn = metricRho ? effectiveRho : duty > 0 ? effectiveRho / duty : effectiveRho;
   const curvatureInfo = resolveQiCurvature(state, tau_ms);
@@ -7610,6 +7742,17 @@ export function evaluateQiGuardrail(
     metricDerivedSource,
     metricDerivedReason,
     metricDerivedChart,
+    couplingMode: couplingDiagnostics.mode,
+    couplingAlpha: couplingDiagnostics.alpha,
+    rhoMetric_Jm3: couplingDiagnostics.metricRho_Jm3,
+    rhoMetricSource: couplingDiagnostics.metricSource,
+    rhoProxy_Jm3: couplingDiagnostics.proxyRho_Jm3,
+    rhoProxySource: couplingDiagnostics.proxySource,
+    rhoCoupledShadow_Jm3: couplingDiagnostics.coupledRhoShadow_Jm3,
+    couplingResidualRel: couplingDiagnostics.residualRel,
+    couplingComparable: couplingDiagnostics.comparable,
+    couplingEquationRef: couplingDiagnostics.equationRef,
+    couplingSemantics: couplingDiagnostics.semantics,
   };
 }
 

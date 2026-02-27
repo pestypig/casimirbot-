@@ -28,6 +28,13 @@ type RecoveryCase = {
   applicabilityStatus: string;
   reasonCode: string[];
   rhoSource: string | null;
+  couplingMode: string | null;
+  couplingAlpha: number | null;
+  rhoMetric_Jm3: number | null;
+  rhoProxy_Jm3: number | null;
+  rhoCoupledShadow_Jm3: number | null;
+  couplingResidualRel: number | null;
+  couplingComparable: boolean | null;
   classificationTag: 'candidate_pass_found' | 'margin_limited' | 'applicability_limited' | 'evidence_path_blocked';
   comparabilityClass:
     | 'comparable_canonical'
@@ -467,6 +474,14 @@ export async function runRecoverySearch(opts: {
     const marginRatioRawComputed = finiteOrNull(guard.marginRatioRawComputed);
     const reasonCode = deriveReasonCodes(guard);
     const rhoSource = stringOrNull(guard.rhoSource);
+    const couplingMode = stringOrNull((guard as any).couplingMode);
+    const couplingAlpha = finiteOrNull((guard as any).couplingAlpha);
+    const rhoMetric_Jm3 = finiteOrNull((guard as any).rhoMetric_Jm3);
+    const rhoProxy_Jm3 = finiteOrNull((guard as any).rhoProxy_Jm3);
+    const rhoCoupledShadow_Jm3 = finiteOrNull((guard as any).rhoCoupledShadow_Jm3);
+    const couplingResidualRel = finiteOrNull((guard as any).couplingResidualRel);
+    const couplingComparable =
+      typeof (guard as any).couplingComparable === 'boolean' ? Boolean((guard as any).couplingComparable) : null;
     results.push({
       id: `case_${String(results.length + 1).padStart(4, '0')}`,
       params: row,
@@ -479,6 +494,13 @@ export async function runRecoverySearch(opts: {
       applicabilityStatus,
       reasonCode,
       rhoSource,
+      couplingMode,
+      couplingAlpha,
+      rhoMetric_Jm3,
+      rhoProxy_Jm3,
+      rhoCoupledShadow_Jm3,
+      couplingResidualRel,
+      couplingComparable,
       classificationTag: classify(applicabilityStatus, marginRatioRawComputed),
       comparabilityClass: classifyComparability({
         lhs_Jm3,
@@ -594,6 +616,13 @@ export async function runRecoverySearch(opts: {
       marginRatioRawComputed: entry.marginRatioRawComputed,
       applicabilityStatus: entry.applicabilityStatus,
       reasonCode: entry.reasonCode,
+      couplingMode: entry.couplingMode,
+      couplingAlpha: entry.couplingAlpha,
+      rhoMetric_Jm3: entry.rhoMetric_Jm3,
+      rhoProxy_Jm3: entry.rhoProxy_Jm3,
+      rhoCoupledShadow_Jm3: entry.rhoCoupledShadow_Jm3,
+      couplingResidualRel: entry.couplingResidualRel,
+      couplingComparable: entry.couplingComparable,
     }));
   const leverInfluenceRanking = summarizeInfluence(comparableCases);
 

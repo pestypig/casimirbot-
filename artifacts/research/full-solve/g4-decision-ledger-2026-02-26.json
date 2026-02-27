@@ -1,7 +1,7 @@
 {
   "date": "2026-02-26",
-  "commitHash": "e6a6b428ae6158eab12587f4bdb561979cf380e8",
-  "headCommitHash": "e6a6b428ae6158eab12587f4bdb561979cf380e8",
+  "commitHash": "6b9adbecd41ca8c3ddf100542dd400a9b5d4a82e",
+  "headCommitHash": "6b9adbecd41ca8c3ddf100542dd400a9b5d4a82e",
   "commitHashShapeValid": true,
   "commitHashResolvable": true,
   "commitHashMatchesHead": true,
@@ -111,6 +111,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },

@@ -167,7 +167,7 @@ describe('warp-full-solve-campaign runner', () => {
           {
             id: 'FordRomanQI',
             status: 'fail',
-            note: 'reasonCode=G4_QI_SOURCE_NOT_METRIC;reasonCode=G4_QI_MARGIN_EXCEEDED;lhs_Jm3=-2;bound_Jm3=-1;boundComputed_Jm3=-0.75;boundFloor_Jm3=-1;boundUsed_Jm3=-1;boundFloorApplied=true;marginRatio=2;metricT00Ref=warp.metric.T00.natario.shift;metricT00Geom=-0.25;metricT00GeomSource=direct_metric_pipeline;metricT00Si=-2.2;metricT00SiFromGeom=-2.2;metricT00SiRelError=0',
+            note: 'reasonCode=G4_QI_SOURCE_NOT_METRIC;reasonCode=G4_QI_MARGIN_EXCEEDED;lhs_Jm3=-2;bound_Jm3=-1;boundComputed_Jm3=-0.75;boundFloor_Jm3=-1;boundUsed_Jm3=-1;boundFloorApplied=true;marginRatio=2;couplingMode=shadow;couplingAlpha=0.5;rhoMetric_Jm3=-10;rhoMetricSource=warp.metric.T00.natario.shift;rhoProxy_Jm3=-5;rhoProxySource=pipeline.rho_static;rhoCoupledShadow_Jm3=-7.5;couplingResidualRel=0.5;couplingComparable=true;couplingEquationRef=semiclassical_coupling+atomic_energy_to_energy_density_proxy;couplingSemantics=diagnostic_only_no_gate_override;metricT00Ref=warp.metric.T00.natario.shift;metricT00Geom=-0.25;metricT00GeomSource=direct_metric_pipeline;metricT00Si=-2.2;metricT00SiFromGeom=-2.2;metricT00SiRelError=0',
           },
           { id: 'ThetaAudit', status: 'pass', note: 'theta ok' },
         ],
@@ -188,6 +188,17 @@ describe('warp-full-solve-campaign runner', () => {
             qi_margin_ratio: 2,
             qi_margin_ratio_raw: 2,
             qi_margin_ratio_raw_computed: 2.6666666667,
+            qi_coupling_mode: 'shadow',
+            qi_coupling_alpha: 0.5,
+            qi_rho_metric_Jm3: -10,
+            qi_rho_metric_source: 'warp.metric.T00.natario.shift',
+            qi_rho_proxy_Jm3: -5,
+            qi_rho_proxy_source: 'pipeline.rho_static',
+            qi_rho_coupled_shadow_Jm3: -7.5,
+            qi_coupling_residual_rel: 0.5,
+            qi_coupling_comparable: true,
+            qi_coupling_equation_ref: 'semiclassical_coupling+atomic_energy_to_energy_density_proxy',
+            qi_coupling_semantics: 'diagnostic_only_no_gate_override',
             qi_rho_source: 'proxy',
             qi_metric_contract_status: 'missing',
             qi_applicability_status: 'PASS',
@@ -214,6 +225,17 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.boundFloorApplied).toBe(true);
     expect(diagnostics.marginRatio).toBe(2);
     expect(diagnostics.marginRatioRawComputed).toBeCloseTo(2.6666666667);
+    expect(diagnostics.couplingMode).toBe('shadow');
+    expect(diagnostics.couplingAlpha).toBe(0.5);
+    expect(diagnostics.rhoMetric_Jm3).toBe(-10);
+    expect(diagnostics.rhoMetricSource).toBe('warp.metric.T00.natario.shift');
+    expect(diagnostics.rhoProxy_Jm3).toBe(-5);
+    expect(diagnostics.rhoProxySource).toBe('pipeline.rho_static');
+    expect(diagnostics.rhoCoupledShadow_Jm3).toBe(-7.5);
+    expect(diagnostics.couplingResidualRel).toBe(0.5);
+    expect(diagnostics.couplingComparable).toBe(true);
+    expect(diagnostics.couplingEquationRef).toContain('semiclassical_coupling');
+    expect(diagnostics.couplingSemantics).toBe('diagnostic_only_no_gate_override');
     expect(diagnostics.metricContractStatus).toBe('missing');
     expect(diagnostics.metricT00Ref).toBe('warp.metric.T00.natario.shift');
     expect(diagnostics.metricT00Geom).toBe(-0.25);

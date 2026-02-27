@@ -81,6 +81,8 @@ beforeEach(() => {
   tileTelemetry.avgNeg = null;
   tileTelemetry.source = null;
   process.env.QI_TILE_TELEMETRY_SCALE = undefined;
+  process.env.QI_COUPLING_MODE = undefined;
+  process.env.QI_COUPLING_ALPHA = undefined;
   process.env.WARP_STRICT_CONGRUENCE = "0";
 });
 
@@ -313,6 +315,68 @@ describe("evaluateQiGuardrail", () => {
 
     expect(guard.rhoSource).toBe("warp.metric.T00.vdb.regionII");
     expect(guard.effectiveRho).toBeCloseTo(metricT00, 9);
+  });
+
+  test("emits deterministic shadow coupling diagnostics without changing gate evaluation path", () => {
+    const sectorPeriod_ms = 1;
+    const tau_ms = 1;
+    const schedule = makeSchedule(1, [0], sectorPeriod_ms, tau_ms);
+    const scheduleGuard: PhaseSchedule = {
+      phi_deg_by_sector: schedule.phi_deg_by_sector,
+      negSectors: schedule.negSectors,
+      posSectors: schedule.posSectors,
+      weights: schedule.weights ?? Array.from({ length: schedule.N }, () => 1),
+    };
+    const metricT00 = -120;
+    const proxyRho = -40;
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 0.2,
+        dutyShip: 0.2,
+        dutyEffective_FR: 0.2,
+        sectorCount: 1,
+        concurrentSectors: 1,
+        sectorStrobing: 1,
+        negativeFraction: 1,
+        phaseSchedule: schedule,
+        rho_static: proxyRho,
+        warp: {
+          metricT00,
+          metricT00Source: "metric",
+          metricT00Ref: "warp.metric.T00.natario.shift",
+        },
+      } as any),
+      { schedule: scheduleGuard, sectorPeriod_ms, tau_ms },
+    );
+
+    expect(guard.effectiveRho).toBeCloseTo(metricT00, 9);
+    expect(guard.couplingMode).toBe("shadow");
+    expect(guard.couplingAlpha).toBeCloseTo(0.5, 12);
+    expect(guard.rhoMetric_Jm3).toBeCloseTo(metricT00, 9);
+    expect(guard.rhoProxy_Jm3).toBeCloseTo(proxyRho, 9);
+    expect(guard.rhoCoupledShadow_Jm3).toBeCloseTo((metricT00 + proxyRho) / 2, 9);
+    expect(guard.couplingComparable).toBe(true);
+    expect(guard.couplingEquationRef).toContain("semiclassical_coupling");
+    expect(guard.couplingSemantics).toBe("diagnostic_only_no_gate_override");
+    expect(guard.lhs_Jm3).toBeCloseTo(metricT00, 9);
+  });
+
+  test("supports coupling mode off while preserving comparability diagnostics", () => {
+    process.env.QI_COUPLING_MODE = "off";
+    const guard = evaluateQiGuardrail(
+      makeState({
+        rho_static: -10,
+        warp: {
+          metricT00: -20,
+          metricT00Source: "metric",
+          metricT00Ref: "warp.metric.T00.natario.shift",
+        },
+      } as any),
+      { tau_ms: 1 },
+    );
+    expect(guard.couplingMode).toBe("off");
+    expect(guard.couplingComparable).toBe(true);
+    expect(guard.rhoCoupledShadow_Jm3).toBeUndefined();
   });
 
   test("enforces metric-only rho source in strict congruence mode", () => {

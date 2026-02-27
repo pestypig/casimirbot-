@@ -111,6 +111,17 @@ type EvidencePack = {
     g4PolicyExceeded?: boolean;
     g4ComputedExceeded?: boolean;
     g4DualFailMode?: 'policy_only' | 'computed_only' | 'both' | 'neither';
+    couplingMode?: string;
+    couplingAlpha?: number;
+    rhoMetric_Jm3?: number;
+    rhoMetricSource?: string;
+    rhoProxy_Jm3?: number;
+    rhoProxySource?: string;
+    rhoCoupledShadow_Jm3?: number;
+    couplingResidualRel?: number;
+    couplingComparable?: boolean;
+    couplingEquationRef?: string;
+    couplingSemantics?: string;
     rhoSource?: string;
     metricT00Ref?: string;
     metricT00Geom?: number;
@@ -177,6 +188,17 @@ type QiForensicsArtifact = {
   g4ComputedExceeded: boolean | null;
   g4DualFailMode: 'policy_only' | 'computed_only' | 'both' | 'neither' | null;
   marginRatioClamped: number | null;
+  couplingMode: string | null;
+  couplingAlpha: number | null;
+  rhoMetric_Jm3: number | null;
+  rhoMetricSource: string | null;
+  rhoProxy_Jm3: number | null;
+  rhoProxySource: string | null;
+  rhoCoupledShadow_Jm3: number | null;
+  couplingResidualRel: number | null;
+  couplingComparable: boolean | null;
+  couplingEquationRef: string | null;
+  couplingSemantics: string | null;
   tau_s: number | null;
   sampler: string | null;
   fieldType: string | null;
@@ -1143,6 +1165,36 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
         | 'both'
         | 'neither'
         | undefined),
+    couplingMode:
+      readSnapshotString(snapshot?.qi_coupling_mode) ?? (parseFordField('couplingMode') ?? undefined),
+    couplingAlpha:
+      readCanonicalNumber(snapshot?.qi_coupling_alpha, 'couplingAlpha') ?? parseNumberField('couplingAlpha'),
+    rhoMetric_Jm3:
+      readCanonicalNumber(snapshot?.qi_rho_metric_Jm3, 'rhoMetric_Jm3') ?? parseNumberField('rhoMetric_Jm3'),
+    rhoMetricSource:
+      readSnapshotString(snapshot?.qi_rho_metric_source) ?? (parseFordField('rhoMetricSource') ?? undefined),
+    rhoProxy_Jm3:
+      readCanonicalNumber(snapshot?.qi_rho_proxy_Jm3, 'rhoProxy_Jm3') ?? parseNumberField('rhoProxy_Jm3'),
+    rhoProxySource:
+      readSnapshotString(snapshot?.qi_rho_proxy_source) ?? (parseFordField('rhoProxySource') ?? undefined),
+    rhoCoupledShadow_Jm3:
+      readCanonicalNumber(snapshot?.qi_rho_coupled_shadow_Jm3, 'rhoCoupledShadow_Jm3') ??
+      parseNumberField('rhoCoupledShadow_Jm3'),
+    couplingResidualRel:
+      readCanonicalNumber(snapshot?.qi_coupling_residual_rel, 'couplingResidualRel') ??
+      parseNumberField('couplingResidualRel'),
+    couplingComparable:
+      typeof snapshot?.qi_coupling_comparable === 'boolean'
+        ? snapshot.qi_coupling_comparable
+        : parseFordField('couplingComparable') === 'true'
+          ? true
+          : parseFordField('couplingComparable') === 'false'
+            ? false
+            : undefined,
+    couplingEquationRef:
+      readSnapshotString(snapshot?.qi_coupling_equation_ref) ?? (parseFordField('couplingEquationRef') ?? undefined),
+    couplingSemantics:
+      readSnapshotString(snapshot?.qi_coupling_semantics) ?? (parseFordField('couplingSemantics') ?? undefined),
     rhoSource: readSnapshotString(snapshot?.qi_rho_source) ?? (parseFordField('rhoSource') ?? undefined),
     metricT00Ref:
       readSnapshotString(snapshot?.qi_metric_t00_ref) ?? (parseFordField('metricT00Ref') ?? undefined),
@@ -1229,6 +1281,17 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
         ? pack.g4Diagnostics.g4DualFailMode
         : null,
     marginRatioClamped: finiteOrNull(pack.g4Diagnostics?.marginRatio),
+    couplingMode: stringOrNull(pack.g4Diagnostics?.couplingMode),
+    couplingAlpha: finiteOrNull(pack.g4Diagnostics?.couplingAlpha),
+    rhoMetric_Jm3: finiteOrNull(pack.g4Diagnostics?.rhoMetric_Jm3),
+    rhoMetricSource: stringOrNull(pack.g4Diagnostics?.rhoMetricSource),
+    rhoProxy_Jm3: finiteOrNull(pack.g4Diagnostics?.rhoProxy_Jm3),
+    rhoProxySource: stringOrNull(pack.g4Diagnostics?.rhoProxySource),
+    rhoCoupledShadow_Jm3: finiteOrNull(pack.g4Diagnostics?.rhoCoupledShadow_Jm3),
+    couplingResidualRel: finiteOrNull(pack.g4Diagnostics?.couplingResidualRel),
+    couplingComparable: booleanOrNull(pack.g4Diagnostics?.couplingComparable),
+    couplingEquationRef: stringOrNull(pack.g4Diagnostics?.couplingEquationRef),
+    couplingSemantics: stringOrNull(pack.g4Diagnostics?.couplingSemantics),
     tau_s: finiteOrNull(pack.g4Diagnostics?.tau_s),
     sampler: stringOrNull(guard?.sampler),
     fieldType: stringOrNull(guard?.fieldType),

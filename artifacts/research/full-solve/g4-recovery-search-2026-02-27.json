@@ -1,6 +1,6 @@
 {
   "runId": "g4-recovery-search-20260227-2026-02-27",
-  "generatedAt": "2026-02-27T18:10:00.124Z",
+  "generatedAt": "2026-02-27T19:04:41.659Z",
   "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
   "deterministicSearch": {
     "seed": 20260227,
@@ -9,7 +9,7 @@
     "attemptedCaseUniverse": 8709120,
     "executedCaseCount": 160,
     "evaluatedCaseCount": 160,
-    "elapsedMs": 2609,
+    "elapsedMs": 2855,
     "deterministicWalk": {
       "start": 2841987,
       "step": 6655861
@@ -58,11 +58,18 @@
       "G4_QI_SIGNAL_MISSING"
     ],
     "rhoSource": "warp.metric.T00.natario_sdf.shift",
+    "couplingMode": "shadow",
+    "couplingAlpha": 0.5,
+    "rhoMetric_Jm3": -89888730.09553961,
+    "rhoProxy_Jm3": -2.5512274856810015,
+    "rhoCoupledShadow_Jm3": -44944366.32338355,
+    "couplingResidualRel": 0.9999999716179383,
+    "couplingComparable": true,
     "classificationTag": "applicability_limited",
     "comparabilityClass": "comparable_canonical"
   },
   "provenance": {
-    "commitHash": "e6a6b428ae6158eab12587f4bdb561979cf380e8",
+    "commitHash": "6b9adbecd41ca8c3ddf100542dd400a9b5d4a82e",
     "freshnessSource": "git.head"
   },
   "topRankedApplicabilityPassCases": [],
@@ -99,6 +106,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -134,6 +148,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -169,6 +190,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -204,6 +232,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -239,6 +274,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -274,6 +316,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -309,6 +358,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -344,6 +400,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -379,6 +442,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -414,6 +484,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -449,6 +526,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -484,6 +568,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -519,6 +610,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -554,6 +652,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -589,6 +694,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -624,6 +736,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -659,6 +778,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -694,6 +820,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -729,6 +862,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -764,6 +904,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -799,6 +946,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -834,6 +988,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -869,6 +1030,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -904,6 +1072,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -939,6 +1114,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -974,6 +1156,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1009,6 +1198,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1044,6 +1240,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1079,6 +1282,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1114,6 +1324,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1149,6 +1366,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1184,6 +1408,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1219,6 +1450,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1254,6 +1492,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1289,6 +1534,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1324,6 +1576,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1359,6 +1618,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1394,6 +1660,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1429,6 +1702,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1464,6 +1744,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1499,6 +1786,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1534,6 +1828,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1569,6 +1870,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1604,6 +1912,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1639,6 +1954,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1674,6 +1996,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1709,6 +2038,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1744,6 +2080,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1779,6 +2122,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1814,6 +2164,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1849,6 +2206,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1884,6 +2248,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1919,6 +2290,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1954,6 +2332,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -1989,6 +2374,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2024,6 +2416,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2059,6 +2458,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2094,6 +2500,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2129,6 +2542,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2164,6 +2584,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2199,6 +2626,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2234,6 +2668,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2269,6 +2710,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2304,6 +2752,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2339,6 +2794,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2374,6 +2836,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2409,6 +2878,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2444,6 +2920,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2479,6 +2962,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2514,6 +3004,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2549,6 +3046,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2584,6 +3088,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2619,6 +3130,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2654,6 +3172,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2689,6 +3214,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2724,6 +3256,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2759,6 +3298,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2794,6 +3340,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2829,6 +3382,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2864,6 +3424,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2899,6 +3466,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2934,6 +3508,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -2969,6 +3550,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3004,6 +3592,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3039,6 +3634,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3074,6 +3676,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3109,6 +3718,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3144,6 +3760,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3179,6 +3802,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3214,6 +3844,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3249,6 +3886,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3284,6 +3928,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3319,6 +3970,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3354,6 +4012,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3389,6 +4054,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3424,6 +4096,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3459,6 +4138,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3494,6 +4180,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3529,6 +4222,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3564,6 +4264,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3599,6 +4306,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3634,6 +4348,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3669,6 +4390,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3704,6 +4432,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3739,6 +4474,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3774,6 +4516,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3809,6 +4558,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3844,6 +4600,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3879,6 +4642,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3914,6 +4684,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3949,6 +4726,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -3984,6 +4768,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4019,6 +4810,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4054,6 +4852,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4089,6 +4894,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4124,6 +4936,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4159,6 +4978,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4194,6 +5020,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4229,6 +5062,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4264,6 +5104,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4299,6 +5146,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4334,6 +5188,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4369,6 +5230,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4404,6 +5272,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4439,6 +5314,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4474,6 +5356,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4509,6 +5398,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4544,6 +5440,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4579,6 +5482,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4614,6 +5524,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4649,6 +5566,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4684,6 +5608,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4719,6 +5650,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4754,6 +5692,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4789,6 +5734,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4824,6 +5776,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4859,6 +5818,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4894,6 +5860,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4929,6 +5902,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4964,6 +5944,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -4999,6 +5986,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5034,6 +6028,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5069,6 +6070,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5104,6 +6112,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5139,6 +6154,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5174,6 +6196,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5209,6 +6238,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5244,6 +6280,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5279,6 +6322,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5314,6 +6364,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5349,6 +6406,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5384,6 +6448,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5419,6 +6490,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5454,6 +6532,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5489,6 +6574,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5524,6 +6616,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5559,6 +6658,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5594,6 +6700,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5629,6 +6742,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     },
@@ -5664,6 +6784,13 @@
         "G4_QI_SIGNAL_MISSING"
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
       "classificationTag": "applicability_limited",
       "comparabilityClass": "comparable_canonical"
     }

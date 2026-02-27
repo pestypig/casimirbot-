@@ -1062,6 +1062,33 @@ export async function evaluateWarpViability(
     qi_g4_policy_exceeded: (qiGuard as any)?.g4PolicyExceeded === true,
     qi_g4_computed_exceeded: (qiGuard as any)?.g4ComputedExceeded === true,
     qi_g4_dual_fail_mode: (qiGuard as any)?.g4DualFailMode,
+    qi_coupling_mode:
+      typeof (qiGuard as any)?.couplingMode === "string" ? String((qiGuard as any).couplingMode) : undefined,
+    qi_coupling_alpha: finiteOrUndefined((qiGuard as any)?.couplingAlpha),
+    qi_rho_metric_Jm3: finiteOrUndefined((qiGuard as any)?.rhoMetric_Jm3),
+    qi_rho_metric_source:
+      typeof (qiGuard as any)?.rhoMetricSource === "string"
+        ? String((qiGuard as any).rhoMetricSource)
+        : undefined,
+    qi_rho_proxy_Jm3: finiteOrUndefined((qiGuard as any)?.rhoProxy_Jm3),
+    qi_rho_proxy_source:
+      typeof (qiGuard as any)?.rhoProxySource === "string"
+        ? String((qiGuard as any).rhoProxySource)
+        : undefined,
+    qi_rho_coupled_shadow_Jm3: finiteOrUndefined((qiGuard as any)?.rhoCoupledShadow_Jm3),
+    qi_coupling_residual_rel: finiteOrUndefined((qiGuard as any)?.couplingResidualRel),
+    qi_coupling_comparable:
+      typeof (qiGuard as any)?.couplingComparable === "boolean"
+        ? Boolean((qiGuard as any).couplingComparable)
+        : undefined,
+    qi_coupling_equation_ref:
+      typeof (qiGuard as any)?.couplingEquationRef === "string"
+        ? String((qiGuard as any).couplingEquationRef)
+        : undefined,
+    qi_coupling_semantics:
+      typeof (qiGuard as any)?.couplingSemantics === "string"
+        ? String((qiGuard as any).couplingSemantics)
+        : undefined,
     qi_rho_source: qiGuard?.rhoSource,
     qi_metric_t00_ref:
       warpMetricSource ??
@@ -1210,6 +1237,17 @@ export async function evaluateWarpViability(
           `g4PolicyExceeded=${(qiGuard as any).g4PolicyExceeded === true}`,
           `g4ComputedExceeded=${(qiGuard as any).g4ComputedExceeded === true}`,
           `g4DualFailMode=${(qiGuard as any).g4DualFailMode ?? "n/a"}`,
+          `couplingMode=${(qiGuard as any).couplingMode ?? "n/a"}`,
+          `couplingAlpha=${(qiGuard as any).couplingAlpha ?? "n/a"}`,
+          `rhoMetric_Jm3=${(qiGuard as any).rhoMetric_Jm3 ?? "n/a"}`,
+          `rhoMetricSource=${(qiGuard as any).rhoMetricSource ?? "n/a"}`,
+          `rhoProxy_Jm3=${(qiGuard as any).rhoProxy_Jm3 ?? "n/a"}`,
+          `rhoProxySource=${(qiGuard as any).rhoProxySource ?? "n/a"}`,
+          `rhoCoupledShadow_Jm3=${(qiGuard as any).rhoCoupledShadow_Jm3 ?? "n/a"}`,
+          `couplingResidualRel=${(qiGuard as any).couplingResidualRel ?? "n/a"}`,
+          `couplingComparable=${(qiGuard as any).couplingComparable === true}`,
+          `couplingEquationRef=${(qiGuard as any).couplingEquationRef ?? "n/a"}`,
+          `couplingSemantics=${(qiGuard as any).couplingSemantics ?? "n/a"}`,
           `rhoSource=${qiGuard.rhoSource ?? "unknown"}`,
           `metricT00Ref=${warpMetricSource ?? "n/a"}`,
           `metricT00Geom=${warpMetricT00GeomForAudit ?? "n/a"}`,
