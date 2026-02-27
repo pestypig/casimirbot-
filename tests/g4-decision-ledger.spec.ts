@@ -81,6 +81,54 @@ describe('g4-decision-ledger generator', () => {
     expect(ledger.canonicalMissingWaves).toEqual(['D']);
   });
 
+
+
+  it('integrates recovery search block and fails closed when missing', () => {
+    const root = makeRoot();
+    seedBase(root);
+    for (const wave of ['A', 'B', 'C', 'D']) writeWave(root, wave, 1);
+    const out = path.join(root, 'out.json');
+    generateG4DecisionLedger({
+      rootDir: root,
+      outPath: out,
+      scoreboardPath: path.join(root, 'campaign-gate-scoreboard-2026-02-24.json'),
+      firstFailPath: path.join(root, 'campaign-first-fail-map-2026-02-24.json'),
+      influencePath: path.join(root, 'g4-influence-scan-2026-02-26.json'),
+      getCommitHash: () => 'deadbeef',
+    });
+    const ledger = JSON.parse(fs.readFileSync(out, 'utf8'));
+    expect(ledger.recoverySearch.failClosedReason).toBe('recovery_artifact_missing');
+    expect(ledger.recoverySearch.caseCount).toBe(null);
+  });
+
+  it('integrates recovery search artifact summary', () => {
+    const root = makeRoot();
+    seedBase(root);
+    for (const wave of ['A', 'B', 'C', 'D']) writeWave(root, wave, 1);
+    writeJson(path.join(root, 'g4-recovery-search-2026-02-27.json'), {
+      generatedAt: '2026-02-27T00:00:00.000Z',
+      caseCount: 3,
+      candidatePassFound: false,
+      bestCandidate: { id: 'case_0001', marginRatioRawComputed: 4.2, applicabilityStatus: 'PASS' },
+      topRankedApplicabilityPassCases: [{ id: 'case_0001' }],
+    });
+    const out = path.join(root, 'out.json');
+    generateG4DecisionLedger({
+      rootDir: root,
+      outPath: out,
+      scoreboardPath: path.join(root, 'campaign-gate-scoreboard-2026-02-24.json'),
+      firstFailPath: path.join(root, 'campaign-first-fail-map-2026-02-24.json'),
+      influencePath: path.join(root, 'g4-influence-scan-2026-02-26.json'),
+      recoveryPath: path.join(root, 'g4-recovery-search-2026-02-27.json'),
+      getCommitHash: () => 'deadbeef',
+    });
+    const ledger = JSON.parse(fs.readFileSync(out, 'utf8'));
+    expect(ledger.recoverySearch.caseCount).toBe(3);
+    expect(ledger.recoverySearch.candidatePassFound).toBe(false);
+    expect(ledger.recoverySearch.bestCandidate.id).toBe('case_0001');
+    expect(ledger.recoverySearch.failClosedReason).toBe(null);
+  });
+
   it('emits deterministic mismatch reason and required metadata', () => {
     const root = makeRoot();
     seedBase(root);

@@ -1,7 +1,7 @@
 {
   "date": "2026-02-26",
-  "commitHash": "b960e2d33a1922f378d0264f8f2c0543a0b9d1a1",
-  "headCommitHash": "b960e2d33a1922f378d0264f8f2c0543a0b9d1a1",
+  "commitHash": "be25e45f8fc9a20ec280c6956721bca76bdcd703",
+  "headCommitHash": "be25e45f8fc9a20ec280c6956721bca76bdcd703",
   "commitHashShapeValid": true,
   "commitHashResolvable": true,
   "commitHashMatchesHead": true,
@@ -64,6 +64,44 @@
         "marginRatioRaw": 1
       }
     ]
+  },
+  "recoverySearch": {
+    "artifactPath": "artifacts/research/full-solve/g4-recovery-search-2026-02-27.json",
+    "artifactDate": "2026-02-27",
+    "caseCount": 160,
+    "candidatePassFound": false,
+    "bestCandidate": {
+      "id": "case_0055",
+      "params": {
+        "warpFieldType": "natario_sdf",
+        "gammaGeo": 12,
+        "dutyCycle": 0.12,
+        "dutyShip": 0.12,
+        "dutyEffective_FR": 0.12,
+        "sectorCount": 80,
+        "concurrentSectors": 1,
+        "gammaVanDenBroeck": 1.5,
+        "sampler": "hann",
+        "fieldType": "em",
+        "tau_s_ms": 10,
+        "gap_nm": 1,
+        "shipRadius_m": 2
+      },
+      "lhs_Jm3": -35955487.4827724,
+      "boundComputed_Jm3": -24,
+      "boundUsed_Jm3": -35955487.4827724,
+      "marginRatioRaw": 1,
+      "marginRatioRawComputed": 1498145.3117821834,
+      "applicabilityStatus": "UNKNOWN",
+      "reasonCode": [
+        "G4_QI_APPLICABILITY_NOT_PASS",
+        "G4_QI_MARGIN_EXCEEDED",
+        "G4_QI_SIGNAL_MISSING"
+      ],
+      "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "classificationTag": "applicability_limited"
+    },
+    "failClosedReason": "no_applicability_pass_cases"
   },
   "waves": {
     "A": {

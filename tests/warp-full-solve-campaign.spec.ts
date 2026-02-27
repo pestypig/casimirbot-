@@ -717,6 +717,15 @@ describe('warp-full-solve-campaign runner', () => {
     expect(decreasing.residualTrend.trend).toBe('decreasing');
   });
 
+
+
+  it('canonical report includes G4 recovery-search summary section', () => {
+    const canonicalReport = path.resolve('docs/audits/research/warp-full-solve-campaign-execution-report-2026-02-24.md');
+    const content = fs.readFileSync(canonicalReport, 'utf8');
+    expect(content).toContain('## G4 recovery-search summary');
+    expect(content).toContain('canonical decision remains authoritative until wave profiles are promoted and rerun.');
+  });
+
   it('marks provenance signals as missing when pipeline provenance fields are unavailable', () => {
     const attempt = {
       initial: { status: 'CERTIFIED' },

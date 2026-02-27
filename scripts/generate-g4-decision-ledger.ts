@@ -8,6 +8,7 @@ const OUT_PATH = path.join('artifacts/research/full-solve', `g4-decision-ledger-
 const CANONICAL_SCOREBOARD = path.join('artifacts/research/full-solve', 'campaign-gate-scoreboard-2026-02-24.json');
 const CANONICAL_FIRST_FAIL = path.join('artifacts/research/full-solve', 'campaign-first-fail-map-2026-02-24.json');
 const INFLUENCE_PATH = path.join('artifacts/research/full-solve', 'g4-influence-scan-2026-02-26.json');
+const RECOVERY_PATH = path.join('artifacts/research/full-solve', 'g4-recovery-search-2026-02-27.json');
 
 export const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
@@ -21,6 +22,7 @@ type GenerateG4DecisionLedgerOptions = {
   scoreboardPath?: string;
   firstFailPath?: string;
   influencePath?: string;
+  recoveryPath?: string;
   getCommitHash?: () => string;
 };
 
@@ -105,6 +107,7 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
   const scoreboardPath = options.scoreboardPath ?? path.join(rootDir, CANONICAL_SCOREBOARD);
   const firstFailPath = options.firstFailPath ?? path.join(rootDir, CANONICAL_FIRST_FAIL);
   const influencePath = options.influencePath ?? path.join(rootDir, INFLUENCE_PATH);
+  const recoveryPath = options.recoveryPath ?? path.join(rootDir, RECOVERY_PATH);
   const getCommitHash =
     options.getCommitHash ??
     (() => execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
@@ -117,6 +120,7 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
   const canonicalScoreboard = readJson(scoreboardPath);
   const canonicalFirstFail = readJson(firstFailPath);
   const influence = fs.existsSync(influencePath) ? readJson(influencePath) : null;
+  const recovery = fs.existsSync(recoveryPath) ? readJson(recoveryPath) : null;
 
   const waves: Record<string, any> = {};
   for (const wave of REQUIRED_WAVES) {
@@ -188,6 +192,21 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
             marginRatioRaw: finiteOrNull(entry?.marginRatioRaw),
           }))
         : [],
+    },
+    recoverySearch: {
+      artifactPath: fs.existsSync(recoveryPath) ? path.relative(rootDir, recoveryPath).replace(/\\/g, '/') : null,
+      artifactDate: stringOrNull(recovery?.generatedAt)?.slice(0, 10) ?? null,
+      caseCount: finiteOrNull(recovery?.caseCount),
+      candidatePassFound: Boolean(recovery?.candidatePassFound),
+      bestCandidate: recovery?.bestCandidate ?? null,
+      failClosedReason:
+        recovery == null
+          ? 'recovery_artifact_missing'
+          : (finiteOrNull(recovery?.caseCount) ?? 0) <= 0
+            ? 'recovery_artifact_empty'
+            : Array.isArray(recovery?.topRankedApplicabilityPassCases) && recovery.topRankedApplicabilityPassCases.length === 0
+              ? 'no_applicability_pass_cases'
+              : null,
     },
     waves,
   };
