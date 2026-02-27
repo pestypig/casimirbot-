@@ -1,6 +1,6 @@
 {
   "runId": "g4-recovery-search-20260227-2026-02-27",
-  "generatedAt": "2026-02-27T17:29:29.385Z",
+  "generatedAt": "2026-02-27T18:10:00.124Z",
   "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
   "deterministicSearch": {
     "seed": 20260227,
@@ -9,7 +9,7 @@
     "attemptedCaseUniverse": 8709120,
     "executedCaseCount": 160,
     "evaluatedCaseCount": 160,
-    "elapsedMs": 2482,
+    "elapsedMs": 2609,
     "deterministicWalk": {
       "start": 2841987,
       "step": 6655861
@@ -62,7 +62,7 @@
     "comparabilityClass": "comparable_canonical"
   },
   "provenance": {
-    "commitHash": "089a24fb82bf9f790ce136eb4e794f43d42fa456",
+    "commitHash": "e6a6b428ae6158eab12587f4bdb561979cf380e8",
     "freshnessSource": "git.head"
   },
   "topRankedApplicabilityPassCases": [],

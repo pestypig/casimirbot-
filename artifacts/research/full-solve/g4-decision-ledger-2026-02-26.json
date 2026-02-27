@@ -1,7 +1,7 @@
 {
   "date": "2026-02-26",
-  "commitHash": "20aa39ed64ca25101891baf3b2fc6f4b5a64c423",
-  "headCommitHash": "20aa39ed64ca25101891baf3b2fc6f4b5a64c423",
+  "commitHash": "e6a6b428ae6158eab12587f4bdb561979cf380e8",
+  "headCommitHash": "e6a6b428ae6158eab12587f4bdb561979cf380e8",
   "commitHashShapeValid": true,
   "commitHashResolvable": true,
   "commitHashMatchesHead": true,
@@ -80,30 +80,30 @@
       "class": "no_pass_signal"
     },
     "bestCandidate": {
-      "id": "case_0049",
+      "id": "case_0109",
       "params": {
         "shipRadius_m": 2,
-        "gap_nm": 1,
-        "tau_s_ms": 5,
-        "qSpoilingFactor": 1.5,
+        "gap_nm": 8,
+        "tau_s_ms": 2,
+        "qSpoilingFactor": 3,
         "qCavity": 100000,
         "fieldType": "em",
         "sampler": "hann",
-        "gammaVanDenBroeck": 1.5,
+        "gammaVanDenBroeck": 500,
         "concurrentSectors": 2,
         "sectorCount": 80,
-        "dutyCycle": 0.25,
-        "gammaGeo": 12,
+        "dutyCycle": 0.12,
+        "gammaGeo": 1,
         "warpFieldType": "natario_sdf",
-        "dutyShip": 0.25,
-        "dutyEffective_FR": 0.25
+        "dutyShip": 0.12,
+        "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -35955474.008891776,
+      "lhs_Jm3": -35955387.330709726,
       "boundComputed_Jm3": -24,
-      "boundUsed_Jm3": -35955474.008891776,
+      "boundUsed_Jm3": -35955387.330709726,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 1498144.7503704906,
+      "marginRatioRawComputed": 1498141.138779572,
       "applicabilityStatus": "UNKNOWN",
       "reasonCode": [
         "G4_QI_APPLICABILITY_NOT_PASS",
@@ -112,7 +112,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     "failClosedReason": "no_applicability_pass_cases"
   },
