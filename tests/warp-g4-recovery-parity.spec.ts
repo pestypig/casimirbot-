@@ -117,4 +117,87 @@ describe('warp g4 recovery parity', () => {
     expect(payload.candidateCountChecked).toBe(2);
     expect(payload.candidates.map((c: any) => c.id)).toEqual(['case_a', 'case_c']);
   });
+
+  it('treats tiny relative numeric drift as a parity match for large magnitudes', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-parity-relative-'));
+    const recoverySeedPath = path.join(tmpDir, 'recovery-seed.json');
+    const recoveryDriftPath = path.join(tmpDir, 'recovery-drift.json');
+    const outA = path.join(tmpDir, 'parity-seed.json');
+    const outB = path.join(tmpDir, 'parity-drift.json');
+
+    const params = {
+      warpFieldType: 'natario',
+      gammaGeo: 1,
+      dutyCycle: 0.02,
+      dutyShip: 0.02,
+      dutyEffective_FR: 0.02,
+      sectorCount: 80,
+      concurrentSectors: 1,
+      gammaVanDenBroeck: 0.8,
+      sampler: 'gaussian',
+      fieldType: 'em',
+      qCavity: 1e5,
+      qSpoilingFactor: 1,
+      tau_s_ms: 5,
+      gap_nm: 0.4,
+      shipRadius_m: 2,
+    };
+
+    fs.writeFileSync(
+      recoverySeedPath,
+      `${JSON.stringify(
+        {
+          provenance: { commitHash: 'deadbeef' },
+          topRankedApplicabilityPassCases: [
+            {
+              id: 'case_seed',
+              params,
+              applicabilityStatus: 'PASS',
+              marginRatioRaw: 1,
+              marginRatioRawComputed: 1,
+              boundComputed_Jm3: -18,
+              boundUsed_Jm3: -18,
+              boundFloorApplied: false,
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    await runRecoveryParity({ topN: 1, recoveryPath: recoverySeedPath, outPath: outA });
+    const seedPayload = JSON.parse(fs.readFileSync(outA, 'utf8'));
+    const parity = seedPayload.candidates[0].parity;
+
+    const drift = (value: number | null) => (typeof value === 'number' ? value * (1 + 5e-10) : value);
+
+    fs.writeFileSync(
+      recoveryDriftPath,
+      `${JSON.stringify(
+        {
+          provenance: { commitHash: 'deadbeef' },
+          topRankedApplicabilityPassCases: [
+            {
+              id: 'case_seed',
+              params,
+              applicabilityStatus: parity.applicabilityStatus,
+              marginRatioRaw: drift(parity.marginRatioRaw),
+              marginRatioRawComputed: drift(parity.marginRatioRawComputed),
+              boundComputed_Jm3: drift(parity.boundComputed_Jm3),
+              boundUsed_Jm3: drift(parity.boundUsed_Jm3),
+              boundFloorApplied: parity.boundFloorApplied,
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    await runRecoveryParity({ topN: 1, recoveryPath: recoveryDriftPath, outPath: outB });
+    const driftPayload = JSON.parse(fs.readFileSync(outB, 'utf8'));
+    expect(driftPayload.candidates[0].parityStatus).toBe('match');
+    expect(driftPayload.candidates[0].mismatchReason).toBe('none');
+  });
 });

@@ -13,10 +13,13 @@ const BOUNDARY_STATEMENT =
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const str = (value: unknown): string => (typeof value === 'string' ? value : String(value ?? 'UNKNOWN'));
-const numEq = (a: number | null, b: number | null, eps = 1e-12) => {
+const numEq = (a: number | null, b: number | null, absEps = 1e-12, relEps = 1e-9) => {
   if (a == null && b == null) return true;
   if (a == null || b == null) return false;
-  return Math.abs(a - b) <= eps;
+  const diff = Math.abs(a - b);
+  if (diff <= absEps) return true;
+  const scale = Math.max(1, Math.abs(a), Math.abs(b));
+  return diff <= relEps * scale;
 };
 
 type SelectionPolicy = 'applicability_pass' | 'fallback_global_min_raw_computed';
