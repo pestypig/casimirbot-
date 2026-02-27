@@ -4,6 +4,7 @@ import path from "node:path";
 import { readKnowledgeConfig } from "../config/knowledge";
 import { persistKnowledgeBundles } from "../services/knowledge/corpus";
 import { buildKnowledgeValidator, KnowledgeValidationError } from "../services/knowledge/validation";
+import { evaluateKnowledgePromotionGate } from "../services/knowledge/promotion-gate";
 
 const DEFAULT_FILES = [
   "docs/V0.1-SIGNOFF.md",
@@ -126,4 +127,51 @@ knowledgeRouter.post("/projects/sync", async (req, res) => {
     const message = error instanceof Error ? error.message : String(error);
     res.status(500).json({ error: "knowledge_sync_failed", message });
   }
+});
+
+knowledgeRouter.post("/projects/promote", (req, res) => {
+  const claimTier = typeof req.body?.claimTier === "string" ? req.body.claimTier : "diagnostic";
+  const casimirVerdict = req.body?.casimirVerdict === "PASS" || req.body?.casimirVerdict === "FAIL"
+    ? req.body.casimirVerdict
+    : undefined;
+  const certificateHash = typeof req.body?.certificateHash === "string" ? req.body.certificateHash : null;
+  const certificateIntegrityOk = req.body?.certificateIntegrityOk === true;
+  const enforceCertifiedOnly = req.body?.enforceCertifiedOnly !== false;
+
+  const decision = evaluateKnowledgePromotionGate({
+    enforceCertifiedOnly,
+    claimTier,
+    casimirVerdict,
+    certificateHash,
+    certificateIntegrityOk,
+  });
+
+  if (!decision.ok) {
+    if (enforceCertifiedOnly) {
+      return res.status(409).json({
+        ok: false,
+        rejection: {
+          code: decision.code,
+          message: decision.message,
+        },
+      });
+    }
+    return res.status(202).json({
+      ok: false,
+      rejection: {
+        code: decision.code,
+        message: decision.message,
+      },
+      mode: "report-only",
+    });
+  }
+
+  return res.json({
+    ok: true,
+    mode: decision.enforcement,
+    promotion: {
+      status: "promoted",
+      claimTier: "certified",
+    },
+  });
 });

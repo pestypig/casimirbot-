@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "artifact": "helix-ask-direct-codex-build-graduation-gates",
+    "version": 1,
+    "date": "2026-02-27"
+  },
+  "modes": {
+    "report_only": {
+      "description": "Violations are emitted but do not block promotion.",
+      "blocks": false
+    },
+    "enforce": {
+      "description": "Violations are hard failures and block promotion.",
+      "blocks": true
+    }
+  },
+  "gates": [
+    {
+      "id": "GATE_CERTIFIED_ONLY_PROMOTION",
+      "severity": "HARD",
+      "mode": "enforce",
+      "requirements": [
+        "claimTier=certified",
+        "casimirVerdict=PASS",
+        "certificateHash present",
+        "certificateIntegrityOk=true"
+      ],
+      "typed_rejection_codes": [
+        "KNOWLEDGE_PROMOTION_CERTIFIED_ONLY_REQUIRED",
+        "KNOWLEDGE_PROMOTION_MISSING_CASIMIR_VERIFICATION",
+        "KNOWLEDGE_PROMOTION_CERTIFICATE_INTEGRITY_REQUIRED"
+      ]
+    },
+    {
+      "id": "GATE_PATH_BOUNDED_DIFF",
+      "severity": "HARD",
+      "mode": "enforce",
+      "requirements": ["all changed files within active slice allowlist"],
+      "typed_rejection_codes": ["outside_allowlist"]
+    },
+    {
+      "id": "GATE_CASIMIR_VERIFY_REQUIRED",
+      "severity": "HARD",
+      "mode": "enforce",
+      "requirements": [
+        "adapter envelope includes verdict/firstFail/deltas/artifacts",
+        "verdict=PASS",
+        "certificateHash emitted",
+        "integrityOk=true"
+      ],
+      "typed_rejection_codes": [
+        "CASIMIR_VERIFY_REQUIRED_MISSING",
+        "CASIMIR_VERIFY_FAIL"
+      ]
+    }
+  ]
+}
