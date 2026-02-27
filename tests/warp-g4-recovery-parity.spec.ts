@@ -16,7 +16,7 @@ describe('warp g4 recovery parity', () => {
       `${JSON.stringify(
         {
           provenance: { commitHash: 'deadbeef' },
-          topRankedApplicabilityPassCases: [
+          topComparableCandidates: [
             {
               id: 'case_0001',
               params: {
@@ -36,12 +36,15 @@ describe('warp g4 recovery parity', () => {
                 gap_nm: 0.4,
                 shipRadius_m: 2,
               },
-              applicabilityStatus: 'UNKNOWN',
+              applicabilityStatus: 'PASS',
               marginRatioRaw: 1.2,
-              marginRatioRawComputed: 0.7,
-              boundComputed_Jm3: -10,
-              boundUsed_Jm3: -100,
+              marginRatioRawComputed: 1.2,
+              lhs_Jm3: -10,
+              boundComputed_Jm3: -8,
+              boundUsed_Jm3: -8,
               boundFloorApplied: true,
+              rhoSource: 'warp.metric.T00.natario.shift',
+              reasonCode: [],
             },
           ],
         },
@@ -61,7 +64,7 @@ describe('warp g4 recovery parity', () => {
     payloadB.generatedAt = 'fixed';
 
     expect(payloadA).toEqual(payloadB);
-    expect(payloadA.selectionPolicy).toBe('applicability_pass');
+    expect(payloadA.selectionPolicy).toBe('comparable_canonical');
     expect(['match', 'mismatch']).toContain(payloadA.candidates[0].parityStatus);
     expect(typeof payloadA.candidates[0].mismatchReason).toBe('string');
     expect(payloadA.boundaryStatement).toBe(
@@ -69,7 +72,7 @@ describe('warp g4 recovery parity', () => {
     );
   });
 
-  it('falls back deterministically to global minimum computed margin when applicability-pass is empty', async () => {
+  it('fails closed with empty selection when no canonical comparable candidates exist', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-parity-fallback-'));
     const recoveryPath = path.join(tmpDir, 'recovery.json');
     const outPath = path.join(tmpDir, 'parity.json');
@@ -110,12 +113,12 @@ describe('warp g4 recovery parity', () => {
 
     const result = await runRecoveryParity({ topN: 2, recoveryPath, outPath });
     expect(result.ok).toBe(true);
-    expect(result.selectionPolicy).toBe('fallback_global_min_raw_computed');
+    expect(result.selectionPolicy).toBe('fallback_no_comparable_canonical');
 
     const payload = JSON.parse(fs.readFileSync(outPath, 'utf8'));
-    expect(payload.selectionPolicy).toBe('fallback_global_min_raw_computed');
-    expect(payload.candidateCountChecked).toBe(2);
-    expect(payload.candidates.map((c: any) => c.id)).toEqual(['case_a', 'case_c']);
+    expect(payload.selectionPolicy).toBe('fallback_no_comparable_canonical');
+    expect(payload.candidateCountChecked).toBe(0);
+    expect(payload.candidates).toEqual([]);
   });
 
 
@@ -257,16 +260,19 @@ describe('warp g4 recovery parity', () => {
       `${JSON.stringify(
         {
           provenance: { commitHash: 'deadbeef' },
-          topRankedApplicabilityPassCases: [
+          topComparableCandidates: [
             {
               id: 'case_seed',
               params,
               applicabilityStatus: 'PASS',
               marginRatioRaw: 1,
               marginRatioRawComputed: 1,
+              lhs_Jm3: -18,
               boundComputed_Jm3: -18,
               boundUsed_Jm3: -18,
               boundFloorApplied: false,
+              rhoSource: 'warp.metric.T00.natario.shift',
+              reasonCode: [],
             },
           ],
         },
@@ -286,16 +292,19 @@ describe('warp g4 recovery parity', () => {
       `${JSON.stringify(
         {
           provenance: { commitHash: 'deadbeef' },
-          topRankedApplicabilityPassCases: [
+          topComparableCandidates: [
             {
               id: 'case_seed',
               params,
               applicabilityStatus: parity.applicabilityStatus,
               marginRatioRaw: drift(parity.marginRatioRaw),
               marginRatioRawComputed: drift(parity.marginRatioRawComputed),
+              lhs_Jm3: drift(parity.lhs_Jm3),
               boundComputed_Jm3: drift(parity.boundComputed_Jm3),
               boundUsed_Jm3: drift(parity.boundUsed_Jm3),
               boundFloorApplied: parity.boundFloorApplied,
+              rhoSource: 'warp.metric.T00.natario.shift',
+              reasonCode: [],
             },
           ],
         },
