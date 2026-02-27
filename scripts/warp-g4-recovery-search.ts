@@ -52,6 +52,10 @@ type BootstrapResult = {
   }[];
 };
 
+type StepASummary = {
+  canonicalComparableCaseCount: number;
+};
+
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const stringOrNull = (v: unknown): string | null => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : null);
 
@@ -63,7 +67,6 @@ const classify = (applicabilityStatus: string, marginRatioRawComputed: number | 
 
 const REQUIRED_CANONICAL_SIGNALS = ['lhs_Jm3', 'boundComputed_Jm3', 'boundUsed_Jm3', 'marginRatioRaw', 'marginRatioRawComputed'] as const;
 const CONTRACT_REASON_CODES = new Set(['G4_QI_SOURCE_NOT_METRIC', 'G4_QI_CONTRACT_MISSING']);
-const MISSING_SIGNAL_REASON_CODES = new Set(['G4_QI_SIGNAL_MISSING']);
 
 export const classifyComparability = (entry: {
   lhs_Jm3: number | null;
@@ -78,10 +81,8 @@ export const classifyComparability = (entry: {
 }): ComparabilityClass => {
   const missingSignals = REQUIRED_CANONICAL_SIGNALS.some((field) => entry[field] == null);
   if (missingSignals) return 'non_comparable_missing_signals';
-  const missingSignalReason = entry.reasonCode.some((code) => MISSING_SIGNAL_REASON_CODES.has(code));
-  if (missingSignalReason || String(entry.applicabilityStatus ?? 'UNKNOWN').toUpperCase() === 'UNKNOWN') {
-    return 'non_comparable_missing_signals';
-  }
+  // Comparability is structural for ranking: finite canonical signals + metric contract path.
+  // Applicability/curvature reasons remain part of reasonCode diagnostics, not cohort exclusion.
   const contractMismatch = entry.reasonCode.some((code) => CONTRACT_REASON_CODES.has(code));
   if (contractMismatch || !entry.rhoSource?.startsWith('warp.metric')) return 'non_comparable_contract_mismatch';
   return 'comparable_canonical';
@@ -206,6 +207,18 @@ const writeStepBSummary = (summaryPath: string, payload: Record<string, unknown>
   fs.writeFileSync(summaryPath, `${JSON.stringify(payload, null, 2)}\n`);
 };
 
+const readStepASummary = (summaryPath: string): StepASummary | null => {
+  if (!fs.existsSync(summaryPath)) return null;
+  try {
+    const payload = JSON.parse(fs.readFileSync(summaryPath, 'utf8')) as Record<string, unknown>;
+    const canonicalComparableCaseCount = Number(payload?.canonicalComparableCaseCount);
+    if (!Number.isFinite(canonicalComparableCaseCount) || canonicalComparableCaseCount < 0) return null;
+    return { canonicalComparableCaseCount };
+  } catch {
+    return null;
+  }
+};
+
 export async function runRecoverySearch(opts: {
   outPath?: string;
   stepASummaryPath?: string;
@@ -239,12 +252,104 @@ export async function runRecoverySearch(opts: {
     (path.resolve(outPath) === path.resolve(DEFAULT_OUT_PATH)
       ? STEP_C_SUMMARY_PATH
       : path.join(path.dirname(outPath), 'g4-stepC-summary.json'));
-
-  const startedAt = Date.now();
-  const baseline = structuredClone(getGlobalPipelineState());
+  const stepASummary = readStepASummary(stepASummaryPath);
   const attemptedCaseUniverse = universeSize();
   const { start, step } = deriveDeterministicWalk(seed, attemptedCaseUniverse);
   const commitHash = execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const blockedReason =
+    stepASummary == null
+      ? 'missing_stepA_summary'
+      : stepASummary.canonicalComparableCaseCount <= 0
+        ? 'no_canonical_comparable_cases'
+        : null;
+
+  if (blockedReason != null) {
+    const blockedPayload = {
+      runId: `g4-recovery-search-${seed}-${DATE_STAMP}`,
+      generatedAt: new Date().toISOString(),
+      boundaryStatement: BOUNDARY_STATEMENT,
+      deterministicSearch: {
+        seed,
+        maxCases,
+        runtimeCapMs,
+        attemptedCaseUniverse,
+        executedCaseCount: 0,
+        evaluatedCaseCount: 0,
+        elapsedMs: 0,
+        deterministicWalk: { start, step },
+      },
+      caseCount: 0,
+      candidatePassFound: false,
+      candidatePassFoundCanonical: false,
+      candidatePassFoundComputedOnly: false,
+      minMarginRatioRawAmongApplicabilityPass: null,
+      minMarginRatioRawComputedAmongApplicabilityPass: null,
+      bestCandidateEligibility: {
+        canonicalPassEligible: false,
+        counterfactualPassEligible: false,
+        class: 'no_pass_signal',
+      },
+      bestCandidate: null,
+      blockedReason,
+      provenance: {
+        commitHash,
+        freshnessSource: 'git.head',
+      },
+      topRankedApplicabilityPassCases: [],
+      cases: [],
+    };
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, `${JSON.stringify(blockedPayload, null, 2)}\n`);
+    writeStepBSummary(stepBSummaryPath, {
+      boundaryStatement: BOUNDARY_STATEMENT,
+      executedCaseCount: 0,
+      canonicalComparableCaseCount: 0,
+      candidatePassFoundCanonicalComparable: false,
+      minMarginRatioRawComputedComparable: null,
+      topComparableCandidates: [],
+      leverInfluenceRanking: [],
+      blockedReason,
+      provenance: {
+        commitHash,
+      },
+    });
+    const stepCSummary = {
+      boundaryStatement: BOUNDARY_STATEMENT,
+      bootstrapAttempted: false,
+      bootstrapSucceeded: false,
+      bootstrapReason: blockedReason,
+      bootstrapProvenance: [],
+      executedCaseCount: 0,
+      canonicalComparableCaseCount: 0,
+      nonComparableBuckets: {
+        non_comparable_missing_signals: 0,
+        non_comparable_contract_mismatch: 0,
+        non_comparable_other: 0,
+      },
+      nonComparableDiagnosticsTop: [],
+      candidatePassFoundCanonicalComparable: false,
+      minMarginRatioRawComputedComparable: null,
+      topComparableCandidates: [],
+      blockedReason,
+      provenance: { commitHash },
+    };
+    fs.mkdirSync(path.dirname(stepCSummaryPath), { recursive: true });
+    fs.writeFileSync(stepCSummaryPath, `${JSON.stringify(stepCSummary, null, 2)}\n`);
+    return {
+      ok: false,
+      outPath,
+      stepASummaryPath,
+      stepBSummaryPath,
+      stepCSummaryPath,
+      caseCount: 0,
+      candidatePassFound: false,
+      bestCandidate: null,
+      blockedReason,
+    };
+  }
+
+  const startedAt = Date.now();
+  const baseline = structuredClone(getGlobalPipelineState());
   const baselineGuard = evaluateQiGuardrail(structuredClone(baseline), {
     sampler: baseline.qi?.sampler as any,
     tau_ms: Number(baseline.qi?.tau_s_ms ?? 5),
@@ -524,19 +629,6 @@ export async function runRecoverySearch(opts: {
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, `${JSON.stringify(payload, null, 2)}\n`);
-
-  const stepASummaryOut = {
-    canonicalComparableCaseCount: comparableCases.length,
-    nonComparableCaseCount: nonComparableCases.length,
-    nonComparableBuckets,
-    minMarginRatioRawComputedComparable,
-    candidatePassFoundCanonicalComparable,
-    provenance: {
-      commitHash,
-    },
-  };
-  fs.mkdirSync(path.dirname(stepASummaryPath), { recursive: true });
-  fs.writeFileSync(stepASummaryPath, `${JSON.stringify(stepASummaryOut, null, 2)}\n`);
   writeStepBSummary(stepBSummaryPath, {
     boundaryStatement: BOUNDARY_STATEMENT,
     executedCaseCount: results.length,

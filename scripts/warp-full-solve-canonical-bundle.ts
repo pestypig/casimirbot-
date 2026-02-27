@@ -12,6 +12,7 @@ const INITIAL_CANONICAL_COMMANDS = [
 ] as const;
 
 const FINALIZATION_COMMANDS = [
+  ['run', 'warp:full-solve:g4-stepA-summary'],
   ['run', 'warp:full-solve:g4-recovery-search'],
   ['run', 'warp:full-solve:g4-recovery-parity'],
   ['run', 'warp:full-solve:g4-governance-matrix'],
@@ -21,6 +22,7 @@ const FINALIZATION_COMMANDS = [
 
 const LEDGER_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-decision-ledger-2026-02-26.json');
 const MATRIX_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-governance-matrix-2026-02-27.json');
+const STEP_A_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-stepA-summary.json');
 const RECOVERY_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-recovery-search-2026-02-27.json');
 const PARITY_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-recovery-parity-2026-02-27.json');
 const DEFAULT_COMMAND_TIMEOUT_MS = 8 * 60_000;
@@ -30,6 +32,7 @@ export type CanonicalBundleResult = {
   ok: boolean;
   boundaryStatement: string;
   headCommitHash: string;
+  stepAPath: string;
   ledgerPath: string;
   matrixPath: string;
   recoveryPath: string;
@@ -95,12 +98,16 @@ export const runCommandWithRetry = (args: readonly string[], options: RunCommand
   }
 };
 
-export const assertBundleProvenanceFresh = (headCommitHash: string, ledger: any, matrix: any, recovery: any, parity: any) => {
+export const assertBundleProvenanceFresh = (headCommitHash: string, stepA: any, ledger: any, matrix: any, recovery: any, parity: any) => {
+  const stepACommitHash = readCommitHash(stepA);
   const ledgerCommitHash = readCommitHash(ledger);
   const matrixCommitHash = readCommitHash(matrix);
   const recoveryCommitHash = readCommitHash(recovery);
   const parityCommitHash = readCommitHash(parity);
 
+  if (stepACommitHash !== headCommitHash) {
+    throw new Error(`Step A summary commit hash mismatch: stepA=${String(stepACommitHash ?? 'null')} head=${headCommitHash}`);
+  }
   if (ledgerCommitHash !== headCommitHash) {
     throw new Error(`Ledger commit hash mismatch: ledger=${String(ledgerCommitHash ?? 'null')} head=${headCommitHash}`);
   }
@@ -122,16 +129,18 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
   for (const args of FINALIZATION_COMMANDS) runCommandWithRetry(args);
 
   const headCommitHash = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+  const stepA = readJson(STEP_A_PATH);
   const ledger = readJson(LEDGER_PATH);
   const matrix = readJson(MATRIX_PATH);
   const recovery = readJson(RECOVERY_PATH);
   const parity = readJson(PARITY_PATH);
-  assertBundleProvenanceFresh(headCommitHash, ledger, matrix, recovery, parity);
+  assertBundleProvenanceFresh(headCommitHash, stepA, ledger, matrix, recovery, parity);
 
   return {
     ok: true,
     boundaryStatement: BOUNDARY_STATEMENT,
     headCommitHash,
+    stepAPath: STEP_A_PATH,
     ledgerPath: LEDGER_PATH,
     matrixPath: MATRIX_PATH,
     recoveryPath: RECOVERY_PATH,

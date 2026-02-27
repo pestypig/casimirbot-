@@ -16,6 +16,7 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
     expect(commands).toEqual([
       'warp:full-solve:canonical',
       'warp:full-solve:g4-sensitivity',
+      'warp:full-solve:g4-stepA-summary',
       'warp:full-solve:g4-recovery-search',
       'warp:full-solve:g4-recovery-parity',
       'warp:full-solve:g4-governance-matrix',
@@ -69,16 +70,25 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
   });
 
   it('fails if recovery provenance commit is missing or stale', () => {
-    expect(() => assertBundleProvenanceFresh('abc123', { commitHash: 'abc123' }, { commitHash: 'abc123' }, {}, { commitHash: 'abc123' })).toThrow(
+    expect(() => assertBundleProvenanceFresh('abc123', { commitHash: 'abc123' }, { commitHash: 'abc123' }, { commitHash: 'abc123' }, {}, { commitHash: 'abc123' })).toThrow(
       /Recovery artifact provenance commit hash mismatch/,
     );
     expect(() =>
-      assertBundleProvenanceFresh('abc123', { commitHash: 'abc123' }, { commitHash: 'abc123' }, { provenance: { commitHash: 'def456' } }, { commitHash: 'abc123' }),
+      assertBundleProvenanceFresh('abc123', { commitHash: 'abc123' }, { commitHash: 'abc123' }, { commitHash: 'abc123' }, { provenance: { commitHash: 'def456' } }, { commitHash: 'abc123' }),
     ).toThrow(/Recovery artifact provenance commit hash mismatch/);
  
     expect(() =>
-      assertBundleProvenanceFresh('abc123', { commitHash: 'abc123' }, { commitHash: 'abc123' }, { provenance: { commitHash: 'abc123' } }, { commitHash: 'def456' }),
+      assertBundleProvenanceFresh('abc123', { commitHash: 'abc123' }, { commitHash: 'abc123' }, { commitHash: 'abc123' }, { provenance: { commitHash: 'abc123' } }, { commitHash: 'def456' }),
     ).toThrow(/Recovery parity provenance commit hash mismatch/);
+  });
+
+  it('fails if Step A summary provenance is missing or stale', () => {
+    expect(() =>
+      assertBundleProvenanceFresh('abc123', {}, { commitHash: 'abc123' }, { commitHash: 'abc123' }, { provenance: { commitHash: 'abc123' } }, { commitHash: 'abc123' }),
+    ).toThrow(/Step A summary commit hash mismatch/);
+    expect(() =>
+      assertBundleProvenanceFresh('abc123', { commitHash: 'def456' }, { commitHash: 'abc123' }, { commitHash: 'abc123' }, { provenance: { commitHash: 'abc123' } }, { commitHash: 'abc123' }),
+    ).toThrow(/Step A summary commit hash mismatch/);
   });
 
   it('preserves canonical report recovery and governance provenance consistency after bundle', () => {

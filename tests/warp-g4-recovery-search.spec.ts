@@ -114,30 +114,94 @@ describe('warp-g4-recovery-search', () => {
   });
 
 
-  it('classifies comparability deterministically and emits stable Step A bucket accounting', async () => {
+  it('classifies comparability deterministically and treats Step A input as read-only', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-recovery-stepa-'));
     const outA = path.join(root, 'stepa-a.json');
     const outB = path.join(root, 'stepa-b.json');
     const summaryPath = path.join(root, 'g4-stepA-summary.json');
 
     writeStepASummary(summaryPath, 4);
+    const beforeSummary = fs.readFileSync(summaryPath, 'utf8');
     await runRecoverySearch({ outPath: outA, stepASummaryPath: summaryPath, seed: 42, maxCases: 16, topN: 4, runtimeCapMs: 10_000 });
-    const summaryA = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
     const payloadA = JSON.parse(fs.readFileSync(outA, 'utf8'));
 
     writeStepASummary(summaryPath, 4);
     await runRecoverySearch({ outPath: outB, stepASummaryPath: summaryPath, seed: 42, maxCases: 16, topN: 4, runtimeCapMs: 10_000 });
-    const summaryB = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+    const afterSummary = fs.readFileSync(summaryPath, 'utf8');
     const payloadB = JSON.parse(fs.readFileSync(outB, 'utf8'));
 
     expect(payloadA.cases.map((row: any) => row.comparabilityClass)).toEqual(
       payloadB.cases.map((row: any) => row.comparabilityClass),
     );
-    expect(summaryA).toEqual(summaryB);
-    expect(summaryA.canonicalComparableCaseCount + summaryA.nonComparableCaseCount).toBe(payloadA.caseCount);
-    expect(summaryA.nonComparableBuckets.non_comparable_missing_signals).toBeTypeOf('number');
-    expect(summaryA.nonComparableBuckets.non_comparable_contract_mismatch).toBeTypeOf('number');
-    expect(summaryA.nonComparableBuckets.non_comparable_other).toBeTypeOf('number');
+    expect(afterSummary).toBe(beforeSummary);
+    const comparabilityCounts = payloadA.cases.reduce(
+      (acc: Record<string, number>, row: any) => {
+        acc[row.comparabilityClass] = (acc[row.comparabilityClass] ?? 0) + 1;
+        return acc;
+      },
+      {},
+    );
+    expect((comparabilityCounts.comparable_canonical ?? 0) + (comparabilityCounts.non_comparable_missing_signals ?? 0) + (comparabilityCounts.non_comparable_contract_mismatch ?? 0) + (comparabilityCounts.non_comparable_other ?? 0)).toBe(payloadA.caseCount);
+  });
+
+  it('fails closed when Step A summary is missing', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-recovery-stepa-missing-'));
+    const out = path.join(root, 'search.json');
+    const stepA = path.join(root, 'g4-stepA-summary.json');
+    const stepB = path.join(root, 'g4-stepB-summary.json');
+    const stepC = path.join(root, 'g4-stepC-summary.json');
+
+    const result = await runRecoverySearch({
+      outPath: out,
+      stepASummaryPath: stepA,
+      stepBSummaryPath: stepB,
+      stepCSummaryPath: stepC,
+      seed: 9,
+      maxCases: 12,
+      runtimeCapMs: 10_000,
+    });
+
+    expect(result.ok).toBe(false);
+    expect((result as any).blockedReason).toBe('missing_stepA_summary');
+    const payload = JSON.parse(fs.readFileSync(out, 'utf8'));
+    expect(payload.blockedReason).toBe('missing_stepA_summary');
+    expect(payload.caseCount).toBe(0);
+    expect(payload.cases).toEqual([]);
+    const summaryB = JSON.parse(fs.readFileSync(stepB, 'utf8'));
+    expect(summaryB.blockedReason).toBe('missing_stepA_summary');
+    const summaryC = JSON.parse(fs.readFileSync(stepC, 'utf8'));
+    expect(summaryC.blockedReason).toBe('missing_stepA_summary');
+    expect(summaryC.bootstrapAttempted).toBe(false);
+  });
+
+  it('fails closed when Step A reports zero canonical-comparable coverage', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-recovery-stepa-zero-'));
+    const out = path.join(root, 'search.json');
+    const stepA = path.join(root, 'g4-stepA-summary.json');
+    const stepB = path.join(root, 'g4-stepB-summary.json');
+    const stepC = path.join(root, 'g4-stepC-summary.json');
+    writeStepASummary(stepA, 0);
+
+    const result = await runRecoverySearch({
+      outPath: out,
+      stepASummaryPath: stepA,
+      stepBSummaryPath: stepB,
+      stepCSummaryPath: stepC,
+      seed: 7,
+      maxCases: 16,
+      runtimeCapMs: 10_000,
+    });
+
+    expect(result.ok).toBe(false);
+    expect((result as any).blockedReason).toBe('no_canonical_comparable_cases');
+    const payload = JSON.parse(fs.readFileSync(out, 'utf8'));
+    expect(payload.blockedReason).toBe('no_canonical_comparable_cases');
+    expect(payload.caseCount).toBe(0);
+    const summaryB = JSON.parse(fs.readFileSync(stepB, 'utf8'));
+    expect(summaryB.blockedReason).toBe('no_canonical_comparable_cases');
+    const summaryC = JSON.parse(fs.readFileSync(stepC, 'utf8'));
+    expect(summaryC.blockedReason).toBe('no_canonical_comparable_cases');
+    expect(summaryC.bootstrapAttempted).toBe(false);
   });
 
   it('does not mutate canonical artifact during temp output runs', async () => {
@@ -185,7 +249,7 @@ describe('warp-g4-recovery-search', () => {
     const stepA = path.join(root, 'g4-stepA-summary.json');
     const stepB = path.join(root, 'g4-stepB-summary.json');
     const stepC = path.join(root, 'g4-stepC-summary.json');
-    writeStepASummary(stepA, 0);
+    writeStepASummary(stepA, 4);
     await runRecoverySearch({
       outPath: out,
       stepASummaryPath: stepA,
@@ -209,9 +273,7 @@ describe('warp-g4-recovery-search', () => {
     expect(Array.isArray(summary.nonComparableDiagnosticsTop)).toBe(true);
     expect(Array.isArray(summary.topComparableCandidates)).toBe(true);
     expect(summary.topComparableCandidates.length).toBeLessThanOrEqual(10);
-    if (summary.canonicalComparableCaseCount === 0) {
-      expect(summary.blockedReason).toBe('no_canonical_comparable_cases_after_bootstrap');
-    }
+    expect([null, 'no_canonical_comparable_cases_after_bootstrap']).toContain(summary.blockedReason);
   });
 
 

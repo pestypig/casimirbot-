@@ -164,7 +164,11 @@ import {
   tokenizeAskQuery,
 } from "../services/helix-ask/query";
 import { resolveHelixAskArbiter } from "../services/helix-ask/arbiter";
-import { evaluateHelixAskAlignmentGate, resolveOpenWorldBypassPolicy } from "../services/helix-ask/alignment-gate";
+import {
+  evaluateHelixAskAlignmentGate,
+  resolveFrontierHardGuard,
+  resolveOpenWorldBypassPolicy,
+} from "../services/helix-ask/alignment-gate";
 import {
   buildHelixAskVerifyDegradedFirstFail,
   resolveHelixAskVerifyDegradeReason,
@@ -186,6 +190,7 @@ import {
 import {
   buildRepoSearchPlan,
   formatRepoSearchEvidence,
+  runGitTrackedRepoSearch,
   runRepoSearch,
   type RepoSearchResult,
 } from "../services/helix-ask/repo-search";
@@ -3177,6 +3182,27 @@ const HELIX_ASK_RRF_WEIGHT_FUZZY = clampNumber(
   0.1,
   3,
 );
+const HELIX_ASK_RRF_WEIGHT_GIT_TRACKED = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_RRF_WEIGHT_GIT_TRACKED ??
+      process.env.VITE_HELIX_ASK_RRF_WEIGHT_GIT_TRACKED,
+    1.1,
+  ),
+  0.1,
+  3,
+);
+const HELIX_ASK_GIT_TRACKED_LANE =
+  String(process.env.HELIX_ASK_GIT_TRACKED_LANE ?? "1").trim() !== "0";
+const HELIX_ASK_GIT_TRACKED_MAX_QUERIES = clampNumber(
+  readNumber(process.env.HELIX_ASK_GIT_TRACKED_MAX_QUERIES, 3),
+  1,
+  8,
+);
+const HELIX_ASK_GIT_TRACKED_MAX_HITS_PER_QUERY = clampNumber(
+  readNumber(process.env.HELIX_ASK_GIT_TRACKED_MAX_HITS_PER_QUERY, 8),
+  1,
+  32,
+);
 const HELIX_ASK_MMR_LAMBDA = clampNumber(
   readNumber(process.env.HELIX_ASK_MMR_LAMBDA ?? process.env.VITE_HELIX_ASK_MMR_LAMBDA, 0.72),
   0.2,
@@ -3463,6 +3489,8 @@ const HELIX_ASK_TELEMETRY_LEAK_GATE =
 const HELIX_ASK_FRONTIER_INTENT_ID = "falsifiable.frontier_consciousness_theory_lens";
 const HELIX_ASK_FRONTIER_LENS_RE =
   /\b(conscious|consciousness|sentient|sentience|orch(?:estrated)?\s*objective\s*reduction|orch[-\s]?or|penrose|hameroff|microtubule|stellar consciousness|sun conscious|is the sun conscious)\b/i;
+const HELIX_ASK_FRONTIER_EXPLICIT_LENS_RE =
+  /\b(orch(?:estrated)?\s*objective\s*reduction|orch[-\s]?or|objective\s*reduction|penrose|hameroff|microtubule|ops)\b/i;
 const HELIX_ASK_FRONTIER_FOLLOWUP_RE =
   /\b(since this is the case|given this|based on this|what now|what should we focus|reasoning ladder|follow[-\s]?up|continue|in that case|next step)\b/i;
 const HELIX_ASK_FRONTIER_SESSION_RESET_RE =
@@ -3476,6 +3504,7 @@ const HELIX_ASK_FRONTIER_REQUIRED_SLOTS = [
   "uncertainty_band",
   "claim_tier",
 ] as const;
+const HELIX_ASK_FRONTIER_COMPARISON_FIELD_MAX_CHARS = 220;
 type HelixAskFrontierRequiredSlot = (typeof HELIX_ASK_FRONTIER_REQUIRED_SLOTS)[number];
 const HELIX_ASK_FRONTIER_SLOT_PATTERNS: Record<HelixAskFrontierRequiredSlot, RegExp[]> = {
   definitions: [/^\s*(definitions?|terms)\s*:/im],
@@ -5947,7 +5976,7 @@ type AskCandidate = {
   rrfScore: number;
 };
 
-type AskCandidateChannel = "lexical" | "symbol" | "fuzzy" | "path";
+type AskCandidateChannel = "lexical" | "symbol" | "fuzzy" | "path" | "git_tracked";
 type AskCandidateChannelStats = Record<AskCandidateChannel, number>;
 type AskCandidateChannelList = { channel: AskCandidateChannel; candidates: AskCandidate[] };
 type EvidenceEligibility = ReturnType<typeof evaluateEvidenceEligibility>;
@@ -5970,12 +5999,25 @@ type AmbiguityClusterSummary = {
   clusters: AmbiguityCluster[];
 };
 
-const HELIX_ASK_CHANNELS: AskCandidateChannel[] = ["lexical", "symbol", "fuzzy", "path"];
+const HELIX_ASK_CHANNELS: AskCandidateChannel[] = [
+  "lexical",
+  "symbol",
+  "fuzzy",
+  "path",
+  "git_tracked",
+];
+const HELIX_ASK_RETRIEVAL_COVERAGE_CHANNELS: AskCandidateChannel[] = [
+  "lexical",
+  "symbol",
+  "fuzzy",
+  "path",
+];
 const HELIX_ASK_RRF_CHANNEL_WEIGHTS: AskCandidateChannelStats = {
   lexical: HELIX_ASK_RRF_WEIGHT_LEXICAL,
   symbol: HELIX_ASK_RRF_WEIGHT_SYMBOL,
   fuzzy: HELIX_ASK_RRF_WEIGHT_FUZZY,
   path: 1.5,
+  git_tracked: HELIX_ASK_RRF_WEIGHT_GIT_TRACKED,
 };
 
 type HelixAskPlanDirectives = {
@@ -6000,7 +6042,13 @@ type HelixAskPlanScope = {
 };
 
 function initAskChannelStats(value = 0): AskCandidateChannelStats {
-  return { lexical: value, symbol: value, fuzzy: value, path: value };
+  return {
+    lexical: value,
+    symbol: value,
+    fuzzy: value,
+    path: value,
+    git_tracked: value,
+  };
 }
 
 function applyAskNodeBoosts(
@@ -7905,6 +7953,77 @@ function collectAskCandidatesMultiChannel(
   return { lists, queryHit };
 }
 
+async function collectGitTrackedCandidatesForQueries(
+  queries: string[],
+  question: string,
+  options?: {
+    topicProfile?: HelixAskTopicProfile | null;
+    allowlist?: RegExp[];
+    avoidlist?: RegExp[];
+    candidatePool?: number;
+  },
+): Promise<{ candidates: AskCandidate[]; queryHitCount: number }> {
+  if (!HELIX_ASK_GIT_TRACKED_LANE || queries.length === 0) {
+    return { candidates: [], queryHitCount: 0 };
+  }
+  const allowlist = options?.allowlist ?? [];
+  const avoidlist = options?.avoidlist ?? [];
+  const candidatePool = Math.max(4, options?.candidatePool ?? 12);
+  const normalizedQueries: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of queries) {
+    const cleaned = entry.trim();
+    if (!cleaned) continue;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalizedQueries.push(cleaned);
+    if (normalizedQueries.length >= HELIX_ASK_GIT_TRACKED_MAX_QUERIES) break;
+  }
+  if (normalizedQueries.length === 0) {
+    return { candidates: [], queryHitCount: 0 };
+  }
+
+  const byPath = new Map<string, AskCandidate>();
+  let queryHitCount = 0;
+  for (const query of normalizedQueries) {
+    const result = await runGitTrackedRepoSearch({
+      query,
+      allowlist,
+      avoidlist,
+      maxHits: HELIX_ASK_GIT_TRACKED_MAX_HITS_PER_QUERY,
+    });
+    if (!result.hits.length) continue;
+    queryHitCount += 1;
+    for (const hit of result.hits) {
+      const filePath = hit.filePath.replace(/\\/g, "/");
+      const baseScore = 16 + Math.min(24, hit.term.length * 2);
+      const score = applyAskNodeBoosts(baseScore, filePath, question, options?.topicProfile);
+      const preview = formatAskPreview({
+        doc: `line ${hit.line}`,
+        snippet: `${hit.term}: ${hit.text}`,
+        score,
+        filePath,
+        symbol: "git-tracked",
+      });
+      const existing = byPath.get(filePath);
+      if (!existing || score > existing.score) {
+        byPath.set(filePath, {
+          filePath,
+          preview,
+          score,
+          rrfScore: 0,
+        });
+      }
+    }
+  }
+
+  const candidates = Array.from(byPath.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, candidatePool);
+  return { candidates, queryHitCount };
+}
+
 function mergeCandidatesWithWeightedRrf(
   candidateLists: AskCandidateChannelList[],
   rrfK: number,
@@ -8143,6 +8262,24 @@ async function buildAskContextFromQueries(
         }
       }
     }
+    const gitTracked = await collectGitTrackedCandidatesForQueries(cleanQueries, question, {
+      topicProfile,
+      allowlist,
+      avoidlist: options?.avoidlist,
+      candidatePool,
+    });
+    if (gitTracked.candidates.length > 0) {
+      candidateLists.push({
+        channel: "git_tracked",
+        candidates: gitTracked.candidates,
+      });
+      channelHits.git_tracked = 1;
+      channelTopScores.git_tracked = Math.max(
+        channelTopScores.git_tracked,
+        gitTracked.candidates[0]?.score ?? 0,
+      );
+    }
+    queryHitCount = Math.max(queryHitCount, gitTracked.queryHitCount);
     const channelWeightsForTier = scaleAskChannelWeights(
       HELIX_ASK_RRF_CHANNEL_WEIGHTS,
       channelTopScores,
@@ -14329,20 +14466,92 @@ const stripTelemetryLeakArtifacts = (
   return { text: next, detected: reasons.length > 0, reasons };
 };
 
+const hasExplicitFrontierLensCandidate = (value: string): boolean =>
+  HELIX_ASK_FRONTIER_EXPLICIT_LENS_RE.test(value);
+
+const clipFrontierComparisonField = (value: string, fallback: string): string =>
+  ensureSentence(
+    clipAskText(
+      (value || "").trim() || fallback,
+      HELIX_ASK_FRONTIER_COMPARISON_FIELD_MAX_CHARS,
+    ) || fallback,
+  );
+
+const resolveFrontierLensSeed = (question: string): string => {
+  if (!hasExplicitFrontierLensCandidate(question)) {
+    return "Lens candidate: Orch-OR-style objective reduction as a speculative consciousness mechanism.";
+  }
+  if (/\borch(?:estrated)?\s*objective\s*reduction\b|\borch[-\s]?or\b/i.test(question)) {
+    return "Lens candidate: Orch-OR-style objective reduction in organized quantum states.";
+  }
+  if (/\bpenrose\b/i.test(question)) {
+    return "Lens candidate: Penrose objective-reduction interpretation.";
+  }
+  if (/\bhameroff\b|\bmicrotubule\b/i.test(question)) {
+    return "Lens candidate: Hameroff/Penrose microtubule-centered consciousness hypothesis.";
+  }
+  if (/\bops\b/i.test(question)) {
+    return "Lens candidate: OPS-style objective-reduction framing with explicit falsifiers.";
+  }
+  return "Lens candidate: explicit objective-reduction consciousness lens.";
+};
+
+const buildFrontierHardGuardClarifyLine = (args: {
+  supportRatio: number;
+  missingSlots: string[];
+  lensRequired: boolean;
+  lensCandidateCount: number;
+  planClarify?: string;
+}): string => {
+  const details: string[] = [];
+  details.push(`support_ratio=${args.supportRatio.toFixed(2)}`);
+  if (args.missingSlots.length > 0) {
+    details.push(`missing_slots=${args.missingSlots.join(", ")}`);
+  }
+  if (args.lensRequired) {
+    details.push(
+      args.lensCandidateCount > 0
+        ? "lens_candidate=present"
+        : "lens_candidate=missing",
+    );
+  }
+  const base =
+    "I cannot finalize a frontier verdict yet because the evidence contract is incomplete.";
+  const action =
+    args.planClarify?.trim().length
+      ? ensureSentence(args.planClarify)
+      : "Please clarify the lens and provide evidence paths so I can run a falsifiable comparison.";
+  return `${base} (${details.join("; ")}). ${action}`.trim();
+};
+
 const renderFrontierScientificContract = (args: {
+  question: string;
   verification: HelixAskFrontierVerification;
   slotSummary: HelixAskFrontierSlotSummary;
   planClarify?: string;
   nextEvidence?: string[];
+  requireLensCandidate?: boolean;
 }): string => {
   const baselineLine =
     args.verification.supportedClaims[0] ??
     "Mainstream baseline: no certified evidence currently establishes solar subjective awareness.";
-  const hypothesisLine =
-    args.verification.unsupportedClaims[0] ??
-    "Orch-OR-inspired stellar consciousness remains a hypothesis that requires dedicated falsifier tests.";
-  const antiHypothesisLine =
-    "Null hypothesis: observed stellar coherence/collapse dynamics are non-conscious physical processes.";
+  const lensSeed = resolveFrontierLensSeed(args.question);
+  const hypothesisAssumptionSeed =
+    args.verification.supportRatio > 0
+      ? args.verification.unsupportedClaims[0] ?? ""
+      : "";
+  const hypothesisAssumption = clipFrontierComparisonField(
+    hypothesisAssumptionSeed,
+    `${lensSeed} Consciousness-like behavior would require measurable collapse signatures not explained by standard plasma dynamics.`,
+  );
+  const hypothesisAssumptionWithLens =
+    args.requireLensCandidate && !hasExplicitFrontierLensCandidate(hypothesisAssumption)
+      ? clipFrontierComparisonField(`${lensSeed} ${hypothesisAssumption}`, lensSeed)
+      : hypothesisAssumption;
+  const antiHypothesisAssumption = clipFrontierComparisonField(
+    "Observed stellar coherence/collapse dynamics are non-conscious physical processes.",
+    "Observed stellar dynamics are non-conscious physical processes.",
+  );
   const evidenceHints = (args.nextEvidence ?? []).slice(0, 3);
   if (!evidenceHints.length && args.planClarify) {
     evidenceHints.push(args.planClarify);
@@ -14350,6 +14559,33 @@ const renderFrontierScientificContract = (args: {
   if (!evidenceHints.length) {
     evidenceHints.push("Add explicit prediction vs observation checks tied to repo evidence paths.");
   }
+  const hypothesisPrediction = clipFrontierComparisonField(
+    evidenceHints[0] ?? "",
+    "Predict an observable signature unique to the lens that differs from baseline plasma-only dynamics.",
+  );
+  const antiHypothesisPrediction = clipFrontierComparisonField(
+    "Predict known solar behavior remains explainable with standard stellar physics alone.",
+    "Predict known solar behavior remains explainable with standard stellar physics.",
+  );
+  const hypothesisFalsifier = clipFrontierComparisonField(
+    evidenceHints[1] ?? evidenceHints[0] ?? "",
+    "Falsify if no lens-specific signature appears when tested against baseline predictions.",
+  );
+  const antiHypothesisFalsifier = clipFrontierComparisonField(
+    "Falsify if robust, repeatable signatures appear that standard stellar models cannot explain.",
+    "Falsify if repeatable signatures appear that standard stellar models cannot explain.",
+  );
+  const sharedUncertainty = `support_ratio=${args.verification.supportRatio.toFixed(2)}; missing_slots=${
+    args.slotSummary.missing.join(", ") || "none"
+  }`;
+  const hypothesisUncertainty = clipFrontierComparisonField(
+    sharedUncertainty,
+    "Diagnostic uncertainty remains high pending direct falsifier tests.",
+  );
+  const antiHypothesisUncertainty = clipFrontierComparisonField(
+    sharedUncertainty,
+    "Diagnostic uncertainty remains high pending direct falsifier tests.",
+  );
   const uncertaintyLine = `Support ratio=${args.verification.supportRatio.toFixed(
     2,
   )}; missing slots=${args.slotSummary.missing.join(", ") || "none"}.`;
@@ -14361,10 +14597,16 @@ const renderFrontierScientificContract = (args: {
     `- ${ensureSentence(baselineLine)}`,
     "",
     "Hypothesis:",
-    `- ${ensureSentence(hypothesisLine)}`,
+    `- Assumptions: ${hypothesisAssumptionWithLens}`,
+    `- Predictions: ${hypothesisPrediction}`,
+    `- Falsifiers: ${hypothesisFalsifier}`,
+    `- Uncertainty: ${hypothesisUncertainty}`,
     "",
     "Anti-hypothesis:",
-    `- ${ensureSentence(antiHypothesisLine)}`,
+    `- Assumptions: ${antiHypothesisAssumption}`,
+    `- Predictions: ${antiHypothesisPrediction}`,
+    `- Falsifiers: ${antiHypothesisFalsifier}`,
+    `- Uncertainty: ${antiHypothesisUncertainty}`,
     "",
     "Falsifiers:",
     ...evidenceHints.map((hint) => `- ${ensureSentence(hint)}`),
@@ -23285,7 +23527,8 @@ const executeHelixAsk = async ({
           ? docsHits.length / contextFilesSnapshot.length
           : 0;
         const channelCoverage =
-          HELIX_ASK_CHANNELS.filter((channel) => channelHits[channel] > 0).length / HELIX_ASK_CHANNELS.length;
+          HELIX_ASK_RETRIEVAL_COVERAGE_CHANNELS.filter((channel) => channelHits[channel] > 0).length /
+          HELIX_ASK_RETRIEVAL_COVERAGE_CHANNELS.length;
         const retrievalEvidenceRatio = evidenceCoreRequired
           ? Math.min(evidenceGate.matchRatio, evidenceCoreGate.matchRatio)
           : evidenceGate.matchRatio;
@@ -23496,10 +23739,10 @@ const executeHelixAsk = async ({
           "Retrieval channels",
           "ok",
           [
-            `hits=lex:${channelHits.lexical},sym:${channelHits.symbol},fuz:${channelHits.fuzzy},path:${channelHits.path}`,
+            `hits=lex:${channelHits.lexical},sym:${channelHits.symbol},fuz:${channelHits.fuzzy},path:${channelHits.path},git:${channelHits.git_tracked}`,
             `tops=lex:${channelTopScores.lexical.toFixed(2)},sym:${channelTopScores.symbol.toFixed(
               2,
-            )},fuz:${channelTopScores.fuzzy.toFixed(2)},path:${channelTopScores.path.toFixed(2)}`,
+            )},fuz:${channelTopScores.fuzzy.toFixed(2)},path:${channelTopScores.path.toFixed(2)},git:${channelTopScores.git_tracked.toFixed(2)}`,
           ].join(" | "),
         );
         recordControllerStep({
@@ -23673,8 +23916,8 @@ const executeHelixAsk = async ({
           const attemptDocFiles = attemptFiles.filter((filePath) => /(^|\/)docs\//i.test(filePath));
           const attemptDocShare = attemptFiles.length ? attemptDocFiles.length / attemptFiles.length : 0;
           const attemptChannelCoverage =
-            HELIX_ASK_CHANNELS.filter((channel) => attemptChannelHits[channel] > 0).length /
-            HELIX_ASK_CHANNELS.length;
+            HELIX_ASK_RETRIEVAL_COVERAGE_CHANNELS.filter((channel) => attemptChannelHits[channel] > 0).length /
+            HELIX_ASK_RETRIEVAL_COVERAGE_CHANNELS.length;
           const attemptEvidenceRatio = evidenceCoreRequired
             ? Math.min(evidenceGate.matchRatio, evidenceCoreGate.matchRatio)
             : evidenceGate.matchRatio;
@@ -23781,10 +24024,10 @@ const executeHelixAsk = async ({
             "Retrieval channels",
             "ok",
             [
-              `hits=lex:${attemptChannelHits.lexical},sym:${attemptChannelHits.symbol},fuz:${attemptChannelHits.fuzzy},path:${attemptChannelHits.path}`,
+              `hits=lex:${attemptChannelHits.lexical},sym:${attemptChannelHits.symbol},fuz:${attemptChannelHits.fuzzy},path:${attemptChannelHits.path},git:${attemptChannelHits.git_tracked}`,
               `tops=lex:${attemptChannelTopScores.lexical.toFixed(2)},sym:${attemptChannelTopScores.symbol.toFixed(
                 2,
-              )},fuz:${attemptChannelTopScores.fuzzy.toFixed(2)},path:${attemptChannelTopScores.path.toFixed(2)}`,
+              )},fuz:${attemptChannelTopScores.fuzzy.toFixed(2)},path:${attemptChannelTopScores.path.toFixed(2)},git:${attemptChannelTopScores.git_tracked.toFixed(2)}`,
             ].join(" | "),
             startedAt,
           );
@@ -27911,6 +28154,10 @@ const executeHelixAsk = async ({
       let frontierSlotSummary = frontierTheoryLensActive
         ? evaluateFrontierScientificSlots(cleaned)
         : null;
+      const frontierLensRequired =
+        frontierTheoryLensActive && hasExplicitFrontierLensCandidate(baseQuestion);
+      let frontierLensCandidateCount = 0;
+      let frontierHardGuardResult: ReturnType<typeof resolveFrontierHardGuard> | null = null;
       if (frontierTheoryLensActive && HELIX_ASK_FRONTIER_COVE) {
         const verificationEvidenceContext = [
           evidenceText,
@@ -27923,13 +28170,21 @@ const executeHelixAsk = async ({
           .filter(Boolean)
           .join("\n\n");
         frontierVerification = runFrontierVerificationPass(cleaned, verificationEvidenceContext);
-        const frontierNeedsRevision =
-          frontierVerification.unsupportedClaims.length > 0 &&
-          frontierVerification.supportRatio < 0.6;
-        if (frontierNeedsRevision) {
-          const frontierNextEvidence = buildNextEvidenceHints({
+        const comparisonCandidates =
+          frontierVerification.claims.length > 0
+            ? frontierVerification.claims
+            : extractClaimCandidates(cleaned, 6);
+        frontierLensCandidateCount = comparisonCandidates.filter((entry) =>
+          hasExplicitFrontierLensCandidate(entry),
+        ).length;
+      } else if (frontierTheoryLensActive && frontierLensRequired) {
+        frontierLensCandidateCount = hasExplicitFrontierLensCandidate(cleaned) ? 1 : 0;
+      }
+      if (frontierTheoryLensActive) {
+        const buildFrontierNextEvidence = (missingSlots: string[] | undefined): string[] =>
+          buildNextEvidenceHints({
             question: baseQuestion,
-            missingSlots: frontierSlotSummary?.missing,
+            missingSlots,
             slotPlan,
             anchorFiles: contextFiles,
             searchedTerms: retrievalQueries,
@@ -27939,15 +28194,75 @@ const executeHelixAsk = async ({
             headingSeedSlots: slotPlanHeadingSeedSlots.length ? slotPlanHeadingSeedSlots : headingSeedSlots,
             limit: 3,
           });
-          cleaned = renderFrontierScientificContract({
-            verification: frontierVerification,
-            slotSummary:
-              frontierSlotSummary ??
-              evaluateFrontierScientificSlots(cleaned, HELIX_ASK_FRONTIER_REQUIRED_SLOTS),
-            planClarify: planDirectives?.clarifyQuestion,
-            nextEvidence: frontierNextEvidence,
-          });
+        frontierSlotSummary =
+          frontierSlotSummary ?? evaluateFrontierScientificSlots(cleaned, HELIX_ASK_FRONTIER_REQUIRED_SLOTS);
+        const frontierGuardSupportRatio = frontierVerification ? frontierVerification.supportRatio : 1;
+        frontierHardGuardResult = resolveFrontierHardGuard({
+          supportRatio: frontierGuardSupportRatio,
+          missingRequiredSlots: frontierSlotSummary.missing,
+          openWorldBypassActive: openWorldBypassMode === "active",
+        });
+        const frontierLensCandidateMissing =
+          frontierLensRequired && frontierLensCandidateCount === 0;
+        if (frontierHardGuardResult.triggered || frontierLensCandidateMissing) {
+          const fallbackVerification =
+            frontierVerification ??
+            runFrontierVerificationPass(cleaned, [evidenceText, contextText].filter(Boolean).join("\n\n"));
+          const frontierNextEvidence = buildFrontierNextEvidence(frontierSlotSummary.missing);
+          if (
+            frontierHardGuardResult.action === "bypass_with_uncertainty" ||
+            (frontierLensCandidateMissing && openWorldBypassMode === "active")
+          ) {
+            cleaned = renderFrontierScientificContract({
+              question: baseQuestion,
+              verification: fallbackVerification,
+              slotSummary: frontierSlotSummary,
+              planClarify: planDirectives?.clarifyQuestion,
+              nextEvidence: frontierNextEvidence,
+              requireLensCandidate: frontierLensRequired,
+            });
+            cleaned = ensureOpenWorldBypassUncertainty(cleaned);
+            answerPath.push("frontier:hard_guard_bypass");
+          } else {
+            cleaned = buildFrontierHardGuardClarifyLine({
+              supportRatio: fallbackVerification.supportRatio,
+              missingSlots: frontierSlotSummary.missing,
+              lensRequired: frontierLensRequired,
+              lensCandidateCount: frontierLensCandidateCount,
+              planClarify: planDirectives?.clarifyQuestion,
+            });
+            answerPath.push("frontier:hard_guard_clarify");
+            strictReadyFailReason =
+              strictReadyFailReason ??
+              (frontierSlotSummary.missing.length > 0
+                ? "SCIENTIFIC_METHOD_MISSING_SLOT"
+                : "LOW_EVIDENCE_UTILIZATION");
+            if (debugPayload) {
+              const debugRecord = debugPayload as Record<string, unknown>;
+              debugRecord.arbiter_fail_reason = strictReadyFailReason;
+              debugRecord.helix_ask_fail_reason = strictReadyFailReason;
+              debugRecord.helix_ask_fail_class = "evidence_contract";
+            }
+          }
           frontierSlotSummary = evaluateFrontierScientificSlots(cleaned, HELIX_ASK_FRONTIER_REQUIRED_SLOTS);
+        } else if (HELIX_ASK_FRONTIER_COVE && frontierVerification) {
+          const frontierNeedsRevision =
+            frontierVerification.unsupportedClaims.length > 0 &&
+            frontierVerification.supportRatio < 0.6;
+          if (frontierNeedsRevision) {
+            const frontierNextEvidence = buildFrontierNextEvidence(frontierSlotSummary?.missing);
+            cleaned = renderFrontierScientificContract({
+              question: baseQuestion,
+              verification: frontierVerification,
+              slotSummary:
+                frontierSlotSummary ??
+                evaluateFrontierScientificSlots(cleaned, HELIX_ASK_FRONTIER_REQUIRED_SLOTS),
+              planClarify: planDirectives?.clarifyQuestion,
+              nextEvidence: frontierNextEvidence,
+              requireLensCandidate: frontierLensRequired,
+            });
+            frontierSlotSummary = evaluateFrontierScientificSlots(cleaned, HELIX_ASK_FRONTIER_REQUIRED_SLOTS);
+          }
         }
       }
       if (frontierTheoryLensActive && HELIX_ASK_FRONTIER_CONTRACT) {
@@ -27970,10 +28285,12 @@ const executeHelixAsk = async ({
             limit: 3,
           });
           cleaned = renderFrontierScientificContract({
+            question: baseQuestion,
             verification: fallbackVerification,
             slotSummary: frontierSlotSummary,
             planClarify: planDirectives?.clarifyQuestion,
             nextEvidence: frontierNextEvidence,
+            requireLensCandidate: frontierLensRequired,
           });
           frontierSlotSummary = evaluateFrontierScientificSlots(cleaned, HELIX_ASK_FRONTIER_REQUIRED_SLOTS);
           if (frontierSlotSummary.missing.length > 0) {
@@ -28008,6 +28325,15 @@ const executeHelixAsk = async ({
       if (debugPayload) {
         const debugRecord = debugPayload as Record<string, unknown>;
         debugRecord.frontier_theory_lens_active = frontierTheoryLensActive;
+        debugRecord.frontier_lens_required = frontierLensRequired;
+        debugRecord.frontier_lens_candidate_count = frontierLensCandidateCount;
+        if (frontierHardGuardResult) {
+          debugRecord.frontier_hard_guard_triggered = frontierHardGuardResult.triggered;
+          debugRecord.frontier_hard_guard_action = frontierHardGuardResult.action;
+          debugRecord.frontier_hard_guard_reason = frontierHardGuardResult.reason;
+          debugRecord.frontier_hard_guard_support_ratio = frontierHardGuardResult.supportRatio;
+          debugRecord.frontier_hard_guard_missing_slots = frontierHardGuardResult.missingRequiredSlots;
+        }
         if (frontierVerification) {
           debugRecord.frontier_verification_questions = frontierVerification.questions.slice(0, 6);
           debugRecord.frontier_verified_claim_count = frontierVerification.supportedClaims.length;

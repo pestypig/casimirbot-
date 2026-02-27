@@ -36,7 +36,6 @@ const COMPARABILITY_CLASSES: ComparabilityClass[] = [
   'non_comparable_contract_mismatch',
   'non_comparable_other',
 ];
-const MISSING_SIGNAL_REASON_CODES = new Set(['G4_QI_SIGNAL_MISSING']);
 
 const classifyComparability = (entry: any): ComparabilityClass => {
   const existing = typeof entry?.comparabilityClass === 'string' ? entry.comparabilityClass : null;
@@ -46,12 +45,8 @@ const classifyComparability = (entry: any): ComparabilityClass => {
   const required = [entry?.lhs_Jm3, entry?.boundComputed_Jm3, entry?.boundUsed_Jm3, entry?.marginRatioRaw, entry?.marginRatioRawComputed];
   if (required.some((value) => !Number.isFinite(value))) return 'non_comparable_missing_signals';
   const reasonCode = Array.isArray(entry?.reasonCode) ? entry.reasonCode.map((code: unknown) => str(code).toUpperCase()) : [];
-  if (
-    reasonCode.some((code: string) => MISSING_SIGNAL_REASON_CODES.has(code)) ||
-    str(entry?.applicabilityStatus).toUpperCase() === 'UNKNOWN'
-  ) {
-    return 'non_comparable_missing_signals';
-  }
+  // Comparability excludes only missing structural signals and contract/source mismatches.
+  // Applicability reasons are preserved as diagnostics and parity failure modes.
   if (reasonCode.includes('G4_QI_SOURCE_NOT_METRIC') || reasonCode.includes('G4_QI_CONTRACT_MISSING')) {
     return 'non_comparable_contract_mismatch';
   }
@@ -133,6 +128,7 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
 
   const selectionPolicy: SelectionPolicy =
     comparableCandidates.length > 0 ? 'comparable_canonical' : 'fallback_no_comparable_canonical';
+  const blockedReason = selectionPolicy === 'comparable_canonical' ? null : 'no_canonical_comparable_candidates';
   const selected = (selectionPolicy === 'comparable_canonical' ? comparableCandidates : []).slice(0, topN);
   const baseline = structuredClone(getGlobalPipelineState());
   const rows: any[] = [];
@@ -236,6 +232,7 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
     topN,
     candidateCountChecked: rows.length,
     selectionPolicy,
+    blockedReason,
     anyCanonicalPassCandidate,
     anyComputedOnlyPassCandidate,
     dominantFailureMode: dominantFailureMode(rows),
@@ -266,6 +263,7 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
     outPath,
     candidateCountChecked: rows.length,
     selectionPolicy,
+    blockedReason,
     anyCanonicalPassCandidate,
     anyComputedOnlyPassCandidate,
   };

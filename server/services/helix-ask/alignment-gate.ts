@@ -30,6 +30,24 @@ export type HelixAskOpenWorldBypassPolicyResult = {
   reason: string;
 };
 
+export type HelixAskFrontierHardGuardInput = {
+  supportRatio: number;
+  missingRequiredSlots?: string[];
+  openWorldBypassActive: boolean;
+};
+
+export type HelixAskFrontierHardGuardResult = {
+  triggered: boolean;
+  action: "none" | "clarify_fail_closed" | "bypass_with_uncertainty";
+  reason:
+    | "none"
+    | "support_ratio_zero"
+    | "required_slots_missing"
+    | "support_ratio_zero_and_required_slots_missing";
+  supportRatio: number;
+  missingRequiredSlots: string[];
+};
+
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const clampSigned = (value: number): number =>
   Math.min(1, Math.max(-1, Number.isFinite(value) ? value : 0));
@@ -113,5 +131,38 @@ export const resolveOpenWorldBypassPolicy = (
     return { mode, action: "clarify_fail_closed", reason: "alignment_fail_repo_required" };
   }
   return { mode, action: "bypass_with_uncertainty", reason: "alignment_fail_open_world_bypass" };
+};
+
+export const resolveFrontierHardGuard = (
+  input: HelixAskFrontierHardGuardInput,
+): HelixAskFrontierHardGuardResult => {
+  const supportRatio = clamp01(input.supportRatio);
+  const missingRequiredSlots = (input.missingRequiredSlots ?? [])
+    .map((slot) => String(slot ?? "").trim())
+    .filter(Boolean);
+  const supportRatioZero = supportRatio <= 0;
+  const missingSlots = missingRequiredSlots.length > 0;
+  if (!supportRatioZero && !missingSlots) {
+    return {
+      triggered: false,
+      action: "none",
+      reason: "none",
+      supportRatio,
+      missingRequiredSlots,
+    };
+  }
+  const reason: HelixAskFrontierHardGuardResult["reason"] =
+    supportRatioZero && missingSlots
+      ? "support_ratio_zero_and_required_slots_missing"
+      : supportRatioZero
+        ? "support_ratio_zero"
+        : "required_slots_missing";
+  return {
+    triggered: true,
+    action: input.openWorldBypassActive ? "bypass_with_uncertainty" : "clarify_fail_closed",
+    reason,
+    supportRatio,
+    missingRequiredSlots,
+  };
 };
 

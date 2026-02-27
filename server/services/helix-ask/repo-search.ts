@@ -51,6 +51,10 @@ export type RepoSearchResult = {
   error?: string;
 };
 
+export type GitTrackedRepoSearchResult = RepoSearchResult & {
+  terms: string[];
+};
+
 const REPO_SEARCH_ENABLED = String(process.env.HELIX_ASK_REPO_SEARCH ?? "1").trim() !== "0";
 const REPO_SEARCH_EXPLICIT_ENABLED =
   String(process.env.HELIX_ASK_REPO_SEARCH_EXPLICIT ?? "1").trim() !== "0";
@@ -78,6 +82,28 @@ const REPO_SEARCH_TIMEOUT_MS = Math.max(
 const REPO_SEARCH_MAX_LINE_CHARS = Math.max(
   80,
   Number(process.env.HELIX_ASK_REPO_SEARCH_MAX_LINE_CHARS ?? 180),
+);
+const GIT_TRACKED_SCAN_ENABLED =
+  String(process.env.HELIX_ASK_GIT_TRACKED_SCAN ?? "1").trim() !== "0";
+const GIT_TRACKED_SCAN_SCRIPT = path.resolve(
+  process.cwd(),
+  "scripts/helix_ask_git_tracked_scan.py",
+);
+const GIT_TRACKED_SCAN_MAX_TERMS = Math.max(
+  1,
+  Number(process.env.HELIX_ASK_GIT_TRACKED_SCAN_MAX_TERMS ?? 4),
+);
+const GIT_TRACKED_SCAN_MAX_PER_TERM = Math.max(
+  1,
+  Number(process.env.HELIX_ASK_GIT_TRACKED_SCAN_MAX_PER_TERM ?? 6),
+);
+const GIT_TRACKED_SCAN_MAX_HITS = Math.max(
+  GIT_TRACKED_SCAN_MAX_PER_TERM,
+  Number(process.env.HELIX_ASK_GIT_TRACKED_SCAN_MAX_HITS ?? 24),
+);
+const GIT_TRACKED_SCAN_TIMEOUT_MS = Math.max(
+  1000,
+  Number(process.env.HELIX_ASK_GIT_TRACKED_SCAN_TIMEOUT_MS ?? 7000),
 );
 
 const EXPLICIT_SEARCH_RE =
@@ -496,6 +522,106 @@ const parseRgOutput = (stdout: string, term: string, limit: number): RepoSearchH
   }
   return hits;
 };
+
+const parseGitTrackedScanOutput = (
+  stdout: string,
+  terms: string[],
+): GitTrackedRepoSearchResult => {
+  if (!stdout.trim()) {
+    return { hits: [], truncated: false, terms, error: "git_tracked_scan_empty" };
+  }
+  let parsed: any;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    return { hits: [], truncated: false, terms, error: "git_tracked_scan_invalid_json" };
+  }
+  const rawHits = Array.isArray(parsed?.hits) ? parsed.hits : [];
+  const hits: RepoSearchHit[] = [];
+  for (const raw of rawHits) {
+    const filePath =
+      typeof raw?.filePath === "string"
+        ? raw.filePath.replace(/\\/g, "/").trim()
+        : "";
+    if (!filePath) continue;
+    const line = Number.isFinite(Number(raw?.line))
+      ? Math.max(1, Math.trunc(Number(raw.line)))
+      : 1;
+    const text = typeof raw?.text === "string" ? clipLine(raw.text) : "";
+    if (!text) continue;
+    const termRaw =
+      typeof raw?.term === "string" && raw.term.trim().length > 0
+        ? sanitizeSearchTerm(raw.term)
+        : terms[0] ?? "";
+    if (!termRaw) continue;
+    hits.push({
+      filePath,
+      line,
+      text,
+      term: termRaw,
+    });
+  }
+  const error = typeof parsed?.error === "string" && parsed.error.trim() ? parsed.error.trim() : undefined;
+  return {
+    hits,
+    truncated: Boolean(parsed?.truncated),
+    error,
+    terms,
+  };
+};
+
+export async function runGitTrackedRepoSearch(input: {
+  query: string;
+  allowlist?: RegExp[];
+  avoidlist?: RegExp[];
+  maxHits?: number;
+}): Promise<GitTrackedRepoSearchResult> {
+  if (!GIT_TRACKED_SCAN_ENABLED) {
+    return { hits: [], truncated: false, terms: [] };
+  }
+  const terms = extractRepoSearchTerms(input.query).slice(0, GIT_TRACKED_SCAN_MAX_TERMS);
+  if (terms.length === 0) {
+    return { hits: [], truncated: false, terms };
+  }
+  if (!fs.existsSync(GIT_TRACKED_SCAN_SCRIPT)) {
+    return { hits: [], truncated: false, terms, error: "git_tracked_scan_script_missing" };
+  }
+  const allowlist = (input.allowlist ?? []).map((entry) => entry.source);
+  const avoidlist = (input.avoidlist ?? []).map((entry) => entry.source);
+  const maxHits = Math.max(1, Math.min(input.maxHits ?? GIT_TRACKED_SCAN_MAX_HITS, GIT_TRACKED_SCAN_MAX_HITS));
+  const args = [
+    GIT_TRACKED_SCAN_SCRIPT,
+    "--max-hits",
+    String(maxHits),
+    "--max-per-term",
+    String(GIT_TRACKED_SCAN_MAX_PER_TERM),
+    ...terms.flatMap((term) => ["--term", term]),
+    ...allowlist.flatMap((pattern) => ["--allow", pattern]),
+    ...avoidlist.flatMap((pattern) => ["--avoid", pattern]),
+  ];
+  const pythonBin = process.env.PYTHON_BIN || process.env.SUNPY_PYTHON_BIN || "python";
+  try {
+    const { stdout } = await execFileAsync(pythonBin, args, {
+      cwd: process.cwd(),
+      timeout: GIT_TRACKED_SCAN_TIMEOUT_MS,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    return parseGitTrackedScanOutput(stdout, terms);
+  } catch (error: any) {
+    const stdout = typeof error?.stdout === "string" ? error.stdout : "";
+    if (stdout.trim()) {
+      const parsed = parseGitTrackedScanOutput(stdout, terms);
+      if (!parsed.error || parsed.hits.length > 0) return parsed;
+    }
+    const message =
+      error?.code === "ENOENT"
+        ? "git_tracked_scan_python_not_found"
+        : error?.message?.includes("timed out")
+          ? "git_tracked_scan_timeout"
+          : "git_tracked_scan_failed";
+    return { hits: [], truncated: false, terms, error: message };
+  }
+}
 
 export function formatRepoSearchEvidence(result: RepoSearchResult): {
   evidenceText: string;

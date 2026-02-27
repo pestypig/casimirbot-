@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildRepoSearchPlan,
   PACKAGES_RETRIEVAL_FAIL_REASON,
+  runGitTrackedRepoSearch,
   resolvePackagesRetrievalMetadata,
   selectRepoSearchPaths,
 } from "../server/services/helix-ask/repo-search";
@@ -54,5 +55,18 @@ describe("helix ask repo search", () => {
     });
     expect(plan?.fail_reason).toBeUndefined();
     expect(PACKAGES_RETRIEVAL_FAIL_REASON).toBe("PACKAGES_EVIDENCE_PROVENANCE_MISSING");
+  });
+
+  it("supports git-tracked retrieval lane metadata without throwing", async () => {
+    const result = await runGitTrackedRepoSearch({
+      query: "needle hull natario",
+      maxHits: 4,
+    });
+    expect(result.terms.length).toBeGreaterThan(0);
+    expect(Array.isArray(result.hits)).toBe(true);
+    if (result.hits.length > 0) {
+      expect(result.hits[0]?.filePath.length).toBeGreaterThan(0);
+      expect(result.hits[0]?.line).toBeGreaterThan(0);
+    }
   });
 });

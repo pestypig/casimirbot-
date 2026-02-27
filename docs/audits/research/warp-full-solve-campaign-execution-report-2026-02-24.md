@@ -116,11 +116,11 @@ Per-wave gate status snapshots:
 | D | -12277918379371434000 | -18 | -12277918379371434000 | -12277918379371434000 | n/a | -18 | -12277918379371434000 | true | 1 | 682106576631746300 | true | true | true | both | warp.metric.T00.natario.shift | PASS |
 
 ## G4 governance decomposition
-- canonical authoritative class: both
-- governance artifact freshness: fresh
-- governance freshness reason: none
+- canonical authoritative class: evidence_path_blocked
+- governance artifact freshness: stale_provenance
+- governance freshness reason: artifactCommitHash=54a6693744819aace34072e4453ebd44f31d7cb4;headCommitHash=089a24fb82bf9f790ce136eb4e794f43d42fa456;wellFormed=true;resolvable=true
 - governance artifact commit: 54a6693744819aace34072e4453ebd44f31d7cb4
-- current head commit: 54a6693744819aace34072e4453ebd44f31d7cb4
+- current head commit: 089a24fb82bf9f790ce136eb4e794f43d42fa456
 - policy floor dominated: true
 - policy exceeded (marginRatioRaw >= 1): true
 - computed exceeded (marginRatioRawComputed >= 1): true
@@ -151,18 +151,18 @@ Per-wave gate status snapshots:
 - candidate found canonical/policy semantics: no
 - candidate found computed-only counterfactual semantics: no
 - case count: 160
-- attempted case universe: 4976640
+- attempted case universe: 8709120
 - executed case count: 160
 - min marginRatioRaw among applicability PASS: n/a
 - min marginRatioRawComputed among applicability PASS: n/a
-- best candidate id: case_0049
-- best candidate marginRatioRawComputed: 1498144.7503704906
+- best candidate id: case_0109
+- best candidate marginRatioRawComputed: 1498141.138779572
 - best candidate marginRatioRaw: 1
 - best candidate applicabilityStatus: UNKNOWN
 - best candidate canonical-pass eligible: false
 - best candidate counterfactual-pass eligible: false
 - best candidate semantics class: no_pass_signal
-- recovery provenance commit: 54a6693744819aace34072e4453ebd44f31d7cb4
+- recovery provenance commit: 089a24fb82bf9f790ce136eb4e794f43d42fa456
 - recovery provenance freshness vs HEAD: fresh
 
 ## G4 recovery parity summary
@@ -170,9 +170,9 @@ Per-wave gate status snapshots:
 - anyCanonicalPassCandidate: false
 - anyComputedOnlyPassCandidate: false
 - dominantFailureMode: applicability_limited
-- selectionPolicy: fallback_global_min_raw_computed
+- selectionPolicy: comparable_canonical
 - parity artifact: artifacts/research/full-solve/g4-recovery-parity-2026-02-27.json
-- parity provenance commit: 54a6693744819aace34072e4453ebd44f31d7cb4
+- parity provenance commit: 089a24fb82bf9f790ce136eb4e794f43d42fa456
 - parity provenance freshness vs HEAD: fresh
 - canonical decision remains authoritative until wave profiles are promoted and rerun.
 

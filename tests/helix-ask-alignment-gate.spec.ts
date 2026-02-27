@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   evaluateHelixAskAlignmentGate,
+  resolveFrontierHardGuard,
   resolveOpenWorldBypassPolicy,
 } from "../server/services/helix-ask/alignment-gate";
 
@@ -74,5 +75,40 @@ describe("open world bypass policy", () => {
     });
     expect(result.action).toBe("bypass_with_uncertainty");
     expect(result.reason).toBe("alignment_fail_open_world_bypass");
+  });
+});
+
+describe("frontier hard guard", () => {
+  it("forces clarify when support ratio is zero and bypass is inactive", () => {
+    const result = resolveFrontierHardGuard({
+      supportRatio: 0,
+      missingRequiredSlots: [],
+      openWorldBypassActive: false,
+    });
+    expect(result.triggered).toBe(true);
+    expect(result.action).toBe("clarify_fail_closed");
+    expect(result.reason).toBe("support_ratio_zero");
+  });
+
+  it("forces bypass mode when support ratio is zero and bypass is active", () => {
+    const result = resolveFrontierHardGuard({
+      supportRatio: 0,
+      missingRequiredSlots: ["definitions"],
+      openWorldBypassActive: true,
+    });
+    expect(result.triggered).toBe(true);
+    expect(result.action).toBe("bypass_with_uncertainty");
+    expect(result.reason).toBe("support_ratio_zero_and_required_slots_missing");
+  });
+
+  it("stays inactive when support ratio is positive and required slots are present", () => {
+    const result = resolveFrontierHardGuard({
+      supportRatio: 0.4,
+      missingRequiredSlots: [],
+      openWorldBypassActive: false,
+    });
+    expect(result.triggered).toBe(false);
+    expect(result.action).toBe("none");
+    expect(result.reason).toBe("none");
   });
 });

@@ -63,7 +63,7 @@ Live events
 - Helix Ask: Retrieval scope - ok
 
 ## 5) Retrieval (multi-channel)
-- Channels: lexical, symbol, fuzzy, path (path lookup for explicit file hints).
+- Channels: lexical, symbol, fuzzy, path, git_tracked (tracked-file scan lane for out-of-lattice evidence).
 - Weighted RRF fusion + MMR selection.
 
 Live events

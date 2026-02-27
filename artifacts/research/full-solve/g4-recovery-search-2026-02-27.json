@@ -1,6 +1,6 @@
 {
   "runId": "g4-recovery-search-20260227-2026-02-27",
-  "generatedAt": "2026-02-27T07:54:06.751Z",
+  "generatedAt": "2026-02-27T17:29:29.385Z",
   "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
   "deterministicSearch": {
     "seed": 20260227,
@@ -9,7 +9,7 @@
     "attemptedCaseUniverse": 8709120,
     "executedCaseCount": 160,
     "evaluatedCaseCount": 160,
-    "elapsedMs": 3693,
+    "elapsedMs": 2482,
     "deterministicWalk": {
       "start": 2841987,
       "step": 6655861
@@ -59,10 +59,10 @@
     ],
     "rhoSource": "warp.metric.T00.natario_sdf.shift",
     "classificationTag": "applicability_limited",
-    "comparabilityClass": "non_comparable_missing_signals"
+    "comparabilityClass": "comparable_canonical"
   },
   "provenance": {
-    "commitHash": "d13b32c0f72da941a57bb966f06ee48513f40980",
+    "commitHash": "089a24fb82bf9f790ce136eb4e794f43d42fa456",
     "freshnessSource": "git.head"
   },
   "topRankedApplicabilityPassCases": [],
@@ -100,7 +100,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0002",
@@ -135,7 +135,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0003",
@@ -170,7 +170,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0004",
@@ -205,7 +205,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0005",
@@ -240,7 +240,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0006",
@@ -275,7 +275,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0007",
@@ -310,7 +310,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0008",
@@ -345,7 +345,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0009",
@@ -380,7 +380,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0010",
@@ -415,7 +415,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0011",
@@ -450,7 +450,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0012",
@@ -485,7 +485,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0013",
@@ -520,7 +520,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0014",
@@ -555,7 +555,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0015",
@@ -590,7 +590,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0016",
@@ -625,7 +625,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0017",
@@ -660,7 +660,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0018",
@@ -695,7 +695,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0019",
@@ -730,7 +730,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0020",
@@ -765,7 +765,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0021",
@@ -800,7 +800,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0022",
@@ -835,7 +835,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0023",
@@ -870,7 +870,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0024",
@@ -905,7 +905,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0025",
@@ -940,7 +940,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0026",
@@ -975,7 +975,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0027",
@@ -1010,7 +1010,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0028",
@@ -1045,7 +1045,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0029",
@@ -1080,7 +1080,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0030",
@@ -1115,7 +1115,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0031",
@@ -1150,7 +1150,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0032",
@@ -1185,7 +1185,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0033",
@@ -1220,7 +1220,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0034",
@@ -1255,7 +1255,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0035",
@@ -1290,7 +1290,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0036",
@@ -1325,7 +1325,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0037",
@@ -1360,7 +1360,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0038",
@@ -1395,7 +1395,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0039",
@@ -1430,7 +1430,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0040",
@@ -1465,7 +1465,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0041",
@@ -1500,7 +1500,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0042",
@@ -1535,7 +1535,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0043",
@@ -1570,7 +1570,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0044",
@@ -1605,7 +1605,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0045",
@@ -1640,7 +1640,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0046",
@@ -1675,7 +1675,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0047",
@@ -1710,7 +1710,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0048",
@@ -1745,7 +1745,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0049",
@@ -1780,7 +1780,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0050",
@@ -1815,7 +1815,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0051",
@@ -1850,7 +1850,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0052",
@@ -1885,7 +1885,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0053",
@@ -1920,7 +1920,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0054",
@@ -1955,7 +1955,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0055",
@@ -1990,7 +1990,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0056",
@@ -2025,7 +2025,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0057",
@@ -2060,7 +2060,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0058",
@@ -2095,7 +2095,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0059",
@@ -2130,7 +2130,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0060",
@@ -2165,7 +2165,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0061",
@@ -2200,7 +2200,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0062",
@@ -2235,7 +2235,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0063",
@@ -2270,7 +2270,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0064",
@@ -2305,7 +2305,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0065",
@@ -2340,7 +2340,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0066",
@@ -2375,7 +2375,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0067",
@@ -2410,7 +2410,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0068",
@@ -2445,7 +2445,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0069",
@@ -2480,7 +2480,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0070",
@@ -2515,7 +2515,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0071",
@@ -2550,7 +2550,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0072",
@@ -2585,7 +2585,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0073",
@@ -2620,7 +2620,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0074",
@@ -2655,7 +2655,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0075",
@@ -2690,7 +2690,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0076",
@@ -2725,7 +2725,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0077",
@@ -2760,7 +2760,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0078",
@@ -2795,7 +2795,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0079",
@@ -2830,7 +2830,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0080",
@@ -2865,7 +2865,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0081",
@@ -2900,7 +2900,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0082",
@@ -2935,7 +2935,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0083",
@@ -2970,7 +2970,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0084",
@@ -3005,7 +3005,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0085",
@@ -3040,7 +3040,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0086",
@@ -3075,7 +3075,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0087",
@@ -3110,7 +3110,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0088",
@@ -3145,7 +3145,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0089",
@@ -3180,7 +3180,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0090",
@@ -3215,7 +3215,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0091",
@@ -3250,7 +3250,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0092",
@@ -3285,7 +3285,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0093",
@@ -3320,7 +3320,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0094",
@@ -3355,7 +3355,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0095",
@@ -3390,7 +3390,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0096",
@@ -3425,7 +3425,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0097",
@@ -3460,7 +3460,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0098",
@@ -3495,7 +3495,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0099",
@@ -3530,7 +3530,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0100",
@@ -3565,7 +3565,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0101",
@@ -3600,7 +3600,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0102",
@@ -3635,7 +3635,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0103",
@@ -3670,7 +3670,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0104",
@@ -3705,7 +3705,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0105",
@@ -3740,7 +3740,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0106",
@@ -3775,7 +3775,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0107",
@@ -3810,7 +3810,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0108",
@@ -3845,7 +3845,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0109",
@@ -3880,7 +3880,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0110",
@@ -3915,7 +3915,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0111",
@@ -3950,7 +3950,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0112",
@@ -3985,7 +3985,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0113",
@@ -4020,7 +4020,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0114",
@@ -4055,7 +4055,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0115",
@@ -4090,7 +4090,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0116",
@@ -4125,7 +4125,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0117",
@@ -4160,7 +4160,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0118",
@@ -4195,7 +4195,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0119",
@@ -4230,7 +4230,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0120",
@@ -4265,7 +4265,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0121",
@@ -4300,7 +4300,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0122",
@@ -4335,7 +4335,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0123",
@@ -4370,7 +4370,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0124",
@@ -4405,7 +4405,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0125",
@@ -4440,7 +4440,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0126",
@@ -4475,7 +4475,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0127",
@@ -4510,7 +4510,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0128",
@@ -4545,7 +4545,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0129",
@@ -4580,7 +4580,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0130",
@@ -4615,7 +4615,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0131",
@@ -4650,7 +4650,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0132",
@@ -4685,7 +4685,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0133",
@@ -4720,7 +4720,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0134",
@@ -4755,7 +4755,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0135",
@@ -4790,7 +4790,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0136",
@@ -4825,7 +4825,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0137",
@@ -4860,7 +4860,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0138",
@@ -4895,7 +4895,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0139",
@@ -4930,7 +4930,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0140",
@@ -4965,7 +4965,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0141",
@@ -5000,7 +5000,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0142",
@@ -5035,7 +5035,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0143",
@@ -5070,7 +5070,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0144",
@@ -5105,7 +5105,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0145",
@@ -5140,7 +5140,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0146",
@@ -5175,7 +5175,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0147",
@@ -5210,7 +5210,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0148",
@@ -5245,7 +5245,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0149",
@@ -5280,7 +5280,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0150",
@@ -5315,7 +5315,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0151",
@@ -5350,7 +5350,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0152",
@@ -5385,7 +5385,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0153",
@@ -5420,7 +5420,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0154",
@@ -5455,7 +5455,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0155",
@@ -5490,7 +5490,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0156",
@@ -5525,7 +5525,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0157",
@@ -5560,7 +5560,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0158",
@@ -5595,7 +5595,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0159",
@@ -5630,7 +5630,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0160",
@@ -5665,7 +5665,7 @@
       ],
       "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "non_comparable_missing_signals"
+      "comparabilityClass": "comparable_canonical"
     }
   ]
 }

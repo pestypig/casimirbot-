@@ -14,6 +14,14 @@ describe("Helix Ask concept candidates", () => {
     expect(candidates[0].card.id).toBe("feedback-loop-hygiene");
   });
 
+  it("maps needle hull Natario questions to the Natario warp concept", () => {
+    const match = findConceptMatch("Is the needle hull a Natario solution?");
+    expect(match).not.toBeNull();
+    expect(match?.card.id).toBe("natario-zero-expansion");
+    expect(match?.card.aliases).toContain("needle hull");
+    expect(match?.card.mustIncludeFiles).toContain("docs/needle-hull-mainframe.md");
+  });
+
 
   it("applies conservative concept provenance defaults when frontmatter is missing", () => {
     const match = findConceptMatch("What is epistemology?");

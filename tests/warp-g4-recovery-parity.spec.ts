@@ -114,9 +114,11 @@ describe('warp g4 recovery parity', () => {
     const result = await runRecoveryParity({ topN: 2, recoveryPath, outPath });
     expect(result.ok).toBe(true);
     expect(result.selectionPolicy).toBe('fallback_no_comparable_canonical');
+    expect((result as any).blockedReason).toBe('no_canonical_comparable_candidates');
 
     const payload = JSON.parse(fs.readFileSync(outPath, 'utf8'));
     expect(payload.selectionPolicy).toBe('fallback_no_comparable_canonical');
+    expect(payload.blockedReason).toBe('no_canonical_comparable_candidates');
     expect(payload.candidateCountChecked).toBe(0);
     expect(payload.candidates).toEqual([]);
   });
@@ -191,7 +193,7 @@ describe('warp g4 recovery parity', () => {
     });
   });
 
-  it('treats UNKNOWN applicability as non-comparable missing-signals even when numeric fields are present', async () => {
+  it('keeps UNKNOWN applicability structurally comparable when canonical signal fields are present', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-parity-unknown-'));
     const recoveryPath = path.join(tmpDir, 'recovery.json');
     const outPath = path.join(tmpDir, 'parity.json');
@@ -226,8 +228,9 @@ describe('warp g4 recovery parity', () => {
     expect(result.ok).toBe(true);
 
     const payload = JSON.parse(fs.readFileSync(outPath, 'utf8'));
-    expect(payload.comparability.canonicalComparableCaseCount).toBe(0);
-    expect(payload.comparability.nonComparableBuckets.non_comparable_missing_signals).toBe(1);
+    expect(payload.comparability.canonicalComparableCaseCount).toBe(1);
+    expect(payload.selectionPolicy).toBe('comparable_canonical');
+    expect(payload.candidateCountChecked).toBe(1);
   });
 
   it('treats tiny relative numeric drift as a parity match for large magnitudes', async () => {
