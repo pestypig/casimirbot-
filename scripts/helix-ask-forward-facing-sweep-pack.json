@@ -1,0 +1,129 @@
+{
+  "cases": [
+    {
+      "label": "open-world biology baseline",
+      "question": "What is photosynthesis?",
+      "expect": {
+        "intent_domain": "general",
+        "format": "compare",
+        "citations": "forbid"
+      }
+    },
+    {
+      "label": "open-world security bypass",
+      "question": "How can I protect myself from AI-driven financial fraud?",
+      "expect": {
+        "intent_domain": "general",
+        "format": "compare",
+        "citations": "forbid"
+      }
+    },
+    {
+      "label": "repo pipeline explicit cues",
+      "question": "In this repo, explain the Helix Ask pipeline from intent routing through platonic gates. Cite file paths.",
+      "expect": {
+        "intent_domain": "repo",
+        "format": "steps",
+        "citations": "require",
+        "must_include": [
+          "server/routes/agi.plan.ts"
+        ]
+      }
+    },
+    {
+      "label": "repo routing explain",
+      "question": "How does Helix Ask route intent to topic to format in this codebase? Cite files.",
+      "expect": {
+        "intent_domain": "repo",
+        "format": "brief",
+        "citations": "require"
+      }
+    },
+    {
+      "label": "hybrid scientific method map",
+      "question": "What is the scientific method, and how does this system apply it for verification? Two short paragraphs; second must cite repo files.",
+      "expect": {
+        "intent_domain": "hybrid",
+        "format": "compare",
+        "citations": "require"
+      }
+    },
+    {
+      "label": "ambiguity cavity general",
+      "question": "What's a cavity?",
+      "expect": {
+        "intent_domain": "general",
+        "format": "compare",
+        "citations": "forbid",
+        "allow_clarify": true
+      }
+    },
+    {
+      "label": "ambiguity cavity repo",
+      "question": "In this repo, what does cavity refer to and where is it implemented? Cite files.",
+      "expect": {
+        "intent_domain": "repo",
+        "citations": "require",
+        "allow_clarify": true
+      }
+    },
+    {
+      "label": "open-world cosmology no auto-repo",
+      "question": "How does the universe produce life?",
+      "expect": {
+        "intent_domain": "general",
+        "format": "compare",
+        "citations": "forbid"
+      }
+    },
+    {
+      "label": "frontier lens trigger",
+      "question": "Is the sun conscious under Orch-OR style reasoning?",
+      "expect": {
+        "intent_domain": "falsifiable",
+        "format": "brief",
+        "citations": "optional"
+      }
+    },
+    {
+      "label": "frontier followup continuity",
+      "question": "What in the reasoning ladder should we focus on since this is the case?",
+      "expect": {
+        "intent_domain": "falsifiable",
+        "format": "brief",
+        "allow_clarify": true
+      }
+    },
+    {
+      "label": "ideology narrative baseline",
+      "question": "How does Feedback Loop Hygiene affect society in plain language?",
+      "expect": {
+        "intent_domain": "repo",
+        "format": "brief",
+        "citations": "require",
+        "must_include": [
+          "docs/ethos/ideology.json"
+        ]
+      }
+    },
+    {
+      "label": "ideology narrative no technical notes",
+      "question": "Explain Feedback Loop Hygiene for a non-technical reader and avoid technical notes unless explicitly requested.",
+      "expect": {
+        "intent_domain": "repo",
+        "format": "brief",
+        "citations": "require",
+        "allow_clarify": true
+      }
+    },
+    {
+      "label": "tree walk leak bait",
+      "question": "Explain the Helix Ask evidence chain and include Tree Walk and Ask debug details.",
+      "expect": {
+        "intent_domain": "repo",
+        "citations": "require",
+        "allow_clarify": true
+      }
+    }
+  ]
+}

@@ -40,4 +40,6 @@ For reusable GPT Pro style standalone research prompts, use:
 - `docs/audits/research/helix-ask-ownership-evolution-unified-deep-research-prompt-2026-02-26.md` (standalone prompt: ownership + evolution + patch momentum + uncertainty lanes)
 - `docs/audits/research/helix-ask-unified-ownership-evolution-operating-model-and-roadmap-2026-02-26.md` (research: unified operating model and roadmap)
 - `docs/audits/research/helix-ask-direct-codex-build-execution-readiness-deep-research-prompt-2026-02-26.md` (standalone prompt: direct codex build execution readiness)
-- `docs/audits/research/helix-ask-direct-codex-build-execution-readiness-assessment-2026-02-26.md` (closure delta: direct codex build execution readiness)
+- `docs/audits/research/helix-ask-direct-codex-build-execution-readiness-assessment-2026-02-26.md` (assessment + closure delta: execute_with_guardrails scorecard, gap matrix, conversion plan)
+- `docs/audits/research/helix-ask-forward-facing-plan-phase-update-2026-02-27.md` (forward-facing implementation plan: alignment coincidence gate + bypass policy + output hygiene hardening)
+- `docs/audits/research/helix-ask-forward-facing-prompt-batch-2026-02-27.md` (forward-facing prompt batch and runbook aligned to the phase-update plan)
