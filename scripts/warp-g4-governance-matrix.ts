@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 type Wave = 'A' | 'B' | 'C' | 'D';
@@ -14,6 +14,7 @@ const OUT_MD = path.join('docs', 'audits', 'research', `warp-g4-governance-matri
 const WAVES: Wave[] = ['A', 'B', 'C', 'D'];
 const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
+const COMMIT_HASH_RE = /^[0-9a-f]{7,40}$/i;
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 
@@ -24,6 +25,7 @@ const fmt = (n: number | null): string => (n == null ? 'n/a' : Number(n).toStrin
 
 type Row = {
   wave: Wave;
+  evidencePresent: boolean;
   lhs_Jm3: number | null;
   boundComputed_Jm3: number | null;
   boundUsed_Jm3: number | null;
@@ -52,6 +54,31 @@ type GenerateG4GovernanceMatrixOptions = {
 function readJson(filePath: string): any {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
+
+const tryReadJson = (filePath: string): any | null => {
+  if (!fs.existsSync(filePath)) return null;
+  return readJson(filePath);
+};
+
+const isResolvableCommitHash = (hash: string, cwd: string): boolean => {
+  try {
+    execFileSync('git', ['cat-file', '-e', `${hash}^{commit}`], { encoding: 'utf8', stdio: 'ignore', cwd });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const resolveHeadCommitHash = (cwdCandidates: string[]): string | null => {
+  for (const cwd of cwdCandidates) {
+    try {
+      return execSync('git rev-parse HEAD', { encoding: 'utf8', cwd, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    } catch {
+      continue;
+    }
+  }
+  return null;
+};
 
 function classifyAuthoritative(d: Row['g4DualFailMode']): Row['canonicalAuthoritativeClass'] {
   if (d === 'both') return 'both';
@@ -98,11 +125,42 @@ export function generateG4GovernanceMatrix(options: GenerateG4GovernanceMatrixOp
   const outJsonPath = options.outJsonPath ?? path.join(rootDir, OUT_JSON);
   const outMdPath = options.outMdPath ?? path.join(rootDir, OUT_MD);
   const waves = options.waves ?? WAVES;
-  const getCommitHash = options.getCommitHash ?? (() => execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim());
+  const getCommitHash =
+    options.getCommitHash ??
+    (() => execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
 
   const commitHash = getCommitHash();
+  const headCommitHash = resolveHeadCommitHash([rootDir, process.cwd()]);
+  const commitHashShapeValid = COMMIT_HASH_RE.test(commitHash);
+  const commitHashResolvable = commitHashShapeValid && isResolvableCommitHash(commitHash, rootDir);
+  const commitHashMatchesHead = headCommitHash != null && commitHashResolvable && commitHash === headCommitHash;
+  const missingWaves: Wave[] = [];
   const rows: Row[] = waves.map((wave) => {
-    const evidence = readJson(path.join(rootDir, ROOT, wave, 'evidence-pack.json'));
+    const canonicalEvidencePath = path.join(rootDir, ROOT, wave, 'evidence-pack.json');
+    const fallbackEvidencePath = path.join(rootDir, wave, 'evidence-pack.json');
+    const evidence = tryReadJson(canonicalEvidencePath) ?? tryReadJson(fallbackEvidencePath);
+    if (!evidence) {
+      missingWaves.push(wave);
+      return {
+        wave,
+        evidencePresent: false,
+        lhs_Jm3: null,
+        boundComputed_Jm3: null,
+        boundUsed_Jm3: null,
+        boundFloorApplied: null,
+        marginRatioRaw: null,
+        marginRatioRawComputed: null,
+        applicabilityStatus: 'UNKNOWN',
+        g4FloorDominated: false,
+        g4PolicyExceeded: false,
+        g4ComputedExceeded: false,
+        g4DualFailMode: 'neither',
+        canonicalAuthoritativeClass: 'neither',
+        computedOnlyCounterfactualClass: 'neither',
+        mismatch: false,
+        mismatchReason: 'missing_evidence_pack',
+      };
+    }
     const d = evidence?.g4Diagnostics ?? {};
     const lhs = finiteOrNull(d.lhs_Jm3);
     const boundComputed = finiteOrNull(d.boundComputed_Jm3);
@@ -123,6 +181,7 @@ export function generateG4GovernanceMatrix(options: GenerateG4GovernanceMatrixOp
 
     return {
       wave,
+      evidencePresent: true,
       lhs_Jm3: lhs,
       boundComputed_Jm3: boundComputed,
       boundUsed_Jm3: boundUsed,
@@ -141,13 +200,24 @@ export function generateG4GovernanceMatrix(options: GenerateG4GovernanceMatrixOp
     };
   });
 
-  const aggregateCanonical = classifyAggregate(rows.map((r) => r.canonicalAuthoritativeClass));
+  const aggregateCanonical = missingWaves.length > 0
+    ? {
+        canonicalAuthoritativeClass: 'evidence_path_blocked' as AuthoritativeClass,
+        mismatch: true,
+        mismatchReason: `canonical_authoritative_aggregate_missing_required_waves:${missingWaves.join(',')}`,
+      }
+    : classifyAggregate(rows.map((r) => r.canonicalAuthoritativeClass));
   const aggregateCounterfactual = aggregateCounterfactualClass(rows.map((r) => r.computedOnlyCounterfactualClass));
 
   const payload = {
     date: DATE,
     commitHash,
+    headCommitHash,
+    commitHashShapeValid,
+    commitHashResolvable,
+    commitHashMatchesHead,
     boundaryStatement: BOUNDARY_STATEMENT,
+    canonicalMissingWaves: missingWaves,
     canonicalAuthoritativeClass: aggregateCanonical.canonicalAuthoritativeClass,
     computedOnlyCounterfactualClass: aggregateCounterfactual,
     mismatch: aggregateCanonical.mismatch || aggregateCanonical.canonicalAuthoritativeClass !== aggregateCounterfactual,

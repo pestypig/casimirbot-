@@ -100,6 +100,9 @@ describe('g4-decision-ledger generator', () => {
       'canonical_authoritative_override: canonical=margin_limited;scan=applicability_limited',
     );
     expect(ledger.commitHash).toBe('deadbeef');
+    expect(ledger.commitHashShapeValid).toBe(true);
+    expect(ledger.commitHashResolvable).toBe(false);
+    expect(ledger.commitHashMatchesHead).toBe(false);
     expect(ledger.boundaryStatement).toBe(BOUNDARY_STATEMENT);
   });
 });

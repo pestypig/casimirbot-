@@ -117,6 +117,10 @@ Per-wave gate status snapshots:
 
 ## G4 governance decomposition
 - canonical authoritative class: both
+- governance artifact freshness: fresh
+- governance freshness reason: none
+- governance artifact commit: 3afc13d96bd3171bc56ed1ab44ba4c31bba31690
+- current head commit: 3afc13d96bd3171bc56ed1ab44ba4c31bba31690
 - policy floor dominated: true
 - policy exceeded (marginRatioRaw >= 1): true
 - computed exceeded (marginRatioRawComputed >= 1): true
