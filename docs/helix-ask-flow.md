@@ -105,3 +105,14 @@ A complementary governance loop now exists for patch lifecycle checks:
 5) Query rolling trajectory with `/api/evolution/trajectory/:id`.
 
 This loop does not replace Helix Ask answering flow and does not bypass Casimir verification requirements.
+
+
+## Forward-facing alignment coincidence gate (phase update)
+- Helix Ask now computes alignment gate metrics before final synthesis + arbiter finalization:
+  `alignment_real`, `alignment_decoy`, `coincidence_margin`, `stability_3_rewrites`,
+  `contradiction_rate`, `lower95_p_align`.
+- Gate decision is deterministic: `PASS | BORDERLINE | FAIL`.
+- `open_world_bypass_mode` policy is explicit:
+  - repo-required + alignment FAIL => clarify/fail-closed.
+  - open-world-allowed + alignment FAIL => bypass with explicit uncertainty and no fabricated repo citations.
+- Output hygiene strips Tree Walk/Execution log/Ask debug variants before final answer text, while preserving valid `Sources:` lines.

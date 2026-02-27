@@ -164,6 +164,7 @@ import {
   tokenizeAskQuery,
 } from "../services/helix-ask/query";
 import { resolveHelixAskArbiter } from "../services/helix-ask/arbiter";
+import { evaluateHelixAskAlignmentGate, resolveOpenWorldBypassPolicy } from "../services/helix-ask/alignment-gate";
 import {
   buildHelixAskVerifyDegradedFirstFail,
   resolveHelixAskVerifyDegradeReason,
@@ -4800,6 +4801,27 @@ function hasSourcesLine(value: string): boolean {
   if (!value) return false;
   return /(?:^|\n)sources?\s*:\s*\S/i.test(value);
 }
+
+function stripRepoCitationsForOpenWorldBypass(value: string): string {
+  if (!value) return value;
+  return value
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*sources?\s*:/i.test(line.trim()))
+    .join("\n")
+    .trim();
+}
+
+function ensureOpenWorldBypassUncertainty(value: string): string {
+  const body = value.trim();
+  const prefix =
+    "I couldn't confirm this against repo-grounded evidence, so this is an open-world best-effort answer with explicit uncertainty.";
+  if (!body) return prefix;
+  if (body.toLowerCase().includes("open-world best-effort") || body.toLowerCase().includes("explicit uncertainty")) {
+    return body;
+  }
+  return `${prefix}\n\n${body}`;
+}
+
 
 function repairAnswerFilePathFragments(
   answer: string,
@@ -21634,6 +21656,8 @@ const executeHelixAsk = async ({
     let blockGateDecision: string | undefined;
     let failClosedRepoEvidence = false;
     let failClosedReason: string | null = null;
+    let alignmentGateDecision: "PASS" | "BORDERLINE" | "FAIL" = "PASS";
+    let openWorldBypassMode: "off" | "active" = "off";
     let runtimeBudgetRecommend: string | null = null;
     const arbiterAnswerArtifacts: {
       provenance_class: "measured" | "proxy" | "inferred";
@@ -24038,6 +24062,37 @@ const executeHelixAsk = async ({
           failClosedReason = null;
         }
         failClosedRepoEvidence = Boolean(failClosedReason);
+        const alignmentGate = evaluateHelixAskAlignmentGate({
+          alignment_real: retrievalConfidence,
+          alignment_decoy: 1 - retrievalConfidence,
+          stability_3_rewrites: mustIncludeOk ? 0.82 : 0.58,
+          contradiction_rate: failClosedRepoEvidence ? 0.24 : 0.05,
+          sampleCount: 3,
+        });
+        alignmentGateDecision = alignmentGate.decision;
+        const openWorldBypassPolicy = resolveOpenWorldBypassPolicy({
+          gateDecision: alignmentGate.decision,
+          requiresRepoEvidence,
+          openWorldAllowed:
+            !requiresRepoEvidence &&
+            (isOpenWorldExplainerQuestion(baseQuestion) ||
+              isSecurityRiskPrompt(baseQuestion) ||
+              intentDomain === "general"),
+        });
+        if (openWorldBypassPolicy.action === "clarify_fail_closed" && !failClosedReason) {
+          failClosedReason = "alignment_gate_fail_repo_required";
+          failClosedRepoEvidence = true;
+        }
+        if (openWorldBypassPolicy.action === "bypass_with_uncertainty") {
+          openWorldBypassMode = "active";
+          answerPath.push("openWorldBypass:alignment_fail");
+        }
+        if (debugPayload) {
+          debugPayload.alignment_gate_decision = alignmentGate.decision;
+          debugPayload.open_world_bypass_mode = openWorldBypassMode;
+          (debugPayload as Record<string, unknown>).alignment_gate_metrics = alignmentGate.metrics;
+          (debugPayload as Record<string, unknown>).open_world_bypass_policy = openWorldBypassPolicy;
+        }
         const hasHighStakesConstraints =
           intentTier === "F3" ||
           intentStrategy === "constraint_report" ||
@@ -24102,6 +24157,10 @@ const executeHelixAsk = async ({
             ? "repo_grounded"
             : rawArbiterMode;
         let arbiterReason = arbiterDecision.reason;
+        if (alignmentGateDecision === "FAIL" && openWorldBypassMode !== "active") {
+          arbiterMode = "clarify";
+          arbiterReason = "alignment_gate_fail_repo_required";
+        }
         if (isFrontierTheoryLensActive() && arbiterMode === "general") {
           arbiterMode = "clarify";
           arbiterReason = "frontier_lens_non_general_guard";
@@ -29569,6 +29628,10 @@ const executeHelixAsk = async ({
         answerPath.push("policy:non_report_scaffold_guard");
       }
       cleaned = finalNonReportGuard.text;
+      if (openWorldBypassMode === "active") {
+        cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
+        cleaned = ensureOpenWorldBypassUncertainty(cleaned);
+      }
       if (debugPayload && !reportDecision.enabled && intentStrategy !== "constraint_report") {
         debugPayload.report_mode_mismatch = finalNonReportGuard.mismatch;
         debugPayload.report_scaffold_guard_triggered =

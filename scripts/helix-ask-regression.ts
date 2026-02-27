@@ -6,6 +6,8 @@ type HelixAskDebug = {
   clarify_triggered?: boolean;
   ambiguity_target_span?: string;
   ambiguity_cluster_count?: number;
+  open_world_bypass_mode?: "off" | "active";
+  alignment_gate_decision?: "PASS" | "BORDERLINE" | "FAIL";
 };
 
 type AskResponse = {
@@ -109,6 +111,17 @@ const cases: RegressionCase[] = [
       intent_domain: "repo",
       format: "steps",
       stage_tags: false,
+    },
+  },
+  {
+    label: "open-world bypass uncertainty",
+    question: "How can I protect myself from AI-driven financial fraud?",
+    expect: {
+      intent_id: "general.conceptual_define_compare",
+      intent_domain: "general",
+      format: "compare",
+      mustIncludeText: ["open-world best-effort", "explicit uncertainty"],
+      mustNotIncludeText: ["Sources:", "Tree Walk", "Ask debug", "Execution log"],
     },
   },
 ];

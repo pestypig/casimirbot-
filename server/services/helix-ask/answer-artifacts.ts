@@ -17,6 +17,9 @@ const RUNAWAY_MARKER_RE = new RegExp(
 );
 
 const SOURCES_LINE_RE = /^sources\s*:\s*(.+)$/i;
+const TREE_WALK_VARIANT_RE = /^\s*(?:#{1,6}\s*)?tree\s*walk\b\s*(?::|-)?/i;
+const EXECUTION_LOG_VARIANT_RE = /^\s*(?:#{1,6}\s*)?execution\s*log\b\s*(?::|-)?/i;
+const ASK_DEBUG_VARIANT_RE = /^\s*(?:#{1,6}\s*)?ask\s*debug\b\s*(?::|-)?/i;
 
 const collectSourcesLines = (value: string): string[] => {
   if (!value) return [];
@@ -43,9 +46,10 @@ const appendMissingSourcesLines = (cleaned: string, original: string): string =>
     output.pop();
   }
   if (output.length > 0) output.push("");
-  output.push(...merged.map((entry) => `Sources: ${entry.replace(/^sources\s*:\s*/i, '')}`));
+  output.push(...merged.map((entry) => `Sources: ${entry.replace(/^sources\s*:\s*/i, "")}`));
   return output.join("\n").trim();
 };
+
 const stripDuplicateTrailingSources = (value: string): string => {
   const lines = value.split(/\r?\n/);
   const out: string[] = [];
@@ -69,6 +73,31 @@ const stripDuplicateTrailingSources = (value: string): string => {
   return out.join("\n");
 };
 
+const stripDebugVariants = (value: string): string => {
+  const lines = value.split(/\r?\n/);
+  const out: string[] = [];
+  let skipping = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const marker =
+      TREE_WALK_VARIANT_RE.test(trimmed) ||
+      EXECUTION_LOG_VARIANT_RE.test(trimmed) ||
+      ASK_DEBUG_VARIANT_RE.test(trimmed);
+    if (marker) {
+      skipping = true;
+      continue;
+    }
+    if (skipping) {
+      if (!trimmed) {
+        skipping = false;
+      }
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join("\n");
+};
+
 export const stripRunawayAnswerArtifacts = (value: string): string => {
   if (!value) return value;
   let cleaned = value;
@@ -79,6 +108,7 @@ export const stripRunawayAnswerArtifacts = (value: string): string => {
   cleaned = cleaned.replace(/\bEND_OF_ANSWER\b/gi, "");
   cleaned = cleaned.replace(/(?:\bEND\.\s*){3,}/gi, "");
   cleaned = cleaned.replace(/(?:\s*END\.\s*)+$/i, "");
+  cleaned = stripDebugVariants(cleaned);
   const markerMatch = cleaned.match(RUNAWAY_MARKER_RE);
   if (markerMatch && typeof markerMatch.index === "number") {
     cleaned = cleaned.slice(0, markerMatch.index);
@@ -88,4 +118,3 @@ export const stripRunawayAnswerArtifacts = (value: string): string => {
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
   return cleaned;
 };
-

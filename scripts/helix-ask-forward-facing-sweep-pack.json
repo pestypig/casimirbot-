@@ -15,7 +15,10 @@
       "expect": {
         "intent_domain": "general",
         "format": "compare",
-        "citations": "forbid"
+        "citations": "forbid",
+        "must_include": [
+          "explicit uncertainty"
+        ]
       }
     },
     {
