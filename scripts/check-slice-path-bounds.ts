@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type SlicePathBoundsInput = {
   changedPaths: string[];
@@ -48,7 +49,18 @@ export function evaluateSlicePathBounds(input: SlicePathBoundsInput): SlicePathB
   };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+export function isCliEntrypoint(argv = process.argv): boolean {
+  const argvPath = argv[1];
+  if (!argvPath) {
+    return false;
+  }
+
+  const scriptPath = fileURLToPath(import.meta.url);
+  const resolvedArgvPath = path.resolve(argvPath);
+  return path.normalize(resolvedArgvPath) === path.normalize(scriptPath);
+}
+
+if (isCliEntrypoint()) {
   const changedArg = process.argv[2] ?? "";
   const allowArg = process.argv[3] ?? "";
   const changedPaths = changedArg.split(",").map((entry) => entry.trim()).filter(Boolean);
