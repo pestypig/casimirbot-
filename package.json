@@ -122,7 +122,8 @@
     "warp:full-solve:g4-sensitivity": "tsx scripts/warp-g4-sensitivity.ts",
     "warp:full-solve:g4-decision-ledger": "tsx scripts/generate-g4-decision-ledger.ts",
     "warp:full-solve:g4-governance-matrix": "tsx scripts/warp-g4-governance-matrix.ts",
-    "warp:full-solve:g4-recovery-search": "tsx scripts/warp-g4-recovery-search.ts"
+    "warp:full-solve:g4-recovery-search": "tsx scripts/warp-g4-recovery-search.ts",
+    "warp:full-solve:g4-recovery-parity": "tsx scripts/warp-g4-recovery-parity.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",

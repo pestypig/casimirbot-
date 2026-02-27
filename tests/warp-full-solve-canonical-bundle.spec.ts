@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { assertBundleProvenanceFresh, runCommandWithRetry } from '../scripts/warp-full-solve-canonical-bundle';
 
 const getCanonicalCommands = (script: string): string[] => {
   const commandMatches = script.matchAll(/\['run',\s*'([^']+)'\]/g);
@@ -22,6 +23,59 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
     ]);
   });
 
+  it('uses fail-fast timeout behavior for timed-out commands', () => {
+    const fakeSpawn = () => ({
+      status: null,
+      signal: 'SIGTERM',
+      output: [],
+      stdout: null,
+      stderr: null,
+      pid: 0,
+      error: new Error('spawnSync npm ETIMEDOUT'),
+    });
+    expect(() => runCommandWithRetry(['run', 'warp:full-solve:canonical'], { timeoutMs: 1234, maxRetries: 2, runSpawnSync: fakeSpawn as any })).toThrow(
+      /timeout after 1234ms/,
+    );
+  });
+
+  it('retries once for transient bootstrap failures', () => {
+    let calls = 0;
+    const fakeSpawn = () => {
+      calls += 1;
+      if (calls === 1) {
+        return {
+          status: 1,
+          signal: null,
+          output: [],
+          stdout: null,
+          stderr: null,
+          pid: 1,
+          error: new Error('transient bootstrap failure'),
+        };
+      }
+      return {
+        status: 0,
+        signal: null,
+        output: [],
+        stdout: null,
+        stderr: null,
+        pid: 1,
+      };
+    };
+
+    expect(() => runCommandWithRetry(['run', 'warp:full-solve:canonical'], { maxRetries: 1, runSpawnSync: fakeSpawn as any })).not.toThrow();
+    expect(calls).toBe(2);
+  });
+
+  it('fails if recovery provenance commit is missing or stale', () => {
+    expect(() => assertBundleProvenanceFresh('abc123', { commitHash: 'abc123' }, { commitHash: 'abc123' }, {})).toThrow(
+      /Recovery artifact provenance commit hash mismatch/,
+    );
+    expect(() =>
+      assertBundleProvenanceFresh('abc123', { commitHash: 'abc123' }, { commitHash: 'abc123' }, { provenance: { commitHash: 'def456' } }),
+    ).toThrow(/Recovery artifact provenance commit hash mismatch/);
+  });
+
   it('preserves canonical report recovery and governance provenance consistency after bundle', () => {
     const reportPath = path.resolve('docs/audits/research/warp-full-solve-campaign-execution-report-2026-02-24.md');
     const recoveryPath = path.resolve('artifacts/research/full-solve/g4-recovery-search-2026-02-27.json');
@@ -33,9 +87,7 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
 
     const recoveryBest = (recovery.bestCandidate ?? {}) as Record<string, any>;
     expect(report).toContain(`- best candidate id: ${String(recoveryBest.id ?? 'n/a')}`);
-    expect(report).toContain(
-      `- best candidate marginRatioRawComputed: ${String(recoveryBest.marginRatioRawComputed ?? 'n/a')}`,
-    );
+    expect(report).toContain(`- best candidate marginRatioRawComputed: ${String(recoveryBest.marginRatioRawComputed ?? 'n/a')}`);
     expect(report).toContain(`- recovery provenance commit: ${String(recovery.provenance?.commitHash ?? 'n/a')}`);
 
     expect(report).toContain(`- governance artifact commit: ${String(governance.commitHash ?? 'n/a')}`);

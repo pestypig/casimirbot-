@@ -1627,6 +1627,8 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
   const recoveryProvenanceCommit = typeof recovery?.provenance?.commitHash === 'string' ? recovery.provenance.commitHash : null;
   const recoveryHeadCommit = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
   const recoveryProvenanceFresh = recoveryProvenanceCommit != null && recoveryProvenanceCommit === recoveryHeadCommit;
+  const recoveryParityPath = path.join(CANONICAL_ARTIFACT_ROOT, 'g4-recovery-parity-2026-02-27.json');
+  const recoveryParity = fs.existsSync(recoveryParityPath) ? JSON.parse(fs.readFileSync(recoveryParityPath, 'utf8')) : null;
 
   if (sourceArtifactRoot === canonicalArtifactRoot) {
     writeMd(
@@ -1726,6 +1728,15 @@ ${g4WaveRows}
 - best candidate semantics class: ${recovery?.bestCandidateEligibility?.class ?? 'n/a'}
 - recovery provenance commit: ${recoveryProvenanceCommit ?? 'n/a'}
 - recovery provenance freshness vs HEAD: ${recoveryProvenanceFresh ? 'fresh' : 'stale_or_missing'}
+
+## G4 recovery parity summary
+- candidate count checked: ${typeof recoveryParity?.candidateCountChecked === 'number' ? recoveryParity.candidateCountChecked : 'n/a'}
+- anyCanonicalPassCandidate: ${recoveryParity?.anyCanonicalPassCandidate ?? 'n/a'}
+- anyComputedOnlyPassCandidate: ${recoveryParity?.anyComputedOnlyPassCandidate ?? 'n/a'}
+- dominantFailureMode: ${recoveryParity?.dominantFailureMode ?? 'n/a'}
+- parity artifact: ${fs.existsSync(recoveryParityPath) ? recoveryParityPath.replace(/\\/g, '/') : 'missing'}
+- parity provenance commit: ${recoveryParity?.provenance?.commitHash ?? 'n/a'}
+- parity provenance freshness vs HEAD: ${recoveryParity?.provenance?.recoveryProvenanceFresh === true ? 'fresh' : 'stale_or_missing'}
 - canonical decision remains authoritative until wave profiles are promoted and rerun.
 
 ## Operator translation
