@@ -1520,6 +1520,14 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
   const sourceArtifactRoot = outDir.replace(/\\/g, '/');
   const canonicalArtifactRoot = CANONICAL_ARTIFACT_ROOT.replace(/\\/g, '/');
   const reportPath = path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.md`);
+  const governanceMatrixPath = path.join(CANONICAL_ARTIFACT_ROOT, 'g4-governance-matrix-2026-02-27.json');
+  const governanceMatrix = fs.existsSync(governanceMatrixPath)
+    ? JSON.parse(fs.readFileSync(governanceMatrixPath, 'utf8'))
+    : null;
+  const governanceCanonicalClass =
+    typeof governanceMatrix?.canonicalAuthoritativeClass === 'string'
+      ? governanceMatrix.canonicalAuthoritativeClass
+      : 'evidence_path_blocked';
 
   if (sourceArtifactRoot === canonicalArtifactRoot) {
     writeMd(
@@ -1571,7 +1579,7 @@ ${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
 ${g4WaveRows}
 
 ## G4 governance decomposition
-- canonical authoritative class: ${bestCasePack?.g4Diagnostics?.g4DualFailMode ?? 'n/a'}
+- canonical authoritative class: ${governanceCanonicalClass}
 - policy floor dominated: ${bestCasePack?.g4Diagnostics?.g4FloorDominated ?? 'n/a'}
 - policy exceeded (marginRatioRaw >= 1): ${bestCasePack?.g4Diagnostics?.g4PolicyExceeded ?? 'n/a'}
 - computed exceeded (marginRatioRawComputed >= 1): ${bestCasePack?.g4Diagnostics?.g4ComputedExceeded ?? 'n/a'}
