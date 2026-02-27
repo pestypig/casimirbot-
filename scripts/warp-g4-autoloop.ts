@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { runCanonicalBundle } from './warp-full-solve-canonical-bundle';
 
 type LoopClass =
   | 'evidence_path_blocked'
@@ -12,7 +13,7 @@ type LoopClass =
   | 'stalled'
   | 'budget_exhausted';
 
-type Mode = 'analyze' | 'status';
+type Mode = 'analyze' | 'status' | 'cycle';
 
 const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
@@ -45,7 +46,7 @@ const parseArgs = (argv: string[]) => {
   for (let i = 0; i < argv.length; i += 1) {
     const tok = argv[i];
     const next = argv[i + 1];
-    if (tok === '--mode' && (next === 'analyze' || next === 'status')) out.mode = next;
+    if (tok === '--mode' && (next === 'analyze' || next === 'status' || next === 'cycle')) out.mode = next;
     if (tok === '--max-iterations' && next) out.maxIterations = Math.max(0, Number(next));
     if (tok === '--max-wall-clock-minutes' && next) out.maxWallClockMinutes = Math.max(1, Number(next));
     if (tok === '--stall-cycles' && next) out.stallCycles = Math.max(1, Number(next));
@@ -114,10 +115,67 @@ const summarizeIdeology = (payload: any): string[] => {
   ];
 };
 
-export const runAutoloop = (argv = process.argv.slice(2)) => {
+type AutoloopDeps = {
+  runCycle: () => unknown;
+};
+
+export const runAutoloop = (argv = process.argv.slice(2), deps: Partial<AutoloopDeps> = {}) => {
   const opts = parseArgs(argv);
+  const runCycle = deps.runCycle ?? runCanonicalBundle;
   const startedAt = new Date().toISOString();
   const nowMs = Date.now();
+
+  const previousState = readIfExists(opts.statePath);
+  const previousIterationCount = Number(previousState?.iterationCount ?? 0);
+  const previousClass = String(previousState?.class ?? '');
+  const previousStallCounter = Number(previousState?.stallCounter ?? 0);
+
+  if (opts.mode === 'cycle' && previousIterationCount >= opts.maxIterations) {
+    const iterationCount = previousIterationCount;
+    const remainingIterations = Math.max(0, opts.maxIterations - iterationCount);
+    const state = {
+      runId: `g4-autoloop-${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}`,
+      generatedAt: startedAt,
+      boundaryStatement: BOUNDARY_STATEMENT,
+      mode: opts.mode,
+      class: 'budget_exhausted' as LoopClass,
+      solved: false,
+      stopReason: 'max_iterations_reached',
+      stallCounter: previousStallCounter,
+      iterationCount,
+      remainingIterations,
+      maxIterations: opts.maxIterations,
+      maxWallClockMinutes: opts.maxWallClockMinutes,
+      stallCycles: opts.stallCycles,
+    };
+
+    if (opts.mode !== 'status') {
+      fs.mkdirSync(path.dirname(opts.statePath), { recursive: true });
+      fs.mkdirSync(path.dirname(opts.historyPath), { recursive: true });
+      fs.mkdirSync(path.dirname(opts.promptPath), { recursive: true });
+      fs.writeFileSync(opts.statePath, `${JSON.stringify(state, null, 2)}\n`);
+      fs.appendFileSync(opts.historyPath, `${JSON.stringify({
+        ts: startedAt,
+        class: state.class,
+        solved: state.solved,
+        stopReason: state.stopReason,
+        stallCounter: state.stallCounter,
+        iterationCount: state.iterationCount,
+        remainingIterations: state.remainingIterations,
+      })}\n`);
+      fs.writeFileSync(
+        opts.promptPath,
+        `# Warp G4 DEGA autoloop next step\n\n## Hard boundary statement\n${BOUNDARY_STATEMENT}\n\n## Current deterministic state\n- class: ${state.class}\n- solved: ${state.solved}\n- iteration count: ${state.iterationCount}\n- remaining iterations: ${state.remainingIterations}\n`,
+      );
+    }
+
+    console.log(JSON.stringify({ ok: true, class: state.class, solved: state.solved, statePath: opts.statePath, historyPath: opts.historyPath, promptPath: opts.promptPath }));
+    return { ok: true, mode: opts.mode, statePath: opts.statePath, historyPath: opts.historyPath, promptPath: opts.promptPath, class: state.class };
+  }
+
+  if (opts.mode === 'cycle') {
+    runCycle();
+  }
 
   const inputPaths = {
     scoreboard: path.join(opts.artifactRoot, files.scoreboard),
@@ -141,7 +199,7 @@ export const runAutoloop = (argv = process.argv.slice(2)) => {
     canonicalReport: fs.existsSync(inputPaths.canonicalReport) ? fs.readFileSync(inputPaths.canonicalReport, 'utf8') : null,
     ideology: readIfExists(inputPaths.ideology),
     casimir: readIfExists(inputPaths.casimir),
-    prevState: readIfExists(opts.statePath),
+    prevState: previousState,
   };
 
   const outcome = classify(inputs);
@@ -162,25 +220,24 @@ export const runAutoloop = (argv = process.argv.slice(2)) => {
     parityCommitHash === headCommitHash &&
     recoveryCommitHash === headCommitHash;
 
-  const previousIterationCount = Number(inputs.prevState?.iterationCount ?? 0);
-  const iterationIncrement = opts.mode === 'analyze' ? 1 : 0;
+  const iterationIncrement = opts.mode === 'analyze' || opts.mode === 'cycle' ? 1 : 0;
   const iterationCount = previousIterationCount + iterationIncrement;
   const remainingIterations = Math.max(0, opts.maxIterations - iterationCount);
-  const previousClass = String(inputs.prevState?.class ?? '');
-  const previousStallCounter = Number(inputs.prevState?.stallCounter ?? 0);
   const nextStallCounter = !outcome.solved && previousClass === outcome.loopClass ? previousStallCounter + 1 : 0;
 
   let loopClass: LoopClass = outcome.loopClass;
   let solved = outcome.solved;
   let stopReason = outcome.stopReason;
 
-  if (!solved && opts.mode === 'analyze') {
+  if (!solved && (opts.mode === 'analyze' || opts.mode === 'cycle')) {
     if (previousIterationCount >= opts.maxIterations) {
       loopClass = 'budget_exhausted';
       stopReason = 'max_iterations_reached';
     } else if (nextStallCounter >= opts.stallCycles) {
       loopClass = 'stalled';
       stopReason = 'stall_cycles_reached';
+    } else if (opts.mode === 'cycle' && !String(stopReason).startsWith('missing_required_artifacts:')) {
+      stopReason = 'cycle_complete';
     }
   }
 
