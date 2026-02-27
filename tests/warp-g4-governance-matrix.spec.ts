@@ -32,6 +32,14 @@ describe('warp g4 governance matrix', () => {
     const json = JSON.parse(fs.readFileSync(result.json, 'utf8'));
     expect(Array.isArray(json.rows)).toBe(true);
     expect(json.rows.length).toBe(4);
+    expect(json.commitHashShapeValid).toBe(true);
+    expect(typeof json.commitHashResolvable).toBe('boolean');
+    expect(typeof json.commitHashMatchesHead).toBe('boolean');
+    if (json.commitHashMatchesHead) {
+      expect(json.commitHashResolvable).toBe(true);
+    }
+    expect(Array.isArray(json.canonicalMissingWaves)).toBe(true);
+    expect(json.canonicalMissingWaves).toEqual([]);
     expect(json.canonicalAuthoritativeClass).toBe('both');
     expect(json.computedOnlyCounterfactualClass).toBe('computed-bound dominated');
     expect(json.mismatch).toBe(true);
@@ -97,5 +105,43 @@ describe('warp g4 governance matrix', () => {
     expect(result.payload.canonicalAuthoritativeClass).toBe('evidence_path_blocked');
     expect(result.payload.mismatch).toBe(true);
     expect(result.payload.mismatchReason).toContain('canonical_authoritative_aggregate_wave_disagreement');
+  });
+
+  it('fails closed when required wave evidence is missing', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-governance-missing-wave-'));
+    const artifactsRoot = path.join(tmpRoot, 'artifacts', 'research', 'full-solve');
+    fs.mkdirSync(path.join(artifactsRoot, 'A'), { recursive: true });
+    fs.writeFileSync(
+      path.join(artifactsRoot, 'A', 'evidence-pack.json'),
+      JSON.stringify(
+        {
+          g4Diagnostics: {
+            lhs_Jm3: -2,
+            boundComputed_Jm3: -1,
+            boundUsed_Jm3: -1,
+            boundFloorApplied: false,
+            marginRatioRaw: 2,
+            marginRatioRawComputed: 2,
+            applicabilityStatus: 'PASS',
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const result = generateG4GovernanceMatrix({
+      rootDir: tmpRoot,
+      outJsonPath: path.join(tmpRoot, 'matrix.json'),
+      outMdPath: path.join(tmpRoot, 'matrix.md'),
+      waves: ['A', 'B'],
+      getCommitHash: () => 'test-commit',
+    });
+
+    expect(result.payload.canonicalAuthoritativeClass).toBe('evidence_path_blocked');
+    expect(result.payload.canonicalMissingWaves).toEqual(['B']);
+    expect(result.payload.mismatch).toBe(true);
+    expect(String(result.payload.mismatchReason)).toContain('canonical_authoritative_aggregate_missing_required_waves');
+    expect(result.payload.rows.find((row: any) => row.wave === 'B')?.evidencePresent).toBe(false);
   });
 });

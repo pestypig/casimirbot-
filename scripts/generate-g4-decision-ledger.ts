@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 const DATE_STAMP = '2026-02-26';
@@ -27,6 +27,27 @@ type GenerateG4DecisionLedgerOptions = {
 const readJson = (p: string) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const stringOrNull = (s: unknown): string | null => (typeof s === 'string' && s.trim().length > 0 ? s.trim() : null);
+const COMMIT_HASH_RE = /^[0-9a-f]{7,40}$/i;
+
+const isResolvableCommitHash = (hash: string, cwd: string): boolean => {
+  try {
+    execFileSync('git', ['cat-file', '-e', `${hash}^{commit}`], { encoding: 'utf8', stdio: 'ignore', cwd });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const resolveHeadCommitHash = (cwdCandidates: string[]): string | null => {
+  for (const cwd of cwdCandidates) {
+    try {
+      return execSync('git rev-parse HEAD', { encoding: 'utf8', cwd, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    } catch {
+      continue;
+    }
+  }
+  return null;
+};
 
 const REQUIRED_WAVES: Wave[] = ['A', 'B', 'C', 'D'];
 
@@ -84,9 +105,15 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
   const scoreboardPath = options.scoreboardPath ?? path.join(rootDir, CANONICAL_SCOREBOARD);
   const firstFailPath = options.firstFailPath ?? path.join(rootDir, CANONICAL_FIRST_FAIL);
   const influencePath = options.influencePath ?? path.join(rootDir, INFLUENCE_PATH);
-  const getCommitHash = options.getCommitHash ?? (() => execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim());
+  const getCommitHash =
+    options.getCommitHash ??
+    (() => execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
 
   const commitHash = getCommitHash();
+  const headCommitHash = resolveHeadCommitHash([rootDir, process.cwd()]);
+  const commitHashShapeValid = COMMIT_HASH_RE.test(commitHash);
+  const commitHashResolvable = commitHashShapeValid && isResolvableCommitHash(commitHash, rootDir);
+  const commitHashMatchesHead = headCommitHash != null && commitHashResolvable && commitHash === headCommitHash;
   const canonicalScoreboard = readJson(scoreboardPath);
   const canonicalFirstFail = readJson(firstFailPath);
   const influence = fs.existsSync(influencePath) ? readJson(influencePath) : null;
@@ -132,6 +159,10 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
   const payload = {
     date: DATE_STAMP,
     commitHash,
+    headCommitHash,
+    commitHashShapeValid,
+    commitHashResolvable,
+    commitHashMatchesHead,
     boundaryStatement: BOUNDARY_STATEMENT,
     canonical: {
       counts: canonicalScoreboard?.counts ?? canonicalScoreboard?.statusCounts ?? null,

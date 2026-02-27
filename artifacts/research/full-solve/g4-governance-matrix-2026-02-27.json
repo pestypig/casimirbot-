@@ -1,7 +1,12 @@
 {
   "date": "2026-02-27",
-  "commitHash": "3ee89ad00d53e7520b4d8b8b256053d3d3ea549e",
+  "commitHash": "3afc13d96bd3171bc56ed1ab44ba4c31bba31690",
+  "headCommitHash": "3afc13d96bd3171bc56ed1ab44ba4c31bba31690",
+  "commitHashShapeValid": true,
+  "commitHashResolvable": true,
+  "commitHashMatchesHead": true,
   "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "canonicalMissingWaves": [],
   "canonicalAuthoritativeClass": "both",
   "computedOnlyCounterfactualClass": "computed-bound dominated",
   "mismatch": true,
@@ -9,6 +14,7 @@
   "rows": [
     {
       "wave": "A",
+      "evidencePresent": true,
       "lhs_Jm3": -24064720231109177000,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -24064720231109177000,
@@ -27,6 +33,7 @@
     },
     {
       "wave": "B",
+      "evidencePresent": true,
       "lhs_Jm3": -37601125453291720000,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -37601125453291720000,
@@ -45,6 +52,7 @@
     },
     {
       "wave": "C",
+      "evidencePresent": true,
       "lhs_Jm3": -66846445350679880000,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -66846445350679880000,
@@ -63,6 +71,7 @@
     },
     {
       "wave": "D",
+      "evidencePresent": true,
       "lhs_Jm3": -12277918379371434000,
       "boundComputed_Jm3": -18,
       "boundUsed_Jm3": -12277918379371434000,

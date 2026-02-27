@@ -15,6 +15,7 @@ import {
   buildQiForensicsArtifact,
   deriveCampaignDecision,
   deriveFirstFail,
+  resolveGovernanceCanonicalClass,
   parseArgs,
   parsePositiveIntArg,
   parseSeedArg,
@@ -71,6 +72,34 @@ describe('warp-full-solve-campaign runner', () => {
     expect(scoreboard.counts).toEqual({ PASS: 1, FAIL: 1, UNKNOWN: 1, NOT_READY: 1, NOT_APPLICABLE: 1 });
     expect(scoreboard.reconciled).toBe(true);
     expect(scoreboard.total).toBe(scoreboard.gateCount);
+  });
+
+  it('fails closed when governance artifact is missing', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-governance-missing-'));
+    const resolution = resolveGovernanceCanonicalClass(path.join(tmpRoot, 'missing.json'), tmpRoot);
+    expect(resolution.canonicalClass).toBe('evidence_path_blocked');
+    expect(resolution.freshness).toBe('missing_artifact');
+    expect(resolution.freshnessReason).toBe('governance_matrix_missing');
+  });
+
+  it('fails closed when governance artifact commit provenance is stale', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-governance-stale-'));
+    const governancePath = path.join(tmpRoot, 'g4-governance.json');
+    fs.writeFileSync(
+      governancePath,
+      JSON.stringify(
+        {
+          canonicalAuthoritativeClass: 'both',
+          commitHash: 'deadbeef',
+        },
+        null,
+        2,
+      ),
+    );
+    const resolution = resolveGovernanceCanonicalClass(governancePath, tmpRoot);
+    expect(resolution.canonicalClass).toBe('evidence_path_blocked');
+    expect(resolution.freshness).toBe('stale_provenance');
+    expect(resolution.freshnessReason).toContain('resolvable=false');
   });
 
 

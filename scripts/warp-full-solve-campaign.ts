@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { type GrAgentLoopAttempt, type GrAgentLoopOptions, type GrAgentLoopResult } from '../server/gr/gr-agent-loop.js';
 
@@ -218,6 +218,100 @@ const G4_REASON_CODE_ORDER = [
   G4_REASON_CODES.applicabilityNotPass,
   G4_REASON_CODES.marginExceeded,
 ] as const;
+const COMMIT_HASH_RE = /^[0-9a-f]{7,40}$/i;
+
+type GovernanceClassResolution = {
+  canonicalClass: string;
+  freshness: 'fresh' | 'missing_artifact' | 'invalid_artifact' | 'stale_provenance';
+  freshnessReason: string;
+  artifactCommitHash: string | null;
+  headCommitHash: string | null;
+};
+
+const resolveHeadCommitHash = (cwdCandidates: string[]): string | null => {
+  for (const cwd of cwdCandidates) {
+    try {
+      return execSync('git rev-parse HEAD', { encoding: 'utf8', cwd, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    } catch {
+      continue;
+    }
+  }
+  return null;
+};
+
+const isResolvableCommitHash = (hash: string, cwd: string): boolean => {
+  try {
+    execFileSync('git', ['cat-file', '-e', `${hash}^{commit}`], { encoding: 'utf8', stdio: 'ignore', cwd });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const resolveGovernanceCanonicalClass = (
+  governanceMatrixPath: string,
+  rootDir = '.',
+): GovernanceClassResolution => {
+  if (!fs.existsSync(governanceMatrixPath)) {
+    return {
+      canonicalClass: 'evidence_path_blocked',
+      freshness: 'missing_artifact',
+      freshnessReason: 'governance_matrix_missing',
+      artifactCommitHash: null,
+      headCommitHash: resolveHeadCommitHash([rootDir, process.cwd()]),
+    };
+  }
+
+  let governanceMatrix: any;
+  try {
+    governanceMatrix = JSON.parse(fs.readFileSync(governanceMatrixPath, 'utf8'));
+  } catch {
+    return {
+      canonicalClass: 'evidence_path_blocked',
+      freshness: 'invalid_artifact',
+      freshnessReason: 'governance_matrix_invalid_json',
+      artifactCommitHash: null,
+      headCommitHash: resolveHeadCommitHash([rootDir, process.cwd()]),
+    };
+  }
+
+  const canonicalClass =
+    typeof governanceMatrix?.canonicalAuthoritativeClass === 'string' && governanceMatrix.canonicalAuthoritativeClass.length > 0
+      ? governanceMatrix.canonicalAuthoritativeClass
+      : 'evidence_path_blocked';
+  const artifactCommitHash =
+    typeof governanceMatrix?.commitHash === 'string' && governanceMatrix.commitHash.trim().length > 0
+      ? governanceMatrix.commitHash.trim()
+      : null;
+  const headCommitHash = resolveHeadCommitHash([rootDir, process.cwd()]);
+  const artifactCommitWellFormed = artifactCommitHash != null && COMMIT_HASH_RE.test(artifactCommitHash);
+  const artifactCommitResolvable = artifactCommitWellFormed && isResolvableCommitHash(artifactCommitHash, rootDir);
+  const artifactCommitFresh = artifactCommitResolvable && headCommitHash != null && artifactCommitHash === headCommitHash;
+
+  if (!artifactCommitFresh) {
+    const reasonParts = [
+      `artifactCommitHash=${artifactCommitHash ?? 'null'}`,
+      `headCommitHash=${headCommitHash ?? 'null'}`,
+      `wellFormed=${artifactCommitWellFormed}`,
+      `resolvable=${artifactCommitResolvable}`,
+    ];
+    return {
+      canonicalClass: 'evidence_path_blocked',
+      freshness: 'stale_provenance',
+      freshnessReason: reasonParts.join(';'),
+      artifactCommitHash,
+      headCommitHash,
+    };
+  }
+
+  return {
+    canonicalClass,
+    freshness: 'fresh',
+    freshnessReason: 'none',
+    artifactCommitHash,
+    headCommitHash,
+  };
+};
 
 const orderReasonCodes = (codes: string[]): string[] => {
   const unique = Array.from(new Set(codes));
@@ -1521,13 +1615,8 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
   const canonicalArtifactRoot = CANONICAL_ARTIFACT_ROOT.replace(/\\/g, '/');
   const reportPath = path.join('docs/audits/research', `warp-full-solve-campaign-execution-report-${DATE_STAMP}.md`);
   const governanceMatrixPath = path.join(CANONICAL_ARTIFACT_ROOT, 'g4-governance-matrix-2026-02-27.json');
-  const governanceMatrix = fs.existsSync(governanceMatrixPath)
-    ? JSON.parse(fs.readFileSync(governanceMatrixPath, 'utf8'))
-    : null;
-  const governanceCanonicalClass =
-    typeof governanceMatrix?.canonicalAuthoritativeClass === 'string'
-      ? governanceMatrix.canonicalAuthoritativeClass
-      : 'evidence_path_blocked';
+  const governanceClassResolution = resolveGovernanceCanonicalClass(governanceMatrixPath);
+  const governanceCanonicalClass = governanceClassResolution.canonicalClass;
 
   if (sourceArtifactRoot === canonicalArtifactRoot) {
     writeMd(
@@ -1580,6 +1669,10 @@ ${g4WaveRows}
 
 ## G4 governance decomposition
 - canonical authoritative class: ${governanceCanonicalClass}
+- governance artifact freshness: ${governanceClassResolution.freshness}
+- governance freshness reason: ${governanceClassResolution.freshnessReason}
+- governance artifact commit: ${governanceClassResolution.artifactCommitHash ?? 'n/a'}
+- current head commit: ${governanceClassResolution.headCommitHash ?? 'n/a'}
 - policy floor dominated: ${bestCasePack?.g4Diagnostics?.g4FloorDominated ?? 'n/a'}
 - policy exceeded (marginRatioRaw >= 1): ${bestCasePack?.g4Diagnostics?.g4PolicyExceeded ?? 'n/a'}
 - computed exceeded (marginRatioRawComputed >= 1): ${bestCasePack?.g4Diagnostics?.g4ComputedExceeded ?? 'n/a'}
