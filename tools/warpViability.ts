@@ -1058,6 +1058,10 @@ export async function evaluateWarpViability(
     qi_margin_ratio: finiteOrUndefined(qiGuard?.marginRatio),
     qi_margin_ratio_raw: finiteOrUndefined(qiGuard?.marginRatioRaw),
     qi_margin_ratio_raw_computed: finiteOrUndefined((qiGuard as any)?.marginRatioRawComputed),
+    qi_g4_floor_dominated: (qiGuard as any)?.g4FloorDominated === true,
+    qi_g4_policy_exceeded: (qiGuard as any)?.g4PolicyExceeded === true,
+    qi_g4_computed_exceeded: (qiGuard as any)?.g4ComputedExceeded === true,
+    qi_g4_dual_fail_mode: (qiGuard as any)?.g4DualFailMode,
     qi_rho_source: qiGuard?.rhoSource,
     qi_metric_t00_ref:
       warpMetricSource ??
@@ -1202,6 +1206,10 @@ export async function evaluateWarpViability(
           `marginRatio=${qiGuard.marginRatio ?? "n/a"}`,
           `marginRatioRaw=${qiGuard.marginRatioRaw ?? "n/a"}`,
           `marginRatioRawComputed=${(qiGuard as any).marginRatioRawComputed ?? "n/a"}`,
+          `g4FloorDominated=${(qiGuard as any).g4FloorDominated === true}`,
+          `g4PolicyExceeded=${(qiGuard as any).g4PolicyExceeded === true}`,
+          `g4ComputedExceeded=${(qiGuard as any).g4ComputedExceeded === true}`,
+          `g4DualFailMode=${(qiGuard as any).g4DualFailMode ?? "n/a"}`,
           `rhoSource=${qiGuard.rhoSource ?? "unknown"}`,
           `metricT00Ref=${warpMetricSource ?? "n/a"}`,
           `metricT00Geom=${warpMetricT00GeomForAudit ?? "n/a"}`,

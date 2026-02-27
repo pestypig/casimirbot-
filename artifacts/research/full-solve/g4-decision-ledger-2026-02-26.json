@@ -1,6 +1,6 @@
 {
   "date": "2026-02-26",
-  "commitHash": "cb70256079441ed3511c25d37f12131841dedc98",
+  "commitHash": "32fc0828d48bed484b4769d85c40e5489a79155d",
   "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
   "canonical": {
     "counts": {
@@ -73,6 +73,10 @@
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1336928901728287700,
+      "g4FloorDominated": true,
+      "g4PolicyExceeded": true,
+      "g4ComputedExceeded": true,
+      "g4DualFailMode": "both",
       "applicabilityStatus": "PASS",
       "reasonCode": [
         "G4_QI_MARGIN_EXCEEDED"
@@ -90,6 +94,10 @@
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 2088951414071762000,
+      "g4FloorDominated": true,
+      "g4PolicyExceeded": true,
+      "g4ComputedExceeded": true,
+      "g4DualFailMode": "both",
       "applicabilityStatus": "PASS",
       "reasonCode": [
         "G4_QI_MARGIN_EXCEEDED"
@@ -107,6 +115,10 @@
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 3713691408371104300,
+      "g4FloorDominated": true,
+      "g4PolicyExceeded": true,
+      "g4ComputedExceeded": true,
+      "g4DualFailMode": "both",
       "applicabilityStatus": "PASS",
       "reasonCode": [
         "G4_QI_MARGIN_EXCEEDED"
@@ -124,6 +136,10 @@
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 682106576631746300,
+      "g4FloorDominated": true,
+      "g4PolicyExceeded": true,
+      "g4ComputedExceeded": true,
+      "g4DualFailMode": "both",
       "applicabilityStatus": "PASS",
       "reasonCode": [
         "G4_QI_MARGIN_EXCEEDED"

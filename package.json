@@ -119,7 +119,8 @@
     "warp:full-solve:readiness": "npm run warp:full-solve:campaign -- --wave all --out artifacts/research/full-solve/lanes/readiness --ci --ci-fast-path --wave-timeout-ms 120000 --campaign-timeout-ms 600000",
     "warp:full-solve:canonical": "npm run warp:full-solve:campaign -- --wave all --out artifacts/research/full-solve --ci --ci-fast-path --wave-timeout-ms 120000 --campaign-timeout-ms 600000",
     "warp:full-solve:g4-sensitivity": "tsx scripts/warp-g4-sensitivity.ts",
-    "warp:full-solve:g4-decision-ledger": "tsx scripts/generate-g4-decision-ledger.ts"
+    "warp:full-solve:g4-decision-ledger": "tsx scripts/generate-g4-decision-ledger.ts",
+    "warp:full-solve:g4-governance-matrix": "tsx scripts/warp-g4-governance-matrix.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",

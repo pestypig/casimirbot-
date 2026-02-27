@@ -107,6 +107,10 @@ type EvidencePack = {
     marginRatio?: number;
     marginRatioRaw?: number;
     marginRatioRawComputed?: number;
+    g4FloorDominated?: boolean;
+    g4PolicyExceeded?: boolean;
+    g4ComputedExceeded?: boolean;
+    g4DualFailMode?: 'policy_only' | 'computed_only' | 'both' | 'neither';
     rhoSource?: string;
     metricT00Ref?: string;
     metricT00Geom?: number;
@@ -168,6 +172,10 @@ type QiForensicsArtifact = {
   boundFloorApplied: boolean | null;
   marginRatioRaw: number | null;
   marginRatioRawComputed: number | null;
+  g4FloorDominated: boolean | null;
+  g4PolicyExceeded: boolean | null;
+  g4ComputedExceeded: boolean | null;
+  g4DualFailMode: 'policy_only' | 'computed_only' | 'both' | 'neither' | null;
   marginRatioClamped: number | null;
   tau_s: number | null;
   sampler: string | null;
@@ -1010,6 +1018,37 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
     marginRatioRawComputed:
       readCanonicalNumber(snapshot?.qi_margin_ratio_raw_computed, 'marginRatioRawComputed') ??
       parseNumberField('marginRatioRawComputed'),
+    g4FloorDominated:
+      typeof snapshot?.qi_g4_floor_dominated === 'boolean'
+        ? snapshot.qi_g4_floor_dominated
+        : parseFordField('g4FloorDominated') === 'true'
+          ? true
+          : parseFordField('g4FloorDominated') === 'false'
+            ? false
+            : undefined,
+    g4PolicyExceeded:
+      typeof snapshot?.qi_g4_policy_exceeded === 'boolean'
+        ? snapshot.qi_g4_policy_exceeded
+        : parseFordField('g4PolicyExceeded') === 'true'
+          ? true
+          : parseFordField('g4PolicyExceeded') === 'false'
+            ? false
+            : undefined,
+    g4ComputedExceeded:
+      typeof snapshot?.qi_g4_computed_exceeded === 'boolean'
+        ? snapshot.qi_g4_computed_exceeded
+        : parseFordField('g4ComputedExceeded') === 'true'
+          ? true
+          : parseFordField('g4ComputedExceeded') === 'false'
+            ? false
+            : undefined,
+    g4DualFailMode:
+      ((readSnapshotString(snapshot?.qi_g4_dual_fail_mode) ?? parseFordField('g4DualFailMode') ?? undefined) as
+        | 'policy_only'
+        | 'computed_only'
+        | 'both'
+        | 'neither'
+        | undefined),
     rhoSource: readSnapshotString(snapshot?.qi_rho_source) ?? (parseFordField('rhoSource') ?? undefined),
     metricT00Ref:
       readSnapshotString(snapshot?.qi_metric_t00_ref) ?? (parseFordField('metricT00Ref') ?? undefined),
@@ -1085,6 +1124,16 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
     boundFloorApplied: booleanOrNull(pack.g4Diagnostics?.boundFloorApplied),
     marginRatioRaw: finiteOrNull(pack.g4Diagnostics?.marginRatioRaw),
     marginRatioRawComputed: finiteOrNull(pack.g4Diagnostics?.marginRatioRawComputed),
+    g4FloorDominated: booleanOrNull(pack.g4Diagnostics?.g4FloorDominated),
+    g4PolicyExceeded: booleanOrNull(pack.g4Diagnostics?.g4PolicyExceeded),
+    g4ComputedExceeded: booleanOrNull(pack.g4Diagnostics?.g4ComputedExceeded),
+    g4DualFailMode:
+      pack.g4Diagnostics?.g4DualFailMode === 'policy_only' ||
+      pack.g4Diagnostics?.g4DualFailMode === 'computed_only' ||
+      pack.g4Diagnostics?.g4DualFailMode === 'both' ||
+      pack.g4Diagnostics?.g4DualFailMode === 'neither'
+        ? pack.g4Diagnostics.g4DualFailMode
+        : null,
     marginRatioClamped: finiteOrNull(pack.g4Diagnostics?.marginRatio),
     tau_s: finiteOrNull(pack.g4Diagnostics?.tau_s),
     sampler: stringOrNull(guard?.sampler),
@@ -1436,9 +1485,13 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
       const boundFloorApplied = typeof d.boundFloorApplied === 'boolean' ? d.boundFloorApplied : 'n/a';
       const raw = Number.isFinite(d.marginRatioRaw) ? d.marginRatioRaw : Number.isFinite(d.marginRatio) ? d.marginRatio : 'n/a';
       const rawComputed = Number.isFinite(d.marginRatioRawComputed) ? d.marginRatioRawComputed : 'n/a';
+      const g4FloorDominated = typeof d.g4FloorDominated === 'boolean' ? d.g4FloorDominated : 'n/a';
+      const g4PolicyExceeded = typeof d.g4PolicyExceeded === 'boolean' ? d.g4PolicyExceeded : 'n/a';
+      const g4ComputedExceeded = typeof d.g4ComputedExceeded === 'boolean' ? d.g4ComputedExceeded : 'n/a';
+      const g4DualFailMode = typeof d.g4DualFailMode === 'string' && d.g4DualFailMode.length > 0 ? d.g4DualFailMode : 'n/a';
       const rho = typeof d.rhoSource === 'string' && d.rhoSource.length > 0 ? d.rhoSource : 'unknown';
       const applicability = typeof d.applicabilityStatus === 'string' && d.applicabilityStatus.length > 0 ? d.applicabilityStatus : 'UNKNOWN';
-      return `| ${pack.wave} | ${lhs} | ${boundComputed} | ${boundFloor} | ${boundPolicyFloor} | ${boundEnvFloor} | ${boundDefaultFloor} | ${boundUsed} | ${boundFloorApplied} | ${raw} | ${rawComputed} | ${rho} | ${applicability} |`;
+      return `| ${pack.wave} | ${lhs} | ${boundComputed} | ${boundFloor} | ${boundPolicyFloor} | ${boundEnvFloor} | ${boundDefaultFloor} | ${boundUsed} | ${boundFloorApplied} | ${raw} | ${rawComputed} | ${g4FloorDominated} | ${g4PolicyExceeded} | ${g4ComputedExceeded} | ${g4DualFailMode} | ${rho} | ${applicability} |`;
     })
     .join('\n');
   const bestCasePack = packs.reduce<EvidencePack | null>((best, current) => {
@@ -1513,9 +1566,15 @@ ${Object.entries(pack.gateStatus).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
 - reproducibility.gateAgreement: ${pack.reproducibility?.repeatedRunGateAgreement?.status ?? 'NOT_READY'}`).join('\n\n')}
 
 ## Per-wave G4 evidence table
-| Wave | lhs_Jm3 | boundComputed_Jm3 | boundFloor_Jm3 | boundPolicyFloor_Jm3 | boundEnvFloor_Jm3 | boundDefaultFloor_Jm3 | boundUsed_Jm3 | boundFloorApplied | marginRatioRaw | marginRatioRawComputed | rhoSource | applicabilityStatus |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- | --- |
+| Wave | lhs_Jm3 | boundComputed_Jm3 | boundFloor_Jm3 | boundPolicyFloor_Jm3 | boundEnvFloor_Jm3 | boundDefaultFloor_Jm3 | boundUsed_Jm3 | boundFloorApplied | marginRatioRaw | marginRatioRawComputed | g4FloorDominated | g4PolicyExceeded | g4ComputedExceeded | g4DualFailMode | rhoSource | applicabilityStatus |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- | --- | --- | --- | --- | --- |
 ${g4WaveRows}
+
+## G4 governance decomposition
+- canonical authoritative class: ${bestCasePack?.g4Diagnostics?.g4DualFailMode ?? 'n/a'}
+- policy floor dominated: ${bestCasePack?.g4Diagnostics?.g4FloorDominated ?? 'n/a'}
+- policy exceeded (marginRatioRaw >= 1): ${bestCasePack?.g4Diagnostics?.g4PolicyExceeded ?? 'n/a'}
+- computed exceeded (marginRatioRawComputed >= 1): ${bestCasePack?.g4Diagnostics?.g4ComputedExceeded ?? 'n/a'}
 
 ## Best-case G4 summary
 - classification: ${bestCaseStatus}
