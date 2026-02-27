@@ -1,22 +1,36 @@
 import express from "express";
 import request from "supertest";
-import { beforeEach, describe, expect, it } from "vitest";
-import { knowledgeRouter } from "../server/routes/knowledge";
-import {
-  __resetTrainingTraceStore,
-  recordTrainingTrace,
-} from "../server/services/observability/training-trace-store";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-describe("knowledge promotion route", () => {
+const createAppWithRouter = async (opts?: { knowledgeEnabled?: string }) => {
+  vi.resetModules();
+  if (opts?.knowledgeEnabled !== undefined) {
+    process.env.ENABLE_KNOWLEDGE_PROJECTS = opts.knowledgeEnabled;
+  } else {
+    delete process.env.ENABLE_KNOWLEDGE_PROJECTS;
+  }
+
+  const { knowledgeRouter } = await import("../server/routes/knowledge");
+  const traceStore = await import("../server/services/observability/training-trace-store");
   const app = express();
   app.use(express.json());
   app.use("/api/knowledge", knowledgeRouter);
+  return {
+    app,
+    ...traceStore,
+  };
+};
 
+describe("knowledge promotion route", () => {
   beforeEach(() => {
-    __resetTrainingTraceStore();
+    delete process.env.AGI_TENANT_REQUIRED;
+    delete process.env.ENABLE_KNOWLEDGE_PROJECTS;
   });
 
   it("rejects forged client PASS payload without evidenceRef", async () => {
+    const { app, __resetTrainingTraceStore } = await createAppWithRouter();
+    __resetTrainingTraceStore();
+
     const res = await request(app).post("/api/knowledge/projects/promote").send({
       claimTier: "certified",
       casimirVerdict: "PASS",
@@ -30,6 +44,9 @@ describe("knowledge promotion route", () => {
   });
 
   it("rejects unknown evidenceRef with typed code", async () => {
+    const { app, __resetTrainingTraceStore } = await createAppWithRouter();
+    __resetTrainingTraceStore();
+
     const res = await request(app).post("/api/knowledge/projects/promote").send({
       claimTier: "certified",
       evidenceRef: "unknown-trace-id",
@@ -40,9 +57,70 @@ describe("knowledge promotion route", () => {
     expect(res.body?.rejection?.code).toBe("KNOWLEDGE_PROMOTION_UNRESOLVED_EVIDENCE_REF");
   });
 
-  it("accepts only when resolved server evidence satisfies gate conditions", async () => {
+  it("rejects cross-tenant evidenceRef deterministically", async () => {
+    process.env.AGI_TENANT_REQUIRED = "1";
+    const { app, __resetTrainingTraceStore, recordTrainingTrace } = await createAppWithRouter();
+    __resetTrainingTraceStore();
+
     const trace = recordTrainingTrace({
       traceId: "knowledge-promotion-pass",
+      tenantId: "tenant-a",
+      source: { system: "agi", component: "adapter", tool: "adapter.run", version: "1" },
+      pass: true,
+      deltas: [],
+      certificate: {
+        certificateHash: "cert:ok",
+        certificateId: "cert:ok:id",
+        integrityOk: true,
+      },
+    });
+
+    const res = await request(app)
+      .post("/api/knowledge/projects/promote")
+      .set("X-Tenant-Id", "tenant-b")
+      .send({
+        claimTier: "certified",
+        evidenceRef: trace.id,
+        enforceCertifiedOnly: true,
+      });
+
+    expect(res.status).toBe(409);
+    expect(res.body?.rejection?.code).toBe("KNOWLEDGE_PROMOTION_EVIDENCE_TENANT_FORBIDDEN");
+  });
+
+  it("rejects forged local trace lacking trusted provenance", async () => {
+    const { app, __resetTrainingTraceStore, recordTrainingTrace } = await createAppWithRouter();
+    __resetTrainingTraceStore();
+
+    const trace = recordTrainingTrace({
+      traceId: "knowledge-promotion-untrusted-source",
+      pass: true,
+      source: { system: "manual", component: "ingest", tool: "training-trace.post", version: "1" },
+      deltas: [],
+      certificate: {
+        certificateHash: "cert:ok",
+        certificateId: "cert:ok:id",
+        integrityOk: true,
+      },
+    });
+
+    const res = await request(app).post("/api/knowledge/projects/promote").send({
+      claimTier: "certified",
+      evidenceRef: trace.id,
+      enforceCertifiedOnly: true,
+    });
+
+    expect(res.status).toBe(409);
+    expect(res.body?.rejection?.code).toBe("KNOWLEDGE_PROMOTION_UNTRUSTED_EVIDENCE_PROVENANCE");
+  });
+
+  it("accepts only when resolved trusted evidence satisfies gate conditions", async () => {
+    const { app, __resetTrainingTraceStore, recordTrainingTrace } = await createAppWithRouter();
+    __resetTrainingTraceStore();
+
+    const trace = recordTrainingTrace({
+      traceId: "knowledge-promotion-pass",
+      source: { system: "agi", component: "adapter", tool: "adapter.run", version: "1" },
       pass: true,
       deltas: [],
       certificate: {
@@ -73,8 +151,12 @@ describe("knowledge promotion route", () => {
   });
 
   it("returns report-only non-promoted response when gate fails", async () => {
+    const { app, __resetTrainingTraceStore, recordTrainingTrace } = await createAppWithRouter();
+    __resetTrainingTraceStore();
+
     const trace = recordTrainingTrace({
       traceId: "knowledge-promotion-fail",
+      source: { system: "agi", component: "adapter", tool: "adapter.run", version: "1" },
       pass: false,
       deltas: [],
       certificate: {
@@ -99,5 +181,19 @@ describe("knowledge promotion route", () => {
       },
     });
     expect(res.body?.rejection?.code).toBe("KNOWLEDGE_PROMOTION_MISSING_CASIMIR_VERIFICATION");
+  });
+
+  it("fails closed when knowledge subsystem is disabled", async () => {
+    const { app, __resetTrainingTraceStore } = await createAppWithRouter({ knowledgeEnabled: "0" });
+    __resetTrainingTraceStore();
+
+    const res = await request(app).post("/api/knowledge/projects/promote").send({
+      claimTier: "certified",
+      evidenceRef: "any-trace",
+      enforceCertifiedOnly: true,
+    });
+
+    expect(res.status).toBe(409);
+    expect(res.body?.rejection?.code).toBe("KNOWLEDGE_PROMOTION_POLICY_DISABLED");
   });
 });

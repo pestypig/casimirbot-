@@ -1,10 +1,12 @@
 import { Router } from "express";
+import type { Request } from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { readKnowledgeConfig } from "../config/knowledge";
 import { persistKnowledgeBundles } from "../services/knowledge/corpus";
 import { buildKnowledgeValidator, KnowledgeValidationError } from "../services/knowledge/validation";
 import { evaluateKnowledgePromotionGate } from "../services/knowledge/promotion-gate";
+import { guardTenant, shouldRequireTenant } from "../auth/tenant";
 import { getTrainingTraceById } from "../services/observability/training-trace-store";
 
 const DEFAULT_FILES = [
@@ -35,6 +37,30 @@ function clip(text: string, max: number): string {
 
 const knowledgeConfig = readKnowledgeConfig();
 const validateKnowledgeContext = buildKnowledgeValidator(knowledgeConfig);
+
+const normalizeTenantId = (value?: string): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const resolveTenant = (req: Request):
+  | { ok: true; tenantId?: string }
+  | { ok: false; status: number; error: string } => {
+  const guard = guardTenant(req, { require: shouldRequireTenant() });
+  if (!guard.ok) return guard;
+  return { ok: true, tenantId: normalizeTenantId(guard.tenantId) };
+};
+
+const isTrustedPromotionEvidence = (trace: ReturnType<typeof getTrainingTraceById>): boolean => {
+  if (!trace) return false;
+  if (trace.source?.system !== "agi" || trace.source?.component !== "adapter") {
+    return false;
+  }
+  const sourceTool = trace.source?.tool;
+  return sourceTool === "adapter.run" || sourceTool === "adapter.verify";
+};
+
 const hasDatabaseUrl = (): boolean => {
   // Treat in-memory pg-mem URLs as configured for tests and local dev.
   const databaseUrl = (process.env.DATABASE_URL ?? "").trim();
@@ -135,13 +161,29 @@ knowledgeRouter.post("/projects/promote", (req, res) => {
   const evidenceRef = typeof req.body?.evidenceRef === "string" ? req.body.evidenceRef.trim() : "";
   const enforceCertifiedOnly = req.body?.enforceCertifiedOnly !== false;
 
-  const trace = evidenceRef ? getTrainingTraceById(evidenceRef) : null;
+  const tenant = resolveTenant(req);
+  if (!tenant.ok) {
+    return res.status(tenant.status).json({
+      ok: false,
+      rejection: {
+        code: "KNOWLEDGE_PROMOTION_EVIDENCE_TENANT_FORBIDDEN",
+        message: tenant.error,
+      },
+    });
+  }
+
+  const trace = evidenceRef ? getTrainingTraceById(evidenceRef, tenant.tenantId) : null;
+  const globalTrace = evidenceRef ? getTrainingTraceById(evidenceRef) : null;
+  const hasCrossTenantEvidenceRef = Boolean(evidenceRef) && !trace && Boolean(globalTrace);
 
   const decision = evaluateKnowledgePromotionGate({
     enforceCertifiedOnly,
     claimTier,
     evidenceRef,
+    promotionPolicyEnabled: knowledgeConfig.enabled,
     evidenceResolved: Boolean(trace),
+    evidenceTenantAllowed: !hasCrossTenantEvidenceRef,
+    evidenceTrustedProvenance: isTrustedPromotionEvidence(trace),
     casimirVerdict: trace?.pass ? "PASS" : "FAIL",
     certificateHash: trace?.certificate?.certificateHash ?? null,
     certificateIntegrityOk: trace?.certificate?.integrityOk === true,
