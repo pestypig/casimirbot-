@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { execSync } from 'node:child_process';
 import { evaluateQiGuardrail, getGlobalPipelineState, updateParameters } from '../server/energy-pipeline.js';
 
 const DATE_STAMP = '2026-02-27';
@@ -28,22 +29,6 @@ type RecoveryCase = {
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const stringOrNull = (v: unknown): string | null => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : null);
-
-const lcg = (seed: number) => {
-  let s = (seed >>> 0) || 1;
-  return () => {
-    s = (1664525 * s + 1013904223) >>> 0;
-    return s / 0x1_0000_0000;
-  };
-};
-
-const deterministicRank = (items: string[], seed: number): string[] => {
-  const rand = lcg(seed);
-  return items
-    .map((key) => ({ key, score: rand() }))
-    .sort((a, b) => (a.score === b.score ? a.key.localeCompare(b.key) : a.score - b.score))
-    .map((entry) => entry.key);
-};
 
 const classify = (applicabilityStatus: string, marginRatioRawComputed: number | null): RecoveryCase['classificationTag'] => {
   if (applicabilityStatus !== 'PASS') return 'applicability_limited';
@@ -75,51 +60,66 @@ const leverFamilies: Record<string, Array<string | number>> = {
   gammaVanDenBroeck: [0.8, 1.5, 20, 500],
   sampler: ['gaussian', 'hann', 'boxcar'],
   fieldType: ['em', 'scalar'],
+  qCavity: [1e5, 1e7, 1e9],
+  qSpoilingFactor: [1, 1.5, 3],
   tau_s_ms: [5, 10, 20, 50],
   gap_nm: [0.4, 1, 5, 8],
   shipRadius_m: [2, 10, 40],
 };
 
-const crossJoinCases = (): Array<Record<string, unknown>> => {
-  const jointCases: Array<Record<string, unknown>> = [];
-  for (const warpFieldType of leverFamilies.warpFieldType) {
-    for (const gammaGeo of leverFamilies.gammaGeo) {
-      for (const dutyCycle of leverFamilies.dutyCycle) {
-        for (const sectorCount of leverFamilies.sectorCount) {
-          for (const concurrentSectors of leverFamilies.concurrentSectors) {
-            for (const gammaVanDenBroeck of leverFamilies.gammaVanDenBroeck) {
-              for (const sampler of leverFamilies.sampler) {
-                for (const fieldType of leverFamilies.fieldType) {
-                  for (const tau_s_ms of leverFamilies.tau_s_ms) {
-                    for (const gap_nm of leverFamilies.gap_nm) {
-                      for (const shipRadius_m of leverFamilies.shipRadius_m) {
-                        jointCases.push({
-                          warpFieldType,
-                          gammaGeo,
-                          dutyCycle,
-                          dutyShip: dutyCycle,
-                          dutyEffective_FR: dutyCycle,
-                          sectorCount,
-                          concurrentSectors,
-                          gammaVanDenBroeck,
-                          sampler,
-                          fieldType,
-                          tau_s_ms,
-                          gap_nm,
-                          shipRadius_m,
-                        });
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+const LEVER_ORDER = [
+  'warpFieldType',
+  'gammaGeo',
+  'dutyCycle',
+  'sectorCount',
+  'concurrentSectors',
+  'gammaVanDenBroeck',
+  'sampler',
+  'fieldType',
+  'qCavity',
+  'qSpoilingFactor',
+  'tau_s_ms',
+  'gap_nm',
+  'shipRadius_m',
+] as const;
+
+const gcd = (a: number, b: number): number => {
+  let x = Math.abs(a);
+  let y = Math.abs(b);
+  while (y !== 0) {
+    const t = x % y;
+    x = y;
+    y = t;
   }
-  return jointCases;
+  return x;
+};
+
+const universeSize = () => LEVER_ORDER.reduce((acc, key) => acc * leverFamilies[key].length, 1);
+
+const decodeCase = (flatIndex: number): Record<string, unknown> => {
+  let idx = Math.floor(flatIndex);
+  const row: Record<string, unknown> = {};
+  for (let i = LEVER_ORDER.length - 1; i >= 0; i -= 1) {
+    const key = LEVER_ORDER[i]!;
+    const values = leverFamilies[key];
+    const base = values.length;
+    const digit = idx % base;
+    idx = Math.floor(idx / base);
+    row[key] = values[digit];
+  }
+  row.dutyShip = row.dutyCycle;
+  row.dutyEffective_FR = row.dutyCycle;
+  return row;
+};
+
+const deriveDeterministicWalk = (seed: number, total: number): { start: number; step: number } => {
+  const start = Math.abs(seed) % total;
+  let step = ((Math.abs(seed * 1103515245 + 12345) % (total - 1)) + 1) | 0;
+  while (gcd(step, total) !== 1) {
+    step = (step + 1) % total;
+    if (step <= 0) step = 1;
+  }
+  return { start, step };
 };
 
 export async function runRecoverySearch(opts: {
@@ -140,16 +140,18 @@ export async function runRecoverySearch(opts: {
 
   const startedAt = Date.now();
   const baseline = structuredClone(getGlobalPipelineState());
-  const jointCases = crossJoinCases();
-  const keys = jointCases.map((entry, idx) => `${idx}:${JSON.stringify(entry)}`);
-  const ranked = deterministicRank(keys, seed);
+  const attemptedCaseUniverse = universeSize();
+  const { start, step } = deriveDeterministicWalk(seed, attemptedCaseUniverse);
+  const commitHash = execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
   const results: RecoveryCase[] = [];
-  for (const rankedKey of ranked) {
+  let evaluated = 0;
+  for (let visit = 0; visit < attemptedCaseUniverse; visit += 1) {
     if (results.length >= maxCases) break;
     if (Date.now() - startedAt > runtimeCapMs) break;
-    const idx = Number(rankedKey.slice(0, rankedKey.indexOf(':')));
-    const row = jointCases[idx]!;
+    const idx = (start + visit * step) % attemptedCaseUniverse;
+    const row = decodeCase(idx);
+    evaluated += 1;
     const next = await updateParameters(structuredClone(baseline), {
       warpFieldType: row.warpFieldType,
       gammaGeo: row.gammaGeo,
@@ -159,6 +161,8 @@ export async function runRecoverySearch(opts: {
       sectorCount: row.sectorCount,
       concurrentSectors: row.concurrentSectors,
       gammaVanDenBroeck: row.gammaVanDenBroeck,
+      qCavity: row.qCavity,
+      qSpoilingFactor: row.qSpoilingFactor,
       gap_nm: row.gap_nm,
       shipRadius_m: row.shipRadius_m,
       qi: {
@@ -200,11 +204,26 @@ export async function runRecoverySearch(opts: {
   const bestCandidate =
     rankedCandidates[0] ??
     results.slice().sort((a, b) => (a.marginRatioRawComputed ?? Number.POSITIVE_INFINITY) - (b.marginRatioRawComputed ?? Number.POSITIVE_INFINITY) || a.id.localeCompare(b.id))[0] ?? null;
-  const minMarginRatioRawComputedAmongApplicabilityPass =
-    rankedCandidates[0]?.marginRatioRawComputed ?? null;
-  const candidatePassFound = rankedCandidates.some(
-    (entry) => (entry.marginRatioRawComputed ?? Number.POSITIVE_INFINITY) < 1 && (entry.marginRatioRaw ?? Number.POSITIVE_INFINITY) < 1,
+  const minMarginRatioRawComputedAmongApplicabilityPass = rankedCandidates[0]?.marginRatioRawComputed ?? null;
+  const minMarginRatioRawAmongApplicabilityPass = applicabilityPass
+    .map((entry) => entry.marginRatioRaw ?? Number.POSITIVE_INFINITY)
+    .sort((a, b) => a - b)[0] ?? null;
+  const candidatePassFoundCanonical = rankedCandidates.some((entry) => (entry.marginRatioRaw ?? Number.POSITIVE_INFINITY) < 1);
+  const candidatePassFoundComputedOnly = rankedCandidates.some(
+    (entry) => (entry.marginRatioRawComputed ?? Number.POSITIVE_INFINITY) < 1,
   );
+  const candidatePassFound = candidatePassFoundCanonical;
+  const bestCandidateCanonicalPassEligible = (bestCandidate?.marginRatioRaw ?? Number.POSITIVE_INFINITY) < 1;
+  const bestCandidateComputedPassEligible = (bestCandidate?.marginRatioRawComputed ?? Number.POSITIVE_INFINITY) < 1;
+  const bestCandidateEligibility = {
+    canonicalPassEligible: bestCandidateCanonicalPassEligible,
+    counterfactualPassEligible: bestCandidateComputedPassEligible,
+    class: bestCandidateCanonicalPassEligible
+      ? 'canonical_pass_eligible'
+      : bestCandidateComputedPassEligible
+        ? 'counterfactual_only'
+        : 'no_pass_signal',
+  };
 
   const payload = {
     runId: `g4-recovery-search-${seed}-${DATE_STAMP}`,
@@ -214,13 +233,24 @@ export async function runRecoverySearch(opts: {
       seed,
       maxCases,
       runtimeCapMs,
-      attemptedCaseUniverse: jointCases.length,
+      attemptedCaseUniverse,
       executedCaseCount: results.length,
+      evaluatedCaseCount: evaluated,
+      elapsedMs: Date.now() - startedAt,
+      deterministicWalk: { start, step },
     },
     caseCount: results.length,
     candidatePassFound,
+    candidatePassFoundCanonical,
+    candidatePassFoundComputedOnly,
+    minMarginRatioRawAmongApplicabilityPass,
     minMarginRatioRawComputedAmongApplicabilityPass,
+    bestCandidateEligibility,
     bestCandidate,
+    provenance: {
+      commitHash,
+      freshnessSource: 'git.head',
+    },
     topRankedApplicabilityPassCases: rankedCandidates.slice(0, topN),
     cases: results,
   };
