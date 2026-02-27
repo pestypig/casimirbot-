@@ -7320,6 +7320,10 @@ export function evaluateQiGuardrail(
   marginRatio: number;
   marginRatioRaw: number;
   marginRatioRawComputed: number;
+  g4FloorDominated: boolean;
+  g4PolicyExceeded: boolean;
+  g4ComputedExceeded: boolean;
+  g4DualFailMode: 'policy_only' | 'computed_only' | 'both' | 'neither';
   policyLimit?: number;
   window_ms: number;
   sampler: SamplingKind;
@@ -7471,6 +7475,17 @@ export function evaluateQiGuardrail(
     boundComputed_Jm3 < 0 && Number.isFinite(boundComputed_Jm3)
       ? Math.abs(lhs) / Math.abs(boundComputed_Jm3)
       : Infinity;
+  const g4FloorDominated = boundFloorApplied && bound_Jm3 !== boundComputed_Jm3;
+  const g4PolicyExceeded = rawRatio >= 1;
+  const g4ComputedExceeded = rawRatioComputed >= 1;
+  const g4DualFailMode: 'policy_only' | 'computed_only' | 'both' | 'neither' =
+    g4PolicyExceeded && g4ComputedExceeded
+      ? 'both'
+      : g4PolicyExceeded
+        ? 'policy_only'
+        : g4ComputedExceeded
+          ? 'computed_only'
+          : 'neither';
   const marginRatio = QI_POLICY_ENFORCE ? Math.min(rawRatio, policyMaxZeta) : rawRatio;
 
   const rhoNote = [rhoDebug.note ?? rhoDebug.reason, curvatureNote].filter(Boolean).join("; ") || undefined;
@@ -7557,6 +7572,10 @@ export function evaluateQiGuardrail(
     marginRatio: Number.isFinite(marginRatio) ? marginRatio : Infinity,
     marginRatioRaw: Number.isFinite(rawRatio) ? rawRatio : Infinity,
     marginRatioRawComputed: Number.isFinite(rawRatioComputed) ? rawRatioComputed : Infinity,
+    g4FloorDominated,
+    g4PolicyExceeded,
+    g4ComputedExceeded,
+    g4DualFailMode,
     policyLimit: QI_POLICY_ENFORCE ? policyMaxZeta : undefined,
     window_ms: pattern.window_ms,
     sampler,

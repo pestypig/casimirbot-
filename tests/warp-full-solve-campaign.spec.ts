@@ -352,6 +352,7 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.marginRatio).toBe(0.5);
     expect(diagnostics.applicabilityStatus).toBe('PASS');
     expect(diagnostics.rhoSource).toBe('gr.rho_constraint');
+    expect(diagnostics.g4PolicyExceeded).toBeUndefined();
   });
 
   it('builds qi-forensics payload with finite-or-null numeric hygiene', () => {
@@ -365,6 +366,10 @@ describe('warp-full-solve-campaign runner', () => {
         bound_Jm3: -2,
         marginRatioRaw: Infinity,
         marginRatioRawComputed: 3.25,
+        g4FloorDominated: true,
+        g4PolicyExceeded: true,
+        g4ComputedExceeded: true,
+        g4DualFailMode: 'both',
         marginRatio: 0.5,
         tau_s: undefined,
         K: 12,
@@ -406,6 +411,10 @@ describe('warp-full-solve-campaign runner', () => {
     expect(artifact.bound_Jm3).toBe(-2);
     expect(artifact.marginRatioRaw).toBeNull();
     expect(artifact.marginRatioRawComputed).toBe(3.25);
+    expect(artifact.g4FloorDominated).toBe(true);
+    expect(artifact.g4PolicyExceeded).toBe(true);
+    expect(artifact.g4ComputedExceeded).toBe(true);
+    expect(artifact.g4DualFailMode).toBe('both');
     expect(artifact.marginRatioClamped).toBe(0.5);
     expect(artifact.effectiveRho_SI_Jm3).toBeNull();
     expect(artifact.rhoOn_SI_Jm3).toBe(-1);
@@ -419,6 +428,36 @@ describe('warp-full-solve-campaign runner', () => {
     expect(artifact.curvatureRadius_m).toBe(4);
   });
 
+
+  it('parses deterministic g4 governance decomposition fields', () => {
+    const diagnostics = deriveG4Diagnostics({
+      evaluation: {
+        constraints: [
+          {
+            id: 'FordRomanQI',
+            status: 'fail',
+            note: 'g4FloorDominated=true;g4PolicyExceeded=true;g4ComputedExceeded=true;g4DualFailMode=both',
+          },
+          { id: 'ThetaAudit', status: 'pass', note: 'ok' },
+        ],
+      },
+      certificate: {
+        payload: {
+          snapshot: {
+            qi_g4_floor_dominated: true,
+            qi_g4_policy_exceeded: true,
+            qi_g4_computed_exceeded: true,
+            qi_g4_dual_fail_mode: 'both',
+          },
+        },
+      },
+    } as any);
+
+    expect(diagnostics.g4FloorDominated).toBe(true);
+    expect(diagnostics.g4PolicyExceeded).toBe(true);
+    expect(diagnostics.g4ComputedExceeded).toBe(true);
+    expect(diagnostics.g4DualFailMode).toBe('both');
+  });
   it('derives deterministic first-fail from canonical gate order', () => {
     const gateMap = {
       G0: { status: 'PASS', reason: 'ok', source: 'x' },

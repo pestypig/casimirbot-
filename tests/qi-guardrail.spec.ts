@@ -383,6 +383,17 @@ describe("evaluateQiGuardrail", () => {
       expect(guard.boundDefaultFloor_Jm3).toBeLessThan(0);
       expect(guard.boundFallbackAbs_Jm3).toBeGreaterThan(0);
       expect(guard.boundFloorApplied).toBe(guard.boundUsed_Jm3 !== guard.boundComputed_Jm3);
+      expect(guard.g4FloorDominated).toBe(guard.boundFloorApplied && guard.boundUsed_Jm3 !== guard.boundComputed_Jm3);
+      expect(guard.g4PolicyExceeded).toBe(guard.marginRatioRaw >= 1);
+      expect(guard.g4ComputedExceeded).toBe(guard.marginRatioRawComputed >= 1);
+      const expectedDual = guard.g4PolicyExceeded
+        ? guard.g4ComputedExceeded
+          ? 'both'
+          : 'policy_only'
+        : guard.g4ComputedExceeded
+          ? 'computed_only'
+          : 'neither';
+      expect(guard.g4DualFailMode).toBe(expectedDual);
     } finally {
       process.env.QI_BOUND_FLOOR_ABS = prevFloor;
     }
