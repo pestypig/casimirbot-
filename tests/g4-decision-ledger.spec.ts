@@ -109,7 +109,12 @@ describe('g4-decision-ledger generator', () => {
       generatedAt: '2026-02-27T00:00:00.000Z',
       caseCount: 3,
       candidatePassFound: false,
-      bestCandidate: { id: 'case_0001', marginRatioRawComputed: 4.2, applicabilityStatus: 'PASS' },
+      candidatePassFoundCanonical: false,
+      candidatePassFoundComputedOnly: true,
+      minMarginRatioRawAmongApplicabilityPass: 1.3,
+      minMarginRatioRawComputedAmongApplicabilityPass: 0.92,
+      bestCandidateEligibility: { canonicalPassEligible: false, counterfactualPassEligible: true, class: 'counterfactual_only' },
+      bestCandidate: { id: 'case_0001', marginRatioRawComputed: 0.92, marginRatioRaw: 1.3, applicabilityStatus: 'PASS' },
       topRankedApplicabilityPassCases: [{ id: 'case_0001' }],
     });
     const out = path.join(root, 'out.json');
@@ -125,6 +130,11 @@ describe('g4-decision-ledger generator', () => {
     const ledger = JSON.parse(fs.readFileSync(out, 'utf8'));
     expect(ledger.recoverySearch.caseCount).toBe(3);
     expect(ledger.recoverySearch.candidatePassFound).toBe(false);
+    expect(ledger.recoverySearch.candidatePassFoundCanonical).toBe(false);
+    expect(ledger.recoverySearch.candidatePassFoundComputedOnly).toBe(true);
+    expect(ledger.recoverySearch.minMarginRatioRawAmongApplicabilityPass).toBe(1.3);
+    expect(ledger.recoverySearch.minMarginRatioRawComputedAmongApplicabilityPass).toBe(0.92);
+    expect(ledger.recoverySearch.bestCandidateEligibility.class).toBe('counterfactual_only');
     expect(ledger.recoverySearch.bestCandidate.id).toBe('case_0001');
     expect(ledger.recoverySearch.failClosedReason).toBe(null);
   });

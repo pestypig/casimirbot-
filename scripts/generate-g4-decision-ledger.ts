@@ -198,6 +198,11 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
       artifactDate: stringOrNull(recovery?.generatedAt)?.slice(0, 10) ?? null,
       caseCount: finiteOrNull(recovery?.caseCount),
       candidatePassFound: Boolean(recovery?.candidatePassFound),
+      candidatePassFoundCanonical: Boolean(recovery?.candidatePassFoundCanonical ?? recovery?.candidatePassFound),
+      candidatePassFoundComputedOnly: Boolean(recovery?.candidatePassFoundComputedOnly),
+      minMarginRatioRawAmongApplicabilityPass: finiteOrNull(recovery?.minMarginRatioRawAmongApplicabilityPass),
+      minMarginRatioRawComputedAmongApplicabilityPass: finiteOrNull(recovery?.minMarginRatioRawComputedAmongApplicabilityPass),
+      bestCandidateEligibility: recovery?.bestCandidateEligibility ?? null,
       bestCandidate: recovery?.bestCandidate ?? null,
       failClosedReason:
         recovery == null

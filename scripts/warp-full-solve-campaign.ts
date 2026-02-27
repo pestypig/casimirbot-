@@ -1622,6 +1622,11 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
   const recovery = fs.existsSync(recoveryPath) ? JSON.parse(fs.readFileSync(recoveryPath, 'utf8')) : null;
   const recoveryBest = recovery?.bestCandidate ?? null;
   const recoveryCandidateFound = Boolean(recovery?.candidatePassFound);
+  const recoveryCandidateFoundCanonical = Boolean(recovery?.candidatePassFoundCanonical ?? recovery?.candidatePassFound);
+  const recoveryCandidateFoundComputedOnly = Boolean(recovery?.candidatePassFoundComputedOnly);
+  const recoveryProvenanceCommit = typeof recovery?.provenance?.commitHash === 'string' ? recovery.provenance.commitHash : null;
+  const recoveryHeadCommit = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+  const recoveryProvenanceFresh = recoveryProvenanceCommit != null && recoveryProvenanceCommit === recoveryHeadCommit;
 
   if (sourceArtifactRoot === canonicalArtifactRoot) {
     writeMd(
@@ -1704,12 +1709,23 @@ ${g4WaveRows}
 
 ## G4 recovery-search summary
 - recovery artifact: ${fs.existsSync(recoveryPath) ? recoveryPath.replace(/\\/g, '/') : 'missing'}
-- candidate found: ${recoveryCandidateFound ? 'yes' : 'no'}
+- candidate found (backward-compatible canonical alias): ${recoveryCandidateFound ? 'yes' : 'no'}
+- candidate found canonical/policy semantics: ${recoveryCandidateFoundCanonical ? 'yes' : 'no'}
+- candidate found computed-only counterfactual semantics: ${recoveryCandidateFoundComputedOnly ? 'yes' : 'no'}
 - case count: ${typeof recovery?.caseCount === 'number' ? recovery.caseCount : 'n/a'}
+- attempted case universe: ${typeof recovery?.deterministicSearch?.attemptedCaseUniverse === 'number' ? recovery.deterministicSearch.attemptedCaseUniverse : 'n/a'}
+- executed case count: ${typeof recovery?.deterministicSearch?.executedCaseCount === 'number' ? recovery.deterministicSearch.executedCaseCount : 'n/a'}
+- min marginRatioRaw among applicability PASS: ${recovery?.minMarginRatioRawAmongApplicabilityPass ?? 'n/a'}
+- min marginRatioRawComputed among applicability PASS: ${recovery?.minMarginRatioRawComputedAmongApplicabilityPass ?? 'n/a'}
 - best candidate id: ${recoveryBest?.id ?? 'n/a'}
 - best candidate marginRatioRawComputed: ${recoveryBest?.marginRatioRawComputed ?? 'n/a'}
 - best candidate marginRatioRaw: ${recoveryBest?.marginRatioRaw ?? 'n/a'}
 - best candidate applicabilityStatus: ${recoveryBest?.applicabilityStatus ?? 'UNKNOWN'}
+- best candidate canonical-pass eligible: ${recovery?.bestCandidateEligibility?.canonicalPassEligible ?? 'n/a'}
+- best candidate counterfactual-pass eligible: ${recovery?.bestCandidateEligibility?.counterfactualPassEligible ?? 'n/a'}
+- best candidate semantics class: ${recovery?.bestCandidateEligibility?.class ?? 'n/a'}
+- recovery provenance commit: ${recoveryProvenanceCommit ?? 'n/a'}
+- recovery provenance freshness vs HEAD: ${recoveryProvenanceFresh ? 'fresh' : 'stale_or_missing'}
 - canonical decision remains authoritative until wave profiles are promoted and rerun.
 
 ## Operator translation

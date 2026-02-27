@@ -9,6 +9,7 @@ const BOUNDARY_STATEMENT =
 const CANONICAL_COMMANDS = [
   ['run', 'warp:full-solve:canonical'],
   ['run', 'warp:full-solve:g4-sensitivity'],
+  ['run', 'warp:full-solve:g4-recovery-search'],
   ['run', 'warp:full-solve:g4-governance-matrix'],
   ['run', 'warp:full-solve:g4-decision-ledger'],
 ] as const;
