@@ -1,7 +1,7 @@
 {
   "date": "2026-02-26",
-  "commitHash": "9609458b8ec0e3e359ae7cd4e925b50b4d0e1857",
-  "headCommitHash": "9609458b8ec0e3e359ae7cd4e925b50b4d0e1857",
+  "commitHash": "824729a7e26126c3b6f6bacc6971809f471102a3",
+  "headCommitHash": "824729a7e26126c3b6f6bacc6971809f471102a3",
   "commitHashShapeValid": true,
   "commitHashResolvable": true,
   "commitHashMatchesHead": true,
@@ -67,7 +67,7 @@
   },
   "recoverySearch": {
     "artifactPath": "artifacts/research/full-solve/g4-recovery-search-2026-02-27.json",
-    "artifactDate": "2026-02-27",
+    "artifactDate": "2026-02-28",
     "caseCount": 160,
     "candidatePassFound": false,
     "candidatePassFoundCanonical": false,
@@ -80,30 +80,38 @@
       "class": "no_pass_signal"
     },
     "bestCandidate": {
-      "id": "case_0109",
+      "id": "case_0001",
       "params": {
-        "shipRadius_m": 2,
-        "gap_nm": 8,
-        "tau_s_ms": 2,
-        "qSpoilingFactor": 3,
-        "qCavity": 100000,
-        "fieldType": "em",
-        "sampler": "hann",
-        "gammaVanDenBroeck": 500,
-        "concurrentSectors": 2,
-        "sectorCount": 80,
-        "dutyCycle": 0.12,
-        "gammaGeo": 1,
         "warpFieldType": "natario_sdf",
+        "gammaGeo": 1,
+        "dutyCycle": 0.12,
+        "sectorCount": 80,
+        "concurrentSectors": 2,
+        "gammaVanDenBroeck": 500,
+        "sampler": "hann",
+        "fieldType": "em",
+        "qCavity": 100000,
+        "qSpoilingFactor": 3,
+        "tau_s_ms": 2,
+        "gap_nm": 8,
+        "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
       "lhs_Jm3": -35955387.330709726,
       "boundComputed_Jm3": -24,
+      "boundPolicyFloor_Jm3": -35955387.330709726,
+      "boundEnvFloor_Jm3": null,
+      "boundDefaultFloor_Jm3": -18,
+      "boundFloor_Jm3": -35955387.330709726,
       "boundUsed_Jm3": -35955387.330709726,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
       "marginRatioRawComputed": 1498141.138779572,
+      "sumWindowDt": 0.9999999999999987,
+      "tau_s": null,
+      "K": 3.8e-30,
+      "safetySigma_Jm3": 24,
       "applicabilityStatus": "UNKNOWN",
       "reasonCode": [
         "G4_QI_APPLICABILITY_NOT_PASS",
@@ -118,10 +126,26 @@
       "rhoCoupledShadow_Jm3": -44944366.32338355,
       "couplingResidualRel": 0.9999999716179383,
       "couplingComparable": true,
+      "quantitySemanticType": "classical_proxy_from_curvature",
+      "quantitySemanticBaseType": "classical_proxy_from_curvature",
+      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
+      "quantityWorldlineClass": "timelike",
+      "quantitySemanticComparable": false,
+      "quantitySemanticReason": "semantic_mismatch:classical_proxy_from_curvature:timelike",
+      "quantitySemanticBridgeMode": "strict_evidence_gated",
+      "quantitySemanticBridgeReady": false,
+      "quantitySemanticBridgeMissing": "applicability_not_pass|coupling_semantics_diagnostic_only|qei_state_class_not_hadamard|qei_renormalization_not_point_splitting|qei_sampling_normalization_not_unit_integral|qei_operator_mapping_not_t_munu_uu_ren",
+      "qeiStateClass": null,
+      "qeiRenormalizationScheme": null,
+      "qeiSamplingNormalization": null,
+      "qeiOperatorMapping": null,
       "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
       "metricT00Derivation": "forward_shift_to_K_to_rho_E",
       "metricT00ContractStatus": "ok",
+      "metricT00Geom": null,
       "metricT00Si_Jm3": -89888730.09553961,
+      "metricT00SiFromGeom": null,
+      "metricT00SiRelError": null,
       "metricStressRhoSiMean_Jm3": -89888730.09553961,
       "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
       "metricStressKTraceMean": 2.474459600646483e-18,
@@ -130,9 +154,58 @@
       "metricStressScale_m": 179.14162298838383,
       "metricStressSampleCount": 9,
       "classificationTag": "applicability_limited",
-      "comparabilityClass": "comparable_canonical"
+      "comparabilityClass": "comparable_structural_semantic_gap"
     },
+    "blockedReason": null,
     "failClosedReason": "no_applicability_pass_cases"
+  },
+  "couplingAblation": {
+    "artifactPath": "artifacts/research/full-solve/g4-coupling-ablation-2026-02-27.json",
+    "artifactDate": "2026-02-28",
+    "analysisMode": "canonical_comparable",
+    "baselineCaseId": "case_0001",
+    "baselineMarginRatioRawComputed": 1498141.138779572,
+    "bestCounterfactualMarginRatioRawComputed": 1498141.138779572,
+    "candidatePassFoundCounterfactual": false,
+    "topAblations": [
+      {
+        "field": "metricStressRhoSiMean_Jm3",
+        "estimationMode": "linear_slope_reference_substitution",
+        "slopeToMarginRatioRawComputed": -0.02312724942928119,
+        "counterfactualMarginRatioRawComputed": 1498141.138779572,
+        "counterfactualPass": false
+      },
+      {
+        "field": "metricT00Si_Jm3",
+        "estimationMode": "linear_slope_reference_substitution",
+        "slopeToMarginRatioRawComputed": -0.02312724942928119,
+        "counterfactualMarginRatioRawComputed": 1498141.138779572,
+        "counterfactualPass": false
+      },
+      {
+        "field": "rhoCoupledShadow_Jm3",
+        "estimationMode": "linear_slope_reference_substitution",
+        "slopeToMarginRatioRawComputed": -0.04625449885856238,
+        "counterfactualMarginRatioRawComputed": 1498141.138779572,
+        "counterfactualPass": false
+      },
+      {
+        "field": "rhoMetric_Jm3",
+        "estimationMode": "linear_slope_reference_substitution",
+        "slopeToMarginRatioRawComputed": -0.02312724942928119,
+        "counterfactualMarginRatioRawComputed": 1498141.138779572,
+        "counterfactualPass": false
+      },
+      {
+        "field": "couplingResidualRel",
+        "estimationMode": "blocked_missing_slope",
+        "slopeToMarginRatioRawComputed": null,
+        "counterfactualMarginRatioRawComputed": null,
+        "counterfactualPass": false
+      }
+    ],
+    "blockedReason": null,
+    "failClosedReason": null
   },
   "waves": {
     "A": {

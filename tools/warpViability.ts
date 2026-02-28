@@ -1089,6 +1089,58 @@ export async function evaluateWarpViability(
       typeof (qiGuard as any)?.couplingSemantics === "string"
         ? String((qiGuard as any).couplingSemantics)
         : undefined,
+    qi_quantity_semantic_type:
+      typeof (qiGuard as any)?.quantitySemanticType === "string"
+        ? String((qiGuard as any).quantitySemanticType)
+        : undefined,
+    qi_quantity_semantic_base_type:
+      typeof (qiGuard as any)?.quantitySemanticBaseType === "string"
+        ? String((qiGuard as any).quantitySemanticBaseType)
+        : undefined,
+    qi_quantity_semantic_target_type:
+      typeof (qiGuard as any)?.quantitySemanticTargetType === "string"
+        ? String((qiGuard as any).quantitySemanticTargetType)
+        : undefined,
+    qi_quantity_worldline_class:
+      typeof (qiGuard as any)?.quantityWorldlineClass === "string"
+        ? String((qiGuard as any).quantityWorldlineClass)
+        : undefined,
+    qi_quantity_semantic_comparable:
+      typeof (qiGuard as any)?.quantitySemanticComparable === "boolean"
+        ? Boolean((qiGuard as any).quantitySemanticComparable)
+        : undefined,
+    qi_quantity_semantic_reason:
+      typeof (qiGuard as any)?.quantitySemanticReason === "string"
+        ? String((qiGuard as any).quantitySemanticReason)
+        : undefined,
+    qi_quantity_semantic_bridge_mode:
+      typeof (qiGuard as any)?.quantitySemanticBridgeMode === "string"
+        ? String((qiGuard as any).quantitySemanticBridgeMode)
+        : undefined,
+    qi_quantity_semantic_bridge_ready:
+      typeof (qiGuard as any)?.quantitySemanticBridgeReady === "boolean"
+        ? Boolean((qiGuard as any).quantitySemanticBridgeReady)
+        : undefined,
+    qi_quantity_semantic_bridge_missing:
+      Array.isArray((qiGuard as any)?.quantitySemanticBridgeMissing)
+        ? ((qiGuard as any).quantitySemanticBridgeMissing as unknown[])
+            .filter((item) => typeof item === "string" && item.length > 0)
+            .join("|")
+        : undefined,
+    qi_qei_state_class:
+      typeof (qiGuard as any)?.qeiStateClass === "string" ? String((qiGuard as any).qeiStateClass) : undefined,
+    qi_qei_renormalization_scheme:
+      typeof (qiGuard as any)?.qeiRenormalizationScheme === "string"
+        ? String((qiGuard as any).qeiRenormalizationScheme)
+        : undefined,
+    qi_qei_sampling_normalization:
+      typeof (qiGuard as any)?.qeiSamplingNormalization === "string"
+        ? String((qiGuard as any).qeiSamplingNormalization)
+        : undefined,
+    qi_qei_operator_mapping:
+      typeof (qiGuard as any)?.qeiOperatorMapping === "string"
+        ? String((qiGuard as any).qeiOperatorMapping)
+        : undefined,
     qi_rho_source: qiGuard?.rhoSource,
     qi_metric_t00_ref:
       warpMetricSource ??
@@ -1248,6 +1300,19 @@ export async function evaluateWarpViability(
           `couplingComparable=${(qiGuard as any).couplingComparable === true}`,
           `couplingEquationRef=${(qiGuard as any).couplingEquationRef ?? "n/a"}`,
           `couplingSemantics=${(qiGuard as any).couplingSemantics ?? "n/a"}`,
+          `quantitySemanticBaseType=${(qiGuard as any).quantitySemanticBaseType ?? "n/a"}`,
+          `quantitySemanticType=${(qiGuard as any).quantitySemanticType ?? "n/a"}`,
+          `quantitySemanticTargetType=${(qiGuard as any).quantitySemanticTargetType ?? "n/a"}`,
+          `quantityWorldlineClass=${(qiGuard as any).quantityWorldlineClass ?? "n/a"}`,
+          `quantitySemanticComparable=${(qiGuard as any).quantitySemanticComparable === true}`,
+          `quantitySemanticReason=${(qiGuard as any).quantitySemanticReason ?? "n/a"}`,
+          `quantitySemanticBridgeMode=${(qiGuard as any).quantitySemanticBridgeMode ?? "n/a"}`,
+          `quantitySemanticBridgeReady=${(qiGuard as any).quantitySemanticBridgeReady === true}`,
+          `quantitySemanticBridgeMissing=${Array.isArray((qiGuard as any).quantitySemanticBridgeMissing) ? (qiGuard as any).quantitySemanticBridgeMissing.join('|') : "n/a"}`,
+          `qeiStateClass=${(qiGuard as any).qeiStateClass ?? "n/a"}`,
+          `qeiRenormalizationScheme=${(qiGuard as any).qeiRenormalizationScheme ?? "n/a"}`,
+          `qeiSamplingNormalization=${(qiGuard as any).qeiSamplingNormalization ?? "n/a"}`,
+          `qeiOperatorMapping=${(qiGuard as any).qeiOperatorMapping ?? "n/a"}`,
           `rhoSource=${qiGuard.rhoSource ?? "unknown"}`,
           `metricT00Ref=${warpMetricSource ?? "n/a"}`,
           `metricT00Geom=${warpMetricT00GeomForAudit ?? "n/a"}`,

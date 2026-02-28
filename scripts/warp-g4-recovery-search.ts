@@ -3,6 +3,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execSync } from 'node:child_process';
 import { evaluateQiGuardrail, getGlobalPipelineState, updateParameters } from '../server/energy-pipeline.js';
+import { generateStepASummary } from './warp-g4-stepA-summary.js';
 
 const DATE_STAMP = '2026-02-27';
 const DEFAULT_SEED = 20260227;
@@ -13,18 +14,29 @@ const DEFAULT_OUT_PATH = path.join('artifacts/research/full-solve', `g4-recovery
 const STEP_A_SUMMARY_PATH = path.join('artifacts/research/full-solve', 'g4-stepA-summary.json');
 const STEP_B_SUMMARY_PATH = path.join('artifacts/research/full-solve', 'g4-stepB-summary.json');
 const STEP_C_SUMMARY_PATH = path.join('artifacts/research/full-solve', 'g4-stepC-summary.json');
+const COUPLING_LOCALIZATION_PATH = path.join('artifacts/research/full-solve', `g4-coupling-localization-${DATE_STAMP}.json`);
 const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
+const DEFAULT_INFLUENCE_FAMILY_LIMIT = 5;
+const MAX_PAIRWISE_MICRO_ROWS = 24;
 
 type RecoveryCase = {
   id: string;
   params: Record<string, unknown>;
   lhs_Jm3: number | null;
   boundComputed_Jm3: number | null;
+  boundPolicyFloor_Jm3: number | null;
+  boundEnvFloor_Jm3: number | null;
+  boundDefaultFloor_Jm3: number | null;
+  boundFloor_Jm3: number | null;
   boundUsed_Jm3: number | null;
   boundFloorApplied: boolean;
   marginRatioRaw: number | null;
   marginRatioRawComputed: number | null;
+  sumWindowDt: number | null;
+  tau_s: number | null;
+  K: number | null;
+  safetySigma_Jm3: number | null;
   applicabilityStatus: string;
   reasonCode: string[];
   rhoSource: string | null;
@@ -38,7 +50,10 @@ type RecoveryCase = {
   metricT00Ref: string | null;
   metricT00Derivation: string | null;
   metricT00ContractStatus: string | null;
+  metricT00Geom: number | null;
   metricT00Si_Jm3: number | null;
+  metricT00SiFromGeom: number | null;
+  metricT00SiRelError: number | null;
   metricStressRhoSiMean_Jm3: number | null;
   metricStressRhoGeomMean_Geom: number | null;
   metricStressKTraceMean: number | null;
@@ -46,15 +61,54 @@ type RecoveryCase = {
   metricStressStep_m: number | null;
   metricStressScale_m: number | null;
   metricStressSampleCount: number | null;
+  quantitySemanticType: string | null;
+  quantitySemanticBaseType: string | null;
+  quantitySemanticTargetType: string | null;
+  quantityWorldlineClass: string | null;
+  quantitySemanticComparable: boolean | null;
+  quantitySemanticReason: string | null;
+  quantitySemanticBridgeMode: string | null;
+  quantitySemanticBridgeReady: boolean | null;
+  quantitySemanticBridgeMissing: string | null;
+  qeiStateClass: string | null;
+  qeiRenormalizationScheme: string | null;
+  qeiSamplingNormalization: string | null;
+  qeiOperatorMapping: string | null;
   classificationTag: 'candidate_pass_found' | 'margin_limited' | 'applicability_limited' | 'evidence_path_blocked';
   comparabilityClass:
     | 'comparable_canonical'
+    | 'comparable_structural_semantic_gap'
     | 'non_comparable_missing_signals'
     | 'non_comparable_contract_mismatch'
     | 'non_comparable_other';
 };
 
 type ComparabilityClass = RecoveryCase['comparabilityClass'];
+type LeverFamily =
+  | 'warpFieldType'
+  | 'gammaGeo'
+  | 'dutyCycle'
+  | 'sectorCount'
+  | 'concurrentSectors'
+  | 'gammaVanDenBroeck'
+  | 'sampler'
+  | 'fieldType'
+  | 'qCavity'
+  | 'qSpoilingFactor'
+  | 'tau_s_ms'
+  | 'gap_nm'
+  | 'shipRadius_m';
+
+type StepBSeed = {
+  topComparableCandidates?: Array<{ id?: string; params?: Record<string, unknown> }>;
+  leverInfluenceRanking?: Array<{ family?: string; measuredImpactAbsLhsDelta?: number; noOpByAbsLhsDelta?: boolean }>;
+  provenance?: { commitHash?: string };
+} | null;
+
+type CouplingLocalizationSeed = {
+  termInfluenceRanking?: Array<{ field?: string; influenceScore?: number }>;
+  provenance?: { commitHash?: string };
+} | null;
 type BootstrapResult = {
   attempted: boolean;
   succeeded: boolean;
@@ -67,11 +121,25 @@ type BootstrapResult = {
     rhoSource: string | null;
     applicabilityStatus: string;
     missingSignals: string[];
+    quantitySemanticType: string | null;
+    quantitySemanticBaseType: string | null;
+    quantitySemanticTargetType: string | null;
+    quantityWorldlineClass: string | null;
+    quantitySemanticComparable: boolean | null;
+    quantitySemanticReason: string | null;
+    quantitySemanticBridgeMode: string | null;
+    quantitySemanticBridgeReady: boolean | null;
+    quantitySemanticBridgeMissing: string | null;
+    qeiStateClass: string | null;
+    qeiRenormalizationScheme: string | null;
+    qeiSamplingNormalization: string | null;
+    qeiOperatorMapping: string | null;
   }[];
 };
 
 type StepASummary = {
   canonicalComparableCaseCount: number;
+  canonicalStructuralComparableCaseCount: number;
 };
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
@@ -96,6 +164,13 @@ export const classifyComparability = (entry: {
   applicabilityStatus?: string;
   rhoSource: string | null;
   reasonCode: string[];
+  quantitySemanticType: string | null;
+  quantitySemanticBaseType?: string | null;
+  quantitySemanticTargetType?: string | null;
+  quantityWorldlineClass: string | null;
+  quantitySemanticComparable: boolean | null;
+  quantitySemanticReason?: string | null;
+  quantitySemanticBridgeReady?: boolean | null;
 }): ComparabilityClass => {
   const missingSignals = REQUIRED_CANONICAL_SIGNALS.some((field) => entry[field] == null);
   if (missingSignals) return 'non_comparable_missing_signals';
@@ -103,6 +178,20 @@ export const classifyComparability = (entry: {
   // Applicability/curvature reasons remain part of reasonCode diagnostics, not cohort exclusion.
   const contractMismatch = entry.reasonCode.some((code) => CONTRACT_REASON_CODES.has(code));
   if (contractMismatch || !entry.rhoSource?.startsWith('warp.metric')) return 'non_comparable_contract_mismatch';
+  const semanticBridgeReady = entry.quantitySemanticBridgeReady === true;
+  const canonicalSemanticComparable =
+    (semanticBridgeReady ||
+      (entry.quantitySemanticComparable === true &&
+        entry.quantitySemanticType === 'ren_expectation_timelike_energy_density')) &&
+    entry.quantityWorldlineClass === 'timelike';
+  if (canonicalSemanticComparable) return 'comparable_canonical';
+  const structuralSemanticComparable =
+    entry.quantityWorldlineClass === 'timelike' &&
+    (entry.quantitySemanticBridgeReady === false ||
+      (entry.quantitySemanticType === 'classical_proxy_from_curvature' &&
+        entry.quantitySemanticTargetType === 'ren_expectation_timelike_energy_density'));
+  if (structuralSemanticComparable) return 'comparable_structural_semantic_gap';
+  if (!canonicalSemanticComparable) return 'non_comparable_other';
   return 'comparable_canonical';
 };
 
@@ -129,7 +218,7 @@ const deriveReasonCodes = (guard: any): string[] => {
   return [...reasons].sort((a, b) => a.localeCompare(b));
 };
 
-const leverFamilies: Record<string, Array<string | number>> = {
+const leverFamilies: Record<LeverFamily, Array<string | number>> = {
   warpFieldType: ['natario', 'natario_sdf', 'lentz', 'bobrick_martire'],
   gammaGeo: [1, 4, 12, 48, 120],
   dutyCycle: [0.02, 0.06, 0.12, 0.25],
@@ -145,7 +234,7 @@ const leverFamilies: Record<string, Array<string | number>> = {
   shipRadius_m: [2, 10, 40],
 };
 
-const LEVER_ORDER = [
+const LEVER_ORDER: readonly LeverFamily[] = [
   'warpFieldType',
   'gammaGeo',
   'dutyCycle',
@@ -159,7 +248,7 @@ const LEVER_ORDER = [
   'tau_s_ms',
   'gap_nm',
   'shipRadius_m',
-] as const;
+];
 
 const gcd = (a: number, b: number): number => {
   let x = Math.abs(a);
@@ -200,8 +289,171 @@ const deriveDeterministicWalk = (seed: number, total: number): { start: number; 
   return { start, step };
 };
 
+const readJsonObject = (filePath: string): Record<string, unknown> | null => {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const DEFAULT_FAMILY_PRIORITY: LeverFamily[] = [
+  'warpFieldType',
+  'gammaGeo',
+  'shipRadius_m',
+  'gap_nm',
+  'tau_s_ms',
+  'qCavity',
+  'qSpoilingFactor',
+  'gammaVanDenBroeck',
+  'dutyCycle',
+  'sectorCount',
+  'concurrentSectors',
+  'sampler',
+  'fieldType',
+];
+
+const TERM_TO_FAMILIES: Record<string, LeverFamily[]> = {
+  rhoMetric_Jm3: ['warpFieldType', 'gammaGeo', 'shipRadius_m', 'gap_nm'],
+  rhoProxy_Jm3: ['qCavity', 'qSpoilingFactor', 'fieldType', 'sampler', 'tau_s_ms'],
+  rhoCoupledShadow_Jm3: ['gammaVanDenBroeck', 'dutyCycle', 'sectorCount', 'concurrentSectors'],
+  couplingResidualRel: ['gammaVanDenBroeck', 'dutyCycle', 'sectorCount', 'concurrentSectors'],
+  metricT00Si_Jm3: ['warpFieldType', 'gammaGeo', 'shipRadius_m', 'gap_nm'],
+  metricT00Geom: ['warpFieldType', 'gammaGeo', 'shipRadius_m', 'gap_nm'],
+  metricT00SiFromGeom: ['warpFieldType', 'gammaGeo', 'shipRadius_m', 'gap_nm'],
+  metricT00SiRelError: ['sampler', 'fieldType', 'tau_s_ms'],
+  metricStressRhoSiMean_Jm3: ['warpFieldType', 'gammaGeo', 'shipRadius_m'],
+  metricStressRhoGeomMean_Geom: ['warpFieldType', 'gammaGeo', 'shipRadius_m'],
+  metricStressKTraceMean: ['gammaGeo', 'shipRadius_m'],
+  metricStressKSquaredMean: ['gammaGeo', 'shipRadius_m'],
+  metricStressStep_m: ['shipRadius_m'],
+  metricStressScale_m: ['shipRadius_m', 'gap_nm'],
+};
+
+const isLeverFamily = (value: unknown): value is LeverFamily =>
+  typeof value === 'string' && (LEVER_ORDER as readonly string[]).includes(value);
+
+const setDutyAliases = (row: Record<string, unknown>): Record<string, unknown> => ({
+  ...row,
+  dutyShip: row.dutyCycle,
+  dutyEffective_FR: row.dutyCycle,
+});
+
+const sanitizeLeverRow = (
+  candidate: Record<string, unknown> | null | undefined,
+  fallback: Record<string, unknown>,
+): Record<string, unknown> => {
+  const row: Record<string, unknown> = {};
+  for (const family of LEVER_ORDER) {
+    const allowed = leverFamilies[family];
+    const candidateValue = candidate?.[family];
+    const fallbackValue = fallback[family];
+    const accepted = allowed.some((entry) => Object.is(entry, candidateValue));
+    row[family] = accepted ? candidateValue : fallbackValue;
+  }
+  return setDutyAliases(row);
+};
+
+const readStepBSeed = (summaryPath: string): StepBSeed => {
+  const payload = readJsonObject(summaryPath);
+  if (!payload) return null;
+  return payload as StepBSeed;
+};
+
+const readCouplingLocalizationSeed = (localizationPath: string): CouplingLocalizationSeed => {
+  const payload = readJsonObject(localizationPath);
+  if (!payload) return null;
+  return payload as CouplingLocalizationSeed;
+};
+
+const derivePrioritizedFamilies = (
+  stepBSeed: StepBSeed,
+  localizationSeed: CouplingLocalizationSeed,
+  limit: number,
+): LeverFamily[] => {
+  const scoreByFamily = new Map<LeverFamily, number>();
+  const addScore = (family: LeverFamily, score: number) => {
+    const current = scoreByFamily.get(family) ?? 0;
+    scoreByFamily.set(family, current + score);
+  };
+  for (const row of stepBSeed?.leverInfluenceRanking ?? []) {
+    const family = row?.family;
+    const noOp = row?.noOpByAbsLhsDelta === true;
+    if (!isLeverFamily(family) || noOp) continue;
+    const measured = finiteOrNull(row?.measuredImpactAbsLhsDelta) ?? 1;
+    addScore(family, Math.max(measured, 1e-9));
+  }
+  for (const row of localizationSeed?.termInfluenceRanking ?? []) {
+    const term = typeof row?.field === 'string' ? row.field : null;
+    if (!term) continue;
+    const families = TERM_TO_FAMILIES[term] ?? [];
+    const influenceScore = Math.max(finiteOrNull(row?.influenceScore) ?? 1, 1e-9);
+    families.forEach((family, index) => addScore(family, influenceScore / (index + 1)));
+  }
+  DEFAULT_FAMILY_PRIORITY.forEach((family, index) => {
+    if (!scoreByFamily.has(family)) {
+      scoreByFamily.set(family, 1e-12 * (DEFAULT_FAMILY_PRIORITY.length - index));
+    }
+  });
+  return [...scoreByFamily.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, Math.max(1, limit))
+    .map(([family]) => family);
+};
+
+const extractCenterSeed = (stepBSeed: StepBSeed): { caseId: string | null; params: Record<string, unknown> | null } => {
+  const candidate = (stepBSeed?.topComparableCandidates ?? []).find(
+    (row) => row && typeof row === 'object' && row.params && typeof row.params === 'object',
+  );
+  if (!candidate || !candidate.params) return { caseId: null, params: null };
+  return {
+    caseId: typeof candidate.id === 'string' ? candidate.id : null,
+    params: candidate.params,
+  };
+};
+
+const buildTauPriorityRows = (baseRow: Record<string, unknown>): Record<string, unknown>[] =>
+  leverFamilies.tau_s_ms.map((tau) => setDutyAliases({ ...baseRow, tau_s_ms: tau }));
+
+const buildInfluenceMicroRows = (
+  baseRow: Record<string, unknown>,
+  prioritizedFamilies: LeverFamily[],
+): Record<string, unknown>[] => {
+  const rows: Record<string, unknown>[] = [];
+  for (const family of prioritizedFamilies) {
+    for (const value of leverFamilies[family]) {
+      if (Object.is(value, baseRow[family])) continue;
+      rows.push(setDutyAliases({ ...baseRow, [family]: value }));
+    }
+  }
+  const pairFamilies = prioritizedFamilies.slice(0, 2);
+  if (pairFamilies.length === 2) {
+    const [familyA, familyB] = pairFamilies;
+    let pairCount = 0;
+    for (const valueA of leverFamilies[familyA]) {
+      if (Object.is(valueA, baseRow[familyA])) continue;
+      for (const valueB of leverFamilies[familyB]) {
+        if (Object.is(valueB, baseRow[familyB])) continue;
+        rows.push(setDutyAliases({ ...baseRow, [familyA]: valueA, [familyB]: valueB }));
+        pairCount += 1;
+        if (pairCount >= MAX_PAIRWISE_MICRO_ROWS) {
+          return rows;
+        }
+      }
+    }
+  }
+  return rows;
+};
+
 const summarizeInfluence = (cases: RecoveryCase[]) =>
-  LEVER_ORDER.map((family) => {
+  cases.length === 0
+    ? []
+    : LEVER_ORDER.map((family) => {
     const grouped = new Map<string, number[]>();
     for (const entry of cases) {
       if (entry.lhs_Jm3 == null) continue;
@@ -242,11 +494,27 @@ const extractMetricDecomposition = (
       (warp as any)?.metricT00ContractStatus ??
       (natario as any)?.metricT00ContractStatus,
     ),
+    metricT00Geom: finiteOrNull(
+      (guard as any)?.metricT00Geom ??
+      (warp as any)?.metricT00Geom ??
+      (natario as any)?.metricT00Geom,
+    ),
     metricT00Si_Jm3: finiteOrNull(
+      (guard as any)?.metricT00Si ??
       (warp as any)?.metricT00 ??
       (natario as any)?.metricT00 ??
       (warp as any)?.stressEnergyTensor?.T00 ??
       (natario as any)?.stressEnergyTensor?.T00,
+    ),
+    metricT00SiFromGeom: finiteOrNull(
+      (guard as any)?.metricT00SiFromGeom ??
+      (warp as any)?.metricT00SiFromGeom ??
+      (natario as any)?.metricT00SiFromGeom,
+    ),
+    metricT00SiRelError: finiteOrNull(
+      (guard as any)?.metricT00SiRelError ??
+      (warp as any)?.metricT00SiRelError ??
+      (natario as any)?.metricT00SiRelError,
     ),
     metricStressRhoSiMean_Jm3: finiteOrNull((metricDiagnostics as any)?.rhoSiMean),
     metricStressRhoGeomMean_Geom: finiteOrNull((metricDiagnostics as any)?.rhoGeomMean),
@@ -269,7 +537,11 @@ const readStepASummary = (summaryPath: string): StepASummary | null => {
     const payload = JSON.parse(fs.readFileSync(summaryPath, 'utf8')) as Record<string, unknown>;
     const canonicalComparableCaseCount = Number(payload?.canonicalComparableCaseCount);
     if (!Number.isFinite(canonicalComparableCaseCount) || canonicalComparableCaseCount < 0) return null;
-    return { canonicalComparableCaseCount };
+    const canonicalStructuralComparableCaseCount = Number(
+      payload?.canonicalStructuralComparableCaseCount ?? canonicalComparableCaseCount,
+    );
+    if (!Number.isFinite(canonicalStructuralComparableCaseCount) || canonicalStructuralComparableCaseCount < 0) return null;
+    return { canonicalComparableCaseCount, canonicalStructuralComparableCaseCount };
   } catch {
     return null;
   }
@@ -284,6 +556,9 @@ export async function runRecoverySearch(opts: {
   topN?: number;
   runtimeCapMs?: number;
   stepCSummaryPath?: string;
+  couplingLocalizationPath?: string;
+  influenceFamilyLimit?: number;
+  useSeedArtifacts?: boolean;
 } = {}) {
   const outPath = opts.outPath ?? DEFAULT_OUT_PATH;
   const seed = Number.isFinite(opts.seed) ? Number(opts.seed) : DEFAULT_SEED;
@@ -308,14 +583,38 @@ export async function runRecoverySearch(opts: {
     (path.resolve(outPath) === path.resolve(DEFAULT_OUT_PATH)
       ? STEP_C_SUMMARY_PATH
       : path.join(path.dirname(outPath), 'g4-stepC-summary.json'));
-  const stepASummary = readStepASummary(stepASummaryPath);
+  const couplingLocalizationPath =
+    opts.couplingLocalizationPath ??
+    (path.resolve(outPath) === path.resolve(DEFAULT_OUT_PATH)
+      ? COUPLING_LOCALIZATION_PATH
+      : path.join(path.dirname(outPath), `g4-coupling-localization-${DATE_STAMP}.json`));
+  const influenceFamilyLimit = Math.max(
+    1,
+    Math.floor(Number.isFinite(opts.influenceFamilyLimit) ? Number(opts.influenceFamilyLimit) : DEFAULT_INFLUENCE_FAMILY_LIMIT),
+  );
+  const useSeedArtifacts =
+    typeof opts.useSeedArtifacts === 'boolean'
+      ? opts.useSeedArtifacts
+      : path.resolve(outPath) === path.resolve(DEFAULT_OUT_PATH);
   const attemptedCaseUniverse = universeSize();
   const { start, step } = deriveDeterministicWalk(seed, attemptedCaseUniverse);
   const commitHash = execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const usingCanonicalDefaultStepA =
+    opts.stepASummaryPath == null && path.resolve(stepASummaryPath) === path.resolve(STEP_A_SUMMARY_PATH);
+  if (usingCanonicalDefaultStepA) {
+    generateStepASummary({
+      artifactRoot: path.join('artifacts', 'research', 'full-solve'),
+      outPath: stepASummaryPath,
+      getCommitHash: () => commitHash,
+    });
+  }
+  const stepASummary = readStepASummary(stepASummaryPath);
+  const structuralComparableSeedCount =
+    (stepASummary?.canonicalStructuralComparableCaseCount ?? 0) + (stepASummary?.canonicalComparableCaseCount ?? 0);
   const blockedReason =
     stepASummary == null
       ? 'missing_stepA_summary'
-      : stepASummary.canonicalComparableCaseCount <= 0
+      : structuralComparableSeedCount <= 0
         ? 'no_canonical_comparable_cases'
         : null;
 
@@ -324,15 +623,28 @@ export async function runRecoverySearch(opts: {
       runId: `g4-recovery-search-${seed}-${DATE_STAMP}`,
       generatedAt: new Date().toISOString(),
       boundaryStatement: BOUNDARY_STATEMENT,
+      stepASummaryPath: stepASummaryPath.replace(/\\/g, '/'),
+      stepBSummaryPath: stepBSummaryPath.replace(/\\/g, '/'),
+      stepCSummaryPath: stepCSummaryPath.replace(/\\/g, '/'),
+      couplingLocalizationPath: couplingLocalizationPath.replace(/\\/g, '/'),
       deterministicSearch: {
         seed,
         maxCases,
         runtimeCapMs,
+        influenceFamilyLimit,
         attemptedCaseUniverse,
         executedCaseCount: 0,
         evaluatedCaseCount: 0,
         elapsedMs: 0,
         deterministicWalk: { start, step },
+        seedStrategy: {
+          centerSource: 'blocked',
+          centerCaseId: null,
+          prioritizedFamilies: [],
+          stepBSeedUsed: false,
+          couplingLocalizationSeedUsed: false,
+          seedArtifactsEnabled: useSeedArtifacts,
+        },
       },
       caseCount: 0,
       candidatePassFound: false,
@@ -360,8 +672,11 @@ export async function runRecoverySearch(opts: {
       boundaryStatement: BOUNDARY_STATEMENT,
       executedCaseCount: 0,
       canonicalComparableCaseCount: 0,
+      canonicalStructuralComparableCaseCount: 0,
       candidatePassFoundCanonicalComparable: false,
+      candidatePassFoundStructuralComparable: false,
       minMarginRatioRawComputedComparable: null,
+      minMarginRatioRawComputedCanonicalComparable: null,
       topComparableCandidates: [],
       leverInfluenceRanking: [],
       blockedReason,
@@ -377,14 +692,20 @@ export async function runRecoverySearch(opts: {
       bootstrapProvenance: [],
       executedCaseCount: 0,
       canonicalComparableCaseCount: 0,
+      canonicalStructuralComparableCaseCount: 0,
       nonComparableBuckets: {
         non_comparable_missing_signals: 0,
         non_comparable_contract_mismatch: 0,
         non_comparable_other: 0,
       },
+      semanticGapBuckets: {
+        comparable_structural_semantic_gap: 0,
+      },
       nonComparableDiagnosticsTop: [],
       candidatePassFoundCanonicalComparable: false,
+      candidatePassFoundStructuralComparable: false,
       minMarginRatioRawComputedComparable: null,
+      minMarginRatioRawComputedCanonicalComparable: null,
       topComparableCandidates: [],
       blockedReason,
       provenance: { commitHash },
@@ -397,6 +718,7 @@ export async function runRecoverySearch(opts: {
       stepASummaryPath,
       stepBSummaryPath,
       stepCSummaryPath,
+      couplingLocalizationPath,
       caseCount: 0,
       candidatePassFound: false,
       bestCandidate: null,
@@ -427,12 +749,37 @@ export async function runRecoverySearch(opts: {
     const entry = {
       lhs_Jm3: finiteOrNull(guard?.lhs_Jm3),
       boundComputed_Jm3: finiteOrNull(guard?.boundComputed_Jm3),
+      boundPolicyFloor_Jm3: finiteOrNull(guard?.boundPolicyFloor_Jm3),
+      boundEnvFloor_Jm3: finiteOrNull(guard?.boundEnvFloor_Jm3),
+      boundDefaultFloor_Jm3: finiteOrNull(guard?.boundDefaultFloor_Jm3),
+      boundFloor_Jm3: finiteOrNull(guard?.boundFloor_Jm3),
       boundUsed_Jm3: finiteOrNull(guard?.boundUsed_Jm3),
       marginRatioRaw: finiteOrNull(guard?.marginRatioRaw),
       marginRatioRawComputed: finiteOrNull(guard?.marginRatioRawComputed),
       applicabilityStatus: String(guard?.applicabilityStatus ?? 'UNKNOWN').toUpperCase(),
       rhoSource: stringOrNull(guard?.rhoSource),
       reasonCode: deriveReasonCodes(guard),
+      quantitySemanticType: stringOrNull((guard as any)?.quantitySemanticType),
+      quantitySemanticBaseType: stringOrNull((guard as any)?.quantitySemanticBaseType),
+      quantitySemanticTargetType: stringOrNull((guard as any)?.quantitySemanticTargetType),
+      quantityWorldlineClass: stringOrNull((guard as any)?.quantityWorldlineClass),
+      quantitySemanticComparable:
+        typeof (guard as any)?.quantitySemanticComparable === 'boolean'
+          ? Boolean((guard as any).quantitySemanticComparable)
+          : null,
+      quantitySemanticReason: stringOrNull((guard as any)?.quantitySemanticReason),
+      quantitySemanticBridgeMode: stringOrNull((guard as any)?.quantitySemanticBridgeMode),
+      quantitySemanticBridgeReady:
+        typeof (guard as any)?.quantitySemanticBridgeReady === 'boolean'
+          ? Boolean((guard as any).quantitySemanticBridgeReady)
+          : null,
+      quantitySemanticBridgeMissing: Array.isArray((guard as any)?.quantitySemanticBridgeMissing)
+        ? ((guard as any).quantitySemanticBridgeMissing as unknown[]).filter((item) => typeof item === 'string').join('|')
+        : null,
+      qeiStateClass: stringOrNull((guard as any)?.qeiStateClass),
+      qeiRenormalizationScheme: stringOrNull((guard as any)?.qeiRenormalizationScheme),
+      qeiSamplingNormalization: stringOrNull((guard as any)?.qeiSamplingNormalization),
+      qeiOperatorMapping: stringOrNull((guard as any)?.qeiOperatorMapping),
     };
     bootstrapProvenance.push({
       profileId,
@@ -442,6 +789,19 @@ export async function runRecoverySearch(opts: {
       rhoSource: entry.rhoSource,
       applicabilityStatus: entry.applicabilityStatus,
       missingSignals: missingSignalFields(entry),
+      quantitySemanticType: entry.quantitySemanticType,
+      quantitySemanticBaseType: entry.quantitySemanticBaseType ?? null,
+      quantitySemanticTargetType: entry.quantitySemanticTargetType ?? null,
+      quantityWorldlineClass: entry.quantityWorldlineClass,
+      quantitySemanticComparable: entry.quantitySemanticComparable,
+      quantitySemanticReason: entry.quantitySemanticReason,
+      quantitySemanticBridgeMode: entry.quantitySemanticBridgeMode ?? null,
+      quantitySemanticBridgeReady: entry.quantitySemanticBridgeReady ?? null,
+      quantitySemanticBridgeMissing: entry.quantitySemanticBridgeMissing ?? null,
+      qeiStateClass: entry.qeiStateClass ?? null,
+      qeiRenormalizationScheme: entry.qeiRenormalizationScheme ?? null,
+      qeiSamplingNormalization: entry.qeiSamplingNormalization ?? null,
+      qeiOperatorMapping: entry.qeiOperatorMapping ?? null,
     });
   };
   captureBootstrap('baseline', {}, baselineGuard);
@@ -450,7 +810,10 @@ export async function runRecoverySearch(opts: {
     const guard = evaluateQiGuardrail(next, { sampler: 'gaussian', tau_ms: 5 });
     captureBootstrap(profile.profileId, profile.params, guard);
   }
-  const bootstrapComparable = bootstrapProvenance.find((entry) => entry.comparabilityClass === 'comparable_canonical');
+  const bootstrapComparable = bootstrapProvenance.find((entry) =>
+    entry.comparabilityClass === 'comparable_canonical' ||
+    entry.comparabilityClass === 'comparable_structural_semantic_gap',
+  );
   const bootstrap: BootstrapResult = {
     attempted: true,
     succeeded: Boolean(bootstrapComparable),
@@ -462,28 +825,31 @@ export async function runRecoverySearch(opts: {
 
   const results: RecoveryCase[] = [];
   let evaluated = 0;
-  const priorityCases = leverFamilies.tau_s_ms.map((tau) =>
-    JSON.stringify({ ...decodeCase(start), tau_s_ms: tau, dutyShip: decodeCase(start).dutyCycle, dutyEffective_FR: decodeCase(start).dutyCycle }),
-  );
+  const fallbackCenterRow = decodeCase(start);
+  const stepBSeed = useSeedArtifacts ? readStepBSeed(stepBSummaryPath) : null;
+  const couplingLocalizationSeed = useSeedArtifacts ? readCouplingLocalizationSeed(couplingLocalizationPath) : null;
+  const centerSeed = extractCenterSeed(stepBSeed);
+  const centerRow = sanitizeLeverRow(centerSeed.params, fallbackCenterRow);
+  const prioritizedFamilies = derivePrioritizedFamilies(stepBSeed, couplingLocalizationSeed, influenceFamilyLimit);
+  const tauPriorityRows = buildTauPriorityRows(centerRow);
+  const influenceRows = buildInfluenceMicroRows(centerRow, prioritizedFamilies);
   const seen = new Set<string>();
   const stagedRows: Record<string, unknown>[] = [];
-  for (const encoded of priorityCases) {
-    const row = JSON.parse(encoded) as Record<string, unknown>;
-    const key = JSON.stringify(row);
+  const pushRow = (row: Record<string, unknown>) => {
+    if (stagedRows.length >= maxCases) return;
+    const normalized = sanitizeLeverRow(row, centerRow);
+    const key = JSON.stringify(normalized);
     if (!seen.has(key)) {
       seen.add(key);
-      stagedRows.push(row);
+      stagedRows.push(normalized);
     }
-  }
+  };
+  for (const row of tauPriorityRows) pushRow(row);
+  for (const row of influenceRows) pushRow(row);
   for (let visit = 0; visit < attemptedCaseUniverse; visit += 1) {
     if (stagedRows.length >= maxCases) break;
     const idx = (start + visit * step) % attemptedCaseUniverse;
-    const row = decodeCase(idx);
-    const key = JSON.stringify(row);
-    if (!seen.has(key)) {
-      seen.add(key);
-      stagedRows.push(row);
-    }
+    pushRow(decodeCase(idx));
   }
 
   for (const row of stagedRows) {
@@ -517,12 +883,41 @@ export async function runRecoverySearch(opts: {
     const applicabilityStatus = String(guard.applicabilityStatus ?? 'UNKNOWN').toUpperCase();
     const lhs_Jm3 = finiteOrNull(guard.lhs_Jm3);
     const boundComputed_Jm3 = finiteOrNull(guard.boundComputed_Jm3);
+    const boundPolicyFloor_Jm3 = finiteOrNull((guard as any).boundPolicyFloor_Jm3);
+    const boundEnvFloor_Jm3 = finiteOrNull((guard as any).boundEnvFloor_Jm3);
+    const boundDefaultFloor_Jm3 = finiteOrNull((guard as any).boundDefaultFloor_Jm3);
+    const boundFloor_Jm3 = finiteOrNull((guard as any).boundFloor_Jm3);
     const boundUsed_Jm3 = finiteOrNull(guard.boundUsed_Jm3);
     const boundFloorApplied = Boolean(guard.boundFloorApplied);
     const marginRatioRaw = finiteOrNull(guard.marginRatioRaw);
     const marginRatioRawComputed = finiteOrNull(guard.marginRatioRawComputed);
+    const sumWindowDt = finiteOrNull((guard as any).sumWindowDt);
+    const tau_s = finiteOrNull((guard as any).tau_s);
+    const K = finiteOrNull((guard as any).K);
+    const safetySigma_Jm3 = finiteOrNull((guard as any).safetySigma_Jm3);
     const reasonCode = deriveReasonCodes(guard);
     const rhoSource = stringOrNull(guard.rhoSource);
+    const quantitySemanticType = stringOrNull((guard as any).quantitySemanticType);
+    const quantitySemanticBaseType = stringOrNull((guard as any).quantitySemanticBaseType);
+    const quantitySemanticTargetType = stringOrNull((guard as any).quantitySemanticTargetType);
+    const quantityWorldlineClass = stringOrNull((guard as any).quantityWorldlineClass);
+    const quantitySemanticComparable =
+      typeof (guard as any).quantitySemanticComparable === 'boolean'
+        ? Boolean((guard as any).quantitySemanticComparable)
+        : null;
+    const quantitySemanticReason = stringOrNull((guard as any).quantitySemanticReason);
+    const quantitySemanticBridgeMode = stringOrNull((guard as any).quantitySemanticBridgeMode);
+    const quantitySemanticBridgeReady =
+      typeof (guard as any).quantitySemanticBridgeReady === 'boolean'
+        ? Boolean((guard as any).quantitySemanticBridgeReady)
+        : null;
+    const quantitySemanticBridgeMissing = Array.isArray((guard as any).quantitySemanticBridgeMissing)
+      ? ((guard as any).quantitySemanticBridgeMissing as unknown[]).filter((item) => typeof item === 'string').join('|')
+      : null;
+    const qeiStateClass = stringOrNull((guard as any).qeiStateClass);
+    const qeiRenormalizationScheme = stringOrNull((guard as any).qeiRenormalizationScheme);
+    const qeiSamplingNormalization = stringOrNull((guard as any).qeiSamplingNormalization);
+    const qeiOperatorMapping = stringOrNull((guard as any).qeiOperatorMapping);
     const couplingMode = stringOrNull((guard as any).couplingMode);
     const couplingAlpha = finiteOrNull((guard as any).couplingAlpha);
     const rhoMetric_Jm3 = finiteOrNull((guard as any).rhoMetric_Jm3);
@@ -537,10 +932,18 @@ export async function runRecoverySearch(opts: {
       params: row,
       lhs_Jm3,
       boundComputed_Jm3,
+      boundPolicyFloor_Jm3,
+      boundEnvFloor_Jm3,
+      boundDefaultFloor_Jm3,
+      boundFloor_Jm3,
       boundUsed_Jm3,
       boundFloorApplied,
       marginRatioRaw,
       marginRatioRawComputed,
+      sumWindowDt,
+      tau_s,
+      K,
+      safetySigma_Jm3,
       applicabilityStatus,
       reasonCode,
       rhoSource,
@@ -551,6 +954,19 @@ export async function runRecoverySearch(opts: {
       rhoCoupledShadow_Jm3,
       couplingResidualRel,
       couplingComparable,
+      quantitySemanticType,
+      quantitySemanticBaseType,
+      quantitySemanticTargetType,
+      quantityWorldlineClass,
+      quantitySemanticComparable,
+      quantitySemanticReason,
+      quantitySemanticBridgeMode,
+      quantitySemanticBridgeReady,
+      quantitySemanticBridgeMissing,
+      qeiStateClass,
+      qeiRenormalizationScheme,
+      qeiSamplingNormalization,
+      qeiOperatorMapping,
       ...metricDecomposition,
       classificationTag: classify(applicabilityStatus, marginRatioRawComputed),
       comparabilityClass: classifyComparability({
@@ -563,21 +979,47 @@ export async function runRecoverySearch(opts: {
         applicabilityStatus,
         rhoSource,
         reasonCode,
+        quantitySemanticType,
+        quantitySemanticBaseType,
+        quantitySemanticTargetType,
+        quantityWorldlineClass,
+        quantitySemanticComparable,
+        quantitySemanticReason,
+        quantitySemanticBridgeReady,
       }),
     });
   }
 
-  const comparableCases = results.filter((entry) => entry.comparabilityClass === 'comparable_canonical');
-  const nonComparableCases = results.filter((entry) => entry.comparabilityClass !== 'comparable_canonical');
-  const comparableComputedMargins = comparableCases
+  const canonicalComparableCases = results.filter((entry) => entry.comparabilityClass === 'comparable_canonical');
+  const structuralComparableCases = results.filter(
+    (entry) =>
+      entry.comparabilityClass === 'comparable_canonical' ||
+      entry.comparabilityClass === 'comparable_structural_semantic_gap',
+  );
+  const nonComparableCases = results.filter(
+    (entry) =>
+      entry.comparabilityClass !== 'comparable_canonical' &&
+      entry.comparabilityClass !== 'comparable_structural_semantic_gap',
+  );
+  const canonicalComparableComputedMargins = canonicalComparableCases
     .map((entry) => entry.marginRatioRawComputed)
     .filter((value): value is number => value != null)
     .sort((a, b) => a - b);
-  const minMarginRatioRawComputedComparable = comparableComputedMargins[0] ?? null;
-  const candidatePassFoundCanonicalComparable = comparableCases.some(
+  const structuralComparableComputedMargins = structuralComparableCases
+    .map((entry) => entry.marginRatioRawComputed)
+    .filter((value): value is number => value != null)
+    .sort((a, b) => a - b);
+  const minMarginRatioRawComputedCanonicalComparable = canonicalComparableComputedMargins[0] ?? null;
+  const minMarginRatioRawComputedComparable = structuralComparableComputedMargins[0] ?? null;
+  const candidatePassFoundCanonicalComparable = canonicalComparableCases.some(
     (entry) => entry.applicabilityStatus === 'PASS' && (entry.marginRatioRaw ?? Number.POSITIVE_INFINITY) < 1,
   );
-  const nonComparableBuckets = nonComparableCases.reduce<Record<Exclude<ComparabilityClass, 'comparable_canonical'>, number>>(
+  const candidatePassFoundStructuralComparable = structuralComparableCases.some(
+    (entry) => entry.applicabilityStatus === 'PASS' && (entry.marginRatioRaw ?? Number.POSITIVE_INFINITY) < 1,
+  );
+  const nonComparableBuckets = nonComparableCases.reduce<
+    Record<Exclude<ComparabilityClass, 'comparable_canonical' | 'comparable_structural_semantic_gap'>, number>
+  >(
     (acc, entry) => {
       if (entry.comparabilityClass === 'non_comparable_missing_signals') {
         acc.non_comparable_missing_signals += 1;
@@ -594,6 +1036,11 @@ export async function runRecoverySearch(opts: {
       non_comparable_other: 0,
     },
   );
+  const semanticGapBuckets = {
+    comparable_structural_semantic_gap: results.filter(
+      (entry) => entry.comparabilityClass === 'comparable_structural_semantic_gap',
+    ).length,
+  };
   const nonComparableDiagnostics = new Map<string, number>();
   for (const entry of nonComparableCases) {
     if (entry.comparabilityClass === 'non_comparable_missing_signals') {
@@ -611,6 +1058,12 @@ export async function runRecoverySearch(opts: {
       for (const code of contractCodes) {
         nonComparableDiagnostics.set(`contract_mismatch_reason:${code}`, (nonComparableDiagnostics.get(`contract_mismatch_reason:${code}`) ?? 0) + 1);
       }
+    } else {
+      const semanticReason = entry.quantitySemanticReason ?? 'semantic_untyped';
+      nonComparableDiagnostics.set(
+        `semantic_mismatch:${semanticReason}`,
+        (nonComparableDiagnostics.get(`semantic_mismatch:${semanticReason}`) ?? 0) + 1,
+      );
     }
   }
   const nonComparableDiagnosticsTop = [...nonComparableDiagnostics.entries()]
@@ -618,8 +1071,9 @@ export async function runRecoverySearch(opts: {
     .slice(0, 10)
     .map(([reason, count]) => ({ reason, count }));
 
-  const applicabilityPass = results.filter((entry) => entry.applicabilityStatus === 'PASS');
-  const rankedCandidates = applicabilityPass
+  const canonicalApplicabilityPass = canonicalComparableCases.filter((entry) => entry.applicabilityStatus === 'PASS');
+  const comparableApplicabilityPass = structuralComparableCases.filter((entry) => entry.applicabilityStatus === 'PASS');
+  const rankedCandidates = comparableApplicabilityPass
     .slice()
     .sort(
       (a, b) =>
@@ -630,10 +1084,12 @@ export async function runRecoverySearch(opts: {
     rankedCandidates[0] ??
     results.slice().sort((a, b) => (a.marginRatioRawComputed ?? Number.POSITIVE_INFINITY) - (b.marginRatioRawComputed ?? Number.POSITIVE_INFINITY) || a.id.localeCompare(b.id))[0] ?? null;
   const minMarginRatioRawComputedAmongApplicabilityPass = rankedCandidates[0]?.marginRatioRawComputed ?? null;
-  const minMarginRatioRawAmongApplicabilityPass = applicabilityPass
+  const minMarginRatioRawAmongApplicabilityPass = comparableApplicabilityPass
     .map((entry) => entry.marginRatioRaw ?? Number.POSITIVE_INFINITY)
     .sort((a, b) => a - b)[0] ?? null;
-  const candidatePassFoundCanonical = rankedCandidates.some((entry) => (entry.marginRatioRaw ?? Number.POSITIVE_INFINITY) < 1);
+  const candidatePassFoundCanonical = canonicalApplicabilityPass.some(
+    (entry) => (entry.marginRatioRaw ?? Number.POSITIVE_INFINITY) < 1,
+  );
   const candidatePassFoundComputedOnly = rankedCandidates.some(
     (entry) => (entry.marginRatioRawComputed ?? Number.POSITIVE_INFINITY) < 1,
   );
@@ -649,7 +1105,7 @@ export async function runRecoverySearch(opts: {
         ? 'counterfactual_only'
         : 'no_pass_signal',
   };
-  const rankedComparableCandidates = comparableCases
+  const rankedComparableCandidates = structuralComparableCases
     .slice()
     .sort(
       (a, b) =>
@@ -659,14 +1115,36 @@ export async function runRecoverySearch(opts: {
     .slice(0, 10)
     .map((entry) => ({
       id: entry.id,
+      comparabilityClass: entry.comparabilityClass,
       params: entry.params,
       lhs_Jm3: entry.lhs_Jm3,
       boundComputed_Jm3: entry.boundComputed_Jm3,
+      boundPolicyFloor_Jm3: entry.boundPolicyFloor_Jm3,
+      boundEnvFloor_Jm3: entry.boundEnvFloor_Jm3,
+      boundDefaultFloor_Jm3: entry.boundDefaultFloor_Jm3,
+      boundFloor_Jm3: entry.boundFloor_Jm3,
       boundUsed_Jm3: entry.boundUsed_Jm3,
       marginRatioRaw: entry.marginRatioRaw,
       marginRatioRawComputed: entry.marginRatioRawComputed,
+      sumWindowDt: entry.sumWindowDt,
+      tau_s: entry.tau_s,
+      K: entry.K,
+      safetySigma_Jm3: entry.safetySigma_Jm3,
       applicabilityStatus: entry.applicabilityStatus,
       reasonCode: entry.reasonCode,
+      quantitySemanticType: entry.quantitySemanticType,
+      quantitySemanticBaseType: entry.quantitySemanticBaseType,
+      quantitySemanticTargetType: entry.quantitySemanticTargetType,
+      quantityWorldlineClass: entry.quantityWorldlineClass,
+      quantitySemanticComparable: entry.quantitySemanticComparable,
+      quantitySemanticReason: entry.quantitySemanticReason,
+      quantitySemanticBridgeMode: entry.quantitySemanticBridgeMode,
+      quantitySemanticBridgeReady: entry.quantitySemanticBridgeReady,
+      quantitySemanticBridgeMissing: entry.quantitySemanticBridgeMissing,
+      qeiStateClass: entry.qeiStateClass,
+      qeiRenormalizationScheme: entry.qeiRenormalizationScheme,
+      qeiSamplingNormalization: entry.qeiSamplingNormalization,
+      qeiOperatorMapping: entry.qeiOperatorMapping,
       couplingMode: entry.couplingMode,
       couplingAlpha: entry.couplingAlpha,
       rhoMetric_Jm3: entry.rhoMetric_Jm3,
@@ -677,7 +1155,10 @@ export async function runRecoverySearch(opts: {
       metricT00Ref: entry.metricT00Ref,
       metricT00Derivation: entry.metricT00Derivation,
       metricT00ContractStatus: entry.metricT00ContractStatus,
+      metricT00Geom: entry.metricT00Geom,
       metricT00Si_Jm3: entry.metricT00Si_Jm3,
+      metricT00SiFromGeom: entry.metricT00SiFromGeom,
+      metricT00SiRelError: entry.metricT00SiRelError,
       metricStressRhoSiMean_Jm3: entry.metricStressRhoSiMean_Jm3,
       metricStressRhoGeomMean_Geom: entry.metricStressRhoGeomMean_Geom,
       metricStressKTraceMean: entry.metricStressKTraceMean,
@@ -686,7 +1167,16 @@ export async function runRecoverySearch(opts: {
       metricStressScale_m: entry.metricStressScale_m,
       metricStressSampleCount: entry.metricStressSampleCount,
     }));
-  const leverInfluenceRanking = summarizeInfluence(comparableCases);
+  const leverInfluenceRanking = summarizeInfluence(structuralComparableCases);
+  const postBootstrapBlockedReason = structuralComparableCases.length === 0 ? 'no_canonical_comparable_cases_after_bootstrap' : null;
+  const normalizedTopRankedApplicabilityPassCases = postBootstrapBlockedReason == null ? rankedCandidates.slice(0, topN) : [];
+  const normalizedCandidatePassFoundCanonical = postBootstrapBlockedReason == null ? candidatePassFoundCanonical : false;
+  const normalizedCandidatePassFoundComputedOnly = postBootstrapBlockedReason == null ? candidatePassFoundComputedOnly : false;
+  const normalizedCandidatePassFound = postBootstrapBlockedReason == null ? candidatePassFound : false;
+  const normalizedMinMarginRatioRawAmongApplicabilityPass =
+    postBootstrapBlockedReason == null ? minMarginRatioRawAmongApplicabilityPass : null;
+  const normalizedMinMarginRatioRawComputedAmongApplicabilityPass =
+    postBootstrapBlockedReason == null ? minMarginRatioRawComputedAmongApplicabilityPass : null;
 
   const payload = {
     runId: `g4-recovery-search-${seed}-${DATE_STAMP}`,
@@ -696,25 +1186,57 @@ export async function runRecoverySearch(opts: {
       seed,
       maxCases,
       runtimeCapMs,
+      influenceFamilyLimit,
       attemptedCaseUniverse,
       executedCaseCount: results.length,
       evaluatedCaseCount: evaluated,
       elapsedMs: Date.now() - startedAt,
       deterministicWalk: { start, step },
+      stagedCounts: {
+        tauPriorityRows: tauPriorityRows.length,
+        influenceRows: influenceRows.length,
+        stagedRows: stagedRows.length,
+      },
+      seedStrategy: {
+        centerSource: centerSeed.params ? 'stepB_top_comparable' : 'deterministic_walk_seed',
+        centerCaseId: centerSeed.caseId,
+        prioritizedFamilies,
+        stepBSeedUsed: Boolean(centerSeed.params),
+        couplingLocalizationSeedUsed: Boolean(couplingLocalizationSeed?.termInfluenceRanking),
+        seedArtifactsEnabled: useSeedArtifacts,
+      },
     },
     caseCount: results.length,
-    candidatePassFound,
-    candidatePassFoundCanonical,
-    candidatePassFoundComputedOnly,
-    minMarginRatioRawAmongApplicabilityPass,
-    minMarginRatioRawComputedAmongApplicabilityPass,
+    canonicalComparableCaseCount: canonicalComparableCases.length,
+    canonicalStructuralComparableCaseCount: structuralComparableCases.length,
+    canonicalSemanticGapCaseCount: semanticGapBuckets.comparable_structural_semantic_gap,
+    candidatePassFound: normalizedCandidatePassFound,
+    candidatePassFoundCanonical: normalizedCandidatePassFoundCanonical,
+    candidatePassFoundComputedOnly: normalizedCandidatePassFoundComputedOnly,
+    candidatePassFoundCanonicalComparable,
+    candidatePassFoundStructuralComparable,
+    minMarginRatioRawAmongApplicabilityPass: normalizedMinMarginRatioRawAmongApplicabilityPass,
+    minMarginRatioRawComputedAmongApplicabilityPass: normalizedMinMarginRatioRawComputedAmongApplicabilityPass,
+    minMarginRatioRawComputedCanonicalComparable,
+    minMarginRatioRawComputedComparable,
     bestCandidateEligibility,
     bestCandidate,
+    blockedReason: postBootstrapBlockedReason,
+    stepASummaryPath: stepASummaryPath.replace(/\\/g, '/'),
+    stepBSummaryPath: stepBSummaryPath.replace(/\\/g, '/'),
+    stepCSummaryPath: stepCSummaryPath.replace(/\\/g, '/'),
+    couplingLocalizationPath: couplingLocalizationPath.replace(/\\/g, '/'),
     provenance: {
       commitHash,
       freshnessSource: 'git.head',
+      stepBSeedCommitHash:
+        typeof stepBSeed?.provenance?.commitHash === 'string' ? stepBSeed.provenance.commitHash : null,
+      couplingLocalizationSeedCommitHash:
+        typeof couplingLocalizationSeed?.provenance?.commitHash === 'string'
+          ? couplingLocalizationSeed.provenance.commitHash
+          : null,
     },
-    topRankedApplicabilityPassCases: rankedCandidates.slice(0, topN),
+    topRankedApplicabilityPassCases: normalizedTopRankedApplicabilityPassCases,
     cases: results,
   };
 
@@ -723,12 +1245,15 @@ export async function runRecoverySearch(opts: {
   writeStepBSummary(stepBSummaryPath, {
     boundaryStatement: BOUNDARY_STATEMENT,
     executedCaseCount: results.length,
-    canonicalComparableCaseCount: comparableCases.length,
+    canonicalComparableCaseCount: canonicalComparableCases.length,
+    canonicalStructuralComparableCaseCount: structuralComparableCases.length,
     candidatePassFoundCanonicalComparable,
+    candidatePassFoundStructuralComparable,
     minMarginRatioRawComputedComparable,
+    minMarginRatioRawComputedCanonicalComparable,
     topComparableCandidates: rankedComparableCandidates,
     leverInfluenceRanking,
-    blockedReason: comparableCases.length === 0 ? 'no_canonical_comparable_cases_after_bootstrap' : null,
+    blockedReason: postBootstrapBlockedReason,
     provenance: {
       commitHash,
     },
@@ -740,26 +1265,32 @@ export async function runRecoverySearch(opts: {
     bootstrapReason: bootstrap.reason,
     bootstrapProvenance: bootstrap.provenance,
     executedCaseCount: results.length,
-    canonicalComparableCaseCount: comparableCases.length,
+    canonicalComparableCaseCount: canonicalComparableCases.length,
+    canonicalStructuralComparableCaseCount: structuralComparableCases.length,
     nonComparableBuckets,
+    semanticGapBuckets,
     nonComparableDiagnosticsTop,
     candidatePassFoundCanonicalComparable,
+    candidatePassFoundStructuralComparable,
     minMarginRatioRawComputedComparable,
+    minMarginRatioRawComputedCanonicalComparable,
     topComparableCandidates: rankedComparableCandidates,
-    blockedReason: comparableCases.length === 0 ? 'no_canonical_comparable_cases_after_bootstrap' : null,
+    blockedReason: postBootstrapBlockedReason,
     provenance: { commitHash },
   };
   fs.mkdirSync(path.dirname(stepCSummaryPath), { recursive: true });
   fs.writeFileSync(stepCSummaryPath, `${JSON.stringify(stepCSummary, null, 2)}\n`);
   return {
-    ok: true,
+    ok: postBootstrapBlockedReason == null,
     outPath,
     stepASummaryPath,
     stepBSummaryPath,
     stepCSummaryPath,
+    couplingLocalizationPath,
     caseCount: results.length,
-    candidatePassFound,
+    candidatePassFound: normalizedCandidatePassFound,
     bestCandidate,
+    blockedReason: postBootstrapBlockedReason,
   };
 }
 

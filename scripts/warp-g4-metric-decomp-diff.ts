@@ -29,6 +29,7 @@ type RecoveryCase = {
   id: string;
   applicabilityStatus?: string;
   comparabilityClass?: string;
+  reasonCode?: string[];
   marginRatioRawComputed?: number | null;
   marginRatioRaw?: number | null;
   rhoSource?: string | null;
@@ -59,6 +60,13 @@ type GenerateMetricDecompDiffOptions = {
   candidateTopN?: number;
 };
 
+type ComparabilityClass =
+  | 'comparable_canonical'
+  | 'comparable_structural_semantic_gap'
+  | 'non_comparable_missing_signals'
+  | 'non_comparable_contract_mismatch'
+  | 'non_comparable_other';
+
 const METRIC_FIELDS: MetricField[] = [
   'metricT00Si_Jm3',
   'metricStressRhoSiMean_Jm3',
@@ -73,13 +81,35 @@ const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Nu
 const asString = (v: unknown): string | null => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : null);
 const safeReadJson = (p: string): any | null => (fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null);
 
-const isComparableCanonical = (entry: RecoveryCase): boolean => {
-  if (entry.comparabilityClass === 'comparable_canonical') return true;
-  const rhoSource = asString(entry.rhoSource) ?? '';
+const isComparabilityClass = (value: unknown): value is ComparabilityClass =>
+  value === 'comparable_canonical' ||
+  value === 'comparable_structural_semantic_gap' ||
+  value === 'non_comparable_missing_signals' ||
+  value === 'non_comparable_contract_mismatch' ||
+  value === 'non_comparable_other';
+
+const resolveComparabilityClass = (entry: RecoveryCase): ComparabilityClass => {
+  if (isComparabilityClass(entry.comparabilityClass)) return entry.comparabilityClass;
+
   const hasRequired =
     finiteOrNull(entry.marginRatioRawComputed) != null &&
-    finiteOrNull(entry.metricT00Si_Jm3) != null;
-  return rhoSource.startsWith('warp.metric') && hasRequired;
+    finiteOrNull(entry.metricT00Si_Jm3) != null &&
+    finiteOrNull(entry.marginRatioRaw) != null;
+  if (!hasRequired) return 'non_comparable_missing_signals';
+
+  const rhoSource = asString(entry.rhoSource) ?? '';
+  const reasonCodes = Array.isArray(entry.reasonCode)
+    ? entry.reasonCode.map((code) => String(code).toUpperCase())
+    : [];
+  if (
+    !rhoSource.startsWith('warp.metric') ||
+    reasonCodes.includes('G4_QI_SOURCE_NOT_METRIC') ||
+    reasonCodes.includes('G4_QI_CONTRACT_MISSING')
+  ) {
+    return 'non_comparable_contract_mismatch';
+  }
+
+  return 'comparable_structural_semantic_gap';
 };
 
 const compareByMarginThenId = (a: RecoveryCase, b: RecoveryCase): number =>
@@ -139,19 +169,35 @@ export const generateG4MetricDecompDiff = (options: GenerateMetricDecompDiffOpti
     return { ok: false, blockedReason: payload.blockedReason, outJsonPath, outMdPath };
   }
 
-  const cases = (recovery.cases as RecoveryCase[]).slice().sort(compareByMarginThenId);
-  const comparableCases = cases.filter(isComparableCanonical);
+  const cases = (recovery.cases as RecoveryCase[])
+    .map((entry) => ({
+      ...entry,
+      comparabilityClass: resolveComparabilityClass(entry),
+    }))
+    .slice()
+    .sort(compareByMarginThenId);
+  const canonicalComparableCases = cases.filter((entry) => entry.comparabilityClass === 'comparable_canonical');
+  const structuralComparableCases = cases.filter(
+    (entry) =>
+      entry.comparabilityClass === 'comparable_canonical' ||
+      entry.comparabilityClass === 'comparable_structural_semantic_gap',
+  );
 
-  if (comparableCases.length === 0) {
+  if (structuralComparableCases.length === 0) {
     const payload = {
       date: DATE_STAMP,
       generatedAt: new Date().toISOString(),
       boundaryStatement: BOUNDARY_STATEMENT,
-      blockedReason: 'no_comparable_canonical_cases',
+      blockedReason: 'no_structural_comparable_cases',
       recoveryPath,
       provenance: {
         commitHash,
         recoveryCommitHash: asString(recovery?.provenance?.commitHash),
+      },
+      selectionMode: null,
+      comparableCaseCounts: {
+        canonicalComparable: 0,
+        structuralComparable: 0,
       },
       reference: null,
       candidates: [],
@@ -165,15 +211,20 @@ export const generateG4MetricDecompDiff = (options: GenerateMetricDecompDiffOpti
     return { ok: false, blockedReason: payload.blockedReason, outJsonPath, outMdPath };
   }
 
-  const referencePoolPass = comparableCases.filter(
+  const selectionMode =
+    canonicalComparableCases.length > 0 ? 'canonical' : 'structural_semantic_gap_fallback';
+  const selectedComparableCases =
+    canonicalComparableCases.length > 0 ? canonicalComparableCases : structuralComparableCases;
+
+  const referencePoolPass = selectedComparableCases.filter(
     (entry) => String(entry.applicabilityStatus ?? 'UNKNOWN').toUpperCase() === 'PASS',
   );
-  const referencePool = referencePoolPass.length > 0 ? referencePoolPass : comparableCases;
+  const referencePool = referencePoolPass.length > 0 ? referencePoolPass : selectedComparableCases;
   const referenceCases = referencePool.slice(0, referenceTopN);
   const referenceStats = computeFieldStats(referenceCases);
   const referenceByField = statByField(referenceStats);
 
-  const selectedCandidates = comparableCases.slice(0, candidateTopN);
+  const selectedCandidates = selectedComparableCases.slice(0, candidateTopN);
   const anomalyCountsByField: Record<string, number> = {};
   const candidates = selectedCandidates.map((entry) => {
     const termComparisons = METRIC_FIELDS.map((field) => {
@@ -214,7 +265,7 @@ export const generateG4MetricDecompDiff = (options: GenerateMetricDecompDiffOpti
     const abnormalTerms = termComparisons.filter((row) => row.abnormal).map((row) => row.field);
     return {
       id: entry.id,
-      comparabilityClass: entry.comparabilityClass ?? null,
+      comparabilityClass: entry.comparabilityClass,
       applicabilityStatus: entry.applicabilityStatus ?? 'UNKNOWN',
       marginRatioRaw: finiteOrNull(entry.marginRatioRaw),
       marginRatioRawComputed: finiteOrNull(entry.marginRatioRawComputed),
@@ -248,8 +299,20 @@ export const generateG4MetricDecompDiff = (options: GenerateMetricDecompDiffOpti
       commitHash,
       recoveryCommitHash: asString(recovery?.provenance?.commitHash),
     },
+    selectionMode,
+    comparableCaseCounts: {
+      canonicalComparable: canonicalComparableCases.length,
+      structuralComparable: structuralComparableCases.length,
+    },
     reference: {
-      mode: referencePoolPass.length > 0 ? 'applicability_pass_comparable' : 'comparable_fallback',
+      mode:
+        selectionMode === 'canonical'
+          ? referencePoolPass.length > 0
+            ? 'applicability_pass_canonical'
+            : 'canonical_fallback'
+          : referencePoolPass.length > 0
+            ? 'applicability_pass_structural_semantic_gap'
+            : 'structural_semantic_gap_fallback',
       caseCount: referenceCases.length,
       ids: referenceCases.map((entry) => entry.id),
       fieldStats: referenceStats,
@@ -277,7 +340,9 @@ export const generateG4MetricDecompDiff = (options: GenerateMetricDecompDiffOpti
 ${BOUNDARY_STATEMENT}
 
 ## Summary
-- comparable cases analyzed: ${comparableCases.length}
+- selection mode: ${selectionMode}
+- canonical comparable cases analyzed: ${canonicalComparableCases.length}
+- structural comparable cases analyzed: ${structuralComparableCases.length}
 - reference mode: ${payload.reference.mode}
 - reference case count: ${payload.reference.caseCount}
 - candidate count: ${payload.candidateSelection.caseCount}
@@ -291,11 +356,19 @@ ${mdRows}
   fs.mkdirSync(path.dirname(outMdPath), { recursive: true });
   fs.writeFileSync(outMdPath, md);
 
-  console.log(JSON.stringify({ ok: true, outJsonPath, outMdPath, anyAbnormalCandidates, candidateCount: candidates.length }));
-  return { ok: true, outJsonPath, outMdPath, anyAbnormalCandidates, candidateCount: candidates.length };
+  console.log(
+    JSON.stringify({
+      ok: true,
+      outJsonPath,
+      outMdPath,
+      selectionMode,
+      anyAbnormalCandidates,
+      candidateCount: candidates.length,
+    }),
+  );
+  return { ok: true, outJsonPath, outMdPath, selectionMode, anyAbnormalCandidates, candidateCount: candidates.length };
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   generateG4MetricDecompDiff();
 }
-

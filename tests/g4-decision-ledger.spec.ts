@@ -99,6 +99,8 @@ describe('g4-decision-ledger generator', () => {
     const ledger = JSON.parse(fs.readFileSync(out, 'utf8'));
     expect(ledger.recoverySearch.failClosedReason).toBe('recovery_artifact_missing');
     expect(ledger.recoverySearch.caseCount).toBe(null);
+    expect(ledger.couplingAblation.failClosedReason).toBe('coupling_ablation_artifact_missing');
+    expect(ledger.couplingAblation.artifactPath).toBe(null);
   });
 
   it('integrates recovery search artifact summary', () => {
@@ -136,7 +138,100 @@ describe('g4-decision-ledger generator', () => {
     expect(ledger.recoverySearch.minMarginRatioRawComputedAmongApplicabilityPass).toBe(0.92);
     expect(ledger.recoverySearch.bestCandidateEligibility.class).toBe('counterfactual_only');
     expect(ledger.recoverySearch.bestCandidate.id).toBe('case_0001');
+    expect(ledger.recoverySearch.blockedReason).toBe(null);
     expect(ledger.recoverySearch.failClosedReason).toBe(null);
+  });
+
+  it('integrates coupling ablation summary', () => {
+    const root = makeRoot();
+    seedBase(root);
+    for (const wave of ['A', 'B', 'C', 'D']) writeWave(root, wave, 1);
+    writeJson(path.join(root, 'g4-coupling-ablation-2026-02-27.json'), {
+      generatedAt: '2026-02-27T00:00:00.000Z',
+      analysisMode: 'diagnostic_fallback_noncomparable_other',
+      baselineCaseId: 'canonical_a',
+      baselineMarginRatioRawComputed: 1498144.75,
+      bestCounterfactualMarginRatioRawComputed: 1498100.12,
+      candidatePassFoundCounterfactual: false,
+      topAblations: [
+        {
+          field: 'metricT00Si_Jm3',
+          estimationMode: 'linear_slope_reference_substitution',
+          slopeToMarginRatioRawComputed: 2.5,
+          counterfactualMarginRatioRawComputed: 1498100.12,
+          counterfactualPass: false,
+        },
+      ],
+    });
+    const out = path.join(root, 'out.json');
+    generateG4DecisionLedger({
+      rootDir: root,
+      outPath: out,
+      scoreboardPath: path.join(root, 'campaign-gate-scoreboard-2026-02-24.json'),
+      firstFailPath: path.join(root, 'campaign-first-fail-map-2026-02-24.json'),
+      influencePath: path.join(root, 'g4-influence-scan-2026-02-26.json'),
+      couplingAblationPath: path.join(root, 'g4-coupling-ablation-2026-02-27.json'),
+      getCommitHash: () => 'deadbeef',
+    });
+    const ledger = JSON.parse(fs.readFileSync(out, 'utf8'));
+    expect(ledger.couplingAblation.analysisMode).toBe('diagnostic_fallback_noncomparable_other');
+    expect(ledger.couplingAblation.baselineCaseId).toBe('canonical_a');
+    expect(ledger.couplingAblation.bestCounterfactualMarginRatioRawComputed).toBe(1498100.12);
+    expect(ledger.couplingAblation.candidatePassFoundCounterfactual).toBe(false);
+    expect(ledger.couplingAblation.topAblations).toHaveLength(1);
+    expect(ledger.couplingAblation.failClosedReason).toBe(null);
+  });
+
+  it('propagates explicit coupling ablation blockedReason as fail-closed reason', () => {
+    const root = makeRoot();
+    seedBase(root);
+    for (const wave of ['A', 'B', 'C', 'D']) writeWave(root, wave, 1);
+    writeJson(path.join(root, 'g4-coupling-ablation-2026-02-27.json'), {
+      generatedAt: '2026-02-27T00:00:00.000Z',
+      blockedReason: 'coupling_localization_missing',
+      topAblations: [],
+    });
+    const out = path.join(root, 'out.json');
+    generateG4DecisionLedger({
+      rootDir: root,
+      outPath: out,
+      scoreboardPath: path.join(root, 'campaign-gate-scoreboard-2026-02-24.json'),
+      firstFailPath: path.join(root, 'campaign-first-fail-map-2026-02-24.json'),
+      influencePath: path.join(root, 'g4-influence-scan-2026-02-26.json'),
+      couplingAblationPath: path.join(root, 'g4-coupling-ablation-2026-02-27.json'),
+      getCommitHash: () => 'deadbeef',
+    });
+    const ledger = JSON.parse(fs.readFileSync(out, 'utf8'));
+    expect(ledger.couplingAblation.blockedReason).toBe('coupling_localization_missing');
+    expect(ledger.couplingAblation.failClosedReason).toBe('coupling_localization_missing');
+  });
+
+  it('propagates explicit recovery blockedReason as fail-closed reason', () => {
+    const root = makeRoot();
+    seedBase(root);
+    for (const wave of ['A', 'B', 'C', 'D']) writeWave(root, wave, 1);
+    writeJson(path.join(root, 'g4-recovery-search-2026-02-27.json'), {
+      generatedAt: '2026-02-27T00:00:00.000Z',
+      caseCount: 160,
+      blockedReason: 'no_canonical_comparable_cases_after_bootstrap',
+      candidatePassFound: false,
+      candidatePassFoundCanonical: false,
+      candidatePassFoundComputedOnly: false,
+      topRankedApplicabilityPassCases: [],
+    });
+    const out = path.join(root, 'out.json');
+    generateG4DecisionLedger({
+      rootDir: root,
+      outPath: out,
+      scoreboardPath: path.join(root, 'campaign-gate-scoreboard-2026-02-24.json'),
+      firstFailPath: path.join(root, 'campaign-first-fail-map-2026-02-24.json'),
+      influencePath: path.join(root, 'g4-influence-scan-2026-02-26.json'),
+      recoveryPath: path.join(root, 'g4-recovery-search-2026-02-27.json'),
+      getCommitHash: () => 'deadbeef',
+    });
+    const ledger = JSON.parse(fs.readFileSync(out, 'utf8'));
+    expect(ledger.recoverySearch.blockedReason).toBe('no_canonical_comparable_cases_after_bootstrap');
+    expect(ledger.recoverySearch.failClosedReason).toBe('no_canonical_comparable_cases_after_bootstrap');
   });
 
   it('emits deterministic mismatch reason and required metadata', () => {

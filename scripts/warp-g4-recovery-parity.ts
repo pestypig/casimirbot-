@@ -26,12 +26,14 @@ const numEq = (a: number | null, b: number | null, absEps = 1e-12, relEps = 1e-9
 
 type ComparabilityClass =
   | 'comparable_canonical'
+  | 'comparable_structural_semantic_gap'
   | 'non_comparable_missing_signals'
   | 'non_comparable_contract_mismatch'
   | 'non_comparable_other';
 
 const COMPARABILITY_CLASSES: ComparabilityClass[] = [
   'comparable_canonical',
+  'comparable_structural_semantic_gap',
   'non_comparable_missing_signals',
   'non_comparable_contract_mismatch',
   'non_comparable_other',
@@ -51,10 +53,29 @@ const classifyComparability = (entry: any): ComparabilityClass => {
     return 'non_comparable_contract_mismatch';
   }
   if (!str(entry?.rhoSource).startsWith('warp.metric')) return 'non_comparable_contract_mismatch';
+  const semanticType = typeof entry?.quantitySemanticType === 'string' ? entry.quantitySemanticType : null;
+  const semanticTargetType = typeof entry?.quantitySemanticTargetType === 'string' ? entry.quantitySemanticTargetType : null;
+  const worldlineClass = typeof entry?.quantityWorldlineClass === 'string' ? entry.quantityWorldlineClass : null;
+  const semanticBridgeReady = typeof entry?.quantitySemanticBridgeReady === 'boolean' ? entry.quantitySemanticBridgeReady : null;
+  const canonicalSemanticComparable =
+    (semanticBridgeReady === true) ||
+    (typeof entry?.quantitySemanticComparable === 'boolean'
+      ? entry.quantitySemanticComparable
+      : semanticType === 'ren_expectation_timelike_energy_density' && worldlineClass === 'timelike');
+  if (canonicalSemanticComparable) return 'comparable_canonical';
+  const structuralSemanticComparable =
+    worldlineClass === 'timelike' &&
+    (semanticBridgeReady === false ||
+      (semanticType === 'classical_proxy_from_curvature' && semanticTargetType === 'ren_expectation_timelike_energy_density'));
+  if (structuralSemanticComparable) return 'comparable_structural_semantic_gap';
+  if (!canonicalSemanticComparable) return 'non_comparable_other';
   return 'comparable_canonical';
 };
 
-type SelectionPolicy = 'comparable_canonical' | 'fallback_no_comparable_canonical';
+type SelectionPolicy =
+  | 'comparable_canonical'
+  | 'comparable_structural_semantic_gap'
+  | 'fallback_no_canonical_structural_comparable';
 
 type MismatchReason =
   | 'none'
@@ -113,11 +134,10 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
 
   const recovery = JSON.parse(fs.readFileSync(recoveryPath, 'utf8')) as any;
   const recoveryCommitHash = typeof recovery?.provenance?.commitHash === 'string' ? recovery.provenance.commitHash : null;
-  const comparableCandidates = Array.isArray(recovery?.topComparableCandidates) && recovery.topComparableCandidates.length > 0
+  const candidatePool = Array.isArray(recovery?.topComparableCandidates) && recovery.topComparableCandidates.length > 0
     ? recovery.topComparableCandidates
     : Array.isArray(recovery?.cases)
       ? recovery.cases
-          .filter((entry: any) => classifyComparability(entry) === 'comparable_canonical')
           .sort((a: any, b: any) => {
             const aRawComputed = finiteOrNull(a?.marginRatioRawComputed) ?? Number.POSITIVE_INFINITY;
             const bRawComputed = finiteOrNull(b?.marginRatioRawComputed) ?? Number.POSITIVE_INFINITY;
@@ -125,11 +145,28 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
             return str(a?.id).localeCompare(str(b?.id));
           })
       : [];
+  const canonicalCandidates = candidatePool.filter((entry: any) => classifyComparability(entry) === 'comparable_canonical');
+  const structuralGapCandidates = candidatePool.filter(
+    (entry: any) => classifyComparability(entry) === 'comparable_structural_semantic_gap',
+  );
 
   const selectionPolicy: SelectionPolicy =
-    comparableCandidates.length > 0 ? 'comparable_canonical' : 'fallback_no_comparable_canonical';
-  const blockedReason = selectionPolicy === 'comparable_canonical' ? null : 'no_canonical_comparable_candidates';
-  const selected = (selectionPolicy === 'comparable_canonical' ? comparableCandidates : []).slice(0, topN);
+    canonicalCandidates.length > 0
+      ? 'comparable_canonical'
+      : structuralGapCandidates.length > 0
+        ? 'comparable_structural_semantic_gap'
+        : 'fallback_no_canonical_structural_comparable';
+  const blockedReason =
+    selectionPolicy === 'fallback_no_canonical_structural_comparable'
+      ? 'no_canonical_structural_comparable_candidates'
+      : null;
+  const selectedSource =
+    selectionPolicy === 'comparable_canonical'
+      ? canonicalCandidates
+      : selectionPolicy === 'comparable_structural_semantic_gap'
+        ? structuralGapCandidates
+        : [];
+  const selected = selectedSource.slice(0, topN);
   const baseline = structuredClone(getGlobalPipelineState());
   const rows: any[] = [];
 
@@ -218,6 +255,7 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
     },
     {
       comparable_canonical: 0,
+      comparable_structural_semantic_gap: 0,
       non_comparable_missing_signals: 0,
       non_comparable_contract_mismatch: 0,
       non_comparable_other: 0,
@@ -238,15 +276,22 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
     dominantFailureMode: dominantFailureMode(rows),
     comparability: {
       canonicalComparableCaseCount: comparabilityCounts.comparable_canonical,
+      canonicalStructuralComparableCaseCount:
+        comparabilityCounts.comparable_canonical + comparabilityCounts.comparable_structural_semantic_gap,
       nonComparableCaseCount:
         comparabilityCounts.non_comparable_missing_signals +
         comparabilityCounts.non_comparable_contract_mismatch +
         comparabilityCounts.non_comparable_other,
+      semanticGapCaseCount: comparabilityCounts.comparable_structural_semantic_gap,
       nonComparableBuckets: {
         non_comparable_missing_signals: comparabilityCounts.non_comparable_missing_signals,
         non_comparable_contract_mismatch: comparabilityCounts.non_comparable_contract_mismatch,
         non_comparable_other: comparabilityCounts.non_comparable_other,
       },
+    },
+    selectionPool: {
+      canonicalComparableCandidateCount: canonicalCandidates.length,
+      structuralSemanticGapCandidateCount: structuralGapCandidates.length,
     },
     provenance: {
       commitHash: headCommitHash,

@@ -4,12 +4,17 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runRecoverySearch } from '../scripts/warp-g4-recovery-search';
 
-const writeStepASummary = (summaryPath: string, canonicalComparableCaseCount: number) => {
+const writeStepASummary = (
+  summaryPath: string,
+  canonicalComparableCaseCount: number,
+  canonicalStructuralComparableCaseCount: number = canonicalComparableCaseCount,
+) => {
   fs.writeFileSync(
     summaryPath,
     `${JSON.stringify(
       {
         canonicalComparableCaseCount,
+        canonicalStructuralComparableCaseCount,
         nonComparableCaseCount: 0,
         nonComparableBuckets: {
           non_comparable_missing_signals: 0,
@@ -23,6 +28,14 @@ const writeStepASummary = (summaryPath: string, canonicalComparableCaseCount: nu
       2,
     )}\n`,
   );
+};
+
+const writeStepBSeed = (summaryPath: string, payload: Record<string, unknown>) => {
+  fs.writeFileSync(summaryPath, `${JSON.stringify(payload, null, 2)}\n`);
+};
+
+const writeCouplingLocalizationSeed = (localizationPath: string, payload: Record<string, unknown>) => {
+  fs.writeFileSync(localizationPath, `${JSON.stringify(payload, null, 2)}\n`);
 };
 
 describe('warp-g4-recovery-search', () => {
@@ -55,18 +68,37 @@ describe('warp-g4-recovery-search', () => {
     expect(payload.caseCount).toBe(8);
     expect(typeof payload.candidatePassFound).toBe('boolean');
     expect(payload.bestCandidate).not.toBeNull();
+    expect(payload).toHaveProperty('blockedReason');
+    expect(payload).toHaveProperty('stepASummaryPath');
+    expect(payload).toHaveProperty('stepBSummaryPath');
+    expect(payload).toHaveProperty('stepCSummaryPath');
     expect(Array.isArray(payload.cases)).toBe(true);
     for (const row of payload.cases) {
       expect(row).toHaveProperty('lhs_Jm3');
       expect(row).toHaveProperty('boundComputed_Jm3');
+      expect(row).toHaveProperty('boundPolicyFloor_Jm3');
+      expect(row).toHaveProperty('boundEnvFloor_Jm3');
+      expect(row).toHaveProperty('boundDefaultFloor_Jm3');
+      expect(row).toHaveProperty('boundFloor_Jm3');
       expect(row).toHaveProperty('boundUsed_Jm3');
       expect(row).toHaveProperty('marginRatioRaw');
       expect(row).toHaveProperty('marginRatioRawComputed');
+      expect(row).toHaveProperty('sumWindowDt');
+      expect(row).toHaveProperty('tau_s');
+      expect(row).toHaveProperty('K');
+      expect(row).toHaveProperty('safetySigma_Jm3');
       expect(row).toHaveProperty('applicabilityStatus');
       expect(row).toHaveProperty('reasonCode');
       expect(row).toHaveProperty('rhoSource');
       expect(row).toHaveProperty('classificationTag');
       expect(row).toHaveProperty('comparabilityClass');
+      expect(row).toHaveProperty('quantitySemanticType');
+      expect(row).toHaveProperty('quantityWorldlineClass');
+      expect(row).toHaveProperty('quantitySemanticComparable');
+      expect(row).toHaveProperty('quantitySemanticReason');
+      expect(row).toHaveProperty('metricT00Geom');
+      expect(row).toHaveProperty('metricT00SiFromGeom');
+      expect(row).toHaveProperty('metricT00SiRelError');
     }
   });
 
@@ -141,7 +173,13 @@ describe('warp-g4-recovery-search', () => {
       },
       {},
     );
-    expect((comparabilityCounts.comparable_canonical ?? 0) + (comparabilityCounts.non_comparable_missing_signals ?? 0) + (comparabilityCounts.non_comparable_contract_mismatch ?? 0) + (comparabilityCounts.non_comparable_other ?? 0)).toBe(payloadA.caseCount);
+    expect(
+      (comparabilityCounts.comparable_canonical ?? 0) +
+        (comparabilityCounts.comparable_structural_semantic_gap ?? 0) +
+        (comparabilityCounts.non_comparable_missing_signals ?? 0) +
+        (comparabilityCounts.non_comparable_contract_mismatch ?? 0) +
+        (comparabilityCounts.non_comparable_other ?? 0),
+    ).toBe(payloadA.caseCount);
   });
 
   it('fails closed when Step A summary is missing', async () => {
@@ -180,7 +218,7 @@ describe('warp-g4-recovery-search', () => {
     const stepA = path.join(root, 'g4-stepA-summary.json');
     const stepB = path.join(root, 'g4-stepB-summary.json');
     const stepC = path.join(root, 'g4-stepC-summary.json');
-    writeStepASummary(stepA, 0);
+    writeStepASummary(stepA, 0, 0);
 
     const result = await runRecoverySearch({
       outPath: out,
@@ -202,6 +240,32 @@ describe('warp-g4-recovery-search', () => {
     const summaryC = JSON.parse(fs.readFileSync(stepC, 'utf8'));
     expect(summaryC.blockedReason).toBe('no_canonical_comparable_cases');
     expect(summaryC.bootstrapAttempted).toBe(false);
+  });
+
+  it('allows exploratory recovery when Step A structural-comparable coverage exists', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-recovery-stepa-structural-'));
+    const out = path.join(root, 'search.json');
+    const stepA = path.join(root, 'g4-stepA-summary.json');
+    const stepB = path.join(root, 'g4-stepB-summary.json');
+    const stepC = path.join(root, 'g4-stepC-summary.json');
+    writeStepASummary(stepA, 0, 4);
+
+    const result = await runRecoverySearch({
+      outPath: out,
+      stepASummaryPath: stepA,
+      stepBSummaryPath: stepB,
+      stepCSummaryPath: stepC,
+      seed: 5,
+      maxCases: 10,
+      runtimeCapMs: 10_000,
+    });
+
+    expect(result.ok).toBeTypeOf('boolean');
+    expect((result as any).blockedReason).not.toBe('no_canonical_comparable_cases');
+    const payload = JSON.parse(fs.readFileSync(out, 'utf8'));
+    expect(payload.caseCount).toBeGreaterThan(0);
+    expect(payload.canonicalComparableCaseCount).toBeTypeOf('number');
+    expect(payload.canonicalStructuralComparableCaseCount).toBeTypeOf('number');
   });
 
   it('does not mutate canonical artifact during temp output runs', async () => {
@@ -235,12 +299,85 @@ describe('warp-g4-recovery-search', () => {
     }
     expect(summary.executedCaseCount).toBe(payload.caseCount);
     expect(summary.canonicalComparableCaseCount).toBeTypeOf('number');
+    expect(summary.canonicalStructuralComparableCaseCount).toBeTypeOf('number');
     expect([null, 'no_canonical_comparable_cases_after_bootstrap']).toContain(summary.blockedReason);
     expect(Array.isArray(summary.topComparableCandidates)).toBe(true);
     expect(summary.topComparableCandidates.length).toBeLessThanOrEqual(10);
     expect(Array.isArray(summary.leverInfluenceRanking)).toBe(true);
-    expect(summary.leverInfluenceRanking[0]).toHaveProperty('family');
-    expect(summary.leverInfluenceRanking[0]).toHaveProperty('measuredImpactAbsLhsDelta');
+    if (summary.blockedReason === 'no_canonical_comparable_cases_after_bootstrap') {
+      expect(summary.leverInfluenceRanking).toEqual([]);
+    } else {
+      expect(summary.leverInfluenceRanking[0]).toHaveProperty('family');
+      expect(summary.leverInfluenceRanking[0]).toHaveProperty('measuredImpactAbsLhsDelta');
+    }
+  });
+
+  it('uses Step B top candidate and influence seed for deterministic micro-search staging', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-recovery-micro-'));
+    const out = path.join(root, 'search.json');
+    const stepA = path.join(root, 'g4-stepA-summary.json');
+    const stepB = path.join(root, 'g4-stepB-summary.json');
+    const localization = path.join(root, 'g4-coupling-localization-2026-02-27.json');
+    writeStepASummary(stepA, 0, 4);
+    writeStepBSeed(stepB, {
+      topComparableCandidates: [
+        {
+          id: 'seed_case_0099',
+          params: {
+            warpFieldType: 'lentz',
+            gammaGeo: 48,
+            dutyCycle: 0.12,
+            sectorCount: 200,
+            concurrentSectors: 2,
+            gammaVanDenBroeck: 20,
+            sampler: 'hann',
+            fieldType: 'scalar',
+            qCavity: 1e7,
+            qSpoilingFactor: 1.5,
+            tau_s_ms: 35,
+            gap_nm: 5,
+            shipRadius_m: 10,
+          },
+        },
+      ],
+      leverInfluenceRanking: [
+        { family: 'gammaGeo', measuredImpactAbsLhsDelta: 10, noOpByAbsLhsDelta: false },
+        { family: 'warpFieldType', measuredImpactAbsLhsDelta: 6, noOpByAbsLhsDelta: false },
+        { family: 'qCavity', measuredImpactAbsLhsDelta: 5, noOpByAbsLhsDelta: false },
+      ],
+      provenance: { commitHash: 'deadbeef' },
+    });
+    writeCouplingLocalizationSeed(localization, {
+      termInfluenceRanking: [
+        { field: 'metricT00Si_Jm3', influenceScore: 3 },
+        { field: 'rhoProxy_Jm3', influenceScore: 2 },
+      ],
+      provenance: { commitHash: 'deadbeef' },
+    });
+
+    await runRecoverySearch({
+      outPath: out,
+      stepASummaryPath: stepA,
+      stepBSummaryPath: stepB,
+      couplingLocalizationPath: localization,
+      useSeedArtifacts: true,
+      seed: 101,
+      maxCases: 20,
+      runtimeCapMs: 10_000,
+    });
+    const payload = JSON.parse(fs.readFileSync(out, 'utf8'));
+    expect(payload.deterministicSearch.seedStrategy.centerSource).toBe('stepB_top_comparable');
+    expect(payload.deterministicSearch.seedStrategy.centerCaseId).toBe('seed_case_0099');
+    expect(payload.deterministicSearch.seedStrategy.prioritizedFamilies).toContain('gammaGeo');
+    expect(payload.deterministicSearch.stagedCounts.tauPriorityRows).toBe(7);
+
+    const tauRows = payload.cases.slice(0, 7);
+    expect(new Set(tauRows.map((row: any) => row.params.tau_s_ms))).toEqual(new Set([2, 5, 8, 10, 20, 35, 50]));
+    for (const row of tauRows) {
+      expect(row.params.warpFieldType).toBe('lentz');
+      expect(row.params.gammaGeo).toBe(48);
+      expect(row.params.qCavity).toBe(1e7);
+    }
   });
 
   it('emits Step C summary with bootstrap provenance and fail-closed blocker semantics', async () => {
@@ -269,7 +406,9 @@ describe('warp-g4-recovery-search', () => {
     expect(Array.isArray(summary.bootstrapProvenance)).toBe(true);
     expect(summary.executedCaseCount).toBe(14);
     expect(summary.canonicalComparableCaseCount).toBeTypeOf('number');
+    expect(summary.canonicalStructuralComparableCaseCount).toBeTypeOf('number');
     expect(summary.nonComparableBuckets).toHaveProperty('non_comparable_missing_signals');
+    expect(summary.semanticGapBuckets).toHaveProperty('comparable_structural_semantic_gap');
     expect(Array.isArray(summary.nonComparableDiagnosticsTop)).toBe(true);
     expect(Array.isArray(summary.topComparableCandidates)).toBe(true);
     expect(summary.topComparableCandidates.length).toBeLessThanOrEqual(10);

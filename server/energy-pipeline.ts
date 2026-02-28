@@ -7363,6 +7363,110 @@ function rhoSourceIsMetric(rhoDebug: EffectiveRhoDebug): boolean {
   );
 }
 
+export type QiQuantitySemanticType =
+  | "ren_expectation_timelike_energy_density"
+  | "classical_proxy_from_curvature"
+  | "model_energy_density_casimir_like"
+  | "effective_energy_density_sec"
+  | "null_contracted_average"
+  | "unknown_representation";
+
+export type QiWorldlineClass = "timelike" | "null_like" | "unknown";
+export type QiSemanticBridgeMode = "strict_evidence_gated";
+
+function resolveQiWorldlineClass(observer: unknown, rhoSource?: string): QiWorldlineClass {
+  const observerText = String(observer ?? "").toLowerCase();
+  const sourceText = String(rhoSource ?? "").toLowerCase();
+  if (observerText.includes("null") || sourceText.includes("null")) return "null_like";
+  if (
+    observerText.includes("timelike") ||
+    observerText.includes("eulerian") ||
+    observerText.includes("comoving") ||
+    observerText.includes("normal")
+  ) {
+    return "timelike";
+  }
+  return "unknown";
+}
+
+function resolveQiQuantitySemanticType(args: {
+  rhoSource?: string;
+  couplingSemantics?: string;
+  worldlineClass: QiWorldlineClass;
+}): QiQuantitySemanticType {
+  const sourceText = String(args.rhoSource ?? "").toLowerCase();
+  const semanticsText = String(args.couplingSemantics ?? "").toLowerCase();
+  if (args.worldlineClass === "null_like" || sourceText.includes("null")) {
+    return "null_contracted_average";
+  }
+  if (semanticsText.includes("effective energy density") || sourceText.startsWith("gr.rho_constraint")) {
+    return "effective_energy_density_sec";
+  }
+  if (
+    sourceText.includes("casimir") ||
+    sourceText.includes("tile") ||
+    sourceText.includes("telemetry")
+  ) {
+    return "model_energy_density_casimir_like";
+  }
+  if (sourceText.startsWith("warp.metric") || sourceText.startsWith("gr.metric")) {
+    return "classical_proxy_from_curvature";
+  }
+  return "unknown_representation";
+}
+
+function normalizeLower(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  return trimmed.toLowerCase();
+}
+
+function resolveQiSemanticBridge(args: {
+  worldlineClass: QiWorldlineClass;
+  rhoSource?: string;
+  metricContractOk: boolean;
+  applicabilityStatus?: "PASS" | "FAIL" | "NOT_APPLICABLE" | "UNKNOWN";
+  couplingSemantics?: string;
+  qeiStateClass?: string | null;
+  qeiRenormalizationScheme?: string | null;
+  qeiSamplingNormalization?: string | null;
+  qeiOperatorMapping?: string | null;
+}): {
+  mode: QiSemanticBridgeMode;
+  ready: boolean;
+  missing: string[];
+} {
+  const mode: QiSemanticBridgeMode = "strict_evidence_gated";
+  const missing: string[] = [];
+  const sourceText = String(args.rhoSource ?? "").toLowerCase();
+  const couplingText = String(args.couplingSemantics ?? "").toLowerCase();
+  const stateClass = normalizeLower(args.qeiStateClass);
+  const renormScheme = normalizeLower(args.qeiRenormalizationScheme);
+  const samplingNorm = normalizeLower(args.qeiSamplingNormalization);
+  const operatorMapping = normalizeLower(args.qeiOperatorMapping);
+
+  if (args.worldlineClass !== "timelike") missing.push("worldline_not_timelike");
+  if (!sourceText.startsWith("warp.metric") && !sourceText.startsWith("gr.metric")) {
+    missing.push("source_not_metric");
+  }
+  if (!args.metricContractOk) missing.push("metric_contract_not_ok");
+  if (String(args.applicabilityStatus ?? "UNKNOWN").toUpperCase() !== "PASS") {
+    missing.push("applicability_not_pass");
+  }
+  if (couplingText.includes("diagnostic_only")) missing.push("coupling_semantics_diagnostic_only");
+  if (stateClass !== "hadamard") missing.push("qei_state_class_not_hadamard");
+  if (renormScheme !== "point_splitting") missing.push("qei_renormalization_not_point_splitting");
+  if (samplingNorm !== "unit_integral") missing.push("qei_sampling_normalization_not_unit_integral");
+  if (operatorMapping !== "t_munu_uu_ren") missing.push("qei_operator_mapping_not_t_munu_uu_ren");
+
+  return {
+    mode,
+    ready: missing.length === 0,
+    missing,
+  };
+}
+
 type QiStatusInput = {
   zetaRaw?: number;
   zetaClamped?: number;
@@ -7487,6 +7591,19 @@ export function evaluateQiGuardrail(
   couplingComparable?: boolean;
   couplingEquationRef?: string;
   couplingSemantics?: string;
+  quantitySemanticBaseType: QiQuantitySemanticType;
+  quantitySemanticType: QiQuantitySemanticType;
+  quantityWorldlineClass: QiWorldlineClass;
+  quantitySemanticComparable: boolean;
+  quantitySemanticReason: string;
+  quantitySemanticTargetType: "ren_expectation_timelike_energy_density";
+  quantitySemanticBridgeMode: QiSemanticBridgeMode;
+  quantitySemanticBridgeReady: boolean;
+  quantitySemanticBridgeMissing: string[];
+  qeiStateClass?: string | null;
+  qeiRenormalizationScheme?: string | null;
+  qeiSamplingNormalization?: string | null;
+  qeiOperatorMapping?: string | null;
 } {
   const sampler = opts.sampler ?? state.phaseSchedule?.sampler ?? state.qi?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
   const tau_ms =
@@ -7690,6 +7807,35 @@ export function evaluateQiGuardrail(
     metricNormalization.length > 0 &&
     metricUnitSystem === "SI";
 
+  const qeiStateClass = normalizeLower((state as any)?.qi?.qeiStateClass);
+  const qeiRenormalizationScheme = normalizeLower((state as any)?.qi?.qeiRenormalizationScheme);
+  const qeiSamplingNormalization = normalizeLower((state as any)?.qi?.qeiSamplingNormalization);
+  const qeiOperatorMapping = normalizeLower((state as any)?.qi?.qeiOperatorMapping);
+  const quantityWorldlineClass = resolveQiWorldlineClass(metricObserver, rhoDebug.source);
+  const quantitySemanticBaseType = resolveQiQuantitySemanticType({
+    rhoSource: rhoDebug.source,
+    couplingSemantics: couplingDiagnostics.semantics,
+    worldlineClass: quantityWorldlineClass,
+  });
+  const quantitySemanticBridge = resolveQiSemanticBridge({
+    worldlineClass: quantityWorldlineClass,
+    rhoSource: rhoDebug.source,
+    metricContractOk,
+    applicabilityStatus,
+    couplingSemantics: couplingDiagnostics.semantics,
+    qeiStateClass,
+    qeiRenormalizationScheme,
+    qeiSamplingNormalization,
+    qeiOperatorMapping,
+  });
+  const quantitySemanticType: QiQuantitySemanticType = quantitySemanticBridge.ready
+    ? "ren_expectation_timelike_energy_density"
+    : quantitySemanticBaseType;
+  const quantitySemanticComparable = quantitySemanticBridge.ready;
+  const quantitySemanticReason = quantitySemanticComparable
+    ? "semantic_parity_qei_timelike_ren"
+    : `semantic_mismatch:${quantitySemanticBaseType}:${quantityWorldlineClass}`;
+
   return {
     lhs_Jm3: lhs,
     bound_Jm3,
@@ -7753,6 +7899,19 @@ export function evaluateQiGuardrail(
     couplingComparable: couplingDiagnostics.comparable,
     couplingEquationRef: couplingDiagnostics.equationRef,
     couplingSemantics: couplingDiagnostics.semantics,
+    quantitySemanticBaseType,
+    quantitySemanticType,
+    quantityWorldlineClass,
+    quantitySemanticComparable,
+    quantitySemanticReason,
+    quantitySemanticTargetType: "ren_expectation_timelike_energy_density",
+    quantitySemanticBridgeMode: quantitySemanticBridge.mode,
+    quantitySemanticBridgeReady: quantitySemanticBridge.ready,
+    quantitySemanticBridgeMissing: quantitySemanticBridge.missing,
+    qeiStateClass,
+    qeiRenormalizationScheme,
+    qeiSamplingNormalization,
+    qeiOperatorMapping,
   };
 }
 

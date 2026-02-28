@@ -358,6 +358,14 @@ describe("evaluateQiGuardrail", () => {
     expect(guard.couplingComparable).toBe(true);
     expect(guard.couplingEquationRef).toContain("semiclassical_coupling");
     expect(guard.couplingSemantics).toBe("diagnostic_only_no_gate_override");
+    expect(guard.quantitySemanticBaseType).toBe("classical_proxy_from_curvature");
+    expect(guard.quantitySemanticType).toBe("classical_proxy_from_curvature");
+    expect(guard.quantitySemanticTargetType).toBe("ren_expectation_timelike_energy_density");
+    expect(guard.quantitySemanticBridgeMode).toBe("strict_evidence_gated");
+    expect(guard.quantitySemanticBridgeReady).toBe(false);
+    expect(Array.isArray(guard.quantitySemanticBridgeMissing)).toBe(true);
+    expect(guard.quantitySemanticBridgeMissing).toContain("qei_state_class_not_hadamard");
+    expect(guard.quantitySemanticBridgeMissing).toContain("qei_renormalization_not_point_splitting");
     expect(guard.lhs_Jm3).toBeCloseTo(metricT00, 9);
   });
 

@@ -44,6 +44,10 @@ describe('warp g4 recovery parity', () => {
               boundUsed_Jm3: -8,
               boundFloorApplied: true,
               rhoSource: 'warp.metric.T00.natario.shift',
+              quantitySemanticType: 'ren_expectation_timelike_energy_density',
+              quantityWorldlineClass: 'timelike',
+              quantitySemanticComparable: true,
+              quantitySemanticReason: 'semantic_parity_qei_timelike_ren',
               reasonCode: [],
             },
           ],
@@ -72,7 +76,7 @@ describe('warp g4 recovery parity', () => {
     );
   });
 
-  it('fails closed with empty selection when no canonical comparable candidates exist', async () => {
+  it('fails closed with empty selection when no canonical or structural comparable candidates exist', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-parity-fallback-'));
     const recoveryPath = path.join(tmpDir, 'recovery.json');
     const outPath = path.join(tmpDir, 'parity.json');
@@ -113,12 +117,12 @@ describe('warp g4 recovery parity', () => {
 
     const result = await runRecoveryParity({ topN: 2, recoveryPath, outPath });
     expect(result.ok).toBe(true);
-    expect(result.selectionPolicy).toBe('fallback_no_comparable_canonical');
-    expect((result as any).blockedReason).toBe('no_canonical_comparable_candidates');
+    expect(result.selectionPolicy).toBe('fallback_no_canonical_structural_comparable');
+    expect((result as any).blockedReason).toBe('no_canonical_structural_comparable_candidates');
 
     const payload = JSON.parse(fs.readFileSync(outPath, 'utf8'));
-    expect(payload.selectionPolicy).toBe('fallback_no_comparable_canonical');
-    expect(payload.blockedReason).toBe('no_canonical_comparable_candidates');
+    expect(payload.selectionPolicy).toBe('fallback_no_canonical_structural_comparable');
+    expect(payload.blockedReason).toBe('no_canonical_structural_comparable_candidates');
     expect(payload.candidateCountChecked).toBe(0);
     expect(payload.candidates).toEqual([]);
   });
@@ -146,6 +150,10 @@ describe('warp g4 recovery parity', () => {
               boundComputed_Jm3: -2,
               boundUsed_Jm3: -5,
               rhoSource: 'warp.metric.T00.natario.shift',
+              quantitySemanticType: 'ren_expectation_timelike_energy_density',
+              quantityWorldlineClass: 'timelike',
+              quantitySemanticComparable: true,
+              quantitySemanticReason: 'semantic_parity_qei_timelike_ren',
               reasonCode: [],
             },
             {
@@ -214,6 +222,10 @@ describe('warp g4 recovery parity', () => {
               boundComputed_Jm3: -2,
               boundUsed_Jm3: -5,
               rhoSource: 'warp.metric.T00.natario.shift',
+              quantitySemanticType: 'ren_expectation_timelike_energy_density',
+              quantityWorldlineClass: 'timelike',
+              quantitySemanticComparable: true,
+              quantitySemanticReason: 'semantic_parity_qei_timelike_ren',
               reasonCode: [],
             },
           ],
@@ -229,7 +241,56 @@ describe('warp g4 recovery parity', () => {
 
     const payload = JSON.parse(fs.readFileSync(outPath, 'utf8'));
     expect(payload.comparability.canonicalComparableCaseCount).toBe(1);
+    expect(payload.comparability.canonicalStructuralComparableCaseCount).toBe(1);
     expect(payload.selectionPolicy).toBe('comparable_canonical');
+    expect(payload.candidateCountChecked).toBe(1);
+  });
+
+  it('selects structural-semantic-gap candidates when canonical set is empty', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-parity-structural-'));
+    const recoveryPath = path.join(tmpDir, 'recovery.json');
+    const outPath = path.join(tmpDir, 'parity.json');
+
+    fs.writeFileSync(
+      recoveryPath,
+      `${JSON.stringify(
+        {
+          provenance: { commitHash: 'deadbeef' },
+          cases: [
+            {
+              id: 'case_struct',
+              params: { sampler: 'gaussian', tau_s_ms: 5 },
+              applicabilityStatus: 'UNKNOWN',
+              marginRatioRawComputed: 2,
+              marginRatioRaw: 2,
+              lhs_Jm3: -5,
+              boundComputed_Jm3: -2,
+              boundUsed_Jm3: -5,
+              rhoSource: 'warp.metric.T00.natario.shift',
+              quantitySemanticType: 'classical_proxy_from_curvature',
+              quantitySemanticTargetType: 'ren_expectation_timelike_energy_density',
+              quantityWorldlineClass: 'timelike',
+              quantitySemanticComparable: false,
+              quantitySemanticBridgeReady: false,
+              reasonCode: [],
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const result = await runRecoveryParity({ topN: 1, recoveryPath, outPath });
+    expect(result.ok).toBe(true);
+    expect(result.selectionPolicy).toBe('comparable_structural_semantic_gap');
+    expect((result as any).blockedReason).toBe(null);
+
+    const payload = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+    expect(payload.comparability.canonicalComparableCaseCount).toBe(0);
+    expect(payload.comparability.semanticGapCaseCount).toBe(1);
+    expect(payload.comparability.canonicalStructuralComparableCaseCount).toBe(1);
+    expect(payload.selectionPool.structuralSemanticGapCandidateCount).toBe(1);
     expect(payload.candidateCountChecked).toBe(1);
   });
 
@@ -275,6 +336,10 @@ describe('warp g4 recovery parity', () => {
               boundUsed_Jm3: -18,
               boundFloorApplied: false,
               rhoSource: 'warp.metric.T00.natario.shift',
+              quantitySemanticType: 'ren_expectation_timelike_energy_density',
+              quantityWorldlineClass: 'timelike',
+              quantitySemanticComparable: true,
+              quantitySemanticReason: 'semantic_parity_qei_timelike_ren',
               reasonCode: [],
             },
           ],
@@ -307,6 +372,10 @@ describe('warp g4 recovery parity', () => {
               boundUsed_Jm3: drift(parity.boundUsed_Jm3),
               boundFloorApplied: parity.boundFloorApplied,
               rhoSource: 'warp.metric.T00.natario.shift',
+              quantitySemanticType: 'ren_expectation_timelike_energy_density',
+              quantityWorldlineClass: 'timelike',
+              quantitySemanticComparable: true,
+              quantitySemanticReason: 'semantic_parity_qei_timelike_ren',
               reasonCode: [],
             },
           ],

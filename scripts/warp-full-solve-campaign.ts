@@ -122,6 +122,19 @@ type EvidencePack = {
     couplingComparable?: boolean;
     couplingEquationRef?: string;
     couplingSemantics?: string;
+    quantitySemanticBaseType?: string;
+    quantitySemanticType?: string;
+    quantitySemanticTargetType?: string;
+    quantityWorldlineClass?: string;
+    quantitySemanticComparable?: boolean;
+    quantitySemanticReason?: string;
+    quantitySemanticBridgeMode?: string;
+    quantitySemanticBridgeReady?: boolean;
+    quantitySemanticBridgeMissing?: string;
+    qeiStateClass?: string;
+    qeiRenormalizationScheme?: string;
+    qeiSamplingNormalization?: string;
+    qeiOperatorMapping?: string;
     rhoSource?: string;
     metricT00Ref?: string;
     metricT00Geom?: number;
@@ -199,6 +212,19 @@ type QiForensicsArtifact = {
   couplingComparable: boolean | null;
   couplingEquationRef: string | null;
   couplingSemantics: string | null;
+  quantitySemanticBaseType: string | null;
+  quantitySemanticType: string | null;
+  quantitySemanticTargetType: string | null;
+  quantityWorldlineClass: string | null;
+  quantitySemanticComparable: boolean | null;
+  quantitySemanticReason: string | null;
+  quantitySemanticBridgeMode: string | null;
+  quantitySemanticBridgeReady: boolean | null;
+  quantitySemanticBridgeMissing: string | null;
+  qeiStateClass: string | null;
+  qeiRenormalizationScheme: string | null;
+  qeiSamplingNormalization: string | null;
+  qeiOperatorMapping: string | null;
   tau_s: number | null;
   sampler: string | null;
   fieldType: string | null;
@@ -1195,6 +1221,47 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
       readSnapshotString(snapshot?.qi_coupling_equation_ref) ?? (parseFordField('couplingEquationRef') ?? undefined),
     couplingSemantics:
       readSnapshotString(snapshot?.qi_coupling_semantics) ?? (parseFordField('couplingSemantics') ?? undefined),
+    quantitySemanticBaseType:
+      readSnapshotString(snapshot?.qi_quantity_semantic_base_type) ?? (parseFordField('quantitySemanticBaseType') ?? undefined),
+    quantitySemanticType:
+      readSnapshotString(snapshot?.qi_quantity_semantic_type) ?? (parseFordField('quantitySemanticType') ?? undefined),
+    quantitySemanticTargetType:
+      readSnapshotString(snapshot?.qi_quantity_semantic_target_type) ?? (parseFordField('quantitySemanticTargetType') ?? undefined),
+    quantityWorldlineClass:
+      readSnapshotString(snapshot?.qi_quantity_worldline_class) ?? (parseFordField('quantityWorldlineClass') ?? undefined),
+    quantitySemanticComparable:
+      typeof snapshot?.qi_quantity_semantic_comparable === 'boolean'
+        ? snapshot.qi_quantity_semantic_comparable
+        : parseFordField('quantitySemanticComparable') === 'true'
+          ? true
+          : parseFordField('quantitySemanticComparable') === 'false'
+            ? false
+            : undefined,
+    quantitySemanticReason:
+      readSnapshotString(snapshot?.qi_quantity_semantic_reason) ?? (parseFordField('quantitySemanticReason') ?? undefined),
+    quantitySemanticBridgeMode:
+      readSnapshotString(snapshot?.qi_quantity_semantic_bridge_mode) ?? (parseFordField('quantitySemanticBridgeMode') ?? undefined),
+    quantitySemanticBridgeReady:
+      typeof snapshot?.qi_quantity_semantic_bridge_ready === 'boolean'
+        ? snapshot.qi_quantity_semantic_bridge_ready
+        : parseFordField('quantitySemanticBridgeReady') === 'true'
+          ? true
+          : parseFordField('quantitySemanticBridgeReady') === 'false'
+            ? false
+            : undefined,
+    quantitySemanticBridgeMissing:
+      readSnapshotString(snapshot?.qi_quantity_semantic_bridge_missing) ??
+      (parseFordField('quantitySemanticBridgeMissing') ?? undefined),
+    qeiStateClass:
+      readSnapshotString(snapshot?.qi_qei_state_class) ?? (parseFordField('qeiStateClass') ?? undefined),
+    qeiRenormalizationScheme:
+      readSnapshotString(snapshot?.qi_qei_renormalization_scheme) ??
+      (parseFordField('qeiRenormalizationScheme') ?? undefined),
+    qeiSamplingNormalization:
+      readSnapshotString(snapshot?.qi_qei_sampling_normalization) ??
+      (parseFordField('qeiSamplingNormalization') ?? undefined),
+    qeiOperatorMapping:
+      readSnapshotString(snapshot?.qi_qei_operator_mapping) ?? (parseFordField('qeiOperatorMapping') ?? undefined),
     rhoSource: readSnapshotString(snapshot?.qi_rho_source) ?? (parseFordField('rhoSource') ?? undefined),
     metricT00Ref:
       readSnapshotString(snapshot?.qi_metric_t00_ref) ?? (parseFordField('metricT00Ref') ?? undefined),
@@ -1292,6 +1359,19 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
     couplingComparable: booleanOrNull(pack.g4Diagnostics?.couplingComparable),
     couplingEquationRef: stringOrNull(pack.g4Diagnostics?.couplingEquationRef),
     couplingSemantics: stringOrNull(pack.g4Diagnostics?.couplingSemantics),
+    quantitySemanticBaseType: stringOrNull(pack.g4Diagnostics?.quantitySemanticBaseType),
+    quantitySemanticType: stringOrNull(pack.g4Diagnostics?.quantitySemanticType),
+    quantitySemanticTargetType: stringOrNull(pack.g4Diagnostics?.quantitySemanticTargetType),
+    quantityWorldlineClass: stringOrNull(pack.g4Diagnostics?.quantityWorldlineClass),
+    quantitySemanticComparable: booleanOrNull(pack.g4Diagnostics?.quantitySemanticComparable),
+    quantitySemanticReason: stringOrNull(pack.g4Diagnostics?.quantitySemanticReason),
+    quantitySemanticBridgeMode: stringOrNull(pack.g4Diagnostics?.quantitySemanticBridgeMode),
+    quantitySemanticBridgeReady: booleanOrNull(pack.g4Diagnostics?.quantitySemanticBridgeReady),
+    quantitySemanticBridgeMissing: stringOrNull(pack.g4Diagnostics?.quantitySemanticBridgeMissing),
+    qeiStateClass: stringOrNull(pack.g4Diagnostics?.qeiStateClass),
+    qeiRenormalizationScheme: stringOrNull(pack.g4Diagnostics?.qeiRenormalizationScheme),
+    qeiSamplingNormalization: stringOrNull(pack.g4Diagnostics?.qeiSamplingNormalization),
+    qeiOperatorMapping: stringOrNull(pack.g4Diagnostics?.qeiOperatorMapping),
     tau_s: finiteOrNull(pack.g4Diagnostics?.tau_s),
     sampler: stringOrNull(guard?.sampler),
     fieldType: stringOrNull(guard?.fieldType),
@@ -1687,6 +1767,10 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
   const recoveryCandidateFound = Boolean(recovery?.candidatePassFound);
   const recoveryCandidateFoundCanonical = Boolean(recovery?.candidatePassFoundCanonical ?? recovery?.candidatePassFound);
   const recoveryCandidateFoundComputedOnly = Boolean(recovery?.candidatePassFoundComputedOnly);
+  const recoveryBlockedReason =
+    typeof recovery?.blockedReason === 'string' && recovery.blockedReason.trim().length > 0
+      ? recovery.blockedReason
+      : null;
   const recoveryProvenanceCommit = typeof recovery?.provenance?.commitHash === 'string' ? recovery.provenance.commitHash : null;
   const recoveryHeadCommit = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
   const recoveryProvenanceFresh = recoveryProvenanceCommit != null && recoveryProvenanceCommit === recoveryHeadCommit;
@@ -1779,6 +1863,7 @@ ${g4WaveRows}
 - candidate found (backward-compatible canonical alias): ${recoveryCandidateFound ? 'yes' : 'no'}
 - candidate found canonical/policy semantics: ${recoveryCandidateFoundCanonical ? 'yes' : 'no'}
 - candidate found computed-only counterfactual semantics: ${recoveryCandidateFoundComputedOnly ? 'yes' : 'no'}
+- blocked reason (fail-closed): ${recoveryBlockedReason ?? 'none'}
 - case count: ${typeof recovery?.caseCount === 'number' ? recovery.caseCount : 'n/a'}
 - attempted case universe: ${typeof recovery?.deterministicSearch?.attemptedCaseUniverse === 'number' ? recovery.deterministicSearch.attemptedCaseUniverse : 'n/a'}
 - executed case count: ${typeof recovery?.deterministicSearch?.executedCaseCount === 'number' ? recovery.deterministicSearch.executedCaseCount : 'n/a'}

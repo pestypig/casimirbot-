@@ -9,6 +9,7 @@ const CANONICAL_SCOREBOARD = path.join('artifacts/research/full-solve', 'campaig
 const CANONICAL_FIRST_FAIL = path.join('artifacts/research/full-solve', 'campaign-first-fail-map-2026-02-24.json');
 const INFLUENCE_PATH = path.join('artifacts/research/full-solve', 'g4-influence-scan-2026-02-26.json');
 const RECOVERY_PATH = path.join('artifacts/research/full-solve', 'g4-recovery-search-2026-02-27.json');
+const COUPLING_ABLATION_PATH = path.join('artifacts/research/full-solve', 'g4-coupling-ablation-2026-02-27.json');
 
 export const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
@@ -23,6 +24,7 @@ type GenerateG4DecisionLedgerOptions = {
   firstFailPath?: string;
   influencePath?: string;
   recoveryPath?: string;
+  couplingAblationPath?: string;
   getCommitHash?: () => string;
 };
 
@@ -108,6 +110,7 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
   const firstFailPath = options.firstFailPath ?? path.join(rootDir, CANONICAL_FIRST_FAIL);
   const influencePath = options.influencePath ?? path.join(rootDir, INFLUENCE_PATH);
   const recoveryPath = options.recoveryPath ?? path.join(rootDir, RECOVERY_PATH);
+  const couplingAblationPath = options.couplingAblationPath ?? path.join(rootDir, COUPLING_ABLATION_PATH);
   const getCommitHash =
     options.getCommitHash ??
     (() => execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
@@ -121,6 +124,9 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
   const canonicalFirstFail = readJson(firstFailPath);
   const influence = fs.existsSync(influencePath) ? readJson(influencePath) : null;
   const recovery = fs.existsSync(recoveryPath) ? readJson(recoveryPath) : null;
+  const couplingAblation = fs.existsSync(couplingAblationPath) ? readJson(couplingAblationPath) : null;
+  const recoveryBlockedReason = stringOrNull(recovery?.blockedReason);
+  const couplingAblationBlockedReason = stringOrNull(couplingAblation?.blockedReason);
 
   const waves: Record<string, any> = {};
   for (const wave of REQUIRED_WAVES) {
@@ -204,13 +210,43 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
       minMarginRatioRawComputedAmongApplicabilityPass: finiteOrNull(recovery?.minMarginRatioRawComputedAmongApplicabilityPass),
       bestCandidateEligibility: recovery?.bestCandidateEligibility ?? null,
       bestCandidate: recovery?.bestCandidate ?? null,
+      blockedReason: recoveryBlockedReason,
       failClosedReason:
         recovery == null
           ? 'recovery_artifact_missing'
+          : recoveryBlockedReason != null
+            ? recoveryBlockedReason
           : (finiteOrNull(recovery?.caseCount) ?? 0) <= 0
             ? 'recovery_artifact_empty'
             : Array.isArray(recovery?.topRankedApplicabilityPassCases) && recovery.topRankedApplicabilityPassCases.length === 0
               ? 'no_applicability_pass_cases'
+              : null,
+    },
+    couplingAblation: {
+      artifactPath: fs.existsSync(couplingAblationPath) ? path.relative(rootDir, couplingAblationPath).replace(/\\/g, '/') : null,
+      artifactDate: stringOrNull(couplingAblation?.generatedAt)?.slice(0, 10) ?? null,
+      analysisMode: stringOrNull(couplingAblation?.analysisMode),
+      baselineCaseId: stringOrNull(couplingAblation?.baselineCaseId),
+      baselineMarginRatioRawComputed: finiteOrNull(couplingAblation?.baselineMarginRatioRawComputed),
+      bestCounterfactualMarginRatioRawComputed: finiteOrNull(couplingAblation?.bestCounterfactualMarginRatioRawComputed),
+      candidatePassFoundCounterfactual: Boolean(couplingAblation?.candidatePassFoundCounterfactual),
+      topAblations: Array.isArray(couplingAblation?.topAblations)
+        ? couplingAblation.topAblations.slice(0, 5).map((entry: any) => ({
+            field: stringOrNull(entry?.field),
+            estimationMode: stringOrNull(entry?.estimationMode),
+            slopeToMarginRatioRawComputed: finiteOrNull(entry?.slopeToMarginRatioRawComputed),
+            counterfactualMarginRatioRawComputed: finiteOrNull(entry?.counterfactualMarginRatioRawComputed),
+            counterfactualPass: typeof entry?.counterfactualPass === 'boolean' ? entry.counterfactualPass : null,
+          }))
+        : [],
+      blockedReason: couplingAblationBlockedReason,
+      failClosedReason:
+        couplingAblation == null
+          ? 'coupling_ablation_artifact_missing'
+          : couplingAblationBlockedReason != null
+            ? couplingAblationBlockedReason
+            : Array.isArray(couplingAblation?.topAblations) && couplingAblation.topAblations.length === 0
+              ? 'coupling_ablation_rows_empty'
               : null,
     },
     waves,

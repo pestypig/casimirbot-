@@ -4,6 +4,65 @@ As-of date: 2026-02-26 (local repo context)
 
 "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim."
 
+## Iteration Log - R16 (2026-02-28)
+
+- Patch wave ID: R16
+- Code surfaces changed:
+  - `scripts/warp-g4-metric-decomp-diff.ts`
+  - `tests/warp-g4-metric-decomp-diff.spec.ts`
+- Baseline before:
+  - Canonical class: `margin_limited`
+  - Decision: `INADMISSIBLE`
+  - First fail: `G4`
+- Baseline after:
+  - Canonical class: `margin_limited` (unchanged)
+  - Decision: `INADMISSIBLE` (unchanged)
+  - First fail: `G4` (unchanged)
+- G4 class after run (`evidence_path_blocked|applicability_limited|margin_limited|candidate_pass`): `margin_limited` (canonical) with recovery/parity still `applicability_limited`.
+- Metric decomp integrity change:
+  - Diff runner no longer promotes structural-semantic-gap rows into canonical-comparable implicitly.
+  - Selection mode is explicit (`canonical` vs `structural_semantic_gap_fallback`) and emitted in JSON/MD.
+  - Blocker reason renamed to fail-closed `no_structural_comparable_cases` when no usable cohort exists.
+- Key outputs:
+  - `g4-metric-decomp-diff-2026-02-27.json` reports `selectionMode=structural_semantic_gap_fallback`.
+  - `comparableCaseCounts`: `canonicalComparable=0`, `structuralComparable=160`.
+  - Recovery parity remains `selectionPolicy=comparable_structural_semantic_gap`.
+- Casimir verify: verdict / certificateHash / integrityOk / traceId / runId
+  - `PASS / 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 / true / adapter:622ce27b-e031-4206-9394-b150c5da8689 / 22301`
+- Decision: continue (next patch should target canonical-semantic bridge prerequisites as explicit diagnostic counters without changing thresholds/policy).
+
+"This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim."
+
+## Iteration Log - R15 (2026-02-28)
+
+- Patch wave ID: R15
+- Code surfaces changed:
+  - `scripts/warp-g4-recovery-search.ts`
+  - `tests/warp-g4-recovery-search.spec.ts`
+- Baseline before:
+  - Canonical class: `margin_limited`
+  - Decision: `INADMISSIBLE`
+  - First fail: `G4`
+- Baseline after:
+  - Canonical class: `margin_limited` (unchanged)
+  - Decision: `INADMISSIBLE` (unchanged)
+  - First fail: `G4` (unchanged)
+- G4 class after run (`evidence_path_blocked|applicability_limited|margin_limited|candidate_pass`): `applicability_limited` (recovery/parity lane), canonical remains `margin_limited`.
+- New deterministic recovery behavior:
+  - Recovery search now seeds from Step B top comparable candidate and uses bounded influence-driven micro rows before deterministic walk fill.
+  - Seeded strategy is emitted in artifact (`deterministicSearch.seedStrategy`) with prioritized families and source provenance.
+  - Structural semantic-gap comparability remains explicit and fail-closed.
+- Key outputs:
+  - Step A: `canonicalComparable=0`, `canonicalStructuralComparable=4`.
+  - Step B: `executedCaseCount=160`, `canonicalComparable=0`, `canonicalStructuralComparable=160`, `minMarginRatioRawComputedComparable=1498141.138779572`, `blockedReason=null`.
+  - Step C: `bootstrapSucceeded=true` with reason `canonical_signals_available:natario-low-curvature`, `blockedReason=null`.
+  - Recovery parity: `selectionPolicy=comparable_structural_semantic_gap`, `candidateCountChecked=5`, `dominantFailureMode=applicability_limited`.
+- Casimir verify: verdict / certificateHash / integrityOk / traceId / runId
+  - `PASS / af30145020f02c70d367a3582a2a8029fde487cc110d5e0f45d316f95fbb9e89 / true / adapter:b0822ac7-f260-46ec-81a6-d2de8344ae88 / 22300`
+- Decision: continue (next patch should consume coupling-localization influence ranking to run tighter causal ablations around top structural candidate, then rerun parity under same canonical guardrails).
+
+"This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim."
+
 ## Mission
 
 Create one objective, stable operating document for resolving the G4 blocker by evidence, not narrative drift.
@@ -158,3 +217,38 @@ Minimum for G4 closure pathway:
 - Decision: continue (bookkeeping now supports policy-floor vs computed-bound decomposition and deterministic sensitivity parity diagnostics)
 
 “This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.”
+
+## Iteration Log - R14 (2026-02-28)
+
+- Patch wave ID: R14
+- Code surfaces changed:
+  - `scripts/warp-g4-recovery-search.ts`
+  - `scripts/warp-g4-coupling-localization.ts`
+  - `tests/warp-g4-recovery-search.spec.ts`
+  - `tests/warp-g4-coupling-localization.spec.ts`
+  - `package.json`
+- Baseline before:
+  - Canonical class: `margin_limited`
+  - Decision: `INADMISSIBLE`
+  - First fail: `G4`
+- Baseline after:
+  - Canonical class: `margin_limited` (unchanged)
+  - Decision: `INADMISSIBLE` (unchanged)
+  - First fail: `G4` (unchanged)
+- G4 class after run (`evidence_path_blocked|applicability_limited|margin_limited|candidate_pass`): `margin_limited`
+- New artifact checkpoints:
+  - `artifacts/research/full-solve/g4-coupling-localization-2026-02-27.json`
+  - `docs/audits/research/warp-g4-coupling-localization-2026-02-27.md`
+- Known now:
+  - Gate failure remains deterministic and floor-dominated at canonical decision layer.
+  - Coupling localization now exposes per-term deltas and term influence ranking against `marginRatioRawComputed`.
+  - Latest localization ranks `metricStressRhoSiMean_Jm3` and `metricT00Si_Jm3` as strongest terms against `marginRatioRawComputed` in the comparable cohort (`r=-0.9049834647767903`, sampleCount=160).
+- Unknowns now:
+  - Which physical/coupling term is the dominant cause of large metric-side numerator magnitude under canonical levers.
+  - Why exploratory cohorts still produce `applicabilityStatus=UNKNOWN` in non-canonical recovery regions.
+  - Whether computed-only margin can be reduced below 1 within canonically comparable settings.
+- Casimir verify: verdict / certificateHash / integrityOk / traceId / runId
+  - `PASS / 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45 / true / adapter:45c9727b-3a1e-4a4c-be51-d2fbdcbacfd1 / 22286`
+- Decision: continue (localize dominant causal term before attempting additional search breadth)
+
+"This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim."

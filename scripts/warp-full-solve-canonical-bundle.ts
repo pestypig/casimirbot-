@@ -15,6 +15,8 @@ const FINALIZATION_COMMANDS = [
   ['run', 'warp:full-solve:g4-stepA-summary'],
   ['run', 'warp:full-solve:g4-recovery-search'],
   ['run', 'warp:full-solve:g4-recovery-parity'],
+  ['run', 'warp:full-solve:g4-coupling-localization'],
+  ['run', 'warp:full-solve:g4-coupling-ablation'],
   ['run', 'warp:full-solve:g4-governance-matrix'],
   ['run', 'warp:full-solve:g4-decision-ledger'],
   ['run', 'warp:full-solve:canonical'],
@@ -25,6 +27,8 @@ const MATRIX_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-governa
 const STEP_A_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-stepA-summary.json');
 const RECOVERY_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-recovery-search-2026-02-27.json');
 const PARITY_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-recovery-parity-2026-02-27.json');
+const LOCALIZATION_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-coupling-localization-2026-02-27.json');
+const ABLATION_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-coupling-ablation-2026-02-27.json');
 const DEFAULT_COMMAND_TIMEOUT_MS = 8 * 60_000;
 const DEFAULT_MAX_RETRIES = 1;
 
@@ -37,6 +41,8 @@ export type CanonicalBundleResult = {
   matrixPath: string;
   recoveryPath: string;
   parityPath: string;
+  localizationPath: string;
+  ablationPath: string;
 };
 
 type RunCommandOptions = {
@@ -98,12 +104,23 @@ export const runCommandWithRetry = (args: readonly string[], options: RunCommand
   }
 };
 
-export const assertBundleProvenanceFresh = (headCommitHash: string, stepA: any, ledger: any, matrix: any, recovery: any, parity: any) => {
+export const assertBundleProvenanceFresh = (
+  headCommitHash: string,
+  stepA: any,
+  ledger: any,
+  matrix: any,
+  recovery: any,
+  parity: any,
+  localization: any,
+  ablation: any,
+) => {
   const stepACommitHash = readCommitHash(stepA);
   const ledgerCommitHash = readCommitHash(ledger);
   const matrixCommitHash = readCommitHash(matrix);
   const recoveryCommitHash = readCommitHash(recovery);
   const parityCommitHash = readCommitHash(parity);
+  const localizationCommitHash = readCommitHash(localization);
+  const ablationCommitHash = readCommitHash(ablation);
 
   if (stepACommitHash !== headCommitHash) {
     throw new Error(`Step A summary commit hash mismatch: stepA=${String(stepACommitHash ?? 'null')} head=${headCommitHash}`);
@@ -122,6 +139,16 @@ export const assertBundleProvenanceFresh = (headCommitHash: string, stepA: any, 
   if (parityCommitHash !== headCommitHash) {
     throw new Error(`Recovery parity provenance commit hash mismatch: parity=${String(parityCommitHash ?? 'null')} head=${headCommitHash}`);
   }
+  if (localizationCommitHash !== headCommitHash) {
+    throw new Error(
+      `Coupling localization provenance commit hash mismatch: localization=${String(localizationCommitHash ?? 'null')} head=${headCommitHash}`,
+    );
+  }
+  if (ablationCommitHash !== headCommitHash) {
+    throw new Error(
+      `Coupling ablation provenance commit hash mismatch: ablation=${String(ablationCommitHash ?? 'null')} head=${headCommitHash}`,
+    );
+  }
 };
 
 export const runCanonicalBundle = (): CanonicalBundleResult => {
@@ -134,7 +161,9 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
   const matrix = readJson(MATRIX_PATH);
   const recovery = readJson(RECOVERY_PATH);
   const parity = readJson(PARITY_PATH);
-  assertBundleProvenanceFresh(headCommitHash, stepA, ledger, matrix, recovery, parity);
+  const localization = readJson(LOCALIZATION_PATH);
+  const ablation = readJson(ABLATION_PATH);
+  assertBundleProvenanceFresh(headCommitHash, stepA, ledger, matrix, recovery, parity, localization, ablation);
 
   return {
     ok: true,
@@ -145,6 +174,8 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
     matrixPath: MATRIX_PATH,
     recoveryPath: RECOVERY_PATH,
     parityPath: PARITY_PATH,
+    localizationPath: LOCALIZATION_PATH,
+    ablationPath: ABLATION_PATH,
   };
 };
 
