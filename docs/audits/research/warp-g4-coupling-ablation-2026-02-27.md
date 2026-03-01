@@ -6,19 +6,19 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 - diagnosticFallbackUsed: false
 - diagnosticFallbackSource: n/a
 - baselineCaseId: case_0001
-- baselineApplicabilityStatus: UNKNOWN
-- baselineMarginRatioRawComputed: 1498141.138779572
-- candidatePassFoundCounterfactual: false
-- bestCounterfactualMarginRatioRawComputed: 1498141.138779572
+- baselineApplicabilityStatus: PASS
+- baselineMarginRatioRawComputed: 0.12890679702998561
+- candidatePassFoundCounterfactual: true
+- bestCounterfactualMarginRatioRawComputed: 0.12890679702998561
 
 ## Counterfactual Term Ablations
 
 | field | mode | slope | baseline | reference | counterfactual margin | improvement rel | blockedReason |
 |---|---|---:|---:|---:|---:|---:|---|
-| metricStressRhoSiMean_Jm3 | linear_slope_reference_substitution | -0.02312724942928119 | -89888730.09553961 | -89888730.09553961 | 1498141.138779572 | 0 |  |
-| metricT00Si_Jm3 | linear_slope_reference_substitution | -0.02312724942928119 | -89888730.09553961 | -89888730.09553961 | 1498141.138779572 | 0 |  |
-| rhoCoupledShadow_Jm3 | linear_slope_reference_substitution | -0.04625449885856238 | -44944366.32338355 | -44944366.32338355 | 1498141.138779572 | 0 |  |
-| rhoMetric_Jm3 | linear_slope_reference_substitution | -0.02312724942928119 | -89888730.09553961 | -89888730.09553961 | 1498141.138779572 | 0 |  |
+| metricStressRhoSiMean_Jm3 | linear_slope_reference_substitution | -0.018512698345788215 | -89888730.09553961 | -89888730.09553961 | 0.12890679702998561 | 0 |  |
+| metricT00Si_Jm3 | linear_slope_reference_substitution | -0.018512698345788215 | -89888730.09553961 | -89888730.09553961 | 0.12890679702998561 | 0 |  |
+| rhoCoupledShadow_Jm3 | linear_slope_reference_substitution | -0.03702539669157643 | -44944366.32338355 | -44944366.32338355 | 0.12890679702998561 | 0 |  |
+| rhoMetric_Jm3 | linear_slope_reference_substitution | -0.018512698345788215 | -89888730.09553961 | -89888730.09553961 | 0.12890679702998561 | 0 |  |
 | couplingResidualRel | blocked_missing_slope | null | 0.9999999716179383 | 0.9999999716179383 | null | null | missing_term_slope |
 | metricStressKSquaredMean | blocked_missing_slope | null | 8.104627668767766e-35 | 8.104627668767766e-35 | null | null | missing_term_slope |
 | metricStressKTraceMean | blocked_missing_slope | null | 2.474459600646483e-18 | 2.474459600646483e-18 | null | null | missing_term_slope |

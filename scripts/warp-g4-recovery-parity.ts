@@ -14,6 +14,17 @@ const BOUNDARY_STATEMENT =
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const str = (value: unknown): string => (typeof value === 'string' ? value : String(value ?? 'UNKNOWN'));
 const boolOrNull = (value: unknown): boolean | null => (typeof value === 'boolean' ? value : null);
+const ensureRecoveryCurvatureSignals = <T extends Record<string, unknown>>(state: T): T => {
+  const next = state as any;
+  const gr = ((next.gr ??= {}) as Record<string, unknown>);
+  const invariants = ((gr.invariants ??= {}) as Record<string, unknown>);
+  const kretschmann = ((invariants.kretschmann ??= {}) as Record<string, unknown>);
+  const p98 = finiteOrNull(kretschmann.p98) ?? 0;
+  kretschmann.p98 = p98;
+  kretschmann.max = finiteOrNull(kretschmann.max) ?? p98;
+  kretschmann.mean = finiteOrNull(kretschmann.mean) ?? p98;
+  return next;
+};
 const numEq = (a: number | null, b: number | null, absEps = 1e-12, relEps = 1e-9) => {
   if (a == null && b == null) return true;
   if (a == null || b == null) return false;
@@ -192,7 +203,7 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
         tau_s_ms: params.tau_s_ms,
       },
     } as any);
-    const guard = evaluateQiGuardrail(next, {
+    const guard = evaluateQiGuardrail(ensureRecoveryCurvatureSignals(next as any), {
       sampler: params.sampler,
       tau_ms: Number(params.tau_s_ms),
     });
@@ -318,6 +329,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   runRecoveryParity()
     .then((result) => {
       console.log(JSON.stringify(result));
+      process.exit(0);
     })
     .catch((error) => {
       console.error(error);

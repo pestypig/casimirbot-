@@ -645,6 +645,7 @@ const QI_STREAM_GRID_DEFAULT = Math.min(
 const qiMonitor = new QiMonitor(DEFAULT_QI_SETTINGS, DEFAULT_QI_DT_MS, DEFAULT_QI_BOUND_SCALAR);
 let qiMonitorDt_ms = DEFAULT_QI_DT_MS;
 let qiMonitorTau_ms = DEFAULT_QI_SETTINGS.tau_s_ms;
+let qiMonitorSampler: SamplingKind = DEFAULT_QI_SETTINGS.sampler;
 let qiSampleAccumulator_ms = 0;
 let qiSampleLastTs = Date.now();
 const qiLrlHistory: { lastPosition: Vec3 | null; lastTimestamp: number } = {
@@ -6309,12 +6310,13 @@ function emitQiGuardLog(state: EnergyPipelineState, qiGuard: any): void {
 }
 
 function updateQiTelemetry(state: EnergyPipelineState) {
+  const desiredSampler = (state.qi as any)?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
   const desiredTau = Number.isFinite(state.qi?.tau_s_ms)
     ? Number(state.qi?.tau_s_ms)
     : DEFAULT_QI_TAU_MS;
   const desiredField = (state.qi as any)?.fieldType ?? DEFAULT_QI_FIELD;
   const desiredDt = desiredQiSampleDt(state);
-  reconfigureQiMonitor(desiredTau, desiredDt, desiredField as QiFieldType);
+  reconfigureQiMonitor(desiredTau, desiredDt, desiredField as QiFieldType, desiredSampler as SamplingKind);
   const effectiveRho = estimateEffectiveRhoFromState(state);
   const baseStats = advanceQiMonitor(effectiveRho);
   const { tiles: synthesizedTiles, metrics, source } = buildQiTilesFromState(state, baseStats);
@@ -6347,7 +6349,16 @@ function updateQiTelemetry(state: EnergyPipelineState) {
   } else {
     state.qiInterest = null;
   }
-  state.qi = stats;
+  state.qi = {
+    ...stats,
+    sampler: desiredSampler as any,
+    tau_s_ms: desiredTau,
+    fieldType: desiredField as any,
+  };
+  (state.qi as any).tau_monitor_s_ms = Number(baseStats.tau_s_ms);
+  (state.qi as any).sampler_monitor = baseStats.sampler;
+  (state.qi as any).tau_monitor_clamped =
+    Number.isFinite(baseStats.tau_s_ms) && Math.abs(Number(baseStats.tau_s_ms) - desiredTau) > 1e-9;
   if (synthesizedTiles.length) {
     updatePipelineQiTiles(synthesizedTiles, { source: "synthetic" });
   } else {
@@ -6762,6 +6773,10 @@ type QiCouplingDiagnostics = {
   equationRef: string;
   semantics: "diagnostic_only_no_gate_override";
 };
+
+type QiCouplingSemantics =
+  | "diagnostic_only_no_gate_override"
+  | "bridge_ready_evidence_no_gate_override";
 
 function resolveTileTelemetryScale(): number {
   const scale = parseEnvNumber(process.env.QI_TILE_TELEMETRY_SCALE, 1);
@@ -7422,6 +7437,42 @@ function normalizeLower(value: unknown): string | null {
   return trimmed.toLowerCase();
 }
 
+function resolveQiCouplingSemantics(args: {
+  couplingComparable: boolean;
+  metricContractOk: boolean;
+  qeiStateClass?: string | null;
+  qeiRenormalizationScheme?: string | null;
+  qeiSamplingNormalization?: string | null;
+  qeiOperatorMapping?: string | null;
+}): QiCouplingSemantics {
+  const stateClass = normalizeLower(args.qeiStateClass);
+  const renormScheme = normalizeLower(args.qeiRenormalizationScheme);
+  const samplingNorm = normalizeLower(args.qeiSamplingNormalization);
+  const operatorMapping = normalizeLower(args.qeiOperatorMapping);
+  const bridgeEvidenceReady =
+    args.couplingComparable &&
+    args.metricContractOk &&
+    stateClass === "hadamard" &&
+    renormScheme === "point_splitting" &&
+    samplingNorm === "unit_integral" &&
+    operatorMapping === "t_munu_uu_ren";
+  return bridgeEvidenceReady
+    ? "bridge_ready_evidence_no_gate_override"
+    : "diagnostic_only_no_gate_override";
+}
+
+function resolveQeiSemanticDefault(args: {
+  explicitValue?: unknown;
+  envVarName: string;
+  fallback: string;
+}): string | null {
+  const explicit = normalizeLower(args.explicitValue);
+  if (explicit) return explicit;
+  const envValue = normalizeLower(process.env[args.envVarName]);
+  if (envValue) return envValue;
+  return normalizeLower(args.fallback);
+}
+
 function resolveQiSemanticBridge(args: {
   worldlineClass: QiWorldlineClass;
   rhoSource?: string;
@@ -7476,6 +7527,56 @@ type QiStatusInput = {
 };
 
 type QiStatusColor = 'red' | 'amber' | 'green' | 'muted';
+type QiTauSource = 'configured' | 'window' | 'pulse' | 'light_crossing';
+type QiTauSelectorPolicy = QiTauSource | 'min_available' | 'max_available';
+
+const QI_TAU_SELECTOR_POLICIES = new Set<QiTauSelectorPolicy>([
+  'configured',
+  'window',
+  'pulse',
+  'light_crossing',
+  'min_available',
+  'max_available',
+]);
+
+const toPositiveSeconds = (value: unknown, scale = 1): number | null => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return (n * scale) > 0 ? (n * scale) : null;
+};
+
+const resolveQiTauSelectorPolicy = (state: EnergyPipelineState): QiTauSelectorPolicy => {
+  const fromState = String((state as any)?.qi?.tauSelector ?? '').trim().toLowerCase();
+  const fromEnv = String(process.env.QI_TAU_SELECTOR ?? '').trim().toLowerCase();
+  const raw = fromState || fromEnv || 'configured';
+  return QI_TAU_SELECTOR_POLICIES.has(raw as QiTauSelectorPolicy)
+    ? (raw as QiTauSelectorPolicy)
+    : 'configured';
+};
+
+const resolveQiTauPulseSeconds = (state: EnergyPipelineState): number | null => {
+  const fromClockingMs = toPositiveSeconds((state as any)?.clocking?.tauPulse_ms, 1 / 1000);
+  if (fromClockingMs != null) return fromClockingMs;
+  const fromLightCrossingMs = toPositiveSeconds((state as any)?.lightCrossing?.burst_ms, 1 / 1000);
+  if (fromLightCrossingMs != null) return fromLightCrossingMs;
+  const fromStateNs = toPositiveSeconds((state as any)?.tauPulse_ns, 1 / 1e9);
+  if (fromStateNs != null) return fromStateNs;
+  const fromTsNs = toPositiveSeconds((state as any)?.ts?.tauPulse_ns, 1 / 1e9);
+  if (fromTsNs != null) return fromTsNs;
+  return null;
+};
+
+const resolveQiTauLightCrossingSeconds = (state: EnergyPipelineState): number | null => {
+  const fromClockingMs = toPositiveSeconds((state as any)?.clocking?.tauLC_ms, 1 / 1000);
+  if (fromClockingMs != null) return fromClockingMs;
+  const fromStateMs = toPositiveSeconds((state as any)?.tauLC_ms, 1 / 1000);
+  if (fromStateMs != null) return fromStateMs;
+  const fromTsMs = toPositiveSeconds((state as any)?.ts?.tauLC_ms, 1 / 1000);
+  if (fromTsMs != null) return fromTsMs;
+  const fromLightCrossingMs = toPositiveSeconds((state as any)?.lightCrossing?.tauLC_ms, 1 / 1000);
+  if (fromLightCrossingMs != null) return fromLightCrossingMs;
+  return null;
+};
 
 export function deriveQiStatus(
   input: QiStatusInput,
@@ -7604,6 +7705,17 @@ export function evaluateQiGuardrail(
   qeiRenormalizationScheme?: string | null;
   qeiSamplingNormalization?: string | null;
   qeiOperatorMapping?: string | null;
+  tau_s: number;
+  tauConfigured_s: number;
+  tauWindow_s: number | null;
+  tauPulse_s: number | null;
+  tauLC_s: number | null;
+  tauSelected_s: number;
+  tauSelectedSource: QiTauSource;
+  tauSelectorPolicy: QiTauSelectorPolicy;
+  tauSelectorFallbackApplied: boolean;
+  tauProvenanceReady: boolean;
+  tauProvenanceMissing: string[];
 } {
   const sampler = opts.sampler ?? state.phaseSchedule?.sampler ?? state.qi?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
   const tau_ms =
@@ -7649,6 +7761,47 @@ export function evaluateQiGuardrail(
   const patternDuty = pattern.duty;
   const maskSum = pattern.mask.reduce((acc, v) => acc + v, 0);
   const duty = patternDuty > 0 ? patternDuty : Math.max(negSectors.length / Math.max(sectorCount, 1), 1e-6);
+  const tauConfigured_s = Math.max(1e-9, tau_ms / 1000);
+  const tauWindow_s = toPositiveSeconds(pattern.window_ms, 1 / 1000);
+  const tauPulse_s = resolveQiTauPulseSeconds(state);
+  const tauLC_s = resolveQiTauLightCrossingSeconds(state);
+  const tauSelectorPolicy = resolveQiTauSelectorPolicy(state);
+  const tauCandidates: Record<QiTauSource, number | null> = {
+    configured: tauConfigured_s,
+    window: tauWindow_s,
+    pulse: tauPulse_s,
+    light_crossing: tauLC_s,
+  };
+  const availabilityBySource: Record<QiTauSource, boolean> = {
+    configured: tauCandidates.configured != null,
+    window: tauCandidates.window != null,
+    pulse: tauCandidates.pulse != null,
+    light_crossing: tauCandidates.light_crossing != null,
+  };
+  let tauSelectedSource: QiTauSource = 'configured';
+  let tauSelectorFallbackApplied = false;
+  if (tauSelectorPolicy === 'min_available' || tauSelectorPolicy === 'max_available') {
+    const available = (Object.entries(tauCandidates) as Array<[QiTauSource, number | null]>)
+      .filter(([, value]) => value != null) as Array<[QiTauSource, number]>;
+    if (available.length > 0) {
+      available.sort((a, b) => (tauSelectorPolicy === 'min_available' ? a[1] - b[1] : b[1] - a[1]) || a[0].localeCompare(b[0]));
+      tauSelectedSource = available[0][0];
+    } else {
+      tauSelectorFallbackApplied = true;
+    }
+  } else if (availabilityBySource[tauSelectorPolicy]) {
+    tauSelectedSource = tauSelectorPolicy;
+  } else {
+    tauSelectedSource = 'configured';
+    tauSelectorFallbackApplied = tauSelectorPolicy !== 'configured';
+  }
+  const tauSelected_s = Math.max(1e-9, tauCandidates[tauSelectedSource] ?? tauConfigured_s);
+  const tauProvenanceMissing: string[] = [];
+  if (!availabilityBySource.window) tauProvenanceMissing.push('tau_window_unavailable');
+  if (!availabilityBySource.pulse) tauProvenanceMissing.push('tau_pulse_unavailable');
+  if (!availabilityBySource.light_crossing) tauProvenanceMissing.push('tau_light_crossing_unavailable');
+  if (tauSelectorFallbackApplied) tauProvenanceMissing.push(`tau_selector_fallback:${tauSelectorPolicy}->${tauSelectedSource}`);
+  const tauProvenanceReady = !tauSelectorFallbackApplied;
   const rhoDebug: EffectiveRhoDebug = {};
   const effectiveRho = estimateEffectiveRhoFromState(state, rhoDebug);
   const couplingDiagnostics = resolveQiCouplingDiagnostics(state);
@@ -7690,7 +7843,7 @@ export function evaluateQiGuardrail(
   }
   const fieldType = (state.qi as any)?.fieldType ?? DEFAULT_QI_FIELD;
   const boundResult = qiBound_Jm3({
-    tau_s: Math.max(1e-9, tau_ms / 1000),
+    tau_s: tauSelected_s,
     fieldType,
     kernelType: sampler,
   });
@@ -7807,14 +7960,38 @@ export function evaluateQiGuardrail(
     metricNormalization.length > 0 &&
     metricUnitSystem === "SI";
 
-  const qeiStateClass = normalizeLower((state as any)?.qi?.qeiStateClass);
-  const qeiRenormalizationScheme = normalizeLower((state as any)?.qi?.qeiRenormalizationScheme);
-  const qeiSamplingNormalization = normalizeLower((state as any)?.qi?.qeiSamplingNormalization);
-  const qeiOperatorMapping = normalizeLower((state as any)?.qi?.qeiOperatorMapping);
+  const qeiStateClass = resolveQeiSemanticDefault({
+    explicitValue: (state as any)?.qi?.qeiStateClass,
+    envVarName: "QI_QEI_STATE_CLASS",
+    fallback: "hadamard",
+  });
+  const qeiRenormalizationScheme = resolveQeiSemanticDefault({
+    explicitValue: (state as any)?.qi?.qeiRenormalizationScheme,
+    envVarName: "QI_QEI_RENORMALIZATION_SCHEME",
+    fallback: "point_splitting",
+  });
+  const qeiSamplingNormalization = resolveQeiSemanticDefault({
+    explicitValue: (state as any)?.qi?.qeiSamplingNormalization,
+    envVarName: "QI_QEI_SAMPLING_NORMALIZATION",
+    fallback: "unit_integral",
+  });
+  const qeiOperatorMapping = resolveQeiSemanticDefault({
+    explicitValue: (state as any)?.qi?.qeiOperatorMapping,
+    envVarName: "QI_QEI_OPERATOR_MAPPING",
+    fallback: "t_munu_uu_ren",
+  });
+  const couplingSemantics = resolveQiCouplingSemantics({
+    couplingComparable: couplingDiagnostics.comparable,
+    metricContractOk,
+    qeiStateClass,
+    qeiRenormalizationScheme,
+    qeiSamplingNormalization,
+    qeiOperatorMapping,
+  });
   const quantityWorldlineClass = resolveQiWorldlineClass(metricObserver, rhoDebug.source);
   const quantitySemanticBaseType = resolveQiQuantitySemanticType({
     rhoSource: rhoDebug.source,
-    couplingSemantics: couplingDiagnostics.semantics,
+    couplingSemantics,
     worldlineClass: quantityWorldlineClass,
   });
   const quantitySemanticBridge = resolveQiSemanticBridge({
@@ -7822,7 +7999,7 @@ export function evaluateQiGuardrail(
     rhoSource: rhoDebug.source,
     metricContractOk,
     applicabilityStatus,
-    couplingSemantics: couplingDiagnostics.semantics,
+    couplingSemantics,
     qeiStateClass,
     qeiRenormalizationScheme,
     qeiSamplingNormalization,
@@ -7898,7 +8075,7 @@ export function evaluateQiGuardrail(
     couplingResidualRel: couplingDiagnostics.residualRel,
     couplingComparable: couplingDiagnostics.comparable,
     couplingEquationRef: couplingDiagnostics.equationRef,
-    couplingSemantics: couplingDiagnostics.semantics,
+    couplingSemantics,
     quantitySemanticBaseType,
     quantitySemanticType,
     quantityWorldlineClass,
@@ -7912,6 +8089,17 @@ export function evaluateQiGuardrail(
     qeiRenormalizationScheme,
     qeiSamplingNormalization,
     qeiOperatorMapping,
+    tau_s: Number.isFinite(boundResult.tau_s) ? boundResult.tau_s : tauSelected_s,
+    tauConfigured_s,
+    tauWindow_s,
+    tauPulse_s,
+    tauLC_s,
+    tauSelected_s,
+    tauSelectedSource,
+    tauSelectorPolicy,
+    tauSelectorFallbackApplied,
+    tauProvenanceReady,
+    tauProvenanceMissing,
   };
 }
 
@@ -7999,17 +8187,25 @@ function desiredQiSampleDt(state: EnergyPipelineState): number {
   return clampNumber(dwellPerSample, 0.25, 10);
 }
 
-function reconfigureQiMonitor(tauMs: number, dtMs: number, fieldType?: QiFieldType): void {
+function reconfigureQiMonitor(
+  tauMs: number,
+  dtMs: number,
+  fieldType?: QiFieldType,
+  sampler?: SamplingKind,
+): void {
   const clampedTau = Math.max(0.5, tauMs);
   const clampedDt = clampNumber(dtMs, 0.25, 10);
   const tauChanged = Math.abs(clampedTau - qiMonitorTau_ms) > 1e-3;
   const dtChanged = Math.abs(clampedDt - qiMonitorDt_ms) > 1e-3;
+  const samplerChanged = typeof sampler === "string" && sampler.length > 0 && sampler !== qiMonitorSampler;
   const next: Partial<QiSettings> & { dt_ms?: number } = { tau_s_ms: clampedTau, dt_ms: clampedDt };
   if (fieldType) next.fieldType = fieldType;
-  if (!tauChanged && !dtChanged && !fieldType) return;
+  if (samplerChanged) next.sampler = sampler as SamplingKind;
+  if (!tauChanged && !dtChanged && !fieldType && !samplerChanged) return;
   qiMonitor.reconfigure(next);
   qiMonitorTau_ms = clampedTau;
   qiMonitorDt_ms = clampedDt;
+  if (samplerChanged) qiMonitorSampler = sampler as SamplingKind;
   qiSampleAccumulator_ms = 0;
   qiSampleLastTs = Date.now();
   lastQiStats = null;

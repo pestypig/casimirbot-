@@ -228,6 +228,27 @@ describe("pipeline ts/qi autoscale integration", () => {
     expect(typeof (snapshot as any).qiGuardrail?.metricContractOk).toBe("boolean");
     expect((snapshot as any).qi?.repayment_label).toBe("repayment_heuristic");
   });
+
+  it("preserves configured QI tau/sampler for guard evaluation after telemetry refresh", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    const { initializePipelineState, updateParameters, evaluateQiGuardrail } = await loadPipeline();
+    const state = initializePipelineState();
+    state.qi = {
+      ...(state.qi ?? {}),
+      sampler: "hann",
+      fieldType: "em",
+      tau_s_ms: 0.02,
+    } as any;
+
+    const next = await updateParameters(state, {});
+    expect(Number((next as any).qi?.tau_s_ms)).toBeCloseTo(0.02, 12);
+    expect(String((next as any).qi?.sampler)).toBe("hann");
+    expect(Number((next as any).qi?.tau_monitor_s_ms)).toBeGreaterThanOrEqual(0.5);
+
+    const guard = evaluateQiGuardrail(next as any);
+    expect(guard.tauConfigured_s).toBeCloseTo(0.00002, 12);
+    expect(guard.sampler).toBe("hann");
+  });
 });
 
 

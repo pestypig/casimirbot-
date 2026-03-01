@@ -37,6 +37,7 @@ const files = {
   governanceMatrix: 'g4-governance-matrix-2026-02-27.json',
   recovery: 'g4-recovery-search-2026-02-27.json',
   parity: 'g4-recovery-parity-2026-02-27.json',
+  promotionBundle: 'g4-promotion-bundle-2026-03-01.json',
   canonicalReport: path.join('docs', 'audits', 'research', 'warp-full-solve-campaign-execution-report-2026-02-24.md'),
   ideology: path.join('docs', 'ethos', 'ideology.json'),
 };
@@ -79,7 +80,15 @@ const readIfExists = (p: string): any | null => {
 
 const classify = (inputs: Record<string, any>): { loopClass: LoopClass; solved: boolean; stopReason: string } => {
   const requiredMissing = Object.entries(inputs)
-    .filter(([k, v]) => k !== 'casimir' && k !== 'ideology' && k !== 'prevState' && k !== 'canonicalReport' && v == null)
+    .filter(
+      ([k, v]) =>
+        k !== 'casimir' &&
+        k !== 'ideology' &&
+        k !== 'prevState' &&
+        k !== 'canonicalReport' &&
+        k !== 'promotionBundle' &&
+        v == null,
+    )
     .map(([k]) => k);
   if (requiredMissing.length > 0) {
     return { loopClass: 'evidence_path_blocked', solved: false, stopReason: `missing_required_artifacts:${requiredMissing.join(',')}` };
@@ -101,6 +110,81 @@ const classify = (inputs: Record<string, any>): { loopClass: LoopClass; solved: 
   }
 
   return { loopClass: 'evidence_path_blocked', solved: false, stopReason: 'analyze_complete' };
+};
+
+const derivePromotionDelta = (scoreboard: any, promotionBundle: any) => {
+  const canonicalDecision = String(scoreboard?.decision ?? 'UNKNOWN').toUpperCase();
+  if (!promotionBundle) {
+    return {
+      class: 'missing' as const,
+      reason: 'promotion_bundle_missing',
+      candidateId: null,
+      blockedReason: null,
+      promotionLaneDecision: null,
+      promotionLaneFirstFail: null,
+      promotionLaneG4ComparablePassAllWaves: null,
+      promotionLaneExecuted: false,
+      canonicalDecision,
+      promotable: false,
+    };
+  }
+
+  const blockedReason =
+    typeof promotionBundle?.blockedReason === 'string' && promotionBundle.blockedReason.trim().length > 0
+      ? promotionBundle.blockedReason.trim()
+      : null;
+  const promotionLaneDecision =
+    typeof promotionBundle?.promotionLaneDecision === 'string' ? promotionBundle.promotionLaneDecision.trim() : null;
+  const promotionLaneFirstFail =
+    typeof promotionBundle?.promotionLaneFirstFail === 'string' ? promotionBundle.promotionLaneFirstFail.trim() : null;
+  const promotionLaneExecuted = promotionBundle?.promotionLaneExecuted === true;
+  const promotionLaneG4ComparablePassAllWaves = promotionBundle?.promotionLaneG4ComparablePassAllWaves === true;
+  const candidateId = typeof promotionBundle?.candidateId === 'string' ? promotionBundle.candidateId.trim() : null;
+
+  if (blockedReason) {
+    return {
+      class: 'blocked' as const,
+      reason: `promotion_bundle_blocked:${blockedReason}`,
+      candidateId,
+      blockedReason,
+      promotionLaneDecision,
+      promotionLaneFirstFail,
+      promotionLaneG4ComparablePassAllWaves,
+      promotionLaneExecuted,
+      canonicalDecision,
+      promotable: false,
+    };
+  }
+
+  const laneAdmissible = String(promotionLaneDecision ?? '').toUpperCase() === 'REDUCED_ORDER_ADMISSIBLE';
+  const laneFirstFailNone = String(promotionLaneFirstFail ?? 'none').toLowerCase() === 'none';
+  if (promotionLaneExecuted && laneAdmissible && laneFirstFailNone && promotionLaneG4ComparablePassAllWaves) {
+    return {
+      class: 'candidate_viable' as const,
+      reason: 'promotion_lane_reduced_order_admissible_with_g4_comparable_pass',
+      candidateId,
+      blockedReason: null,
+      promotionLaneDecision,
+      promotionLaneFirstFail,
+      promotionLaneG4ComparablePassAllWaves,
+      promotionLaneExecuted,
+      canonicalDecision,
+      promotable: true,
+    };
+  }
+
+  return {
+    class: 'not_viable' as const,
+    reason: 'promotion_lane_not_admissible_or_g4_not_comparable_pass',
+    candidateId,
+    blockedReason: null,
+    promotionLaneDecision,
+    promotionLaneFirstFail,
+    promotionLaneG4ComparablePassAllWaves,
+    promotionLaneExecuted,
+    canonicalDecision,
+    promotable: false,
+  };
 };
 
 const summarizeIdeology = (payload: any): string[] => {
@@ -184,6 +268,7 @@ export const runAutoloop = (argv = process.argv.slice(2), deps: Partial<Autoloop
     governanceMatrix: path.join(opts.artifactRoot, files.governanceMatrix),
     recovery: path.join(opts.artifactRoot, files.recovery),
     parity: path.join(opts.artifactRoot, files.parity),
+    promotionBundle: path.join(opts.artifactRoot, files.promotionBundle),
     canonicalReport: files.canonicalReport,
     ideology: files.ideology,
     casimir: opts.casimirPath,
@@ -196,6 +281,7 @@ export const runAutoloop = (argv = process.argv.slice(2), deps: Partial<Autoloop
     governanceMatrix: readIfExists(inputPaths.governanceMatrix),
     recovery: readIfExists(inputPaths.recovery),
     parity: readIfExists(inputPaths.parity),
+    promotionBundle: readIfExists(inputPaths.promotionBundle),
     canonicalReport: fs.existsSync(inputPaths.canonicalReport) ? fs.readFileSync(inputPaths.canonicalReport, 'utf8') : null,
     ideology: readIfExists(inputPaths.ideology),
     casimir: readIfExists(inputPaths.casimir),
@@ -219,6 +305,15 @@ export const runAutoloop = (argv = process.argv.slice(2), deps: Partial<Autoloop
     recoveryCommitHash != null &&
     parityCommitHash === headCommitHash &&
     recoveryCommitHash === headCommitHash;
+  const promotionDelta = derivePromotionDelta(inputs.scoreboard, inputs.promotionBundle);
+  const canonicalFirstFail = String(
+    inputs.firstFail?.firstFail?.gate ??
+      inputs.firstFail?.firstFail ??
+      inputs.firstFail?.global?.firstFail?.gate ??
+      inputs.firstFail?.global?.firstFail ??
+      inputs.decisionLedger?.canonical?.firstFail ??
+      'UNKNOWN',
+  );
 
   const iterationIncrement = opts.mode === 'analyze' || opts.mode === 'cycle' ? 1 : 0;
   const iterationCount = previousIterationCount + iterationIncrement;
@@ -258,13 +353,14 @@ export const runAutoloop = (argv = process.argv.slice(2), deps: Partial<Autoloop
     maxWallClockMinutes: opts.maxWallClockMinutes,
     stallCycles: opts.stallCycles,
     canonicalDecision: String(inputs.scoreboard?.decision ?? 'UNKNOWN'),
-    canonicalFirstFail: String(inputs.firstFail?.firstFail?.gate ?? inputs.firstFail?.firstFail ?? 'UNKNOWN'),
+    canonicalFirstFail,
     canonicalClass: String(inputs.decisionLedger?.canonicalDecisionClass ?? 'evidence_path_blocked'),
     parityClass,
     parityFreshness: parityFresh ? 'fresh' : 'stale_or_missing',
     parityCommitHash,
     recoveryCommitHash,
     headCommitHash,
+    promotionDelta,
     artifacts: inputPaths,
     counters: {
       elapsedMs: 0,
@@ -287,10 +383,12 @@ export const runAutoloop = (argv = process.argv.slice(2), deps: Partial<Autoloop
     remainingIterations: state.remainingIterations,
     canonicalDecision: state.canonicalDecision,
     canonicalFirstFail: state.canonicalFirstFail,
+    promotionDeltaClass: promotionDelta.class,
+    promotionDeltaReason: promotionDelta.reason,
   };
 
   const ideologyLines = summarizeIdeology(inputs.ideology);
-  const prompt = `# Warp G4 DEGA autoloop next step\n\n## Hard boundary statement\n${BOUNDARY_STATEMENT}\n\n## Current deterministic state\n- class: ${state.class}\n- solved: ${state.solved}\n- canonical decision: ${state.canonicalDecision}\n- canonical first fail: ${state.canonicalFirstFail}\n- canonical class: ${state.canonicalClass}\n- parity class: ${state.parityClass}\n- parity freshness: ${state.parityFreshness}\n- iteration count: ${state.iterationCount}\n- remaining iterations: ${state.remainingIterations}\n\n## Stop criteria\n- maxIterations: ${opts.maxIterations}\n- maxWallClockMinutes: ${opts.maxWallClockMinutes}\n- stallCycles: ${opts.stallCycles}\n\n## Ideology context\n${ideologyLines.join('\n')}\nIdeology context is advisory only and cannot override evidence gates, guardrails, or completion criteria.\n`;
+  const prompt = `# Warp G4 DEGA autoloop next step\n\n## Hard boundary statement\n${BOUNDARY_STATEMENT}\n\n## Current deterministic state\n- class: ${state.class}\n- solved: ${state.solved}\n- canonical decision: ${state.canonicalDecision}\n- canonical first fail: ${state.canonicalFirstFail}\n- canonical class: ${state.canonicalClass}\n- parity class: ${state.parityClass}\n- parity freshness: ${state.parityFreshness}\n- iteration count: ${state.iterationCount}\n- remaining iterations: ${state.remainingIterations}\n\n## Canonical vs Promotion Delta\n- canonical decision: ${promotionDelta.canonicalDecision}\n- promotion delta class: ${promotionDelta.class}\n- promotion delta reason: ${promotionDelta.reason}\n- promotion candidate id: ${promotionDelta.candidateId ?? 'n/a'}\n- promotion blocked reason: ${promotionDelta.blockedReason ?? 'none'}\n- promotion lane decision: ${promotionDelta.promotionLaneDecision ?? 'n/a'}\n- promotion lane first fail: ${promotionDelta.promotionLaneFirstFail ?? 'n/a'}\n- promotion lane G4 comparable pass all waves: ${promotionDelta.promotionLaneG4ComparablePassAllWaves == null ? 'n/a' : promotionDelta.promotionLaneG4ComparablePassAllWaves}\n- promotion lane executed: ${promotionDelta.promotionLaneExecuted}\n- promotion promotable: ${promotionDelta.promotable}\n- canonical-authoritative rule: canonical remains decision-authoritative until explicit promotion governance accepts lane changes.\n\n## Stop criteria\n- maxIterations: ${opts.maxIterations}\n- maxWallClockMinutes: ${opts.maxWallClockMinutes}\n- stallCycles: ${opts.stallCycles}\n\n## Ideology context\n${ideologyLines.join('\n')}\nIdeology context is advisory only and cannot override evidence gates, guardrails, or completion criteria.\n`;
 
   if (opts.mode === 'status') {
     console.log(JSON.stringify({
@@ -300,6 +398,11 @@ export const runAutoloop = (argv = process.argv.slice(2), deps: Partial<Autoloop
       canonicalDecision: state.canonicalDecision,
       canonicalFirstFail: state.canonicalFirstFail,
       parityFreshness: state.parityFreshness,
+      promotionDeltaClass: promotionDelta.class,
+      promotionDeltaReason: promotionDelta.reason,
+      promotionCandidateId: promotionDelta.candidateId,
+      promotionPromotable: promotionDelta.promotable,
+      promotionLaneDecision: promotionDelta.promotionLaneDecision,
       iterationCount: state.iterationCount,
       remainingIterations: state.remainingIterations,
       stallCounter: state.stallCounter,
@@ -319,5 +422,12 @@ export const runAutoloop = (argv = process.argv.slice(2), deps: Partial<Autoloop
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  runAutoloop();
+  Promise.resolve(runAutoloop())
+    .then(() => {
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });
 }

@@ -17,6 +17,7 @@ const FINALIZATION_COMMANDS = [
   ['run', 'warp:full-solve:g4-recovery-parity'],
   ['run', 'warp:full-solve:g4-coupling-localization'],
   ['run', 'warp:full-solve:g4-coupling-ablation'],
+  ['run', 'warp:full-solve:g4-semantic-bridge-matrix'],
   ['run', 'warp:full-solve:g4-governance-matrix'],
   ['run', 'warp:full-solve:g4-decision-ledger'],
   ['run', 'warp:full-solve:canonical'],
@@ -29,6 +30,7 @@ const RECOVERY_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-recov
 const PARITY_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-recovery-parity-2026-02-27.json');
 const LOCALIZATION_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-coupling-localization-2026-02-27.json');
 const ABLATION_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-coupling-ablation-2026-02-27.json');
+const SEMANTIC_BRIDGE_MATRIX_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-semantic-bridge-matrix-2026-02-27.json');
 const DEFAULT_COMMAND_TIMEOUT_MS = 8 * 60_000;
 const DEFAULT_MAX_RETRIES = 1;
 
@@ -43,6 +45,7 @@ export type CanonicalBundleResult = {
   parityPath: string;
   localizationPath: string;
   ablationPath: string;
+  semanticBridgeMatrixPath: string;
 };
 
 type RunCommandOptions = {
@@ -113,6 +116,7 @@ export const assertBundleProvenanceFresh = (
   parity: any,
   localization: any,
   ablation: any,
+  semanticBridgeMatrix: any,
 ) => {
   const stepACommitHash = readCommitHash(stepA);
   const ledgerCommitHash = readCommitHash(ledger);
@@ -121,6 +125,7 @@ export const assertBundleProvenanceFresh = (
   const parityCommitHash = readCommitHash(parity);
   const localizationCommitHash = readCommitHash(localization);
   const ablationCommitHash = readCommitHash(ablation);
+  const semanticBridgeMatrixCommitHash = readCommitHash(semanticBridgeMatrix);
 
   if (stepACommitHash !== headCommitHash) {
     throw new Error(`Step A summary commit hash mismatch: stepA=${String(stepACommitHash ?? 'null')} head=${headCommitHash}`);
@@ -149,6 +154,11 @@ export const assertBundleProvenanceFresh = (
       `Coupling ablation provenance commit hash mismatch: ablation=${String(ablationCommitHash ?? 'null')} head=${headCommitHash}`,
     );
   }
+  if (semanticBridgeMatrixCommitHash !== headCommitHash) {
+    throw new Error(
+      `Semantic bridge matrix provenance commit hash mismatch: semanticBridgeMatrix=${String(semanticBridgeMatrixCommitHash ?? 'null')} head=${headCommitHash}`,
+    );
+  }
 };
 
 export const runCanonicalBundle = (): CanonicalBundleResult => {
@@ -163,7 +173,18 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
   const parity = readJson(PARITY_PATH);
   const localization = readJson(LOCALIZATION_PATH);
   const ablation = readJson(ABLATION_PATH);
-  assertBundleProvenanceFresh(headCommitHash, stepA, ledger, matrix, recovery, parity, localization, ablation);
+  const semanticBridgeMatrix = readJson(SEMANTIC_BRIDGE_MATRIX_PATH);
+  assertBundleProvenanceFresh(
+    headCommitHash,
+    stepA,
+    ledger,
+    matrix,
+    recovery,
+    parity,
+    localization,
+    ablation,
+    semanticBridgeMatrix,
+  );
 
   return {
     ok: true,
@@ -176,9 +197,16 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
     parityPath: PARITY_PATH,
     localizationPath: LOCALIZATION_PATH,
     ablationPath: ABLATION_PATH,
+    semanticBridgeMatrixPath: SEMANTIC_BRIDGE_MATRIX_PATH,
   };
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  console.log(JSON.stringify(runCanonicalBundle()));
+  try {
+    console.log(JSON.stringify(runCanonicalBundle()));
+    process.exit(0);
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
 }

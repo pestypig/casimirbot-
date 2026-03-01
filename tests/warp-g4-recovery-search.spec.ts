@@ -85,6 +85,16 @@ describe('warp-g4-recovery-search', () => {
       expect(row).toHaveProperty('marginRatioRawComputed');
       expect(row).toHaveProperty('sumWindowDt');
       expect(row).toHaveProperty('tau_s');
+      expect(row).toHaveProperty('tauConfigured_s');
+      expect(row).toHaveProperty('tauWindow_s');
+      expect(row).toHaveProperty('tauPulse_s');
+      expect(row).toHaveProperty('tauLC_s');
+      expect(row).toHaveProperty('tauSelected_s');
+      expect(row).toHaveProperty('tauSelectedSource');
+      expect(row).toHaveProperty('tauSelectorPolicy');
+      expect(row).toHaveProperty('tauSelectorFallbackApplied');
+      expect(row).toHaveProperty('tauProvenanceReady');
+      expect(row).toHaveProperty('tauProvenanceMissing');
       expect(row).toHaveProperty('K');
       expect(row).toHaveProperty('safetySigma_Jm3');
       expect(row).toHaveProperty('applicabilityStatus');
@@ -136,7 +146,7 @@ describe('warp-g4-recovery-search', () => {
     await runRecoverySearch({ outPath: outB, stepASummaryPath: stepA, seed: 123, maxCases: 3000, runtimeCapMs: 1_000 });
     const a = JSON.parse(fs.readFileSync(outA, 'utf8'));
     const b = JSON.parse(fs.readFileSync(outB, 'utf8'));
-    expect(a.deterministicSearch.attemptedCaseUniverse).toBe(8709120);
+    expect(a.deterministicSearch.attemptedCaseUniverse).toBe(16174080);
     expect(a.caseCount).toBeLessThan(3000);
     expect(a.deterministicSearch.executedCaseCount).toBe(a.caseCount);
     expect(a.deterministicSearch.elapsedMs).toBeLessThanOrEqual(2_000);
@@ -294,7 +304,7 @@ describe('warp-g4-recovery-search', () => {
     const payload = JSON.parse(fs.readFileSync(out, 'utf8'));
     const summary = JSON.parse(fs.readFileSync(stepB, 'utf8'));
     const tauValues = new Set(payload.cases.map((row: any) => row.params.tau_s_ms));
-    for (const tau of [2, 5, 8, 10, 20, 35, 50]) {
+    for (const tau of [0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 8, 10, 20, 35, 50]) {
       expect(tauValues.has(tau)).toBe(true);
     }
     expect(summary.executedCaseCount).toBe(payload.caseCount);
@@ -369,10 +379,12 @@ describe('warp-g4-recovery-search', () => {
     expect(payload.deterministicSearch.seedStrategy.centerSource).toBe('stepB_top_comparable');
     expect(payload.deterministicSearch.seedStrategy.centerCaseId).toBe('seed_case_0099');
     expect(payload.deterministicSearch.seedStrategy.prioritizedFamilies).toContain('gammaGeo');
-    expect(payload.deterministicSearch.stagedCounts.tauPriorityRows).toBe(7);
+    expect(payload.deterministicSearch.stagedCounts.tauPriorityRows).toBe(13);
 
-    const tauRows = payload.cases.slice(0, 7);
-    expect(new Set(tauRows.map((row: any) => row.params.tau_s_ms))).toEqual(new Set([2, 5, 8, 10, 20, 35, 50]));
+    const tauRows = payload.cases.slice(0, 13);
+    expect(new Set(tauRows.map((row: any) => row.params.tau_s_ms))).toEqual(
+      new Set([0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 8, 10, 20, 35, 50]),
+    );
     for (const row of tauRows) {
       expect(row.params.warpFieldType).toBe('lentz');
       expect(row.params.gammaGeo).toBe(48);

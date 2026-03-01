@@ -364,9 +364,78 @@ describe("evaluateQiGuardrail", () => {
     expect(guard.quantitySemanticBridgeMode).toBe("strict_evidence_gated");
     expect(guard.quantitySemanticBridgeReady).toBe(false);
     expect(Array.isArray(guard.quantitySemanticBridgeMissing)).toBe(true);
-    expect(guard.quantitySemanticBridgeMissing).toContain("qei_state_class_not_hadamard");
-    expect(guard.quantitySemanticBridgeMissing).toContain("qei_renormalization_not_point_splitting");
+    expect(guard.quantitySemanticBridgeMissing).toContain("worldline_not_timelike");
+    expect(guard.quantitySemanticBridgeMissing).toContain("coupling_semantics_diagnostic_only");
+    expect(guard.quantitySemanticBridgeMissing).not.toContain("qei_state_class_not_hadamard");
+    expect(guard.quantitySemanticBridgeMissing).not.toContain("qei_renormalization_not_point_splitting");
     expect(guard.lhs_Jm3).toBeCloseTo(metricT00, 9);
+  });
+
+  test("promotes coupling semantics to bridge-ready channel when QEI evidence metadata is complete", () => {
+    const sectorPeriod_ms = 1;
+    const tau_ms = 1;
+    const schedule = makeSchedule(1, [0], sectorPeriod_ms, tau_ms);
+    const scheduleGuard: PhaseSchedule = {
+      phi_deg_by_sector: schedule.phi_deg_by_sector,
+      negSectors: schedule.negSectors,
+      posSectors: schedule.posSectors,
+      weights: schedule.weights ?? Array.from({ length: schedule.N }, () => 1),
+    };
+    const metricT00 = -120;
+    const proxyRho = -40;
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 0.2,
+        dutyShip: 0.2,
+        dutyEffective_FR: 0.2,
+        sectorCount: 1,
+        concurrentSectors: 1,
+        sectorStrobing: 1,
+        negativeFraction: 1,
+        phaseSchedule: schedule,
+        rho_static: proxyRho,
+        qi: {
+          sampler: "gaussian",
+          tau_s_ms: 5,
+          observerId: "obs-1",
+          fieldType: "em",
+          qeiStateClass: "hadamard",
+          qeiRenormalizationScheme: "point_splitting",
+          qeiSamplingNormalization: "unit_integral",
+          qeiOperatorMapping: "t_munu_uu_ren",
+        } as any,
+        gr: {
+          invariants: {
+            kretschmann: { p98: 0, max: 0, mean: 0 },
+          },
+        } as any,
+        warp: {
+          metricT00,
+          metricT00Source: "metric",
+          metricT00Ref: "warp.metric.T00.natario.shift",
+          metricT00Contract: {
+            status: "ok",
+            observer: "comoving_timelike",
+            normalization: "ren_expectation",
+            unitSystem: "SI",
+          },
+          metricAdapter: {
+            chart: {
+              label: "comoving_cartesian",
+              contractStatus: "ok",
+            },
+          },
+        },
+      } as any),
+      { schedule: scheduleGuard, sectorPeriod_ms, tau_ms },
+    );
+
+    expect(guard.couplingComparable).toBe(true);
+    expect(guard.couplingSemantics).toBe("bridge_ready_evidence_no_gate_override");
+    expect(guard.quantitySemanticBridgeReady).toBe(true);
+    expect(guard.quantitySemanticComparable).toBe(true);
+    expect(guard.quantitySemanticType).toBe("ren_expectation_timelike_energy_density");
+    expect(guard.quantitySemanticBridgeMissing).not.toContain("coupling_semantics_diagnostic_only");
   });
 
   test("supports coupling mode off while preserving comparability diagnostics", () => {
@@ -620,5 +689,49 @@ describe("deriveQiStatus", () => {
     expect(guard.applicabilityReasonCode).toBeUndefined();
     expect(guard.curvatureOk).toBe(true);
     expect(guard.curvatureRatio).toBe(0);
+  });
+
+  test("emits deterministic tau provenance fields with configured selector", () => {
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 5,
+        dutyShip: 5,
+        dutyEffective_FR: 5,
+        clocking: { tauPulse_ms: 0.25, tauLC_ms: 2 },
+      }),
+      { tau_ms: 5 },
+    );
+    expect(guard.tauSelectorPolicy).toBe("configured");
+    expect(guard.tauSelectedSource).toBe("configured");
+    expect(guard.tauConfigured_s).toBeCloseTo(0.005, 12);
+    expect(guard.tauSelected_s).toBeCloseTo(0.005, 12);
+    expect(guard.tauPulse_s).toBeCloseTo(0.00025, 12);
+    expect(guard.tauLC_s).toBeCloseTo(0.002, 12);
+    expect(guard.tau_s).toBeGreaterThan(0);
+    expect(guard.tauSelectorFallbackApplied).toBe(false);
+    expect(guard.tauProvenanceReady).toBe(true);
+  });
+
+  test("fails closed to configured tau when requested selector source is unavailable", () => {
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 5,
+        dutyShip: 5,
+        dutyEffective_FR: 5,
+        qi: {
+          sampler: "gaussian",
+          fieldType: "em",
+          tau_s_ms: 5,
+          tauSelector: "pulse",
+        } as any,
+      }),
+      { tau_ms: 5 },
+    );
+    expect(guard.tauSelectorPolicy).toBe("pulse");
+    expect(guard.tauSelectedSource).toBe("configured");
+    expect(guard.tauSelectorFallbackApplied).toBe(true);
+    expect(guard.tauProvenanceReady).toBe(false);
+    expect(guard.tauProvenanceMissing).toContain("tau_pulse_unavailable");
+    expect(guard.tauProvenanceMissing).toContain("tau_selector_fallback:pulse->configured");
   });
 });

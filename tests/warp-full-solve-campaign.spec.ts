@@ -20,6 +20,7 @@ import {
   parsePositiveIntArg,
   parseSeedArg,
   parseWaveArg,
+  resolveWaveProfiles,
   summarizeScoreboard,
 } from '../scripts/warp-full-solve-campaign';
 
@@ -206,6 +207,16 @@ describe('warp-full-solve-campaign runner', () => {
             qi_curvature_ratio: 0.5,
             qi_curvature_enforced: true,
             qi_bound_tau_s: 1,
+            qi_tau_configured_s: 1,
+            qi_tau_window_s: 0.2,
+            qi_tau_pulse_s: 0.01,
+            qi_tau_lc_s: 0.5,
+            qi_tau_selected_s: 1,
+            qi_tau_selected_source: 'configured',
+            qi_tau_selector_policy: 'configured',
+            qi_tau_selector_fallback_applied: false,
+            qi_tau_provenance_ready: true,
+            qi_tau_provenance_missing: 'tau_light_crossing_unavailable',
             qi_bound_K: 3,
             qi_safetySigma_Jm3: 4,
           },
@@ -243,6 +254,16 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.metricT00Si).toBe(-2.2);
     expect(diagnostics.metricT00SiFromGeom).toBe(-2.2);
     expect(diagnostics.metricT00SiRelError).toBe(0);
+    expect(diagnostics.tauConfigured_s).toBe(1);
+    expect(diagnostics.tauWindow_s).toBe(0.2);
+    expect(diagnostics.tauPulse_s).toBe(0.01);
+    expect(diagnostics.tauLC_s).toBe(0.5);
+    expect(diagnostics.tauSelected_s).toBe(1);
+    expect(diagnostics.tauSelectedSource).toBe('configured');
+    expect(diagnostics.tauSelectorPolicy).toBe('configured');
+    expect(diagnostics.tauSelectorFallbackApplied).toBe(false);
+    expect(diagnostics.tauProvenanceReady).toBe(true);
+    expect(diagnostics.tauProvenanceMissing).toBe('tau_light_crossing_unavailable');
   });
 
   it('treats null snapshot numerics as missing instead of coercing to 0', () => {
@@ -423,6 +444,16 @@ describe('warp-full-solve-campaign runner', () => {
         g4DualFailMode: 'both',
         marginRatio: 0.5,
         tau_s: undefined,
+        tauConfigured_s: 0.005,
+        tauWindow_s: 0.01,
+        tauPulse_s: Number.NaN,
+        tauLC_s: 0.1,
+        tauSelected_s: 0.005,
+        tauSelectedSource: 'configured',
+        tauSelectorPolicy: 'configured',
+        tauSelectorFallbackApplied: false,
+        tauProvenanceReady: true,
+        tauProvenanceMissing: 'tau_pulse_unavailable',
         K: 12,
         safetySigma_Jm3: Number.NaN,
         metricT00Ref: 'warp.metric.T00.natario.shift',
@@ -477,6 +508,16 @@ describe('warp-full-solve-campaign runner', () => {
     expect(artifact.metricT00SiRelError).toBe(0.01);
     expect(artifact.curvatureScalar).toBeNull();
     expect(artifact.curvatureRadius_m).toBe(4);
+    expect(artifact.tauConfigured_s).toBe(0.005);
+    expect(artifact.tauWindow_s).toBe(0.01);
+    expect(artifact.tauPulse_s).toBeNull();
+    expect(artifact.tauLC_s).toBe(0.1);
+    expect(artifact.tauSelected_s).toBe(0.005);
+    expect(artifact.tauSelectedSource).toBe('configured');
+    expect(artifact.tauSelectorPolicy).toBe('configured');
+    expect(artifact.tauSelectorFallbackApplied).toBe(false);
+    expect(artifact.tauProvenanceReady).toBe(true);
+    expect(artifact.tauProvenanceMissing).toBe('tau_pulse_unavailable');
   });
 
 
@@ -544,6 +585,38 @@ describe('warp-full-solve-campaign runner', () => {
     expect(gatesD.G8.status).toBe('PASS');
   });
 
+  it('G8 parity ignores volatile constraint note fields and compares semantic signatures', () => {
+    const mk = (constraintsA1: unknown[]) =>
+      ({
+        attempts: [
+          { evaluation: { gate: { status: 'fail' }, constraints: [{ id: 'FordRomanQI', status: 'fail' }] } },
+          { evaluation: { gate: { status: 'fail' }, constraints: constraintsA1 } },
+        ],
+      }) as any;
+
+    const runResults = [
+      mk([
+        {
+          id: 'FordRomanQI',
+          status: 'fail',
+          reasonCode: ['G4_QI_MARGIN_EXCEEDED'],
+          note: 'lhs_Jm3=-1.0e9; bound_Jm3=-1.0e9; marginRatioRaw=1',
+        },
+      ]),
+      mk([
+        {
+          id: 'FordRomanQI',
+          status: 'fail',
+          reasonCode: ['G4_QI_MARGIN_EXCEEDED'],
+          note: 'lhs_Jm3=-9.9e8; bound_Jm3=-9.9e8; marginRatioRaw=1',
+        },
+      ]),
+    ];
+
+    const gatesD = buildGateMap('D', runResults, [] as any);
+    expect(gatesD.G8.status).toBe('PASS');
+  });
+
   it('G7/G8 return NOT_READY with explicit missing evaluation reasons', () => {
     const incompleteRuns = [
       { attempts: [{ evaluation: { gate: {}, constraints: [] } }] },
@@ -580,6 +653,158 @@ describe('warp-full-solve-campaign runner', () => {
     const localFast = parseArgs(['--ci-fast-path']);
     expect(localFast.ci).toBe(false);
     expect(localFast.ciFastPath).toBe(true);
+  });
+
+  it('keeps promotion args optional with deterministic defaults', () => {
+    const args = parseArgs([]);
+    expect(args.promoteCandidateId).toBeNull();
+    expect(args.autoPromoteReadyCandidate).toBe(false);
+    expect(typeof args.promotionCheckPath).toBe('string');
+    expect(args.promotionCheckPath).toContain('g4-candidate-promotion-check');
+  });
+
+  it('resolves promoted wave profiles only when explicit promotable candidate is supplied', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-promo-profile-'));
+    const promotionPath = path.join(tmpRoot, 'promotion-check.json');
+    fs.writeFileSync(
+      promotionPath,
+      JSON.stringify(
+        {
+          blockedReason: null,
+          candidate: {
+            id: 'case_0001',
+            params: {
+              warpFieldType: 'natario_sdf',
+              gammaGeo: 1,
+              dutyCycle: 0.12,
+              dutyShip: 0.12,
+              dutyEffective_FR: 0.12,
+              sectorCount: 80,
+              concurrentSectors: 2,
+              gammaVanDenBroeck: 500,
+              qCavity: 100000,
+              qSpoilingFactor: 3,
+              gap_nm: 8,
+              shipRadius_m: 2,
+              sampler: 'hann',
+              fieldType: 'em',
+              tau_s_ms: 0.02,
+            },
+            applicabilityStatus: 'PASS',
+            comparabilityClass: 'comparable_canonical',
+            marginRatioRaw: 0.1,
+            marginRatioRawComputed: 0.1,
+          },
+          aggregate: {
+            candidatePromotionReady: true,
+            candidatePromotionStable: true,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const promotedProfiles = resolveWaveProfiles({
+      promoteCandidateId: 'case_0001',
+      promotionCheckPath: promotionPath,
+    });
+    const canonicalProfiles = resolveWaveProfiles({
+      promoteCandidateId: null,
+      promotionCheckPath: promotionPath,
+    });
+
+    expect(promotedProfiles.A.options.proposals?.[0]?.label).toContain('promoted-case_0001');
+    expect((promotedProfiles.A.options.proposals?.[0]?.params as any)?.warpFieldType).toBe('natario_sdf');
+    expect((promotedProfiles.A.options.proposals?.[0]?.params as any)?.qi?.tau_s_ms).toBe(0.02);
+    expect(canonicalProfiles.A.options.proposals?.[0]?.label).toContain('wave-a-natario-baseline');
+  });
+
+  it('fails closed for promotion profile when candidate is not promotion-ready', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-promo-blocked-'));
+    const promotionPath = path.join(tmpRoot, 'promotion-check.json');
+    fs.writeFileSync(
+      promotionPath,
+      JSON.stringify(
+        {
+          blockedReason: null,
+          candidate: {
+            id: 'case_0009',
+            params: { warpFieldType: 'natario_sdf' },
+            applicabilityStatus: 'PASS',
+            comparabilityClass: 'comparable_canonical',
+            marginRatioRaw: 0.1,
+            marginRatioRawComputed: 0.1,
+          },
+          aggregate: {
+            candidatePromotionReady: false,
+            candidatePromotionStable: false,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    expect(() =>
+      resolveWaveProfiles({
+        promoteCandidateId: 'case_0009',
+        promotionCheckPath: promotionPath,
+      }),
+    ).toThrow(/candidatePromotionReady=false/);
+  });
+
+  it('auto-promotes wave profiles when requested and promotion artifact is ready', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-promo-auto-'));
+    const promotionPath = path.join(tmpRoot, 'promotion-check.json');
+    fs.writeFileSync(
+      promotionPath,
+      JSON.stringify(
+        {
+          blockedReason: null,
+          candidate: {
+            id: 'case_0001',
+            params: {
+              warpFieldType: 'natario_sdf',
+              gammaGeo: 1,
+              dutyCycle: 0.12,
+              dutyShip: 0.12,
+              dutyEffective_FR: 0.12,
+              sectorCount: 80,
+              concurrentSectors: 2,
+              gammaVanDenBroeck: 500,
+              qCavity: 100000,
+              qSpoilingFactor: 3,
+              gap_nm: 8,
+              shipRadius_m: 2,
+              sampler: 'hann',
+              fieldType: 'em',
+              tau_s_ms: 0.02,
+            },
+            applicabilityStatus: 'PASS',
+            comparabilityClass: 'comparable_canonical',
+            marginRatioRaw: 0.1,
+            marginRatioRawComputed: 0.1,
+          },
+          aggregate: {
+            candidatePromotionReady: true,
+            candidatePromotionStable: true,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const autoPromotedProfiles = resolveWaveProfiles({
+      promoteCandidateId: null,
+      promotionCheckPath: promotionPath,
+      autoPromoteReadyCandidate: true,
+    });
+
+    expect(autoPromotedProfiles.A.options.proposals?.[0]?.label).toContain('promoted-case_0001');
+    expect((autoPromotedProfiles.A.options.proposals?.[0]?.params as any)?.warpFieldType).toBe('natario_sdf');
+    expect((autoPromotedProfiles.A.options.proposals?.[0]?.params as any)?.qi?.tau_s_ms).toBe(0.02);
   });
 
   it('marks gates NOT_READY when required signals are missing', () => {

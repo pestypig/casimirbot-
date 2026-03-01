@@ -10,13 +10,23 @@ const writeJson = (base: string, rel: string, payload: unknown) => {
   fs.writeFileSync(full, `${JSON.stringify(payload, null, 2)}\n`);
 };
 
-const seedArtifacts = (dir: string, parityMode: string = 'margin_limited') => {
+const seedArtifacts = (dir: string, parityMode: string = 'margin_limited', includePromotionBundle = true) => {
   writeJson(dir, 'artifacts/research/full-solve/campaign-gate-scoreboard-2026-02-24.json', { decision: 'INADMISSIBLE', gateStatus: { G4: 'FAIL' } });
   writeJson(dir, 'artifacts/research/full-solve/campaign-first-fail-map-2026-02-24.json', { firstFail: { gate: 'G4' } });
   writeJson(dir, 'artifacts/research/full-solve/g4-decision-ledger-2026-02-26.json', { canonicalDecisionClass: 'margin_limited' });
   writeJson(dir, 'artifacts/research/full-solve/g4-governance-matrix-2026-02-27.json', { canonicalAuthoritativeClass: 'margin_limited' });
   writeJson(dir, 'artifacts/research/full-solve/g4-recovery-search-2026-02-27.json', { provenance: { commitHash: 'abc' } });
   writeJson(dir, 'artifacts/research/full-solve/g4-recovery-parity-2026-02-27.json', { dominantFailureMode: parityMode, provenance: { commitHash: 'abc' } });
+  if (includePromotionBundle) {
+    writeJson(dir, 'artifacts/research/full-solve/g4-promotion-bundle-2026-03-01.json', {
+      blockedReason: null,
+      candidateId: 'case_0001',
+      promotionLaneExecuted: true,
+      promotionLaneDecision: 'REDUCED_ORDER_ADMISSIBLE',
+      promotionLaneFirstFail: 'none',
+      promotionLaneG4ComparablePassAllWaves: true,
+    });
+  }
   writeJson(dir, 'artifacts/casimir-verify.json', { verdict: 'FAIL', integrityOk: false });
   writeJson(dir, 'docs/ethos/ideology.json', { rootId: 'mission-ethos', nodes: [{ id: 'mission-ethos', title: 'Mission Ethos', children: ['integrity-protocols'] }] });
   writeJson(dir, 'artifacts/research/full-solve/g4-autoloop-state.json', { iterationCount: 0, stallCounter: 0, class: 'evidence_path_blocked' });
@@ -62,8 +72,12 @@ describe('warp g4 autoloop', () => {
     expect(state.iterationCount).toBe(1);
     expect(state.remainingIterations).toBe(9);
     expect(state.parityFreshness).toBe('stale_or_missing');
+    expect(state.promotionDelta.class).toBe('candidate_viable');
+    expect(state.promotionDelta.promotable).toBe(true);
 
     const prompt = fs.readFileSync(promptPath, 'utf8');
+    expect(prompt).toContain('## Canonical vs Promotion Delta');
+    expect(prompt).toContain('promotion delta class: candidate_viable');
     expect(prompt).toContain('Ideology context is advisory only and cannot override evidence gates, guardrails, or completion criteria.');
     expect(prompt).toContain('This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.');
   });
@@ -358,5 +372,32 @@ describe('warp g4 autoloop', () => {
 
     expect(result.ok).toBe(true);
     expect(result.class).toBe('margin_limited');
+  });
+
+  it('marks promotion delta missing when promotion bundle artifact is unavailable', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-autoloop-promo-missing-'));
+    const artifactRoot = path.join(dir, 'artifacts', 'research', 'full-solve');
+    const statePath = path.join(dir, 'artifacts/research/full-solve/g4-autoloop-state.json');
+
+    seedArtifacts(dir, 'margin_limited', false);
+
+    runAutoloop([
+      '--mode',
+      'analyze',
+      '--artifact-root',
+      artifactRoot,
+      '--casimir-path',
+      path.join(dir, 'artifacts/casimir-verify.json'),
+      '--state-path',
+      statePath,
+      '--history-path',
+      path.join(dir, 'artifacts/research/full-solve/g4-autoloop-history.jsonl'),
+      '--prompt-path',
+      path.join(dir, 'docs/audits/research/warp-g4-autoloop-next-prompt.md'),
+    ]);
+
+    const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    expect(state.promotionDelta.class).toBe('missing');
+    expect(state.promotionDelta.reason).toBe('promotion_bundle_missing');
   });
 });

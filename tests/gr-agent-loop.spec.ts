@@ -13,6 +13,7 @@ const baseState = {
 
 const {
   mockBuildGrRequestPayload,
+  mockEvaluateQiGuardrail,
   mockGetGlobalPipelineState,
   mockSetGlobalPipelineState,
   mockUpdateParameters,
@@ -22,6 +23,13 @@ const {
   mockRunGrEvaluation,
 } = vi.hoisted(() => ({
   mockBuildGrRequestPayload: vi.fn(() => ({ mocked: true })),
+  mockEvaluateQiGuardrail: vi.fn(() => ({
+    marginRatioRaw: 1,
+    marginRatioRawComputed: 1,
+    lhs_Jm3: -1,
+    bound_Jm3: -1,
+    rhoSource: "warp.metric.T00.natario.shift",
+  })),
   mockGetGlobalPipelineState: vi.fn(),
   mockSetGlobalPipelineState: vi.fn(),
   mockUpdateParameters: vi.fn(async (state: any, params: any) => ({
@@ -36,6 +44,7 @@ const {
 
 vi.mock("../server/energy-pipeline.js", () => ({
   buildGrRequestPayload: mockBuildGrRequestPayload,
+  evaluateQiGuardrail: mockEvaluateQiGuardrail,
   getGlobalPipelineState: mockGetGlobalPipelineState,
   setGlobalPipelineState: mockSetGlobalPipelineState,
   updateParameters: mockUpdateParameters,

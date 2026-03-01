@@ -76,6 +76,67 @@ describe('warp g4 recovery parity', () => {
     );
   });
 
+  it('preserves canonical PASS applicability for comparable pass candidates', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-parity-pass-'));
+    const recoveryPath = path.join(tmpDir, 'recovery.json');
+    const outPath = path.join(tmpDir, 'parity.json');
+
+    fs.writeFileSync(
+      recoveryPath,
+      `${JSON.stringify(
+        {
+          provenance: { commitHash: 'deadbeef' },
+          topComparableCandidates: [
+            {
+              id: 'case_pass',
+              params: {
+                warpFieldType: 'natario_sdf',
+                gammaGeo: 1,
+                dutyCycle: 0.12,
+                dutyShip: 0.12,
+                dutyEffective_FR: 0.12,
+                sectorCount: 80,
+                concurrentSectors: 2,
+                gammaVanDenBroeck: 500,
+                sampler: 'hann',
+                fieldType: 'em',
+                qCavity: 1e5,
+                qSpoilingFactor: 3,
+                tau_s_ms: 0.02,
+                gap_nm: 8,
+                shipRadius_m: 2,
+              },
+              applicabilityStatus: 'PASS',
+              marginRatioRaw: 0.12890679702998561,
+              marginRatioRawComputed: 0.12890679702998561,
+              lhs_Jm3: -3.0937631287227165,
+              boundComputed_Jm3: -24.00000000002375,
+              boundUsed_Jm3: -24.00000000002375,
+              boundFloorApplied: false,
+              rhoSource: 'warp.metric.T00.natario_sdf.shift',
+              quantitySemanticType: 'ren_expectation_timelike_energy_density',
+              quantityWorldlineClass: 'timelike',
+              quantitySemanticComparable: true,
+              quantitySemanticReason: 'semantic_parity_qei_timelike_ren',
+              reasonCode: [],
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const result = await runRecoveryParity({ topN: 1, recoveryPath, outPath });
+    expect(result.ok).toBe(true);
+    expect(result.selectionPolicy).toBe('comparable_canonical');
+    expect(result.anyCanonicalPassCandidate).toBe(true);
+
+    const payload = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+    expect(payload.candidates[0].parity.applicabilityStatus).toBe('PASS');
+    expect(payload.candidates[0].parity.marginRatioRaw).toBeLessThan(1);
+  });
+
   it('fails closed with empty selection when no canonical or structural comparable candidates exist', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'g4-parity-fallback-'));
     const recoveryPath = path.join(tmpDir, 'recovery.json');

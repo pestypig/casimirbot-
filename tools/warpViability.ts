@@ -1156,8 +1156,37 @@ export async function evaluateWarpViability(
     qi_curvature_ratio: finiteOrUndefined(qiGuard?.curvatureRatio),
     qi_curvature_enforced: qiGuard?.curvatureEnforced,
     qi_bound_tau_s:
-      Number.isFinite((pipeline as any).qi?.tau_s_ms) && Number((pipeline as any).qi?.tau_s_ms) > 0
-        ? Number((pipeline as any).qi?.tau_s_ms) / 1000
+      Number.isFinite(qiGuard?.tau_s) && Number(qiGuard?.tau_s) > 0
+        ? Number(qiGuard?.tau_s)
+        : Number.isFinite((pipeline as any).qi?.tau_s_ms) && Number((pipeline as any).qi?.tau_s_ms) > 0
+          ? Number((pipeline as any).qi?.tau_s_ms) / 1000
+        : undefined,
+    qi_tau_configured_s: finiteOrUndefined((qiGuard as any)?.tauConfigured_s),
+    qi_tau_window_s: finiteOrUndefined((qiGuard as any)?.tauWindow_s),
+    qi_tau_pulse_s: finiteOrUndefined((qiGuard as any)?.tauPulse_s),
+    qi_tau_lc_s: finiteOrUndefined((qiGuard as any)?.tauLC_s),
+    qi_tau_selected_s: finiteOrUndefined((qiGuard as any)?.tauSelected_s),
+    qi_tau_selected_source:
+      typeof (qiGuard as any)?.tauSelectedSource === "string" && (qiGuard as any).tauSelectedSource.length > 0
+        ? String((qiGuard as any).tauSelectedSource)
+        : undefined,
+    qi_tau_selector_policy:
+      typeof (qiGuard as any)?.tauSelectorPolicy === "string" && (qiGuard as any).tauSelectorPolicy.length > 0
+        ? String((qiGuard as any).tauSelectorPolicy)
+        : undefined,
+    qi_tau_selector_fallback_applied:
+      typeof (qiGuard as any)?.tauSelectorFallbackApplied === "boolean"
+        ? Boolean((qiGuard as any).tauSelectorFallbackApplied)
+        : undefined,
+    qi_tau_provenance_ready:
+      typeof (qiGuard as any)?.tauProvenanceReady === "boolean"
+        ? Boolean((qiGuard as any).tauProvenanceReady)
+        : undefined,
+    qi_tau_provenance_missing:
+      Array.isArray((qiGuard as any)?.tauProvenanceMissing)
+        ? ((qiGuard as any).tauProvenanceMissing as unknown[])
+            .filter((item) => typeof item === "string" && item.length > 0)
+            .join("|")
         : undefined,
     qi_bound_K: finiteOrUndefined(qiGuard?.K),
     qi_bound_K_null_reason:
@@ -1326,7 +1355,17 @@ export async function evaluateWarpViability(
           `curvatureOk=${qiGuard.curvatureOk ?? "unknown"}`,
           `curvatureRatio=${qiGuard.curvatureRatio ?? "n/a"}`,
           `curvatureEnforced=${curvatureEnforced}`,
-          `tau_s=${Number.isFinite((pipeline as any).qi?.tau_s_ms) ? Number((pipeline as any).qi?.tau_s_ms) / 1000 : "n/a"}`,
+          `tau_s=${Number.isFinite((qiGuard as any).tau_s) ? Number((qiGuard as any).tau_s) : Number.isFinite((pipeline as any).qi?.tau_s_ms) ? Number((pipeline as any).qi?.tau_s_ms) / 1000 : "n/a"}`,
+          `tauConfigured_s=${(qiGuard as any).tauConfigured_s ?? "n/a"}`,
+          `tauWindow_s=${(qiGuard as any).tauWindow_s ?? "n/a"}`,
+          `tauPulse_s=${(qiGuard as any).tauPulse_s ?? "n/a"}`,
+          `tauLC_s=${(qiGuard as any).tauLC_s ?? "n/a"}`,
+          `tauSelected_s=${(qiGuard as any).tauSelected_s ?? "n/a"}`,
+          `tauSelectedSource=${(qiGuard as any).tauSelectedSource ?? "n/a"}`,
+          `tauSelectorPolicy=${(qiGuard as any).tauSelectorPolicy ?? "n/a"}`,
+          `tauSelectorFallbackApplied=${(qiGuard as any).tauSelectorFallbackApplied === true}`,
+          `tauProvenanceReady=${(qiGuard as any).tauProvenanceReady === true}`,
+          `tauProvenanceMissing=${Array.isArray((qiGuard as any).tauProvenanceMissing) ? (qiGuard as any).tauProvenanceMissing.join('|') : "n/a"}`,
           `K=${qiGuard.K ?? "n/a"}`,
           `KNullReason=${qiGuard.KNullReason ?? "none"}`,
           `safetySigma_Jm3=${qiGuard.safetySigma_Jm3 ?? "n/a"}`,

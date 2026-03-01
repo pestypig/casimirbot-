@@ -2,22 +2,22 @@
 
 This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.
 
-- canonicalComparableCaseCount: 0
-- canonicalStructuralComparableCaseCount: 160
+- canonicalComparableCaseCount: 160
+- canonicalStructuralComparableCaseCount: 0
 - selectedCaseCount: 10
-- candidatePassFoundComparable: false
-- candidatePassFoundComparableComputedOnly: false
-- minMarginRatioRawComputedComparable: 1498141.138779572
+- candidatePassFoundComparable: true
+- candidatePassFoundComparableComputedOnly: true
+- minMarginRatioRawComputedComparable: 0.12890679702998561
 - bestComparableCaseId: case_0001
 
 ## Top Influence Terms
 
 | field | scoreMode | influenceScore | pearsonR | slope | maxRelativeDeltaAbs |
 |---|---|---:|---:|---:|---:|
-| metricStressRhoSiMean_Jm3 | correlation | 0.8877167406854541 | -0.8877167406854541 | -0.02312724942928119 | 0 |
-| metricT00Si_Jm3 | correlation | 0.8877167406854541 | -0.8877167406854541 | -0.02312724942928119 | 0 |
-| rhoCoupledShadow_Jm3 | correlation | 0.8877167406854541 | -0.8877167406854541 | -0.04625449885856238 | 0 |
-| rhoMetric_Jm3 | correlation | 0.8877167406854541 | -0.8877167406854541 | -0.02312724942928119 | 0 |
+| metricStressRhoSiMean_Jm3 | correlation | 0.695446275392409 | -0.695446275392409 | -0.018512698345788215 | 0 |
+| metricT00Si_Jm3 | correlation | 0.695446275392409 | -0.695446275392409 | -0.018512698345788215 | 0 |
+| rhoCoupledShadow_Jm3 | correlation | 0.695446275392409 | -0.695446275392409 | -0.03702539669157643 | 0 |
+| rhoMetric_Jm3 | correlation | 0.695446275392409 | -0.695446275392409 | -0.018512698345788215 | 0 |
 | metricStressStep_m | delta_fallback | 1.2394919797027262e-16 | null | null | 1.2394919797027262e-16 |
 | couplingResidualRel | delta_fallback | 0 | null | null | 0 |
 | metricStressKSquaredMean | delta_fallback | 0 | null | null | 0 |
@@ -29,14 +29,14 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 
 | id | applicabilityStatus | marginRatioRawComputed | topDominantTerms |
 |---|---|---:|---|
-| case_0001 | UNKNOWN | 1498141.138779572 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0011 | UNKNOWN | 1498141.138779572 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0012 | UNKNOWN | 1498141.138779572 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0013 | UNKNOWN | 1498141.138779572 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0014 | UNKNOWN | 1498141.138779572 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0015 | UNKNOWN | 1498141.138779572 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0016 | UNKNOWN | 1498141.138779572 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0017 | UNKNOWN | 1498141.138779572 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0018 | UNKNOWN | 1498141.138779572 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0105 | UNKNOWN | 1498141.562251998 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0001 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0017 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0018 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0019 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0020 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0133 | PASS | 0.2578135940599578 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0021 | PASS | 0.519347006952574 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0136 | PASS | 0.519347006952574 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0022 | PASS | 0.7616409782623893 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0086 | PASS | 1.523281956524699 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
 

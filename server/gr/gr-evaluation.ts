@@ -17,6 +17,7 @@ import { withSpan } from "../services/observability/otel-tracing.js";
 
 export type GrEvaluationInput = {
   diagnostics?: GrPipelineDiagnostics | null;
+  snapshot?: PipelineSnapshot;
   warpConfig?: WarpConfig;
   thresholds?: Partial<GrConstraintThresholds>;
   policy?: Partial<GrConstraintPolicy>;
@@ -227,13 +228,16 @@ export async function runGrEvaluation(
           semiclassical: input.semiclassical,
         },
       );
+      const diagnosticsSnapshot =
+        input.snapshot ??
+        (input.useDiagnosticsSnapshot && diagnostics
+          ? ({ gr: diagnostics } as unknown as PipelineSnapshot)
+          : undefined);
       const certificate = await issueWarpViabilityCertificate(
         input.warpConfig ?? {},
         {
           useLiveSnapshot: input.useLiveSnapshot,
-          ...(input.useDiagnosticsSnapshot && diagnostics
-            ? { snapshot: ({ gr: diagnostics } as unknown as PipelineSnapshot) }
-            : {}),
+          ...(diagnosticsSnapshot ? { snapshot: diagnosticsSnapshot } : {}),
         },
       );
       const integrityOk = verifyCertificateIntegrity(certificate);

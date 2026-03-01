@@ -16,6 +16,9 @@ type ParsedArgs = {
   ciFastPath: boolean;
   waveTimeoutMs: number;
   campaignTimeoutMs: number;
+  promotionCheckPath: string | null;
+  promoteCandidateId: string | null;
+  autoPromoteReadyCandidate: boolean;
 };
 
 export type CliResult = {
@@ -148,6 +151,16 @@ type EvidencePack = {
     curvatureRatio?: number;
     curvatureEnforced?: boolean;
     tau_s?: number;
+    tauConfigured_s?: number;
+    tauWindow_s?: number;
+    tauPulse_s?: number;
+    tauLC_s?: number;
+    tauSelected_s?: number;
+    tauSelectedSource?: string;
+    tauSelectorPolicy?: string;
+    tauSelectorFallbackApplied?: boolean;
+    tauProvenanceReady?: boolean;
+    tauProvenanceMissing?: string;
     K?: number;
     safetySigma_Jm3?: number;
   };
@@ -226,6 +239,16 @@ type QiForensicsArtifact = {
   qeiSamplingNormalization: string | null;
   qeiOperatorMapping: string | null;
   tau_s: number | null;
+  tauConfigured_s: number | null;
+  tauWindow_s: number | null;
+  tauPulse_s: number | null;
+  tauLC_s: number | null;
+  tauSelected_s: number | null;
+  tauSelectedSource: string | null;
+  tauSelectorPolicy: string | null;
+  tauSelectorFallbackApplied: boolean | null;
+  tauProvenanceReady: boolean | null;
+  tauProvenanceMissing: string | null;
   sampler: string | null;
   fieldType: string | null;
   K: number | null;
@@ -247,6 +270,7 @@ const BOUNDARY_STATEMENT =
 
 const DATE_STAMP = '2026-02-24';
 const CANONICAL_ARTIFACT_ROOT = path.join('artifacts', 'research', 'full-solve');
+const DEFAULT_PROMOTION_CHECK_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-candidate-promotion-check-2026-03-01.json');
 const EXECUTIVE_TRANSLATION_DOC = `docs/audits/research/warp-gates-executive-translation-${DATE_STAMP}.md`;
 const ALLOWED_WAVES: readonly WaveArg[] = ['A', 'B', 'C', 'D', 'all'] as const;
 const FIRST_FAIL_ORDER = ['G0', 'G1', 'G2', 'G3', 'G4', 'G6', 'G7', 'G8'] as const;
@@ -517,6 +541,174 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
   },
 };
 
+type PromotionCheckCandidate = {
+  id: string;
+  params: Record<string, unknown>;
+  applicabilityStatus?: string;
+  marginRatioRaw?: number | null;
+  marginRatioRawComputed?: number | null;
+  comparabilityClass?: string;
+};
+
+const numericOrNull = (value: unknown): number | null => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const finiteOrUndefined = (value: unknown): number | undefined => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+};
+
+const stringOrUndefined = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+
+const asPromotionCandidate = (value: unknown): PromotionCheckCandidate | null => {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const id = typeof record.id === 'string' ? record.id : null;
+  const params = record.params && typeof record.params === 'object' ? (record.params as Record<string, unknown>) : null;
+  if (!id || !params) return null;
+  return {
+    id,
+    params,
+    applicabilityStatus: typeof record.applicabilityStatus === 'string' ? record.applicabilityStatus : undefined,
+    marginRatioRaw: numericOrNull(record.marginRatioRaw),
+    marginRatioRawComputed: numericOrNull(record.marginRatioRawComputed),
+    comparabilityClass: typeof record.comparabilityClass === 'string' ? record.comparabilityClass : undefined,
+  };
+};
+
+const isPromotableCandidate = (candidate: PromotionCheckCandidate | null): candidate is PromotionCheckCandidate => {
+  if (!candidate) return false;
+  const applicabilityPass = String(candidate.applicabilityStatus ?? '').toUpperCase() === 'PASS';
+  const comparable = String(candidate.comparabilityClass ?? '') === 'comparable_canonical';
+  const marginRaw = numericOrNull(candidate.marginRatioRaw);
+  const marginRawComputed = numericOrNull(candidate.marginRatioRawComputed);
+  return applicabilityPass && comparable && marginRaw != null && marginRaw < 1 && marginRawComputed != null && marginRawComputed < 1;
+};
+
+const buildPromotedProposalParams = (candidate: PromotionCheckCandidate): Record<string, unknown> => {
+  const row = candidate.params;
+  const dutyCycle = finiteOrUndefined(row.dutyCycle);
+  const dutyShip = finiteOrUndefined(row.dutyShip ?? dutyCycle);
+  const dutyEffectiveFR = finiteOrUndefined(row.dutyEffective_FR ?? dutyCycle);
+  const sectorCount = finiteOrUndefined(row.sectorCount);
+  const concurrentSectors = finiteOrUndefined(row.concurrentSectors);
+  const warpFieldType = stringOrUndefined(row.warpFieldType);
+  const qCavity = finiteOrUndefined(row.qCavity);
+  const sampler = stringOrUndefined(row.sampler);
+  const fieldType = stringOrUndefined(row.fieldType);
+  const tau_s_ms = finiteOrUndefined(row.tau_s_ms);
+
+  return {
+    ...(warpFieldType ? { warpFieldType } : {}),
+    ...(finiteOrUndefined(row.gammaGeo) !== undefined ? { gammaGeo: finiteOrUndefined(row.gammaGeo) } : {}),
+    ...(dutyCycle !== undefined ? { dutyCycle } : {}),
+    ...(dutyShip !== undefined ? { dutyShip } : {}),
+    ...(dutyEffectiveFR !== undefined ? { dutyEffective_FR: dutyEffectiveFR } : {}),
+    ...(sectorCount !== undefined ? { sectorCount } : {}),
+    ...(concurrentSectors !== undefined ? { concurrentSectors } : {}),
+    ...(finiteOrUndefined(row.gammaVanDenBroeck) !== undefined ? { gammaVanDenBroeck: finiteOrUndefined(row.gammaVanDenBroeck) } : {}),
+    ...(qCavity !== undefined ? { qCavity } : {}),
+    ...(finiteOrUndefined(row.qSpoilingFactor) !== undefined ? { qSpoilingFactor: finiteOrUndefined(row.qSpoilingFactor) } : {}),
+    ...(finiteOrUndefined(row.gap_nm) !== undefined ? { gap_nm: finiteOrUndefined(row.gap_nm) } : {}),
+    ...(finiteOrUndefined(row.shipRadius_m) !== undefined ? { shipRadius_m: finiteOrUndefined(row.shipRadius_m) } : {}),
+    qi: {
+      sampler,
+      fieldType,
+      tau_s_ms,
+    },
+    dynamicConfig: {
+      ...(warpFieldType ? { warpFieldType } : {}),
+      ...(dutyCycle !== undefined ? { dutyCycle } : {}),
+      ...(sectorCount !== undefined ? { sectorCount } : {}),
+      ...(concurrentSectors !== undefined ? { concurrentSectors } : {}),
+      ...(qCavity !== undefined ? { cavityQ: qCavity } : {}),
+    },
+  };
+};
+
+const loadPromotedCandidateFromArtifact = (
+  promotionCheckPath: string,
+  requestedCandidateId: string | null,
+): PromotionCheckCandidate => {
+  if (!fs.existsSync(promotionCheckPath)) {
+    throw new Error(`Promotion check artifact missing at ${promotionCheckPath}.`);
+  }
+  const raw = JSON.parse(fs.readFileSync(promotionCheckPath, 'utf8')) as Record<string, unknown>;
+  const blockedReason = typeof raw.blockedReason === 'string' ? raw.blockedReason : null;
+  if (blockedReason) {
+    throw new Error(`Promotion check is blocked (${blockedReason}); cannot promote candidate wave profile.`);
+  }
+  const aggregate = (raw.aggregate && typeof raw.aggregate === 'object' ? raw.aggregate : {}) as Record<string, unknown>;
+  if (aggregate.candidatePromotionReady !== true) {
+    throw new Error('Promotion check artifact indicates candidatePromotionReady=false; refusing promotion.');
+  }
+  if (aggregate.candidatePromotionStable !== true) {
+    throw new Error('Promotion check artifact indicates candidatePromotionStable=false; refusing promotion.');
+  }
+
+  const selected = asPromotionCandidate(raw.candidate);
+  if (!selected) {
+    throw new Error('Promotion check artifact is missing candidate payload.');
+  }
+  if (requestedCandidateId && selected.id !== requestedCandidateId) {
+    throw new Error(`Requested candidate ${requestedCandidateId} does not match promotion artifact candidate ${selected.id}.`);
+  }
+  if (!isPromotableCandidate(selected)) {
+    throw new Error(`Candidate ${selected.id} is not promotable under canonical-comparable PASS criteria.`);
+  }
+  return selected;
+};
+
+export const resolveWaveProfiles = (
+  args: Pick<ParsedArgs, 'promotionCheckPath' | 'promoteCandidateId'> & { autoPromoteReadyCandidate?: boolean },
+) => {
+  const promotionCheckPath = args.promotionCheckPath ?? DEFAULT_PROMOTION_CHECK_PATH;
+  const loadAutoPromotedCandidate = (): PromotionCheckCandidate | null => {
+    if (!fs.existsSync(promotionCheckPath)) return null;
+    try {
+      const raw = JSON.parse(fs.readFileSync(promotionCheckPath, 'utf8')) as Record<string, unknown>;
+      const blockedReason = typeof raw.blockedReason === 'string' ? raw.blockedReason : null;
+      if (blockedReason) return null;
+      const aggregate = (raw.aggregate && typeof raw.aggregate === 'object' ? raw.aggregate : {}) as Record<string, unknown>;
+      if (aggregate.candidatePromotionReady !== true || aggregate.candidatePromotionStable !== true) return null;
+      const selected = asPromotionCandidate(raw.candidate);
+      if (!isPromotableCandidate(selected)) return null;
+      return selected;
+    } catch {
+      return null;
+    }
+  };
+  const promotedCandidate = args.promoteCandidateId
+    ? loadPromotedCandidateFromArtifact(promotionCheckPath, args.promoteCandidateId)
+    : args.autoPromoteReadyCandidate
+      ? loadAutoPromotedCandidate()
+      : null;
+  if (!promotedCandidate) {
+    return WAVE_PROFILES;
+  }
+  const promotedParams = buildPromotedProposalParams(promotedCandidate);
+
+  return (['A', 'B', 'C', 'D'] as Wave[]).reduce<Record<Wave, { runCount: number; options: GrAgentLoopOptions }>>((acc, wave) => {
+    const baseProfile = WAVE_PROFILES[wave];
+    const maxIterations = Math.max(1, Number(baseProfile.options.maxIterations ?? 1));
+    const proposals = Array.from({ length: maxIterations }, (_, index) => ({
+      label: `wave-${wave.toLowerCase()}-promoted-${promotedCandidate.id}-iter-${index + 1}`,
+      params: structuredClone(promotedParams),
+    }));
+    acc[wave] = {
+      runCount: baseProfile.runCount,
+      options: {
+        ...baseProfile.options,
+        proposals,
+      },
+    };
+    return acc;
+  }, {} as Record<Wave, { runCount: number; options: GrAgentLoopOptions }>);
+};
+
 const mkdirp = (p: string) => fs.mkdirSync(p, { recursive: true });
 const sortDeep = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(sortDeep);
@@ -717,6 +909,9 @@ export const parseArgs = (argv = process.argv.slice(2)): ParsedArgs => {
     ciFastPath: args.includes('--ci-fast-path'),
     waveTimeoutMs: parsePositiveIntArg(read('--wave-timeout-ms', '120000'), 'wave-timeout-ms'),
     campaignTimeoutMs: parsePositiveIntArg(read('--campaign-timeout-ms', '600000'), 'campaign-timeout-ms'),
+    promotionCheckPath: read('--promotion-check-path', DEFAULT_PROMOTION_CHECK_PATH) ?? DEFAULT_PROMOTION_CHECK_PATH,
+    promoteCandidateId: read('--promote-candidate-id', '')?.trim() || null,
+    autoPromoteReadyCandidate: args.includes('--auto-promote-ready-candidate'),
   };
 };
 
@@ -761,12 +956,34 @@ const hasPersistedRawOutputFiles = (runArtifacts: EvidencePack['runArtifacts']) 
 
 const canonicalizeConstraintPayload = (constraints: unknown[]): string => {
   const canonicalEntries = constraints
-    .map((entry) => sortDeep(entry) as Record<string, unknown>)
+    .map((entry) => {
+      const record = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
+      const id = typeof record.id === 'string' ? record.id : '';
+      const status = typeof record.status === 'string' ? record.status.toLowerCase() : '';
+      const reasonCodes = new Set<string>();
+      const addReasonCodes = (value: unknown) => {
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            if (typeof item === 'string' && item.trim().length > 0) reasonCodes.add(item.trim());
+          }
+          return;
+        }
+        if (typeof value === 'string' && value.trim().length > 0) {
+          reasonCodes.add(value.trim());
+        }
+      };
+      addReasonCodes(record.reasonCode);
+      addReasonCodes(record.reasonCodes);
+      return {
+        id,
+        status,
+        reasonCode: Array.from(reasonCodes).sort(),
+      };
+    })
     .sort((lhs, rhs) => {
-      const lhsId = typeof lhs.id === 'string' ? lhs.id : '';
-      const rhsId = typeof rhs.id === 'string' ? rhs.id : '';
-      if (lhsId !== rhsId) return lhsId.localeCompare(rhsId);
-      return JSON.stringify(lhs).localeCompare(JSON.stringify(rhs));
+      if (lhs.id !== rhs.id) return lhs.id.localeCompare(rhs.id);
+      if (lhs.status !== rhs.status) return lhs.status.localeCompare(rhs.status);
+      return JSON.stringify(lhs.reasonCode).localeCompare(JSON.stringify(rhs.reasonCode));
     });
   return JSON.stringify(canonicalEntries);
 };
@@ -1301,6 +1518,33 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
             ? false
             : undefined,
     tau_s: readCanonicalNumber(snapshot?.qi_bound_tau_s, 'tau_s'),
+    tauConfigured_s: readCanonicalNumber(snapshot?.qi_tau_configured_s, 'tauConfigured_s'),
+    tauWindow_s: readCanonicalNumber(snapshot?.qi_tau_window_s, 'tauWindow_s'),
+    tauPulse_s: readCanonicalNumber(snapshot?.qi_tau_pulse_s, 'tauPulse_s'),
+    tauLC_s: readCanonicalNumber(snapshot?.qi_tau_lc_s, 'tauLC_s'),
+    tauSelected_s: readCanonicalNumber(snapshot?.qi_tau_selected_s, 'tauSelected_s'),
+    tauSelectedSource:
+      readSnapshotString(snapshot?.qi_tau_selected_source) ?? (parseFordField('tauSelectedSource') ?? undefined),
+    tauSelectorPolicy:
+      readSnapshotString(snapshot?.qi_tau_selector_policy) ?? (parseFordField('tauSelectorPolicy') ?? undefined),
+    tauSelectorFallbackApplied:
+      typeof snapshot?.qi_tau_selector_fallback_applied === 'boolean'
+        ? snapshot.qi_tau_selector_fallback_applied
+        : parseFordField('tauSelectorFallbackApplied') === 'true'
+          ? true
+          : parseFordField('tauSelectorFallbackApplied') === 'false'
+            ? false
+            : undefined,
+    tauProvenanceReady:
+      typeof snapshot?.qi_tau_provenance_ready === 'boolean'
+        ? snapshot.qi_tau_provenance_ready
+        : parseFordField('tauProvenanceReady') === 'true'
+          ? true
+          : parseFordField('tauProvenanceReady') === 'false'
+            ? false
+            : undefined,
+    tauProvenanceMissing:
+      readSnapshotString(snapshot?.qi_tau_provenance_missing) ?? (parseFordField('tauProvenanceMissing') ?? undefined),
     K: readCanonicalNumber(snapshot?.qi_bound_K, 'K'),
     safetySigma_Jm3: readCanonicalNumber(snapshot?.qi_safetySigma_Jm3, 'safetySigma_Jm3'),
   };
@@ -1373,6 +1617,16 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
     qeiSamplingNormalization: stringOrNull(pack.g4Diagnostics?.qeiSamplingNormalization),
     qeiOperatorMapping: stringOrNull(pack.g4Diagnostics?.qeiOperatorMapping),
     tau_s: finiteOrNull(pack.g4Diagnostics?.tau_s),
+    tauConfigured_s: finiteOrNull(pack.g4Diagnostics?.tauConfigured_s),
+    tauWindow_s: finiteOrNull(pack.g4Diagnostics?.tauWindow_s),
+    tauPulse_s: finiteOrNull(pack.g4Diagnostics?.tauPulse_s),
+    tauLC_s: finiteOrNull(pack.g4Diagnostics?.tauLC_s),
+    tauSelected_s: finiteOrNull(pack.g4Diagnostics?.tauSelected_s),
+    tauSelectedSource: stringOrNull(pack.g4Diagnostics?.tauSelectedSource),
+    tauSelectorPolicy: stringOrNull(pack.g4Diagnostics?.tauSelectorPolicy),
+    tauSelectorFallbackApplied: booleanOrNull(pack.g4Diagnostics?.tauSelectorFallbackApplied),
+    tauProvenanceReady: booleanOrNull(pack.g4Diagnostics?.tauProvenanceReady),
+    tauProvenanceMissing: stringOrNull(pack.g4Diagnostics?.tauProvenanceMissing),
     sampler: stringOrNull(guard?.sampler),
     fieldType: stringOrNull(guard?.fieldType),
     K: finiteOrNull(pack.g4Diagnostics?.K),
@@ -1426,6 +1680,7 @@ export const computeReproducibility = (runResults: GrAgentLoopResult[]): Evidenc
 
 const runWave = async (
   wave: Wave,
+  waveProfiles: Record<Wave, { runCount: number; options: GrAgentLoopOptions }>,
   outDir: string,
   seed: number,
   ci: boolean,
@@ -1438,7 +1693,7 @@ const runWave = async (
   const startIso = new Date().toISOString();
   const runId = `fs-${wave.toLowerCase()}-${seed}-${Date.now()}`;
   const traceId = `trace-${hashId(`${wave}-${seed}-${startIso}`)}`;
-  const profile = WAVE_PROFILES[wave];
+  const profile = waveProfiles[wave];
   const base = path.join(outDir, wave);
   mkdirp(base);
 
@@ -1778,6 +2033,17 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
   const recoveryParity = fs.existsSync(recoveryParityPath) ? JSON.parse(fs.readFileSync(recoveryParityPath, 'utf8')) : null;
   const recoveryParityProvenanceCommit = typeof recoveryParity?.provenance?.commitHash === 'string' ? recoveryParity.provenance.commitHash : null;
   const recoveryParityProvenanceFresh = recoveryParityProvenanceCommit != null && recoveryParityProvenanceCommit === recoveryHeadCommit;
+  const semanticBridgeMatrixPath = path.join(CANONICAL_ARTIFACT_ROOT, 'g4-semantic-bridge-matrix-2026-02-27.json');
+  const semanticBridgeMatrix = fs.existsSync(semanticBridgeMatrixPath)
+    ? JSON.parse(fs.readFileSync(semanticBridgeMatrixPath, 'utf8'))
+    : null;
+  const semanticBridgeProvenanceCommit =
+    typeof semanticBridgeMatrix?.provenance?.commitHash === 'string' ? semanticBridgeMatrix.provenance.commitHash : null;
+  const semanticBridgeProvenanceFresh =
+    semanticBridgeProvenanceCommit != null && semanticBridgeProvenanceCommit === recoveryHeadCommit;
+  const semanticBridgeTopRows = Array.isArray(semanticBridgeMatrix?.tokens)
+    ? semanticBridgeMatrix.tokens.slice(0, 5)
+    : [];
 
   if (sourceArtifactRoot === canonicalArtifactRoot) {
     writeMd(
@@ -1890,6 +2156,23 @@ ${g4WaveRows}
 - parity provenance freshness vs HEAD: ${recoveryParityProvenanceFresh ? 'fresh' : 'stale_or_missing'}
 - canonical decision remains authoritative until wave profiles are promoted and rerun.
 
+## G4 semantic bridge matrix summary
+- semantic bridge matrix artifact: ${fs.existsSync(semanticBridgeMatrixPath) ? semanticBridgeMatrixPath.replace(/\\/g, '/') : 'missing'}
+- blocked reason: ${semanticBridgeMatrix?.blockedReason ?? 'none'}
+- canonical comparable count: ${semanticBridgeMatrix?.canonicalComparableCaseCount ?? 'n/a'}
+- canonical structural comparable count: ${semanticBridgeMatrix?.canonicalStructuralComparableCaseCount ?? 'n/a'}
+- recovery structural comparable count: ${semanticBridgeMatrix?.recoveryStructuralComparableCaseCount ?? 'n/a'}
+- dominant blocker token: ${semanticBridgeMatrix?.dominantBlockerToken ?? 'n/a'}
+- dominant blocker score: ${semanticBridgeMatrix?.dominantBlockerScore ?? 'n/a'}
+- semantic bridge matrix provenance commit: ${semanticBridgeProvenanceCommit ?? 'n/a'}
+- semantic bridge matrix provenance freshness vs HEAD: ${semanticBridgeProvenanceFresh ? 'fresh' : 'stale_or_missing'}
+${semanticBridgeTopRows
+  .map(
+    (row: any, idx: number) =>
+      `- blocker[${idx + 1}]: token=${row?.token ?? 'n/a'}; priority=${row?.closurePriority ?? 'n/a'}; canonicalWaves=${Array.isArray(row?.canonicalWaves) ? row.canonicalWaves.join(',') : 'n/a'}; recoveryCases=${row?.recoveryCaseCount ?? 'n/a'}`,
+  )
+  .join('\n')}
+
 ## Operator translation
 - What failed: ${aggregateFirstFail.firstFail} (${aggregateFirstFail.reason})
 - Why it failed: hard gate and/or required signal deficits are fail-closed; see per-wave reason codes and missing-signal maps.
@@ -1911,6 +2194,7 @@ ${BOUNDARY_STATEMENT}
 
 export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliResult> => {
   const args = parseArgs(argv);
+  const waveProfiles = resolveWaveProfiles(args);
   const waves: Wave[] = args.wave === 'all' ? ['A', 'B', 'C', 'D'] : [args.wave];
   const campaignStarted = Date.now();
   for (const wave of waves) {
@@ -1968,9 +2252,9 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
           mode: args.ci ? 'ci' : 'local',
         },
         commandMetadata: {
-          maxIterations: WAVE_PROFILES[wave].options.maxIterations ?? 0,
-          runCount: WAVE_PROFILES[wave].runCount,
-          waveProfile: WAVE_PROFILES[wave].options,
+          maxIterations: waveProfiles[wave].options.maxIterations ?? 0,
+          runCount: waveProfiles[wave].runCount,
+          waveProfile: waveProfiles[wave].options,
         },
         runArtifacts: [],
         gateStatus,
@@ -2019,7 +2303,7 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
       });
       break;
     }
-    await runWave(wave, args.out, args.seed, args.ci, args.ciFastPath, args.waveTimeoutMs, campaignElapsedMs, args.campaignTimeoutMs);
+    await runWave(wave, waveProfiles, args.out, args.seed, args.ci, args.ciFastPath, args.waveTimeoutMs, campaignElapsedMs, args.campaignTimeoutMs);
   }
   const allWaves: Wave[] = ['A', 'B', 'C', 'D'];
   const campaign = allWaves.every((w) => fs.existsSync(path.join(args.out, w, 'evidence-pack.json')))
@@ -2029,4 +2313,4 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
 };
 
 export const CAMPAIGN_USAGE =
-  'Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <integer>] [--wave-timeout-ms <ms>] [--campaign-timeout-ms <ms>] [--ci] [--ci-fast-path]';
+  'Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <integer>] [--wave-timeout-ms <ms>] [--campaign-timeout-ms <ms>] [--ci] [--ci-fast-path] [--promote-candidate-id <id>] [--promotion-check-path <path>] [--auto-promote-ready-candidate]';

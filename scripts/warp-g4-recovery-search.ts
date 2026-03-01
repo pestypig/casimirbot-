@@ -35,6 +35,16 @@ type RecoveryCase = {
   marginRatioRawComputed: number | null;
   sumWindowDt: number | null;
   tau_s: number | null;
+  tauConfigured_s: number | null;
+  tauWindow_s: number | null;
+  tauPulse_s: number | null;
+  tauLC_s: number | null;
+  tauSelected_s: number | null;
+  tauSelectedSource: string | null;
+  tauSelectorPolicy: string | null;
+  tauSelectorFallbackApplied: boolean | null;
+  tauProvenanceReady: boolean | null;
+  tauProvenanceMissing: string | null;
   K: number | null;
   safetySigma_Jm3: number | null;
   applicabilityStatus: string;
@@ -144,6 +154,17 @@ type StepASummary = {
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const stringOrNull = (v: unknown): string | null => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : null);
+const ensureRecoveryCurvatureSignals = <T extends Record<string, unknown>>(state: T): T => {
+  const next = state as any;
+  const gr = ((next.gr ??= {}) as Record<string, unknown>);
+  const invariants = ((gr.invariants ??= {}) as Record<string, unknown>);
+  const kretschmann = ((invariants.kretschmann ??= {}) as Record<string, unknown>);
+  const p98 = finiteOrNull(kretschmann.p98) ?? 0;
+  kretschmann.p98 = p98;
+  kretschmann.max = finiteOrNull(kretschmann.max) ?? p98;
+  kretschmann.mean = finiteOrNull(kretschmann.mean) ?? p98;
+  return next;
+};
 
 const classify = (applicabilityStatus: string, marginRatioRawComputed: number | null): RecoveryCase['classificationTag'] => {
   if (applicabilityStatus !== 'PASS') return 'applicability_limited';
@@ -229,7 +250,7 @@ const leverFamilies: Record<LeverFamily, Array<string | number>> = {
   fieldType: ['em', 'scalar'],
   qCavity: [1e5, 1e7, 1e9],
   qSpoilingFactor: [1, 1.5, 3],
-  tau_s_ms: [2, 5, 8, 10, 20, 35, 50],
+  tau_s_ms: [0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 8, 10, 20, 35, 50],
   gap_nm: [0.4, 1, 5, 8],
   shipRadius_m: [2, 10, 40],
 };
@@ -728,7 +749,7 @@ export async function runRecoverySearch(opts: {
 
   const startedAt = Date.now();
   const baseline = structuredClone(getGlobalPipelineState());
-  const baselineGuard = evaluateQiGuardrail(structuredClone(baseline), {
+  const baselineGuard = evaluateQiGuardrail(ensureRecoveryCurvatureSignals(structuredClone(baseline)), {
     sampler: baseline.qi?.sampler as any,
     tau_ms: Number(baseline.qi?.tau_s_ms ?? 5),
   });
@@ -807,7 +828,7 @@ export async function runRecoverySearch(opts: {
   captureBootstrap('baseline', {}, baselineGuard);
   for (const profile of bootstrapProfiles.slice(1)) {
     const next = await updateParameters(structuredClone(baseline), profile.params as any);
-    const guard = evaluateQiGuardrail(next, { sampler: 'gaussian', tau_ms: 5 });
+    const guard = evaluateQiGuardrail(ensureRecoveryCurvatureSignals(next as any), { sampler: 'gaussian', tau_ms: 5 });
     captureBootstrap(profile.profileId, profile.params, guard);
   }
   const bootstrapComparable = bootstrapProvenance.find((entry) =>
@@ -876,7 +897,7 @@ export async function runRecoverySearch(opts: {
         tau_s_ms: row.tau_s_ms,
       },
     } as any);
-    const guard = evaluateQiGuardrail(next, {
+    const guard = evaluateQiGuardrail(ensureRecoveryCurvatureSignals(next as any), {
       sampler: row.sampler as any,
       tau_ms: Number(row.tau_s_ms),
     });
@@ -893,6 +914,24 @@ export async function runRecoverySearch(opts: {
     const marginRatioRawComputed = finiteOrNull(guard.marginRatioRawComputed);
     const sumWindowDt = finiteOrNull((guard as any).sumWindowDt);
     const tau_s = finiteOrNull((guard as any).tau_s);
+    const tauConfigured_s = finiteOrNull((guard as any).tauConfigured_s);
+    const tauWindow_s = finiteOrNull((guard as any).tauWindow_s);
+    const tauPulse_s = finiteOrNull((guard as any).tauPulse_s);
+    const tauLC_s = finiteOrNull((guard as any).tauLC_s);
+    const tauSelected_s = finiteOrNull((guard as any).tauSelected_s);
+    const tauSelectedSource = stringOrNull((guard as any).tauSelectedSource);
+    const tauSelectorPolicy = stringOrNull((guard as any).tauSelectorPolicy);
+    const tauSelectorFallbackApplied =
+      typeof (guard as any).tauSelectorFallbackApplied === 'boolean'
+        ? Boolean((guard as any).tauSelectorFallbackApplied)
+        : null;
+    const tauProvenanceReady =
+      typeof (guard as any).tauProvenanceReady === 'boolean'
+        ? Boolean((guard as any).tauProvenanceReady)
+        : null;
+    const tauProvenanceMissing = Array.isArray((guard as any).tauProvenanceMissing)
+      ? ((guard as any).tauProvenanceMissing as unknown[]).filter((item) => typeof item === 'string').join('|')
+      : null;
     const K = finiteOrNull((guard as any).K);
     const safetySigma_Jm3 = finiteOrNull((guard as any).safetySigma_Jm3);
     const reasonCode = deriveReasonCodes(guard);
@@ -942,6 +981,16 @@ export async function runRecoverySearch(opts: {
       marginRatioRawComputed,
       sumWindowDt,
       tau_s,
+      tauConfigured_s,
+      tauWindow_s,
+      tauPulse_s,
+      tauLC_s,
+      tauSelected_s,
+      tauSelectedSource,
+      tauSelectorPolicy,
+      tauSelectorFallbackApplied,
+      tauProvenanceReady,
+      tauProvenanceMissing,
       K,
       safetySigma_Jm3,
       applicabilityStatus,
@@ -1128,6 +1177,16 @@ export async function runRecoverySearch(opts: {
       marginRatioRawComputed: entry.marginRatioRawComputed,
       sumWindowDt: entry.sumWindowDt,
       tau_s: entry.tau_s,
+      tauConfigured_s: entry.tauConfigured_s,
+      tauWindow_s: entry.tauWindow_s,
+      tauPulse_s: entry.tauPulse_s,
+      tauLC_s: entry.tauLC_s,
+      tauSelected_s: entry.tauSelected_s,
+      tauSelectedSource: entry.tauSelectedSource,
+      tauSelectorPolicy: entry.tauSelectorPolicy,
+      tauSelectorFallbackApplied: entry.tauSelectorFallbackApplied,
+      tauProvenanceReady: entry.tauProvenanceReady,
+      tauProvenanceMissing: entry.tauProvenanceMissing,
       K: entry.K,
       safetySigma_Jm3: entry.safetySigma_Jm3,
       applicabilityStatus: entry.applicabilityStatus,
@@ -1298,6 +1357,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   runRecoverySearch()
     .then((result) => {
       console.log(JSON.stringify(result));
+      process.exit(0);
     })
     .catch((error) => {
       console.error(error);

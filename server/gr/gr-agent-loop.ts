@@ -1,5 +1,6 @@
 import {
   buildGrRequestPayload,
+  evaluateQiGuardrail,
   getGlobalPipelineState,
   setGlobalPipelineState,
   updateParameters,
@@ -15,6 +16,7 @@ import {
 import type { Vec3 } from "../curvature-brick.js";
 import type { StressEnergyBrickParams } from "../stress-energy-brick.js";
 import type { WarpConfig } from "../../types/warpViability.js";
+import type { PipelineSnapshot } from "../../types/pipeline.js";
 import type {
   GrConstraintPolicy,
   GrConstraintThresholds,
@@ -307,6 +309,36 @@ const resolveWarpConfig = (
   };
 };
 
+const buildEvaluationSnapshot = (
+  state: EnergyPipelineState,
+  diagnostics: GrPipelineDiagnostics,
+): PipelineSnapshot => {
+  const guardInput = cloneState(state) as any;
+  guardInput.gr = diagnostics;
+  const sampler =
+    typeof (state as any).qi?.sampler === "string" && String((state as any).qi.sampler).length > 0
+      ? String((state as any).qi.sampler)
+      : undefined;
+  const fieldType =
+    typeof (state as any).qi?.fieldType === "string" && String((state as any).qi.fieldType).length > 0
+      ? String((state as any).qi.fieldType)
+      : undefined;
+  const tauMs =
+    Number.isFinite((state as any).qi?.tau_s_ms) && Number((state as any).qi?.tau_s_ms) > 0
+      ? Number((state as any).qi.tau_s_ms)
+      : undefined;
+  const qiGuardrail = evaluateQiGuardrail(guardInput, {
+    ...(sampler ? { sampler: sampler as any } : {}),
+    ...(fieldType ? { fieldType } : {}),
+    ...(tauMs !== undefined ? { tau_ms: tauMs } : {}),
+  });
+  return {
+    gr: diagnostics as unknown as PipelineSnapshot["gr"],
+    qiGuardrail: qiGuardrail as unknown as PipelineSnapshot["qiGuardrail"],
+    qi: (state as any).qi ?? null,
+  };
+};
+
 const buildStrategyProposal = (
   state: EnergyPipelineState,
   strategy: Required<GrAgentLoopStrategy>,
@@ -566,6 +598,7 @@ export async function runGrAgentLoop(
         const evaluationStart = Date.now();
         const evaluationResult = await runGrEvaluation({
           diagnostics,
+          snapshot: buildEvaluationSnapshot(workingState, diagnostics),
           warpConfig: resolveWarpConfig(workingState, options.warpConfig),
           thresholds: options.thresholds,
           policy: options.policy,

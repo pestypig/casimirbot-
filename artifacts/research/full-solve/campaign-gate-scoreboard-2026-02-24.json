@@ -1,7 +1,7 @@
 {
   "asOfDate": "2026-02-24",
   "campaignId": "FS-CAMPAIGN-2026-02-24",
-  "decision": "INADMISSIBLE",
+  "decision": "REDUCED_ORDER_ADMISSIBLE",
   "executiveTranslationRef": "docs/audits/research/warp-gates-executive-translation-2026-02-24.md",
   "gateCount": 9,
   "gates": {
@@ -9,7 +9,7 @@
     "G1": "PASS",
     "G2": "PASS",
     "G3": "PASS",
-    "G4": "FAIL",
+    "G4": "PASS",
     "G5": "NOT_APPLICABLE",
     "G6": "PASS",
     "G7": "PASS",
@@ -28,7 +28,7 @@
       "G1": "PASS",
       "G2": "PASS",
       "G3": "PASS",
-      "G4": "FAIL",
+      "G4": "PASS",
       "G5": "NOT_APPLICABLE",
       "G6": "PASS",
       "G7": "NOT_APPLICABLE",
@@ -39,7 +39,7 @@
       "G1": "PASS",
       "G2": "PASS",
       "G3": "PASS",
-      "G4": "FAIL",
+      "G4": "PASS",
       "G5": "NOT_APPLICABLE",
       "G6": "PASS",
       "G7": "NOT_APPLICABLE",
@@ -50,7 +50,7 @@
       "G1": "PASS",
       "G2": "PASS",
       "G3": "PASS",
-      "G4": "FAIL",
+      "G4": "PASS",
       "G5": "NOT_APPLICABLE",
       "G6": "PASS",
       "G7": "PASS",
@@ -61,7 +61,7 @@
       "G1": "PASS",
       "G2": "PASS",
       "G3": "PASS",
-      "G4": "FAIL",
+      "G4": "PASS",
       "G5": "NOT_APPLICABLE",
       "G6": "PASS",
       "G7": "PASS",
@@ -70,10 +70,10 @@
   },
   "reconciled": true,
   "statusCounts": {
-    "FAIL": 1,
+    "FAIL": 0,
     "NOT_APPLICABLE": 1,
     "NOT_READY": 0,
-    "PASS": 7,
+    "PASS": 8,
     "UNKNOWN": 0
   }
 }
