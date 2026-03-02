@@ -1,0 +1,167 @@
+{
+  "snapshotId": "warp-evidence-pack-2026-03-02",
+  "commitHash": "88a45597e3563ce65f5ae1a9740c3fae9d5bbdd8",
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "canonicalAuthoritative": {
+    "sourceReportPath": "docs/audits/research/warp-full-solve-campaign-execution-report-2026-02-24.md",
+    "decisionLabel": "REDUCED_ORDER_ADMISSIBLE",
+    "scoreboard": {
+      "PASS": 8,
+      "FAIL": 0,
+      "UNKNOWN": 0,
+      "NOT_READY": 0,
+      "NOT_APPLICABLE": 1
+    },
+    "embeddedHeadCommit": "3b86c282ad24e9c7df0d249ac1790db78a9eba58",
+    "freshAgainstSnapshot": false
+  },
+  "promotedCandidate": {
+    "solutionCategory": "Needle Hull Mark 2",
+    "profileVersion": "NHM2-2026-03-01",
+    "calculator": {
+      "decisionClass": "candidate_pass_found",
+      "congruentSolvePass": true,
+      "lhs_Jm3": -6.569611780568343,
+      "boundComputed_Jm3": -18.000000000018126,
+      "boundUsed_Jm3": -18.000000000018126,
+      "marginRatioRawComputed": 0.3649784322534293,
+      "applicabilityStatus": "PASS",
+      "reasonCode": [],
+      "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "quantitySemanticType": "ren_expectation_timelike_energy_density",
+      "quantitySemanticComparable": true,
+      "provenanceCommit": "34809c78eb3d6d61101650e76c7713f5b7f999fc"
+    },
+    "promotionCheck": {
+      "blockedReason": null,
+      "candidate": {
+        "id": "case_0001",
+        "params": {
+          "warpFieldType": "natario_sdf",
+          "gammaGeo": 1,
+          "dutyCycle": 0.12,
+          "sectorCount": 80,
+          "concurrentSectors": 2,
+          "gammaVanDenBroeck": 500,
+          "sampler": "hann",
+          "fieldType": "em",
+          "qCavity": 100000,
+          "qSpoilingFactor": 3,
+          "tau_s_ms": 0.02,
+          "gap_nm": 8,
+          "shipRadius_m": 2,
+          "dutyShip": 0.12,
+          "dutyEffective_FR": 0.12
+        },
+        "applicabilityStatus": "PASS",
+        "marginRatioRaw": 0.12890679702998561,
+        "marginRatioRawComputed": 0.12890679702998561,
+        "comparabilityClass": "comparable_canonical",
+        "reasonCode": []
+      },
+      "aggregate": {
+        "referenceLane": "fixed_candidate",
+        "gateStatus": {
+          "G0": "PASS",
+          "G1": "PASS",
+          "G2": "PASS",
+          "G3": "PASS",
+          "G4": "FAIL",
+          "G5": "NOT_APPLICABLE",
+          "G6": "PASS",
+          "G7": "PASS",
+          "G8": "FAIL"
+        },
+        "scoreboard": {
+          "counts": {
+            "PASS": 6,
+            "FAIL": 2,
+            "UNKNOWN": 0,
+            "NOT_READY": 0,
+            "NOT_APPLICABLE": 1
+          },
+          "total": 9,
+          "gateCount": 9,
+          "reconciled": true
+        },
+        "decision": "INADMISSIBLE",
+        "firstFail": {
+          "firstFail": "G4",
+          "reason": "[wave A] Hard guardrails failed: FordRomanQI=FAIL, ThetaAudit=PASS."
+        },
+        "g4Status": "FAIL",
+        "candidatePromotionReady": false,
+        "candidatePromotionStable": false
+      },
+      "analysis": {
+        "seedPassComparable": true,
+        "promotionPathMismatch": true,
+        "mismatchReason": "recovery_seed_pass_but_wave_promotion_failed",
+        "seedMarginRatioRawComputed": 0.12890679702998561,
+        "seedApplicabilityStatus": "PASS"
+      },
+      "governance": {
+        "canonicalDecisionRemainsAuthoritative": true,
+        "note": "Exploratory promotion check only. Canonical wave profile changes require explicit promotion and rerun.",
+        "adaptiveLaneMayDivergeFromFixedCandidate": true
+      },
+      "provenance": {
+        "commitHash": "34809c78eb3d6d61101650e76c7713f5b7f999fc",
+        "recoveryProvenanceCommitHash": "3b86c282ad24e9c7df0d249ac1790db78a9eba58"
+      }
+    },
+    "promotionBundle": {
+      "blockedReason": "promotion_check_not_ready:ready=false;stable=false",
+      "candidatePromotionReady": false,
+      "candidatePromotionStable": false,
+      "promotionLaneExecuted": false,
+      "promotionLaneDecision": null,
+      "promotionLaneCounts": null,
+      "provenanceCommit": "34809c78eb3d6d61101650e76c7713f5b7f999fc"
+    }
+  },
+  "certification": {
+    "latestTrace": {
+      "path": "artifacts/training-trace.jsonl",
+      "id": "22348",
+      "traceId": "adapter:6e9536be-a9d6-4649-93db-92e70e9ac714",
+      "pass": true,
+      "firstFail": null,
+      "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificateId": "constraint-pack:repo-convergence:6e84f965957f",
+      "integrityOk": true,
+      "status": "GREEN"
+    },
+    "latestExportTrace": {
+      "path": "artifacts/training-trace-export.jsonl",
+      "id": "22347",
+      "traceId": "adapter:299926db-8bc0-4eaf-b6a7-06692ee618de",
+      "pass": true,
+      "firstFail": null,
+      "certificateHash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificateId": "constraint-pack:repo-convergence:6e84f965957f",
+      "integrityOk": true,
+      "status": "GREEN"
+    }
+  },
+  "claimTiers": [
+    {
+      "tier": "canonical-authoritative",
+      "definition": "Policy/canonical report controls decision authority."
+    },
+    {
+      "tier": "promoted-candidate",
+      "definition": "Candidate profile artifacts indicate possible pass but do not override canonical state."
+    },
+    {
+      "tier": "exploratory",
+      "definition": "Hypothesis/research layer only; non-adjudicative."
+    }
+  ],
+  "requiredSections": [
+    "materials_bounds_constraints",
+    "falsifiers",
+    "non_goals",
+    "boundary_statement_verbatim"
+  ]
+}
