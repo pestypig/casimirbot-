@@ -264,9 +264,14 @@ type QiForensicsArtifact = {
   tauSelectorFallbackApplied: boolean | null;
   tauProvenanceReady: boolean | null;
   tauProvenanceMissing: string | null;
+  samplingKernelIdentity: string | null;
+  samplingKernelNormalization: string | null;
   sampler: string | null;
   fieldType: string | null;
   K: number | null;
+  KUnits: string | null;
+  KProvenanceCommit: string | null;
+  KDerivation: string | null;
   safetySigma_Jm3: number | null;
   curvatureScalar: number | null;
   curvatureRadius_m: number | null;
@@ -422,6 +427,9 @@ const REQUIRED_SIGNAL_KEYS = [
   'provenance_observer',
   'provenance_normalization',
   'provenance_unit_system',
+  'applicability_status',
+  'applicability_curvature_ok',
+  'applicability_curvature_ratio',
 ] as const;
 
 
@@ -1230,6 +1238,18 @@ export const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null, lates
     provenance_observer: { required: true, present: isMeaningfulValue(observer) },
     provenance_normalization: { required: true, present: isMeaningfulValue(normalization) },
     provenance_unit_system: { required: true, present: isMeaningfulValue(unitSystem) },
+    applicability_status: {
+      required: true,
+      present: isMeaningfulValue((latestResult?.finalState as any)?.qi_applicability_status),
+    },
+    applicability_curvature_ok: {
+      required: true,
+      present: typeof (latestResult?.finalState as any)?.qi_curvature_ok === 'boolean',
+    },
+    applicability_curvature_ratio: {
+      required: true,
+      present: Number.isFinite((latestResult?.finalState as any)?.qi_curvature_ratio),
+    },
   };
   const missingSignals = REQUIRED_SIGNAL_KEYS
     .filter((signal) => requiredSignals[signal]?.required && !requiredSignals[signal]?.present)
@@ -1671,9 +1691,14 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
     tauSelectorFallbackApplied: booleanOrNull(pack.g4Diagnostics?.tauSelectorFallbackApplied),
     tauProvenanceReady: booleanOrNull(pack.g4Diagnostics?.tauProvenanceReady),
     tauProvenanceMissing: stringOrNull(pack.g4Diagnostics?.tauProvenanceMissing),
+    samplingKernelIdentity: stringOrNull(guard?.sampler),
+    samplingKernelNormalization: stringOrNull(pack.g4Diagnostics?.qeiSamplingNormalization),
     sampler: stringOrNull(guard?.sampler),
     fieldType: stringOrNull(guard?.fieldType),
     K: finiteOrNull(pack.g4Diagnostics?.K),
+    KUnits: pack.g4Diagnostics?.K != null ? 'J*s^4/m^3' : null,
+    KProvenanceCommit: pack.g4Diagnostics?.K != null ? stringOrNull(pack.commitSha) : null,
+    KDerivation: pack.g4Diagnostics?.K != null ? 'ford_roman_bound_constant_from_qi_guard' : null,
     safetySigma_Jm3: finiteOrNull(pack.g4Diagnostics?.safetySigma_Jm3),
     curvatureScalar: finiteOrNull(snapshot?.qi_curvature_scalar),
     curvatureRadius_m: finiteOrNull(snapshot?.qi_curvature_radius_m),

@@ -1287,8 +1287,9 @@ export async function evaluateWarpViability(
     const qiConstraintSource = qiSourceRaw.startsWith("gr.rho_constraint");
     const contractPass = qiConstraintSource || warpMetricContractOk;
     const sourcePass = !strictCongruence || (metricRhoSource && contractPass);
-    const passed = qiGuard.marginRatio < 1 && curvaturePass && sourcePass;
     const applicabilityStatus = String(qiGuard.applicabilityStatus ?? "UNKNOWN").toUpperCase();
+    const applicabilityPass = applicabilityStatus === "PASS";
+    const passed = qiGuard.marginRatio < 1 && curvaturePass && sourcePass && applicabilityPass;
     const g4ReasonCodes: string[] = [];
     if (!metricRhoSource) g4ReasonCodes.push(G4_QI_REASON_CODES.sourceNotMetric);
     if (metricRhoSource && !contractPass) g4ReasonCodes.push(G4_QI_REASON_CODES.contractMissing);
