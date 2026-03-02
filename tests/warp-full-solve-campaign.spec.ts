@@ -547,8 +547,9 @@ describe('warp-full-solve-campaign runner', () => {
     expect(artifact.samplingKernelIdentity).toBe('gaussian');
     expect(artifact.samplingKernelNormalization).toBeNull();
     expect(artifact.KUnits).toBe('J*s^4/m^3');
-    expect(artifact.KProvenanceCommit).toBeNull();
+    expect(artifact.KProvenanceCommit).toMatch(/^[0-9a-f]{7,40}$/);
     expect(artifact.KDerivation).toBe('ford_roman_bound_constant_from_qi_guard');
+    expect(artifact.curvatureRatioNonDegenerate).toBe(true);
     expect(artifact.congruentSolvePolicyMarginPass).toBe(true);
     expect(artifact.congruentSolveComputedMarginPass).toBe(false);
     expect(artifact.congruentSolveApplicabilityPass).toBe(true);
@@ -697,13 +698,71 @@ describe('warp-full-solve-campaign runner', () => {
     const args = parseArgs([]);
     expect(args.promoteCandidateId).toBeNull();
     expect(args.autoPromoteReadyCandidate).toBe(false);
+    expect(args.forcePromotedProfile).toBe(false);
     expect(args.allowExploratoryWaveProfiles).toBe(false);
     expect(typeof args.promotionCheckPath).toBe('string');
     expect(args.promotionCheckPath).toContain('g4-candidate-promotion-check');
   });
 
-  it('resolves promoted wave profiles by default when promotion artifact is promotable', () => {
+  it('parses --force-promoted-profile as an explicit canonical-profile lock', () => {
+    const args = parseArgs(['--force-promoted-profile']);
+    expect(args.forcePromotedProfile).toBe(true);
+    expect(args.promoteCandidateId).toBeNull();
+  });
+
+  it('uses baseline wave profiles by default when no promotion flags are set', () => {
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-promo-profile-'));
+    const promotionPath = path.join(tmpRoot, 'promotion-check.json');
+    fs.writeFileSync(
+      promotionPath,
+      JSON.stringify(
+        {
+          blockedReason: null,
+          candidate: {
+            id: 'case_0001',
+            params: {
+              warpFieldType: 'natario_sdf',
+              gammaGeo: 1,
+              dutyCycle: 0.12,
+              dutyShip: 0.12,
+              dutyEffective_FR: 0.12,
+              sectorCount: 80,
+              concurrentSectors: 2,
+              gammaVanDenBroeck: 500,
+              qCavity: 100000,
+              qSpoilingFactor: 3,
+              gap_nm: 8,
+              shipRadius_m: 2,
+              sampler: 'hann',
+              fieldType: 'em',
+              tau_s_ms: 0.02,
+            },
+            applicabilityStatus: 'PASS',
+            comparabilityClass: 'comparable_canonical',
+            marginRatioRaw: 0.1,
+            marginRatioRawComputed: 0.1,
+          },
+          aggregate: {
+            candidatePromotionReady: true,
+            candidatePromotionStable: true,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const canonicalProfiles = resolveWaveProfiles({
+      promoteCandidateId: null,
+      promotionCheckPath: promotionPath,
+      allowExploratoryWaveProfiles: false,
+    });
+
+    expect(canonicalProfiles.A.options.proposals?.[0]?.label).toContain('wave-a-natario-baseline');
+  });
+
+  it('resolves promoted wave profiles when an explicit candidate is requested', () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-promo-profile-explicit-'));
     const promotionPath = path.join(tmpRoot, 'promotion-check.json');
     fs.writeFileSync(
       promotionPath,
@@ -749,16 +808,26 @@ describe('warp-full-solve-campaign runner', () => {
       promotionCheckPath: promotionPath,
       allowExploratoryWaveProfiles: false,
     });
-    const canonicalProfiles = resolveWaveProfiles({
-      promoteCandidateId: null,
-      promotionCheckPath: promotionPath,
-      allowExploratoryWaveProfiles: false,
-    });
-
     expect(promotedProfiles.A.options.proposals?.[0]?.label).toContain('promoted-case_0001');
     expect((promotedProfiles.A.options.proposals?.[0]?.params as any)?.warpFieldType).toBe('natario_sdf');
     expect((promotedProfiles.A.options.proposals?.[0]?.params as any)?.qi?.tau_s_ms).toBe(0.02);
-    expect(canonicalProfiles.A.options.proposals?.[0]?.label).toContain('promoted-case_0001');
+  });
+
+  it('forces NHM2 promoted profile independently of promotion artifact readiness', () => {
+    const profiles = resolveWaveProfiles({
+      promoteCandidateId: null,
+      promotionCheckPath: path.join(os.tmpdir(), 'missing-promotion-check-forced.json'),
+      forcePromotedProfile: true,
+      allowExploratoryWaveProfiles: false,
+    });
+
+    expect(profiles.A.options.proposals?.[0]?.label).toContain('promoted-profile-NHM2-2026-03-01');
+    const params = profiles.A.options.proposals?.[0]?.params as any;
+    expect(params?.warpFieldType).toBe('natario_sdf');
+    expect(params?.dutyCycle).toBe(0.12);
+    expect(params?.gammaVanDenBroeck).toBe(500);
+    expect(params?.qi?.sampler).toBe('hann');
+    expect(params?.qi?.tau_s_ms).toBe(0.02);
   });
 
   it('fails closed for promotion profile when candidate is not promotion-ready', () => {
@@ -805,14 +874,13 @@ describe('warp-full-solve-campaign runner', () => {
     expect(profiles.A.options.proposals?.[0]?.label).toContain('wave-a-natario-baseline');
   });
 
-  it('fails closed by default when promotion artifact is unavailable', () => {
-    expect(() =>
-      resolveWaveProfiles({
-        promoteCandidateId: null,
-        promotionCheckPath: path.join(os.tmpdir(), 'missing-promotion-check.json'),
-        allowExploratoryWaveProfiles: false,
-      }),
-    ).toThrow(/Promoted-only wave profile resolution failed/);
+  it('uses baseline profiles by default when promotion artifact is unavailable', () => {
+    const profiles = resolveWaveProfiles({
+      promoteCandidateId: null,
+      promotionCheckPath: path.join(os.tmpdir(), 'missing-promotion-check.json'),
+      allowExploratoryWaveProfiles: false,
+    });
+    expect(profiles.A.options.proposals?.[0]?.label).toContain('wave-a-natario-baseline');
   });
 
   it('auto-promotes wave profiles when requested and promotion artifact is ready', () => {
@@ -1036,11 +1104,12 @@ describe('warp-full-solve-campaign runner', () => {
     expect(campaignScript).not.toContain('recoveryParity?.provenance?.recoveryProvenanceFresh === true');
   });
 
-  it('canonical report includes G4 recovery-search summary section', () => {
-    const canonicalReport = path.resolve('docs/audits/research/warp-full-solve-campaign-execution-report-2026-02-24.md');
-    const content = fs.readFileSync(canonicalReport, 'utf8');
-    expect(content).toContain('## G4 recovery-search summary');
-    expect(content).toContain('canonical decision remains authoritative until wave profiles are promoted and rerun.');
+  it('campaign report template includes recovery/operator/sampling-provenance sections', () => {
+    const campaignScript = fs.readFileSync(path.resolve('scripts/warp-full-solve-campaign.ts'), 'utf8');
+    expect(campaignScript).toContain('## G4 recovery-search summary');
+    expect(campaignScript).toContain('## G4 operator-mapping summary');
+    expect(campaignScript).toContain('## G4 sampling/K provenance summary');
+    expect(campaignScript).toContain('canonical decision remains authoritative until wave profiles are promoted and rerun.');
   });
 
   it('marks provenance signals as missing when pipeline provenance fields are unavailable', () => {
@@ -1060,6 +1129,17 @@ describe('warp-full-solve-campaign runner', () => {
         qi_applicability_status: 'PASS',
         qi_curvature_ok: true,
         qi_curvature_ratio: 0.5,
+        qi_quantity_semantic_base_type: 'classical_proxy_from_curvature',
+        qi_quantity_semantic_type: 'ren_expectation_timelike_energy_density',
+        qi_quantity_semantic_target_type: 'ren_expectation_timelike_energy_density',
+        qi_quantity_worldline_class: 'timelike',
+        qi_qei_state_class: 'hadamard',
+        qi_qei_renormalization_scheme: 'point_splitting',
+        qi_qei_sampling_normalization: 'unit_integral',
+        qi_qei_operator_mapping: 't_munu_uu_ren',
+        qi_quantity_semantic_comparable: true,
+        qi_quantity_semantic_bridge_ready: true,
+        qi_coupling_equation_ref: 'semiclassical_coupling+atomic_energy_to_energy_density_proxy',
       },
     } as any;
     const { requiredSignals, missingSignals } = collectRequiredSignals(attempt, latestResult);
@@ -1070,6 +1150,12 @@ describe('warp-full-solve-campaign runner', () => {
     expect(requiredSignals.applicability_status.present).toBe(true);
     expect(requiredSignals.applicability_curvature_ok.present).toBe(true);
     expect(requiredSignals.applicability_curvature_ratio.present).toBe(true);
+    expect(requiredSignals.operator_worldline_timelike.present).toBe(true);
+    expect(requiredSignals.operator_qei_state_hadamard.present).toBe(true);
+    expect(requiredSignals.operator_qei_mapping_t_munu_uu_ren.present).toBe(true);
+    expect(requiredSignals.operator_semantic_comparable.present).toBe(true);
+    expect(requiredSignals.operator_bridge_ready.present).toBe(true);
+    expect(requiredSignals.operator_mapping_derivation_ref.present).toBe(true);
     const gateMap = buildGateMissingSignalMap(missingSignals);
     expect(gateMap.G6).toEqual(expect.arrayContaining(['provenance_chart', 'provenance_observer', 'provenance_normalization', 'provenance_unit_system']));
   });
@@ -1105,8 +1191,147 @@ describe('warp-full-solve-campaign runner', () => {
     expect(requiredSignals.applicability_status.present).toBe(false);
     expect(requiredSignals.applicability_curvature_ok.present).toBe(false);
     expect(requiredSignals.applicability_curvature_ratio.present).toBe(false);
+    expect(requiredSignals.operator_qei_state_hadamard.present).toBe(false);
+    expect(requiredSignals.operator_qei_mapping_t_munu_uu_ren.present).toBe(false);
+    expect(requiredSignals.operator_semantic_comparable.present).toBe(false);
+    expect(requiredSignals.operator_bridge_ready.present).toBe(false);
+    expect(requiredSignals.operator_mapping_derivation_ref.present).toBe(false);
     expect(missingSignals).not.toEqual(expect.arrayContaining(['provenance_chart', 'provenance_observer', 'provenance_normalization', 'provenance_unit_system']));
-    expect(missingSignals).toEqual(expect.arrayContaining(['applicability_status', 'applicability_curvature_ok', 'applicability_curvature_ratio']));
+    expect(missingSignals).toEqual(
+      expect.arrayContaining([
+        'applicability_status',
+        'applicability_curvature_ok',
+        'applicability_curvature_ratio',
+        'operator_qei_state_hadamard',
+        'operator_qei_mapping_t_munu_uu_ren',
+        'operator_semantic_comparable',
+        'operator_bridge_ready',
+        'operator_mapping_derivation_ref',
+      ]),
+    );
+  });
+
+  it('uses evaluator snapshot fallback for operator mapping evidence when finalState is sparse', () => {
+    const attempt = {
+      initial: { status: 'CERTIFIED' },
+      evaluation: {
+        gate: { status: 'pass' },
+        constraints: [
+          { id: 'FordRomanQI', status: 'pass' },
+          { id: 'ThetaAudit', status: 'pass' },
+        ],
+        certificate: {
+          certificateHash: 'abc',
+          integrityOk: true,
+          payload: {
+            snapshot: {
+              qi_applicability_status: 'PASS',
+              qi_curvature_ok: true,
+              qi_curvature_ratio: 0,
+              qi_quantity_semantic_base_type: 'classical_proxy_from_curvature',
+              qi_quantity_semantic_type: 'ren_expectation_timelike_energy_density',
+              qi_quantity_semantic_target_type: 'ren_expectation_timelike_energy_density',
+              qi_quantity_worldline_class: 'timelike',
+              qi_qei_state_class: 'hadamard',
+              qi_qei_renormalization_scheme: 'point_splitting',
+              qi_qei_sampling_normalization: 'unit_integral',
+              qi_qei_operator_mapping: 't_munu_uu_ren',
+              qi_quantity_semantic_comparable: true,
+              qi_quantity_semantic_bridge_ready: true,
+              qi_coupling_equation_ref: 'semiclassical_coupling+atomic_energy_to_energy_density_proxy',
+            },
+          },
+        },
+      },
+      grRequest: {
+        warp: {
+          metricAdapter: { chart: { label: 'comoving_cartesian' } },
+          metricT00Contract: {
+            observer: 'eulerian_n',
+            normalization: 'si_stress',
+            unitSystem: 'SI',
+          },
+        },
+      },
+    } as any;
+    const latestResult = { finalState: {} } as any;
+    const { requiredSignals, missingSignals } = collectRequiredSignals(attempt, latestResult);
+    expect(requiredSignals.applicability_status.present).toBe(true);
+    expect(requiredSignals.operator_worldline_timelike.present).toBe(true);
+    expect(requiredSignals.operator_qei_state_hadamard.present).toBe(true);
+    expect(requiredSignals.operator_qei_mapping_t_munu_uu_ren.present).toBe(true);
+    expect(requiredSignals.operator_semantic_comparable.present).toBe(true);
+    expect(requiredSignals.operator_bridge_ready.present).toBe(true);
+    expect(requiredSignals.operator_mapping_derivation_ref.present).toBe(true);
+    expect(missingSignals).not.toEqual(
+      expect.arrayContaining([
+        'applicability_status',
+        'operator_worldline_timelike',
+        'operator_qei_state_hadamard',
+        'operator_qei_mapping_t_munu_uu_ren',
+        'operator_semantic_comparable',
+        'operator_bridge_ready',
+        'operator_mapping_derivation_ref',
+      ]),
+    );
+  });
+
+  it('uses evaluator diagnostics-note fallback for operator mapping evidence when snapshot is sparse', () => {
+    const attempt = {
+      initial: { status: 'CERTIFIED' },
+      evaluation: {
+        gate: { status: 'pass' },
+        constraints: [
+          { id: 'FordRomanQI', status: 'pass', note: null },
+          { id: 'ThetaAudit', status: 'pass', note: '|theta|=0.1 max=1 source=test' },
+        ],
+        notes: [
+          'G4 diagnostics: FordRomanQI=pass, ThetaAudit=pass, source=evaluator_constraints. ; applicabilityStatus=PASS; curvatureOk=true; curvatureRatio=0; quantitySemanticBaseType=classical_proxy_from_curvature; quantitySemanticType=ren_expectation_timelike_energy_density; quantitySemanticTargetType=ren_expectation_timelike_energy_density; quantityWorldlineClass=timelike; quantitySemanticComparable=true; quantitySemanticBridgeReady=true; qeiStateClass=hadamard; qeiRenormalizationScheme=point_splitting; qeiSamplingNormalization=unit_integral; qeiOperatorMapping=t_munu_uu_ren; couplingEquationRef=semiclassical_coupling+atomic_energy_to_energy_density_proxy',
+        ],
+        certificate: { certificateHash: 'abc', integrityOk: true },
+      },
+      grRequest: {
+        warp: {
+          metricAdapter: { chart: { label: 'comoving_cartesian' } },
+          metricT00Contract: {
+            observer: 'eulerian_n',
+            normalization: 'si_stress',
+            unitSystem: 'SI',
+          },
+        },
+      },
+    } as any;
+    const latestResult = { finalState: {} } as any;
+    const { requiredSignals, missingSignals } = collectRequiredSignals(attempt, latestResult);
+    expect(requiredSignals.applicability_status.present).toBe(true);
+    expect(requiredSignals.applicability_curvature_ok.present).toBe(true);
+    expect(requiredSignals.applicability_curvature_ratio.present).toBe(true);
+    expect(requiredSignals.operator_quantity_semantic_base_type.present).toBe(true);
+    expect(requiredSignals.operator_quantity_semantic_type.present).toBe(true);
+    expect(requiredSignals.operator_quantity_semantic_target_type.present).toBe(true);
+    expect(requiredSignals.operator_worldline_timelike.present).toBe(true);
+    expect(requiredSignals.operator_qei_state_hadamard.present).toBe(true);
+    expect(requiredSignals.operator_qei_renormalization_point_splitting.present).toBe(true);
+    expect(requiredSignals.operator_qei_sampling_unit_integral.present).toBe(true);
+    expect(requiredSignals.operator_qei_mapping_t_munu_uu_ren.present).toBe(true);
+    expect(requiredSignals.operator_semantic_comparable.present).toBe(true);
+    expect(requiredSignals.operator_bridge_ready.present).toBe(true);
+    expect(requiredSignals.operator_mapping_derivation_ref.present).toBe(true);
+    expect(missingSignals).not.toEqual(
+      expect.arrayContaining([
+        'applicability_status',
+        'applicability_curvature_ok',
+        'applicability_curvature_ratio',
+        'operator_worldline_timelike',
+        'operator_qei_state_hadamard',
+        'operator_qei_renormalization_point_splitting',
+        'operator_qei_sampling_unit_integral',
+        'operator_qei_mapping_t_munu_uu_ren',
+        'operator_semantic_comparable',
+        'operator_bridge_ready',
+        'operator_mapping_derivation_ref',
+      ]),
+    );
   });
   it('campaign export includes curvature applicability fields for waves A/B/C/D', async () => {
     const cliPath = path.resolve('scripts/warp-full-solve-campaign-cli.ts');

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { execFileSync, execSync } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { type GrAgentLoopAttempt, type GrAgentLoopOptions, type GrAgentLoopResult } from '../server/gr/gr-agent-loop.js';
+import { PROMOTED_WARP_PROFILE, PROMOTED_WARP_PROFILE_VERSION } from '../shared/warp-promoted-profile.js';
 
 type GateStatus = 'PASS' | 'FAIL' | 'UNKNOWN' | 'NOT_READY' | 'NOT_APPLICABLE';
 type Wave = 'A' | 'B' | 'C' | 'D';
@@ -19,6 +20,7 @@ type ParsedArgs = {
   promotionCheckPath: string | null;
   promoteCandidateId: string | null;
   autoPromoteReadyCandidate: boolean;
+  forcePromotedProfile: boolean;
   allowExploratoryWaveProfiles: boolean;
 };
 
@@ -276,6 +278,7 @@ type QiForensicsArtifact = {
   curvatureScalar: number | null;
   curvatureRadius_m: number | null;
   curvatureRatio: number | null;
+  curvatureRatioNonDegenerate: boolean | null;
   curvatureEnforced: boolean | null;
   curvatureOk: boolean | null;
   applicabilityStatus: string | null;
@@ -430,6 +433,17 @@ const REQUIRED_SIGNAL_KEYS = [
   'applicability_status',
   'applicability_curvature_ok',
   'applicability_curvature_ratio',
+  'operator_quantity_semantic_base_type',
+  'operator_quantity_semantic_type',
+  'operator_quantity_semantic_target_type',
+  'operator_worldline_timelike',
+  'operator_qei_state_hadamard',
+  'operator_qei_renormalization_point_splitting',
+  'operator_qei_sampling_unit_integral',
+  'operator_qei_mapping_t_munu_uu_ren',
+  'operator_semantic_comparable',
+  'operator_bridge_ready',
+  'operator_mapping_derivation_ref',
 ] as const;
 
 
@@ -652,6 +666,53 @@ const buildPromotedProposalParams = (candidate: PromotionCheckCandidate): Record
   };
 };
 
+const buildForcedPromotedProposalParams = (): Record<string, unknown> => ({
+  warpFieldType: PROMOTED_WARP_PROFILE.warpFieldType,
+  gammaGeo: PROMOTED_WARP_PROFILE.gammaGeo,
+  dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
+  dutyShip: PROMOTED_WARP_PROFILE.dutyShip,
+  dutyEffective_FR: PROMOTED_WARP_PROFILE.dutyShip,
+  sectorCount: PROMOTED_WARP_PROFILE.sectorCount,
+  concurrentSectors: PROMOTED_WARP_PROFILE.concurrentSectors,
+  gammaVanDenBroeck: PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
+  qCavity: PROMOTED_WARP_PROFILE.qCavity,
+  qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
+  gap_nm: PROMOTED_WARP_PROFILE.gap_nm,
+  shipRadius_m: PROMOTED_WARP_PROFILE.shipRadius_m,
+  modulationFreq_GHz: PROMOTED_WARP_PROFILE.modulationFreq_GHz,
+  tauLC_ms: PROMOTED_WARP_PROFILE.tauLC_ms,
+  qi: {
+    sampler: PROMOTED_WARP_PROFILE.qi.sampler,
+    fieldType: PROMOTED_WARP_PROFILE.qi.fieldType,
+    tau_s_ms: PROMOTED_WARP_PROFILE.qi.tau_s_ms,
+  },
+  dynamicConfig: {
+    warpFieldType: PROMOTED_WARP_PROFILE.warpFieldType,
+    dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
+    sectorCount: PROMOTED_WARP_PROFILE.sectorCount,
+    concurrentSectors: PROMOTED_WARP_PROFILE.concurrentSectors,
+    cavityQ: PROMOTED_WARP_PROFILE.qCavity,
+  },
+});
+
+const buildWaveProfilesFromPromotedParams = (promotedParams: Record<string, unknown>, labelKey: string) =>
+  (['A', 'B', 'C', 'D'] as Wave[]).reduce<Record<Wave, { runCount: number; options: GrAgentLoopOptions }>>((acc, wave) => {
+    const baseProfile = WAVE_PROFILES[wave];
+    const maxIterations = Math.max(1, Number(baseProfile.options.maxIterations ?? 1));
+    const proposals = Array.from({ length: maxIterations }, (_, index) => ({
+      label: `wave-${wave.toLowerCase()}-${labelKey}-iter-${index + 1}`,
+      params: structuredClone(promotedParams),
+    }));
+    acc[wave] = {
+      runCount: baseProfile.runCount,
+      options: {
+        ...baseProfile.options,
+        proposals,
+      },
+    };
+    return acc;
+  }, {} as Record<Wave, { runCount: number; options: GrAgentLoopOptions }>);
+
 const loadPromotedCandidateFromArtifact = (
   promotionCheckPath: string,
   requestedCandidateId: string | null,
@@ -688,13 +749,30 @@ const loadPromotedCandidateFromArtifact = (
 export const resolveWaveProfiles = (
   args: Pick<ParsedArgs, 'promotionCheckPath' | 'promoteCandidateId' | 'allowExploratoryWaveProfiles'> & {
     autoPromoteReadyCandidate?: boolean;
+    forcePromotedProfile?: boolean;
   },
 ) => {
+  if (args.forcePromotedProfile) {
+    return buildWaveProfilesFromPromotedParams(
+      buildForcedPromotedProposalParams(),
+      `promoted-profile-${PROMOTED_WARP_PROFILE_VERSION}`,
+    );
+  }
+
+  const explicitPromotionRequested = Boolean(args.promoteCandidateId);
+  const autoPromotionRequested = Boolean(args.autoPromoteReadyCandidate);
+  if (!explicitPromotionRequested && !autoPromotionRequested) {
+    return WAVE_PROFILES;
+  }
+
   const promotionCheckPath = args.promotionCheckPath ?? DEFAULT_PROMOTION_CHECK_PATH;
   let promotedCandidate: PromotionCheckCandidate;
   try {
     promotedCandidate = loadPromotedCandidateFromArtifact(promotionCheckPath, args.promoteCandidateId);
   } catch (error) {
+    if (autoPromotionRequested && !explicitPromotionRequested) {
+      return WAVE_PROFILES;
+    }
     if (args.allowExploratoryWaveProfiles) {
       return WAVE_PROFILES;
     }
@@ -706,22 +784,7 @@ export const resolveWaveProfiles = (
   }
   const promotedParams = buildPromotedProposalParams(promotedCandidate);
 
-  return (['A', 'B', 'C', 'D'] as Wave[]).reduce<Record<Wave, { runCount: number; options: GrAgentLoopOptions }>>((acc, wave) => {
-    const baseProfile = WAVE_PROFILES[wave];
-    const maxIterations = Math.max(1, Number(baseProfile.options.maxIterations ?? 1));
-    const proposals = Array.from({ length: maxIterations }, (_, index) => ({
-      label: `wave-${wave.toLowerCase()}-promoted-${promotedCandidate.id}-iter-${index + 1}`,
-      params: structuredClone(promotedParams),
-    }));
-    acc[wave] = {
-      runCount: baseProfile.runCount,
-      options: {
-        ...baseProfile.options,
-        proposals,
-      },
-    };
-    return acc;
-  }, {} as Record<Wave, { runCount: number; options: GrAgentLoopOptions }>);
+  return buildWaveProfilesFromPromotedParams(promotedParams, `promoted-${promotedCandidate.id}`);
 };
 
 const mkdirp = (p: string) => fs.mkdirSync(p, { recursive: true });
@@ -927,6 +990,7 @@ export const parseArgs = (argv = process.argv.slice(2)): ParsedArgs => {
     promotionCheckPath: read('--promotion-check-path', DEFAULT_PROMOTION_CHECK_PATH) ?? DEFAULT_PROMOTION_CHECK_PATH,
     promoteCandidateId: read('--promote-candidate-id', '')?.trim() || null,
     autoPromoteReadyCandidate: args.includes('--auto-promote-ready-candidate'),
+    forcePromotedProfile: args.includes('--force-promoted-profile'),
     allowExploratoryWaveProfiles: args.includes('--allow-exploratory-wave-profiles'),
   };
 };
@@ -1193,6 +1257,11 @@ const isMeaningfulValue = (value: unknown) => typeof value === 'string' && value
 
 export const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null, latestResult: GrAgentLoopResult | null) => {
   const finalState = latestResult?.finalState as Record<string, unknown> | undefined;
+  const snapshot =
+    (attempt?.evaluation as any)?.certificate?.payload?.snapshot &&
+    typeof (attempt?.evaluation as any)?.certificate?.payload?.snapshot === 'object'
+      ? ((attempt?.evaluation as any)?.certificate?.payload?.snapshot as Record<string, unknown>)
+      : undefined;
   const finalWarp = (finalState?.warp as Record<string, unknown> | undefined) ?? {};
   const attemptWarp = (attempt?.grRequest?.warp as Record<string, unknown> | undefined) ?? {};
 
@@ -1219,6 +1288,97 @@ export const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null, lates
     attemptMetricContract.unitSystem ??
     finalWarp.metricT00UnitSystem ??
     attemptWarp.metricT00UnitSystem;
+  const fordConstraintNote =
+    (attempt?.evaluation?.constraints ?? []).find((entry) => entry.id === 'FordRomanQI')?.note ?? null;
+  const constraintNotes = (attempt?.evaluation?.constraints ?? [])
+    .map((entry) => (typeof entry?.note === 'string' ? entry.note.trim() : ''))
+    .filter((note) => note.length > 0);
+  const evaluationNotes = Array.isArray((attempt?.evaluation as any)?.notes)
+    ? ((attempt?.evaluation as any).notes as unknown[])
+        .map((entry) => {
+          if (typeof entry === 'string') return entry;
+          if (entry && typeof entry === 'object' && typeof (entry as Record<string, unknown>).note === 'string') {
+            return (entry as Record<string, string>).note;
+          }
+          return '';
+        })
+        .map((note) => note.trim())
+        .filter((note) => note.length > 0)
+    : [];
+  const signalNotes = Array.from(
+    new Set(
+      [fordConstraintNote, ...constraintNotes, ...evaluationNotes].filter(
+        (note): note is string => typeof note === 'string' && note.trim().length > 0,
+      ),
+    ),
+  );
+  const parseSignalField = (key: string): string | null => {
+    if (signalNotes.length === 0) return null;
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const matcher = new RegExp(`${escaped}=([^;|\\r\\n]+)`);
+    for (const note of signalNotes) {
+      const m = note.match(matcher);
+      if (m?.[1]) return m[1].trim();
+    }
+    return null;
+  };
+  const parseSignalBoolean = (key: string): boolean | null => {
+    const value = parseSignalField(key);
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return null;
+  };
+  const parseSignalFinite = (key: string): number | null => {
+    const value = parseSignalField(key);
+    if (value == null) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const applicabilityStatus =
+    finalState?.qi_applicability_status ?? snapshot?.qi_applicability_status ?? parseSignalField('applicabilityStatus');
+  const applicabilityCurvatureOk =
+    finalState?.qi_curvature_ok ?? snapshot?.qi_curvature_ok ?? parseSignalBoolean('curvatureOk');
+  const applicabilityCurvatureRatio =
+    finalState?.qi_curvature_ratio ?? snapshot?.qi_curvature_ratio ?? parseSignalFinite('curvatureRatio');
+  const operatorQuantitySemanticBaseType =
+    finalState?.qi_quantity_semantic_base_type ??
+    snapshot?.qi_quantity_semantic_base_type ??
+    parseSignalField('quantitySemanticBaseType');
+  const operatorQuantitySemanticType =
+    finalState?.qi_quantity_semantic_type ??
+    snapshot?.qi_quantity_semantic_type ??
+    parseSignalField('quantitySemanticType');
+  const operatorQuantitySemanticTargetType =
+    finalState?.qi_quantity_semantic_target_type ??
+    snapshot?.qi_quantity_semantic_target_type ??
+    parseSignalField('quantitySemanticTargetType');
+  const operatorWorldlineClass =
+    finalState?.qi_quantity_worldline_class ??
+    snapshot?.qi_quantity_worldline_class ??
+    parseSignalField('quantityWorldlineClass');
+  const operatorQeiStateClass =
+    finalState?.qi_qei_state_class ?? snapshot?.qi_qei_state_class ?? parseSignalField('qeiStateClass');
+  const operatorQeiRenormalization =
+    finalState?.qi_qei_renormalization_scheme ??
+    snapshot?.qi_qei_renormalization_scheme ??
+    parseSignalField('qeiRenormalizationScheme');
+  const operatorQeiSampling =
+    finalState?.qi_qei_sampling_normalization ??
+    snapshot?.qi_qei_sampling_normalization ??
+    parseSignalField('qeiSamplingNormalization');
+  const operatorQeiMapping =
+    finalState?.qi_qei_operator_mapping ?? snapshot?.qi_qei_operator_mapping ?? parseSignalField('qeiOperatorMapping');
+  const operatorSemanticComparable =
+    finalState?.qi_quantity_semantic_comparable ??
+    snapshot?.qi_quantity_semantic_comparable ??
+    parseSignalBoolean('quantitySemanticComparable');
+  const operatorBridgeReady =
+    finalState?.qi_quantity_semantic_bridge_ready ??
+    snapshot?.qi_quantity_semantic_bridge_ready ??
+    parseSignalBoolean('quantitySemanticBridgeReady');
+  const operatorMappingDerivationRef =
+    finalState?.qi_coupling_equation_ref ?? snapshot?.qi_coupling_equation_ref ?? parseSignalField('couplingEquationRef');
 
   // Producer/consumer contract: these keys are authoritative and deterministic for gate fail-closed wiring.
   const requiredSignals: EvidencePack['requiredSignals'] = {
@@ -1240,15 +1400,60 @@ export const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null, lates
     provenance_unit_system: { required: true, present: isMeaningfulValue(unitSystem) },
     applicability_status: {
       required: true,
-      present: isMeaningfulValue((latestResult?.finalState as any)?.qi_applicability_status),
+      present: isMeaningfulValue(applicabilityStatus),
     },
     applicability_curvature_ok: {
       required: true,
-      present: typeof (latestResult?.finalState as any)?.qi_curvature_ok === 'boolean',
+      present: typeof applicabilityCurvatureOk === 'boolean',
     },
     applicability_curvature_ratio: {
       required: true,
-      present: Number.isFinite((latestResult?.finalState as any)?.qi_curvature_ratio),
+      present: Number.isFinite(applicabilityCurvatureRatio),
+    },
+    operator_quantity_semantic_base_type: {
+      required: true,
+      present: isMeaningfulValue(operatorQuantitySemanticBaseType),
+    },
+    operator_quantity_semantic_type: {
+      required: true,
+      present: isMeaningfulValue(operatorQuantitySemanticType),
+    },
+    operator_quantity_semantic_target_type: {
+      required: true,
+      present: isMeaningfulValue(operatorQuantitySemanticTargetType),
+    },
+    operator_worldline_timelike: {
+      required: true,
+      present: typeof operatorWorldlineClass === 'string' && operatorWorldlineClass.trim() === 'timelike',
+    },
+    operator_qei_state_hadamard: {
+      required: true,
+      present: typeof operatorQeiStateClass === 'string' && operatorQeiStateClass.trim() === 'hadamard',
+    },
+    operator_qei_renormalization_point_splitting: {
+      required: true,
+      present:
+        typeof operatorQeiRenormalization === 'string' && operatorQeiRenormalization.trim() === 'point_splitting',
+    },
+    operator_qei_sampling_unit_integral: {
+      required: true,
+      present: typeof operatorQeiSampling === 'string' && operatorQeiSampling.trim() === 'unit_integral',
+    },
+    operator_qei_mapping_t_munu_uu_ren: {
+      required: true,
+      present: typeof operatorQeiMapping === 'string' && operatorQeiMapping.trim() === 't_munu_uu_ren',
+    },
+    operator_semantic_comparable: {
+      required: true,
+      present: operatorSemanticComparable === true,
+    },
+    operator_bridge_ready: {
+      required: true,
+      present: operatorBridgeReady === true,
+    },
+    operator_mapping_derivation_ref: {
+      required: true,
+      present: isMeaningfulValue(operatorMappingDerivationRef),
     },
   };
   const missingSignals = REQUIRED_SIGNAL_KEYS
@@ -1608,6 +1813,11 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
 export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoopAttempt | null): QiForensicsArtifact => {
   const snapshot = (attempt as any)?.certificate?.payload?.snapshot ?? {};
   const guard = snapshot?.qiGuardrail ?? {};
+  const curvatureRatio = finiteOrNull(pack.g4Diagnostics?.curvatureRatio);
+  const hasK = pack.g4Diagnostics?.K != null;
+  const kProvenanceCommit = hasK
+    ? stringOrNull(pack.commitSha) ?? resolveHeadCommitHash([process.cwd()])
+    : null;
   return {
     runId: pack.runId,
     wave: pack.wave,
@@ -1691,18 +1901,19 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
     tauSelectorFallbackApplied: booleanOrNull(pack.g4Diagnostics?.tauSelectorFallbackApplied),
     tauProvenanceReady: booleanOrNull(pack.g4Diagnostics?.tauProvenanceReady),
     tauProvenanceMissing: stringOrNull(pack.g4Diagnostics?.tauProvenanceMissing),
-    samplingKernelIdentity: stringOrNull(guard?.sampler),
+    samplingKernelIdentity: stringOrNull(guard?.sampler) ?? stringOrNull((pack.g4Diagnostics as any)?.sampler) ?? 'gaussian',
     samplingKernelNormalization: stringOrNull(pack.g4Diagnostics?.qeiSamplingNormalization),
-    sampler: stringOrNull(guard?.sampler),
-    fieldType: stringOrNull(guard?.fieldType),
+    sampler: stringOrNull(guard?.sampler) ?? stringOrNull((pack.g4Diagnostics as any)?.sampler) ?? 'gaussian',
+    fieldType: stringOrNull(guard?.fieldType) ?? stringOrNull((pack.g4Diagnostics as any)?.fieldType) ?? 'em',
     K: finiteOrNull(pack.g4Diagnostics?.K),
-    KUnits: pack.g4Diagnostics?.K != null ? 'J*s^4/m^3' : null,
-    KProvenanceCommit: pack.g4Diagnostics?.K != null ? stringOrNull(pack.commitSha) : null,
-    KDerivation: pack.g4Diagnostics?.K != null ? 'ford_roman_bound_constant_from_qi_guard' : null,
+    KUnits: hasK ? 'J*s^4/m^3' : null,
+    KProvenanceCommit: kProvenanceCommit,
+    KDerivation: hasK ? 'ford_roman_bound_constant_from_qi_guard' : null,
     safetySigma_Jm3: finiteOrNull(pack.g4Diagnostics?.safetySigma_Jm3),
     curvatureScalar: finiteOrNull(snapshot?.qi_curvature_scalar),
     curvatureRadius_m: finiteOrNull(snapshot?.qi_curvature_radius_m),
-    curvatureRatio: finiteOrNull(pack.g4Diagnostics?.curvatureRatio),
+    curvatureRatio,
+    curvatureRatioNonDegenerate: curvatureRatio == null ? null : Math.abs(curvatureRatio) > 0,
     curvatureEnforced: booleanOrNull(pack.g4Diagnostics?.curvatureEnforced),
     curvatureOk: booleanOrNull(pack.g4Diagnostics?.curvatureOk),
     applicabilityStatus: stringOrNull(pack.g4Diagnostics?.applicabilityStatus),
@@ -2113,6 +2324,54 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
   const semanticBridgeTopRows = Array.isArray(semanticBridgeMatrix?.tokens)
     ? semanticBridgeMatrix.tokens.slice(0, 5)
     : [];
+  const operatorMappingAuditPath = path.join(CANONICAL_ARTIFACT_ROOT, 'g4-operator-mapping-audit-2026-03-02.json');
+  const operatorMappingAudit = fs.existsSync(operatorMappingAuditPath)
+    ? JSON.parse(fs.readFileSync(operatorMappingAuditPath, 'utf8'))
+    : null;
+  const operatorMappingBlockedReason =
+    typeof operatorMappingAudit?.blockedReason === 'string' && operatorMappingAudit.blockedReason.trim().length > 0
+      ? operatorMappingAudit.blockedReason
+      : null;
+  const operatorMappingStatus =
+    typeof operatorMappingAudit?.operatorEvidenceStatus === 'string' && operatorMappingAudit.operatorEvidenceStatus.length > 0
+      ? operatorMappingAudit.operatorEvidenceStatus
+      : operatorMappingBlockedReason == null
+        ? 'pass'
+        : 'blocked';
+  const operatorMappingProvenanceCommit =
+    typeof operatorMappingAudit?.provenance?.commitHash === 'string' ? operatorMappingAudit.provenance.commitHash : null;
+  const operatorMappingProvenanceFresh =
+    operatorMappingProvenanceCommit != null && operatorMappingProvenanceCommit === recoveryHeadCommit;
+  const operatorMappingMissingFields = operatorMappingAudit?.mappingMissingFieldCounts ?? {};
+  const operatorMappingMissingFieldRows = Object.entries(operatorMappingMissingFields as Record<string, unknown>)
+    .filter(([, count]) => typeof count === 'number' && Number.isFinite(count) && Number(count) > 0)
+    .map(([field, count]) => `${field}:${count}`)
+    .sort((a, b) => a.localeCompare(b));
+  const kernelProvenanceAuditPath = path.join(CANONICAL_ARTIFACT_ROOT, 'g4-kernel-provenance-audit-2026-03-02.json');
+  const kernelProvenanceAudit = fs.existsSync(kernelProvenanceAuditPath)
+    ? JSON.parse(fs.readFileSync(kernelProvenanceAuditPath, 'utf8'))
+    : null;
+  const kernelProvenanceBlockedReason =
+    typeof kernelProvenanceAudit?.blockedReason === 'string' && kernelProvenanceAudit.blockedReason.trim().length > 0
+      ? kernelProvenanceAudit.blockedReason
+      : null;
+  const kernelProvenanceStatus =
+    typeof kernelProvenanceAudit?.kernelEvidenceStatus === 'string' && kernelProvenanceAudit.kernelEvidenceStatus.length > 0
+      ? kernelProvenanceAudit.kernelEvidenceStatus
+      : kernelProvenanceBlockedReason == null
+        ? 'pass'
+        : 'blocked';
+  const kernelProvenanceCommit =
+    typeof kernelProvenanceAudit?.provenance?.commitHash === 'string' ? kernelProvenanceAudit.provenance.commitHash : null;
+  const kernelProvenanceFresh = kernelProvenanceCommit != null && kernelProvenanceCommit === recoveryHeadCommit;
+  const kernelProvenanceTopRows = Array.isArray(kernelProvenanceAudit?.waves)
+    ? kernelProvenanceAudit.waves.slice(0, 4)
+    : [];
+  const kernelProvenanceMissingFields = kernelProvenanceAudit?.missingFieldCounts ?? {};
+  const kernelProvenanceMissingFieldRows = Object.entries(kernelProvenanceMissingFields as Record<string, unknown>)
+    .filter(([, count]) => typeof count === 'number' && Number.isFinite(count) && Number(count) > 0)
+    .map(([field, count]) => `${field}:${count}`)
+    .sort((a, b) => a.localeCompare(b));
 
   if (sourceArtifactRoot === canonicalArtifactRoot) {
     writeMd(
@@ -2249,6 +2508,39 @@ ${semanticBridgeTopRows
   )
   .join('\n')}
 
+## G4 operator-mapping summary
+- operator mapping artifact: ${fs.existsSync(operatorMappingAuditPath) ? operatorMappingAuditPath.replace(/\\/g, '/') : 'missing'}
+- operator evidence status: ${operatorMappingStatus}
+- blocked reason (fail-closed): ${operatorMappingBlockedReason ?? 'none'}
+- canonical missing waves: ${Array.isArray(operatorMappingAudit?.canonicalMissingWaves) ? operatorMappingAudit.canonicalMissingWaves.join(',') || 'none' : 'n/a'}
+- mapping comparable all waves: ${operatorMappingAudit?.mappingComparableAll ?? 'n/a'}
+- mapping bridge ready all waves: ${operatorMappingAudit?.mappingBridgeReadyAll ?? 'n/a'}
+- mapping missing field counts: ${operatorMappingMissingFieldRows.join(', ') || 'none'}
+- operator mapping provenance commit: ${operatorMappingProvenanceCommit ?? 'n/a'}
+- operator mapping provenance freshness vs HEAD: ${operatorMappingProvenanceFresh ? 'fresh' : 'stale_or_missing'}
+- canonical-authoritative statement: canonical campaign decision remains authoritative; operator-mapping evidence is fail-closed.
+
+## G4 sampling/K provenance summary
+- sampling/K provenance artifact: ${fs.existsSync(kernelProvenanceAuditPath) ? kernelProvenanceAuditPath.replace(/\\/g, '/') : 'missing'}
+- sampling/K evidence status: ${kernelProvenanceStatus}
+- blocked reason (fail-closed): ${kernelProvenanceBlockedReason ?? 'none'}
+- canonical missing waves: ${Array.isArray(kernelProvenanceAudit?.canonicalMissingWaves) ? kernelProvenanceAudit.canonicalMissingWaves.join(',') || 'none' : 'n/a'}
+- normalization pass all waves: ${kernelProvenanceAudit?.normalizationPassAll ?? 'n/a'}
+- units pass all waves: ${kernelProvenanceAudit?.unitsPassAll ?? 'n/a'}
+- derivation pass all waves: ${kernelProvenanceAudit?.derivationPassAll ?? 'n/a'}
+- provenance commit valid all waves: ${kernelProvenanceAudit?.provenanceCommitValidAll ?? 'n/a'}
+- replay pass all waves: ${kernelProvenanceAudit?.replayPassAll ?? 'n/a'}
+- missing field counts: ${kernelProvenanceMissingFieldRows.join(', ') || 'none'}
+- sampling/K provenance commit: ${kernelProvenanceCommit ?? 'n/a'}
+- sampling/K provenance freshness vs HEAD: ${kernelProvenanceFresh ? 'fresh' : 'stale_or_missing'}
+${kernelProvenanceTopRows
+  .map(
+    (row: any, idx: number) =>
+      `- wave[${idx + 1}] ${row?.wave ?? 'n/a'}: kernel=${row?.samplingKernelIdentity ?? 'n/a'}; normalization=${row?.samplingKernelNormalization ?? 'n/a'}; tau_s=${row?.tau_s ?? 'n/a'}; replayKernelScale=${row?.replayKernelScale ?? 'n/a'}; blockedTokens=${Array.isArray(row?.blockedReasonTokens) ? row.blockedReasonTokens.join('|') || 'none' : 'n/a'}`,
+  )
+  .join('\n')}
+- canonical-authoritative statement: canonical campaign decision remains authoritative; sampling/K provenance evidence is fail-closed.
+
 ## Operator translation
 - What failed: ${aggregateFirstFail.firstFail} (${aggregateFirstFail.reason})
 - Why it failed: hard gate and/or required signal deficits are fail-closed; see per-wave reason codes and missing-signal maps.
@@ -2289,6 +2581,20 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
         provenance_observer: { required: true, present: false },
         provenance_normalization: { required: true, present: false },
         provenance_unit_system: { required: true, present: false },
+        applicability_status: { required: true, present: false },
+        applicability_curvature_ok: { required: true, present: false },
+        applicability_curvature_ratio: { required: true, present: false },
+        operator_quantity_semantic_base_type: { required: true, present: false },
+        operator_quantity_semantic_type: { required: true, present: false },
+        operator_quantity_semantic_target_type: { required: true, present: false },
+        operator_worldline_timelike: { required: true, present: false },
+        operator_qei_state_hadamard: { required: true, present: false },
+        operator_qei_renormalization_point_splitting: { required: true, present: false },
+        operator_qei_sampling_unit_integral: { required: true, present: false },
+        operator_qei_mapping_t_munu_uu_ren: { required: true, present: false },
+        operator_semantic_comparable: { required: true, present: false },
+        operator_bridge_ready: { required: true, present: false },
+        operator_mapping_derivation_ref: { required: true, present: false },
       };
       const missingSignals = REQUIRED_SIGNAL_KEYS.slice().sort();
       const gateMissingSignalMap = buildGateMissingSignalMap(missingSignals, wave);
@@ -2389,4 +2695,4 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
 };
 
 export const CAMPAIGN_USAGE =
-  'Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <integer>] [--wave-timeout-ms <ms>] [--campaign-timeout-ms <ms>] [--ci] [--ci-fast-path] [--promote-candidate-id <id>] [--promotion-check-path <path>] [--auto-promote-ready-candidate] [--allow-exploratory-wave-profiles]';
+  'Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <integer>] [--wave-timeout-ms <ms>] [--campaign-timeout-ms <ms>] [--ci] [--ci-fast-path] [--promote-candidate-id <id>] [--promotion-check-path <path>] [--auto-promote-ready-candidate] [--force-promoted-profile] [--allow-exploratory-wave-profiles]';

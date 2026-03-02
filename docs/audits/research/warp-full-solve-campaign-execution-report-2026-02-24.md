@@ -119,8 +119,8 @@ Per-wave gate status snapshots:
 - canonical authoritative class: neither
 - governance artifact freshness: fresh
 - governance freshness reason: none
-- governance artifact commit: 3b86c282ad24e9c7df0d249ac1790db78a9eba58
-- current head commit: 3b86c282ad24e9c7df0d249ac1790db78a9eba58
+- governance artifact commit: 75557ef5a98ab1a4d1c57c87a1e2c4b4f12c48be
+- current head commit: 75557ef5a98ab1a4d1c57c87a1e2c4b4f12c48be
 - policy floor dominated: false
 - policy exceeded (marginRatioRaw >= 1): false
 - computed exceeded (marginRatioRawComputed >= 1): false
@@ -170,7 +170,7 @@ Per-wave gate status snapshots:
 - best candidate canonical-pass eligible: true
 - best candidate counterfactual-pass eligible: true
 - best candidate semantics class: canonical_pass_eligible
-- recovery provenance commit: 3b86c282ad24e9c7df0d249ac1790db78a9eba58
+- recovery provenance commit: 75557ef5a98ab1a4d1c57c87a1e2c4b4f12c48be
 - recovery provenance freshness vs HEAD: fresh
 
 ## G4 recovery parity summary
@@ -180,7 +180,7 @@ Per-wave gate status snapshots:
 - dominantFailureMode: evidence_path_blocked
 - selectionPolicy: comparable_canonical
 - parity artifact: artifacts/research/full-solve/g4-recovery-parity-2026-02-27.json
-- parity provenance commit: 3b86c282ad24e9c7df0d249ac1790db78a9eba58
+- parity provenance commit: 75557ef5a98ab1a4d1c57c87a1e2c4b4f12c48be
 - parity provenance freshness vs HEAD: fresh
 - canonical decision remains authoritative until wave profiles are promoted and rerun.
 
@@ -192,9 +192,40 @@ Per-wave gate status snapshots:
 - recovery structural comparable count: 0
 - dominant blocker token: n/a
 - dominant blocker score: n/a
-- semantic bridge matrix provenance commit: 3b86c282ad24e9c7df0d249ac1790db78a9eba58
+- semantic bridge matrix provenance commit: 75557ef5a98ab1a4d1c57c87a1e2c4b4f12c48be
 - semantic bridge matrix provenance freshness vs HEAD: fresh
 
+
+## G4 operator-mapping summary
+- operator mapping artifact: artifacts/research/full-solve/g4-operator-mapping-audit-2026-03-02.json
+- operator evidence status: pass
+- blocked reason (fail-closed): none
+- canonical missing waves: none
+- mapping comparable all waves: true
+- mapping bridge ready all waves: true
+- mapping missing field counts: none
+- operator mapping provenance commit: 75557ef5a98ab1a4d1c57c87a1e2c4b4f12c48be
+- operator mapping provenance freshness vs HEAD: fresh
+- canonical-authoritative statement: canonical campaign decision remains authoritative; operator-mapping evidence is fail-closed.
+
+## G4 sampling/K provenance summary
+- sampling/K provenance artifact: artifacts/research/full-solve/g4-kernel-provenance-audit-2026-03-02.json
+- sampling/K evidence status: pass
+- blocked reason (fail-closed): none
+- canonical missing waves: none
+- normalization pass all waves: true
+- units pass all waves: true
+- derivation pass all waves: true
+- provenance commit valid all waves: true
+- replay pass all waves: true
+- missing field counts: none
+- sampling/K provenance commit: 75557ef5a98ab1a4d1c57c87a1e2c4b4f12c48be
+- sampling/K provenance freshness vs HEAD: fresh
+- wave[1] A: kernel=gaussian; normalization=unit_integral; tau_s=0.00002; replayKernelScale=1010526315790.474; blockedTokens=none
+- wave[2] B: kernel=gaussian; normalization=unit_integral; tau_s=0.00002; replayKernelScale=1010526315790.474; blockedTokens=none
+- wave[3] C: kernel=gaussian; normalization=unit_integral; tau_s=0.00002; replayKernelScale=1010526315790.474; blockedTokens=none
+- wave[4] D: kernel=gaussian; normalization=unit_integral; tau_s=0.00002; replayKernelScale=1010526315790.474; blockedTokens=none
+- canonical-authoritative statement: canonical campaign decision remains authoritative; sampling/K provenance evidence is fail-closed.
 
 ## Operator translation
 - What failed: none (No FAIL/NOT_READY/UNKNOWN gate found.)
