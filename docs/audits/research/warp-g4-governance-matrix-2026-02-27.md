@@ -4,15 +4,15 @@
 This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.
 
 ## Summary
-- canonical authoritative class: neither
+- canonical authoritative class: evidence_path_blocked
 - computed-only counterfactual class: neither
-- mismatch: false
-- mismatch reason: none
+- mismatch: true
+- mismatch reason: canonical_authoritative_aggregate_missing_required_waves:A,B,C,D
 
 ## Per-wave matrix
 | Wave | lhs_Jm3 | boundComputed_Jm3 | boundUsed_Jm3 | floorApplied | marginRaw | marginRawComputed | applicability | canonical authoritative class | computed-only counterfactual class (non-authoritative) | mismatch | mismatch explanation |
 | --- | ---: | ---: | ---: | --- | ---: | ---: | --- | --- | --- | --- | --- |
-| A | -3.0937631287227165 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998561 | 0.12890679702998561 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
-| B | -3.0937631287227165 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998561 | 0.12890679702998561 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
-| C | -3.0937631287227165 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998561 | 0.12890679702998561 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
-| D | -3.0937631287227165 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998561 | 0.12890679702998561 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
+| A | n/a | n/a | n/a | n/a | n/a | n/a | UNKNOWN | neither | neither | false | missing_evidence_pack |
+| B | n/a | n/a | n/a | n/a | n/a | n/a | UNKNOWN | neither | neither | false | missing_evidence_pack |
+| C | n/a | n/a | n/a | n/a | n/a | n/a | UNKNOWN | neither | neither | false | missing_evidence_pack |
+| D | n/a | n/a | n/a | n/a | n/a | n/a | UNKNOWN | neither | neither | false | missing_evidence_pack |

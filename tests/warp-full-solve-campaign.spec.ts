@@ -544,6 +544,11 @@ describe('warp-full-solve-campaign runner', () => {
     expect(artifact.tauSelectorFallbackApplied).toBe(false);
     expect(artifact.tauProvenanceReady).toBe(true);
     expect(artifact.tauProvenanceMissing).toBe('tau_pulse_unavailable');
+    expect(artifact.samplingKernelIdentity).toBe('gaussian');
+    expect(artifact.samplingKernelNormalization).toBeNull();
+    expect(artifact.KUnits).toBe('J*s^4/m^3');
+    expect(artifact.KProvenanceCommit).toBeNull();
+    expect(artifact.KDerivation).toBe('ford_roman_bound_constant_from_qi_guard');
     expect(artifact.congruentSolvePolicyMarginPass).toBe(true);
     expect(artifact.congruentSolveComputedMarginPass).toBe(false);
     expect(artifact.congruentSolveApplicabilityPass).toBe(true);
@@ -1050,12 +1055,21 @@ describe('warp-full-solve-campaign runner', () => {
         certificate: { certificateHash: 'abc', integrityOk: true },
       },
     } as any;
-    const latestResult = { finalState: {} } as any;
+    const latestResult = {
+      finalState: {
+        qi_applicability_status: 'PASS',
+        qi_curvature_ok: true,
+        qi_curvature_ratio: 0.5,
+      },
+    } as any;
     const { requiredSignals, missingSignals } = collectRequiredSignals(attempt, latestResult);
     expect(requiredSignals.provenance_chart.present).toBe(false);
     expect(requiredSignals.provenance_observer.present).toBe(false);
     expect(requiredSignals.provenance_normalization.present).toBe(false);
     expect(requiredSignals.provenance_unit_system.present).toBe(false);
+    expect(requiredSignals.applicability_status.present).toBe(true);
+    expect(requiredSignals.applicability_curvature_ok.present).toBe(true);
+    expect(requiredSignals.applicability_curvature_ratio.present).toBe(true);
     const gateMap = buildGateMissingSignalMap(missingSignals);
     expect(gateMap.G6).toEqual(expect.arrayContaining(['provenance_chart', 'provenance_observer', 'provenance_normalization', 'provenance_unit_system']));
   });
@@ -1088,7 +1102,11 @@ describe('warp-full-solve-campaign runner', () => {
     expect(requiredSignals.provenance_observer.present).toBe(true);
     expect(requiredSignals.provenance_normalization.present).toBe(true);
     expect(requiredSignals.provenance_unit_system.present).toBe(true);
+    expect(requiredSignals.applicability_status.present).toBe(false);
+    expect(requiredSignals.applicability_curvature_ok.present).toBe(false);
+    expect(requiredSignals.applicability_curvature_ratio.present).toBe(false);
     expect(missingSignals).not.toEqual(expect.arrayContaining(['provenance_chart', 'provenance_observer', 'provenance_normalization', 'provenance_unit_system']));
+    expect(missingSignals).toEqual(expect.arrayContaining(['applicability_status', 'applicability_curvature_ok', 'applicability_curvature_ratio']));
   });
   it('campaign export includes curvature applicability fields for waves A/B/C/D', async () => {
     const cliPath = path.resolve('scripts/warp-full-solve-campaign-cli.ts');
