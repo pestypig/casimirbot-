@@ -4,6 +4,9 @@ import nerdamer from "nerdamer";
 import "nerdamer/Solve.js";
 import "nerdamer/Calculus.js";
 import type { MathStage } from "../../../shared/math-stage.js";
+import { classifyMathRouterPrompt } from "../math-router/classify";
+import { runSymbolicLane } from "../math-router/lanes/symbolic";
+import { runNumericLane } from "../math-router/lanes/numeric";
 
 const scriptPath = fileURLToPath(new URL("../../../scripts/py/math_solve.py", import.meta.url));
 
@@ -697,6 +700,53 @@ export async function solveHelixAskMathQuestion(
   question: string,
   options?: HelixAskMathSolveOptions,
 ): Promise<HelixAskMathSolveResult | null> {
+  const route = classifyMathRouterPrompt(question);
+  if (route.intent === "warp_delegation") {
+    return withDefaultCertainty({ ok: false, reason: "warp_delegation_required" }, options);
+  }
+
+  if (/treat\s+e\s+as\s+variable/i.test(question) && /derivative/i.test(question)) {
+    const symbolic = await runSymbolicLane({ prompt: question, constants: route.assumptions.constants });
+    if (symbolic.ok) {
+      return withDefaultCertainty({ ok: true, kind: "derivative", expr: question, final: symbolic.result, reason: "symbolic_lane:derivative" }, options);
+    }
+  }
+
+  if (route.domain === "symbolic_linear_algebra") {
+    const symbolic = await runSymbolicLane({ prompt: question, constants: route.assumptions.constants });
+    if (symbolic.ok) {
+      return withDefaultCertainty({
+        ok: true,
+        kind: "evaluate",
+        expr: question,
+        final: symbolic.result,
+        reason: `symbolic_lane:${symbolic.op}`,
+      }, options);
+    }
+    return withDefaultCertainty({ ok: false, reason: symbolic.reason ?? "symbolic_lane_failed" }, options);
+  }
+
+  if (route.domain === "numeric_linear_algebra") {
+    const numeric = runNumericLane(question);
+    if (numeric.ok) {
+      return withDefaultCertainty({
+        ok: true,
+        kind: "evaluate",
+        expr: question,
+        final: Number.isFinite(numeric.value ?? Number.NaN) ? String(numeric.value) : "numeric-route-ok",
+        reason: `numeric_lane:${numeric.op ?? "route"}`,
+        residualPass: numeric.verifier.residualPass,
+        residualMax: numeric.verifier.residualMax,
+      }, options);
+    }
+    return withDefaultCertainty({
+      ok: false,
+      reason: numeric.reason ?? "numeric_lane_failed",
+      residualPass: numeric.verifier.residualPass,
+      residualMax: numeric.verifier.residualMax,
+    }, options);
+  }
+
   if (!isHelixAskMathQuestion(question)) return null;
   const jsResult = solveWithNerdamer(question);
   if (jsResult) return attachMathMaturityStage(jsResult, options);
@@ -738,6 +788,9 @@ export async function solveHelixAskMathQuestion(
 
 export function buildHelixAskMathAnswer(result: HelixAskMathSolveResult): string {
   if (!result.ok || !result.kind) {
+    if (result.reason === "warp_delegation_required") {
+      return "Warp viability claims require the physics.warp.viability certificate path. Status: NOT_CERTIFIED (no certificate). First failing HARD constraint: FordRomanQI (not evaluated without certificate).";
+    }
     return "I could not verify this math problem deterministically.";
   }
   if (result.kind === "solve" && result.gatePass === false) {
