@@ -137,6 +137,7 @@
     "warp:full-solve:g4-kernel-provenance-audit": "tsx scripts/warp-g4-kernel-provenance-audit.ts",
     "warp:full-solve:g4-curvature-applicability-audit": "tsx scripts/warp-g4-curvature-applicability-audit.ts",
     "warp:full-solve:g4-uncertainty-audit": "tsx scripts/warp-g4-uncertainty-audit.ts",
+    "warp:full-solve:g4-literature-parity-replay": "tsx scripts/warp-g4-literature-parity-replay.ts",
     "warp:full-solve:evidence-snapshot": "tsx scripts/warp-evidence-snapshot.ts",
     "warp:full-solve:g4-candidate-promotion-check": "tsx scripts/warp-g4-candidate-promotion-check.ts",
     "warp:full-solve:promotion-bundle": "tsx scripts/warp-full-solve-promotion-bundle.ts",

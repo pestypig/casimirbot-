@@ -50,6 +50,10 @@ describe('warp evidence snapshot generator', () => {
     writeJson(path.join(root, 'artifacts/research/full-solve/g4-uncertainty-audit-2026-03-02.json'), {
       uncertaintyEvidenceStatus: 'pass',
     });
+    writeJson(path.join(root, 'artifacts/research/full-solve/g4-literature-parity-replay-2026-03-02.json'), {
+      parityEvidenceStatus: 'pass',
+      blockedReason: null,
+    });
     for (const wave of ['A', 'B', 'C', 'D']) {
       writeJson(path.join(root, 'artifacts/research/full-solve', wave, 'evidence-pack.json'), {
         reproducibility: { repeatedRunGateAgreement: { status: 'PASS' } },
@@ -81,6 +85,7 @@ describe('warp evidence snapshot generator', () => {
     expect(snapshot.strongClaimClosure.specStatus.B_samplingKernelProvenance.status).toBe('pass');
     expect(snapshot.strongClaimClosure.specStatus.C_curvatureApplicability.status).toBe('pass');
     expect(snapshot.strongClaimClosure.specStatus.D_uncertaintyDecisionBand.status).toBe('pass');
+    expect(snapshot.strongClaimClosure.specStatus.E_literatureParityReplay.status).toBe('pass');
     expect(snapshot.strongClaimClosure.specStatus.F_reproducibilityAgreement.status).toBe('pass');
     expect(snapshot.strongClaimClosure.specStatus.G_promotionReadinessAndStability.status).toBe('pass');
     expect(snapshot.strongClaimClosure.passAll).toBe(true);

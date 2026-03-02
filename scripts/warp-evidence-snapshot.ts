@@ -28,6 +28,7 @@ const DEFAULT_REQUIRED_PATHS = [
   'artifacts/research/full-solve/g4-kernel-provenance-audit-2026-03-02.json',
   'artifacts/research/full-solve/g4-curvature-applicability-audit-2026-03-02.json',
   'artifacts/research/full-solve/g4-uncertainty-audit-2026-03-02.json',
+  'artifacts/research/full-solve/g4-literature-parity-replay-2026-03-02.json',
   'reports/math-report.json',
   'artifacts/training-trace.jsonl',
   'artifacts/training-trace-export.jsonl',
@@ -126,6 +127,9 @@ export const generateWarpEvidenceSnapshot = (options: GenerateWarpEvidenceSnapsh
     path.join(rootDir, 'artifacts', 'research', 'full-solve', 'g4-curvature-applicability-audit-2026-03-02.json'),
   );
   const uncertaintyAudit = readJsonOrNull(path.join(rootDir, 'artifacts', 'research', 'full-solve', 'g4-uncertainty-audit-2026-03-02.json'));
+  const literatureParityReplay = readJsonOrNull(
+    path.join(rootDir, 'artifacts', 'research', 'full-solve', 'g4-literature-parity-replay-2026-03-02.json'),
+  );
   const latestTrace = jsonlLastObject(path.join(rootDir, 'artifacts', 'training-trace.jsonl'));
   const latestExportTrace = jsonlLastObject(path.join(rootDir, 'artifacts', 'training-trace-export.jsonl'));
   const calculatorResult = (calculator?.result as Record<string, unknown> | undefined) ?? calculator;
@@ -175,6 +179,10 @@ export const generateWarpEvidenceSnapshot = (options: GenerateWarpEvidenceSnapsh
     stringOrNull(uncertaintyAudit?.uncertaintyEvidenceStatus) === 'pass',
     stringOrNull(uncertaintyAudit?.blockedReason) ?? 'uncertainty_audit_blocked',
   );
+  const specE = statusFromEvidence(
+    stringOrNull(literatureParityReplay?.parityEvidenceStatus) === 'pass',
+    stringOrNull(literatureParityReplay?.blockedReason) ?? 'literature_parity_replay_blocked',
+  );
   const specF = statusFromEvidence(
     reproducibilityMissingWaves.length === 0 && reproducibilityNonPassWaves.length === 0,
     reproducibilityMissingWaves.length > 0
@@ -201,6 +209,7 @@ export const generateWarpEvidenceSnapshot = (options: GenerateWarpEvidenceSnapsh
     B_samplingKernelProvenance: specB,
     C_curvatureApplicability: specC,
     D_uncertaintyDecisionBand: specD,
+    E_literatureParityReplay: specE,
     F_reproducibilityAgreement: specF,
     G_promotionReadinessAndStability: specG,
   };

@@ -119,8 +119,8 @@ Per-wave gate status snapshots:
 - canonical authoritative class: neither
 - governance artifact freshness: fresh
 - governance freshness reason: none
-- governance artifact commit: 04d65a29c2ae6bd4d1316123b546cd374d020729
-- current head commit: 04d65a29c2ae6bd4d1316123b546cd374d020729
+- governance artifact commit: 36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e
+- current head commit: 36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e
 - policy floor dominated: false
 - policy exceeded (marginRatioRaw >= 1): false
 - computed exceeded (marginRatioRawComputed >= 1): false
@@ -192,7 +192,7 @@ Per-wave gate status snapshots:
 - best candidate canonical-pass eligible: true
 - best candidate counterfactual-pass eligible: true
 - best candidate semantics class: canonical_pass_eligible
-- recovery provenance commit: 04d65a29c2ae6bd4d1316123b546cd374d020729
+- recovery provenance commit: 36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e
 - recovery provenance freshness vs HEAD: fresh
 
 ## G4 recovery parity summary
@@ -202,7 +202,7 @@ Per-wave gate status snapshots:
 - dominantFailureMode: evidence_path_blocked
 - selectionPolicy: comparable_canonical
 - parity artifact: artifacts/research/full-solve/g4-recovery-parity-2026-02-27.json
-- parity provenance commit: 04d65a29c2ae6bd4d1316123b546cd374d020729
+- parity provenance commit: 36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e
 - parity provenance freshness vs HEAD: fresh
 - canonical decision remains authoritative until wave profiles are promoted and rerun.
 
@@ -214,7 +214,7 @@ Per-wave gate status snapshots:
 - recovery structural comparable count: 0
 - dominant blocker token: n/a
 - dominant blocker score: n/a
-- semantic bridge matrix provenance commit: 04d65a29c2ae6bd4d1316123b546cd374d020729
+- semantic bridge matrix provenance commit: 36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e
 - semantic bridge matrix provenance freshness vs HEAD: fresh
 
 
@@ -226,7 +226,7 @@ Per-wave gate status snapshots:
 - mapping comparable all waves: true
 - mapping bridge ready all waves: true
 - mapping missing field counts: none
-- operator mapping provenance commit: 04d65a29c2ae6bd4d1316123b546cd374d020729
+- operator mapping provenance commit: 36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e
 - operator mapping provenance freshness vs HEAD: fresh
 - canonical-authoritative statement: canonical campaign decision remains authoritative; operator-mapping evidence is fail-closed.
 
@@ -241,7 +241,7 @@ Per-wave gate status snapshots:
 - provenance commit valid all waves: true
 - replay pass all waves: true
 - missing field counts: none
-- sampling/K provenance commit: 04d65a29c2ae6bd4d1316123b546cd374d020729
+- sampling/K provenance commit: 36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e
 - sampling/K provenance freshness vs HEAD: fresh
 - wave[1] A: kernel=gaussian; normalization=unit_integral; tau_s=0.00002; replayKernelScale=1010526315790.474; blockedTokens=none
 - wave[2] B: kernel=gaussian; normalization=unit_integral; tau_s=0.00002; replayKernelScale=1010526315790.474; blockedTokens=none
@@ -262,7 +262,7 @@ Per-wave gate status snapshots:
 - min curvatureRatio: 0
 - max curvatureRatio: 0
 - missing field counts: none
-- curvature applicability provenance commit: 04d65a29c2ae6bd4d1316123b546cd374d020729
+- curvature applicability provenance commit: 36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e
 - curvature applicability provenance freshness vs HEAD: fresh
 - wave[1] A: applicability=PASS; curvatureEnforced=true; curvatureOk=true; curvatureRatio=0; nonDegenerate=true; flatSpaceEquivalent=true; curvatureScalar=0; curvatureRadius_m=n/a; windowEvidenceReady=true; blockedTokens=none
 - wave[2] B: applicability=PASS; curvatureEnforced=true; curvatureOk=true; curvatureRatio=0; nonDegenerate=true; flatSpaceEquivalent=true; curvatureScalar=0; curvatureRadius_m=n/a; windowEvidenceReady=true; blockedTokens=none
@@ -291,7 +291,7 @@ Per-wave gate status snapshots:
 - dominant component counts: bridge:4
 - decision class counts: robust_pass:4
 - missing field counts: none
-- uncertainty audit provenance commit: 04d65a29c2ae6bd4d1316123b546cd374d020729
+- uncertainty audit provenance commit: 36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e
 - uncertainty audit provenance freshness vs HEAD: fresh
 - wave[1] A: applicability=PASS; decision=robust_pass; couldFlip=false; sigmaMeasurement=0; sigmaModel=0; sigmaBridge=3.093763040915341; sigmaTau=0; modelSigmaSource=n/a; modelSigmaRequired=n/a; modelSigmaProvenanceReady=n/a; dominant=bridge; slackPolicy=20.906236871301033; slackComputed=20.906236871301033; blockedTokens=none
 - wave[2] B: applicability=PASS; decision=robust_pass; couldFlip=false; sigmaMeasurement=0; sigmaModel=0; sigmaBridge=3.093763040915341; sigmaTau=0; modelSigmaSource=n/a; modelSigmaRequired=n/a; modelSigmaProvenanceReady=n/a; dominant=bridge; slackPolicy=20.906236871301033; slackComputed=20.906236871301033; blockedTokens=none

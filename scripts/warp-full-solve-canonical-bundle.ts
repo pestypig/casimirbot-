@@ -22,6 +22,7 @@ const FINALIZATION_COMMANDS = [
   ['run', 'warp:full-solve:g4-kernel-provenance-audit'],
   ['run', 'warp:full-solve:g4-curvature-applicability-audit'],
   ['run', 'warp:full-solve:g4-uncertainty-audit'],
+  ['run', 'warp:full-solve:g4-literature-parity-replay'],
   ['run', 'warp:full-solve:g4-governance-matrix'],
   ['run', 'warp:full-solve:g4-decision-ledger'],
   ['run', 'warp:full-solve:canonical'],
@@ -41,6 +42,7 @@ const OPERATOR_MAPPING_AUDIT_PATH = path.join('artifacts', 'research', 'full-sol
 const KERNEL_PROVENANCE_AUDIT_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-kernel-provenance-audit-2026-03-02.json');
 const CURVATURE_APPLICABILITY_AUDIT_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-curvature-applicability-audit-2026-03-02.json');
 const UNCERTAINTY_AUDIT_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-uncertainty-audit-2026-03-02.json');
+const LITERATURE_PARITY_REPLAY_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-literature-parity-replay-2026-03-02.json');
 const PROMOTION_BUNDLE_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-promotion-bundle-2026-03-01.json');
 const EVIDENCE_SNAPSHOT_PATH = path.join('artifacts', 'research', 'full-solve', 'warp-evidence-snapshot-2026-03-02.json');
 const DEFAULT_COMMAND_TIMEOUT_MS = 8 * 60_000;
@@ -62,6 +64,7 @@ export type CanonicalBundleResult = {
   kernelProvenanceAuditPath: string;
   curvatureApplicabilityAuditPath: string;
   uncertaintyAuditPath: string;
+  literatureParityReplayPath: string;
   promotionBundlePath: string;
   evidenceSnapshotPath: string;
 };
@@ -219,6 +222,7 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
   const kernelProvenanceAudit = readJson(KERNEL_PROVENANCE_AUDIT_PATH);
   const curvatureApplicabilityAudit = readJson(CURVATURE_APPLICABILITY_AUDIT_PATH);
   const uncertaintyAudit = readJson(UNCERTAINTY_AUDIT_PATH);
+  const literatureParityReplay = readJson(LITERATURE_PARITY_REPLAY_PATH);
   const promotionBundle = readJson(PROMOTION_BUNDLE_PATH);
   const evidenceSnapshot = readJson(EVIDENCE_SNAPSHOT_PATH);
   assertBundleProvenanceFresh(
@@ -247,6 +251,21 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
       `Uncertainty audit provenance commit hash mismatch: uncertaintyAudit=${String(
         uncertaintyAuditCommitHash ?? 'null',
       )} head=${headCommitHash}`,
+    );
+  }
+  const literatureParityReplayCommitHash = readCommitHash(literatureParityReplay);
+  if (literatureParityReplayCommitHash !== headCommitHash) {
+    throw new Error(
+      `Literature parity replay provenance commit hash mismatch: literatureParityReplay=${String(
+        literatureParityReplayCommitHash ?? 'null',
+      )} head=${headCommitHash}`,
+    );
+  }
+  if (literatureParityReplay?.blockedReason != null || literatureParityReplay?.parityEvidenceStatus !== 'pass') {
+    throw new Error(
+      `Literature parity replay blocked fail-closed: blockedReason=${String(
+        literatureParityReplay?.blockedReason ?? 'none',
+      )};status=${String(literatureParityReplay?.parityEvidenceStatus ?? 'unknown')}`,
     );
   }
   const curvatureApplicabilityAuditCommitHash = readCommitHash(curvatureApplicabilityAudit);
@@ -309,6 +328,7 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
     kernelProvenanceAuditPath: KERNEL_PROVENANCE_AUDIT_PATH,
     curvatureApplicabilityAuditPath: CURVATURE_APPLICABILITY_AUDIT_PATH,
     uncertaintyAuditPath: UNCERTAINTY_AUDIT_PATH,
+    literatureParityReplayPath: LITERATURE_PARITY_REPLAY_PATH,
     promotionBundlePath: PROMOTION_BUNDLE_PATH,
     evidenceSnapshotPath: EVIDENCE_SNAPSHOT_PATH,
   };

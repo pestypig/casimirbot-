@@ -30,6 +30,7 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
       'warp:full-solve:g4-kernel-provenance-audit',
       'warp:full-solve:g4-curvature-applicability-audit',
       'warp:full-solve:g4-uncertainty-audit',
+      'warp:full-solve:g4-literature-parity-replay',
       'warp:full-solve:g4-governance-matrix',
       'warp:full-solve:g4-decision-ledger',
       'warp:full-solve:canonical',
@@ -268,6 +269,8 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
     expect(script).toContain('Evidence snapshot provenance commit hash mismatch');
     expect(script).toContain('Evidence snapshot blocked fail-closed');
     expect(script).toContain('Evidence snapshot strong-claim closure blocked fail-closed');
+    expect(script).toContain('g4-literature-parity-replay-2026-03-02.json');
+    expect(script).toContain('Literature parity replay blocked fail-closed');
   });
 
   it('fails closed when evidence snapshot strong-claim closure passAll is false', () => {
