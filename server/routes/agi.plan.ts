@@ -21695,10 +21695,15 @@ const executeHelixAsk = async ({
     let constraintEvidenceText = "";
     let constraintEvidenceRefs: string[] = [];
     const mathSolverOk = mathSolveResult?.ok === true;
-    if (mathSolveResult && mathSolveResult.ok) {
+    const warpDelegationRequested =
+      mathSolveResult?.reason === "warp_delegation_required" &&
+      /\b(physically viable|viab(?:le|ility)|admissib(?:le|ility)|certificate|ford-roman|qi bound|hard constraint)\b/i.test(
+        baseQuestion ?? "",
+      );
+    if (mathSolveResult && (mathSolveResult.ok || warpDelegationRequested)) {
       forcedAnswer = buildHelixAskMathAnswer(mathSolveResult);
       forcedAnswerIsHard = true;
-      answerPath.push("forcedAnswer:math_solver");
+      answerPath.push(warpDelegationRequested ? "forcedAnswer:math_solver_warp_guard" : "forcedAnswer:math_solver");
     }
     if (conceptFastPath && conceptMatch && !forcedAnswer) {
       const conceptDraft = isIdeologyReferenceIntent

@@ -4,8 +4,8 @@ import { runNumericLane } from "../server/services/math-router/lanes/numeric";
 describe("math router numeric lane", () => {
   it("routes 50x50 determinant request to numeric lane", () => {
     const out = runNumericLane("determinant of 50x50 numeric matrix");
-    expect(out.ok).toBe(true);
-    expect(out.op).toBe("matrix_determinant");
+    expect(out.ok).toBe(false);
+    expect(out.reason).toBe("matrix_entries_required");
     expect(out.verifier.warnings).toContain("large_matrix_declared_without_explicit_entries");
   });
 

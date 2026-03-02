@@ -20,4 +20,9 @@ describe("math router classify", () => {
     expect(result.intent).toBe("warp_delegation");
     expect(result.engine).toBe("physics.warp.viability");
   });
+
+  it("does not treat generic warp discussion as viability delegation", () => {
+    const result = classifyMathRouterPrompt("explain natario shift vector in plain terms");
+    expect(result.intent).not.toBe("warp_delegation");
+  });
 });

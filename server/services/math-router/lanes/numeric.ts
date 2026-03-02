@@ -16,14 +16,7 @@ export type NumericLaneResult = {
 export function runNumericLane(prompt: string): NumericLaneResult {
   const text = (prompt ?? "").trim();
   if (/\b(\d{2,}x\d{2,}|50x50)\b/i.test(text) && /\b(det|determinant)\b/i.test(text)) {
-    return {
-      ok: true,
-      route: "numeric",
-      op: "matrix_determinant",
-      verifier: { residualPass: true, residualMax: 0, warnings: ["large_matrix_declared_without_explicit_entries"] },
-      value: Number.NaN,
-      reason: "matrix_shape_route_only",
-    };
+    return fail("matrix_entries_required", ["large_matrix_declared_without_explicit_entries"]);
   }
 
   const evalMatch = text.match(/(?:evaluate|compute|calculate)\s+(.+)$/i);
@@ -55,11 +48,15 @@ export function runNumericLane(prompt: string): NumericLaneResult {
   return fail("unsupported_prompt");
 }
 
-function fail(reason: string): NumericLaneResult {
+function fail(reason: string, warnings?: string[]): NumericLaneResult {
   return {
     ok: false,
     route: "numeric",
-    verifier: { residualPass: false, residualMax: Number.POSITIVE_INFINITY, warnings: [reason] },
+    verifier: {
+      residualPass: false,
+      residualMax: Number.POSITIVE_INFINITY,
+      warnings: warnings?.length ? warnings : [reason],
+    },
     reason,
   };
 }

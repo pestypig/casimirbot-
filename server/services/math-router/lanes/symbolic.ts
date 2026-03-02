@@ -25,8 +25,7 @@ export async function runSymbolicLane(input: SymbolicLaneInput): Promise<Symboli
 
 function parsePrompt(prompt: string): { op: SymbolicLaneResult["op"]; matrix?: unknown; expr?: string; variable?: string } | null {
   const text = (prompt ?? "").trim();
-  const m = text.match(/\[\[.*\]\]/);
-  const matrix = m?.[0] ? parseMatrixLiteral(m[0]) : null;
+  const matrix = parseMatrixFromPrompt(text);
   if (/\bdet(?:erminant)?\b/i.test(text) && matrix) return { op: "determinant", matrix };
   if (/\binverse\b/i.test(text) && matrix) return { op: "inverse", matrix };
   if (/\btrace\b/i.test(text) && matrix) return { op: "trace", matrix };
@@ -36,14 +35,35 @@ function parsePrompt(prompt: string): { op: SymbolicLaneResult["op"]; matrix?: u
   return null;
 }
 
-function runPython(payload: string): Promise<SymbolicLaneResult> {
-  const pythonBin = process.env.PYTHON_BIN || "python3";
+async function runPython(payload: string): Promise<SymbolicLaneResult> {
+  const requested = process.env.PYTHON_BIN?.trim();
+  const bins = Array.from(new Set([requested, "python", "python3"].filter((v): v is string => Boolean(v))));
+  let last: SymbolicLaneResult = { ok: false, reason: "python_bin_unavailable" };
+
+  for (const bin of bins) {
+    const current = await runPythonWithBin(bin, payload);
+    if (current.ok) return current;
+    last = current;
+    if (!isRetryablePythonFailure(current.reason)) {
+      return current;
+    }
+  }
+
+  return last;
+}
+
+function runPythonWithBin(pythonBin: string, payload: string): Promise<SymbolicLaneResult> {
   return new Promise((resolve) => {
     const child = spawn(pythonBin, [scriptPath], { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
+    let stderr = "";
     child.stdout.on("data", (c) => (stdout += c.toString()));
+    child.stderr.on("data", (c) => (stderr += c.toString()));
     child.on("close", () => {
-      if (!stdout.trim()) return resolve({ ok: false, reason: "empty_output" });
+      if (!stdout.trim()) {
+        const detail = stderr.trim().slice(0, 120);
+        return resolve({ ok: false, reason: detail ? `empty_output:${detail}` : "empty_output" });
+      }
       try {
         const parsed = JSON.parse(stdout) as SymbolicLaneResult;
         resolve(parsed);
@@ -58,6 +78,18 @@ function runPython(payload: string): Promise<SymbolicLaneResult> {
 }
 
 
+function parseMatrixFromPrompt(text: string): (number | string)[][] | null {
+  const literal = text.match(/\[\[.*\]\]/)?.[0];
+  if (literal) {
+    const parsed = parseMatrixLiteral(literal);
+    if (parsed) return parsed;
+  }
+
+  const matrixCall = text.match(/matrix\s*\((.+)\)/i)?.[1];
+  if (!matrixCall) return null;
+  return parseMatrixCallRows(matrixCall);
+}
+
 function parseMatrixLiteral(raw: string): (number | string)[][] | null {
   const t = raw.trim();
   if (!t.startsWith("[[") || !t.endsWith("]]")) return null;
@@ -68,4 +100,21 @@ function parseMatrixLiteral(raw: string): (number | string)[][] | null {
     const n = Number(c);
     return Number.isFinite(n) ? n : c;
   }));
+}
+
+function parseMatrixCallRows(raw: string): (number | string)[][] | null {
+  const rows = Array.from(raw.matchAll(/\[([^\[\]]+)\]/g)).map((m) => m[1]);
+  if (!rows.length) return null;
+  return rows.map((row) =>
+    row.split(",").map((cell) => {
+      const c = cell.trim();
+      const n = Number(c);
+      return Number.isFinite(n) ? n : c;
+    }),
+  );
+}
+
+function isRetryablePythonFailure(reason?: string): boolean {
+  if (!reason) return false;
+  return reason.startsWith("spawn_error:") || reason.startsWith("empty_output");
 }

@@ -14,6 +14,12 @@ describe("math router symbolic lane", () => {
     expect(out.result).toBe("-2");
   });
 
+  it("det(matrix([a,b],[c,d])) -> a*d - b*c", async () => {
+    const out = await runSymbolicLane({ prompt: "det(matrix([a,b],[c,d]))", constants: { e: "euler" } });
+    expect(out.ok).toBe(true);
+    expect(out.result?.replace(/\s+/g, "")).toContain("a*d-b*c");
+  });
+
   it("derivative differs for e as symbol vs euler", async () => {
     const symbol = await runSymbolicLane({ prompt: "derivative of e^x", constants: { e: "symbol" } });
     const euler = await runSymbolicLane({ prompt: "derivative of e^x", constants: { e: "euler" } });

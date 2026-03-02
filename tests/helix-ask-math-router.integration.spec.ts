@@ -9,6 +9,13 @@ describe("helix ask math router integration", () => {
     expect(out?.final?.replace(/\s+/g, "")).toContain("a*d-b*c");
   });
 
+  it("routes matrix(...) determinant ask deterministically", async () => {
+    const out = await solveHelixAskMathQuestion("det(matrix([a,b],[c,d]))");
+    expect(out?.ok).toBe(true);
+    expect(out?.reason).toContain("symbolic_lane:determinant");
+    expect(out?.final?.replace(/\s+/g, "")).toContain("a*d-b*c");
+  });
+
   it("respects e-as-symbol policy", async () => {
     const symbol = await solveHelixAskMathQuestion("treat e as variable and derivative of e^x");
     const euler = await solveHelixAskMathQuestion("derivative of e^x");
