@@ -6,7 +6,14 @@
 Generate a literature-backed scientific manuscript package from the current repo state while preserving strict claim-tier governance and fail-closed evidence handling.
 
 ## Commit Pin
-- `36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e`
+- `baf1e53f72439fe00df331f0c53544bcdcf49577`
+
+## Repository Accessibility Rule (important)
+Use only files that are committed and readable at the commit pin.
+
+- Do not hard-require ignored runtime files under `/artifacts/` unless they are tracked in git at that commit.
+- Treat local runtime traces and generated JSON under `/artifacts/` as optional overlays unless the commit explicitly contains them.
+- If optional overlays are missing, continue using the commit-tracked evidence pack and markdown audits.
 
 ## Mandatory Constraints
 1. Keep the boundary statement verbatim in the output.
@@ -27,11 +34,21 @@ Generate a literature-backed scientific manuscript package from the current repo
    - all figures/tables must be static and readable when exported to PDF
    - prefer compact, page-fit tables over wide/scroll-only layouts
 
-## Required Local Inputs (must be read first)
+## Required Local Inputs (must be read first, commit-tracked)
 - `docs/audits/research/warp-paper-authoring-contract-2026-03-02.md`
-- `artifacts/research/full-solve/warp-evidence-snapshot-2026-03-02.json`
+- `docs/audits/research/warp-evidence-pack-2026-03-02.json`
+- `docs/audits/research/warp-evidence-snapshot-2026-03-02.md`
+- `docs/audits/research/warp-full-solve-campaign-execution-report-2026-02-24.md`
 - `artifacts/research/full-solve/g4-decision-ledger-2026-02-26.json`
 - `artifacts/research/full-solve/g4-governance-matrix-2026-02-27.json`
+- `docs/audits/research/warp-g4-operator-mapping-audit-2026-03-02.md`
+- `docs/audits/research/warp-g4-kernel-provenance-audit-2026-03-02.md`
+- `docs/audits/research/warp-g4-curvature-applicability-audit-2026-03-02.md`
+- `docs/audits/research/warp-g4-uncertainty-audit-2026-03-02.md`
+- `docs/audits/research/warp-g4-literature-parity-replay-2026-03-02.md`
+
+## Optional Local Overlays (use when present)
+- `artifacts/research/full-solve/warp-evidence-snapshot-2026-03-02.json`
 - `artifacts/research/full-solve/g4-promotion-bundle-2026-03-01.json`
 - `artifacts/research/full-solve/g4-operator-mapping-audit-2026-03-02.json`
 - `artifacts/research/full-solve/g4-kernel-provenance-audit-2026-03-02.json`
@@ -75,7 +92,7 @@ Generate two outputs.
   - explicit blockers and how to clear them
 
 ## Fail-Closed Rules
-If any required local file is missing/unreadable:
+If any required commit-tracked local file is missing/unreadable:
 - return:
   - `blocked=true`
   - `commit_pin=<hash>`
