@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import { applyHullBasisToPositions, type HullBasisResolved } from "@shared/hull-basis";
 import type { HullPreviewIndexedGeometry, HullPreviewLOD, HullPreviewPayload } from "@shared/schema";
 
@@ -1002,7 +1003,7 @@ export function resolveHullSurfaceMesh(
   const sectorCountInput =
     typeof opts?.totalSectors === "number"
       ? opts.totalSectors
-      : Number((payload as any)?.hullMetrics?.sectorCount) || 400;
+      : Number((payload as any)?.hullMetrics?.sectorCount) || PROMOTED_WARP_PROFILE.sectorCount;
   const vertexSectors = buildSectorIndices(vertexAngles01, sectorCountInput);
   const triangleAngles01 = buildTriangleAngles(geometry.positions, indices);
   const triangleSectors = buildSectorIndices(triangleAngles01, vertexSectors.sectorCount);
@@ -1032,3 +1033,4 @@ export function resolveHullSurfaceMesh(
 
   return { surface, clampReasons, lod: lodPref, source: surface.source };
 }
+

@@ -1,4 +1,5 @@
 // expectations.ts
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 // ───────────────── Types ─────────────────
 export type ThetaExpectedArgs = {
@@ -16,7 +17,7 @@ export type ThetaExpectedArgs = {
   // duty inputs
   dFR?: number;                 // ship-wide Ford–Roman duty (authoritative if present)
   dutyEffectiveFR?: number;     // alias
-  dutyLocal?: number;           // local burst fraction (e.g., 0.01)
+  dutyLocal?: number;           // local burst fraction
   concurrent?: number;          // S_live
   total?: number;               // S_total
 };
@@ -40,9 +41,9 @@ const EPS = 1e-12;
 export function resolveDutyFR({
   dFR,
   dutyEffectiveFR,
-  dutyLocal = 0.01,
+  dutyLocal = PROMOTED_WARP_PROFILE.dutyCycle,
   concurrent = 1,
-  total = 400
+  total = PROMOTED_WARP_PROFILE.sectorCount,
 }: Partial<ThetaExpectedArgs>): number {
   const fr = Number.isFinite(dFR as number)
     ? (dFR as number)
@@ -56,14 +57,19 @@ export function resolveDutyFR({
 // ─────────────── Expected θ (engine law) ───────────────
 // Matches engine θ-scale: θ = γ_geo^3 · q · γ_VdB_vis · √d_FR
 export function thetaScaleExpected(args: ThetaExpectedArgs = {}) {
-  const gammaGeo = Math.max(1, Number(args.gammaGeo ?? 26));
+  const gammaGeo = Math.max(1, Number(args.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo));
 
   // q (ΔA/A) with aliases
   const qRaw = Number(args.q ?? args.deltaAOverA ?? args.qSpoilingFactor ?? 1);
   const q = Math.max(EPS, qRaw);
 
   // visual γ_VdB with aliases; keep ≥1 so it never damps visuals
-  const gammaV = Number(args.gammaVanDenBroeck_vis ?? args.gammaVdB ?? args.gammaVanDenBroeck ?? 1.4e5);
+  const gammaV = Number(
+    args.gammaVanDenBroeck_vis ??
+      args.gammaVdB ??
+      args.gammaVanDenBroeck ??
+      PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
+  );
   const gammaV_vis = Math.max(1, gammaV);
 
   const dFR = resolveDutyFR(args);
@@ -76,8 +82,8 @@ export function thetaScaleExpected(args: ThetaExpectedArgs = {}) {
 // Convert expected (which now uses linear duty like server) into what the renderer actually uses.
 export function thetaScaleUsed(expected: number, opts: ThetaUsedArgs = {}) {
   const concurrent = Math.max(1, Number(opts.concurrent ?? 1));
-  const total = Math.max(1, Number(opts.total ?? 400));
-  const dutyLocal = Math.max(EPS, Number(opts.dutyLocal ?? 0.01));
+  const total = Math.max(1, Number(opts.total ?? PROMOTED_WARP_PROFILE.sectorCount));
+  const dutyLocal = Math.max(EPS, Number(opts.dutyLocal ?? PROMOTED_WARP_PROFILE.dutyCycle));
 
   const dFR = resolveDutyFR({
     dFR: opts.dFR,

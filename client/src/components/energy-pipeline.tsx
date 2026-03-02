@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 /**
  * Energy Pipeline Display Component (aligned with Helix-Core)
  * Shares pipeline mode + FR duty with the rest of the app
@@ -131,7 +132,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     // 2) mode-local burst fraction as physics default
     const localBurstFrac = Number((live as any)?.localBurstFrac ?? (live as any)?.dutyCycle);
     if (!isFiniteNum(dutyLocal) && isFiniteNum(localBurstFrac)) dutyLocal = clamp01(localBurstFrac);
-    if (!isFiniteNum(dutyLocal)) dutyLocal = 0.01; // ultra-conservative fallback
+    if (!isFiniteNum(dutyLocal)) dutyLocal = PROMOTED_WARP_PROFILE.dutyCycle;
 
     // 3) sectorization (metrics-first)
     const S_total =
@@ -139,7 +140,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
         Number((systemMetrics as any)?.lightCrossing?.sectorsTotal) ??
         Number((systemMetrics as any)?.totalSectors) ??
         Number((live as any)?.sectorsTotal) ??
-        Number((live as any)?.sectorCount) ?? 400
+        Number((live as any)?.sectorCount) ?? PROMOTED_WARP_PROFILE.sectorCount
       ));
     const S_live =
       Math.max(1, Math.min(S_total, Math.floor(
@@ -229,7 +230,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const f_m = fGHz * 1e9;                // Hz
   const ω = 2 * Math.PI * f_m;           // rad/s
   const γ_geo = isFiniteNum(live?.gammaGeo) ? live.gammaGeo : 26;
-  const Q = isFiniteNum(live?.qCavity) ? live.qCavity : 1e9;
+  const Q = isFiniteNum(live?.qCavity) ? live.qCavity : PROMOTED_WARP_PROFILE.qCavity;
   const N = Math.max(1, Number(live?.N_tiles ?? 1));
   const U_static =
     isFiniteNum(live?.U_static) ? live.U_static :
@@ -798,6 +799,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     </div>
   );
 }
+
 
 
 

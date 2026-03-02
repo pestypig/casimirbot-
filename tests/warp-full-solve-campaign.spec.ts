@@ -219,6 +219,14 @@ describe('warp-full-solve-campaign runner', () => {
             qi_tau_provenance_missing: 'tau_light_crossing_unavailable',
             qi_bound_K: 3,
             qi_safetySigma_Jm3: 4,
+            qi_congruent_solve_policy_margin_pass: false,
+            qi_congruent_solve_computed_margin_pass: false,
+            qi_congruent_solve_applicability_pass: true,
+            qi_congruent_solve_metric_pass: false,
+            qi_congruent_solve_semantic_pass: true,
+            qi_congruent_solve_pass: false,
+            qi_congruent_solve_fail_reasons:
+              'policy_margin_not_strict_lt_1|computed_margin_not_strict_lt_1|metric_contract_not_ok',
           },
         },
       },
@@ -264,6 +272,17 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.tauSelectorFallbackApplied).toBe(false);
     expect(diagnostics.tauProvenanceReady).toBe(true);
     expect(diagnostics.tauProvenanceMissing).toBe('tau_light_crossing_unavailable');
+    expect(diagnostics.congruentSolvePolicyMarginPass).toBe(false);
+    expect(diagnostics.congruentSolveComputedMarginPass).toBe(false);
+    expect(diagnostics.congruentSolveApplicabilityPass).toBe(true);
+    expect(diagnostics.congruentSolveMetricPass).toBe(false);
+    expect(diagnostics.congruentSolveSemanticPass).toBe(true);
+    expect(diagnostics.congruentSolvePass).toBe(false);
+    expect(diagnostics.congruentSolveFailReasons).toEqual([
+      'policy_margin_not_strict_lt_1',
+      'computed_margin_not_strict_lt_1',
+      'metric_contract_not_ok',
+    ]);
   });
 
   it('treats null snapshot numerics as missing instead of coercing to 0', () => {
@@ -466,6 +485,13 @@ describe('warp-full-solve-campaign runner', () => {
         curvatureEnforced: true,
         curvatureOk: false,
         applicabilityStatus: 'FAIL',
+        congruentSolvePolicyMarginPass: true,
+        congruentSolveComputedMarginPass: false,
+        congruentSolveApplicabilityPass: true,
+        congruentSolveMetricPass: true,
+        congruentSolveSemanticPass: true,
+        congruentSolvePass: false,
+        congruentSolveFailReasons: ['computed_margin_not_strict_lt_1'],
         rhoSource: 'gr.rho_constraint',
         reasonCode: ['G4_QI_MARGIN_EXCEEDED'],
       },
@@ -518,6 +544,13 @@ describe('warp-full-solve-campaign runner', () => {
     expect(artifact.tauSelectorFallbackApplied).toBe(false);
     expect(artifact.tauProvenanceReady).toBe(true);
     expect(artifact.tauProvenanceMissing).toBe('tau_pulse_unavailable');
+    expect(artifact.congruentSolvePolicyMarginPass).toBe(true);
+    expect(artifact.congruentSolveComputedMarginPass).toBe(false);
+    expect(artifact.congruentSolveApplicabilityPass).toBe(true);
+    expect(artifact.congruentSolveMetricPass).toBe(true);
+    expect(artifact.congruentSolveSemanticPass).toBe(true);
+    expect(artifact.congruentSolvePass).toBe(false);
+    expect(artifact.congruentSolveFailReasons).toEqual(['computed_margin_not_strict_lt_1']);
   });
 
 
@@ -659,11 +692,12 @@ describe('warp-full-solve-campaign runner', () => {
     const args = parseArgs([]);
     expect(args.promoteCandidateId).toBeNull();
     expect(args.autoPromoteReadyCandidate).toBe(false);
+    expect(args.allowExploratoryWaveProfiles).toBe(false);
     expect(typeof args.promotionCheckPath).toBe('string');
     expect(args.promotionCheckPath).toContain('g4-candidate-promotion-check');
   });
 
-  it('resolves promoted wave profiles only when explicit promotable candidate is supplied', () => {
+  it('resolves promoted wave profiles by default when promotion artifact is promotable', () => {
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'warp-promo-profile-'));
     const promotionPath = path.join(tmpRoot, 'promotion-check.json');
     fs.writeFileSync(
@@ -708,16 +742,18 @@ describe('warp-full-solve-campaign runner', () => {
     const promotedProfiles = resolveWaveProfiles({
       promoteCandidateId: 'case_0001',
       promotionCheckPath: promotionPath,
+      allowExploratoryWaveProfiles: false,
     });
     const canonicalProfiles = resolveWaveProfiles({
       promoteCandidateId: null,
       promotionCheckPath: promotionPath,
+      allowExploratoryWaveProfiles: false,
     });
 
     expect(promotedProfiles.A.options.proposals?.[0]?.label).toContain('promoted-case_0001');
     expect((promotedProfiles.A.options.proposals?.[0]?.params as any)?.warpFieldType).toBe('natario_sdf');
     expect((promotedProfiles.A.options.proposals?.[0]?.params as any)?.qi?.tau_s_ms).toBe(0.02);
-    expect(canonicalProfiles.A.options.proposals?.[0]?.label).toContain('wave-a-natario-baseline');
+    expect(canonicalProfiles.A.options.proposals?.[0]?.label).toContain('promoted-case_0001');
   });
 
   it('fails closed for promotion profile when candidate is not promotion-ready', () => {
@@ -750,8 +786,28 @@ describe('warp-full-solve-campaign runner', () => {
       resolveWaveProfiles({
         promoteCandidateId: 'case_0009',
         promotionCheckPath: promotionPath,
+        allowExploratoryWaveProfiles: false,
       }),
     ).toThrow(/candidatePromotionReady=false/);
+  });
+
+  it('allows legacy exploratory wave profiles only when explicitly opted in', () => {
+    const profiles = resolveWaveProfiles({
+      promoteCandidateId: null,
+      promotionCheckPath: path.join(os.tmpdir(), 'missing-promotion-check.json'),
+      allowExploratoryWaveProfiles: true,
+    });
+    expect(profiles.A.options.proposals?.[0]?.label).toContain('wave-a-natario-baseline');
+  });
+
+  it('fails closed by default when promotion artifact is unavailable', () => {
+    expect(() =>
+      resolveWaveProfiles({
+        promoteCandidateId: null,
+        promotionCheckPath: path.join(os.tmpdir(), 'missing-promotion-check.json'),
+        allowExploratoryWaveProfiles: false,
+      }),
+    ).toThrow(/Promoted-only wave profile resolution failed/);
   });
 
   it('auto-promotes wave profiles when requested and promotion artifact is ready', () => {
@@ -800,6 +856,7 @@ describe('warp-full-solve-campaign runner', () => {
       promoteCandidateId: null,
       promotionCheckPath: promotionPath,
       autoPromoteReadyCandidate: true,
+      allowExploratoryWaveProfiles: false,
     });
 
     expect(autoPromotedProfiles.A.options.proposals?.[0]?.label).toContain('promoted-case_0001');

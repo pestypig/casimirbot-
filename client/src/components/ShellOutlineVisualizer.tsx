@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import React, { useEffect, useRef, useState } from "react";
 import { gatedUpdateUniforms, withoutPhysics } from "@/lib/warp-uniforms-gate";
 
@@ -90,11 +91,11 @@ export function ShellOutlineVisualizer({ parameters, debugTag }: Props) {
       betaTiltVec: parameters?.betaTiltVec || [0,-1,0],
       // Mode coupling
       mode: parameters?.mode || 'hover',
-      dutyCycle: parameters?.dutyCycle ?? 0.14,
+      dutyCycle: parameters?.dutyCycle ?? PROMOTED_WARP_PROFILE.dutyCycle,
       sectors: parameters?.sectors ?? 1,
       gammaGeo: parameters?.gammaGeo ?? 26,
       qSpoil: parameters?.qSpoil ?? 1.0,
-      qCavity: parameters?.qCavity ?? 1e9,
+      qCavity: parameters?.qCavity ?? PROMOTED_WARP_PROFILE.qCavity,
 
       // NEW: mechanical uniforms
       qMechanical: qMech,
@@ -104,7 +105,7 @@ export function ShellOutlineVisualizer({ parameters, debugTag }: Props) {
       mechGain,           // single "is-mechanics-hot?" scalar for the shader
 
       // Ford-Roman window + light-crossing data
-      dutyEffectiveFR: parameters?.dutyEffectiveFR ?? 0.01,
+      dutyEffectiveFR: parameters?.dutyEffectiveFR ?? PROMOTED_WARP_PROFILE.dutyCycle,
       lightCrossing: parameters?.lightCrossing,
       zeta: parameters?.zeta
     };
@@ -123,12 +124,12 @@ export function ShellOutlineVisualizer({ parameters, debugTag }: Props) {
       // Mode coupling
       mode: currentMode,
       currentMode: currentMode,
-      dutyCycle: parameters?.dutyCycle ?? 0.14,
+      dutyCycle: parameters?.dutyCycle ?? PROMOTED_WARP_PROFILE.dutyCycle,
       sectors: parameters?.sectors ?? 1,
-      sectorCount: parameters?.sectorCount ?? 400,
+      sectorCount: parameters?.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount,
       gammaGeo: parameters?.gammaGeo ?? 26,
       qSpoil: parameters?.qSpoil ?? 1.0,
-      qCavity: parameters?.qCavity ?? 1e9,
+      qCavity: parameters?.qCavity ?? PROMOTED_WARP_PROFILE.qCavity,
 
       // NEW: mechanical uniforms (computed above)
       qMechanical: qMech,
@@ -138,7 +139,7 @@ export function ShellOutlineVisualizer({ parameters, debugTag }: Props) {
       mechGain,           // single "is-mechanics-hot?" scalar for the shader
 
       // Ford-Roman window + light-crossing data
-      dutyEffectiveFR: parameters?.dutyEffectiveFR ?? 0.01,
+      dutyEffectiveFR: parameters?.dutyEffectiveFR ?? PROMOTED_WARP_PROFILE.dutyCycle,
       lightCrossing: parameters?.lightCrossing,
       zeta: parameters?.zeta
     };

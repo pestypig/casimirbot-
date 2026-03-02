@@ -8,7 +8,6 @@ import { getResonanceWatcherState } from "@/lib/agi/resonanceVersion";
 
 export type PanelId =
   | "live-energy"
-  | "helix-core"
   | "helix-phoenix"
   | "endpoints"
   | "taskbar"
@@ -93,19 +92,6 @@ const BASE_PANELS: PanelDefinition[] = [
     endpoints: [
       "GET /api/helix/pipeline",
       "POST /api/helix/pipeline/update",
-      "POST /api/helix/mode",
-      "POST /api/helix/sweep/run",
-      "GET /api/helix/snapshot"
-    ]
-  },
-  {
-    id: "helix-core",
-    title: "Helix Core",
-    loader: load(() => import("@/pages/helix-core")),
-    defaultSize: { w: 1100, h: 720 },
-    defaultPosition: { x: 140, y: 120 },
-    endpoints: [
-      "GET /api/helix/pipeline",
       "POST /api/helix/mode",
       "POST /api/helix/sweep/run",
       "GET /api/helix/snapshot"

@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -3083,7 +3084,7 @@ function TimeDilationLatticePanelInner({
   }, [geometrySource, geometryAssetId]);
   const casimirDefaults = useMemo(() => {
     const sectorCountRaw = firstFinite(pipelineState?.sectorCount, 400);
-    const sectorCount = Math.max(1, Math.floor(sectorCountRaw ?? 400));
+    const sectorCount = Math.max(1, Math.floor(sectorCountRaw ?? PROMOTED_WARP_PROFILE.sectorCount));
     const sectorDutyRaw = firstFinite(
       (pipelineState as any)?.localBurstFrac,
       pipelineState?.dutyBurst,
@@ -8533,3 +8534,4 @@ function TimeDilationLatticePanelInner({
     </div>
   );
 }
+

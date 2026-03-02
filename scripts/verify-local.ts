@@ -97,6 +97,11 @@ const writeVerifyPayload = async (): Promise<void> => {
 };
 
 const runVerification = async (): Promise<number> => {
+  const helixCoreGuard = await runNpm(["run", "guard:helix-core-deprecated"]);
+  if (helixCoreGuard.code !== 0) {
+    return helixCoreGuard.code;
+  }
+
   if (!skipMath) {
     const math = await runNpm(["run", "math:validate"]);
     if (math.code !== 0) {

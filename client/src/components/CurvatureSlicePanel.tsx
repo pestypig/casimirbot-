@@ -1,4 +1,5 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
@@ -44,7 +45,7 @@ export default function CurvatureSlicePanel() {
     return () => ro.disconnect();
   }, []);
 
-  // Hull → semi-axes [a,b,c] in meters
+  // Hull ? semi-axes [a,b,c] in meters
   const hull = useMemo(() => {
     const H = (hullMetrics && hullMetrics.hull) || null;
     return H
@@ -53,17 +54,17 @@ export default function CurvatureSlicePanel() {
   }, [hullMetrics]);
   const hullVec = hull as unknown as [number, number, number];
 
-  // Concurrent/total sectors (for FR fallback). Total = paper 400.
-  const totalSectors = 400;
+  // Concurrent/total sectors (for FR fallback). Canonical lattice total defaults to 400.
+  const totalSectors = PROMOTED_WARP_PROFILE.sectorCount;
   const concurrentSectors = useMemo(() => {
     // Prefer explicit "how many are ON right now?"
     const liveFromMetrics  = Number.isFinite(live?.activeSectors) ? Number(live?.activeSectors) : undefined;
     const liveFromPipeline = Number.isFinite(live?.sectorsConcurrent) ? Number(live?.sectorsConcurrent) : undefined;
 
-    const S_total = Math.max(1, Number(totalSectors) || 400);
+    const S_total = Math.max(1, Number(totalSectors) || PROMOTED_WARP_PROFILE.sectorCount);
     // Our strobe energizes exactly ONE sector at a time
     const S_live = Math.max(1, Math.min(S_total, liveFromMetrics ?? liveFromPipeline ?? 1));
-    return S_live; // ← will be 1 in Hover/Cruise; clamp prevents 400/400
+    return S_live; // ? will be 1 in Hover/Cruise; clamp prevents 400/400
   }, [live?.activeSectors, live?.sectorsConcurrent, totalSectors]);
   const concurrent = concurrentSectors;
 
@@ -82,19 +83,19 @@ export default function CurvatureSlicePanel() {
     const burst = Number(live?.burst_ms);
     const dwell = Number(live?.dwell_ms);
     const dutyLocal = (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0)
-      ? burst / dwell : 0.01;
+      ? burst / dwell : PROMOTED_WARP_PROFILE.dutyCycle;
 
-    const S_total = Math.max(1, Math.floor(totalSectors || 400));
+    const S_total = Math.max(1, Math.floor(totalSectors || PROMOTED_WARP_PROFILE.sectorCount));
     const S_live  = Math.max(1, Math.min(S_total, Math.floor(concurrentSectors || 1)));
 
-    return Math.max(0, Math.min(1, dutyLocal * (S_live / S_total))); // ← with S_live=1 this is 0.01/400
+    return Math.max(0, Math.min(1, dutyLocal * (S_live / S_total))); // ? with S_live=1 this is 0.01/400
   }, [live, isStandby, concurrentSectors, totalSectors]);
 
   // Physics chain from pipeline (keep unity-safe minimums)
-  const gammaGeo = Number.isFinite(live?.gammaGeo) ? Number(live!.gammaGeo) : 26;
-  const qSpoil   = Number.isFinite(live?.qSpoilingFactor) ? Number(live!.qSpoilingFactor) : 1;
-  const gammaVdB = Math.max(1, Number.isFinite(live?.gammaVanDenBroeck) ? Number(live!.gammaVanDenBroeck) : 1.4e5);
-  const dutyUI   = Number.isFinite(live?.dutyCycle) ? Number(live!.dutyCycle) : 0.14;
+  const gammaGeo = Number.isFinite(live?.gammaGeo) ? Number(live!.gammaGeo) : PROMOTED_WARP_PROFILE.gammaGeo;
+  const qSpoil   = Number.isFinite(live?.qSpoilingFactor) ? Number(live!.qSpoilingFactor) : PROMOTED_WARP_PROFILE.qSpoilingFactor;
+  const gammaVdB = Math.max(1, Number.isFinite(live?.gammaVanDenBroeck) ? Number(live!.gammaVanDenBroeck) : PROMOTED_WARP_PROFILE.gammaVanDenBroeck);
+  const dutyUI   = Number.isFinite(live?.dutyCycle) ? Number(live!.dutyCycle) : PROMOTED_WARP_PROFILE.dutyCycle;
 
   const driveDirVec = useMemo<Vec3>(() => {
     const metricsVecRaw = hullMetrics?.shiftVector?.betaTiltVec;
@@ -163,11 +164,11 @@ export default function CurvatureSlicePanel() {
             <TooltipContent side="top" className="max-w-sm">
               <div className="font-medium text-yellow-300 mb-1">Physics</div>
               <p className="mb-2">
-                True parity view: θ proxy scales as γ³ · (ΔA/A) · γ<sub>VdB</sub> · √(duty<sub>FR</sub>).
-                No boosts. Averaging uses ship-wide Ford–Roman duty.
+                True parity view: ? proxy scales as ?� � (?A/A) � ?<sub>VdB</sub> � v(duty<sub>FR</sub>).
+                No boosts. Averaging uses ship-wide Ford�Roman duty.
               </p>
               <div className="font-medium text-cyan-300 mb-1">Scale</div>
-              <p className="text-xs">Wall thickness is converted to ρ-units from meter-scale hull axes.</p>
+              <p className="text-xs">Wall thickness is converted to ?-units from meter-scale hull axes.</p>
             </TooltipContent>
           </Tooltip>
         </CardTitle>
@@ -227,6 +228,8 @@ export default function CurvatureSlicePanel() {
     </Card>
   );
 }
+
+
 
 
 

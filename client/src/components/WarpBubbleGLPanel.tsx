@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { registerWebGLContext } from "@/lib/webgl/context-pool";
 import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
@@ -316,7 +317,7 @@ export default function WarpBubbleGLPanel({
     const q         = Math.max(1e-12, +(snapshot.qSpoilingFactor ?? snapshot.deltaAOverA ?? 1));
     const gammaVdB  = Math.max(1, +(snapshot.gammaVanDenBroeck_vis ?? 1));
 
-    const sTot = Math.max(1, Math.floor(snapshot.sectorCount ?? 400));
+    const sTot = Math.max(1, Math.floor(snapshot.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount));
     const sLive= Math.max(1, Math.floor(snapshot.sectors ?? 1));
     const dFR  = Number.isFinite(snapshot.dutyEffectiveFR as number)
       ? Math.max(0, Math.min(1, snapshot.dutyEffectiveFR as number))
@@ -426,3 +427,4 @@ function hexToRgb(hex: string){
 //      cameraZ: 2.0,
 //    }}
 // />
+

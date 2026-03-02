@@ -25,7 +25,7 @@ interface MetricConstraints {
   P_avg_max: number;  // Max average power (MW) 
   U_min: number;      // Minimum energy magnitude
   TS_min: number;     // Minimum time-scale ratio
-  zeta_max: number;   // Maximum quantum safety
+  zeta_max: number;   // Strict quantum safety ceiling (pass requires zeta < zeta_max)
   M_target: number;   // Target exotic mass (kg)
   M_tolerance: number; // Mass tolerance (%)
 }
@@ -100,19 +100,19 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
         return {
           ...baseConstraints,
           P_avg_max: 120,   // 83.3 MW + headroom
-          zeta_max: 1.0     // Ford-Roman limit (ζ ≤ 1.0)
+          zeta_max: 1.0     // Ford-Roman strict threshold (zeta < 1.0)
         };
       case 'cruise': 
         return {
           ...baseConstraints,
           P_avg_max: 20,    // 7.4 MW + headroom  
-          zeta_max: 1.0     // ζ=0.89 + margin (Ford-Roman limit)
+          zeta_max: 1.0     // zeta=0.89 + margin (Ford-Roman strict threshold)
         };
       case 'emergency':
         return {
           ...baseConstraints,
           P_avg_max: 400,   // 297.5 MW + headroom
-          zeta_max: 1.0     // Ford-Roman limit (ζ ≤ 1.0)
+          zeta_max: 1.0     // Ford-Roman strict threshold (zeta < 1.0)
         };
       case 'standby':
         return {
@@ -124,7 +124,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
         return {
           ...baseConstraints,
           P_avg_max: 200,   // Default moderate limit
-          zeta_max: 1.0     // Ford-Roman bound
+          zeta_max: 1.0     // Ford-Roman strict bound
         };
     }
   };
@@ -341,6 +341,8 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
   const getStatus = (value: number, max: number, invert = false): 'pass' | 'fail' => {
     return invert ? (value >= max ? 'pass' : 'fail') : (value <= max ? 'pass' : 'fail');
   };
+  const getStrictMaxStatus = (value: number, max: number): 'pass' | 'fail' =>
+    value < max ? 'pass' : 'fail';
 
   const getMassStatus = (mass: number, target: number, tolerance: number): 'pass' | 'fail' => {
     const error = Math.abs(mass - target) / target * 100;
@@ -548,12 +550,12 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                 <p className="text-sm font-medium">Quantum Safety ζ</p>
                 <p className="text-2xl font-bold">{f3(zeta ?? 0)}</p>
               </div>
-              <Badge variant={getStatus(zeta ?? 0, constraints.zeta_max) === 'pass' ? 'default' : 'destructive'}>
-                {getStatus(zeta ?? 0, constraints.zeta_max) === 'pass' ? '✓' : '✗'}
+              <Badge variant={getStrictMaxStatus(zeta ?? 0, constraints.zeta_max) === 'pass' ? 'default' : 'destructive'}>
+                {getStrictMaxStatus(zeta ?? 0, constraints.zeta_max) === 'pass' ? '✓' : '✗'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Ford-Roman: ≤ {constraints.zeta_max}
+              Ford-Roman: &lt; {constraints.zeta_max}
             </p>
           </CardContent>
         </Card>

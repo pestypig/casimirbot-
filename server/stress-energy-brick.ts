@@ -3,6 +3,7 @@ import { resolveHullRadius, type HullRadialMap, type Vec3 } from "./curvature-br
 import { getGlobalPipelineState } from "./energy-pipeline";
 import { enhancedAvgEnergyDensity, natarioShiftFromDensity } from "../modules/dynamic/stress-energy-equations.js";
 import { computeInvariantMassFromFluxTotals } from "../modules/gr/stress-energy-integrals.js";
+import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
 
 export interface StressEnergyBrickParams {
   dims: [number, number, number];
@@ -876,10 +877,10 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const sigmaSector = Math.max(input.sigmaSector ?? 0.05, 1e-3);
   const splitEnabled = input.splitEnabled ?? false;
   const splitFrac = clamp01(input.splitFrac ?? 0.6);
-  const dutyFR = Math.max(input.dutyFR ?? 0.0025, 1e-8);
+  const dutyFR = Math.max(input.dutyFR ?? PROMOTED_WARP_PROFILE.dutyShip, 1e-8);
   const q = Math.max(input.q ?? 1, 1e-4);
-  const gammaGeo = Math.max(input.gammaGeo ?? 26, 1);
-  const gammaVdB = Math.max(input.gammaVdB ?? 1, 1);
+  const gammaGeo = Math.max(input.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo, 1);
+  const gammaVdB = Math.max(input.gammaVdB ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck, 1);
   const ampBase = Math.max(input.ampBase ?? 0, 0);
   const zeta = clamp01(input.zeta ?? 0.84);
   const observerRapidityCap = Number.isFinite(input.observerRapidityCap)
@@ -893,7 +894,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
 
   const state = getGlobalPipelineState();
   const gap_m = Math.max(1e-12, (state?.gap_nm ?? 1) * 1e-9);
-  const cavityQ = Math.max(1e5, state?.qCavity ?? state?.QL ?? 1e9);
+  const cavityQ = Math.max(1e5, state?.qCavity ?? state?.QL ?? PROMOTED_WARP_PROFILE.qCavity);
   const dutyEff = dutyFR;
   const qSpoil = Math.max(1e-6, state?.qSpoilingFactor ?? q);
   const metricT00Raw =

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import type { EnergyPipelineState } from "./use-energy-pipeline";
 import type { CurvatureQuality } from "@/lib/curvature-brick";
 import { fetchLapseBrick, type LapseBrickDecoded, type LapseBrickRequest } from "@/lib/lapse-brick";
@@ -42,15 +43,19 @@ export function useLapseBrick(options: UseLapseBrickOptions = {}) {
   const queryClient = useQueryClient();
   const pipeline = queryClient.getQueryData<EnergyPipelineState>(["/api/helix/pipeline"]);
 
-  const sectorCount = pipeline?.sectorCount ?? pipeline?.sectorsTotal ?? 400;
-  const dutyFR = pickPipelineNumber(pipeline?.dutyEffectiveFR ?? pipeline?.dutyCycle, 0.0025);
-  const gammaGeo = pickPipelineNumber(pipeline?.gammaGeo, 26);
+  const sectorCount = pipeline?.sectorCount ?? pipeline?.sectorsTotal ?? PROMOTED_WARP_PROFILE.sectorCount;
+  const dutyFR = pickPipelineNumber(
+    pipeline?.dutyEffectiveFR ?? pipeline?.dutyCycle,
+    PROMOTED_WARP_PROFILE.dutyShip,
+  );
+  const gammaGeo = pickPipelineNumber(pipeline?.gammaGeo, PROMOTED_WARP_PROFILE.gammaGeo);
   const gammaVdB =
     pickPipelineNumber(
-      pipeline?.gammaVanDenBroeck ??
       (pipeline as any)?.gammaVanDenBroeck_mass ??
+      pipeline?.gammaVanDenBroeck ??
+      (pipeline as any)?.gammaVdB ??
       (pipeline as any)?.gammaVanDenBroeck_vis,
-      1e11,
+      PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
     );
 
   const phase01 = useDriveSyncStore((s) => s.phase01);

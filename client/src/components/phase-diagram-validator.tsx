@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { viability } from '../../../sim_core/viability';
 import { Play, CheckCircle, XCircle } from 'lucide-react';
+import { PROMOTED_WARP_PROFILE } from '@shared/warp-promoted-profile';
 
 interface ValidationResult {
   test: string;
@@ -26,11 +27,11 @@ interface ValidationResult {
 // Needle Hull pipeline parameters (keep aligned with server pipeline defaults)
 const needleHullPipeline = {
   gap: 1e-9,             // 1 nm gap (m)
-  gamma_geo: 26,         // Geometric amplification (γ_geo)
-  Q: 1e9,                // Burst-window cavity Q
-  duty: 0.01,            // Local burst duty (10 µs / 1 ms)
-  duty_eff: 0.01 / 400,  // Ship-wide effective duty (Ford–Roman): 0.01 × (S_live=1 / S_total=400)
-  N_tiles: 1.96e9,       // Paper-authentic census (approx; matches server’s order of magnitude)
+  gamma_geo: PROMOTED_WARP_PROFILE.gammaGeo,
+  Q: PROMOTED_WARP_PROFILE.qCavity,
+  duty: PROMOTED_WARP_PROFILE.dutyCycle,
+  duty_eff: PROMOTED_WARP_PROFILE.dutyShip / PROMOTED_WARP_PROFILE.sectorCount,
+  N_tiles: 1.96e9,       // Canonical baseline census (approx; matches server’s order of magnitude)
   P_raw: 2e15,           // Raw lattice power (2 PW) for stress tests
   // ℏc in J·m — must match server constant (see physics-const.ts -> HBAR * C)
   HBARC: 3.16152677e-26,
@@ -53,7 +54,7 @@ export default function PhaseDiagramValidator() {
     setResults([]);
 
     const testCases = [
-      // Canonical needle hull (paper-authentic)
+      // Canonical needle hull (telemetry/reference baseline)
       { test: 'Needle Hull Exact', area: 25, radius: 86.5, expected: true },
 
       // Larger tiles on canonical hull (should remain viable under power target)
@@ -187,3 +188,5 @@ export default function PhaseDiagramValidator() {
     </Card>
   );
 }
+
+

@@ -1,4 +1,5 @@
-ï»¿import { useEffect, useMemo, useRef, useState } from "react";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import type { QiStats } from "@shared/schema";
 import {
@@ -275,7 +276,7 @@ const formatMsFromUs = (microseconds: number) => {
 
   if (!Number.isFinite(microseconds)) return "n/a";
   if (microseconds >= 1000) return `${(microseconds / 1000).toFixed(3)} ms`;
-  if (microseconds >= 1) return `${microseconds.toFixed(3)} Âµs`;
+  if (microseconds >= 1) return `${microseconds.toFixed(3)} µs`;
   return `${(microseconds * 1000).toFixed(2)} ns`;
 
 };
@@ -879,7 +880,7 @@ function computeDutyEffective(pipeline: any): {
 
 
 
-      Number(pipeline?.sectorsTotal ?? pipeline?.sectorCount ?? pipeline?.lightCrossing?.sectorCount ?? 400),
+      Number(pipeline?.sectorsTotal ?? pipeline?.sectorCount ?? pipeline?.lightCrossing?.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount),
 
 
 
@@ -1392,10 +1393,10 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
   const natarioBadgeTone = natarioOk
     ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
     : "border-amber-500/40 bg-amber-500/10 text-amber-200";
-  const natarioBadgeLabel = natarioOk ? "Natario Kâ‰ˆ0" : "Natario violated";
+  const natarioBadgeLabel = natarioOk ? "Natario K˜0" : "Natario violated";
   const helmholtzDisabled = yorkBaseSamples.length === 0;
   const yorkSampleCount = yorkBaseSamples.length;
-  const yorkDocString = "Natario = divergence-free shift ((âˆ‡Â·Î² = 0) â‡’ York time (K=0)).";
+  const yorkDocString = "Natario = divergence-free shift ((?·ß = 0) ? York time (K=0)).";
   const divMaxDisplay = Number.isFinite(divMaxVal) ? toSci(divMaxVal, 2) : "n/a";
   const kRmsDisplay = Number.isFinite(kRmsValue) ? toSci(kRmsValue, 2) : "n/a";
   useEffect(() => {
@@ -1571,7 +1572,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
   const ledgerValue = ledgerPayback && ledgerPayback > 0
     ? `Payback +${toSci(ledgerPayback, 2)} J`
     : ledgerRatioValue !== undefined
-      ? `Î”E drift ${toPercent(ledgerRatioValue, 3)}`
+      ? `?E drift ${toPercent(ledgerRatioValue, 3)}`
       : "Ledger drift unavailable";
   const paybackWindowDisplay =
     cycleLedger.cycleMs !== null && Number.isFinite(cycleLedger.cycleMs)
@@ -1579,8 +1580,8 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
       : null;
   const ledgerDescription =
     ledgerPayback && ledgerPayback > 0
-      ? `Negative-energy cycle needs +${toSci(ledgerPayback, 2)} J reversible energy${paybackWindowDisplay ? ` within ~${paybackWindowDisplay}` : ""} to hold |Î”E|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)}.`
-      : `Ledger safe when |Î”E|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)}.`;
+      ? `Negative-energy cycle needs +${toSci(ledgerPayback, 2)} J reversible energy${paybackWindowDisplay ? ` within ~${paybackWindowDisplay}` : ""} to hold |?E|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)}.`
+      : `Ledger safe when |?E|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)}.`;
   const ledgerSourceLabel =
     cycleLedger.source === "server"
       ? "server ledger"
@@ -1595,7 +1596,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
         : "Awaiting ledger samples.";
   const ledgerReadDescription =
     ledgerRatioValue !== undefined
-      ? `|Î”E|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)} keeps curvature bookkeeping tight. Latest: Î”E ${toSci(cycleLedger.latest?.dE, 2)} J (bus ${toSci(cycleLedger.latest?.bus, 2)} J, sink ${toSci(cycleLedger.latest?.sink, 2)} J).${ledgerPayback && ledgerPayback > 0 ? ` Requires +${toSci(ledgerPayback, 2)} J reversible credit${paybackWindowDisplay ? ` within ~${paybackWindowDisplay}` : ""}.` : ""}`
+      ? `|?E|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)} keeps curvature bookkeeping tight. Latest: ?E ${toSci(cycleLedger.latest?.dE, 2)} J (bus ${toSci(cycleLedger.latest?.bus, 2)} J, sink ${toSci(cycleLedger.latest?.sink, 2)} J).${ledgerPayback && ledgerPayback > 0 ? ` Requires +${toSci(ledgerPayback, 2)} J reversible credit${paybackWindowDisplay ? ` within ~${paybackWindowDisplay}` : ""}.` : ""}`
       : "Ledger guard balances reversible (bus) and sink joules once samples arrive.";
   const mockBannerUsed =
     devMockStatus.used ||
@@ -1618,7 +1619,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
   const ledgerBaseline = Number.isFinite(ledgerRatioValue)
     ? (ledgerRatioValue as number)
     : (Number.isFinite(dutyEffectiveFRLive) ? (dutyEffectiveFRLive as number) * LEDGER_GUARD_THRESHOLD : null);
-  const dutyCap = 1; // QI cap defaults to zeta<=1 unless server provides a tighter bound
+  const dutyCap = 1; // QI cap defaults to strict zeta<1 unless server provides a tighter bound
   const ledgerDutySweep = [0.25, 0.5, 1, 1.25].map((scale) => {
     const pred = ledgerBaseline == null ? null : ledgerBaseline * scale;
     const measured = scale === 1 && Number.isFinite(ledgerRatioValue) ? (ledgerRatioValue as number) : null;
@@ -1723,6 +1724,16 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
       : qiMetricDerived === false
       ? "QI metric path=proxy-only"
       : "QI metric path=unknown";
+  const qiCongruentSolvePass = qiGuard?.congruentSolvePass === true;
+  const qiCongruentSolveReasons = Array.isArray(qiGuard?.congruentSolveFailReasons)
+    ? qiGuard.congruentSolveFailReasons.filter((reason) => typeof reason === "string" && reason.length > 0)
+    : [];
+  const qiCongruentSolveClass = qiCongruentSolvePass
+    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+    : "border-amber-500/40 bg-amber-500/10 text-amber-200";
+  const qiCongruentSolveLabel = qiCongruentSolvePass
+    ? "QI congruent solve pass"
+    : `QI congruent solve blocked (${qiCongruentSolveReasons[0] ?? "missing_strict_inputs"})`;
 
 
 
@@ -2286,7 +2297,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
   const tsAutoscaleNote = typeof tsAutoscale?.note === "string" ? tsAutoscale.note : null;
   const tsAutoscaleGating = typeof tsAutoscale?.gating === "string" ? tsAutoscale.gating : "idle";
   const tsAutoscaleLabel = (() => {
-    if (tsAutoscaleGating === "active") return `auto:shrinking (â†’${tsTarget.toFixed(0)})`;
+    if (tsAutoscaleGating === "active") return `auto:shrinking (?${tsTarget.toFixed(0)})`;
     if (Number.isFinite(ts) && ts >= tsTarget && tsAutoscaleGating === "idle") return "auto:idle";
     return null;
   })();
@@ -2348,7 +2359,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
     if (tsHigh && epsTight) {
 
-      return { state: "ok" as const, message: `TS â‰¥ ${tsTarget.toFixed(0)}; GR sees <T_mu nu>` };
+      return { state: "ok" as const, message: `TS = ${tsTarget.toFixed(0)}; GR sees <T_mu nu>` };
 
     }
 
@@ -2415,7 +2426,7 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
 
 
 
-  const zetaOk = Number.isFinite(zeta) && zeta <= 1;
+  const zetaOk = Number.isFinite(zeta) && zeta < 1;
 
 
 
@@ -2979,7 +2990,7 @@ const natarioTheta =
   Number.isFinite(natarioThetaGeom)
     ? natarioThetaGeom
     : Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.thetaRaw);
-const natarioThetaLabel = Number.isFinite(natarioThetaGeom) ? "Î¸_geom" : "Î¸_cal";
+const natarioThetaLabel = Number.isFinite(natarioThetaGeom) ? "?_geom" : "?_cal";
 const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
@@ -3673,7 +3684,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-        zeta <= 1 &&
+        zeta < 1 &&
 
 
 
@@ -4043,7 +4054,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
                 onChange={(event) => setHelmholtzEnabled(event.target.checked)}
                 disabled={helmholtzDisabled}
               />
-              Project Î² to div-free (Helmholtz)
+              Project ß to div-free (Helmholtz)
             </label>
             <label className="inline-flex items-center gap-1">
               <input
@@ -4058,7 +4069,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
           <div className="font-mono text-[11px] text-slate-400">{yorkDocString}</div>
           <div className="grid grid-cols-1 gap-3 font-mono sm:grid-cols-2">
             <div>
-              <div className="text-slate-500">max|âˆ‡Â·Î²|</div>
+              <div className="text-slate-500">max|?·ß|</div>
               <div className="text-cyan-200">{divMaxDisplay}</div>
             </div>
             <div>
@@ -4067,8 +4078,8 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
-            <span>Î² samples: {betaSourceLabel}</span>
-            <span>{yorkSampleCount ? `${YORK_THETA_STEPS}Ã—${YORK_PHI_STEPS}` : "n/a"}</span>
+            <span>ß samples: {betaSourceLabel}</span>
+            <span>{yorkSampleCount ? `${YORK_THETA_STEPS}×${YORK_PHI_STEPS}` : "n/a"}</span>
           </div>
         </div>
 
@@ -4115,7 +4126,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-            {Number.isFinite(zeta) ? `Duty/QI zeta=${toFixed(zeta, 3)} (auto<=1)` : "Duty/QI awaiting"}
+            {Number.isFinite(zeta) ? `Duty/QI zeta=${toFixed(zeta, 3)} (auto<1 strict)` : "Duty/QI awaiting"}
 
 
 
@@ -4129,7 +4140,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
             {qiCurvatureOk === true
-              ? `QI curvature ok${qiCurvatureRatioDisplay ? ` Ï„/R=${qiCurvatureRatioDisplay}` : ""}`
+              ? `QI curvature ok${qiCurvatureRatioDisplay ? ` t/R=${qiCurvatureRatioDisplay}` : ""}`
               : qiCurvatureOk === false
                 ? `QI curvature window fail${qiCurvatureEnforced ? " (enforced)" : ""}`
                 : "QI curvature n/a"}
@@ -4159,6 +4170,14 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
           {qiMetricReason ? (
             <Badge className="border border-slate-600/60 bg-slate-900/60 text-slate-300">
               {`QI metric reason=${qiMetricReason}`}
+            </Badge>
+          ) : null}
+          <Badge className={`border ${qiCongruentSolveClass}`}>
+            {qiCongruentSolveLabel}
+          </Badge>
+          {!qiCongruentSolvePass && qiCongruentSolveReasons.length > 1 ? (
+            <Badge className="border border-amber-500/30 bg-amber-500/10 text-amber-200">
+              {`QI strict blockers=${qiCongruentSolveReasons.slice(1, 3).join(",")}`}
             </Badge>
           ) : null}
           <Badge className="border border-slate-600 bg-slate-900/70 text-slate-200">
@@ -4306,14 +4325,14 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
                 >
                   <span>eta_d={probe.scale.toFixed(2)}</span>
                   <span>
-                    {probe.pred !== null ? `Râ‰ˆ${toPercent(probe.pred, 3)}` : "R pending"}{" "}
+                    {probe.pred !== null ? `R˜${toPercent(probe.pred, 3)}` : "R pending"}{" "}
                     {probe.measured !== null ? `(seen ${toPercent(probe.measured, 3)})` : ""}
                   </span>
                 </div>
               ))}
             </div>
             <div className="text-[10px] text-slate-400">
-              Linear until the QI cap; keep R &lt;= {toPercent(LEDGER_GUARD_THRESHOLD, 2)} as Î·_d scales.{" "}
+              Linear until the QI cap; keep R &lt;= {toPercent(LEDGER_GUARD_THRESHOLD, 2)} as ?_d scales.{" "}
               {ledgerBaseline == null ? "Awaiting ledger sample." : ledgerLinearOk ? "Projections stay green." : "Projection drift detected."}
             </div>
           </div>
@@ -4326,18 +4345,18 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
               </Badge>
             </div>
             <ul className="space-y-1 text-[11px] text-slate-200">
-              <li>TS/Îµ gate: {averagingBadgeText}</li>
+              <li>TS/e gate: {averagingBadgeText}</li>
               <li className="font-mono text-slate-300">
                 {Number.isFinite(burstMsLive) ? `burst=${formatSecondsFriendly((burstMsLive as number) / 1000)}` : "burst=n/a"}
                 {" | "}
                 {Number.isFinite(dwellMsLive) ? `dwell=${formatSecondsFriendly((dwellMsLive as number) / 1000)}` : "dwell=n/a"}
               </li>
               <li className="text-slate-300">
-                Ledger source: {ledgerSourceLabel} Â· {ledgerReadValue}
+                Ledger source: {ledgerSourceLabel} · {ledgerReadValue}
               </li>
             </ul>
             <div className="text-[10px] text-slate-400">
-              Averaging badge flips when TS or Îµ exit the Isaacson/Green-Wald band; use this slot to run duty-scale falsification
+              Averaging badge flips when TS or e exit the Isaacson/Green-Wald band; use this slot to run duty-scale falsification
               before live hardware.
             </div>
           </div>
@@ -4446,7 +4465,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-                  {"QI cap: zeta <= 1 (solver freezes duty as zeta -> 1)."}
+                  {"QI cap: zeta < 1 (strict; solver freezes duty as zeta -> 1)."}
 
 
 
@@ -4801,11 +4820,11 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
                 <MetricTooltipBadge
 
-                  label="Tiles @ Îº_body"
+                  label="Tiles @ ?_body"
 
                   value={tilesAtBenchmarkDisplay}
 
-                  description="Tile census required to bring Îº_drive up to the Îº_body benchmark (E_potato ~ 1) while holding ship-averaged power, d_eff, and mathcalG fixed."
+                  description="Tile census required to bring ?_drive up to the ?_body benchmark (E_potato ~ 1) while holding ship-averaged power, d_eff, and mathcalG fixed."
 
                   className="bg-slate-700/80 hover:bg-slate-600/80"
 
@@ -4813,11 +4832,11 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
                 <MetricTooltipBadge
 
-                  label="Î” tiles"
+                  label="? tiles"
 
                   value={deltaTilesDisplay}
 
-                  description="Margin between the live tile census and the Îº_body threshold (E_potato ~ 1). Negative means concentrating the same power onto fewer tiles; positive means surplus tiles while staying above the benchmark."
+                  description="Margin between the live tile census and the ?_body threshold (E_potato ~ 1). Negative means concentrating the same power onto fewer tiles; positive means surplus tiles while staying above the benchmark."
 
                   className={deltaTilesBadgeClass}
 
@@ -4825,11 +4844,11 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
                 <MetricTooltipBadge
 
-                  label="Î”M_exotic"
+                  label="?M_exotic"
 
                   value={massDeltaDisplay}
 
-                  description="Change in the exotic mass proxy (M_exotic) if we move from the live tile census to the Îº_body threshold. The proxy scales linearly with N_tiles."
+                  description="Change in the exotic mass proxy (M_exotic) if we move from the live tile census to the ?_body threshold. The proxy scales linearly with N_tiles."
 
                   className="bg-slate-700/80 hover:bg-slate-600/80"
 
@@ -5924,7 +5943,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
           <p className="mt-3 text-[11px] text-slate-400">
-            Averaging (TS &gt;&gt; 1) says GR samples T_mu nu as a cycle-average; the Ford-Roman guard (zeta &lt;= 1) sets how much we may present, and q_mech &lt;= 1 keeps the hardware honest.
+            Averaging (TS &gt;&gt; 1) says GR samples T_mu nu as a cycle-average; the Ford-Roman guard (zeta &lt; 1) sets how much we may present, and q_mech &lt;= 1 keeps the hardware honest.
           </p>
 
 
@@ -6760,20 +6779,20 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
                 <li>
                   {readMode
                     ? Number.isFinite(natarioTheta)
-                      ? `Server-calculated ${natarioThetaLabel} â‰ˆ ${natarioTheta.toExponential(3)} (${natarioThetaTag}); this tracks Natario volume targets.`
+                      ? `Server-calculated ${natarioThetaLabel} ˜ ${natarioTheta.toExponential(3)} (${natarioThetaTag}); this tracks Natario volume targets.`
                       : `${natarioThetaLabel} estimate unavailable.`
-                    : `${natarioThetaLabel} (server) = ${Number.isFinite(natarioTheta) ? natarioTheta.toExponential(3) : "â€”"} (${natarioThetaTag})`}
+                    : `${natarioThetaLabel} (server) = ${Number.isFinite(natarioTheta) ? natarioTheta.toExponential(3) : "—"} (${natarioThetaTag})`}
                 </li>
 
                 <li>
                   {`K_trace_mean = ${
-                    Number.isFinite(kTraceMeanPack) ? kTraceMeanPack.toExponential(3) : "â€”"
+                    Number.isFinite(kTraceMeanPack) ? kTraceMeanPack.toExponential(3) : "—"
                   } (${kTraceTag})`}
                 </li>
 
                 <li>
                   {`K_sq_mean = ${
-                    Number.isFinite(kSqMeanPack) ? kSqMeanPack.toExponential(3) : "â€”"
+                    Number.isFinite(kSqMeanPack) ? kSqMeanPack.toExponential(3) : "—"
                   } (${kSqTag})`}
                 </li>
 
@@ -6869,7 +6888,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
           <p>
 
-            {`Green-zone means the drive is physical and effective: q <= 1, gamma in band, zeta <= 1, TS >> 1. That's where "move a state of rest" starts to be budgetable.`}
+            {`Green-zone means the drive is physical and effective: q <= 1, gamma in band, zeta < 1, TS >> 1. That's where "move a state of rest" starts to be budgetable.`}
 
           </p>
 
@@ -6887,7 +6906,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
               <li>[OK] Averaging valid: TS &gt;&gt; 1; badge shows "GR sees the average."</li>
 
-              <li>{`[OK] QI guard held: zeta <= 1; duty increases stop at the cap.`}</li>
+              <li>{`[OK] QI guard held: zeta < 1 (strict); duty increases stop at the cap.`}</li>
 
               <li>{`[OK] Green-zone mechanics: q_mech <= 1, 1e5 <= gamma_VdB <= 1e6.`}</li>
 
@@ -6966,7 +6985,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-              ok={Number.isFinite(zeta) && zeta <= 1}
+              ok={Number.isFinite(zeta) && zeta < 1}
 
 
 
@@ -6974,7 +6993,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-              description="QI budget keeps ? <= 1 by policy."
+              description="QI budget keeps ? < 1 by policy."
 
 
 
@@ -6990,7 +7009,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-                  ? `Ford-Roman ratio ${toFixed(zeta, 3)}; staying at or below 1 keeps exotic matter requests lawful.`
+                  ? `Ford-Roman ratio ${toFixed(zeta, 3)}; staying strictly below 1 keeps exotic matter requests lawful.`
 
 
 
@@ -7022,7 +7041,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-              value={Number.isFinite(lrlDriftValue) ? `Î”A_norm ${lrlDriftValueDisplay}` : "Awaiting nav samples"}
+              value={Number.isFinite(lrlDriftValue) ? `?A_norm ${lrlDriftValueDisplay}` : "Awaiting nav samples"}
 
 
 
@@ -7042,7 +7061,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-                  ? `LRL delta ${lrlDriftValueDisplay}; |A| â‰ˆ ${lrlMagnitudeDisplay}, Î”|A| = ${lrlDeltaDisplay}.`
+                  ? `LRL delta ${lrlDriftValueDisplay}; |A| ˜ ${lrlMagnitudeDisplay}, ?|A| = ${lrlDeltaDisplay}.`
 
 
 
@@ -7054,7 +7073,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-              readDescription="Laplaceâ€“Rungeâ€“Lenz vector should stay conserved (docs/alcubierre-alignment). Drift implies Maupertuis violations or non-Keplerian potentials."
+              readDescription="Laplace–Runge–Lenz vector should stay conserved (docs/alcubierre-alignment). Drift implies Maupertuis violations or non-Keplerian potentials."
 
 
 
@@ -7524,7 +7543,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-              readValue={`tau_LC ${formatSecondsFriendly(tauLcSecondsDisplay)} | tau_pulse ${formatSecondsFriendly(tauPulseSecondsDisplay)} | dwell ${formatSecondsFriendly(tauDwellSecondsDisplay)}${modelMode ? ` Â· mode ${modelMode}` : ""}`}
+              readValue={`tau_LC ${formatSecondsFriendly(tauLcSecondsDisplay)} | tau_pulse ${formatSecondsFriendly(tauPulseSecondsDisplay)} | dwell ${formatSecondsFriendly(tauDwellSecondsDisplay)}${modelMode ? ` · mode ${modelMode}` : ""}`}
 
 
 
@@ -7930,25 +7949,25 @@ function LRLProofStrip({ telemetry, className }: LRLProofStripProps) {
 
   const proofs = [
     {
-      label: "Proof I Â· Maupertuis",
+      label: "Proof I · Maupertuis",
       ok: actionOk,
-      primary: actionOk ? `${formatSci(action)} kgÂ·mÂ²/sÂ³` : "action undefined",
-      detail: "Instantaneous pÂ·v lock streamed with every stress-energy tick.",
+      primary: actionOk ? `${formatSci(action)} kg·m²/s³` : "action undefined",
+      detail: "Instantaneous p·v lock streamed with every stress-energy tick.",
     },
     {
-      label: "Proof II Â· âˆšz bridge",
+      label: "Proof II · vz bridge",
       ok: bridgeOk && Number.isFinite(oscillatorMag),
-      primary: bridgeOk ? `|w| â‰ˆ ${formatSci(oscillatorMag)} mÂ¹áŸÂ²` : "bridge unlock",
+      primary: bridgeOk ? `|w| ˜ ${formatSci(oscillatorMag)} m¹?²` : "bridge unlock",
       detail: bridgeOk
-        ? `Residual |wÂ² - z| â‰¤ ${formatSci(planarResidual)} m Â· |E_c| â‰ˆ ${formatSci(energyMag)}`
+        ? `Residual |w² - z| = ${formatSci(planarResidual)} m · |E_c| ˜ ${formatSci(energyMag)}`
         : "Conformal lift unavailable.",
     },
     {
-      label: "Proof III Â· Geometry",
+      label: "Proof III · Geometry",
       ok: geometryOk && Number.isFinite(magnitude),
-      primary: geometryOk ? `e â‰ˆ ${formatSci(eccentricity, 3)}` : "ecc undefined",
+      primary: geometryOk ? `e ˜ ${formatSci(eccentricity, 3)}` : "ecc undefined",
       detail: geometryOk
-        ? `|A| â‰ˆ ${formatSci(magnitude)} Â· residual ${formatSci(geometryResidual)}`
+        ? `|A| ˜ ${formatSci(magnitude)} · residual ${formatSci(geometryResidual)}`
         : "LRL magnitude missing.",
     },
   ];
@@ -7975,3 +7994,4 @@ function LRLProofStrip({ telemetry, className }: LRLProofStripProps) {
     </div>
   );
 }
+

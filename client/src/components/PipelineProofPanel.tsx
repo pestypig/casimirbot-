@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { FrontProofsLedger } from "./FrontProofsLedger";
 import { NeedleCavityBubblePanel } from "./NeedleCavityBubblePanel";
@@ -1356,9 +1357,9 @@ function AppendixGR({ pipeline }: { pipeline?: EnergyPipelineState | null }) {
       (pipeline as any)?.dutyShip ??
       (pipeline as any)?.dutyEff,
     );
-    const dutyLocalRaw = num((pipeline as any)?.dutyCycle ?? (pipeline as any)?.dutyBurst) ?? 0.01;
+    const dutyLocalRaw = num((pipeline as any)?.dutyCycle ?? (pipeline as any)?.dutyBurst) ?? PROMOTED_WARP_PROFILE.dutyCycle;
     const dutyLocal = Math.max(0, Math.min(1, dutyLocalRaw));
-    const sectorsTotal = Math.max(1, Math.round(num((pipeline as any)?.sectorCount ?? 400) ?? 400));
+    const sectorsTotal = Math.max(1, Math.round(num((pipeline as any)?.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount) ?? PROMOTED_WARP_PROFILE.sectorCount));
     const sectorsLiveRaw =
       num(
         (pipeline as any)?.sectorStrobing ??
@@ -1570,3 +1571,4 @@ function AppendixGR({ pipeline }: { pipeline?: EnergyPipelineState | null }) {
     </div>
   );
 }
+

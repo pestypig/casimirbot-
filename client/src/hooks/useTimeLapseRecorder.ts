@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEnergyPipeline, useUpdatePipeline, type EnergyPipelineState } from "./use-energy-pipeline";
 import useMetrics from "./use-metrics";
 import { useLightCrossingLoop } from "./useLightCrossingLoop";
@@ -345,9 +346,9 @@ const drawHud = (ctx: CanvasRenderingContext2D, payload: HudPayload) => {
   const lines: Array<[string, string]> = [
     ["t (s)", payload.t.toFixed(2)],
     ["TS", payload.TS != null && Number.isFinite(payload.TS) ? payload.TS.toExponential(1) : "--"],
-    ["τlc (ms)", formatHudValue(payload.tauLC_ms, 3)],
+    ["tlc (ms)", formatHudValue(payload.tauLC_ms, 3)],
     ["burst/dwell", `${formatHudValue(payload.burst_ms, 2)} / ${formatHudValue(payload.dwell_ms, 2)}`],
-    ["ρ", formatHudValue(payload.rho, 2)],
+    ["?", formatHudValue(payload.rho, 2)],
     ["Q_L", payload.QL != null && Number.isFinite(payload.QL) ? payload.QL.toExponential(1) : "--"],
     ["d_eff", payload.deff != null && Number.isFinite(payload.deff) ? payload.deff.toExponential(1) : "--"],
     [
@@ -360,7 +361,7 @@ const drawHud = (ctx: CanvasRenderingContext2D, payload: HudPayload) => {
         payload.gr.qiOk ? "PASS" : "WARN"
       }`,
     ],
-    ["shell Δθ", formatHudValue(payload.shellOffset, 3)],
+    ["shell ??", formatHudValue(payload.shellOffset, 3)],
   ];
 
   const panelHeight = lines.length * lineHeight + padding * 2;
@@ -616,7 +617,7 @@ const buildRecoveryParams = (
       baseline?.dutyCycle,
       pipeline?.dutyCycle,
       0.01,
-    ) ?? 0.01,
+    ) ?? PROMOTED_WARP_PROFILE.dutyCycle,
   );
   const baseStrobing = Math.max(
     1,
@@ -914,7 +915,9 @@ export function useTimeLapseRecorder({
       ) ?? 1,
     duty: pickNumber(pipeline?.dutyCycle, 0.1) ?? 0.1,
     freqGHz: pickNumber(pipeline?.modulationFreq_GHz, 15) ?? 15,
-    localBurstFrac: pickNumber(pipeline?.localBurstFrac, pipeline?.dutyCycle, 0.01) ?? 0.01,
+    localBurstFrac:
+      pickNumber(pipeline?.localBurstFrac, pipeline?.dutyCycle, PROMOTED_WARP_PROFILE.dutyCycle) ??
+      PROMOTED_WARP_PROFILE.dutyCycle,
   });
 
   const lightLoopRef = useRef(lightLoop);
@@ -1885,11 +1888,14 @@ export function useTimeLapseRecorder({
           state?.tiles?.total,
           stateAny?.lightCrossing?.sectorCount,
           400
-        ) ?? 400
+        ) ?? PROMOTED_WARP_PROFILE.sectorCount
       )
     );
     const baseDuty = pickNumber(state?.dutyCycle, 0.14) ?? 0.14;
-    const baseBurst = clamp01(pickNumber(state?.localBurstFrac, state?.dutyCycle, 0.01) ?? 0.01);
+    const baseBurst = clamp01(
+      pickNumber(state?.localBurstFrac, state?.dutyCycle, PROMOTED_WARP_PROFILE.dutyCycle) ??
+        PROMOTED_WARP_PROFILE.dutyCycle
+    );
     const baseConcurrent = Math.max(
       1,
       Math.round(
@@ -2789,4 +2795,5 @@ export function useTimeLapseRecorder({
 }
 
 export default useTimeLapseRecorder;
+
 

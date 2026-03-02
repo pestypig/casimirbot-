@@ -2,19 +2,26 @@ import React, { useMemo } from "react";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import WarpBubbleGLPanel, { type WarpPipelineSnapshot } from "./WarpBubbleGLPanel";
 import PipelineCongruenceBadge from "@/components/common/PipelineCongruenceBadge";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 // Build a safe snapshot from pipeline data with sensible defaults
 function n(x: any, d: number){ const v = Number(x); return Number.isFinite(v) ? v : d; }
 function clamp(x:number,a:number,b:number){ return Math.max(a, Math.min(b, x)); }
 
 function buildSnapshotFromPipeline(p: any, opts: { viewAvg: boolean }): WarpPipelineSnapshot {
-  const gammaGeo = Math.max(1, n(p?.gammaGeo, 26));
-  const q = Math.max(1e-12, n(p?.qSpoilingFactor ?? p?.deltaAOverA, 1));
-  const gammaVdB_vis = Math.max(1, n(p?.gammaVanDenBroeck_vis ?? p?.gammaVanDenBroeck, 2.86e5));
+  const gammaGeo = Math.max(1, n(p?.gammaGeo, PROMOTED_WARP_PROFILE.gammaGeo));
+  const q = Math.max(1e-12, n(p?.qSpoilingFactor ?? p?.deltaAOverA, PROMOTED_WARP_PROFILE.qSpoilingFactor));
+  const gammaVdB_vis = Math.max(
+    1,
+    n(p?.gammaVanDenBroeck_vis ?? p?.gammaVanDenBroeck, PROMOTED_WARP_PROFILE.gammaVanDenBroeck)
+  );
 
-  const sectorsTotal = Math.max(1, Math.floor(n(p?.sectorsTotal ?? p?.sectorCount ?? p?.lightCrossing?.sectorsTotal, 400)));
+  const sectorsTotal = Math.max(
+    1,
+    Math.floor(n(p?.sectorsTotal ?? p?.sectorCount ?? p?.lightCrossing?.sectorsTotal, PROMOTED_WARP_PROFILE.sectorCount))
+  );
   const sectorsLive  = Math.max(1, Math.floor(n(p?.sectorsConcurrent ?? p?.concurrentSectors ?? p?.lightCrossing?.activeSectors, 1)));
-  const localBurst   = clamp(n(p?.localBurstFrac ?? p?.dutyCycle, 0), 0, 1);
+  const localBurst = clamp(n(p?.localBurstFrac ?? p?.dutyCycle, PROMOTED_WARP_PROFILE.dutyCycle), 0, 1);
   const dutyFR       = clamp(n(p?.dutyEffectiveFR, NaN), 0, 1);
   const dFR          = Number.isFinite(dutyFR) ? dutyFR : clamp(localBurst * (sectorsLive / sectorsTotal), 0, 1);
 

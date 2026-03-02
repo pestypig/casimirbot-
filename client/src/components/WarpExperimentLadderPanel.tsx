@@ -104,7 +104,7 @@ export default function WarpExperimentLadderPanel() {
         experiments: [
           "Measure burst/dwell at tile and sector level; compare to burst_ms, dwell_ms, sectorPeriod_ms, sectorsTotal, sectorsConcurrent, dutyEffectiveFR.",
           "Measure tau_LC(x) = d_hull(x)/c and compare to lightCrossing.tauLC_ms / tauLC_s in pipeline and overlays.",
-          "Run high time-scale ratio modes; confirm QI guards (zeta, fordRomanCompliance, TS_ratio) stay in the green band."
+          "Run high time-scale ratio modes; confirm QI guards (zeta, fordRomanCompliance, TS_ratio) stay in the strict green band (zeta < 1)."
         ],
         verifying: "Duty vs tau_LC constraint holds in hardware so GR can couple to <T_mu_nu> over tauLC, not the microbursts.",
         telemetry: [

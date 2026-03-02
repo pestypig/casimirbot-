@@ -1,6 +1,7 @@
 // warp-uniforms.ts
 // Canonical normalization for warp renderer uniforms, with robust aliasing
 // and physics-aware fallbacks so UI code can depend on consistent fields.
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 export type WarpUniforms = {
   // --- geometry (semi-axes in meters) -------------------------------------
@@ -67,6 +68,7 @@ export type WarpUniforms = {
 const EPS = 1e-12;
 const N = (x:any,d:any)=>Number.isFinite(+x)?+x:d;
 const clamp = (v:number, lo:number, hi:number) => Math.min(hi, Math.max(lo, v));
+const DEFAULT_GAMMA_VDB = PROMOTED_WARP_PROFILE.gammaVanDenBroeck;
 
 // helpers for Purple shift vector processing
 const V3 = (a:any)=>Array.isArray(a)&&a.length===3 ? [+a[0],+a[1],+a[2]] : undefined;
@@ -82,13 +84,13 @@ const computeFordRomanDuty = (burstLocal: number, live: number, total: number, i
 export function normalizeWU(raw:any): WarpUniforms {
   if (!raw) {
     // Conservative defaults consistent with backend fallbacks
-    const sectorCount = 400;
-    const sectors = 1;
-    const dutyLocal = 0.01;
+    const sectorCount = PROMOTED_WARP_PROFILE.sectorCount;
+    const sectors = PROMOTED_WARP_PROFILE.concurrentSectors;
+    const dutyLocal = PROMOTED_WARP_PROFILE.dutyCycle;
     const dutyEffectiveFR = computeFordRomanDuty(dutyLocal, sectors, sectorCount, false);
-    const gammaGeo = 26;
-    const gammaVdB = 1e11; // match PAPER_VDB.GAMMA_VDB from server
-    const q = 1;
+    const gammaGeo = PROMOTED_WARP_PROFILE.gammaGeo;
+    const gammaVdB = DEFAULT_GAMMA_VDB; // telemetry-aligned fallback baseline
+    const q = PROMOTED_WARP_PROFILE.qSpoilingFactor;
     const base: WarpUniforms = {
       sectorCount,
       sectors,
@@ -103,7 +105,7 @@ export function normalizeWU(raw:any): WarpUniforms {
       qSpoilingFactor: q,
       qSpoil: q,
       qMech: 1,
-      qCav: 1e9,
+      qCav: PROMOTED_WARP_PROFILE.qCavity,
       viewAvg: true,
       viewMassFraction: sectors / sectorCount,
       colorMode: 'theta',
@@ -115,11 +117,14 @@ export function normalizeWU(raw:any): WarpUniforms {
   }
 
   // --- sectors & duties -----------------------------------------------------
-  const sectorCount = Math.max(1, N(raw.sectorCount, 400));
-  const sectors     = Math.max(1, Math.min(sectorCount, N(raw.sectors, 1)));
+  const sectorCount = Math.max(1, N(raw.sectorCount, PROMOTED_WARP_PROFILE.sectorCount));
+  const sectors = Math.max(
+    1,
+    Math.min(sectorCount, N(raw.sectors, PROMOTED_WARP_PROFILE.concurrentSectors)),
+  );
 
   // UI duty (what users see/adjust)
-  const dutyCycle   = clamp(N(raw.dutyCycle, 0.01), EPS, 1);
+  const dutyCycle = clamp(N(raw.dutyCycle, PROMOTED_WARP_PROFILE.dutyCycle), EPS, 1);
 
   // Local burst fraction (used in FR derivation)
   const dutyLocal   = clamp(N(raw.dutyLocal, dutyCycle), EPS, 1);
@@ -131,11 +136,11 @@ export function normalizeWU(raw:any): WarpUniforms {
   ), EPS, 1);
 
   // --- γ_geo ----------------------------------------------------------------
-  const gammaGeo = Math.max(1, N(raw.gammaGeo, 26));
+  const gammaGeo = Math.max(1, N(raw.gammaGeo, PROMOTED_WARP_PROFILE.gammaGeo));
 
   // --- q (ΔA/A) with symmetric aliases -------------------------------------
   const q_canonical = clamp(
-    N(raw.deltaAOverA ?? raw.qSpoilingFactor ?? raw.qSpoil, 1),
+    N(raw.deltaAOverA ?? raw.qSpoilingFactor ?? raw.qSpoil, PROMOTED_WARP_PROFILE.qSpoilingFactor),
     EPS, 1e6
   );
   // reflect back to all aliases so downstream code can rely on any name
@@ -145,8 +150,11 @@ export function normalizeWU(raw:any): WarpUniforms {
 
   // --- γ_VdB visual with symmetric aliases ---------------------------------
   const gammaV_vis_src = N(
-    raw.gammaVanDenBroeck_vis ?? raw.gammaVdB ?? raw.gammaVanDenBroeck,
-    1e11 // match PAPER_VDB.GAMMA_VDB from server
+    raw.gammaVanDenBroeck_mass ??
+      raw.gammaVanDenBroeck_vis ??
+      raw.gammaVdB ??
+      raw.gammaVanDenBroeck,
+    DEFAULT_GAMMA_VDB // telemetry-aligned fallback baseline
   );
   const gammaVdB              = Math.max(1, gammaV_vis_src);
   const gammaVanDenBroeck     = gammaVdB; // keep legacy alias in sync
@@ -158,7 +166,7 @@ export function normalizeWU(raw:any): WarpUniforms {
 
   // --- mechanical & cavity Q/gains -----------------------------------------
   const qMech        = clamp(N(raw.qMech ?? raw.qMechanical, 1), EPS, 1e12);
-  const qCav         = clamp(N(raw.qCav ?? raw.qCavity, 1e9), 1, 1e12);
+  const qCav = clamp(N(raw.qCav ?? raw.qCavity, PROMOTED_WARP_PROFILE.qCavity), 1, 1e12);
 
   // --- renderer helpers -----------------------------------------------------
   const viewAvg = typeof raw.viewAvg === 'boolean' ? raw.viewAvg : true;

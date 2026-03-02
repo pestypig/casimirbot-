@@ -43,7 +43,7 @@ export function computeViabilityGrid(
   const massTolerance_pct = Number.isFinite(viabilityParams?.massTolerance)
     ? Number(viabilityParams.massTolerance)
     : 5; // %
-  const maxZeta = Number.isFinite(viabilityParams?.maxZeta) ? Number(viabilityParams.maxZeta) : 1.0; // QI bound
+  const maxZeta = Number.isFinite(viabilityParams?.maxZeta) ? Number(viabilityParams.maxZeta) : 1.0; // strict QI bound (pass requires zeta < maxZeta)
   const minTimescale = Number.isFinite(viabilityParams?.minTimescale) ? Number(viabilityParams.minTimescale) : 0.01;
 
   // CRITICAL FIX #1: Single global γ_pocket (2×10¹¹) for all modes - Needle Hull Mk 1 constant
@@ -110,7 +110,7 @@ export function computeViabilityGrid(
           const TS_ratio = T_struct / T_m;
 
           const powerGate = P_avg_MW <= maxPower_MW;
-          const quantumGate = Number.isFinite(zeta) && zeta <= maxZeta;
+          const quantumGate = Number.isFinite(zeta) && zeta < maxZeta;
           const timescaleGate = Number.isFinite(TS_ratio) && TS_ratio >= minTimescale;
 
           const ok = powerGate && quantumGate && timescaleGate;

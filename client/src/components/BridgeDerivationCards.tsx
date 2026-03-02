@@ -6,6 +6,7 @@ import type { HelixMetrics } from "@/hooks/use-metrics";
 import { computeGreensStats, fmtExp, greensKindLabel } from "@/lib/greens";
 import { Badge } from "@/components/ui/badge";
 import { HELIX_DEV_MOCK_EVENT, getDevMockStatus, type DevMockStatus } from "@/lib/queryClient";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 /* ---------- tiny helpers ---------- */
 const Eq = ({ children }: { children: React.ReactNode }) => (
@@ -143,7 +144,7 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
     num(live.S_total) ??
     num((m as any)?.totalSectors) ??
     num((m as any)?.tiles?.sectorsTotal) ??
-    400;
+    PROMOTED_WARP_PROFILE.sectorCount;
 
   const S_live =
     num(fr.S_live) ??
@@ -239,7 +240,16 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
   const gammaVdB_mass =
     num(live.gammaVanDenBroeck_mass) ??
     num((m as any)?.pipeline?.gammaVanDenBroeck_mass);
-  const Q_burst = 1e9; // paper constant used in backend
+  const qBurstTelemetry =
+    num((m as any)?.pipeline?.Q_burst) ??
+    num((m as any)?.pipeline?.qBurst) ??
+    num((m as any)?.Q_burst) ??
+    num((m as any)?.qBurst);
+  const Q_burst = qBurstTelemetry ?? PROMOTED_WARP_PROFILE.qCavity;
+  const qBurstSource =
+    qBurstTelemetry != null
+      ? "telemetry"
+      : `reference baseline (${PROMOTED_WARP_PROFILE.qCavity.toExponential(0)})`;
   const M_exotic_kg =
     num((m as any)?.pipeline?.M_exotic) ??
     num((m as any)?.M_exotic) ??
@@ -363,7 +373,7 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
         base={baseMass}
         sub={subMass}
         result={M_exotic_kg !== undefined ? `M = ${fint(M_exotic_kg)} kg` : undefined}
-        notes="γ_VdB(mass) is the calibrated pocket factor used solely for mass matching"
+        notes={`γ_VdB(mass) is the calibrated pocket factor used for mass matching; Q_burst source: ${qBurstSource}`}
       />
     </section>
   );
@@ -414,7 +424,7 @@ function TilesCard({ m }: { m: HelixMetrics }) {
         />
 
         <FormulaBlock
-          title="Tile count (paper-authentic)"
+          title="Tile count (telemetry geometry)"
           base="N_tiles = ⌊ (A_hull / A_tile) × PACKING × RADIAL_LAYERS ⌋"
           sub={
             A_hull !== undefined && A_tile_m2 !== undefined
@@ -585,7 +595,7 @@ function ThetaScaleCard({ m }: { m: HelixMetrics }) {
         {modelMode === 'calibrated' ? (
           <div className="text-slate-400">γ_VdB scaled to hit mass target (~1405 kg). Physics θ ≈ 4.4×10¹⁰ becomes calibrated θ ≈ 5.9×10⁴</div>
         ) : (
-          <div className="text-slate-400">Raw physics values, no mass calibration. Both θ values should match paper expectations.</div>
+          <div className="text-slate-400">Reference-baseline values, no mass calibration. Use for comparison only, not as live authority.</div>
         )}
       </div>
 
@@ -617,10 +627,10 @@ function ThetaScaleCard({ m }: { m: HelixMetrics }) {
         }
       />
 
-      {/* Raw theta (for comparison) */}
+      {/* Reference-baseline theta (for comparison) */}
       {gammaVdB_raw != null && (
         <FormulaBlock
-          title="θ (raw) — Paper Physics"
+          title="θ (reference baseline)"
           base={baseEq}
           sub={
             gammaGeo != null && q != null && gammaVdB_raw != null && dEff != null
@@ -630,7 +640,7 @@ function ThetaScaleCard({ m }: { m: HelixMetrics }) {
           result={thetaExpectedRaw != null ? `θ_raw = ${fexp(thetaExpectedRaw, 2)}` : undefined}
           notes={
             <>
-              <div className="text-sm">Raw paper value (γ_VdB = 1×10¹¹, no mass calibration):</div>
+              <div className="text-sm">Reference baseline (γ_VdB = 1×10¹¹, no mass calibration):</div>
               <div className="text-xs text-slate-400 mt-1">
                 Server: θ_raw = {thetaRaw ? fexp(thetaRaw, 2) : '—'} • 
                 Expected: ~4.4×10¹⁰
@@ -652,7 +662,7 @@ function ThetaScaleCard({ m }: { m: HelixMetrics }) {
         <div>• γ_geo = {gammaGeo ? fmt(gammaGeo, 0) : '—'} (geometric amplification)</div>
         <div>• q = {q ? fmt(q, 3) : '—'} (Q-spoiling factor)</div>
         <div>• γ_VdB_cal = {gammaVdB_cal ? fexp(gammaVdB_cal, 2) : '—'} (calibrated)</div>
-        {gammaVdB_raw && <div>• γ_VdB_raw = {fexp(gammaVdB_raw, 2)} (raw paper)</div>}
+        {gammaVdB_raw && <div>• γ_VdB_raw = {fexp(gammaVdB_raw, 2)} (reference baseline)</div>}
         {dutySrc && <div>• d_eff = {dEff ? fexp(dEff, 6) : '—'} (from {dutySrc})</div>}
         {thetaGeom != null && (
           <div>
@@ -727,9 +737,9 @@ function ConstraintCard({ m }: { m: HelixMetrics }) {
 
       <FormulaBlock
         title="Ford–Roman window (summary)"
-        base="ζ ≤ 1 (ship-averaged)"
+        base="ζ < limit (ship-averaged)"
         sub={zeta !== undefined ? `ζ = ${fmt(zeta, 3)}, limit = ${fmt(zetaLim, 3)}` : undefined}
-        result={zeta !== undefined ? (zeta <= zetaLim ? "PASS" : "FAIL") : undefined}
+        result={zeta !== undefined ? (zeta < zetaLim ? "PASS" : "FAIL") : undefined}
         notes="ζ is reported by the server’s averaging window; integral omitted here."
       />
 

@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { C } from "./utils/physics-const-safe";
 import { getGlobalPipelineState } from "./energy-pipeline";
+import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
 
 export type Vec3 = [number, number, number];
 
@@ -367,15 +368,15 @@ export function buildCurvatureBrick(input: Partial<CurvBrickParams>): CurvatureB
   const sigmaSector = Math.max(input.sigmaSector ?? 0.05, 1e-3);
   const splitEnabled = input.splitEnabled ?? false;
   const splitFrac = Math.max(0, Math.min(1, input.splitFrac ?? 0.6));
-  const dutyFR = Math.max(input.dutyFR ?? 0.0025, 1e-6);
+  const dutyFR = Math.max(input.dutyFR ?? PROMOTED_WARP_PROFILE.dutyShip, 1e-6);
   const tauLC = Math.max(input.tauLC_s ?? defaults.axes[0] / C, INV_TAU_FLOOR);
   const Tm = Math.max(input.Tm_s ?? 1 / (15e9), INV_TM_FLOOR);
   const beta0 = Math.max(input.beta0 ?? 1, 0);
   const betaMax = Math.max(input.betaMax ?? 12, 0.5);
   const zeta = input.zeta ?? 0.84;
   const q = Math.max(input.q ?? 1, 0);
-  const gammaGeo = Math.max(input.gammaGeo ?? 26, 1e-6);
-  const gammaVdB = Math.max(input.gammaVdB ?? 1e11, 1e-6);
+  const gammaGeo = Math.max(input.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo, 1e-6);
+  const gammaVdB = Math.max(input.gammaVdB ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck, 1e-6);
   const ampBase = Math.max(input.ampBase ?? 0, 0);
   const clampQI = input.clampQI ?? true;
 

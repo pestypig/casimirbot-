@@ -31,6 +31,7 @@ import { HBAR } from "./physics-const.js";
 import { C } from "./utils/physics-const-safe";
 import { GEOM_TO_SI_STRESS, SI_TO_GEOM_STRESS } from "../shared/gr-units.js";
 import { computeClocking, type ClockingSnapshot } from "../shared/clocking.js";
+import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
 import type { StressEnergyStats } from "./stress-energy-brick";
 import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.js";
 import type { CongruenceMeta } from "../types/pipeline";
@@ -598,10 +599,19 @@ const buildNatarioRuntimePayload = (
   };
 };
 
-const DEFAULT_QI_TAU_MS = parseEnvNumber(process.env.QI_TAU_MS, 5);
+const DEFAULT_QI_TAU_MS = parseEnvNumber(process.env.QI_TAU_MS, PROMOTED_WARP_PROFILE.qi.tau_s_ms);
 const DEFAULT_QI_GUARD = parseEnvNumber(process.env.QI_GUARD_FRAC ?? process.env.QI_GUARD, 0.05);
 const DEFAULT_QI_DT_MS = parseEnvNumber(process.env.QI_DT_MS, 2);
-const DEFAULT_QI_FIELD = (process.env.QI_FIELD_TYPE as QiFieldType | undefined) ?? "em";
+const DEFAULT_QI_FIELD =
+  (process.env.QI_FIELD_TYPE as QiFieldType | undefined) ?? PROMOTED_WARP_PROFILE.qi.fieldType;
+const DEFAULT_QI_SAMPLER: SamplingKind = (() => {
+  const envSampler = process.env.QI_SAMPLER as SamplingKind | undefined;
+  if (envSampler) return envSampler;
+  // Canonical promoted profile can request Hann, but QiSettings only accepts schema samplers.
+  return PROMOTED_WARP_PROFILE.qi.sampler === "hann"
+    ? "gaussian"
+    : (PROMOTED_WARP_PROFILE.qi.sampler as SamplingKind);
+})();
 const DEFAULT_NEGATIVE_FRACTION = 0.4;
 const DEFAULT_QI_INTEREST_RATE = parseEnvNumber(process.env.QI_INTEREST_RATE, 0.2);
 const DEFAULT_QI_INTEREST_WINDOW_MULT = parseEnvNumber(process.env.QI_INTEREST_WINDOW_MULT, 2);
@@ -613,7 +623,7 @@ const DEFAULT_PUMP_FREQ_LIMIT_GHZ = Math.max(
 );
 
 const DEFAULT_QI_SETTINGS: QiSettings = {
-  sampler: 'gaussian',
+  sampler: DEFAULT_QI_SAMPLER,
   tau_s_ms: DEFAULT_QI_TAU_MS,
   observerId: 'ship',
   guardBand: DEFAULT_QI_GUARD,
@@ -1191,6 +1201,24 @@ export type GrRequestPayload = {
   };
 };
 
+export type CongruentWarpSolveSnapshot = {
+  pass: boolean;
+  policyMarginPass: boolean;
+  computedMarginPass: boolean;
+  applicabilityPass: boolean;
+  metricPass: boolean;
+  semanticPass: boolean;
+  failReasons: string[];
+  marginRatioRaw: number | null;
+  marginRatioRawComputed: number | null;
+  applicabilityStatus: "PASS" | "FAIL" | "NOT_APPLICABLE" | "UNKNOWN" | null;
+  quantitySemanticType: string | null;
+  quantityWorldlineClass: string | null;
+  rhoSource: string | null;
+  metricDerivedSource: string | null;
+  strictMode: boolean;
+};
+
 export interface EnergyPipelineState {
   // Input parameters
   tileArea_cm2: number;
@@ -1233,7 +1261,7 @@ export interface EnergyPipelineState {
   currentMode: 'hover' | 'taxi' | 'nearzero' | 'cruise' | 'emergency' | 'standby';
   dutyCycle: number;
   dutyShip: number;           // Ship-wide effective duty (promoted from any)
-  sectorCount: number;        // Total sectors (always 400)
+  sectorCount: number;        // Total sectors
   concurrentSectors: number; // Live concurrent sectors (1-2)
   sectorStrobing: number;     // Legacy alias for UI compatibility
   qSpoilingFactor: number;
@@ -1460,6 +1488,7 @@ export interface EnergyPipelineState {
   qiInterest?: QuantumInterestBook | null;
   qiAutothrottle?: QiAutothrottleState | null;
   qiAutoscale?: QiAutoscaleState | null;
+  congruentSolve?: CongruentWarpSolveSnapshot | null;
   curvatureMeta?: CongruenceMeta;
   stressMeta?: CongruenceMeta;
   metricConstraint?: MetricConstraintAudit;
@@ -3369,10 +3398,10 @@ import { firstFundamentalForm } from "../src/metric.js";
 // --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and +┬ª_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).
 const MODE_POLICY = {
-  hover:     { S_live: 1 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
-  taxi:      { S_live: 1 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
-  nearzero:  { S_live: 1 as const,     P_target_W: 5e6,      P_cap_W: 5e6,      M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
-  cruise:    { S_live: 1 as const,     P_target_W: 40e6,     P_cap_W: 40e6,     M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
+  hover:     { S_live: 2 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
+  taxi:      { S_live: 2 as const,     P_target_W: 83.3e6,   P_cap_W: 83.3e6,   M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
+  nearzero:  { S_live: 2 as const,     P_target_W: 5e6,      P_cap_W: 5e6,      M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
+  cruise:    { S_live: 2 as const,     P_target_W: 40e6,     P_cap_W: 40e6,     M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
   emergency: { S_live: 2 as const,     P_target_W: 297.5e6,  P_cap_W: 300e6,    M_target_kg: 1405, massMode: DEFAULT_MASS_MODE },
   standby:   { S_live: 0 as const,     P_target_W: 0,        P_cap_W: 0,        M_target_kg: 0,    massMode: DEFAULT_MASS_MODE },
 } as const;
@@ -3397,52 +3426,52 @@ if (process.env.NODE_ENV !== 'production') {
 
 function resolveSLive(mode: EnergyPipelineState['currentMode']): number {
   const pol = MODE_POLICY[mode];
-  return Math.max(0, Math.min(PAPER_DUTY.TOTAL_SECTORS, pol.S_live));
+  return Math.max(0, Math.min(PROMOTED_WARP_PROFILE.sectorCount, pol.S_live));
 }
 
 // Mode configurations (physics parameters only, no hard locks)
-// NOTE: Concurrent sectors come from MODE_POLICY.*.S_live, total sectors = PAPER_DUTY.TOTAL_SECTORS = 400
+// NOTE: Concurrent sectors come from MODE_POLICY.*.S_live, total sectors follow promoted runtime profile.
 export const MODE_CONFIGS = {
   hover: {
-    dutyCycle: 0.14,
-    sectorStrobing: 1,
-    qSpoilingFactor: 1,
+    dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
+    sectorStrobing: PROMOTED_WARP_PROFILE.concurrentSectors,
+    qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
     description: "High-power hover mode for station-keeping",
     // New fields for mode-aware physics
-    sectorsTotal: 400,
-    sectorsConcurrent: 1,
-    localBurstFrac: 0.01,
+    sectorsTotal: PROMOTED_WARP_PROFILE.sectorCount,
+    sectorsConcurrent: PROMOTED_WARP_PROFILE.concurrentSectors,
+    localBurstFrac: PROMOTED_WARP_PROFILE.dutyCycle,
     zeta_max: 1.0 // standard quantum bound (Ford-Roman limit)
   },
   taxi: {
-    dutyCycle: 0.14,
-    sectorStrobing: 1,
-    qSpoilingFactor: 1,
+    dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
+    sectorStrobing: PROMOTED_WARP_PROFILE.concurrentSectors,
+    qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
     description: "Ground ops posture; translation suppressed",
-    sectorsTotal: 400,
-    sectorsConcurrent: 1,
-    localBurstFrac: 0.01,
+    sectorsTotal: PROMOTED_WARP_PROFILE.sectorCount,
+    sectorsConcurrent: PROMOTED_WARP_PROFILE.concurrentSectors,
+    localBurstFrac: PROMOTED_WARP_PROFILE.dutyCycle,
     zeta_max: 1.0
   },
   nearzero: {
-    dutyCycle: 0.12,
-    sectorStrobing: 1,
-    qSpoilingFactor: 1,
+    dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
+    sectorStrobing: PROMOTED_WARP_PROFILE.concurrentSectors,
+    qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
     description: "Zero-beta hover-climb regime",
-    sectorsTotal: 400,
-    sectorsConcurrent: 1,
-    localBurstFrac: 0.0075,
+    sectorsTotal: PROMOTED_WARP_PROFILE.sectorCount,
+    sectorsConcurrent: PROMOTED_WARP_PROFILE.concurrentSectors,
+    localBurstFrac: PROMOTED_WARP_PROFILE.dutyCycle,
     zeta_max: 1.0
   },
   cruise: {
-    dutyCycle: 0.005,
-    sectorStrobing: 1,       // Consistent with MODE_POLICY.cruise.S_live: 1 (concurrent sectors)
-    qSpoilingFactor: 0.625,  // keep this consistent with UI defaults below
+    dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
+    sectorStrobing: PROMOTED_WARP_PROFILE.concurrentSectors,
+    qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
     description: "Low-power cruise mode for sustained travel",
     // New fields for mode-aware physics
-    sectorsTotal: 400,
-    sectorsConcurrent: 1,
-    localBurstFrac: 0.01
+    sectorsTotal: PROMOTED_WARP_PROFILE.sectorCount,
+    sectorsConcurrent: PROMOTED_WARP_PROFILE.concurrentSectors,
+    localBurstFrac: PROMOTED_WARP_PROFILE.dutyCycle
   },
   emergency: {
     dutyCycle: 0.50,
@@ -3450,7 +3479,7 @@ export const MODE_CONFIGS = {
     qSpoilingFactor: 1,
     description: "Maximum power emergency mode",
     // New fields for mode-aware physics
-    sectorsTotal: 400,
+    sectorsTotal: PROMOTED_WARP_PROFILE.sectorCount,
     sectorsConcurrent: 8,
     localBurstFrac: 0.50
   },
@@ -3460,7 +3489,7 @@ export const MODE_CONFIGS = {
     qSpoilingFactor: 0.1,
     description: "Minimal power standby mode",
     // New fields for mode-aware physics
-    sectorsTotal: 400,
+    sectorsTotal: PROMOTED_WARP_PROFILE.sectorCount,
     sectorsConcurrent: 1,
     localBurstFrac: 0.0
   }
@@ -3591,8 +3620,8 @@ export function initializePipelineState(): EnergyPipelineState {
     // Needle Hull full scale defaults for HELIX-CORE (paper-authentic)
     tileArea_cm2: 25,  // 5+├╣5 cm tiles (was 5 cm-┬ª, now 25 cm-┬ª)
     tilePitch_m: Math.sqrt((25 * CM2_TO_M2) / PAPER_GEO.PACKING),
-    shipRadius_m: 86.5,
-    gap_nm: 1.0,
+    shipRadius_m: PROMOTED_WARP_PROFILE.shipRadius_m,
+    gap_nm: PROMOTED_WARP_PROFILE.gap_nm,
     sag_nm: 16,
     temperature_K: 20,
     modulationFreq_GHz: DEFAULT_MODULATION_FREQ_GHZ,
@@ -3608,7 +3637,7 @@ export function initializePipelineState(): EnergyPipelineState {
       Lz_m: 173,   // height
       wallThickness_m: DEFAULT_WALL_THICKNESS_M  // Matches 15 GHz dwell (~0.02 m); override for paper 1 m stack
     },
-    warpFieldType: 'natario',
+    warpFieldType: PROMOTED_WARP_PROFILE.warpFieldType,
     warpGeometry: null,
     warpGeometryKind: 'ellipsoid',
     warpGeometryAssetId: undefined,
@@ -3631,12 +3660,12 @@ export function initializePipelineState(): EnergyPipelineState {
     massSource: "model",
     massDatasetId: undefined,
     massFitResiduals: undefined,
-    dutyCycle: 0.14,
-    dutyShip: 0.000025,      // Ship-wide effective duty (will be recalculated)
-    sectorCount: 400,        // Total sectors (always 400)
-    concurrentSectors: 1,    // Live concurrent sectors (default 1)
-    sectorStrobing: 1,       // Legacy alias
-    qSpoilingFactor: 1,
+    dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
+    dutyShip: PROMOTED_WARP_PROFILE.dutyShip, // Ship-wide effective duty (will be recalculated)
+    sectorCount: PROMOTED_WARP_PROFILE.sectorCount,
+    concurrentSectors: PROMOTED_WARP_PROFILE.concurrentSectors,
+    sectorStrobing: PROMOTED_WARP_PROFILE.concurrentSectors, // Legacy alias
+    qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
     negativeFraction: DEFAULT_NEGATIVE_FRACTION,
     strobeHz: Number(process.env.STROBE_HZ ?? 1000),
     phase01: 0,
@@ -3650,25 +3679,25 @@ export function initializePipelineState(): EnergyPipelineState {
     iPeakMaxLauncher_A: DEFAULT_PULSED_CURRENT_LIMITS_A.launcher,
 
     // Physics defaults (paper-backed)
-    gammaGeo: 26,
+    gammaGeo: PROMOTED_WARP_PROFILE.gammaGeo,
     qMechanical: 1,               // Set to 1 (was 5e4) - power knob only
-    qCavity: PAPER_Q.Q_BURST,             // Use paper-backed Q_BURST 
-    gammaVanDenBroeck: PAPER_VDB.GAMMA_VDB, // Use paper-backed +┬ª_VdB seed
+    qCavity: PROMOTED_WARP_PROFILE.qCavity,
+    gammaVanDenBroeck: PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
     exoticMassTarget_kg: 1405,    // Reference target (not a lock)
     casimirModel: 'ideal_retarded',
     ampFactors: {
-      gammaGeo: 26,
-      gammaVanDenBroeck: PAPER_VDB.GAMMA_VDB,
-      qSpoilingFactor: 1,
+      gammaGeo: PROMOTED_WARP_PROFILE.gammaGeo,
+      gammaVanDenBroeck: PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
+      qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
       qMechanical: 1,
-      qCavity: PAPER_Q.Q_BURST,
+      qCavity: PROMOTED_WARP_PROFILE.qCavity,
     },
     amps: {
-      gammaGeo: 26,
-      gammaVanDenBroeck: PAPER_VDB.GAMMA_VDB,
-      qSpoilingFactor: 1,
+      gammaGeo: PROMOTED_WARP_PROFILE.gammaGeo,
+      gammaVanDenBroeck: PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
+      qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
       qMechanical: 1,
-      qCavity: PAPER_Q.Q_BURST,
+      qCavity: PROMOTED_WARP_PROFILE.qCavity,
     },
 
     // Initial calculated values
@@ -3807,12 +3836,15 @@ export async function calculateEnergyPipeline(
     state.warpGeometryKind = state.warpGeometryKind ?? state.warpGeometry?.geometryKind ?? 'ellipsoid';
   }
   if (!state.warpFieldType) {
-    state.warpFieldType = 'natario';
+    state.warpFieldType = PROMOTED_WARP_PROFILE.warpFieldType;
   }
 
   // --- Surface area & tile count from actual hull dims ---
   const tileArea_m2 = state.tileArea_cm2 * CM2_TO_M2;
-  const sectorCountHint = Math.max(1, Math.floor(state.sectorCount || TOTAL_SECTORS));
+  const sectorCountHint = Math.max(
+    1,
+    Math.floor(state.sectorCount || PROMOTED_WARP_PROFILE.sectorCount),
+  );
 
   // If a full rectangular needle + rounded caps is added later, we can refine this.
   // For now, the ellipsoid (a=Lx/2, b=Ly/2, c=Lz/2) is an excellent approximation.
@@ -4254,7 +4286,7 @@ export async function calculateEnergyPipeline(
       ? sectorCountMeasured
       : Number.isFinite(sectorCountDesign) && (sectorCountDesign as number) > 0
         ? sectorCountDesign
-        : state.sectorCount || PAPER_DUTY.TOTAL_SECTORS;
+        : state.sectorCount || PROMOTED_WARP_PROFILE.sectorCount;
   const sectorCountSource: ControlSource =
     Number.isFinite(measuredTotal) && measuredTotal > 0
       ? "measured"
@@ -4265,7 +4297,7 @@ export async function calculateEnergyPipeline(
           : "design";
   const S_total = Math.max(
     1,
-    Math.round(sectorTotalResolved ?? PAPER_DUTY.TOTAL_SECTORS),
+    Math.round(sectorTotalResolved ?? PROMOTED_WARP_PROFILE.sectorCount),
   );
   let S_live = Number.isFinite(measuredLive) && measuredLive >= 0
     ? measuredLive
@@ -4287,9 +4319,9 @@ export async function calculateEnergyPipeline(
         ? (state.dutyBurst as number)
         : Number.isFinite((state as any).localBurstFrac)
           ? (state as any).localBurstFrac
-          : Number.isFinite(state.dutyCycle)
-            ? state.dutyCycle
-            : PAPER_DUTY.BURST_DUTY_LOCAL,
+      : Number.isFinite(state.dutyCycle)
+        ? state.dutyCycle
+            : PROMOTED_WARP_PROFILE.dutyCycle,
     0,
     1,
   );
@@ -4465,7 +4497,7 @@ export async function calculateEnergyPipeline(
 
   // 6) Power ? raw first, then power-only calibration via qMechanical
   const omega = 2 * Math.PI * (state.modulationFreq_GHz ?? DEFAULT_MODULATION_FREQ_GHZ) * 1e9;
-  const Q = state.qCavity ?? PAPER_Q.Q_BURST;
+  const Q = state.qCavity ?? PROMOTED_WARP_PROFILE.qCavity;
   const perTilePower = (qMech: number) => Math.abs(state.U_geo * qMech) * omega / Q; // J/s per tile during ON
 
   const CALIBRATED = (modelMode === 'calibrated');
@@ -4572,7 +4604,7 @@ export async function calculateEnergyPipeline(
   const tileVolume_m3 = Math.max(0, tileArea_m2 * gap_m);
   const baseGammaRequest = Number.isFinite(state.gammaVanDenBroeck)
     ? (state.gammaVanDenBroeck as number)
-    : PAPER_VDB.GAMMA_VDB;
+    : PROMOTED_WARP_PROFILE.gammaVanDenBroeck;
   const guardInputHull = {
     Lx_m: hullDims.Lx_m,
     Ly_m: hullDims.Ly_m,
@@ -4583,7 +4615,7 @@ export async function calculateEnergyPipeline(
     hull: guardInputHull,
     gammaRequested: baseGammaRequest,
   });
-  const gammaSeed = Math.min(PAPER_VDB.GAMMA_VDB, vdbGuard.limit);
+  const gammaSeed = Math.min(Math.max(1, baseGammaRequest), vdbGuard.limit);
 
   const massFromGamma = (gammaVdBValue: number) => {
     const { rho_avg, rho_inst } = enhancedAvgEnergyDensity({
@@ -4731,11 +4763,11 @@ export async function calculateEnergyPipeline(
     (state as any).vdb_two_wall_derivative_support = vdbTwoWallDerivativeSupport;
     // Split gamma_VdB into visual vs mass knobs to keep calibrator away from renderer
   (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // G├Ñ├ë pipeline value (targeted when enabled)
-  (state as any).gammaVanDenBroeck_vis  = PAPER_VDB.GAMMA_VDB;                 // G├Ñ├ë fixed "physics/visual" seed for renderer
+  (state as any).gammaVanDenBroeck_vis  = PROMOTED_WARP_PROFILE.gammaVanDenBroeck; // fixed runtime visual seed
 
   // Make visual factor mode-invariant (except standby)
   if (state.currentMode !== 'standby') {
-    (state as any).gammaVanDenBroeck_vis = PAPER_VDB.GAMMA_VDB; // constant across modes
+    (state as any).gammaVanDenBroeck_vis = PROMOTED_WARP_PROFILE.gammaVanDenBroeck; // constant across modes
   } else {
     (state as any).gammaVanDenBroeck_vis = 1; // keep standby dark
   }
@@ -4746,7 +4778,7 @@ export async function calculateEnergyPipeline(
   // Use the calibrated/mass +┬ª_VdB when available; fall back to visual seed if not.
   const _gammaVdB_forTheta = Number.isFinite(state.gammaVanDenBroeck)
     ? state.gammaVanDenBroeck
-    : ((state as any).gammaVanDenBroeck_vis ?? PAPER_VDB.GAMMA_VDB);
+    : ((state as any).gammaVanDenBroeck_vis ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck);
 
   // DEBUG: ++-Scale Field Strength Audit (dual-value: raw vs calibrated)
   const gammaVdB_raw = PAPER_VDB.GAMMA_VDB;  // Raw paper value (1e11)
@@ -4921,7 +4953,11 @@ export async function calculateEnergyPipeline(
       : null;
     const E_tile_mass = rhoAvgAudit != null
       ? rhoAvgAudit * tileVolume_m3
-      : Math.abs(state.U_static) * Math.pow(state.gammaGeo,3) * PAPER_Q.Q_BURST * state.gammaVanDenBroeck * d_eff;
+      : Math.abs(state.U_static) *
+          Math.pow(state.gammaGeo, 3) *
+          (state.qCavity ?? PROMOTED_WARP_PROFILE.qCavity) *
+          state.gammaVanDenBroeck *
+          d_eff;
     const M_exp  = (E_tile_mass / (C*C)) * state.N_tiles;
     if (Math.abs(state.M_exotic - M_exp) > 1e-6 * Math.max(1, M_exp)) {
       if (DEBUG_PIPE) console.warn("[AUDIT] M_exotic drift; correcting", {reported: state.M_exotic, expected: M_exp});
@@ -4993,7 +5029,9 @@ export async function calculateEnergyPipeline(
       : undefined;
   const prevBurstMs = Number.isFinite(prevBurstNs) ? (prevBurstNs as number) / 1e6 : undefined;
 
-  const dutyBurst = Number.isFinite(state.dutyBurst) ? Number(state.dutyBurst) : PAPER_DUTY.BURST_DUTY_LOCAL;
+  const dutyBurst = Number.isFinite(state.dutyBurst)
+    ? Number(state.dutyBurst)
+    : PROMOTED_WARP_PROFILE.dutyCycle;
   let baseBurst_ms: number;
   let baseBurstSource: string;
   if (Number.isFinite(hwBurstMs)) {
@@ -5367,6 +5405,7 @@ export async function calculateEnergyPipeline(
   (state as any).zetaRaw = qiGuard.marginRatioRaw;
   (state as any).zetaRawComputed = qiGuard.marginRatioRawComputed;
   (state as any).qiGuardrail = qiGuard;
+  state.congruentSolve = buildCongruentWarpSolveSnapshot(qiGuard);
 
   const tsLog = {
     TS_ratio: state.TS_ratio,
@@ -5575,11 +5614,11 @@ export async function calculateEnergyPipeline(
     const geomR = Math.cbrt(a * b * c); // meters
 
     const SE = toPipelineStressEnergy({
-      gap_nm: state.gap_nm ?? 1,
-      gammaGeo: state.gammaGeo ?? 26,
-      cavityQ: state.qCavity ?? 1e9,
-      gammaVanDenBroeck: state.gammaVanDenBroeck ?? 3.83e1,
-      qSpoilingFactor: state.qSpoilingFactor ?? 1,
+      gap_nm: state.gap_nm ?? PROMOTED_WARP_PROFILE.gap_nm,
+      gammaGeo: state.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo,
+      cavityQ: state.qCavity ?? PROMOTED_WARP_PROFILE.qCavity,
+      gammaVanDenBroeck: state.gammaVanDenBroeck ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
+      qSpoilingFactor: state.qSpoilingFactor ?? PROMOTED_WARP_PROFILE.qSpoilingFactor,
       dutyCycle: state.dutyCycle,
       sectorStrobing: state.sectorStrobing,
       dutyEffectiveFR: state.dutyEffective_FR,     // stress-energy payload     
@@ -5604,11 +5643,11 @@ export async function calculateEnergyPipeline(
 
     const priorAmpInputs = (state.ampFactors ?? (state as any).amps ?? {}) as AmpFactors;
     const ampFactors: AmpFactors = {
-      gammaGeo: state.gammaGeo ?? 26,
-      gammaVanDenBroeck: state.gammaVanDenBroeck ?? 3.83e1,
-      qSpoilingFactor: state.qSpoilingFactor ?? 1,
+      gammaGeo: state.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo,
+      gammaVanDenBroeck: state.gammaVanDenBroeck ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
+      qSpoilingFactor: state.qSpoilingFactor ?? PROMOTED_WARP_PROFILE.qSpoilingFactor,
       qMechanical: state.qMechanical ?? 1,
-      qCavity: state.qCavity ?? PAPER_Q.Q_BURST,
+      qCavity: state.qCavity ?? PROMOTED_WARP_PROFILE.qCavity,
       measuredGammaGeo: priorAmpInputs.measuredGammaGeo,
       measuredGammaVanDenBroeck: priorAmpInputs.measuredGammaVanDenBroeck,
       measuredQSpoilingFactor: priorAmpInputs.measuredQSpoilingFactor,
@@ -5617,7 +5656,10 @@ export async function calculateEnergyPipeline(
     };
     state.ampFactors = ampFactors;
     (state as any).amps = ampFactors; // back-compat alias
-    const warpFieldType = (state.dynamicConfig as any)?.warpFieldType ?? state.warpFieldType ?? 'natario';
+    const warpFieldType =
+      (state.dynamicConfig as any)?.warpFieldType ??
+      state.warpFieldType ??
+      PROMOTED_WARP_PROFILE.warpFieldType;
     const warpGeometry = (state.dynamicConfig as any)?.warpGeometry ?? state.warpGeometry ?? null;
     const warpGeometryKind =
       (warpGeometry as WarpGeometrySpec)?.geometryKind ??
@@ -5673,7 +5715,7 @@ export async function calculateEnergyPipeline(
 
     const warpParams = {
       geometry: 'bowl' as const,
-      gap: state.gap_nm ?? 1,
+      gap: state.gap_nm ?? PROMOTED_WARP_PROFILE.gap_nm,
       radius: geomR_warp * 1e6, // Convert meters to micrometers for compatibility
       sagDepth: state.sag_nm ?? 16,
       material: 'PEC' as const,
@@ -5690,9 +5732,9 @@ export async function calculateEnergyPipeline(
         strokeAmplitudePm: 50,
         burstLengthUs: 10,
         cycleLengthUs: 1000,
-        cavityQ: state.qCavity ?? 1e9,
-        sectorCount: state.sectorCount ?? 400,
-        sectorDuty: state.dutyEffective_FR ?? 2.5e-5, // warp module payload
+        cavityQ: state.qCavity ?? PROMOTED_WARP_PROFILE.qCavity,
+        sectorCount: state.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount,
+        sectorDuty: state.dutyEffective_FR ?? PROMOTED_WARP_PROFILE.dutyShip, // warp module payload
         pulseFrequencyGHz: state.modulationFreq_GHz ?? DEFAULT_MODULATION_FREQ_GHZ,
         lightCrossingTimeNs: tauLC_s * 1e9,
         shiftAmplitude: 50e-12,
@@ -6163,6 +6205,7 @@ export async function calculateEnergyPipeline(
     (state as any).zetaRaw = qiGuardLate.marginRatioRaw;
     (state as any).zetaRawComputed = qiGuardLate.marginRatioRawComputed;
     (state as any).qiGuardrail = qiGuardLate;
+    state.congruentSolve = buildCongruentWarpSolveSnapshot(qiGuardLate);
     const qiStatusLate = deriveQiStatus({
       zetaRaw: qiGuardLate.marginRatioRaw,
       zetaClamped: qiGuardLate.marginRatio,
@@ -6260,6 +6303,47 @@ function flushPendingPumpCommand(): void {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[pipeline] multi-tone pump slew failed: ${message}`);
   });
+}
+
+function buildCongruentWarpSolveSnapshot(qiGuard: any): CongruentWarpSolveSnapshot | null {
+  if (!qiGuard || typeof qiGuard !== "object") return null;
+  const failReasons = Array.isArray(qiGuard.congruentSolveFailReasons)
+    ? qiGuard.congruentSolveFailReasons
+        .map((reason: unknown) => String(reason))
+        .filter((reason: string) => reason.length > 0)
+    : [];
+  const marginRatioRaw = Number.isFinite(qiGuard.marginRatioRaw)
+    ? Number(qiGuard.marginRatioRaw)
+    : null;
+  const marginRatioRawComputed = Number.isFinite(qiGuard.marginRatioRawComputed)
+    ? Number(qiGuard.marginRatioRawComputed)
+    : null;
+  const applicabilityStatusRaw = String(qiGuard.applicabilityStatus ?? "");
+  const applicabilityStatus =
+    applicabilityStatusRaw === "PASS" ||
+    applicabilityStatusRaw === "FAIL" ||
+    applicabilityStatusRaw === "NOT_APPLICABLE" ||
+    applicabilityStatusRaw === "UNKNOWN"
+      ? (applicabilityStatusRaw as CongruentWarpSolveSnapshot["applicabilityStatus"])
+      : null;
+  return {
+    pass: qiGuard.congruentSolvePass === true,
+    policyMarginPass: qiGuard.congruentSolvePolicyMarginPass === true,
+    computedMarginPass: qiGuard.congruentSolveComputedMarginPass === true,
+    applicabilityPass: qiGuard.congruentSolveApplicabilityPass === true,
+    metricPass: qiGuard.congruentSolveMetricPass === true,
+    semanticPass: qiGuard.congruentSolveSemanticPass === true,
+    failReasons,
+    marginRatioRaw,
+    marginRatioRawComputed,
+    applicabilityStatus,
+    quantitySemanticType: qiGuard.quantitySemanticType != null ? String(qiGuard.quantitySemanticType) : null,
+    quantityWorldlineClass:
+      qiGuard.quantityWorldlineClass != null ? String(qiGuard.quantityWorldlineClass) : null,
+    rhoSource: qiGuard.rhoSource != null ? String(qiGuard.rhoSource) : null,
+    metricDerivedSource: qiGuard.metricDerivedSource != null ? String(qiGuard.metricDerivedSource) : null,
+    strictMode: qiGuard.strictMode === true,
+  };
 }
 
 function emitQiGuardLog(state: EnergyPipelineState, qiGuard: any): void {
@@ -7716,6 +7800,13 @@ export function evaluateQiGuardrail(
   tauSelectorFallbackApplied: boolean;
   tauProvenanceReady: boolean;
   tauProvenanceMissing: string[];
+  congruentSolvePolicyMarginPass: boolean;
+  congruentSolveComputedMarginPass: boolean;
+  congruentSolveApplicabilityPass: boolean;
+  congruentSolveMetricPass: boolean;
+  congruentSolveSemanticPass: boolean;
+  congruentSolvePass: boolean;
+  congruentSolveFailReasons: string[];
 } {
   const sampler = opts.sampler ?? state.phaseSchedule?.sampler ?? state.qi?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
   const tau_ms =
@@ -8012,6 +8103,36 @@ export function evaluateQiGuardrail(
   const quantitySemanticReason = quantitySemanticComparable
     ? "semantic_parity_qei_timelike_ren"
     : `semantic_mismatch:${quantitySemanticBaseType}:${quantityWorldlineClass}`;
+  const congruentSolvePolicyMarginPass = Number.isFinite(rawRatio) && rawRatio < 1;
+  const congruentSolveComputedMarginPass =
+    Number.isFinite(rawRatioComputed) && rawRatioComputed < 1;
+  const congruentSolveApplicabilityPass = applicabilityStatus === "PASS";
+  const congruentSolveMetricPass = metricContractOk && metricDerived;
+  const congruentSolveSemanticPass = quantitySemanticComparable;
+  const congruentSolveFailReasons: string[] = [];
+  if (!congruentSolveApplicabilityPass) {
+    congruentSolveFailReasons.push(
+      `applicability_not_pass:${String(applicabilityStatus ?? "unknown").toLowerCase()}`,
+    );
+  }
+  if (!congruentSolvePolicyMarginPass) {
+    congruentSolveFailReasons.push("policy_margin_not_strict_lt_1");
+  }
+  if (!congruentSolveComputedMarginPass) {
+    congruentSolveFailReasons.push("computed_margin_not_strict_lt_1");
+  }
+  if (!congruentSolveMetricPass) {
+    congruentSolveFailReasons.push(metricContractOk ? "metric_not_derived" : "metric_contract_not_ok");
+  }
+  if (!congruentSolveSemanticPass) {
+    congruentSolveFailReasons.push(`semantic_not_comparable:${quantitySemanticReason}`);
+  }
+  const congruentSolvePass =
+    congruentSolvePolicyMarginPass &&
+    congruentSolveComputedMarginPass &&
+    congruentSolveApplicabilityPass &&
+    congruentSolveMetricPass &&
+    congruentSolveSemanticPass;
 
   return {
     lhs_Jm3: lhs,
@@ -8100,6 +8221,13 @@ export function evaluateQiGuardrail(
     tauSelectorFallbackApplied,
     tauProvenanceReady,
     tauProvenanceMissing,
+    congruentSolvePolicyMarginPass,
+    congruentSolveComputedMarginPass,
+    congruentSolveApplicabilityPass,
+    congruentSolveMetricPass,
+    congruentSolveSemanticPass,
+    congruentSolvePass,
+    congruentSolveFailReasons,
   };
 }
 
@@ -8329,21 +8457,25 @@ export async function computeEnergySnapshot(sim: any) {
   // Convert sim to pipeline state format
   const state = {
     ...initializePipelineState(),
-    gap_nm: sim.gap ?? 1,
+    gap_nm: sim.gap ?? PROMOTED_WARP_PROFILE.gap_nm,
     sag_nm: sim.sagDepth ?? 16,
     temperature_K: sim.temperature ?? 20,
     modulationFreq_GHz: sim.dynamicConfig?.modulationFreqGHz ?? DEFAULT_MODULATION_FREQ_GHZ,
     currentMode: sim.mode ?? 'hover',
     massMode: (sim as any)?.massMode ?? sim.massMode,
-    gammaGeo: ampFactorsInput?.gammaGeo ?? 26,
+    gammaGeo: ampFactorsInput?.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo,
     qMechanical: ampFactorsInput?.qMechanical ?? 1,
-    qCavity: sim.dynamicConfig?.cavityQ ?? ampFactorsInput?.qCavity ?? 1e9,
-    gammaVanDenBroeck: ampFactorsInput?.gammaVanDenBroeck ?? 3.83e1,
-    qSpoilingFactor: ampFactorsInput?.qSpoilingFactor ?? 1,
-    dutyCycle: sim.dynamicConfig?.dutyCycle ?? 0.14,
-    sectorCount: sim.dynamicConfig?.sectorCount ?? 400,
+    qCavity: sim.dynamicConfig?.cavityQ ?? ampFactorsInput?.qCavity ?? PROMOTED_WARP_PROFILE.qCavity,
+    gammaVanDenBroeck:
+      ampFactorsInput?.gammaVanDenBroeck ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
+    qSpoilingFactor: ampFactorsInput?.qSpoilingFactor ?? PROMOTED_WARP_PROFILE.qSpoilingFactor,
+    dutyCycle: sim.dynamicConfig?.dutyCycle ?? PROMOTED_WARP_PROFILE.dutyCycle,
+    sectorCount: sim.dynamicConfig?.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount,
     exoticMassTarget_kg: sim.exoticMassTarget_kg ?? 1405,
-    warpFieldType: sim.dynamicConfig?.warpFieldType ?? (sim as any)?.warpFieldType ?? 'natario',
+    warpFieldType:
+      sim.dynamicConfig?.warpFieldType ??
+      (sim as any)?.warpFieldType ??
+      PROMOTED_WARP_PROFILE.warpFieldType,
     warpGeometry: (sim as any)?.warpGeometry ?? sim.dynamicConfig?.warpGeometry ?? null,
     warpGeometryKind: (sim as any)?.warpGeometryKind ?? (sim as any)?.warpGeometry?.kind,
     warpGeometryAssetId: (sim as any)?.warpGeometryAssetId ?? (sim as any)?.warpGeometry?.assetId,
@@ -8386,7 +8518,11 @@ export async function computeEnergySnapshot(sim: any) {
 
   // ---- Duty (renderer authority) by mode; keep explicit fields too ----------
   // Trust the pipeline's FR duty (ship-wide, sector-averaged)
-  const dutyEffectiveFR = result.dutyEffective_FR ?? result.dutyShip ?? (result as any).dutyEff ?? 2.5e-5;
+  const dutyEffectiveFR =
+    result.dutyEffective_FR ??
+    result.dutyShip ??
+    (result as any).dutyEff ??
+    PROMOTED_WARP_PROFILE.dutyShip;
 
   const duty = {
     dutyUsed:        finite(result.dutyUsed),
@@ -8551,7 +8687,7 @@ export async function computeEnergySnapshot(sim: any) {
     // FordG├ç├┤Roman duty derivation (numbers)
     fordRomanDuty: {
       formula: "d_eff = measuredDuty || (dutyBurst * S_live / S_total)",
-      burstLocal: result.dutyBurst ?? PAPER_DUTY.BURST_DUTY_LOCAL,
+      burstLocal: result.dutyBurst ?? PROMOTED_WARP_PROFILE.dutyCycle,
       S_total: result.sectorCount,
       S_live: result.concurrentSectors,
       measured_d_eff: result.dutyMeasuredFR,
@@ -8711,7 +8847,10 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
 
   const nTheta = Math.max(1, req.nTheta ?? 64);
   const nPhi   = Math.max(2, req.nPhi ?? 32); // need G├½├æ2 to avoid (nPhi-1)=0
-  const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorCount ?? TOTAL_SECTORS));
+  const sectors = Math.max(
+    1,
+    Math.floor(req.sectors ?? state.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount),
+  );
   const split   = Number.isFinite(req.split as number) ? Math.max(0, Math.floor(req.split!)) : Math.floor(sectors / 2);
 
   const totalSamples = nTheta * nPhi;
@@ -8724,8 +8863,8 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   const w_rho = Math.max(1e-6, w_m / aEff);
 
   // Match renderer's gain chain (display-focused): disp ~ +┬ª_geo^3 * q_spoil * bell * sgn
-  const gammaGeo   = state.gammaGeo ?? 26;
-  const qSpoil     = state.qSpoilingFactor ?? 1;
+  const gammaGeo = state.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo;
+  const qSpoil = state.qSpoilingFactor ?? PROMOTED_WARP_PROFILE.qSpoilingFactor;
   const geoAmp     = Math.pow(gammaGeo, 3);               // *** cubic, same as pipeline ***
   const vizGain    = 1.0;                                 // keep physics-scale here; renderer may apply extra gain
 
@@ -8825,14 +8964,17 @@ export function sampleDisplacementFieldGeometry(state: EnergyPipelineState, req:
   const c = hullGeom.Lz_m / 2;
   const axes: HullAxes = { a, b, c };
 
-  const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorCount ?? TOTAL_SECTORS));
+  const sectors = Math.max(
+    1,
+    Math.floor(req.sectors ?? state.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount),
+  );
   const split = Number.isFinite(req.split as number) ? Math.max(0, Math.floor(req.split!)) : Math.floor(sectors / 2);
 
   const aEff = 3 / (1/axes.a + 1/axes.b + 1/axes.c);
   const w_m = req.wallWidth_m ?? Math.max(1e-6, (state.sag_nm ?? 16) * 1e-9);
   const w_rho = Math.max(1e-6, w_m / aEff);
-  const gammaGeo   = state.gammaGeo ?? 26;
-  const qSpoil     = state.qSpoilingFactor ?? 1;
+  const gammaGeo = state.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo;
+  const qSpoil = state.qSpoilingFactor ?? PROMOTED_WARP_PROFILE.qSpoilingFactor;
   const geoAmp     = Math.pow(gammaGeo, 3);
   const vizGain    = 1.0;
   const shellOffset = req.shellOffset ?? 0;

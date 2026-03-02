@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import { useState } from "react";
 import { Download, ChartBar, Folder, Terminal, FileCode, Box, FileText, CheckCircle, TrendingUp, Zap, Layers } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -150,6 +151,9 @@ export default function ResultsPanel({
   const massFromPipeline = isFiniteNumber(pipeline?.M_exotic) ? pipeline.M_exotic : undefined;
 
   const zetaFromPipeline = isFiniteNumber(pipeline?.zeta) ? pipeline.zeta : undefined;
+  const isStrictQiSafe =
+    results.quantumSafetyStatus === "safe" ||
+    (zetaFromPipeline != null && zetaFromPipeline < 1);
 
   const dutyLocal =
     simulation.parameters.dynamicConfig
@@ -164,7 +168,7 @@ export default function ResultsPanel({
       : simulation.parameters.dynamicConfig
         ? ((simulation.parameters.dynamicConfig.burstLengthUs || 10) /
           (simulation.parameters.dynamicConfig.cycleLengthUs || 1000)) /
-          (simulation.parameters.dynamicConfig.sectorCount || 400)
+          (simulation.parameters.dynamicConfig.sectorCount || PROMOTED_WARP_PROFILE.sectorCount)
         : undefined;
 
   const pipelineUCycle = pipeline?.U_cycle;
@@ -264,8 +268,8 @@ export default function ResultsPanel({
 
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-lg font-semibold">
-                      <Badge variant={(results.quantumSafetyStatus === 'safe' || (zetaFromPipeline != null && zetaFromPipeline <= 1)) ? "default" : "destructive"}>
-                        {results.quantumSafetyStatus ?? (zetaFromPipeline != null ? (zetaFromPipeline <= 1 ? "✓ Quantum Safe" : "⚠ Quantum Violation") : "Unknown")}
+                      <Badge variant={isStrictQiSafe ? "default" : "destructive"}>
+                        {results.quantumSafetyStatus ?? (zetaFromPipeline != null ? (zetaFromPipeline < 1 ? "✓ Quantum Safe" : "⚠ Quantum Violation") : "Unknown")}
                       </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">Ford-Roman Limit Compliance</div>
@@ -347,8 +351,8 @@ export default function ResultsPanel({
                     <div>
                       <div className="text-muted-foreground">Quantum Safety</div>
                       <div className="font-medium">
-                        <Badge variant={(results.quantumSafetyStatus === "safe" || (zetaFromPipeline != null && zetaFromPipeline <= 1)) ? "default" : "destructive"}>
-                          {results.quantumSafetyStatus ?? (zetaFromPipeline != null ? (zetaFromPipeline <= 1 ? "safe" : "violation") : "Unknown")}
+                        <Badge variant={isStrictQiSafe ? "default" : "destructive"}>
+                          {results.quantumSafetyStatus ?? (zetaFromPipeline != null ? (zetaFromPipeline < 1 ? "safe" : "violation") : "Unknown")}
                         </Badge>
                       </div>
                     </div>
@@ -397,11 +401,11 @@ export default function ResultsPanel({
                       <div className="flex items-center justify-between">
                         <span className="text-amber-700 dark:text-amber-200">Quantum Safety:</span>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          (results.quantumSafetyStatus === 'safe' || (zetaFromPipeline != null && zetaFromPipeline <= 1))
+                          isStrictQiSafe
                             ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
                             : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
                         }`}>
-                          {(results.quantumSafetyStatus === 'safe' || (zetaFromPipeline != null && zetaFromPipeline <= 1)) ? '✓ SAFE' : '⚠ VIOLATION'}
+                          {isStrictQiSafe ? '✓ SAFE' : '⚠ VIOLATION'}
                         </span>
                       </div>
 
@@ -512,28 +516,30 @@ export default function ResultsPanel({
               results={{
                 totalEnergy: results.totalEnergy,
                 geometricBlueshiftFactor: Number.isFinite(gammaGeoDisplay) ? (gammaGeoDisplay as number) : 25,
-                qEnhancementFactor: results.qEnhancementFactor || (simulation.parameters.dynamicConfig?.cavityQ || 1e9),
+                qEnhancementFactor:
+                  results.qEnhancementFactor ||
+                  (simulation.parameters.dynamicConfig?.cavityQ || PROMOTED_WARP_PROFILE.qCavity),
                 totalExoticMass: results.totalExoticMass ?? massFromPipeline,
                 powerDraw: results.powerDraw ?? powerWFromPipeline,
                 quantumInequalityMargin: results.quantumInequalityMargin ?? zetaFromPipeline,
                 dutyFactor: simulation.parameters.dynamicConfig
                   ? (simulation.parameters.dynamicConfig.burstLengthUs || 10) /
                     (simulation.parameters.dynamicConfig.cycleLengthUs || 1000)
-                  : 0.01,
+                  : PROMOTED_WARP_PROFILE.dutyCycle,
                 effectiveDuty: simulation.parameters.dynamicConfig
                   ? ((simulation.parameters.dynamicConfig.burstLengthUs || 10) /
                     (simulation.parameters.dynamicConfig.cycleLengthUs || 1000)) /
-                    (simulation.parameters.dynamicConfig.sectorCount || 400)
-                  : 2.5e-5,
+                    (simulation.parameters.dynamicConfig.sectorCount || PROMOTED_WARP_PROFILE.sectorCount)
+                  : PROMOTED_WARP_PROFILE.dutyShip / PROMOTED_WARP_PROFILE.sectorCount,
                 baselineEnergyDensity: results.energyPerArea || -1e-12,
                 amplifiedEnergyDensity: (results.energyPerArea || -1e-12) *
                   (Number.isFinite(gammaGeoDisplay) ? (gammaGeoDisplay as number) : 25)
               }}
               targets={{
                 gammaGeo: 25,
-                cavityQ: 1e9,
-                dutyFactor: 0.01,
-                effectiveDuty: 2.5e-5,
+                cavityQ: PROMOTED_WARP_PROFILE.qCavity,
+                dutyFactor: PROMOTED_WARP_PROFILE.dutyCycle,
+                effectiveDuty: PROMOTED_WARP_PROFILE.dutyShip / PROMOTED_WARP_PROFILE.sectorCount,
                 exoticMassTarget: 1.4e3,
                 powerTarget: 83e6,
                 zetaSafeLimit: 1.0
@@ -671,3 +677,4 @@ export default function ResultsPanel({
     </Card>
   );
 }
+

@@ -1,6 +1,7 @@
 import type { NavigationPose } from "@shared/schema";
 import type { EnergyPipelineState } from "@/hooks/use-energy-pipeline";
 import { computeEffectiveLyPerHour } from "@/components/FuelGauge";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 export const METERS_PER_LIGHTYEAR = 9.460_730_472_580_8e15;
 const SECONDS_PER_HOUR = 3600;
@@ -88,8 +89,8 @@ const lyPerHourFromPipeline = (pipeline?: EnergyPipelineState | null): number =>
     const lyh = computeEffectiveLyPerHour(
       pipeline.currentMode ?? "hover",
       duty ?? 0,
-      pipeline.gammaGeo ?? 26,
-      pipeline.qSpoilingFactor ?? pipeline.q ?? pipeline.qMechanical ?? 1e9,
+      pipeline.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo,
+      pipeline.qSpoilingFactor ?? pipeline.q ?? pipeline.qMechanical ?? PROMOTED_WARP_PROFILE.qCavity,
       pipeline.zeta ?? 0.6,
       tsRatio ?? 100,
     );

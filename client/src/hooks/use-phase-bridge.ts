@@ -4,6 +4,7 @@ import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import useGlobalPhase from "@/hooks/useGlobalPhase";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
@@ -57,7 +58,7 @@ export function usePhaseBridge(opts?: { publishHz?: number; damp?: number }) {
     pipelineAny?.sectorsTotal,
     pipelineAny?.sectorCount,
   );
-  const sectorsTotal = Math.max(1, sectorsTotalRaw ?? 400);
+  const sectorsTotal = Math.max(1, sectorsTotalRaw ?? PROMOTED_WARP_PROFILE.sectorCount);
 
   const currentSector = firstFinite(metricsAny?.currentSector, pipelineAny?.currentSector);
   const strobeHz = firstFinite(pipelineAny?.strobeHz, metricsAny?.strobeHz);
@@ -362,3 +363,4 @@ export function usePhaseBridge(opts?: { publishHz?: number; damp?: number }) {
 }
 
 export default usePhaseBridge;
+

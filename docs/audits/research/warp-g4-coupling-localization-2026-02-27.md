@@ -14,10 +14,10 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 
 | field | scoreMode | influenceScore | pearsonR | slope | maxRelativeDeltaAbs |
 |---|---|---:|---:|---:|---:|
-| metricStressRhoSiMean_Jm3 | correlation | 0.695446275392409 | -0.695446275392409 | -0.018512698345788215 | 0 |
-| metricT00Si_Jm3 | correlation | 0.695446275392409 | -0.695446275392409 | -0.018512698345788215 | 0 |
-| rhoCoupledShadow_Jm3 | correlation | 0.695446275392409 | -0.695446275392409 | -0.03702539669157643 | 0 |
-| rhoMetric_Jm3 | correlation | 0.695446275392409 | -0.695446275392409 | -0.018512698345788215 | 0 |
+| metricStressRhoSiMean_Jm3 | correlation | 0.6972711091342001 | -0.6972711091342001 | -0.018422079157393162 | 0 |
+| metricT00Si_Jm3 | correlation | 0.6972711091342001 | -0.6972711091342001 | -0.018422079157393162 | 0 |
+| rhoCoupledShadow_Jm3 | correlation | 0.6972711091342001 | -0.6972711091342001 | -0.036844158314786324 | 0 |
+| rhoMetric_Jm3 | correlation | 0.6972711091342001 | -0.6972711091342001 | -0.018422079157393162 | 0 |
 | metricStressStep_m | delta_fallback | 1.2394919797027262e-16 | null | null | 1.2394919797027262e-16 |
 | couplingResidualRel | delta_fallback | 0 | null | null | 0 |
 | metricStressKSquaredMean | delta_fallback | 0 | null | null | 0 |
@@ -34,9 +34,9 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 | case_0018 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
 | case_0019 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
 | case_0020 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0133 | PASS | 0.2578135940599578 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0021 | PASS | 0.519347006952574 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0136 | PASS | 0.519347006952574 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0022 | PASS | 0.7616409782623893 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
-| case_0086 | PASS | 1.523281956524699 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0021 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0022 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0023 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0024 | PASS | 0.12890679702998561 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
+| case_0135 | PASS | 0.2578135940599578 | metricStressStep_m, couplingResidualRel, metricStressKSquaredMean |
 

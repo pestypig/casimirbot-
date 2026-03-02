@@ -1,4 +1,5 @@
-ï»¿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MODE_CONFIGS, type ModeKey } from "@/hooks/use-energy-pipeline";
 import { publish } from "@/lib/luma-bus";
 import { usePanelTelemetryPublisher } from "@/lib/desktop/panelTelemetryBus";
@@ -204,7 +205,7 @@ function clampClock(seconds: number): number {
 }
 
 function formatDuration(seconds: number): string {
-  if (!Number.isFinite(seconds)) return "âˆž";
+  if (!Number.isFinite(seconds)) return "8";
   const clamped = clampClock(seconds);
   if (clamped >= 3600) {
     const hours = Math.floor(clamped / 3600);
@@ -218,24 +219,24 @@ function formatDuration(seconds: number): string {
 
 // Format very small ON-times with adaptive units to avoid 0.0000 s rendering
 function formatOnTime(seconds?: number): string {
-  if (!Number.isFinite(seconds) || (seconds as number) < 0) return "â€”";
+  if (!Number.isFinite(seconds) || (seconds as number) < 0) return "—";
   const s = seconds as number;
   if (s >= 1) return `${s.toFixed(3)} s ON`;
   if (s >= 1e-3) return `${(s * 1e3).toFixed(3)} ms ON`;
-  return `${(s * 1e6).toFixed(1)} Âµs ON`;
+  return `${(s * 1e6).toFixed(1)} µs ON`;
 }
 
 function formatTauLC(seconds?: number): string {
-  if (!Number.isFinite(seconds) || (seconds as number) <= 0) return "â€”";
+  if (!Number.isFinite(seconds) || (seconds as number) <= 0) return "—";
   const s = seconds as number;
   if (s >= 1) return `${s.toFixed(3)} s`;
   if (s >= 1e-3) return `${(s * 1e3).toFixed(3)} ms`;
-  if (s >= 1e-6) return `${(s * 1e6).toFixed(1)} Âµs`;
+  if (s >= 1e-6) return `${(s * 1e6).toFixed(1)} µs`;
   return `${(s * 1e9).toFixed(0)} ns`;
 }
 
 function formatPercentSmall(frac?: number): string {
-  if (!Number.isFinite(frac)) return "â€”";
+  if (!Number.isFinite(frac)) return "—";
   const pct = (frac as number) * 100;
   if (pct >= 1) return `${pct.toFixed(2)}%`;
   if (pct >= 0.1) return `${pct.toFixed(3)}%`;
@@ -566,7 +567,7 @@ function limiterLabel(limiter: NearZeroBusClocks["limiter"]): string {
     case "q":
       return "q";
     case "zeta":
-      return "Î¶";
+      return "?";
     case "stroke":
       return "Stroke";
     case "TS":
@@ -577,7 +578,7 @@ function limiterLabel(limiter: NearZeroBusClocks["limiter"]): string {
 }
 
 function formatSpeed(speed?: number): string {
-  if (!Number.isFinite(speed)) return "â€”";
+  if (!Number.isFinite(speed)) return "—";
   return `${(speed as number).toFixed(1)} m/s`;
 }
 
@@ -879,7 +880,7 @@ export function NearZeroWidget({
       const altitude = safeNumber(latest.env?.altitude_m);
       const rhoEstimate = rho ?? estimateDensityFromAltitude(altitude);
       const band = computeBandAndCap(rhoEstimate);
-      const total = Math.max(1, sectorsTotal ?? nearZeroConfig.sectorsTotal ?? 400);
+      const total = Math.max(1, sectorsTotal ?? nearZeroConfig.sectorsTotal ?? PROMOTED_WARP_PROFILE.sectorCount);
       const normalizedSplit = (() => {
         const raw = safeNumber(latest.split);
         if (raw == null) return 0.5;
@@ -941,7 +942,7 @@ export function NearZeroWidget({
     [guardValues, guardCfg]
   );
 
-  const total = Math.max(1, sectorsTotal ?? nearZeroConfig.sectorsTotal ?? 400);
+  const total = Math.max(1, sectorsTotal ?? nearZeroConfig.sectorsTotal ?? PROMOTED_WARP_PROFILE.sectorCount);
   const normalizedSplit = (() => {
     const raw = safeNumber(split);
     if (raw == null) return 0.5;
@@ -1022,10 +1023,10 @@ export function NearZeroWidget({
           <Badge className={BADGE_COLORS[bandColor]}>
             Cap:{" "}
             {band.vCap === undefined
-              ? "â€”"
+              ? "—"
               : Number.isFinite(band.vCap)
               ? `${(band.vCap as number).toFixed(0)} m/s`
-              : "âˆž"}
+              : "8"}
           </Badge>
           <Badge
             className={BADGE_COLORS[bandColor]}
@@ -1035,20 +1036,20 @@ export function NearZeroWidget({
           <Badge className="bg-slate-800 text-slate-200 border border-slate-700">
             {env?.altitude_m != null && Number.isFinite(env.altitude_m)
               ? `Altitude ${(env.altitude_m as number).toFixed(0)} m`
-              : "Altitude â€”"}
+              : "Altitude —"}
           </Badge>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className={BADGE_COLORS[guardStatuses.q]}>q {Number.isFinite(guardValues.q) ? guardValues.q.toFixed(2) : "â€”"}</Badge>
+          <Badge className={BADGE_COLORS[guardStatuses.q]}>q {Number.isFinite(guardValues.q) ? guardValues.q.toFixed(2) : "—"}</Badge>
           <Badge className={BADGE_COLORS[guardStatuses.zeta]}>
-            Î¶ {Number.isFinite(guardValues.zeta) ? guardValues.zeta.toFixed(2) : "â€”"}
+            ? {Number.isFinite(guardValues.zeta) ? guardValues.zeta.toFixed(2) : "—"}
           </Badge>
           <Badge className={BADGE_COLORS[guardStatuses.stroke_pm]}>
-            Stroke {Number.isFinite(guardValues.stroke_pm) ? `${guardValues.stroke_pm.toFixed(1)} pm` : "â€”"}
+            Stroke {Number.isFinite(guardValues.stroke_pm) ? `${guardValues.stroke_pm.toFixed(1)} pm` : "—"}
           </Badge>
           <Badge className={BADGE_COLORS[guardStatuses.TS]}>
-            TS {Number.isFinite(guardValues.TS) ? guardValues.TS.toFixed(0) : "â€”"}
+            TS {Number.isFinite(guardValues.TS) ? guardValues.TS.toFixed(0) : "—"}
           </Badge>
         </div>
 
@@ -1095,7 +1096,7 @@ export function NearZeroWidget({
             FR Duty:{" "}
             {formatPercentSmall(frDuty)}
           </span>
-          <span>QL: {Number.isFinite(QL) ? (QL as number).toFixed(0) : "â€”"}</span>
+          <span>QL: {Number.isFinite(QL) ? (QL as number).toFixed(0) : "—"}</span>
           <span>
             Burst:{" "}
             {(() => {
@@ -1106,7 +1107,7 @@ export function NearZeroWidget({
             })()}
           </span>
           <span>
-            Ï„<sub>LC</sub>: {formatTauLC(tauLC_s)}
+            t<sub>LC</sub>: {formatTauLC(tauLC_s)}
           </span>
         </div>
 
@@ -1142,6 +1143,7 @@ export function NearZeroWidget({
 }
 
 export default NearZeroWidget;
+
 
 
 

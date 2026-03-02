@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import * as React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
@@ -119,7 +120,7 @@ export function useSectorRingCoordinator(opts?: {
       pipelineAny?.sectorsTotal,
       pipelineAny?.sectorCount
     );
-    const sectorsTotal = Math.max(1, Math.floor(sectorsTotalCandidate ?? 400));
+    const sectorsTotal = Math.max(1, Math.floor(sectorsTotalCandidate ?? PROMOTED_WARP_PROFILE.sectorCount));
 
     const sectorsConcurrentCandidate = firstFinite(
       lcMetrics?.activeSectors,
@@ -284,3 +285,4 @@ export function useSectorRingCoordinator(opts?: {
 }
 
 export default useSectorRingCoordinator;
+

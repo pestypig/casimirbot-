@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 /**
  * Visual Proof Charts Component
  * Implements the three proof visualizations: Radar plot, Energy Pipeline, and Duty vs Power
@@ -225,7 +226,7 @@ export function VisualProofCharts({ results = {}, targets = {} }: VisualProofCha
   ];
 
   // B. Energy Boost Pipeline Data (units: mJ for display)
-  const E_flat = -2.55e-3; // J (paper-ish seed)
+  const E_flat = -2.55e-3; // J (reference baseline when strict telemetry is unavailable)
   const E_bowl = isFiniteNumber(totalEnergyJ) ? totalEnergyJ : E_flat; // J
   const Q_enhancement = Math.max(1, num(qCavity, 1)); // dimensionless
 
@@ -242,7 +243,7 @@ export function VisualProofCharts({ results = {}, targets = {} }: VisualProofCha
 
   // C. Duty vs Power Analysis Data (scale around live baseline)
   const dutyRange = [0.001, 0.005, 0.01, 0.02, 0.05, 0.1]; // candidate d values
-  const baseDuty = dutyBurst || 0.01;
+  const baseDuty = dutyBurst || PROMOTED_WARP_PROFILE.dutyCycle;
   const basePowerW = powerDrawW || powerTargetW; // avoid zero dividing; use target if no reading
   const baseZeta = zeta || 0.5;
 
@@ -254,7 +255,7 @@ export function VisualProofCharts({ results = {}, targets = {} }: VisualProofCha
       duty: d * 100, // %
       power: power / 1e6, // MW
       zeta: zetaScaled,
-      isOptimal: power < 83e6 && zetaScaled < 1.0, // legacy sweet-spot rule
+      isOptimal: power < powerTargetW && zetaScaled < zetaSafeLimit, // mode-aware strict gate comparison
     };
   });
 
@@ -406,3 +407,4 @@ export function VisualProofCharts({ results = {}, targets = {} }: VisualProofCha
     </div>
   );
 }
+

@@ -481,9 +481,9 @@ function buildLedgerRows(
   rows.push({
     id: "zeta",
     label: "Ford-Roman (QI) scalar",
-    equation: "zeta = sampledIntegral / bound  (require zeta <= 1)",
+    equation: "zeta = sampledIntegral / bound  (require zeta < 1)",
     value: [
-      `zeta = ${fmtFixed(zeta, 3)} (${fordOk === true ? "<= 1" : fordOk === false ? "> 1" : "n/a"})`,
+      `zeta = ${fmtFixed(zeta, 3)} (${fordOk === true ? "< 1" : fordOk === false ? ">= 1" : "n/a"})`,
       `source=${qiRhoSource ?? "n/a"}`,
       `metric=${qiMetricDerived == null ? "n/a" : qiMetricDerived ? "derived" : "proxy"}`,
       qiStrictMode === true

@@ -106,7 +106,7 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
 
     // Sample displacement field using Natário bell math
     const sampleDisplacementField = (x: number, y: number, z: number, uniforms: any) => {
-      const { hullAxes = [1, 0.26, 0.17], wallWidth = 0.06, gammaVdB = 1e11, gammaGeo = 26, qSpoilingFactor = 1, dutyEffectiveFR = 0.000025, viewMassFraction = 1.0 } = uniforms;
+      const { hullAxes = [1, 0.26, 0.17], wallWidth = 0.06, gammaVdB = 1.4e5, gammaGeo = 26, qSpoilingFactor = 1, dutyEffectiveFR = 0.000025, viewMassFraction = 1.0 } = uniforms;
       
       // Ellipsoidal radius calculation
       const rho = Math.sqrt(

@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -91,7 +92,7 @@ export default function CurvaturePhysicsPanel({
   // derive S_concurrent / S_total straight from the left engine uniforms
   const U = leftEngineRef?.current?.uniforms ?? {};
   const sConc = Math.max(1, +(U.sectors ?? concurrentSectors ?? 1));
-  const sTot  = Math.max(1, +(totalSectors ?? (pipeline as any)?.sectorCount ?? 400));
+  const sTot  = Math.max(1, +(totalSectors ?? (pipeline as any)?.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount));
   
   const S_total = sTot;
   const S_live = sConc;
@@ -114,8 +115,8 @@ export default function CurvaturePhysicsPanel({
   const duty_local_measured = (isNum(burst_ms) && isNum(dwell_ms) && dwell_ms! > 0)
     ? clamp01(burst_ms! / dwell_ms!) : undefined;
 
-  // If not measured, fall back to the paper/CFG local window (~1%)
-  const duty_local_default = 0.01;
+  // If not measured, fall back to canonical configured local window (~1%)
+  const duty_local_default = PROMOTED_WARP_PROFILE.dutyCycle;
   const duty_local = isNum(duty_local_measured) ? duty_local_measured : duty_local_default;
 
   // FR duty: use explicit override if provided, else compute from local × sector ratio
@@ -281,3 +282,4 @@ export default function CurvaturePhysicsPanel({
     </TooltipProvider>
   );
 }
+

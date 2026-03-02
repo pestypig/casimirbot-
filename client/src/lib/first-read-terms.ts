@@ -135,7 +135,7 @@ export const FIRST_READ_TERMS: TermDef[] = [
   {
     id: "green_zone",
     label: "Green zone",
-    define: "{ q_mech <= 1, 1e5 <= gamma_VdB <= 1e6, zeta <= 1, TS >> 1 }.",
+    define: "{ q_mech <= 1, 1e5 <= gamma_VdB <= 1e6, zeta < 1, TS >> 1 }.",
     why: "Confirms the drive stays physical and effective.",
     sourceField: "pipeline.guards",
     cite: "docs/sweeps.md",

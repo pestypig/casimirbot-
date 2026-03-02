@@ -7,6 +7,7 @@ import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { clampHullArea, clampHullAxis, clampHullDims } from "@/lib/hull-guardrails";
 import { getModeWisdom } from "@/lib/luma-whispers-core";
 import { isFlagEnabled } from "@/lib/envFlags";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import type {
   VacuumGapSweepRow,
   DynamicConfig,
@@ -1173,9 +1174,9 @@ export interface HelixMetrics {
 
 // Shared physics constants from pipeline backend
 export const PIPE_CONST = {
-  TOTAL_SECTORS: 400,
-  BURST_DUTY_LOCAL: 0.01,  // 1% local burst window
-  Q_BURST: 1e9
+  TOTAL_SECTORS: PROMOTED_WARP_PROFILE.sectorCount,
+  BURST_DUTY_LOCAL: PROMOTED_WARP_PROFILE.dutyCycle,
+  Q_BURST: PROMOTED_WARP_PROFILE.qCavity
 };
 
 // Shared smart formatter (W→kW→MW) for UI labels
@@ -1703,11 +1704,11 @@ export type ModeConfig = {
   dutyCycle: number;
 
   // 🔁 NEW: how many sectors exist vs. are live at once
-  sectorsTotal: number;        // e.g., 400 (grid partitions across the hull)
+  sectorsTotal: number;        // grid partitions across the hull
   sectorsConcurrent: number;   // e.g., 1 in Hover/Cruise, maybe 4–8 in Emergency
 
   // 🔦 NEW: per-sector ON window (fraction of dwell, 0..1)
-  localBurstFrac: number;      // e.g., 0.01 in Hover/Cruise; 0.50 in Emergency; 0 in Standby
+  localBurstFrac: number;      // mode-specific local burst fraction
 
   // 🎯 Optional: what the mode is aiming to produce (display only)
   powerTarget_W?: number;
@@ -1736,10 +1737,10 @@ export type ModeConfig = {
 
 // Mode configurations for UI display (synchronized with backend)
 const GUARDED_SWEEP_DEFAULTS = {
-  sectorsTotal: 400,
-  sectorsConcurrent: 1,
-  localBurstFrac: 0.01,
-  sectorStrobing: 1,
+  sectorsTotal: PROMOTED_WARP_PROFILE.sectorCount,
+  sectorsConcurrent: PROMOTED_WARP_PROFILE.concurrentSectors,
+  localBurstFrac: PROMOTED_WARP_PROFILE.dutyCycle,
+  sectorStrobing: PROMOTED_WARP_PROFILE.concurrentSectors,
 } as const;
 
 export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
@@ -1758,18 +1759,18 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     color: "text-sky-300",
     description: "Gentle bulge / training profile",
     ...GUARDED_SWEEP_DEFAULTS,
-    dutyCycle: 0.14,
+    dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
     powerTarget_W: 83.3e6,       // match your display target
-    qSpoilingFactor: 1,
+    qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
   },
   taxi: {
     name: "Taxi",
     color: "text-sky-300",
     description: "Ground ops posture; translation suppressed",
     ...GUARDED_SWEEP_DEFAULTS,
-    dutyCycle: 0.14,
+    dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
     powerTarget_W: 83.3e6,       // inherits hover power budget
-    qSpoilingFactor: 1,
+    qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
   },
   nearzero: {
     name: "Near-Zero",
@@ -1777,10 +1778,10 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     description: "Zero-β hover-climb regime",
     hint: "Zero-β hover-climb",
     ...GUARDED_SWEEP_DEFAULTS,
-    dutyCycle: 0.12,
-    localBurstFrac: 0.0075,
+    dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
+    localBurstFrac: PROMOTED_WARP_PROFILE.dutyCycle,
     powerTarget_W: 5e6,
-    qSpoilingFactor: 1,
+    qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
     envCaps: {
       rho_pad: 0.1,
       v_pad: 30,
@@ -1798,18 +1799,18 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
   cruise: {
     name: "Cruise",
     color: "text-cyan-300",
-    description: "Coherent 400× sweep; FR duty mostly from averaging",
+    description: "Coherent sector sweep; FR duty mostly from averaging",
     ...GUARDED_SWEEP_DEFAULTS,
-    dutyCycle: 0.005,
+    dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
     powerTarget_W: 40e6,
-    qSpoilingFactor: 0.625,
+    qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
   },
   emergency: {
     name: "Emergency",
     color: "text-rose-300",
     description: "Max response window; fewer averages",
     dutyCycle: 0.50,
-    sectorsTotal: 400,
+    sectorsTotal: PROMOTED_WARP_PROFILE.sectorCount,
     sectorsConcurrent: 8,        // aligned with Mk1 emergency posture
     localBurstFrac: 0.50,        // emergency burst fraction per MODE_POLICY
     powerTarget_W: 297.5e6,
@@ -1827,3 +1828,4 @@ export const modeKnobsFor = (mode: EnergyPipelineState['currentMode']) => {
     qSpoilingFactor: m.qSpoilingFactor,
   } : undefined;
 };
+

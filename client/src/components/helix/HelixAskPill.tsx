@@ -719,7 +719,7 @@ const HELIX_PANEL_ALIASES: Array<{ id: PanelDefinition["id"]; aliases: string[] 
   { id: "helix-noise-gens", aliases: ["noise gens", "noise generators", "noise generator"] },
   { id: "alcubierre-viewer", aliases: ["warp bubble", "warp viewer", "alcubierre", "warp visualizer"] },
   { id: "live-energy", aliases: ["live energy", "energy pipeline", "pipeline"] },
-  { id: "helix-core", aliases: ["helix core", "core"] },
+  { id: "live-energy", aliases: ["helix core", "core"] },
   { id: "docs-viewer", aliases: ["docs", "documentation", "papers"] },
   { id: "resonance-orchestra", aliases: ["resonance", "resonance orchestra"] },
   { id: "agi-essence-console", aliases: ["essence console", "helix console", "conversation panel"] },
@@ -728,7 +728,7 @@ const HELIX_PANEL_ALIASES: Array<{ id: PanelDefinition["id"]; aliases: string[] 
 const HELIX_FILE_PANEL_HINTS: Array<{ pattern: RegExp; panelId: PanelDefinition["id"] }> = [
   { pattern: /(modules\/warp|client\/src\/components\/warp|client\/src\/lib\/warp-|warp-bubble)/i, panelId: "alcubierre-viewer" },
   { pattern: /(energy-pipeline|warp-pipeline-adapter|pipeline)/i, panelId: "live-energy" },
-  { pattern: /(helix-core\.ts|server\/helix-core|\/helix\/pipeline)/i, panelId: "helix-core" },
+  { pattern: /(helix-core\.ts|server\/helix-core|\/helix\/pipeline)/i, panelId: "live-energy" },
   { pattern: /(code-lattice|resonance)/i, panelId: "resonance-orchestra" },
   { pattern: /(agi\.plan|training-trace|essence|trace)/i, panelId: "agi-essence-console" },
   { pattern: /(docs\/|\.md$)/i, panelId: "docs-viewer" },

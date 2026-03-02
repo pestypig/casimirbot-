@@ -16,6 +16,7 @@ import {
   createWebSocketConnection,
 } from "@/lib/simulation-api";
 import { SimulationParameters, SimulationResult } from "@shared/schema";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 export default function Simulation() {
   const { toast } = useToast();
@@ -184,7 +185,7 @@ export default function Simulation() {
         burstLengthUs: burstTime, // µs
         cycleLengthUs: cycleTime, // µs
         cavityQ: qFactor,
-        sectorCount: 400,
+        sectorCount: PROMOTED_WARP_PROFILE.sectorCount,
         sectorDuty: duty, // fraction
         pulseFrequencyGHz: 15,
         lightCrossingTimeNs: 100,

@@ -1,4 +1,5 @@
-﻿// client/src/pages/helix-core.tsx
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
+// client/src/pages/helix-core.tsx
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTransition, useCallback } from "react";
 import { Link, useSearch } from "wouter";
 import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, AlertTriangle, Target, CheckCircle2, Video, Layers, Cpu, Download } from "lucide-react";
@@ -88,6 +89,11 @@ import {
   type ObserverConditionKey,
   type ObserverFrameKey,
 } from "@/lib/stress-energy-brick";
+import {
+  buildWarpCalculatorInputPayload,
+  runWarpCalculatorViaApi,
+  type WarpCalculatorRunResponse,
+} from "@/lib/warp-calculator";
 import { buildCardSignatures, ensureCardRecipeSchemaVersion } from "@/lib/card-signatures";
 import { buildCardExportSidecar } from "@/lib/card-export-sidecar";
 import { buildLatticeTextureExports, extractCardLatticeMetadata } from "@/lib/lattice-export";
@@ -869,11 +875,11 @@ const stableWU = (x:any) => {
 };
 
 function sanitizeServerUniforms(raw: any, version: number) {
-  const gammaVdB_vis = toNumber(raw.gammaVanDenBroeck_vis ?? raw.gammaVanDenBroeck ?? raw.gammaVdB, 1.4e5);
+  const gammaVdB_vis = toNumber(raw.gammaVanDenBroeck_vis ?? raw.gammaVanDenBroeck ?? raw.gammaVdB, PROMOTED_WARP_PROFILE.gammaVanDenBroeck);
   const gammaVdB_mass = toNumber(raw.gammaVanDenBroeck_mass ?? raw.gammaVanDenBroeck ?? raw.gammaVdB, gammaVdB_vis);
-  const gammaGeo = Math.max(1, toNumber(raw.gammaGeo, 26));
-  const q = Math.max(1e-12, toNumber(raw.qSpoilingFactor ?? raw.deltaAOverA, 1));
-  const dFR_raw = toNumber(raw.dutyEffectiveFR, 0.01 / Math.max(1, toNumber(raw.sectorCount, 400)));
+  const gammaGeo = Math.max(1, toNumber(raw.gammaGeo, PROMOTED_WARP_PROFILE.gammaGeo));
+  const q = Math.max(1e-12, toNumber(raw.qSpoilingFactor ?? raw.deltaAOverA, PROMOTED_WARP_PROFILE.qSpoilingFactor));
+  const dFR_raw = toNumber(raw.dutyEffectiveFR, PROMOTED_WARP_PROFILE.dutyCycle / Math.max(1, toNumber(raw.sectorCount, PROMOTED_WARP_PROFILE.sectorCount)));
   const dFR_phys = Math.max(1e-12, dFR_raw);
   const viewAvg = (raw.viewAvg ?? true) ? true : false;
   const rawView = (raw && typeof raw === "object") ? raw.view : undefined;
@@ -897,9 +903,9 @@ function sanitizeServerUniforms(raw: any, version: number) {
     gammaVdB: gammaVdB_vis, // alias for consumers
 
     // scheduling
-    sectorCount: Math.max(1, toNumber(raw.sectorCount, 400)),
+    sectorCount: Math.max(1, toNumber(raw.sectorCount, PROMOTED_WARP_PROFILE.sectorCount)),
     sectors: Math.max(1, toNumber(raw.sectors, 1)),
-    dutyCycle: Math.max(0, toNumber(raw.dutyCycle, 0.01)),
+    dutyCycle: Math.max(0, toNumber(raw.dutyCycle, PROMOTED_WARP_PROFILE.dutyCycle)),
     dutyEffectiveFR: dFR_phys,
     currentMode: String(raw.currentMode ?? "hover").toLowerCase() as "hover" | "cruise" | "emergency" | "standby",
 
@@ -1201,6 +1207,13 @@ export default function HelixCore() {
   const [observerDecDirectionMode, setObserverDecDirectionMode] = useState<"local" | "global">("local");
   const [observerDirectionMaskMode, setObserverDirectionMaskMode] = useState<"all" | "violating" | "missed">("violating");
   const [observerDirectionMinMagnitude, setObserverDirectionMinMagnitude] = useState<number>(0);
+  const [mk2Persist, setMk2Persist] = useState(false);
+  const [mk2InjectCurvature, setMk2InjectCurvature] = useState(true);
+  const [mk2OutPath, setMk2OutPath] = useState("artifacts/research/full-solve/g4-calculator-helix-core.json");
+  const [mk2IsRunning, setMk2IsRunning] = useState(false);
+  const [mk2Error, setMk2Error] = useState<string | null>(null);
+  const [mk2Result, setMk2Result] = useState<WarpCalculatorRunResponse | null>(null);
+  const [mk2LastRunAt, setMk2LastRunAt] = useState<number | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onMockUsed = (event: Event) => {
@@ -1375,6 +1388,65 @@ useEffect(() => {
           : observerRobustStats.dec
     : null;
 
+  const mk2RapidityCap = observerRobustStats?.rapidityCap ?? null;
+  const mk2TypeITolerance = observerRobustStats?.typeI?.tolerance ?? null;
+
+  const formatMk2Ratio = (value: number | null | undefined) =>
+    Number.isFinite(value) ? Number(value).toFixed(4) : "n/a";
+
+  const runNeedleHullMk2Calculator = async () => {
+    if (mk2IsRunning) return;
+    setMk2IsRunning(true);
+    setMk2Error(null);
+    try {
+      const inputPayload = buildWarpCalculatorInputPayload({
+        pipeline: (pipeline as unknown as Record<string, unknown>) ?? null,
+        observerCondition,
+        observerFrame,
+        observerRapidityCap: mk2RapidityCap,
+        observerTypeITolerance: mk2TypeITolerance,
+      });
+      const result = await runWarpCalculatorViaApi({
+        persist: mk2Persist,
+        outPath: mk2Persist ? mk2OutPath : undefined,
+        injectCurvatureSignals: mk2InjectCurvature,
+        inputPayload,
+      });
+      setMk2Result(result);
+      setMk2LastRunAt(Date.now());
+      setMainframeLog((prev) =>
+        [
+          ...prev,
+          "[MK2] calculator=" +
+            result.decisionClass +
+            " congruent=" +
+            (result.congruentSolvePass === true ? "pass" : "fail") +
+            " raw=" +
+            formatMk2Ratio(result.marginRatioRaw) +
+            " rawComputed=" +
+            formatMk2Ratio(result.marginRatioRawComputed),
+        ].slice(-200),
+      );
+      toast({
+        title: "Needle Hull Mark 2 calculator complete",
+        description:
+          result.decisionClass +
+          " | congruent=" +
+          (result.congruentSolvePass === true ? "pass" : "fail"),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setMk2Error(message);
+      setMainframeLog((prev) => [...prev, "[MK2] calculator error: " + message].slice(-200));
+      toast({
+        title: "Needle Hull Mark 2 calculator failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setMk2IsRunning(false);
+    }
+  };
   const dispatchAutoViewEvent = useCallback((detail: any) => {
     if (typeof window === "undefined") return;
     try {
@@ -2235,7 +2307,7 @@ useEffect(() => {
       meshMeta
         ? `Mesh ${meshMeta.meshHash ? meshMeta.meshHash.slice(0, 8) : "n/a"} | ${meshMeta.geometrySource ?? "n/a"}${
             meshMeta.lod ? ` (${meshMeta.lod})` : ""
-          }${meshMeta.triangleCount ? ` · ${meshMeta.triangleCount} tris` : ""}${
+          }${meshMeta.triangleCount ? ` � ${meshMeta.triangleCount} tris` : ""}${
             meshMeta.clampReasons?.length ? ` clamp: ${meshMeta.clampReasons.join(",")}` : ""
           }`
         : null,
@@ -2350,7 +2422,7 @@ useEffect(() => {
       window.dispatchEvent(new CustomEvent("helix:drive-card-preset"));
       toast({
         title: "Drive Card Preset",
-        description: "Applied θ_drive + gate overlays for card export.",
+        description: "Applied theta_drive + gate overlays for card export.",
       });
     } catch (err) {
       console.warn("[Helix] Failed to broadcast drive card preset", err);
@@ -2846,7 +2918,7 @@ useEffect(() => {
     freqGHz: pipeline?.modulationFreq_GHz ?? 15,
     hull: { a: hull.a, b: hull.b, c: hull.c }, // use live hull geometry
     wallWidth_m: 6.0,
-    localBurstFrac: MODE_CONFIGS[effectiveMode as ModeKey]?.localBurstFrac ?? 0.01, // mode-aware burst duty
+    localBurstFrac: MODE_CONFIGS[effectiveMode as ModeKey]?.localBurstFrac ?? PROMOTED_WARP_PROFILE.dutyCycle, // mode-aware burst duty
   });
 
   // Drive Sync Store: bridge scheduler phase and mode presets
@@ -3210,7 +3282,7 @@ useEffect(() => {
   // Follow scheduler phase  drive sync phase (only when phaseMode="scheduler")
   useEffect(() => {
     const ingestWedge = useFlightDirectorStore.getState().ingestSchedulerWedge;
-    const total = Math.max(1, Math.floor(totalSectors || 400));
+    const total = Math.max(1, Math.floor(totalSectors || PROMOTED_WARP_PROFILE.sectorCount));
     const nowTs =
       typeof performance !== "undefined" ? performance.now() : Date.now();
     const idxSrc = Number.isFinite(systemMetrics?.currentSector)
@@ -3301,7 +3373,7 @@ useEffect(() => {
     const burstLocal = Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0 ? burst / dwell : 0.01;
 
     const S_live = Math.max(0, Math.floor(concurrentSectors ?? 1));
-    const S_total = Math.max(1, Math.floor(totalSectors ?? 400));
+    const S_total = Math.max(1, Math.floor(totalSectors ?? PROMOTED_WARP_PROFILE.sectorCount));
 
     return clamp01(burstLocal * (S_live / S_total));
   }, [pipelineState, lc?.burst_ms, lc?.dwell_ms, concurrentSectors, totalSectors]);
@@ -3313,7 +3385,7 @@ useEffect(() => {
   const frDutyForPanels = dutyEffectiveFR_safe;
   const rawLocalBurstFrac = isFiniteNumber((pipeline as any)?.localBurstFrac)
     ? Number((pipeline as any).localBurstFrac)
-    : modeCfg.localBurstFrac ?? 0.01;
+    : modeCfg.localBurstFrac ?? PROMOTED_WARP_PROFILE.dutyCycle;
   const localBurstFrac = clamp01(rawLocalBurstFrac);
   const nearZeroGuards = useMemo(
     () => ({
@@ -3406,7 +3478,7 @@ useEffect(() => {
         const warnOnly = !applied && fallback?.mode === "warn";
         toast({
           title: "Geometry fallback",
-          description: `Mode=${fallback.mode} ${reasons ? `· ${reasons}` : ""}`,
+          description: `Mode=${fallback.mode} ${reasons ? `� ${reasons}` : ""}`,
           ...(applied ? { variant: "destructive" } : warnOnly ? { variant: "default" } : {}),
         });
       }
@@ -3745,7 +3817,7 @@ useEffect(() => {
 
   // --- Derived physics uniforms for AlcubierrePanel
   const realPhys = {
-    gammaGeo: pipeline?.gammaGeo ?? 26,
+    gammaGeo: pipeline?.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo,
     q: qSpoilUI,
     gammaVdB: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
     dFR: dutyEffectiveFR_safe,
@@ -3754,9 +3826,9 @@ useEffect(() => {
   const expREAL = thetaScaleExpected(realPhys);
   const usedREAL = thetaScaleUsed(expREAL, {
     concurrent: 1,
-    total: 400,
-    dutyLocal: 0.01,
-    viewFraction: 0.0025,
+    total: PROMOTED_WARP_PROFILE.sectorCount,
+    dutyLocal: PROMOTED_WARP_PROFILE.dutyCycle,
+    viewFraction: PROMOTED_WARP_PROFILE.dutyShip / PROMOTED_WARP_PROFILE.sectorCount,
     viewAveraging: true,
   });
 
@@ -3782,7 +3854,7 @@ useEffect(() => {
   }, [expREAL, usedREAL]);
 
   const showPhys = {
-    gammaGeo: pipeline?.gammaGeo ?? 26,
+    gammaGeo: pipeline?.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo,
     qSpoilingFactor: qSpoilUI,
     gammaVanDenBroeck_vis: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
     dutyEffectiveFR: dutyEffectiveFR_safe,
@@ -4258,7 +4330,7 @@ useEffect(() => {
                     </div>
                     <div className="mt-1 text-[10px] text-slate-400">
                       {timeLapseRecorder.isProcessing
-                        ? "Finalizing video…"
+                        ? "Finalizing video�"
                         : `Capturing ${Math.round(timeLapseRecorder.progress * 100)}%`}
                     </div>
                   </div>
@@ -4381,9 +4453,9 @@ useEffect(() => {
                   dutyCycle: dutyUI_safe,
                   sectors: totalSectors,
                   sectorCount: totalSectors,
-                  gammaGeo: pipeline?.gammaGeo ?? 26,
+                  gammaGeo: pipeline?.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo,
                   qSpoil: qSpoilUI,
-                  qCavity: pipeline?.qCavity ?? 1e9,
+                  qCavity: pipeline?.qCavity ?? PROMOTED_WARP_PROFILE.qCavity,
                   //  NEW: mechanical chain
                   qMechanical: pipeline?.qMechanical ?? 1,
                   modulationHz: (pipeline?.modulationFreq_GHz ?? 15) * 1e9,
@@ -5201,12 +5273,118 @@ useEffect(() => {
                     <Badge variant="outline" className="border-slate-600 text-slate-200">Type-I: {(observerRobustStats.typeI.fraction * 100).toFixed(2)}%</Badge>
                     <Badge variant="outline" className="border-slate-600 text-slate-200">worst-case source: {observerConditionSummary ? observerConditionSummary.worstCase.source : "n/a"}</Badge>
                     <Badge className={observerRobustStats.consistency.robustNotGreaterThanEulerian ? "bg-green-500/20 text-green-300" : "bg-amber-500/20 text-amber-300"}>
-                      robust≤eulerian: {observerRobustStats.consistency.robustNotGreaterThanEulerian ? "true" : "false"}
+                      robust=eulerian: {observerRobustStats.consistency.robustNotGreaterThanEulerian ? "true" : "false"}
                     </Badge>
                   </div>
                 </CardContent>
               </Card>
             )}
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardHeader>
+                <CardTitle className="text-sm">Needle Hull Mark 2 Calculator Coupling</CardTitle>
+                <CardDescription>
+                  Run the warp calculator from live visualizer context to stamp figure-ready decision metadata.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="bg-cyan-600 hover:bg-cyan-700"
+                    onClick={runNeedleHullMk2Calculator}
+                    disabled={mk2IsRunning}
+                  >
+                    {mk2IsRunning ? "Running calculator..." : "Run MK2 Calculator Snapshot"}
+                  </Button>
+                  <Badge variant="outline" className="border-slate-600 text-slate-200">
+                    condition: {observerCondition.toUpperCase()}
+                  </Badge>
+                  <Badge variant="outline" className="border-slate-600 text-slate-200">
+                    frame: {observerFrame}
+                  </Badge>
+                  {observerRobustStats && (
+                    <Badge variant="outline" className="border-slate-600 text-slate-200">
+                      rapidity cap: {observerRobustStats.rapidityCap.toFixed(3)}
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="flex items-center justify-between rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2">
+                    <div>
+                      <div className="text-xs font-medium text-slate-200">Inject Curvature Signals</div>
+                      <div className="text-[11px] text-slate-400">Recommended for campaign parity.</div>
+                    </div>
+                    <Switch checked={mk2InjectCurvature} onCheckedChange={(checked) => setMk2InjectCurvature(Boolean(checked))} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2">
+                    <div>
+                      <div className="text-xs font-medium text-slate-200">Persist Artifact</div>
+                      <div className="text-[11px] text-slate-400">Write calculator output under artifacts.</div>
+                    </div>
+                    <Switch checked={mk2Persist} onCheckedChange={(checked) => setMk2Persist(Boolean(checked))} />
+                  </div>
+                </div>
+
+                {mk2Persist && (
+                  <div>
+                    <Label className="text-xs text-slate-300">Artifact Out Path</Label>
+                    <Input
+                      className="mt-1 border-slate-700 bg-slate-900/70 text-slate-100"
+                      value={mk2OutPath}
+                      onChange={(event) => setMk2OutPath(event.target.value)}
+                      placeholder="artifacts/research/full-solve/g4-calculator-helix-core.json"
+                    />
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Must resolve under artifacts/research/full-solve.
+                    </p>
+                  </div>
+                )}
+
+                {mk2Result ? (
+                  <div className="grid grid-cols-1 gap-2 text-xs text-slate-200 sm:grid-cols-2">
+                    <div className="rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">Decision</div>
+                      <div className="font-mono text-slate-100">{mk2Result.decisionClass}</div>
+                    </div>
+                    <div className="rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">Congruent Solve</div>
+                      <div className="font-mono text-slate-100">{mk2Result.congruentSolvePass === true ? "PASS" : "FAIL"}</div>
+                    </div>
+                    <div className="rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">marginRatioRaw</div>
+                      <div className="font-mono text-slate-100">{formatMk2Ratio(mk2Result.marginRatioRaw)}</div>
+                    </div>
+                    <div className="rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">marginRatioRawComputed</div>
+                      <div className="font-mono text-slate-100">{formatMk2Ratio(mk2Result.marginRatioRawComputed)}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400">No MK2 calculator run yet in this session.</p>
+                )}
+
+                <div className="flex flex-wrap gap-2 text-xs text-slate-400">
+                  {mk2Result?.outPath && (
+                    <Badge variant="outline" className="border-slate-700 text-slate-300">
+                      artifact: {mk2Result.outPath}
+                    </Badge>
+                  )}
+                  {mk2LastRunAt && (
+                    <Badge variant="outline" className="border-slate-700 text-slate-300">
+                      last run: {new Date(mk2LastRunAt).toLocaleTimeString()}
+                    </Badge>
+                  )}
+                </div>
+
+                {mk2Error && (
+                  <p className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+                    {mk2Error}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Left column: Compliance, Quantum Inequality, Shift Vector */}
             <div className="space-y-4">
               {/* Metric Compliance HUD */}
@@ -5933,8 +6111,8 @@ useEffect(() => {
                 curvatureOk={pipelineState?.curvatureLimit ?? true}
                 freqGHz={15.0}
                 duty={frDutyForPanels}
-                gammaGeo={pipelineState?.gammaGeo ?? 26}
-                qFactor={pipelineState?.qCavity ?? 1e9}
+                gammaGeo={pipelineState?.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo}
+                qFactor={pipelineState?.qCavity ?? PROMOTED_WARP_PROFILE.qCavity}
                 pMaxMW={120}
               />
 
@@ -6143,7 +6321,7 @@ useEffect(() => {
                         powerMW: pipelineState?.P_avg || 83.3,
                         duty: (Number.isFinite(pipelineState?.dutyCycle) ? pipelineState!.dutyCycle! : 0.14),
                         gammaGeo: pipelineState?.gammaGeo || 26,
-                        qFactor: pipelineState?.qCavity || 1e9,
+                        qFactor: pipelineState?.qCavity || PROMOTED_WARP_PROFILE.qCavity,
                         zeta: pipelineState?.zeta,
                         tsRatio: pipelineState?.TS_ratio || 5.03e4,
                         freqGHz: 15.0,
@@ -6152,7 +6330,7 @@ useEffect(() => {
                             pipelineState?.currentMode || "Hover",
                             (Number.isFinite(pipelineState?.dutyCycle) ? pipelineState!.dutyCycle! : 0.14),
                             pipelineState?.gammaGeo || 26,
-                            pipelineState?.qCavity || 1e9,
+                            pipelineState?.qCavity || PROMOTED_WARP_PROFILE.qCavity,
                             pipelineState?.zeta,
                             pipelineState?.TS_ratio || 5.03e4
                           );
@@ -6184,7 +6362,7 @@ useEffect(() => {
                             mode,
                             duty,
                             pipelineState?.gammaGeo || 26,
-                            pipelineState?.qCavity || 1e9,
+                            pipelineState?.qCavity || PROMOTED_WARP_PROFILE.qCavity,
                             pipelineState?.zeta,
                             pipelineState?.TS_ratio || 5.03e4
                           );
@@ -6212,7 +6390,7 @@ useEffect(() => {
                     <div className="space-y-4 rounded-lg border border-slate-800 bg-slate-950/70 p-4">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
-                          <div className="text-sm font-semibold text-cyan-200">Deep Mixing (Sun) â€” Autopilot</div>
+                          <div className="text-sm font-semibold text-cyan-200">Deep Mixing (Sun) — Autopilot</div>
                           <p className="mt-1 text-xs text-slate-400">
                             Slow, distributed wave-driven circulation at the tachocline. Fleet ships act as timed actuators and diagnostics.
                           </p>
@@ -6235,7 +6413,7 @@ useEffect(() => {
                             </DialogTrigger>
                             <DialogContent className="max-w-4xl">
                               <DialogHeader>
-                                <DialogTitle>Deep Mixing (Sun) â€” Autopilot</DialogTitle>
+                                <DialogTitle>Deep Mixing (Sun) — Autopilot</DialogTitle>
                                 <DialogDescription>
                                   Mission deck and guardrails for the tachocline circulation preset.
                                 </DialogDescription>
@@ -6280,7 +6458,7 @@ useEffect(() => {
                         <div className="flex items-center justify-between rounded border border-slate-800/70 bg-slate-900/40 px-3 py-2">
                           <div>
                             <div className="text-[11px] font-medium text-slate-200">Luminosity guardrail</div>
-                            <div className="text-[10px] text-slate-400">â‰¤0.1% per Myr</div>
+                            <div className="text-[10px] text-slate-400">≤0.1% per Myr</div>
                           </div>
                           <Switch
                             checked={enforceLuminosityGuard}
@@ -6310,19 +6488,19 @@ useEffect(() => {
                         </div>
                         <div className="space-y-3 text-[11px] text-slate-300">
                           <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono">
-                            <span>Îµ target</span>
+                            <span>ε target</span>
                             <span>{deepMixingPlan.epsilon.toExponential(2)}</span>
-                            <span>Îµ achieved</span>
+                            <span>ε achieved</span>
                             <span>
                               {deepMixingTelemetry.achievedEpsilon > 0
                                 ? deepMixingTelemetry.achievedEpsilon.toExponential(2)
-                                : "â€”"}
+                                : "—"}
                             </span>
                             <span>vr setpoint</span>
                             <span>
                               {Number.isFinite(deepMixingMmPerYear)
                                 ? `${deepMixingMmPerYear.toFixed(2)} mm/yr`
-                                : "â€”"}
+                                : "—"}
                             </span>
                             <span>pulse cadence</span>
                             <span>{deepMixingPlan.cadenceDays.toFixed(2)} d</span>
@@ -6414,3 +6592,8 @@ useEffect(() => {
     </TooltipProvider>
   );
 }
+
+
+
+
+

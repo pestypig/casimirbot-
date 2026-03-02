@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 type LC = { burst_ms?: number; dwell_ms?: number; phase?: number; sectorCount?: number };
 
 export function useActiveTiles(opts: {
   totalTiles?: number;              // from pipeline or metrics
-  totalSectors: number;             // e.g., 400
-  concurrentSectors: number;        // e.g., 1 or 2
+  totalSectors: number;             // defaults to promoted profile when absent upstream
+  concurrentSectors: number;        // concurrent live sectors
   dutyEffectiveFR: number;          // from your lc-based compute
   tilesPerSector?: number;          // optional override (server)
   lc?: LC;
@@ -69,7 +70,7 @@ export function useActiveTiles(opts: {
       !Number.isFinite(lc.burst_ms) ||
       !Number.isFinite(lc.dwell_ms) ||
       Number(lc.dwell_ms) <= 0
-    ) return 0.01;
+    ) return PROMOTED_WARP_PROFILE.dutyCycle;
     return Math.max(0, Math.min(1, Number(lc.burst_ms) / Number(lc.dwell_ms)));
   }, [lc?.burst_ms, lc?.dwell_ms]);
 
@@ -118,3 +119,4 @@ export function useActiveTiles(opts: {
     inBurstNow,
   };
 }
+

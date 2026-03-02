@@ -1,7 +1,7 @@
 const PANEL_ALIAS_TO_ID: Record<string, string> = {
   essence: "agi-essence-console",
   noisegen: "helix-noise-gens",
-  helix: "helix-core",
+  helix: "live-energy",
   observables: "helix-observables",
   luma: "helix-luma",
   ragadmin: "rag-admin",

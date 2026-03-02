@@ -14,6 +14,7 @@ import { getGlobalPipelineState } from "../../energy-pipeline.js";
 import { HBAR, C } from "../../physics-const.js";
 import type { RawTileInput } from "../../qi/qi-saturation.js";
 import { updatePipelineQiTiles } from "../../qi/pipeline-qi-stream.js";
+import { PROMOTED_WARP_PROFILE } from "../../../shared/warp-promoted-profile.js";
 
 const NM_TO_M = 1e-9;
 const CASIMIR_COEFF = ((Math.PI ** 2) * HBAR * C) / 720;
@@ -134,7 +135,7 @@ export class QiController {
       gapMin_nm: update.gapMin_nm ?? 20,
       gapMax_nm: update.gapMax_nm ?? 400,
       maxDeltaGap_nm_perTick: update.maxDeltaGap_nm_perTick ?? DEFAULTS.gapStep_nm,
-      duty: clamp01(update.duty ?? 0.01),
+      duty: clamp01(update.duty ?? PROMOTED_WARP_PROFILE.dutyCycle),
       dutyMin: clamp01(update.dutyMin ?? DEFAULTS.dutyMin),
       dutyMax: clamp01(update.dutyMax ?? DEFAULTS.dutyMax),
       maxDutyStep: clamp01(update.maxDutyStep ?? DEFAULTS.dutyStep),
@@ -143,13 +144,13 @@ export class QiController {
       temperatureK: update.temperatureK ?? 4,
       T_maxK: update.T_maxK ?? 15,
       area_mm2: update.area_mm2 ?? 50,
-      gammaGeo: update.gammaGeo ?? 20,
+      gammaGeo: update.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo,
       roughness_nm: update.roughness_nm ?? 1,
       fieldType: update.fieldType ?? "em",
       kernelType: update.kernelType ?? "lorentzian",
       tau_s: tau,
       guardBandFrac: update.guardBandFrac ?? DEFAULTS.guardFrac,
-      dutyNominal: update.duty ?? 0.01,
+      dutyNominal: update.duty ?? PROMOTED_WARP_PROFILE.dutyCycle,
       envelopeType: update.envelopeType ?? "rectangular",
       sectorId: update.sectorId ?? 0,
       drivePhase_rad: update.drivePhase_rad ?? 0,
@@ -604,19 +605,19 @@ export class QiController {
     const tau_ms =
       pipeline.qi?.tau_s_ms ??
       Number(process.env.QI_TAU_MS) ??
-      5;
+      PROMOTED_WARP_PROFILE.qi.tau_s_ms;
     const tau_s = Math.max(1e-6, tau_ms / 1000);
     const sampler: SamplingKind = pipeline.qi?.sampler ?? "lorentzian";
-    const baseGap = pipeline.gap_nm ?? 80;
+    const baseGap = pipeline.gap_nm ?? PROMOTED_WARP_PROFILE.gap_nm;
     const baseDuty =
       pipeline.dutyEffectiveFR ??
       pipeline.localBurstFrac ??
       pipeline.dutyCycle ??
-      0.01;
-    const qEff = Math.max(1e4, pipeline.qCavity ?? 1e6);
+      PROMOTED_WARP_PROFILE.dutyCycle;
+    const qEff = Math.max(1e4, pipeline.qCavity ?? PROMOTED_WARP_PROFILE.qCavity);
     const temperature = pipeline.temperature_K ?? 4;
     const area_mm2 = Math.max(1, (pipeline.tileArea_cm2 ?? 0.5) * 100);
-    const gammaGeo = Math.max(1, pipeline.gammaGeo ?? 20);
+    const gammaGeo = Math.max(1, pipeline.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo);
     const negFrac = clamp01(pipeline.negativeFraction ?? 0.4);
     const phaseSchedule = pipeline.phaseSchedule;
     const phaseOffsets = phaseSchedule?.phi_deg_by_sector?.map((deg) => deg * DEG2RAD);

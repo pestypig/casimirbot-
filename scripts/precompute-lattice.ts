@@ -17,6 +17,7 @@ import { buildLatticeTextureExports } from "@/lib/lattice-export";
 import { sha256Hex } from "@/utils/sha";
 import { hashSignature, normalizeBasisForSignature } from "@/lib/card-signatures";
 import type { HullLatticeState } from "@/store/useHull3DSharedStore";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 type CliOptions = {
   input: string | null;
@@ -109,7 +110,7 @@ function parseArgs(argv: string[]): CliOptions {
     profile: "preview",
     preset: "medium",
     boundsProfile: "tight",
-    sectorCount: 400,
+    sectorCount: PROMOTED_WARP_PROFILE.sectorCount,
     maxTriangles: 250_000,
     maxExtent: HULL_DIM_MAX_M,
   };

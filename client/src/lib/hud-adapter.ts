@@ -17,6 +17,8 @@
   );
 */
 
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
+
 // --- Types that mirror your pipeline but keep only what HUDs need ---
 export type PipelineLike = {
   // core numbers
@@ -25,14 +27,14 @@ export type PipelineLike = {
   N_tiles?: number;               // total tiles
   tilesPerSector?: number;        // computed per pipeline (optional)
   activeSectors?: number;         // concurrent sectors used this mode (optional)
-  sectorCount?: number;           // total sectors (defaults to 400)
+  sectorCount?: number;           // total sectors (defaults to promoted profile)
   concurrentSectors?: number;     // concurrent live sectors (1-2)
-  activeFraction?: number;        // = activeSectors/400
+  activeFraction?: number;        // = activeSectors / sectorCount
   dutyCycle?: number;             // UI duty (mode description)
-  dutyBurst?: number;             // default 0.01
+  dutyBurst?: number;             // default promoted duty
   dutyEffective_FR?: number;      // ship-wide duty (server precomputed)
   // New MODE_CONFIGS-style fields (optional)
-  sectorsTotal?: number;          // total grid sectors (defaults to 400)
+  sectorsTotal?: number;          // total grid sectors (defaults to promoted profile)
   sectorsConcurrent?: number;     // concurrent sectors from config
   localBurstFrac?: number;        // per-sector ON window fraction
   // geometry/time
@@ -63,7 +65,7 @@ export type HUDModel = {
   powerOnW: number;         // instantaneous ON power (ship) in W
   // Duty / sectors
   dutyShip: number;         // authoritative ship-wide duty
-  dutyBurst: number;        // 0.01
+  dutyBurst: number;
   sectorsConcurrent: number;
   sectorsTotal: number;
   tilesTotal: number;
@@ -90,7 +92,8 @@ export type HUDModel = {
   parametersClamped: boolean; // any parameters hit policy limits during calibration
 };
 
-const SECTORS_TOTAL = 400;
+const SECTORS_TOTAL = PROMOTED_WARP_PROFILE.sectorCount;
+const DUTY_BURST_DEFAULT = PROMOTED_WARP_PROFILE.dutyCycle;
 
 function clamp01(x: number): number {
   return Math.max(0, Math.min(1, x));
@@ -100,7 +103,7 @@ export function toHUDModel(s: PipelineLike): HUDModel {
   const sectorsTotal = s.sectorsTotal ?? s.sectorCount ?? SECTORS_TOTAL;
   const sectorsConcurrent =
     s.sectorsConcurrent ?? s.concurrentSectors ?? s.activeSectors ?? 1;
-  const localBurstFrac = s.localBurstFrac ?? s.dutyBurst ?? 0.01;
+  const localBurstFrac = s.localBurstFrac ?? s.dutyBurst ?? DUTY_BURST_DEFAULT;
 
   // If computing FR duty here, mirror the same formula (per-sector ON window × fraction live):
   const dutyFRDerived = clamp01(localBurstFrac * (sectorsConcurrent / sectorsTotal));
@@ -118,7 +121,7 @@ export function toHUDModel(s: PipelineLike): HUDModel {
 
   // TS_wall: derive if not present
   const wall = s.hull?.wallThickness_m ?? 1.0;
-  const T_m = 1 / (strobeHz * SECTORS_TOTAL); // approx; UI card just needs a rough number
+  const T_m = 1 / (strobeHz * Math.max(1, sectorsTotal)); // rough UI scale
   const TS_wall = (wall / 299_792_458) / (T_m || 1);
 
   // ζ status
@@ -209,7 +212,7 @@ export type HelixMetricsResponse = {
 
 export function fromRest(r: HelixMetricsResponse): HUDModel {
   const sectorsTotal = SECTORS_TOTAL;
-  const localBurstFrac = 0.01;
+  const localBurstFrac = DUTY_BURST_DEFAULT;
 
   // Derive sectorsConcurrent from dutyEffectiveFR if present; else default to 1
   const sectorsConcurrent = (() => {
@@ -259,8 +262,10 @@ export function fromRest(r: HelixMetricsResponse): HUDModel {
 // --- Sanity checks the HUD can show as tooltips ---
 export function checks(h: HUDModel) {
   const out: string[] = [];
-  if (h.dutyShip <= 0 || h.dutyShip > 0.01) out.push('Duty out of expected range (0 < d_ship ≤ 0.01).');
-  if (h.sectorsConcurrent < 0 || h.sectorsConcurrent > h.sectorsTotal) out.push('S_live outside [0,400].');
+  if (h.dutyShip <= 0 || h.dutyShip > 1) out.push("Duty out of physical range (0 < d_ship <= 1).");
+  if (h.sectorsConcurrent < 0 || h.sectorsConcurrent > h.sectorsTotal) {
+    out.push(`S_live outside [0,${h.sectorsTotal}].`);
+  }
   if (h.powerMW < 0) out.push('Negative average power.');
   if (!isFinite(h.zeta)) out.push('ζ not finite.');
   return out;

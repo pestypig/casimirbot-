@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -276,7 +277,7 @@ function DisplacementHeatmap({ endpoint, metrics, state }: {
   useEffect(() => {
     const sectors = metrics?.totalSectors 
                  ?? state?.sectorStrobing
-                 ?? 400;
+                 ?? PROMOTED_WARP_PROFILE.sectorCount;
     const split = Math.round(sectors * 0.5);
 
     setParams(prevParams => ({
@@ -443,7 +444,7 @@ function DisplacementHeatmap({ endpoint, metrics, state }: {
           <div>
             <Label htmlFor="sec">Sectors</Label>
             <Input id="sec" type="number" min={1} max={400} value={params.sectors}
-              onChange={e=>setParams(p=>({...p, sectors: Math.max(1,Math.min(400, Number(e.target.value)||400))}))}/>
+              onChange={e=>setParams(p=>({...p, sectors: Math.max(1,Math.min(PROMOTED_WARP_PROFILE.sectorCount, Number(e.target.value)|| PROMOTED_WARP_PROFILE.sectorCount))}))}/>
           </div>
           <div>
             <Label htmlFor="split">Split</Label>
@@ -1362,8 +1363,8 @@ export default function HelixCasimirAmplifier({
   })();
   // Refinement B: duty decomposition for baseline classification
   provenance.dutyDecomp = (() => {
-    const localBurst = (state as any)?.dutyBurst ?? 0.01; // baseline 1% ON window
-    const totalSectors = (state as any)?.sectorCount ?? (metrics as any)?.totalSectors ?? 400;
+    const localBurst = (state as any)?.dutyBurst ?? PROMOTED_WARP_PROFILE.dutyCycle; // baseline 1% ON window
+    const totalSectors = (state as any)?.sectorCount ?? (metrics as any)?.totalSectors ?? PROMOTED_WARP_PROFILE.sectorCount;
     const baseline = localBurst / Math.max(1, totalSectors);
     return { localBurst, totalSectors, baseline };
   })();
@@ -2800,6 +2801,7 @@ export default function HelixCasimirAmplifier({
     </div>
   );
 }
+
 
 
 

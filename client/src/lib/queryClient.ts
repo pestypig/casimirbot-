@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { isFlagEnabled } from "@/lib/envFlags";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 interface ApiRequestOptions {
   allowUnauthorized?: boolean;
@@ -382,14 +383,14 @@ export async function apiRequest(
       if (method === 'GET' && normalizedPath === '/api/helix/pipeline') {
         return {
           currentMode: 'hover',
-          dutyEffectiveFR: 0.000025,
+          dutyEffectiveFR: PROMOTED_WARP_PROFILE.dutyShip,
           __mockData: true,
           __mockSource: 'helix-dev-defaults',
-          sectorCount: 400,
-          sectorsConcurrent: 1,
-          gammaGeo: 26,
-          qSpoilingFactor: 1,
-          gammaVanDenBroeck: 134852.5967,
+          sectorCount: PROMOTED_WARP_PROFILE.sectorCount,
+          sectorsConcurrent: PROMOTED_WARP_PROFILE.concurrentSectors,
+          gammaGeo: PROMOTED_WARP_PROFILE.gammaGeo,
+          qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
+          gammaVanDenBroeck: PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
           qiAutoscale: {
             enabled: true,
             engaged: true,
@@ -415,7 +416,7 @@ export async function apiRequest(
           },
           lightCrossing: {
             tauLC_ms: HELIX_MOCK_TAU_LC_MS,
-            burst_ms: 10,
+            burst_ms: 1000 * PROMOTED_WARP_PROFILE.dutyCycle,
             dwell_ms: 1000,
           },
           hull: { a: 503.5, b: 132, c: 86.5 },
@@ -424,8 +425,8 @@ export async function apiRequest(
         };
       }
       if (method === 'GET' && normalizedPath === '/api/helix/metrics') {
-        const sectorsTotal = 400;
-        const sectorsLive = 1;
+        const sectorsTotal = PROMOTED_WARP_PROFILE.sectorCount;
+        const sectorsLive = PROMOTED_WARP_PROFILE.concurrentSectors;
         const strobeHz = 1000;
         const sectorPeriod_ms = 1000 / strobeHz;
         const tilesPerSector = 1024;
@@ -442,8 +443,8 @@ export async function apiRequest(
           currentSector,
           strobeHz,
           sectorPeriod_ms,
-          dutyCycle: 0.01,
-          dutyEffectiveFR: 0.01 * (sectorsLive / sectorsTotal),
+          dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
+          dutyEffectiveFR: PROMOTED_WARP_PROFILE.dutyCycle * (sectorsLive / sectorsTotal),
           currentMode: 'hover',
           overallStatus: 'NOMINAL',
           __mockData: true,
@@ -452,7 +453,7 @@ export async function apiRequest(
           lightCrossing: {
             tauLC_ms: HELIX_MOCK_TAU_LC_MS,
             sectorPeriod_ms,
-            burst_ms: sectorPeriod_ms * 0.01,
+            burst_ms: sectorPeriod_ms * PROMOTED_WARP_PROFILE.dutyCycle,
             dwell_ms: sectorPeriod_ms,
             sectorIdx: currentSector,
             sectorCount: sectorsTotal,
@@ -509,7 +510,7 @@ export async function apiRequest(
             netFlux: [0, 0, 0],
             divMin: mock.divS.min,
             divMax: mock.divS.max,
-            dutyFR: 0.0025,
+            dutyFR: PROMOTED_WARP_PROFILE.dutyShip,
             strobePhase: (now / 1000) % 1,
           },
           mock: true,
@@ -704,3 +705,4 @@ export const queryClient = new QueryClient({
     },
   },
 });
+

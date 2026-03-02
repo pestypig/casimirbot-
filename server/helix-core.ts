@@ -37,6 +37,7 @@ import { writePhaseCalibration, reducePhaseCalLogToLookup } from "./utils/phase-
 // ROBUST speed of light import: handle named/default or missing module gracefully
 import { C } from './utils/physics-const-safe';
 import { computeClocking } from "../shared/clocking.js";
+import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
 import {
   buildCurvatureBrick,
   buildHullRadialMapFromPositions,
@@ -745,7 +746,9 @@ export async function* orchestrateParametricSweep(
   );
   const Qint = Math.max(
     1,
-    toFiniteNumber((state as any)?.qMechanical) ?? toFiniteNumber((state as any)?.qCavity) ?? 2e9,
+    toFiniteNumber((state as any)?.qMechanical) ??
+      toFiniteNumber((state as any)?.qCavity) ??
+      PROMOTED_WARP_PROFILE.qCavity,
   );
 
   const startTs = Date.now();
@@ -1162,7 +1165,7 @@ const UpdateSchema = z.object({
     // --- Duty & θ chain (canonical) ---
     const dutyLocal    = Number.isFinite((s as any).localBurstFrac)
       ? Math.max(1e-12, (s as any).localBurstFrac as number)
-      : Math.max(1e-12, s.dutyCycle ?? 0.01); // ✅ default 1%
+      : Math.max(1e-12, s.dutyCycle ?? PROMOTED_WARP_PROFILE.dutyCycle); // ✅ default 1%
 
     // UI duty (per-sector knob, averaged by UI over all sectors)
     const dutyUI = Math.max(1e-12, s.dutyCycle ?? dutyLocal);
@@ -1344,7 +1347,7 @@ const UpdateSchema = z.object({
 async function runDiagnosticsScan() {
   const s = getGlobalPipelineState();
   const totalSectors = Math.max(1, s.sectorCount);
-  const baseQ   = s.qCavity || 1e9;
+  const baseQ   = s.qCavity || PROMOTED_WARP_PROFILE.qCavity;
   const baseT_K = s.temperature_K ?? 20;
   const massPerTile = (s.N_tiles > 0) ? (s.M_exotic / s.N_tiles) : 0; // proxy
 
@@ -1907,7 +1910,7 @@ export function getSystemMetrics(req: Request, res: Response) {
   // --- Duty & θ chain (canonical) ---
   const dutyLocal    = Number.isFinite((s as any).localBurstFrac)
     ? Math.max(1e-12, (s as any).localBurstFrac as number)
-    : Math.max(1e-12, s.dutyCycle ?? 0.01); // ✅ default 1%
+    : Math.max(1e-12, s.dutyCycle ?? PROMOTED_WARP_PROFILE.dutyCycle); // ✅ default 1%
 
   // UI duty (per-sector knob, averaged by UI over all sectors)
   const dutyUI = Math.max(1e-12, s.dutyCycle ?? dutyLocal);
@@ -2220,7 +2223,7 @@ export async function getPipelineState(req: Request, res: Response) {
     gammaVdB: s.gammaVanDenBroeck,
     deltaAOverA: s.qSpoilingFactor,
     // helpful defaults
-    localBurstFrac: (s as any).localBurstFrac ?? 0.01
+    localBurstFrac: (s as any).localBurstFrac ?? PROMOTED_WARP_PROFILE.dutyCycle
   });
 }
 
@@ -6586,8 +6589,14 @@ export function getCurvatureBrick(req: Request, res: Response) {
     const betaMax = parseNumberParam(query.betaMax, 12);
     const zeta = parseNumberParam(query.zeta, 0.84);
     const q = parseNumberParam(query.q ?? state.qSpoilingFactor, state.qSpoilingFactor ?? 1);
-    const gammaGeo = parseNumberParam(query.gammaGeo ?? state.gammaGeo, state.gammaGeo ?? 26);
-    const gammaVdB = parseNumberParam(query.gammaVdB ?? state.gammaVanDenBroeck, state.gammaVanDenBroeck ?? 1e11);
+    const gammaGeo = parseNumberParam(
+      query.gammaGeo ?? state.gammaGeo,
+      state.gammaGeo ?? PROMOTED_WARP_PROFILE.gammaGeo
+    );
+    const gammaVdB = parseNumberParam(
+      query.gammaVdB ?? state.gammaVanDenBroeck,
+      state.gammaVanDenBroeck ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck
+    );
     const ampBase = parseNumberParam(query.ampBase, 0);
     const clampQI = parseBooleanParam(query.clampQI, true);
     const edgeWeight = Math.max(0, Math.min(1, parseNumberParam(query.edgeWeight, 0)));
@@ -6696,7 +6705,10 @@ export function getStressEnergyBrick(req: Request, res: Response) {
     const dutyFR = parseNumberParam(query.dutyFR, parseNumberParam(dutyFRState, 0.0025));
     const q = parseNumberParam(query.q ?? state.qSpoilingFactor, state.qSpoilingFactor ?? 1);
     const gammaGeo = parseNumberParam(query.gammaGeo ?? state.gammaGeo, state.gammaGeo ?? 26);
-    const gammaVdB = parseNumberParam(query.gammaVdB ?? state.gammaVanDenBroeck, state.gammaVanDenBroeck ?? 1e5);
+    const gammaVdB = parseNumberParam(
+      query.gammaVdB ?? state.gammaVanDenBroeck,
+      state.gammaVanDenBroeck ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck
+    );
     const ampBase = parseNumberParam(query.ampBase, 0);
     const zeta = parseNumberParam(query.zeta, 0.84);
     const observerRapidityCap = parseNumberParam(
@@ -6787,7 +6799,10 @@ export function getCasimirTileSummary(req: Request, res: Response) {
     const dutyFR = parseNumberParam(dutyFRState, 0.0025);
     const q = Math.max(0, parseNumberParam(state.qSpoilingFactor, 1));
     const gammaGeo = Math.max(0, parseNumberParam(state.gammaGeo, 26));
-    const gammaVdB = Math.max(0, parseNumberParam(state.gammaVanDenBroeck, 1e5));
+    const gammaVdB = Math.max(
+      0,
+      parseNumberParam(state.gammaVanDenBroeck, PROMOTED_WARP_PROFILE.gammaVanDenBroeck)
+    );
     const ampBase = parseNumberParam((state as any).ampBase, 0);
     const zeta = parseNumberParam(state.zeta, 0.84);
     const overrideDriveDir = parseVec3ParamOptional((query as any).driveDir);
@@ -6935,7 +6950,10 @@ export function getLapseBrick(req: Request, res: Response) {
     const dutyFR = parseNumberParam(query.dutyFR, parseNumberParam(dutyFRState, 0.0025));
     const q = parseNumberParam(query.q ?? state.qSpoilingFactor, state.qSpoilingFactor ?? 1);
     const gammaGeo = parseNumberParam(query.gammaGeo ?? state.gammaGeo, state.gammaGeo ?? 26);
-    const gammaVdB = parseNumberParam(query.gammaVdB ?? state.gammaVanDenBroeck, state.gammaVanDenBroeck ?? 1e5);
+    const gammaVdB = parseNumberParam(
+      query.gammaVdB ?? state.gammaVanDenBroeck,
+      state.gammaVanDenBroeck ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck
+    );
     const ampBase = parseNumberParam(query.ampBase, 0);
     const zeta = parseNumberParam(query.zeta, 0.84);
     const iterations = Math.max(0, Math.floor(parseNumberParam(query.iterations, iterationsForQuality(quality))));
@@ -7054,7 +7072,7 @@ export async function getGrInitialBrick(req: Request, res: Response) {
     const gammaGeo = parseNumberParam(query.gammaGeo ?? state.gammaGeo, state.gammaGeo ?? 26);
     const gammaVdB = parseNumberParam(
       query.gammaVdB ?? state.gammaVanDenBroeck,
-      state.gammaVanDenBroeck ?? 1e5,
+      state.gammaVanDenBroeck ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
     );
     const ampBase = parseNumberParam(query.ampBase, 0);
     const zeta = parseNumberParam(query.zeta, 0.84);
@@ -7511,7 +7529,7 @@ export async function getGrRegionStats(req: Request, res: Response) {
     const targetRegions =
       Number.isFinite(targetRegionsRaw) && (targetRegionsRaw as number) > 0
         ? Math.floor(targetRegionsRaw as number)
-        : Math.max(1, Math.floor(num((state as any)?.sectorCount) ?? 400));
+        : Math.max(1, Math.floor(num((state as any)?.sectorCount) ?? PROMOTED_WARP_PROFILE.sectorCount));
     const thetaBins = num((query as any).thetaBins);
     const longBins = num((query as any).longBins);
     const phaseBins = num((query as any).phaseBins);
@@ -7820,7 +7838,7 @@ export async function getGrRegionStats(req: Request, res: Response) {
       const gammaGeo = parseNumberParam((query as any).gammaGeo ?? state.gammaGeo, state.gammaGeo ?? 26);
       const gammaVdB = parseNumberParam(
         (query as any).gammaVdB ?? state.gammaVanDenBroeck,
-        state.gammaVanDenBroeck ?? 1e5,
+        state.gammaVanDenBroeck ?? PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
       );
       const ampBase = parseNumberParam((query as any).ampBase, 0);
       const zeta = parseNumberParam((query as any).zeta, 0.84);
@@ -9470,6 +9488,8 @@ export async function getEnergySnapshot(req: Request, res: Response) {
 export const VERSION = "helix-core-debug-0";
 export function noop() { /* noop for debug */ }
 export default { VERSION, noop };
+
+
 
 
 

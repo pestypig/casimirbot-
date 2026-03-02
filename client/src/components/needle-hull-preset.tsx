@@ -8,6 +8,7 @@ import { Rocket } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 import { zenLongToast } from "@/lib/zen-long-toasts";
 import { SimulationParameters } from "@shared/schema";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 interface NeedleHullPresetProps {
   form: UseFormReturn<SimulationParameters>;
@@ -43,11 +44,11 @@ export function NeedleHullPreset({ form, onTileAreaChange, onShipRadiusChange, o
       cycleLengthUs: 1000,
 
       // Superconducting cavity Q ≈ 10⁹
-      cavityQ: 1e9,
+      cavityQ: PROMOTED_WARP_PROFILE.qCavity,
 
       // Needle Hull sector strobing parameters from papers
-      sectorCount: 400,        // 400 azimuthal sectors
-      sectorDuty: 2.5e-5,      // ship-wide duty d_eff = 0.01 × (1/400)
+      sectorCount: PROMOTED_WARP_PROFILE.sectorCount,        // 400 azimuthal sectors
+      sectorDuty: PROMOTED_WARP_PROFILE.dutyShip / PROMOTED_WARP_PROFILE.sectorCount,      // ship-wide duty d_eff = 0.01 × (1/400)
       pulseFrequencyGHz: 15,   // 15 GHz pulse frequency
 
       // Light-crossing time for ~1 m wall thickness (server recomputes too)
@@ -56,7 +57,7 @@ export function NeedleHullPreset({ form, onTileAreaChange, onShipRadiusChange, o
       // Warp field parameters
       shiftAmplitude: 50e-12,       // 50 pm shift amplitude for β(r) field
       expansionTolerance: 1e-12,    // Zero-expansion tolerance
-      warpFieldType: "natario"      // Natário zero-expansion type
+      warpFieldType: PROMOTED_WARP_PROFILE.warpFieldType      // Natário zero-expansion type
     });
 
     // Advanced computational parameters for high precision
@@ -84,8 +85,8 @@ export function NeedleHullPreset({ form, onTileAreaChange, onShipRadiusChange, o
           applyNeedleHullPreset();
           zenLongToast("sim:create", {
             gammaGeo: 26,
-            qFactor: 1e9,
-            duty: 0.14,
+            qFactor: PROMOTED_WARP_PROFILE.qCavity,
+            duty: PROMOTED_WARP_PROFILE.dutyCycle,
             shipRadiusM: 86.5, // keep toast aligned with canonical radius
             gapNm: 1.0
           });
@@ -101,3 +102,4 @@ export function NeedleHullPreset({ form, onTileAreaChange, onShipRadiusChange, o
     </div>
   );
 }
+

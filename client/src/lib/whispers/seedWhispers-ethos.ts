@@ -204,7 +204,7 @@ export const ETHOS_SEEDS: WhisperSeed[] = [
     mode: "both",
     title: "Enough is enough.",
     body:
-      "You're within 10% of the QI envelope. Raise sectors or lower duty; keep zeta <= 1.",
+      "You're within 10% of the QI envelope. Raise sectors or lower duty; keep zeta < 1.",
     action: "Open ledger (Step B)",
     deepen: [{ label: "Ledger - Step B", href: "/warp#step-b" }],
     when: (ctx) => {
@@ -376,7 +376,7 @@ export const ETHOS_SEEDS: WhisperSeed[] = [
     mode: "speak",
     title: "Plan inside the green.",
     body:
-      "Hold P_avg fixed, enforce q <= 1, zeta <= 1, TS >> 1; size A and Q to stay in band before you chase gamma.",
+      "Hold P_avg fixed, enforce q <= 1, zeta < 1, TS >> 1; size A and Q to stay in band before you chase gamma.",
     when: (ctx) => {
       if (!hasAnyHash(ctx, "#mission-planner")) return false;
       const ts = getTimelineTs(ctx);

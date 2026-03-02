@@ -1,6 +1,9 @@
 export interface QiGuardrail {
   lhs_Jm3?: number; // numerator (J/m^3)
   bound_Jm3?: number; // Ford-Roman bound (J/m^3, negative)
+  boundComputed_Jm3?: number; // pre-floor computed bound
+  boundUsed_Jm3?: number; // bound used after floor/policy
+  boundFloorApplied?: boolean;
   marginRatioRaw?: number; // |lhs|/|boundUsed| after bound-floor policy
   marginRatioRawComputed?: number; // |lhs|/|boundComputed| before bound-floor policy
   marginRatio?: number; // policy-clamped
@@ -21,11 +24,41 @@ export interface QiGuardrail {
   curvatureSource?: string | null;
   curvatureNote?: string | null;
   curvatureEnforced?: boolean | null;
+  applicabilityStatus?: "PASS" | "FAIL" | "NOT_APPLICABLE" | "UNKNOWN" | null;
+  applicabilityReasonCode?: "G4_QI_CURVATURE_WINDOW_FAIL" | "G4_QI_SIGNAL_MISSING" | null;
   metricDerived?: boolean | null;
   metricDerivedSource?: string | null;
   metricDerivedReason?: string | null;
   metricDerivedChart?: string | null;
+  quantitySemanticType?: string | null;
+  quantityWorldlineClass?: string | null;
+  quantitySemanticComparable?: boolean | null;
+  congruentSolvePolicyMarginPass?: boolean | null;
+  congruentSolveComputedMarginPass?: boolean | null;
+  congruentSolveApplicabilityPass?: boolean | null;
+  congruentSolveMetricPass?: boolean | null;
+  congruentSolveSemanticPass?: boolean | null;
+  congruentSolvePass?: boolean | null;
+  congruentSolveFailReasons?: string[] | null;
 }
+
+export type CongruentSolveSnapshot = {
+  pass: boolean;
+  policyMarginPass: boolean;
+  computedMarginPass: boolean;
+  applicabilityPass: boolean;
+  metricPass: boolean;
+  semanticPass: boolean;
+  failReasons: string[];
+  marginRatioRaw: number | null;
+  marginRatioRawComputed: number | null;
+  applicabilityStatus: "PASS" | "FAIL" | "NOT_APPLICABLE" | "UNKNOWN" | null;
+  quantitySemanticType: string | null;
+  quantityWorldlineClass: string | null;
+  rhoSource: string | null;
+  metricDerivedSource: string | null;
+  strictMode: boolean;
+};
 
 export type CongruenceMeta = {
   source?: "pipeline" | "metric" | "unknown" | string;
@@ -89,6 +122,7 @@ export type PipelineSnapshot = {
   zetaRaw?: number;
   strictCongruence?: boolean;
   qiGuardrail?: QiGuardrail;
+  congruentSolve?: CongruentSolveSnapshot | null;
   qiAutoscale?: QiAutoscaleTelemetry | null;
   busVoltage_kV?: number;
   busCurrent_A?: number;

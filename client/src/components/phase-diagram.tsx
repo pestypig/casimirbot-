@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import MetricsDashboard from './metrics-dashboard';
 import { zenLongToast } from '@/lib/zen-long-toasts';
 import { useEnergyPipeline, MODE_CONFIGS } from '@/hooks/use-energy-pipeline';
+import { PROMOTED_WARP_PROFILE } from '@shared/warp-promoted-profile';
 
 interface InteractiveHeatMapProps {
   currentTileArea: number;
@@ -19,8 +20,8 @@ interface InteractiveHeatMapProps {
   onModeChange?: (mode: string) => void;
 }
 
-// Match server visual seed unless pipeline provides one
-const DEFAULT_GAMMA_VDB = 1e11;
+// Telemetry-aligned fallback when pipeline has not emitted gamma yet.
+const DEFAULT_GAMMA_VDB = PROMOTED_WARP_PROFILE.gammaVanDenBroeck;
 
 const pick = <T,>(v: T | undefined, d: T) =>
   (typeof v === "number" ? (isFinite(v as any) ? (v as any) : d) : (v ?? d));
@@ -29,10 +30,10 @@ function resolveModeNumbers(mode: string, pipeline?: any) {
   const m = (mode || "hover").toLowerCase() as keyof typeof MODE_CONFIGS;
 
   // Prefer live pipeline; otherwise MODE_CONFIGS; otherwise sane fallbacks
-  const dutyCycle       = pick(pipeline?.dutyCycle,       MODE_CONFIGS[m]?.dutyCycle ?? 0.14);
+  const dutyCycle       = pick(pipeline?.dutyCycle,       MODE_CONFIGS[m]?.dutyCycle ?? PROMOTED_WARP_PROFILE.dutyCycle);
   const sectorStrobing  = pick(pipeline?.sectorStrobing,  MODE_CONFIGS[m]?.sectorStrobing ?? 1);
   const qSpoilingFactor = pick(pipeline?.qSpoilingFactor, MODE_CONFIGS[m]?.qSpoilingFactor ?? 1);
-  const qCavity         = pick(pipeline?.qCavity,         1e9);
+  const qCavity         = pick(pipeline?.qCavity,         PROMOTED_WARP_PROFILE.qCavity);
   const P_avg           = Number.isFinite(pipeline?.P_avg)
     ? pipeline.P_avg
     : (MODE_CONFIGS[m]?.powerTarget_W != null

@@ -10,7 +10,6 @@ import { LumaOverlayHost } from "@/components/LumaOverlayHost";
 import Home from "@/pages/home";
 import Simulation from "@/pages/simulation";
 import Documentation from "@/pages/documentation";
-import HelixCore from "@/pages/helix-core";
 import NoiseGenAlias from "@/pages/noisegen";
 import Why from "@/pages/why";
 import StartPortal from "@/pages/start";
@@ -111,11 +110,15 @@ function StartRoute() {
 }
 
 function HelixCoreRoute() {
-  return (
-    <LumaWhispersProvider>
-      <HelixCore />
-    </LumaWhispersProvider>
-  );
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    const search = typeof window !== "undefined" ? window.location.search ?? "" : "";
+    const hash = typeof window !== "undefined" ? window.location.hash ?? "" : "";
+    setLocation(`/desktop${search}${hash}`, { replace: true });
+  }, [setLocation]);
+
+  return null;
 }
 
 function DesktopRoute() {

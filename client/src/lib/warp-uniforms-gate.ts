@@ -4,6 +4,7 @@
  */
 
 import { DebounceConfig, createDebouncedFunction } from './usePollingSmart';
+import { PROMOTED_WARP_PROFILE } from '@shared/warp-promoted-profile';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -288,15 +289,15 @@ export function applyToEngine(
   }
 
   // --- 3) Compute canonical θ ----------------------------------------------
-  const gammaGeo = POS(u.gammaGeo, 26);
-  const q = POS(u.qSpoilingFactor, 1);
+  const gammaGeo = POS(u.gammaGeo, PROMOTED_WARP_PROFILE.gammaGeo);
+  const q = POS(u.qSpoilingFactor, PROMOTED_WARP_PROFILE.qSpoilingFactor);
 
   // Use the visual γ_VdB for geometry amplitude to match audits/expectations
   const gammaVdB_vis = POS(u.gammaVanDenBroeck_vis ?? u.gammaVdB ?? u.gammaVanDenBroeck, 1);
 
   // Sectors / Duties
   // Allow sectorsTotal / sectorsLive to be zero (don't force a 1-floor here).
-  const sectorsTotal = N(u.sectorCount, 400);
+  const sectorsTotal = N(u.sectorCount, PROMOTED_WARP_PROFILE.sectorCount);
   const sectorsLive  = Number.isFinite(u.sectors) ? Math.max(0, Math.min(sectorsTotal, N(u.sectors, 0))) : N(u.sectors, 1);
 
   // Local duty for provenance (UI/local) — clamp to [0,1] but don't force a small positive floor.

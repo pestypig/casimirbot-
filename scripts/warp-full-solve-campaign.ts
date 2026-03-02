@@ -19,6 +19,7 @@ type ParsedArgs = {
   promotionCheckPath: string | null;
   promoteCandidateId: string | null;
   autoPromoteReadyCandidate: boolean;
+  allowExploratoryWaveProfiles: boolean;
 };
 
 export type CliResult = {
@@ -138,6 +139,13 @@ type EvidencePack = {
     qeiRenormalizationScheme?: string;
     qeiSamplingNormalization?: string;
     qeiOperatorMapping?: string;
+    congruentSolvePolicyMarginPass?: boolean;
+    congruentSolveComputedMarginPass?: boolean;
+    congruentSolveApplicabilityPass?: boolean;
+    congruentSolveMetricPass?: boolean;
+    congruentSolveSemanticPass?: boolean;
+    congruentSolvePass?: boolean;
+    congruentSolveFailReasons?: string[];
     rhoSource?: string;
     metricT00Ref?: string;
     metricT00Geom?: number;
@@ -238,6 +246,13 @@ type QiForensicsArtifact = {
   qeiRenormalizationScheme: string | null;
   qeiSamplingNormalization: string | null;
   qeiOperatorMapping: string | null;
+  congruentSolvePolicyMarginPass: boolean | null;
+  congruentSolveComputedMarginPass: boolean | null;
+  congruentSolveApplicabilityPass: boolean | null;
+  congruentSolveMetricPass: boolean | null;
+  congruentSolveSemanticPass: boolean | null;
+  congruentSolvePass: boolean | null;
+  congruentSolveFailReasons: string[];
   tau_s: number | null;
   tauConfigured_s: number | null;
   tauWindow_s: number | null;
@@ -663,31 +678,23 @@ const loadPromotedCandidateFromArtifact = (
 };
 
 export const resolveWaveProfiles = (
-  args: Pick<ParsedArgs, 'promotionCheckPath' | 'promoteCandidateId'> & { autoPromoteReadyCandidate?: boolean },
+  args: Pick<ParsedArgs, 'promotionCheckPath' | 'promoteCandidateId' | 'allowExploratoryWaveProfiles'> & {
+    autoPromoteReadyCandidate?: boolean;
+  },
 ) => {
   const promotionCheckPath = args.promotionCheckPath ?? DEFAULT_PROMOTION_CHECK_PATH;
-  const loadAutoPromotedCandidate = (): PromotionCheckCandidate | null => {
-    if (!fs.existsSync(promotionCheckPath)) return null;
-    try {
-      const raw = JSON.parse(fs.readFileSync(promotionCheckPath, 'utf8')) as Record<string, unknown>;
-      const blockedReason = typeof raw.blockedReason === 'string' ? raw.blockedReason : null;
-      if (blockedReason) return null;
-      const aggregate = (raw.aggregate && typeof raw.aggregate === 'object' ? raw.aggregate : {}) as Record<string, unknown>;
-      if (aggregate.candidatePromotionReady !== true || aggregate.candidatePromotionStable !== true) return null;
-      const selected = asPromotionCandidate(raw.candidate);
-      if (!isPromotableCandidate(selected)) return null;
-      return selected;
-    } catch {
-      return null;
+  let promotedCandidate: PromotionCheckCandidate;
+  try {
+    promotedCandidate = loadPromotedCandidateFromArtifact(promotionCheckPath, args.promoteCandidateId);
+  } catch (error) {
+    if (args.allowExploratoryWaveProfiles) {
+      return WAVE_PROFILES;
     }
-  };
-  const promotedCandidate = args.promoteCandidateId
-    ? loadPromotedCandidateFromArtifact(promotionCheckPath, args.promoteCandidateId)
-    : args.autoPromoteReadyCandidate
-      ? loadAutoPromotedCandidate()
-      : null;
-  if (!promotedCandidate) {
-    return WAVE_PROFILES;
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Promoted-only wave profile resolution failed: ${detail} ` +
+        '(pass --allow-exploratory-wave-profiles to run legacy exploratory profiles intentionally).',
+    );
   }
   const promotedParams = buildPromotedProposalParams(promotedCandidate);
 
@@ -912,6 +919,7 @@ export const parseArgs = (argv = process.argv.slice(2)): ParsedArgs => {
     promotionCheckPath: read('--promotion-check-path', DEFAULT_PROMOTION_CHECK_PATH) ?? DEFAULT_PROMOTION_CHECK_PATH,
     promoteCandidateId: read('--promote-candidate-id', '')?.trim() || null,
     autoPromoteReadyCandidate: args.includes('--auto-promote-ready-candidate'),
+    allowExploratoryWaveProfiles: args.includes('--allow-exploratory-wave-profiles'),
   };
 };
 
@@ -1344,6 +1352,19 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
     parseSnapshotNumber(snapshotValue) ?? parseNumberField(fordKey);
   const readSnapshotString = (snapshotValue: unknown): string | undefined =>
     typeof snapshotValue === 'string' ? snapshotValue : undefined;
+  const parseBooleanText = (value: string | null | undefined): boolean | undefined =>
+    value === 'true' ? true : value === 'false' ? false : undefined;
+  const readCanonicalBoolean = (snapshotValue: unknown, fordKey: string): boolean | undefined =>
+    typeof snapshotValue === 'boolean' ? snapshotValue : parseBooleanText(parseFordField(fordKey));
+  const readDelimitedStringList = (snapshotValue: unknown, fordKey: string): string[] | undefined => {
+    const raw = readSnapshotString(snapshotValue) ?? parseFordField(fordKey);
+    if (raw == null) return undefined;
+    const items = raw
+      .split('|')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0 && item.toLowerCase() !== 'n/a');
+    return items.length > 0 ? items : [];
+  };
   const hasSynthesizedTag = [ford, theta].some((entry) => typeof entry?.note === 'string' && entry.note.includes('source=synthesized_unknown'));
   const missingAnyHardSource = !ford || !theta;
   const source: EvidencePack['g4Diagnostics']['source'] = hasSynthesizedTag || missingAnyHardSource ? 'synthesized_unknown' : 'evaluator_constraints';
@@ -1479,6 +1500,20 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
       (parseFordField('qeiSamplingNormalization') ?? undefined),
     qeiOperatorMapping:
       readSnapshotString(snapshot?.qi_qei_operator_mapping) ?? (parseFordField('qeiOperatorMapping') ?? undefined),
+    congruentSolvePolicyMarginPass:
+      readCanonicalBoolean(snapshot?.qi_congruent_solve_policy_margin_pass, 'congruentSolvePolicyMarginPass'),
+    congruentSolveComputedMarginPass:
+      readCanonicalBoolean(snapshot?.qi_congruent_solve_computed_margin_pass, 'congruentSolveComputedMarginPass'),
+    congruentSolveApplicabilityPass:
+      readCanonicalBoolean(snapshot?.qi_congruent_solve_applicability_pass, 'congruentSolveApplicabilityPass'),
+    congruentSolveMetricPass:
+      readCanonicalBoolean(snapshot?.qi_congruent_solve_metric_pass, 'congruentSolveMetricPass'),
+    congruentSolveSemanticPass:
+      readCanonicalBoolean(snapshot?.qi_congruent_solve_semantic_pass, 'congruentSolveSemanticPass'),
+    congruentSolvePass:
+      readCanonicalBoolean(snapshot?.qi_congruent_solve_pass, 'congruentSolvePass'),
+    congruentSolveFailReasons:
+      readDelimitedStringList(snapshot?.qi_congruent_solve_fail_reasons, 'congruentSolveFailReasons'),
     rhoSource: readSnapshotString(snapshot?.qi_rho_source) ?? (parseFordField('rhoSource') ?? undefined),
     metricT00Ref:
       readSnapshotString(snapshot?.qi_metric_t00_ref) ?? (parseFordField('metricT00Ref') ?? undefined),
@@ -1616,6 +1651,15 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
     qeiRenormalizationScheme: stringOrNull(pack.g4Diagnostics?.qeiRenormalizationScheme),
     qeiSamplingNormalization: stringOrNull(pack.g4Diagnostics?.qeiSamplingNormalization),
     qeiOperatorMapping: stringOrNull(pack.g4Diagnostics?.qeiOperatorMapping),
+    congruentSolvePolicyMarginPass: booleanOrNull(pack.g4Diagnostics?.congruentSolvePolicyMarginPass),
+    congruentSolveComputedMarginPass: booleanOrNull(pack.g4Diagnostics?.congruentSolveComputedMarginPass),
+    congruentSolveApplicabilityPass: booleanOrNull(pack.g4Diagnostics?.congruentSolveApplicabilityPass),
+    congruentSolveMetricPass: booleanOrNull(pack.g4Diagnostics?.congruentSolveMetricPass),
+    congruentSolveSemanticPass: booleanOrNull(pack.g4Diagnostics?.congruentSolveSemanticPass),
+    congruentSolvePass: booleanOrNull(pack.g4Diagnostics?.congruentSolvePass),
+    congruentSolveFailReasons: Array.isArray(pack.g4Diagnostics?.congruentSolveFailReasons)
+      ? pack.g4Diagnostics.congruentSolveFailReasons.slice()
+      : [],
     tau_s: finiteOrNull(pack.g4Diagnostics?.tau_s),
     tauConfigured_s: finiteOrNull(pack.g4Diagnostics?.tauConfigured_s),
     tauWindow_s: finiteOrNull(pack.g4Diagnostics?.tauWindow_s),
@@ -2115,6 +2159,13 @@ ${g4WaveRows}
 - marginRatioRaw: ${bestCasePack?.g4Diagnostics?.marginRatioRaw ?? bestCasePack?.g4Diagnostics?.marginRatio ?? 'n/a'}
 - marginRatioRawComputed: ${bestCasePack?.g4Diagnostics?.marginRatioRawComputed ?? 'n/a'}
 - applicabilityStatus: ${bestCasePack?.g4Diagnostics?.applicabilityStatus ?? 'UNKNOWN'}
+- congruentSolvePolicyMarginPass: ${bestCasePack?.g4Diagnostics?.congruentSolvePolicyMarginPass ?? 'n/a'}
+- congruentSolveComputedMarginPass: ${bestCasePack?.g4Diagnostics?.congruentSolveComputedMarginPass ?? 'n/a'}
+- congruentSolveApplicabilityPass: ${bestCasePack?.g4Diagnostics?.congruentSolveApplicabilityPass ?? 'n/a'}
+- congruentSolveMetricPass: ${bestCasePack?.g4Diagnostics?.congruentSolveMetricPass ?? 'n/a'}
+- congruentSolveSemanticPass: ${bestCasePack?.g4Diagnostics?.congruentSolveSemanticPass ?? 'n/a'}
+- congruentSolvePass: ${bestCasePack?.g4Diagnostics?.congruentSolvePass ?? 'n/a'}
+- congruentSolveFailReasons: ${(bestCasePack?.g4Diagnostics?.congruentSolveFailReasons ?? []).join('|') || 'none'}
 - rhoSource: ${bestCasePack?.g4Diagnostics?.rhoSource ?? 'unknown'}
 - metricT00Ref: ${bestCasePack?.g4Diagnostics?.metricT00Ref ?? 'unknown'}
 - metricT00Geom: ${bestCasePack?.g4Diagnostics?.metricT00Geom ?? 'n/a'}
@@ -2313,4 +2364,4 @@ export const runCampaignCli = async (argv = process.argv.slice(2)): Promise<CliR
 };
 
 export const CAMPAIGN_USAGE =
-  'Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <integer>] [--wave-timeout-ms <ms>] [--campaign-timeout-ms <ms>] [--ci] [--ci-fast-path] [--promote-candidate-id <id>] [--promotion-check-path <path>] [--auto-promote-ready-candidate]';
+  'Usage: npm run warp:full-solve:campaign -- --wave A|B|C|D|all [--out <dir>] [--seed <integer>] [--wave-timeout-ms <ms>] [--campaign-timeout-ms <ms>] [--ci] [--ci-fast-path] [--promote-candidate-id <id>] [--promotion-check-path <path>] [--auto-promote-ready-candidate] [--allow-exploratory-wave-profiles]';

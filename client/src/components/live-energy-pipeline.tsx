@@ -10,6 +10,7 @@ import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, type EnergyPipelineStat
 import { useRegisterWhisperContext } from "@/lib/whispers/contextRegistry";
 import { usePanelHashFocus } from "@/lib/whispers/usePanelHashFocus";
 import { resolveMetricClaimLabel, type AudienceMode } from "@/lib/audience-mode";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -21,7 +22,7 @@ interface LiveEnergyPipelineProps {
   tileArea: number; // cm²
   shipRadius: number; // m
   gapDistance?: number; // nm, default 1.0
-  sectorCount?: number; // Number of sectors for strobing (default 400)
+  sectorCount?: number; // Number of sectors for strobing (default promoted profile)
   exoticMassTarget?: number; // kg, user-configurable exotic mass target
 
   // Show calculations in real-time
@@ -42,7 +43,7 @@ export function LiveEnergyPipeline({
   tileArea,
   shipRadius,
   gapDistance = 1.0,
-  sectorCount = 400,
+  sectorCount = PROMOTED_WARP_PROFILE.sectorCount,
   exoticMassTarget = 1405,
   isRunning = false,
   selectedMode = "hover",
@@ -79,15 +80,24 @@ export function LiveEnergyPipeline({
 
   const [audienceMode, setAudienceMode] = React.useState<AudienceMode>("public");
 
+  const gammaVanDenBroeckTelemetry =
+    Number.isFinite((P as any)?.gammaVanDenBroeck_mass)
+      ? Number((P as any).gammaVanDenBroeck_mass)
+      : Number.isFinite(P.gammaVanDenBroeck)
+        ? Number(P.gammaVanDenBroeck)
+        : Number.isFinite((P as any)?.gammaVdB)
+          ? Number((P as any).gammaVdB)
+          : Number.NaN;
+
   const live = {
     currentMode: (P.currentMode ?? selectedMode ?? "hover") as "standby"|"hover"|"nearzero"|"cruise"|"emergency",
-    dutyCycle:    Number.isFinite(P.dutyCycle) ? P.dutyCycle! : duty ?? 0.14,
+    dutyCycle:    Number.isFinite(P.dutyCycle) ? P.dutyCycle! : duty ?? PROMOTED_WARP_PROFILE.dutyCycle,
     sectorStrobing: Number.isFinite(P.sectorStrobing) ? P.sectorStrobing! : (Number.isFinite(P.concurrentSectors) ? Number(P.concurrentSectors) : 1),
     qSpoilingFactor: Number.isFinite(P.qSpoilingFactor) ? P.qSpoilingFactor! : 1,
-    qCavity:      Number.isFinite(P.qCavity) ? P.qCavity! : (qFactor ?? 1e9),
+    qCavity:      Number.isFinite(P.qCavity) ? P.qCavity! : (qFactor ?? PROMOTED_WARP_PROFILE.qCavity),
     gammaGeo:     Number.isFinite(P.gammaGeo) ? P.gammaGeo! : (gammaGeo ?? 26),
-    // Use server's calibrated γ_VdB if present; fallback to paper seed 1e11 (keeps UI aligned with backend)
-    gammaVanDenBroeck: Number.isFinite(P.gammaVanDenBroeck) ? P.gammaVanDenBroeck! : 1e11,
+    // Telemetry-first VdB chain; do not inject historical paper seeds when telemetry is missing.
+    gammaVanDenBroeck: gammaVanDenBroeckTelemetry,
     modulationFreq_GHz: Number.isFinite(P.modulationFreq_GHz) ? P.modulationFreq_GHz! : 15,
     P_avg_MW:     Number.isFinite(P.P_avg) ? P.P_avg! : NaN,
     M_exotic_kg:  Number.isFinite(P.M_exotic) ? P.M_exotic! : NaN,
@@ -139,7 +149,7 @@ export function LiveEnergyPipeline({
           ? Number(P.sectors)
           : Number.isFinite(sectorCount)
             ? sectorCount
-            : 400;
+            : PROMOTED_WARP_PROFILE.sectorCount;
   const sectorsConcurrentLive =
     Number.isFinite(P.sectorsConcurrent)
       ? Number(P.sectorsConcurrent)
@@ -155,7 +165,7 @@ export function LiveEnergyPipeline({
       ? Number(P.localBurstFrac)
       : Number.isFinite(P.dutyBurst)
         ? Number(P.dutyBurst)
-        : live.dutyCycle ?? duty ?? 0.14;
+        : live.dutyCycle ?? duty ?? PROMOTED_WARP_PROFILE.dutyCycle;
   const derivedDutyFR = Math.min(
     1,
     clampPos(localBurstFracLive, 0) *
@@ -275,8 +285,10 @@ export function LiveEnergyPipeline({
 
   // Required Van den Broeck amplification to hit target exotic mass (proportionality model)
   const gammaVdB_required =
-    Number.isFinite(live.M_exotic_kg) && live.M_exotic_kg > 0
-      ? (exoticMassTarget / (live.M_exotic_kg as number)) * (live.gammaVanDenBroeck || 1)
+    Number.isFinite(live.M_exotic_kg) &&
+    live.M_exotic_kg > 0 &&
+    Number.isFinite(live.gammaVanDenBroeck)
+      ? (exoticMassTarget / (live.M_exotic_kg as number)) * (live.gammaVanDenBroeck as number)
       : NaN;
 
   return (
@@ -340,7 +352,7 @@ export function LiveEnergyPipeline({
                 freqGHz: live.modulationFreq_GHz,
                 sectors: live.sectorStrobing,
                 frOk: Number.isFinite(live.zeta)
-                        ? live.zeta <= (value==="hover"?0.05:value==="cruise"?1.0:0.02)
+                        ? live.zeta < (value==="hover"?0.05:value==="cruise"?1.0:0.02)
                         : true,
                 natarioOk: Number.isFinite(live.TS_ratio) ? live.TS_ratio >= 100 : true,
                 curvatureOk: true
@@ -584,10 +596,10 @@ export function LiveEnergyPipeline({
           </Tooltip>
           <div className="font-mono text-sm space-y-1">
             <div className="text-orange-700 dark:text-orange-300 font-semibold text-lg">
-              ζ = {fmt(live.zeta, "—", 3)} {Number.isFinite(live.zeta) && live.zeta <= 1 ? "✓" : "✗"}
+              ζ = {fmt(live.zeta, "—", 3)} {Number.isFinite(live.zeta) && live.zeta < 1 ? "✓" : "✗"}
             </div>
             <div className="text-muted-foreground">
-              Ford–Roman compliance: {Number.isFinite(live.zeta) && live.zeta <= 1 ? "SAFE" : "CHECK PARAMETERS"}
+              Ford–Roman compliance: {Number.isFinite(live.zeta) && live.zeta < 1 ? "SAFE" : "CHECK PARAMETERS"}
             </div>
           </div>
         </div>
@@ -725,7 +737,7 @@ export function LiveEnergyPipeline({
             <div>
               <span className="text-muted-foreground">Quantum Safety:</span>
               <div className="font-semibold">
-                zeta = {fmt(live.zeta, "-", 3)} {Number.isFinite(live.zeta) && live.zeta <= 1 ? "OK" : "WARN"}
+                zeta = {fmt(live.zeta, "-", 3)} {Number.isFinite(live.zeta) && live.zeta < 1 ? "OK" : "WARN"}
               </div>
             </div>
             <div>

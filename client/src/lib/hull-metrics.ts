@@ -1,6 +1,7 @@
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { BufferGeometry, Matrix4, Quaternion, Vector3 } from "three";
 import { clampHullArea, clampHullDims, HULL_AREA_MIN_M2, HULL_DIM_MIN_M } from "./hull-guardrails";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 type AxisLabel = "x" | "y" | "z";
 
@@ -161,7 +162,7 @@ export async function loadHullMetricsFromGLB(glbUrl: string, opts: HullMetricsOp
   const axisFlip = opts.axisFlip;
   const unitScale = Number.isFinite(opts.unitScale) && (opts.unitScale as number) > 0 ? (opts.unitScale as number) : 1;
   const previewMatrix = buildPreviewMatrix(opts);
-  const sectorCount = Math.max(1, Math.floor(opts.sectorCount ?? 400));
+  const sectorCount = Math.max(1, Math.floor(opts.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount));
   const areaBySector = new Array(sectorCount).fill(0);
 
   let sumX = 0, sumY = 0, sumZ = 0;
@@ -335,3 +336,4 @@ export async function loadHullMetricsFromGLB(glbUrl: string, opts: HullMetricsOp
     vertexCount,
   };
 }
+

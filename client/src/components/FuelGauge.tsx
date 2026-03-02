@@ -2,6 +2,7 @@ import * as React from "react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 function clamp01(x: number) { return Math.max(0, Math.min(1, x)); }
 function fmt(x?: number, d=2) {
@@ -60,8 +61,8 @@ export function computeEffectiveLyPerHour(
   let v = (baseFrac[canonical] ?? 0) * C_LY_PER_HOUR;
 
   // gentle scaling with current tuning (kept bounded)
-  const g = Math.min(40, Math.max(10, gammaGeo || 26));
-  const qn = Math.log10(Math.max(1, q || 1e9)) - 6; // ~3 when q~1e9
+  const g = Math.min(40, Math.max(10, gammaGeo || PROMOTED_WARP_PROFILE.gammaGeo));
+  const qn = Math.log10(Math.max(1, q || PROMOTED_WARP_PROFILE.qCavity)) - 6;
   const dutyBoost = Math.max(0, duty || 0);     // 0..1
   const safety = clamp01(zeta / 0.84) * clamp01(tsRatio / 100);
 
@@ -114,7 +115,20 @@ function computeSafeWindowHours(mode: string, zeta=0, tsRatio=0, frOk?: boolean,
 }
 
 export function FuelGauge(props: FuelGaugeProps) {
-  const { mode, powerMW, zeta, tsRatio, frOk, natarioOk, curvatureOk, freqGHz=0, duty=0, gammaGeo=26, qFactor=1e9, pMaxMW } = props;
+  const {
+    mode,
+    powerMW,
+    zeta,
+    tsRatio,
+    frOk,
+    natarioOk,
+    curvatureOk,
+    freqGHz = 0,
+    duty = 0,
+    gammaGeo = PROMOTED_WARP_PROFILE.gammaGeo,
+    qFactor = PROMOTED_WARP_PROFILE.qCavity,
+    pMaxMW
+  } = props;
 
   const safeHours = computeSafeWindowHours(mode, zeta, tsRatio, frOk, natarioOk, curvatureOk, powerMW, pMaxMW);
 

@@ -530,7 +530,7 @@ export function NeedleCavityBubblePanel() {
             />
             <LedgerRow
               label="Ford-Roman QI zeta"
-              formula="zeta = sampledIntegral / bound (zeta <= 1)"
+              formula="zeta = sampledIntegral / bound (zeta < 1, strict)"
               value={fmtSci(zeta)}
               unit={fordRomanOK == null ? "n/a" : fordRomanOK ? "ok" : "violation"}
               highlight={fordRomanOK === false}

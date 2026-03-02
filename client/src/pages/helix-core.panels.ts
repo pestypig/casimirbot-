@@ -64,6 +64,7 @@ export type HelixPanelRef = {
 const API = {
   pipelineGet: "GET /api/helix/pipeline",
   pipelineUpdate: "POST /api/helix/pipeline/update",
+  stressEnergyBrick: "GET /api/helix/stress-energy-brick",
   helixMode: "POST /api/helix/mode",
   helixSweep: "POST /api/helix/sweep/run",
   helixSnapshot: "GET /api/helix/snapshot",
@@ -75,6 +76,7 @@ const API = {
   grAgentLoopKpis: "GET /api/helix/gr-agent-loop/kpis",
   mathGraph: "GET /api/helix/math/graph",
   auditTree: "GET /api/helix/audit/tree",
+  warpCalculator: "POST /api/physics/warp/calculator",
   tokamakState: "GET /api/physics/tokamak/sim",
   tokamakCommand: "POST /api/physics/tokamak/command"
 } as const;
@@ -159,6 +161,13 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "deepmix-sweetspot": ["sweet spot", "deep mix target", "isoline", "mix optimization", "duty sweet spot"],
   "deepmix-globe": ["deep mix globe", "mix field", "global mix", "deep mixing globe"],
   "alcubierre-viewer": ["Alcubierre metric", "warp bubble", "metric tensor", "warp visualizer", "bubble hull"],
+  "needle-mk2-calculator": [
+    "needle hull mark 2",
+    "mk2 calculator",
+    "warp calculator",
+    "scientific figure",
+    "g4 calculator"
+  ],
   "shell-outline": ["shell outline", "hull trace", "hull shell", "outline view", "needle shell"],
   "shift-vector": ["shift vector", "beta^i", "lapse shift", "ADM shift", "beta_i"],
   "curvature-slice": ["curvature slice", "R_ab", "Ricci slice", "scalar curvature", "curvature cut"],
@@ -569,6 +578,16 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 1100, h: 720 },
     defaultPosition: { x: 180, y: 80 },
     endpoints: [API.pipelineGet, API.helixMetrics, API.helixDisplacement]
+  },
+  {
+    id: "needle-mk2-calculator",
+    title: "Needle MK2 Calculator",
+    icon: Calculator,
+    loader: lazyPanel(() => import("@/components/panels/NeedleMk2CalculatorPanel")),
+    defaultSize: { w: 760, h: 620 },
+    defaultPosition: { x: 260, y: 120 },
+    mobileReady: true,
+    endpoints: [API.pipelineGet, API.stressEnergyBrick, API.warpCalculator]
   },
   {
     id: "shell-outline",

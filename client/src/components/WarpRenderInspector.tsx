@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 // ============================================================================
 // File: client/src/components/WarpRenderInspector.tsx  (SSOT v2 patch)
 // Purpose: Inspector that ONLY drives physics via the adapter; uses the gate
@@ -257,13 +258,13 @@ export default function WarpRenderInspector(_props: any = {}) {
     const effectiveLive = live || {
       currentMode: 'hover',
       sectors: 1,
-      sectorCount: 400,
-      dutyEffectiveFR: 0.25,
+      sectorCount: PROMOTED_WARP_PROFILE.sectorCount,
+      dutyEffectiveFR: PROMOTED_WARP_PROFILE.dutyShip,
       hull: { a: 0.42, b: 0.11, c: 0.09 },
-      gammaGeo: 26,
-      gammaVanDenBroeck: 134852.59669968978,
-      qSpoilingFactor: 1,
-      dutyCycle: 0.14,
+      gammaGeo: PROMOTED_WARP_PROFILE.gammaGeo,
+      gammaVanDenBroeck: PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
+      qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
+      dutyCycle: PROMOTED_WARP_PROFILE.dutyCycle,
       __mockData: true // flag to indicate this is fallback data
     };
     
@@ -282,7 +283,7 @@ export default function WarpRenderInspector(_props: any = {}) {
       mode: effectiveLive?.currentMode || 'hover',
       currentMode: effectiveLive?.currentMode || 'hover',
       sectors: effectiveLive?.sectors || 1,
-      sectorCount: effectiveLive?.sectorCount || 400,
+      sectorCount: effectiveLive?.sectorCount || PROMOTED_WARP_PROFILE.sectorCount,
       dutyEffectiveFR: effectiveLive?.dutyEffectiveFR ?? 0,
       hullAxes: [
         effectiveLive?.hull?.a || 0.42,
@@ -517,3 +518,4 @@ export default function WarpRenderInspector(_props: any = {}) {
     </div>
   );
 }
+

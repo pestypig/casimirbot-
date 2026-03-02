@@ -3,6 +3,7 @@ import { createWithEqualityFn } from "zustand/traditional";
 import { publishDriveSplit, subscribeDriveSplit, type DriveSplitState } from "@/lib/drive-split-channel";
 import { publishDriveIntent, subscribeDriveIntent, type DriveIntentState } from "@/lib/drive-intent-channel";
 import type { RidgePreset } from "@shared/schema";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 
 export type PhaseMode = "scheduler" | "manual";
 export type AutophaserMode = "viz" | "assist" | "coupled";
@@ -218,7 +219,7 @@ const creator: StateCreator<DriveSyncState> = (set, get) => ({
 
   effectiveSigma01: (totalSectors: number) => {
     const sigmaS = Math.max(1e-4, get().sigmaSectors);
-    const total = Math.max(1, Math.floor(totalSectors || 400));
+    const total = Math.max(1, Math.floor(totalSectors || PROMOTED_WARP_PROFILE.sectorCount));
     return sigmaS / total;
   },
 

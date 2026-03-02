@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -192,7 +193,7 @@ export default function SpectrumTunerPanel({
   const x_cut = clamp01((a_nm / a_eff_nm) * 0.25 + 0.05); // heuristic mapping for viz
 
   // Q / lineshape
-  const Q0 = liveInputs.Q0 ?? 1e9;
+  const Q0 = liveInputs.Q0 ?? PROMOTED_WARP_PROFILE.qCavity;
   const qCavity = liveInputs.qCavity ?? Q0;
   const qSpoil = liveInputs.qSpoilingFactor ?? 1.0;
   const Qvis = showMaterials ? qCavity * qSpoil : Q0;
@@ -204,8 +205,8 @@ export default function SpectrumTunerPanel({
   const etaDCE = showDCE ? Math.min(2, ((qSpoil * qCavity) / Math.max(1, Q0)) * 0.05) : 0; // proxy
 
   // Time loop
-  const duty = liveInputs.duty ?? 0.01;
-  const sectors = liveInputs.sectors ?? 400;
+  const duty = liveInputs.duty ?? PROMOTED_WARP_PROFILE.dutyCycle;
+  const sectors = liveInputs.sectors ?? PROMOTED_WARP_PROFILE.sectorCount;
   const effDuty = showTimeLoop ? duty * (1 / Math.max(1, sectors)) : 1.0; // ship-wide effective duty
   const lc_us = liveInputs.lightCrossing_us ?? 0.3; // for scale only
 
@@ -595,3 +596,4 @@ export default function SpectrumTunerPanel({
     </section>
   );
 }
+

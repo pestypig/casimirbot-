@@ -1141,6 +1141,36 @@ export async function evaluateWarpViability(
       typeof (qiGuard as any)?.qeiOperatorMapping === "string"
         ? String((qiGuard as any).qeiOperatorMapping)
         : undefined,
+    qi_congruent_solve_policy_margin_pass:
+      typeof (qiGuard as any)?.congruentSolvePolicyMarginPass === "boolean"
+        ? Boolean((qiGuard as any).congruentSolvePolicyMarginPass)
+        : undefined,
+    qi_congruent_solve_computed_margin_pass:
+      typeof (qiGuard as any)?.congruentSolveComputedMarginPass === "boolean"
+        ? Boolean((qiGuard as any).congruentSolveComputedMarginPass)
+        : undefined,
+    qi_congruent_solve_applicability_pass:
+      typeof (qiGuard as any)?.congruentSolveApplicabilityPass === "boolean"
+        ? Boolean((qiGuard as any).congruentSolveApplicabilityPass)
+        : undefined,
+    qi_congruent_solve_metric_pass:
+      typeof (qiGuard as any)?.congruentSolveMetricPass === "boolean"
+        ? Boolean((qiGuard as any).congruentSolveMetricPass)
+        : undefined,
+    qi_congruent_solve_semantic_pass:
+      typeof (qiGuard as any)?.congruentSolveSemanticPass === "boolean"
+        ? Boolean((qiGuard as any).congruentSolveSemanticPass)
+        : undefined,
+    qi_congruent_solve_pass:
+      typeof (qiGuard as any)?.congruentSolvePass === "boolean"
+        ? Boolean((qiGuard as any).congruentSolvePass)
+        : undefined,
+    qi_congruent_solve_fail_reasons:
+      Array.isArray((qiGuard as any)?.congruentSolveFailReasons)
+        ? ((qiGuard as any).congruentSolveFailReasons as unknown[])
+            .filter((item) => typeof item === "string" && item.length > 0)
+            .join("|")
+        : undefined,
     qi_rho_source: qiGuard?.rhoSource,
     qi_metric_t00_ref:
       warpMetricSource ??
@@ -1342,6 +1372,13 @@ export async function evaluateWarpViability(
           `qeiRenormalizationScheme=${(qiGuard as any).qeiRenormalizationScheme ?? "n/a"}`,
           `qeiSamplingNormalization=${(qiGuard as any).qeiSamplingNormalization ?? "n/a"}`,
           `qeiOperatorMapping=${(qiGuard as any).qeiOperatorMapping ?? "n/a"}`,
+          `congruentSolvePolicyMarginPass=${(qiGuard as any).congruentSolvePolicyMarginPass === true}`,
+          `congruentSolveComputedMarginPass=${(qiGuard as any).congruentSolveComputedMarginPass === true}`,
+          `congruentSolveApplicabilityPass=${(qiGuard as any).congruentSolveApplicabilityPass === true}`,
+          `congruentSolveMetricPass=${(qiGuard as any).congruentSolveMetricPass === true}`,
+          `congruentSolveSemanticPass=${(qiGuard as any).congruentSolveSemanticPass === true}`,
+          `congruentSolvePass=${(qiGuard as any).congruentSolvePass === true}`,
+          `congruentSolveFailReasons=${Array.isArray((qiGuard as any).congruentSolveFailReasons) ? (qiGuard as any).congruentSolveFailReasons.join('|') : "n/a"}`,
           `rhoSource=${qiGuard.rhoSource ?? "unknown"}`,
           `metricT00Ref=${warpMetricSource ?? "n/a"}`,
           `metricT00Geom=${warpMetricT00GeomForAudit ?? "n/a"}`,

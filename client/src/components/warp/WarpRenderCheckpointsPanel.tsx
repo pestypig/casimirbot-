@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 "use client";
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 import { checkpoint, Check, Side, Stage, within, onCheck, _listenerCount } from "@/lib/checkpoints";
@@ -218,14 +219,20 @@ function FixButton({ onClick, children }: React.PropsWithChildren<{ onClick: () 
 function publishWarpEcho(engine: any, side: Side, liveSnap?: any) {
   try {
     const u = engine?.uniforms || {};
-    const gammaGeo = Math.max(1, N(u.gammaGeo ?? liveSnap?.gammaGeo ?? liveSnap?.g_y, 26));
-    const q       = Math.max(1e-12, N(u.qSpoilingFactor ?? u.deltaAOverA ?? liveSnap?.deltaAOverA ?? liveSnap?.qSpoilingFactor, 1));
-    const gammaVdB= Math.max(1, N(u.gammaVdB ?? u.gammaVanDenBroeck ?? liveSnap?.gammaVanDenBroeck ?? liveSnap?.gammaVdB, 1.4e5));
+    const gammaGeo = Math.max(1, N(u.gammaGeo ?? liveSnap?.gammaGeo ?? liveSnap?.g_y, PROMOTED_WARP_PROFILE.gammaGeo));
+    const q = Math.max(
+      1e-12,
+      N(u.qSpoilingFactor ?? u.deltaAOverA ?? liveSnap?.deltaAOverA ?? liveSnap?.qSpoilingFactor, PROMOTED_WARP_PROFILE.qSpoilingFactor)
+    );
+    const gammaVdB = Math.max(
+      1,
+      N(u.gammaVdB ?? u.gammaVanDenBroeck ?? liveSnap?.gammaVanDenBroeck ?? liveSnap?.gammaVdB, PROMOTED_WARP_PROFILE.gammaVanDenBroeck)
+    );
 
-    const sectorsTotal = Math.max(1, N(u.sectorCount ?? liveSnap?.sectorCount, 400));
+    const sectorsTotal = Math.max(1, N(u.sectorCount ?? liveSnap?.sectorCount, PROMOTED_WARP_PROFILE.sectorCount));
     const sectorsLive  = Math.max(1, N(u.sectors ?? 1, 1));
 
-    const dutyLocal = 0.01; // Ford   Roman window (local)
+    const dutyLocal = PROMOTED_WARP_PROFILE.dutyCycle;
     const dFR_fallback = dutyLocal * (sectorsLive / sectorsTotal);
     const dFR = Number.isFinite(+u.dutyEffectiveFR) ? Math.max(1e-12, +u.dutyEffectiveFR) : dFR_fallback;
 
@@ -268,10 +275,19 @@ function useCheckpointList(
     // === DAG Stage 1: INPUT CHECKPOINTS (ENGINE-FIRST) ===
     // Prefer bound uniforms; fall back to live snapshot for context only.
     const Ue = (e?.uniforms || {});
-    const gammaGeo = N(Ue.gammaGeo ?? liveSnap?.gammaGeo ?? liveSnap?.g_y, 26);
-    const deltaAOverA = N(Ue.deltaAOverA ?? Ue.qSpoilingFactor ?? liveSnap?.deltaAOverA ?? liveSnap?.qSpoilingFactor, 1);
-    const gammaVdB = N(Ue.gammaVdB ?? Ue.gammaVanDenBroeck ?? liveSnap?.gammaVdB ?? liveSnap?.gammaVanDenBroeck, 1.4e5);
-    const sectors = Math.max(1, Math.floor(N(Ue.sectorCount ?? liveSnap?.sectorCount ?? liveSnap?.sectors, 400)));
+    const gammaGeo = N(Ue.gammaGeo ?? liveSnap?.gammaGeo ?? liveSnap?.g_y, PROMOTED_WARP_PROFILE.gammaGeo);
+    const deltaAOverA = N(
+      Ue.deltaAOverA ?? Ue.qSpoilingFactor ?? liveSnap?.deltaAOverA ?? liveSnap?.qSpoilingFactor,
+      PROMOTED_WARP_PROFILE.qSpoilingFactor
+    );
+    const gammaVdB = N(
+      Ue.gammaVdB ?? Ue.gammaVanDenBroeck ?? liveSnap?.gammaVdB ?? liveSnap?.gammaVanDenBroeck,
+      PROMOTED_WARP_PROFILE.gammaVanDenBroeck
+    );
+    const sectors = Math.max(
+      1,
+      Math.floor(N(Ue.sectorCount ?? liveSnap?.sectorCount ?? liveSnap?.sectors, PROMOTED_WARP_PROFILE.sectorCount))
+    );
     const duty    = N(Ue.dutyCycle ?? liveSnap?.dutyCycle, 0);
 
   pushCheck({
@@ -307,9 +323,9 @@ function useCheckpointList(
       if (Number.isFinite(used)) return Math.max(1e-12, used);
       const de   = N(Ue.dutyEffectiveFR, NaN);
       if (Number.isFinite(de)) return Math.max(1e-12, de);
-      const sTot = Math.max(1, N(Ue.sectorCount ?? liveSnap?.sectorCount, 400));
+      const sTot = Math.max(1, N(Ue.sectorCount ?? liveSnap?.sectorCount, PROMOTED_WARP_PROFILE.sectorCount));
       const sCon = Math.max(1, N(Ue.sectors ?? 1, 1));
-      const dutyLocal = 0.01;
+      const dutyLocal = PROMOTED_WARP_PROFILE.dutyCycle;
       return Math.max(1e-12, dutyLocal * (sCon / sTot));
     })();
 
@@ -776,7 +792,7 @@ function useCheckpointList(
 
     // Strobing sanity
     const sConcurrent = u?.sectors ?? 1;
-    const sTotal = liveSnap?.sectorCount ?? 400;
+    const sTotal = liveSnap?.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount;
     const sp = Math.max(0, Math.min(sConcurrent - 1, N(u?.split, 0)));
     const strobeOk = sConcurrent >= 1 && sp < sConcurrent;
     rows.push({ label: "Strobing", detail: `concurrent=${sConcurrent}     total=${sTotal}     split=${sp}`, state: strobeOk ? "ok" : "warn" });
@@ -1059,7 +1075,7 @@ export default function WarpRenderCheckpointsPanel({
     ? (lightCrossing!.burst_ms! / lightCrossing!.dwell_ms!)
     : NaN;
 
-  const sTotal       = snap?.sectorCount ?? 400;
+  const sTotal       = snap?.sectorCount ?? PROMOTED_WARP_PROFILE.sectorCount;
   const sConcLeft    = leftEngineRef.current?.uniforms?.sectors  ?? 1;
   const sConcRight   = rightEngineRef.current?.uniforms?.sectors ?? sConcLeft;
   const dutyFR_left  = (Number.isFinite(dutyLocal) ? dutyLocal : NaN) * (sConcLeft  / sTotal);
@@ -1237,3 +1253,4 @@ export default function WarpRenderCheckpointsPanel({
     </div>
   );
 }
+

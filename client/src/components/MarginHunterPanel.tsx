@@ -1,3 +1,4 @@
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { gatedUpdateUniforms, withoutPhysics } from "@/lib/warp-uniforms-gate";
@@ -143,11 +144,16 @@ export default function MarginHunterPanel({
 }){
   const { data: live } = useEnergyPipeline({ refetchOnWindowFocus: false, staleTime: 10_000 });
 
-  // Baselines from live (safe fallbacks)
-  const sectorCount = Math.max(1, +(live as any)?.sectorCount || 400);
+  // Baselines from live (telemetry-first fallbacks)
+  const sectorCount = Math.max(1, +(live as any)?.sectorCount || PROMOTED_WARP_PROFILE.sectorCount);
   const gammaGeo    = N((live as any)?.gammaGeo, 26);
   const qBase       = N((live as any)?.qSpoilingFactor, 1);
-  const gammaVdB0   = N((live as any)?.gammaVanDenBroeck ?? (live as any)?.gammaVdB, 1e11);
+  const gammaVdB0   = N(
+    (live as any)?.gammaVanDenBroeck_mass ??
+      (live as any)?.gammaVanDenBroeck ??
+      (live as any)?.gammaVdB,
+    1.4e5,
+  );
   const dwell_ms    = N((live as any)?.dwell_ms, 1000);
   const burst_ms    = N((live as any)?.burst_ms, 10);
   const dutyLocal0  = clamp(N(burst_ms/dwell_ms, 0.01), 1e-6, 0.5);
@@ -375,3 +381,4 @@ export default function MarginHunterPanel({
     </div>
   );
 }
+

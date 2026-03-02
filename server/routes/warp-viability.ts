@@ -6,8 +6,11 @@ import type { WarpConfig } from "../../types/warpViability";
 import { loadWarpAgentsConfig } from "../../modules/physics/warpAgents";
 import { recordTrainingTrace } from "../services/observability/training-trace-store";
 import { getGlobalPipelineState, setGlobalPipelineState } from "../energy-pipeline";
+import { runWarpFullSolveCalculator } from "../../scripts/warp-full-solve-calculator.js";
+import path from "node:path";
 
 const router = Router();
+const CALCULATOR_OUT_ROOT = path.resolve("artifacts", "research", "full-solve");
 
 const DEFAULT_VIABILITY_POLICY = {
   admissibleStatus: "ADMISSIBLE",
@@ -32,6 +35,17 @@ const resolveViabilityPolicy = async () => {
   } catch {
     return DEFAULT_VIABILITY_POLICY;
   }
+};
+
+const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+  value != null && typeof value === "object" && !Array.isArray(value);
+
+const resolveCalculatorOutPath = (candidate: unknown): string | null => {
+  if (typeof candidate !== "string" || candidate.trim().length === 0) return null;
+  const resolved = path.resolve(candidate);
+  const rel = path.relative(CALCULATOR_OUT_ROOT, resolved);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  return resolved;
 };
 
 const buildFirstFail = (constraints: Array<{
@@ -155,6 +169,51 @@ router.post("/viability", async (req: Request, res: Response) => {
     console.error("[warp-viability] evaluation failed:", err);
     const message = err instanceof Error ? err.message : "Viability evaluation failed";
     res.status(500).json({ error: "viability_failed", message });
+  }
+});
+
+router.get("/calculator", async (_req: Request, res: Response) => {
+  try {
+    const result = await runWarpFullSolveCalculator({
+      writeOutput: false,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error("[warp-viability] calculator failed:", err);
+    const message = err instanceof Error ? err.message : "Calculator execution failed";
+    res.status(500).json({ error: "calculator_failed", message });
+  }
+});
+
+router.post("/calculator", async (req: Request, res: Response) => {
+  try {
+    const body = isObjectRecord(req.body) ? req.body : {};
+    const persist = body.persist === true;
+    const outPath = persist ? resolveCalculatorOutPath(body.outPath) : undefined;
+    if (persist && !outPath) {
+      res.status(400).json({
+        error: "invalid_out_path",
+        message: "outPath must resolve under artifacts/research/full-solve when persist=true.",
+      });
+      return;
+    }
+
+    const inputPayload = isObjectRecord(body.inputPayload) ? body.inputPayload : undefined;
+    const inputPath = typeof body.inputPath === "string" && body.inputPath.trim().length > 0 ? body.inputPath : undefined;
+    const injectCurvatureSignals = typeof body.injectCurvatureSignals === "boolean" ? body.injectCurvatureSignals : undefined;
+
+    const result = await runWarpFullSolveCalculator({
+      inputPath,
+      inputPayload: inputPayload as any,
+      injectCurvatureSignals,
+      outPath,
+      writeOutput: persist,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error("[warp-viability] calculator failed:", err);
+    const message = err instanceof Error ? err.message : "Calculator execution failed";
+    res.status(500).json({ error: "calculator_failed", message });
   }
 });
 

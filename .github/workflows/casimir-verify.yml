@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Guard deprecated helix-core UI surface
+        run: npm run guard:helix-core-deprecated
+
       - name: Verify ideology verifiers pack
         run: npm run verify:ideology-verifiers
 

@@ -484,7 +484,14 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
         if (!target) return;
         const def = getPanelDef(target);
         whisperPanelOpen(target, def?.title);
-        navigate(`/helix-core?panel=${encodeURIComponent(target)}`);
+        try {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("helix:pending-panel", target);
+          }
+        } catch {
+          // ignore storage failures
+        }
+        navigate("/desktop?desktop=1");
         recordPanelActivity(target, "openInHelix");
       }
     }),
