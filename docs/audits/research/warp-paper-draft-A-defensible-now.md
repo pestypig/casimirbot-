@@ -8,7 +8,7 @@
 - Claim-governance contract: `docs/audits/research/warp-paper-authoring-contract-2026-03-02.md`
 
 ## Abstract
-This draft reports the current reduced-order campaign state using only repository artifacts pinned to one commit. Canonical adjudication is `REDUCED_ORDER_ADMISSIBLE` with gate counts `PASS=8`, `FAIL=0`, `UNKNOWN=0`, `NOT_READY=0`, `NOT_APPLICABLE=1`. Promoted candidate and promotion lane also report admissible status at the same commit pin. Certification traces report `PASS`, certificate hash `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`, and `integrityOk=true`. Strong-claim closure indicators A-G are all pass in the snapshot. This remains a reduced-order, evidence-gated result set and not a physical feasibility claim.
+This draft reports the current reduced-order campaign state using only repository artifacts pinned to one commit. Canonical adjudication is `REDUCED_ORDER_ADMISSIBLE` with gate counts `PASS=8`, `FAIL=0`, `UNKNOWN=0`, `NOT_READY=0`, `NOT_APPLICABLE=1`. Promoted candidate and promotion lane also report admissible status at the same commit pin. Certification traces report `PASS`, certificate hash `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`, and `integrityOk=true`. Strong-claim closure indicators A-G are all pass in the snapshot. This is a reduced-order admissibility and reproducibility result with explicit falsifiers and an upgrade path; it is not, by itself, a full-system physical feasibility claim.
 
 ## Methods
 1. Parse the commit-pinned evidence snapshot and required sub-artifacts.
@@ -91,10 +91,9 @@ Source:
 | Reproducibility falsifier | snapshot blocked, provenance mismatch, or trace integrity failure | Any reproducibility claim |
 
 ## Non-Goals
-- No physical-feasibility claim.
+- No full-system physical-feasibility claim from this campaign alone.
 - No canonical override from promoted-candidate or exploratory lanes.
 - No threshold or policy weakening.
 
 ## Conclusion
-At this commit pin, the repository supports a defensible reduced-order evidence claim set with canonical admissibility, promotion readiness/stability true, strong-claim closure specs A-G passing in the snapshot, and PASS certification traces with integrity OK. This does not authorize a physical feasibility claim and must remain within the campaign boundary statement.
-
+At this commit pin, the repository supports a defensible reduced-order evidence claim set with canonical admissibility, promotion readiness/stability true, strong-claim closure specs A-G passing in the snapshot, and PASS certification traces with integrity OK. This is scientifically valuable because it narrows viable parameter space under deterministic gates and provides a reproducible path for stronger external closure; it does not, by itself, authorize a full-system physical feasibility claim.

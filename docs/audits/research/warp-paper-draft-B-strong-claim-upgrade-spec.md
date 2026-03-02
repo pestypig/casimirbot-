@@ -147,10 +147,9 @@ Fail condition:
 | Materials unknowns | critical constraint rows remain UNKNOWN | block external-feasibility framing |
 
 ## Non-Goals
-- No physical-feasibility claim in this campaign lane.
+- No full-system physical-feasibility claim from this campaign lane alone.
 - No canonical override from exploratory outputs.
 - No threshold weakening or pass relabeling.
 
 ## Exit Criteria for This Upgrade Spec
 All specs H-N are satisfied with commit-pinned artifacts, and publication outputs pass policy checks without tier violations.
-

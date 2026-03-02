@@ -14,9 +14,18 @@ Generate a literature-backed scientific manuscript package from the current repo
    - `canonical-authoritative`
    - `promoted-candidate`
    - `exploratory`
-3. Do not claim physical feasibility.
-4. Do not override canonical decisions with candidate or exploratory lanes.
-5. If a required artifact is missing/unreadable, fail closed and report blocked status.
+3. Do not claim full-system physical feasibility from this campaign alone.
+4. Do explicitly state the scientific value delivered now:
+   - reduced-order admissibility under declared constraints
+   - reproducible evidence and certification traces
+   - deterministic falsifiers and upgrade path to stronger claims
+5. Do not override canonical decisions with candidate or exploratory lanes.
+6. If a required artifact is missing/unreadable, fail closed and report blocked status.
+7. PDF-safe output formatting only:
+   - no scrolling graphs
+   - no interactive charts/widgets
+   - all figures/tables must be static and readable when exported to PDF
+   - prefer compact, page-fit tables over wide/scroll-only layouts
 
 ## Required Local Inputs (must be read first)
 - `docs/audits/research/warp-paper-authoring-contract-2026-03-02.md`
@@ -73,4 +82,3 @@ If any required local file is missing/unreadable:
   - list of missing paths
   - `stop_reason=Fail-closed`
 - do not draft A/B content.
-
