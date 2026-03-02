@@ -361,7 +361,7 @@ const runWaveWithCandidate = async (
       proposals: [
         {
           label: `promotion-${candidate.id}-${wave.toLowerCase()}-run-${runIndex + 1}`,
-          params: lane === 'fixed_candidate' ? {} : (proposalParams as any),
+          params: proposalParams as any,
         },
       ],
     };

@@ -1,7 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { assertBundleProvenanceFresh, runCommandWithRetry } from '../scripts/warp-full-solve-canonical-bundle';
+import {
+  assertBundleProvenanceFresh,
+  assertEvidenceSnapshotStrongClaimClosure,
+  runCommandWithRetry,
+} from '../scripts/warp-full-solve-canonical-bundle';
 
 const getCanonicalCommands = (script: string): string[] => {
   const commandMatches = script.matchAll(/\['run',\s*'([^']+)'\]/g);
@@ -22,9 +26,15 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
       'warp:full-solve:g4-coupling-localization',
       'warp:full-solve:g4-coupling-ablation',
       'warp:full-solve:g4-semantic-bridge-matrix',
+      'warp:full-solve:g4-operator-mapping-audit',
+      'warp:full-solve:g4-kernel-provenance-audit',
+      'warp:full-solve:g4-curvature-applicability-audit',
+      'warp:full-solve:g4-uncertainty-audit',
       'warp:full-solve:g4-governance-matrix',
       'warp:full-solve:g4-decision-ledger',
       'warp:full-solve:canonical',
+      'warp:full-solve:promotion-bundle',
+      'warp:full-solve:evidence-snapshot',
     ]);
   });
 
@@ -90,6 +100,7 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
       ),
     ).toThrow(/Recovery artifact provenance commit hash mismatch/);
     expect(() =>
@@ -99,6 +110,7 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         { provenance: { commitHash: 'def456' } },
+        { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
@@ -113,6 +125,7 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
         { commitHash: 'abc123' },
         { provenance: { commitHash: 'abc123' } },
         { commitHash: 'def456' },
+        { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
@@ -132,6 +145,7 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
       ),
     ).toThrow(/Step A summary commit hash mismatch/);
     expect(() =>
@@ -141,6 +155,7 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         { provenance: { commitHash: 'abc123' } },
+        { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
@@ -161,6 +176,7 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
         {},
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
       ),
     ).toThrow(/Coupling localization provenance commit hash mismatch/);
     expect(() =>
@@ -173,6 +189,7 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
         { commitHash: 'abc123' },
         { provenance: { commitHash: 'abc123' } },
         { provenance: { commitHash: 'def456' } },
+        { commitHash: 'abc123' },
         { commitHash: 'abc123' },
       ),
     ).toThrow(/Coupling ablation provenance commit hash mismatch/);
@@ -190,6 +207,7 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         {},
+        { commitHash: 'abc123' },
       ),
     ).toThrow(/Semantic bridge matrix provenance commit hash mismatch/);
     expect(() =>
@@ -203,8 +221,63 @@ describe('warp-full-solve-canonical-bundle sequencing', () => {
         { commitHash: 'abc123' },
         { commitHash: 'abc123' },
         { commitHash: 'def456' },
+        { commitHash: 'abc123' },
       ),
     ).toThrow(/Semantic bridge matrix provenance commit hash mismatch/);
+  });
+
+  it('fails if kernel provenance audit provenance is missing or stale', () => {
+    expect(() =>
+      assertBundleProvenanceFresh(
+        'abc123',
+        { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
+        { provenance: { commitHash: 'abc123' } },
+        { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
+        {},
+      ),
+    ).toThrow(/Kernel provenance audit provenance commit hash mismatch/);
+    expect(() =>
+      assertBundleProvenanceFresh(
+        'abc123',
+        { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
+        { provenance: { commitHash: 'abc123' } },
+        { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
+        { commitHash: 'abc123' },
+        { commitHash: 'def456' },
+      ),
+    ).toThrow(/Kernel provenance audit provenance commit hash mismatch/);
+  });
+
+  it('checks curvature applicability audit provenance freshness in bundle finalization', () => {
+    const script = fs.readFileSync('scripts/warp-full-solve-canonical-bundle.ts', 'utf8');
+    expect(script).toContain('g4-curvature-applicability-audit-2026-03-02.json');
+    expect(script).toContain('Curvature applicability audit provenance commit hash mismatch');
+    expect(script).toContain('g4-promotion-bundle-2026-03-01.json');
+    expect(script).toContain('Promotion bundle provenance commit hash mismatch');
+    expect(script).toContain('Promotion bundle blocked fail-closed');
+    expect(script).toContain('warp-evidence-snapshot-2026-03-02.json');
+    expect(script).toContain('Evidence snapshot provenance commit hash mismatch');
+    expect(script).toContain('Evidence snapshot blocked fail-closed');
+    expect(script).toContain('Evidence snapshot strong-claim closure blocked fail-closed');
+  });
+
+  it('fails closed when evidence snapshot strong-claim closure passAll is false', () => {
+    expect(() => assertEvidenceSnapshotStrongClaimClosure({ strongClaimClosure: { passAll: false } })).toThrow(
+      /Evidence snapshot strong-claim closure blocked fail-closed/,
+    );
+  });
+
+  it('passes when evidence snapshot strong-claim closure passAll is true', () => {
+    expect(() => assertEvidenceSnapshotStrongClaimClosure({ strongClaimClosure: { passAll: true } })).not.toThrow();
   });
 
   it('preserves canonical report recovery and governance provenance consistency after bundle', () => {

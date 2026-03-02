@@ -18,9 +18,15 @@ const FINALIZATION_COMMANDS = [
   ['run', 'warp:full-solve:g4-coupling-localization'],
   ['run', 'warp:full-solve:g4-coupling-ablation'],
   ['run', 'warp:full-solve:g4-semantic-bridge-matrix'],
+  ['run', 'warp:full-solve:g4-operator-mapping-audit'],
+  ['run', 'warp:full-solve:g4-kernel-provenance-audit'],
+  ['run', 'warp:full-solve:g4-curvature-applicability-audit'],
+  ['run', 'warp:full-solve:g4-uncertainty-audit'],
   ['run', 'warp:full-solve:g4-governance-matrix'],
   ['run', 'warp:full-solve:g4-decision-ledger'],
   ['run', 'warp:full-solve:canonical'],
+  ['run', 'warp:full-solve:promotion-bundle'],
+  ['run', 'warp:full-solve:evidence-snapshot'],
 ] as const;
 
 const LEDGER_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-decision-ledger-2026-02-26.json');
@@ -31,6 +37,12 @@ const PARITY_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-recover
 const LOCALIZATION_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-coupling-localization-2026-02-27.json');
 const ABLATION_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-coupling-ablation-2026-02-27.json');
 const SEMANTIC_BRIDGE_MATRIX_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-semantic-bridge-matrix-2026-02-27.json');
+const OPERATOR_MAPPING_AUDIT_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-operator-mapping-audit-2026-03-02.json');
+const KERNEL_PROVENANCE_AUDIT_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-kernel-provenance-audit-2026-03-02.json');
+const CURVATURE_APPLICABILITY_AUDIT_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-curvature-applicability-audit-2026-03-02.json');
+const UNCERTAINTY_AUDIT_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-uncertainty-audit-2026-03-02.json');
+const PROMOTION_BUNDLE_PATH = path.join('artifacts', 'research', 'full-solve', 'g4-promotion-bundle-2026-03-01.json');
+const EVIDENCE_SNAPSHOT_PATH = path.join('artifacts', 'research', 'full-solve', 'warp-evidence-snapshot-2026-03-02.json');
 const DEFAULT_COMMAND_TIMEOUT_MS = 8 * 60_000;
 const DEFAULT_MAX_RETRIES = 1;
 
@@ -46,6 +58,12 @@ export type CanonicalBundleResult = {
   localizationPath: string;
   ablationPath: string;
   semanticBridgeMatrixPath: string;
+  operatorMappingAuditPath: string;
+  kernelProvenanceAuditPath: string;
+  curvatureApplicabilityAuditPath: string;
+  uncertaintyAuditPath: string;
+  promotionBundlePath: string;
+  evidenceSnapshotPath: string;
 };
 
 type RunCommandOptions = {
@@ -61,6 +79,20 @@ const readJson = (filePath: string): any => JSON.parse(fs.readFileSync(filePath,
 const readCommitHash = (payload: any): string | null => {
   const commitHash = payload?.commitHash ?? payload?.provenance?.commitHash;
   return typeof commitHash === 'string' && commitHash.trim().length > 0 ? commitHash.trim() : null;
+};
+
+export const assertEvidenceSnapshotStrongClaimClosure = (evidenceSnapshot: any) => {
+  const strongClaimPassAll = evidenceSnapshot?.strongClaimClosure?.passAll === true;
+  if (strongClaimPassAll) return;
+  const blockedSpecs = Array.isArray(evidenceSnapshot?.strongClaimClosure?.blockedSpecs)
+    ? evidenceSnapshot.strongClaimClosure.blockedSpecs
+    : [];
+  const blockedSummary = blockedSpecs
+    .map((entry: any) => `${String(entry?.spec ?? 'unknown_spec')}:${String(entry?.blockedReason ?? 'unknown_reason')}`)
+    .join(',');
+  throw new Error(
+    `Evidence snapshot strong-claim closure blocked fail-closed: ${blockedSummary || 'passAll=false;blockedSpecs_missing'}`,
+  );
 };
 
 const hasTimedOut = (result: SpawnSyncReturns<Buffer>): boolean => {
@@ -117,6 +149,7 @@ export const assertBundleProvenanceFresh = (
   localization: any,
   ablation: any,
   semanticBridgeMatrix: any,
+  kernelProvenanceAudit: any,
 ) => {
   const stepACommitHash = readCommitHash(stepA);
   const ledgerCommitHash = readCommitHash(ledger);
@@ -126,6 +159,7 @@ export const assertBundleProvenanceFresh = (
   const localizationCommitHash = readCommitHash(localization);
   const ablationCommitHash = readCommitHash(ablation);
   const semanticBridgeMatrixCommitHash = readCommitHash(semanticBridgeMatrix);
+  const kernelProvenanceAuditCommitHash = readCommitHash(kernelProvenanceAudit);
 
   if (stepACommitHash !== headCommitHash) {
     throw new Error(`Step A summary commit hash mismatch: stepA=${String(stepACommitHash ?? 'null')} head=${headCommitHash}`);
@@ -159,6 +193,13 @@ export const assertBundleProvenanceFresh = (
       `Semantic bridge matrix provenance commit hash mismatch: semanticBridgeMatrix=${String(semanticBridgeMatrixCommitHash ?? 'null')} head=${headCommitHash}`,
     );
   }
+  if (kernelProvenanceAuditCommitHash !== headCommitHash) {
+    throw new Error(
+      `Kernel provenance audit provenance commit hash mismatch: kernelProvenanceAudit=${String(
+        kernelProvenanceAuditCommitHash ?? 'null',
+      )} head=${headCommitHash}`,
+    );
+  }
 };
 
 export const runCanonicalBundle = (): CanonicalBundleResult => {
@@ -174,6 +215,12 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
   const localization = readJson(LOCALIZATION_PATH);
   const ablation = readJson(ABLATION_PATH);
   const semanticBridgeMatrix = readJson(SEMANTIC_BRIDGE_MATRIX_PATH);
+  const operatorMappingAudit = readJson(OPERATOR_MAPPING_AUDIT_PATH);
+  const kernelProvenanceAudit = readJson(KERNEL_PROVENANCE_AUDIT_PATH);
+  const curvatureApplicabilityAudit = readJson(CURVATURE_APPLICABILITY_AUDIT_PATH);
+  const uncertaintyAudit = readJson(UNCERTAINTY_AUDIT_PATH);
+  const promotionBundle = readJson(PROMOTION_BUNDLE_PATH);
+  const evidenceSnapshot = readJson(EVIDENCE_SNAPSHOT_PATH);
   assertBundleProvenanceFresh(
     headCommitHash,
     stepA,
@@ -184,7 +231,67 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
     localization,
     ablation,
     semanticBridgeMatrix,
+    kernelProvenanceAudit,
   );
+  const operatorMappingAuditCommitHash = readCommitHash(operatorMappingAudit);
+  if (operatorMappingAuditCommitHash !== headCommitHash) {
+    throw new Error(
+      `Operator mapping audit provenance commit hash mismatch: operatorMappingAudit=${String(
+        operatorMappingAuditCommitHash ?? 'null',
+      )} head=${headCommitHash}`,
+    );
+  }
+  const uncertaintyAuditCommitHash = readCommitHash(uncertaintyAudit);
+  if (uncertaintyAuditCommitHash !== headCommitHash) {
+    throw new Error(
+      `Uncertainty audit provenance commit hash mismatch: uncertaintyAudit=${String(
+        uncertaintyAuditCommitHash ?? 'null',
+      )} head=${headCommitHash}`,
+    );
+  }
+  const curvatureApplicabilityAuditCommitHash = readCommitHash(curvatureApplicabilityAudit);
+  if (curvatureApplicabilityAuditCommitHash !== headCommitHash) {
+    throw new Error(
+      `Curvature applicability audit provenance commit hash mismatch: curvatureApplicabilityAudit=${String(
+        curvatureApplicabilityAuditCommitHash ?? 'null',
+      )} head=${headCommitHash}`,
+    );
+  }
+  const evidenceSnapshotCommitHash = readCommitHash(evidenceSnapshot);
+  if (evidenceSnapshotCommitHash !== headCommitHash) {
+    throw new Error(
+      `Evidence snapshot provenance commit hash mismatch: evidenceSnapshot=${String(
+        evidenceSnapshotCommitHash ?? 'null',
+      )} head=${headCommitHash}`,
+    );
+  }
+  if (evidenceSnapshot?.blocked === true) {
+    throw new Error(`Evidence snapshot blocked fail-closed: ${String(evidenceSnapshot?.stopReason ?? 'unknown_reason')}`);
+  }
+  assertEvidenceSnapshotStrongClaimClosure(evidenceSnapshot);
+  const promotionBundleCommitHash = readCommitHash(promotionBundle);
+  if (promotionBundleCommitHash !== headCommitHash) {
+    throw new Error(
+      `Promotion bundle provenance commit hash mismatch: promotionBundle=${String(
+        promotionBundleCommitHash ?? 'null',
+      )} head=${headCommitHash}`,
+    );
+  }
+  if (promotionBundle?.blockedReason != null) {
+    throw new Error(
+      `Promotion bundle blocked fail-closed: ${String(promotionBundle?.blockedReason)}`,
+    );
+  }
+  if (promotionBundle?.promotionLaneExecuted !== true) {
+    throw new Error('Promotion bundle lane execution missing: promotionLaneExecuted=false');
+  }
+  if (promotionBundle?.candidatePromotionReady !== true || promotionBundle?.candidatePromotionStable !== true) {
+    throw new Error(
+      `Promotion bundle readiness mismatch: ready=${String(promotionBundle?.candidatePromotionReady)};stable=${String(
+        promotionBundle?.candidatePromotionStable,
+      )}`,
+    );
+  }
 
   return {
     ok: true,
@@ -198,6 +305,12 @@ export const runCanonicalBundle = (): CanonicalBundleResult => {
     localizationPath: LOCALIZATION_PATH,
     ablationPath: ABLATION_PATH,
     semanticBridgeMatrixPath: SEMANTIC_BRIDGE_MATRIX_PATH,
+    operatorMappingAuditPath: OPERATOR_MAPPING_AUDIT_PATH,
+    kernelProvenanceAuditPath: KERNEL_PROVENANCE_AUDIT_PATH,
+    curvatureApplicabilityAuditPath: CURVATURE_APPLICABILITY_AUDIT_PATH,
+    uncertaintyAuditPath: UNCERTAINTY_AUDIT_PATH,
+    promotionBundlePath: PROMOTION_BUNDLE_PATH,
+    evidenceSnapshotPath: EVIDENCE_SNAPSHOT_PATH,
   };
 };
 

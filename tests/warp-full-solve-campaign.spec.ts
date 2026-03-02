@@ -189,6 +189,28 @@ describe('warp-full-solve-campaign runner', () => {
             qi_margin_ratio: 2,
             qi_margin_ratio_raw: 2,
             qi_margin_ratio_raw_computed: 2.6666666667,
+            qi_uncertainty_sigma_Jm3: 5,
+            qi_uncertainty_sigma_measurement_Jm3: 1,
+            qi_uncertainty_sigma_model_Jm3: 2,
+            qi_uncertainty_sigma_bridge_Jm3: 5,
+            qi_uncertainty_sigma_tau_Jm3: 0,
+            qi_uncertainty_model_sigma_configured_Jm3: 2,
+            qi_uncertainty_model_sigma_source: 'env:QI_UNCERTAINTY_SIGMA_MODEL_JM3',
+            qi_uncertainty_model_sigma_rationale: 'configured_model_sigma_applied',
+            qi_uncertainty_model_sigma_required: true,
+            qi_uncertainty_model_sigma_provenance_ready: true,
+            qi_uncertainty_model_sigma_provenance_missing: 'none',
+            qi_uncertainty_dominant_component: 'bridge',
+            qi_uncertainty_k_sigma: 3,
+            qi_uncertainty_slack_policy_Jm3: -1,
+            qi_uncertainty_slack_computed_Jm3: -1.25,
+            qi_uncertainty_band_lower_policy_Jm3: -16,
+            qi_uncertainty_band_upper_policy_Jm3: 14,
+            qi_uncertainty_band_lower_computed_Jm3: -16.25,
+            qi_uncertainty_band_upper_computed_Jm3: 13.75,
+            qi_uncertainty_decision_class: 'indeterminate',
+            qi_uncertainty_could_flip: true,
+            qi_uncertainty_inputs_missing: 'none',
             qi_coupling_mode: 'shadow',
             qi_coupling_alpha: 0.5,
             qi_rho_metric_Jm3: -10,
@@ -244,6 +266,28 @@ describe('warp-full-solve-campaign runner', () => {
     expect(diagnostics.boundFloorApplied).toBe(true);
     expect(diagnostics.marginRatio).toBe(2);
     expect(diagnostics.marginRatioRawComputed).toBeCloseTo(2.6666666667);
+    expect(diagnostics.uncertaintySigma_Jm3).toBe(5);
+    expect(diagnostics.uncertaintySigmaMeasurement_Jm3).toBe(1);
+    expect(diagnostics.uncertaintySigmaModel_Jm3).toBe(2);
+    expect(diagnostics.uncertaintySigmaBridge_Jm3).toBe(5);
+    expect(diagnostics.uncertaintySigmaTau_Jm3).toBe(0);
+    expect(diagnostics.uncertaintyModelSigmaConfigured_Jm3).toBe(2);
+    expect(diagnostics.uncertaintyModelSigmaSource).toBe('env:QI_UNCERTAINTY_SIGMA_MODEL_JM3');
+    expect(diagnostics.uncertaintyModelSigmaRationale).toBe('configured_model_sigma_applied');
+    expect(diagnostics.uncertaintyModelSigmaRequired).toBe(true);
+    expect(diagnostics.uncertaintyModelSigmaProvenanceReady).toBe(true);
+    expect(diagnostics.uncertaintyModelSigmaProvenanceMissing).toBe('none');
+    expect(diagnostics.uncertaintyDominantComponent).toBe('bridge');
+    expect(diagnostics.uncertaintyBandKSigma).toBe(3);
+    expect(diagnostics.uncertaintySlackPolicy_Jm3).toBe(-1);
+    expect(diagnostics.uncertaintySlackComputed_Jm3).toBe(-1.25);
+    expect(diagnostics.uncertaintyBandLowerPolicy_Jm3).toBe(-16);
+    expect(diagnostics.uncertaintyBandUpperPolicy_Jm3).toBe(14);
+    expect(diagnostics.uncertaintyBandLowerComputed_Jm3).toBe(-16.25);
+    expect(diagnostics.uncertaintyBandUpperComputed_Jm3).toBe(13.75);
+    expect(diagnostics.uncertaintyDecisionClass).toBe('indeterminate');
+    expect(diagnostics.uncertaintyCouldFlip).toBe(true);
+    expect(diagnostics.uncertaintyInputsMissing).toBe('none');
     expect(diagnostics.couplingMode).toBe('shadow');
     expect(diagnostics.couplingAlpha).toBe(0.5);
     expect(diagnostics.rhoMetric_Jm3).toBe(-10);
@@ -457,6 +501,22 @@ describe('warp-full-solve-campaign runner', () => {
         bound_Jm3: -2,
         marginRatioRaw: Infinity,
         marginRatioRawComputed: 3.25,
+        uncertaintySigma_Jm3: 9,
+        uncertaintySigmaMeasurement_Jm3: 2,
+        uncertaintySigmaModel_Jm3: 3,
+        uncertaintySigmaBridge_Jm3: 9,
+        uncertaintySigmaTau_Jm3: 0,
+        uncertaintyDominantComponent: 'bridge',
+        uncertaintyBandKSigma: 3,
+        uncertaintySlackPolicy_Jm3: -0.5,
+        uncertaintySlackComputed_Jm3: -2.5,
+        uncertaintyBandLowerPolicy_Jm3: -27.5,
+        uncertaintyBandUpperPolicy_Jm3: 26.5,
+        uncertaintyBandLowerComputed_Jm3: -29.5,
+        uncertaintyBandUpperComputed_Jm3: 24.5,
+        uncertaintyDecisionClass: 'indeterminate',
+        uncertaintyCouldFlip: true,
+        uncertaintyInputsMissing: 'none',
         g4FloorDominated: true,
         g4PolicyExceeded: true,
         g4ComputedExceeded: true,
@@ -519,6 +579,22 @@ describe('warp-full-solve-campaign runner', () => {
     expect(artifact.bound_Jm3).toBe(-2);
     expect(artifact.marginRatioRaw).toBeNull();
     expect(artifact.marginRatioRawComputed).toBe(3.25);
+    expect(artifact.uncertaintySigma_Jm3).toBe(9);
+    expect(artifact.uncertaintySigmaMeasurement_Jm3).toBe(2);
+    expect(artifact.uncertaintySigmaModel_Jm3).toBe(3);
+    expect(artifact.uncertaintySigmaBridge_Jm3).toBe(9);
+    expect(artifact.uncertaintySigmaTau_Jm3).toBe(0);
+    expect(artifact.uncertaintyDominantComponent).toBe('bridge');
+    expect(artifact.uncertaintyBandKSigma).toBe(3);
+    expect(artifact.uncertaintySlackPolicy_Jm3).toBe(-0.5);
+    expect(artifact.uncertaintySlackComputed_Jm3).toBe(-2.5);
+    expect(artifact.uncertaintyBandLowerPolicy_Jm3).toBe(-27.5);
+    expect(artifact.uncertaintyBandUpperPolicy_Jm3).toBe(26.5);
+    expect(artifact.uncertaintyBandLowerComputed_Jm3).toBe(-29.5);
+    expect(artifact.uncertaintyBandUpperComputed_Jm3).toBe(24.5);
+    expect(artifact.uncertaintyDecisionClass).toBe('indeterminate');
+    expect(artifact.uncertaintyCouldFlip).toBe(true);
+    expect(artifact.uncertaintyInputsMissing).toBe('none');
     expect(artifact.g4FloorDominated).toBe(true);
     expect(artifact.g4PolicyExceeded).toBe(true);
     expect(artifact.g4ComputedExceeded).toBe(true);
@@ -1109,6 +1185,8 @@ describe('warp-full-solve-campaign runner', () => {
     expect(campaignScript).toContain('## G4 recovery-search summary');
     expect(campaignScript).toContain('## G4 operator-mapping summary');
     expect(campaignScript).toContain('## G4 sampling/K provenance summary');
+    expect(campaignScript).toContain('## G4 curvature applicability summary');
+    expect(campaignScript).toContain('## G4 uncertainty-band summary');
     expect(campaignScript).toContain('canonical decision remains authoritative until wave profiles are promoted and rerun.');
   });
 

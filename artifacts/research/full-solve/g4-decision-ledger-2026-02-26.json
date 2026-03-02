@@ -1,7 +1,7 @@
 {
   "date": "2026-02-26",
-  "commitHash": "75557ef5a98ab1a4d1c57c87a1e2c4b4f12c48be",
-  "headCommitHash": "75557ef5a98ab1a4d1c57c87a1e2c4b4f12c48be",
+  "commitHash": "04d65a29c2ae6bd4d1316123b546cd374d020729",
+  "headCommitHash": "04d65a29c2ae6bd4d1316123b546cd374d020729",
   "commitHashShapeValid": true,
   "commitHashResolvable": true,
   "commitHashMatchesHead": true,
@@ -33,35 +33,35 @@
         "family": "warpFieldType",
         "absLhsDelta": 0,
         "applicabilityStatus": "UNKNOWN",
-        "marginRatioRaw": 0.17187572937331116
+        "marginRatioRaw": 0.1718757293733112
       },
       {
         "id": "gammaGeo_low",
         "family": "gammaGeo",
         "absLhsDelta": 0,
         "applicabilityStatus": "UNKNOWN",
-        "marginRatioRaw": 0.17187572937331116
+        "marginRatioRaw": 0.1718757293733112
       },
       {
         "id": "gammaGeo_high",
         "family": "gammaGeo",
         "absLhsDelta": 0,
         "applicabilityStatus": "UNKNOWN",
-        "marginRatioRaw": 0.17187572937331116
+        "marginRatioRaw": 0.1718757293733112
       },
       {
         "id": "duty_low",
         "family": "duty",
         "absLhsDelta": 0,
         "applicabilityStatus": "UNKNOWN",
-        "marginRatioRaw": 0.17187572937331116
+        "marginRatioRaw": 0.1718757293733112
       },
       {
         "id": "duty_high",
         "family": "duty",
         "absLhsDelta": 0,
         "applicabilityStatus": "UNKNOWN",
-        "marginRatioRaw": 0.17187572937331116
+        "marginRatioRaw": 0.1718757293733112
       }
     ]
   },
@@ -72,8 +72,8 @@
     "candidatePassFound": true,
     "candidatePassFoundCanonical": true,
     "candidatePassFoundComputedOnly": true,
-    "minMarginRatioRawAmongApplicabilityPass": 0.12890679702998561,
-    "minMarginRatioRawComputedAmongApplicabilityPass": 0.12890679702998561,
+    "minMarginRatioRawAmongApplicabilityPass": 0.12890679702998564,
+    "minMarginRatioRawComputedAmongApplicabilityPass": 0.12890679702998564,
     "bestCandidateEligibility": {
       "canonicalPassEligible": true,
       "counterfactualPassEligible": true,
@@ -98,16 +98,16 @@
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -3.0937631287227165,
+      "lhs_Jm3": -3.093763128722717,
       "boundComputed_Jm3": -24.00000000002375,
-      "boundPolicyFloor_Jm3": -3.0937631287227165,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
       "boundFloor_Jm3": -18.000000000018126,
       "boundUsed_Jm3": -24.00000000002375,
       "boundFloorApplied": false,
-      "marginRatioRaw": 0.12890679702998561,
-      "marginRatioRawComputed": 0.12890679702998561,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
       "sumWindowDt": 1.0000000000000004,
       "tau_s": 0.00002,
       "tauConfigured_s": 0.00002,
@@ -170,36 +170,36 @@
     "artifactDate": "2026-03-02",
     "analysisMode": "canonical_comparable",
     "baselineCaseId": "case_0001",
-    "baselineMarginRatioRawComputed": 0.12890679702998561,
-    "bestCounterfactualMarginRatioRawComputed": 0.12890679702998561,
+    "baselineMarginRatioRawComputed": 0.12890679702998564,
+    "bestCounterfactualMarginRatioRawComputed": 0.12890679702998564,
     "candidatePassFoundCounterfactual": true,
     "topAblations": [
       {
         "field": "metricStressRhoSiMean_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
         "slopeToMarginRatioRawComputed": -0.018512698345788215,
-        "counterfactualMarginRatioRawComputed": 0.12890679702998561,
+        "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },
       {
         "field": "metricT00Si_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
         "slopeToMarginRatioRawComputed": -0.018512698345788215,
-        "counterfactualMarginRatioRawComputed": 0.12890679702998561,
+        "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },
       {
         "field": "rhoCoupledShadow_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
         "slopeToMarginRatioRawComputed": -0.03702539669157643,
-        "counterfactualMarginRatioRawComputed": 0.12890679702998561,
+        "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },
       {
         "field": "rhoMetric_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
         "slopeToMarginRatioRawComputed": -0.018512698345788215,
-        "counterfactualMarginRatioRawComputed": 0.12890679702998561,
+        "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },
       {
@@ -215,16 +215,16 @@
   },
   "waves": {
     "A": {
-      "lhs_Jm3": -3.0937631287227165,
+      "lhs_Jm3": -3.093763128722717,
       "boundComputed_Jm3": -24.00000000002375,
-      "boundPolicyFloor_Jm3": -3.0937631287227165,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
       "boundFloor_Jm3": -18.000000000018126,
       "boundUsed_Jm3": -24.00000000002375,
       "boundFloorApplied": false,
-      "marginRatioRaw": 0.12890679702998561,
-      "marginRatioRawComputed": 0.12890679702998561,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
       "g4FloorDominated": false,
       "g4PolicyExceeded": false,
       "g4ComputedExceeded": false,
@@ -234,16 +234,16 @@
       "rhoSource": "warp.metric.T00.natario_sdf.shift"
     },
     "B": {
-      "lhs_Jm3": -3.0937631287227165,
+      "lhs_Jm3": -3.093763128722717,
       "boundComputed_Jm3": -24.00000000002375,
-      "boundPolicyFloor_Jm3": -3.0937631287227165,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
       "boundFloor_Jm3": -18.000000000018126,
       "boundUsed_Jm3": -24.00000000002375,
       "boundFloorApplied": false,
-      "marginRatioRaw": 0.12890679702998561,
-      "marginRatioRawComputed": 0.12890679702998561,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
       "g4FloorDominated": false,
       "g4PolicyExceeded": false,
       "g4ComputedExceeded": false,
@@ -253,16 +253,16 @@
       "rhoSource": "warp.metric.T00.natario_sdf.shift"
     },
     "C": {
-      "lhs_Jm3": -3.0937631287227165,
+      "lhs_Jm3": -3.093763128722717,
       "boundComputed_Jm3": -24.00000000002375,
-      "boundPolicyFloor_Jm3": -3.0937631287227165,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
       "boundFloor_Jm3": -18.000000000018126,
       "boundUsed_Jm3": -24.00000000002375,
       "boundFloorApplied": false,
-      "marginRatioRaw": 0.12890679702998561,
-      "marginRatioRawComputed": 0.12890679702998561,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
       "g4FloorDominated": false,
       "g4PolicyExceeded": false,
       "g4ComputedExceeded": false,
@@ -272,16 +272,16 @@
       "rhoSource": "warp.metric.T00.natario_sdf.shift"
     },
     "D": {
-      "lhs_Jm3": -3.0937631287227165,
+      "lhs_Jm3": -3.093763128722717,
       "boundComputed_Jm3": -24.00000000002375,
-      "boundPolicyFloor_Jm3": -3.0937631287227165,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
       "boundFloor_Jm3": -18.000000000018126,
       "boundUsed_Jm3": -24.00000000002375,
       "boundFloorApplied": false,
-      "marginRatioRaw": 0.12890679702998561,
-      "marginRatioRawComputed": 0.12890679702998561,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
       "g4FloorDominated": false,
       "g4PolicyExceeded": false,
       "g4ComputedExceeded": false,

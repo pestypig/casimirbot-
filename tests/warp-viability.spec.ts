@@ -555,6 +555,14 @@ describe("warp viability congruence wiring", () => {
     expect((result.snapshot as any).qi_bound_Jm3).toBeUndefined();
     expect((result.snapshot as any).qi_margin_ratio).toBeUndefined();
     expect((result.snapshot as any).qi_margin_ratio_raw).toBeUndefined();
+    expect((result.snapshot as any).qi_uncertainty_sigma_Jm3).toBeUndefined();
+    expect((result.snapshot as any).qi_uncertainty_sigma_measurement_Jm3).toBeUndefined();
+    expect((result.snapshot as any).qi_uncertainty_sigma_model_Jm3).toBeUndefined();
+    expect((result.snapshot as any).qi_uncertainty_sigma_bridge_Jm3).toBeUndefined();
+    expect((result.snapshot as any).qi_uncertainty_sigma_tau_Jm3).toBeUndefined();
+    expect((result.snapshot as any).qi_uncertainty_dominant_component).toBeUndefined();
+    expect((result.snapshot as any).qi_uncertainty_decision_class).toBeUndefined();
+    expect((result.snapshot as any).qi_uncertainty_inputs_missing).toBeUndefined();
     expect((result.snapshot as any).qi_curvature_ratio).toBeUndefined();
     expect((result.snapshot as any).qi_bound_K).toBeUndefined();
     expect((result.snapshot as any).qi_safetySigma_Jm3).toBeUndefined();

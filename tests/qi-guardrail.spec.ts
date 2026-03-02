@@ -83,6 +83,10 @@ beforeEach(() => {
   process.env.QI_TILE_TELEMETRY_SCALE = undefined;
   process.env.QI_COUPLING_MODE = undefined;
   process.env.QI_COUPLING_ALPHA = undefined;
+  delete process.env.QI_UNCERTAINTY_SIGMA_MODEL_JM3;
+  delete process.env.QI_UNCERTAINTY_REQUIRE_MODEL_SIGMA;
+  delete process.env.QI_UNCERTAINTY_SIGMA_MEASUREMENT_JM3;
+  delete process.env.QI_UNCERTAINTY_KSIGMA;
   process.env.WARP_STRICT_CONGRUENCE = "0";
 });
 
@@ -369,6 +373,18 @@ describe("evaluateQiGuardrail", () => {
     expect(guard.quantitySemanticBridgeMissing).not.toContain("qei_state_class_not_hadamard");
     expect(guard.quantitySemanticBridgeMissing).not.toContain("qei_renormalization_not_point_splitting");
     expect(guard.lhs_Jm3).toBeCloseTo(metricT00, 9);
+    expect(guard.uncertaintySigma_Jm3).toBeCloseTo(Math.abs(metricT00 - proxyRho), 9);
+    expect(guard.uncertaintySigmaMeasurement_Jm3).toBe(0);
+    expect(guard.uncertaintySigmaBridge_Jm3).toBeCloseTo(Math.abs(metricT00 - proxyRho), 9);
+    expect(guard.uncertaintySigmaModel_Jm3).toBe(0);
+    expect(guard.uncertaintySigmaTau_Jm3).toBe(0);
+    expect(guard.uncertaintyDominantComponent).toBe("bridge");
+    expect(guard.uncertaintyBandKSigma).toBe(3);
+    expect(guard.uncertaintySlackPolicy_Jm3).toBeCloseTo(guard.lhs_Jm3 - guard.bound_Jm3, 9);
+    expect(guard.uncertaintySlackComputed_Jm3).toBeCloseTo(guard.lhs_Jm3 - guard.boundComputed_Jm3, 9);
+    expect(guard.uncertaintyDecisionClass).toBe("indeterminate");
+    expect(guard.uncertaintyCouldFlip).toBe(true);
+    expect(guard.uncertaintyInputsMissing).not.toContain("coupling_channels_missing");
   });
 
   test("promotes coupling semantics to bridge-ready channel when QEI evidence metadata is complete", () => {
@@ -436,6 +452,81 @@ describe("evaluateQiGuardrail", () => {
     expect(guard.quantitySemanticComparable).toBe(true);
     expect(guard.quantitySemanticType).toBe("ren_expectation_timelike_energy_density");
     expect(guard.quantitySemanticBridgeMissing).not.toContain("coupling_semantics_diagnostic_only");
+  });
+
+  test("records model-sigma provenance when configured", () => {
+    const sectorPeriod_ms = 1;
+    const tau_ms = 1;
+    const schedule = makeSchedule(1, [0], sectorPeriod_ms, tau_ms);
+    const scheduleGuard: PhaseSchedule = {
+      phi_deg_by_sector: schedule.phi_deg_by_sector,
+      negSectors: schedule.negSectors,
+      posSectors: schedule.posSectors,
+      weights: schedule.weights ?? Array.from({ length: schedule.N }, () => 1),
+    };
+    process.env.QI_UNCERTAINTY_SIGMA_MODEL_JM3 = "2.5";
+    process.env.QI_UNCERTAINTY_REQUIRE_MODEL_SIGMA = "1";
+
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 0.2,
+        dutyShip: 0.2,
+        dutyEffective_FR: 0.2,
+        sectorCount: 1,
+        concurrentSectors: 1,
+        sectorStrobing: 1,
+        negativeFraction: 1,
+        phaseSchedule: schedule,
+      } as any),
+      { schedule: scheduleGuard, sectorPeriod_ms, tau_ms },
+    );
+
+    expect(guard.uncertaintyModelSigmaConfigured_Jm3).toBeCloseTo(2.5, 9);
+    expect(guard.uncertaintyModelSigmaSource).toBe("env:QI_UNCERTAINTY_SIGMA_MODEL_JM3");
+    expect(guard.uncertaintyModelSigmaRationale).toBe("configured_model_sigma_applied");
+    expect(guard.uncertaintyModelSigmaRequired).toBe(true);
+    expect(guard.uncertaintyModelSigmaProvenanceReady).toBe(true);
+    expect(guard.uncertaintyModelSigmaProvenanceMissing).toEqual([]);
+    expect(guard.uncertaintySigmaModel_Jm3).toBeCloseTo(2.5, 9);
+    expect(guard.uncertaintyInputsMissing).not.toContain("model_sigma_provenance_missing");
+  });
+
+  test("fails closed uncertainty when model-sigma provenance is required but missing", () => {
+    const sectorPeriod_ms = 1;
+    const tau_ms = 1;
+    const schedule = makeSchedule(1, [0], sectorPeriod_ms, tau_ms);
+    const scheduleGuard: PhaseSchedule = {
+      phi_deg_by_sector: schedule.phi_deg_by_sector,
+      negSectors: schedule.negSectors,
+      posSectors: schedule.posSectors,
+      weights: schedule.weights ?? Array.from({ length: schedule.N }, () => 1),
+    };
+    process.env.QI_UNCERTAINTY_REQUIRE_MODEL_SIGMA = "1";
+
+    const guard = evaluateQiGuardrail(
+      makeState({
+        dutyCycle: 0.2,
+        dutyShip: 0.2,
+        dutyEffective_FR: 0.2,
+        sectorCount: 1,
+        concurrentSectors: 1,
+        sectorStrobing: 1,
+        negativeFraction: 1,
+        phaseSchedule: schedule,
+      } as any),
+      { schedule: scheduleGuard, sectorPeriod_ms, tau_ms },
+    );
+
+    expect(guard.uncertaintyModelSigmaConfigured_Jm3).toBeNull();
+    expect(guard.uncertaintyModelSigmaSource).toBe("default_zero_unconfigured");
+    expect(guard.uncertaintyModelSigmaRationale).toBe("model_sigma_required_but_missing");
+    expect(guard.uncertaintyModelSigmaRequired).toBe(true);
+    expect(guard.uncertaintyModelSigmaProvenanceReady).toBe(false);
+    expect(guard.uncertaintyModelSigmaProvenanceMissing).toContain("model_sigma_unconfigured");
+    expect(guard.uncertaintyModelSigmaProvenanceMissing).toContain("model_sigma_required_but_missing");
+    expect(guard.uncertaintyDecisionClass).toBe("indeterminate");
+    expect(guard.uncertaintyCouldFlip).toBe(true);
+    expect(guard.uncertaintyInputsMissing).toContain("model_sigma_provenance_missing");
   });
 
   test("supports coupling mode off while preserving comparability diagnostics", () => {

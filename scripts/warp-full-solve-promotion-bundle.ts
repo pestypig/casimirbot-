@@ -53,6 +53,22 @@ const BOUNDARY_STATEMENT =
 const DEFAULT_PROMOTION_CHECK_PATH = path.join('artifacts', 'research', 'full-solve', `g4-candidate-promotion-check-${DATE}.json`);
 const DEFAULT_PROMOTION_LANE_OUT = path.join('artifacts', 'research', 'full-solve', 'promotion-lane');
 const DEFAULT_OUT_PATH = path.join('artifacts', 'research', 'full-solve', `g4-promotion-bundle-${DATE}.json`);
+const STRONG_CLAIM_AUDIT_PATHS = {
+  operator: path.join('artifacts', 'research', 'full-solve', 'g4-operator-mapping-audit-2026-03-02.json'),
+  kernel: path.join('artifacts', 'research', 'full-solve', 'g4-kernel-provenance-audit-2026-03-02.json'),
+  curvature: path.join('artifacts', 'research', 'full-solve', 'g4-curvature-applicability-audit-2026-03-02.json'),
+  uncertainty: path.join('artifacts', 'research', 'full-solve', 'g4-uncertainty-audit-2026-03-02.json'),
+} as const;
+const STRONG_CLAIM_AUDITS: ReadonlyArray<{
+  label: string;
+  path: string;
+  statusField: string;
+}> = [
+  { label: 'operator', path: STRONG_CLAIM_AUDIT_PATHS.operator, statusField: 'operatorEvidenceStatus' },
+  { label: 'kernel', path: STRONG_CLAIM_AUDIT_PATHS.kernel, statusField: 'kernelEvidenceStatus' },
+  { label: 'curvature', path: STRONG_CLAIM_AUDIT_PATHS.curvature, statusField: 'curvatureEvidenceStatus' },
+  { label: 'uncertainty', path: STRONG_CLAIM_AUDIT_PATHS.uncertainty, statusField: 'uncertaintyEvidenceStatus' },
+];
 const SCOREBOARD_PATH = path.join(`campaign-gate-scoreboard-2026-02-24.json`);
 const FIRST_FAIL_PATH = path.join(`campaign-first-fail-map-2026-02-24.json`);
 
@@ -176,6 +192,26 @@ const buildBlockedPayload = (
   return payload;
 };
 
+const validateStrongClaimEvidence = (rootDir: string, commitHash: string): string | null => {
+  for (const audit of STRONG_CLAIM_AUDITS) {
+    const auditPath = resolveRootPath(rootDir, audit.path);
+    if (!fs.existsSync(auditPath)) {
+      return `strong_claim_evidence_missing:${audit.path.replace(/\\/g, '/')}`;
+    }
+    const payload = readJson(auditPath);
+    const status = stringOrNull(payload?.[audit.statusField]);
+    if (status !== 'pass') {
+      const blockedReason = stringOrNull(payload?.blockedReason) ?? 'none';
+      return `strong_claim_evidence_blocked:${audit.label}:${blockedReason}`;
+    }
+    const auditCommitHash = stringOrNull(payload?.provenance?.commitHash);
+    if (auditCommitHash !== commitHash) {
+      return `strong_claim_evidence_commit_stale:${audit.label}=${auditCommitHash ?? 'null'};head=${commitHash}`;
+    }
+  }
+  return null;
+};
+
 export const runPromotionBundle = (options: PromotionBundleOptions = {}): PromotionBundleResult => {
   const rootDir = options.rootDir ?? '.';
   const promotionCheckPath = resolveRootPath(rootDir, options.promotionCheckPath ?? DEFAULT_PROMOTION_CHECK_PATH);
@@ -187,7 +223,7 @@ export const runPromotionBundle = (options: PromotionBundleOptions = {}): Promot
   const runCommand = options.runCommand ?? runCommandWithRetry;
   const commitHash = getCommitHash();
 
-  runCommand(['run', 'warp:full-solve:g4-candidate-promotion-check']);
+  runCommand(['run', 'warp:full-solve:g4-candidate-promotion-check', '--', '--lane', 'fixed_candidate']);
 
   if (!fs.existsSync(promotionCheckPath)) {
     const blockedPayload = buildBlockedPayload(
@@ -206,6 +242,18 @@ export const runPromotionBundle = (options: PromotionBundleOptions = {}): Promot
   if (promotionBlockedReason) {
     const blockedPayload = buildBlockedPayload(
       `promotion_check_blocked:${promotionBlockedReason}`,
+      outPath,
+      promotionCheckPath,
+      promotionLaneOutDir,
+      commitHash,
+    );
+    writeJson(outPath, blockedPayload);
+    return blockedPayload;
+  }
+  const promotionCheckCommitHash = stringOrNull(promotionCheck?.provenance?.commitHash);
+  if (promotionCheckCommitHash !== commitHash) {
+    const blockedPayload = buildBlockedPayload(
+      `promotion_check_commit_stale:promotion_check=${promotionCheckCommitHash ?? 'null'};head=${commitHash}`,
       outPath,
       promotionCheckPath,
       promotionLaneOutDir,
@@ -238,6 +286,22 @@ export const runPromotionBundle = (options: PromotionBundleOptions = {}): Promot
       promotionLaneOutDir,
       commitHash,
     );
+    writeJson(outPath, blockedPayload);
+    return blockedPayload;
+  }
+
+  const strongClaimEvidenceBlockedReason = validateStrongClaimEvidence(rootDir, commitHash);
+  if (strongClaimEvidenceBlockedReason) {
+    const blockedPayload = buildBlockedPayload(
+      `promotion_strong_claim_blocked:${strongClaimEvidenceBlockedReason}`,
+      outPath,
+      promotionCheckPath,
+      promotionLaneOutDir,
+      commitHash,
+    );
+    blockedPayload.candidateId = candidateResolution.id;
+    blockedPayload.candidatePromotionReady = true;
+    blockedPayload.candidatePromotionStable = true;
     writeJson(outPath, blockedPayload);
     return blockedPayload;
   }

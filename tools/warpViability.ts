@@ -730,7 +730,11 @@ export async function evaluateWarpViability(
     Math.abs(vdbRegionIVDfdrMaxAbs) > VDB_DFDR_MIN_ABS;
   const vdbTwoWallDerivativeSupport =
     vdbRegionIIDerivativeSupport && vdbRegionIVDerivativeSupport;
-  const qiGuard = (liveSnapshot?.qiGuardrail as any) ?? (pipeline as any).qiGuardrail;
+  const liveQiGuard = (liveSnapshot as any)?.qiGuardrail;
+  const qiGuard =
+    liveQiGuard != null && typeof liveQiGuard === "object"
+      ? (liveQiGuard as any)
+      : ((pipeline as any).qiGuardrail as any);
   const qiProvenanceClass = resolveProvenanceClass(qiGuard?.rhoSource);
   const qiConfidenceBand = CONFIDENCE_BY_PROVENANCE[qiProvenanceClass];
   const modeConfig = MODE_CONFIGS[pipeline.currentMode] as { zeta_max?: number } | undefined;
@@ -1058,6 +1062,61 @@ export async function evaluateWarpViability(
     qi_margin_ratio: finiteOrUndefined(qiGuard?.marginRatio),
     qi_margin_ratio_raw: finiteOrUndefined(qiGuard?.marginRatioRaw),
     qi_margin_ratio_raw_computed: finiteOrUndefined((qiGuard as any)?.marginRatioRawComputed),
+    qi_uncertainty_sigma_Jm3: finiteOrUndefined((qiGuard as any)?.uncertaintySigma_Jm3),
+    qi_uncertainty_sigma_measurement_Jm3: finiteOrUndefined((qiGuard as any)?.uncertaintySigmaMeasurement_Jm3),
+    qi_uncertainty_sigma_model_Jm3: finiteOrUndefined((qiGuard as any)?.uncertaintySigmaModel_Jm3),
+    qi_uncertainty_sigma_bridge_Jm3: finiteOrUndefined((qiGuard as any)?.uncertaintySigmaBridge_Jm3),
+    qi_uncertainty_sigma_tau_Jm3: finiteOrUndefined((qiGuard as any)?.uncertaintySigmaTau_Jm3),
+    qi_uncertainty_model_sigma_configured_Jm3: finiteOrUndefined(
+      (qiGuard as any)?.uncertaintyModelSigmaConfigured_Jm3,
+    ),
+    qi_uncertainty_model_sigma_source:
+      typeof (qiGuard as any)?.uncertaintyModelSigmaSource === "string"
+        ? String((qiGuard as any).uncertaintyModelSigmaSource)
+        : undefined,
+    qi_uncertainty_model_sigma_rationale:
+      typeof (qiGuard as any)?.uncertaintyModelSigmaRationale === "string"
+        ? String((qiGuard as any).uncertaintyModelSigmaRationale)
+        : undefined,
+    qi_uncertainty_model_sigma_required:
+      typeof (qiGuard as any)?.uncertaintyModelSigmaRequired === "boolean"
+        ? Boolean((qiGuard as any).uncertaintyModelSigmaRequired)
+        : undefined,
+    qi_uncertainty_model_sigma_provenance_ready:
+      typeof (qiGuard as any)?.uncertaintyModelSigmaProvenanceReady === "boolean"
+        ? Boolean((qiGuard as any).uncertaintyModelSigmaProvenanceReady)
+        : undefined,
+    qi_uncertainty_model_sigma_provenance_missing:
+      Array.isArray((qiGuard as any)?.uncertaintyModelSigmaProvenanceMissing)
+        ? ((qiGuard as any).uncertaintyModelSigmaProvenanceMissing as unknown[])
+            .filter((item) => typeof item === "string" && item.length > 0)
+            .join("|")
+        : undefined,
+    qi_uncertainty_dominant_component:
+      typeof (qiGuard as any)?.uncertaintyDominantComponent === "string"
+        ? String((qiGuard as any).uncertaintyDominantComponent)
+        : undefined,
+    qi_uncertainty_k_sigma: finiteOrUndefined((qiGuard as any)?.uncertaintyBandKSigma),
+    qi_uncertainty_slack_policy_Jm3: finiteOrUndefined((qiGuard as any)?.uncertaintySlackPolicy_Jm3),
+    qi_uncertainty_slack_computed_Jm3: finiteOrUndefined((qiGuard as any)?.uncertaintySlackComputed_Jm3),
+    qi_uncertainty_band_lower_policy_Jm3: finiteOrUndefined((qiGuard as any)?.uncertaintyBandLowerPolicy_Jm3),
+    qi_uncertainty_band_upper_policy_Jm3: finiteOrUndefined((qiGuard as any)?.uncertaintyBandUpperPolicy_Jm3),
+    qi_uncertainty_band_lower_computed_Jm3: finiteOrUndefined((qiGuard as any)?.uncertaintyBandLowerComputed_Jm3),
+    qi_uncertainty_band_upper_computed_Jm3: finiteOrUndefined((qiGuard as any)?.uncertaintyBandUpperComputed_Jm3),
+    qi_uncertainty_decision_class:
+      typeof (qiGuard as any)?.uncertaintyDecisionClass === "string"
+        ? String((qiGuard as any).uncertaintyDecisionClass)
+        : undefined,
+    qi_uncertainty_could_flip:
+      typeof (qiGuard as any)?.uncertaintyCouldFlip === "boolean"
+        ? Boolean((qiGuard as any).uncertaintyCouldFlip)
+        : undefined,
+    qi_uncertainty_inputs_missing:
+      Array.isArray((qiGuard as any)?.uncertaintyInputsMissing)
+        ? ((qiGuard as any).uncertaintyInputsMissing as unknown[])
+            .filter((item) => typeof item === "string" && item.length > 0)
+            .join("|")
+        : undefined,
     qi_g4_floor_dominated: (qiGuard as any)?.g4FloorDominated === true,
     qi_g4_policy_exceeded: (qiGuard as any)?.g4PolicyExceeded === true,
     qi_g4_computed_exceeded: (qiGuard as any)?.g4ComputedExceeded === true,
@@ -1184,6 +1243,12 @@ export async function evaluateWarpViability(
       qiGuard?.metricContractOk == null ? undefined : qiGuard.metricContractOk ? "ok" : "missing",
     qi_curvature_ok: qiGuard?.curvatureOk,
     qi_curvature_ratio: finiteOrUndefined(qiGuard?.curvatureRatio),
+    qi_curvature_scalar: finiteOrUndefined((qiGuard as any)?.curvatureScalar),
+    qi_curvature_radius_m: finiteOrUndefined((qiGuard as any)?.curvatureRadius_m),
+    qi_curvature_flat_space_equivalent:
+      typeof (qiGuard as any)?.curvatureFlatSpaceEquivalent === "boolean"
+        ? Boolean((qiGuard as any).curvatureFlatSpaceEquivalent)
+        : undefined,
     qi_curvature_enforced: qiGuard?.curvatureEnforced,
     qi_bound_tau_s:
       Number.isFinite(qiGuard?.tau_s) && Number(qiGuard?.tau_s) > 0
@@ -1345,6 +1410,28 @@ export async function evaluateWarpViability(
           `marginRatio=${qiGuard.marginRatio ?? "n/a"}`,
           `marginRatioRaw=${qiGuard.marginRatioRaw ?? "n/a"}`,
           `marginRatioRawComputed=${(qiGuard as any).marginRatioRawComputed ?? "n/a"}`,
+          `uncertaintySigma_Jm3=${(qiGuard as any).uncertaintySigma_Jm3 ?? "n/a"}`,
+          `uncertaintySigmaMeasurement_Jm3=${(qiGuard as any).uncertaintySigmaMeasurement_Jm3 ?? "n/a"}`,
+          `uncertaintySigmaModel_Jm3=${(qiGuard as any).uncertaintySigmaModel_Jm3 ?? "n/a"}`,
+          `uncertaintySigmaBridge_Jm3=${(qiGuard as any).uncertaintySigmaBridge_Jm3 ?? "n/a"}`,
+          `uncertaintySigmaTau_Jm3=${(qiGuard as any).uncertaintySigmaTau_Jm3 ?? "n/a"}`,
+          `uncertaintyModelSigmaConfigured_Jm3=${(qiGuard as any).uncertaintyModelSigmaConfigured_Jm3 ?? "n/a"}`,
+          `uncertaintyModelSigmaSource=${(qiGuard as any).uncertaintyModelSigmaSource ?? "n/a"}`,
+          `uncertaintyModelSigmaRationale=${(qiGuard as any).uncertaintyModelSigmaRationale ?? "n/a"}`,
+          `uncertaintyModelSigmaRequired=${(qiGuard as any).uncertaintyModelSigmaRequired === true}`,
+          `uncertaintyModelSigmaProvenanceReady=${(qiGuard as any).uncertaintyModelSigmaProvenanceReady === true}`,
+          `uncertaintyModelSigmaProvenanceMissing=${Array.isArray((qiGuard as any).uncertaintyModelSigmaProvenanceMissing) ? (qiGuard as any).uncertaintyModelSigmaProvenanceMissing.join('|') : "n/a"}`,
+          `uncertaintyDominantComponent=${(qiGuard as any).uncertaintyDominantComponent ?? "n/a"}`,
+          `uncertaintyBandKSigma=${(qiGuard as any).uncertaintyBandKSigma ?? "n/a"}`,
+          `uncertaintySlackPolicy_Jm3=${(qiGuard as any).uncertaintySlackPolicy_Jm3 ?? "n/a"}`,
+          `uncertaintySlackComputed_Jm3=${(qiGuard as any).uncertaintySlackComputed_Jm3 ?? "n/a"}`,
+          `uncertaintyBandLowerPolicy_Jm3=${(qiGuard as any).uncertaintyBandLowerPolicy_Jm3 ?? "n/a"}`,
+          `uncertaintyBandUpperPolicy_Jm3=${(qiGuard as any).uncertaintyBandUpperPolicy_Jm3 ?? "n/a"}`,
+          `uncertaintyBandLowerComputed_Jm3=${(qiGuard as any).uncertaintyBandLowerComputed_Jm3 ?? "n/a"}`,
+          `uncertaintyBandUpperComputed_Jm3=${(qiGuard as any).uncertaintyBandUpperComputed_Jm3 ?? "n/a"}`,
+          `uncertaintyDecisionClass=${(qiGuard as any).uncertaintyDecisionClass ?? "n/a"}`,
+          `uncertaintyCouldFlip=${(qiGuard as any).uncertaintyCouldFlip === true}`,
+          `uncertaintyInputsMissing=${Array.isArray((qiGuard as any).uncertaintyInputsMissing) ? (qiGuard as any).uncertaintyInputsMissing.join('|') : "n/a"}`,
           `g4FloorDominated=${(qiGuard as any).g4FloorDominated === true}`,
           `g4PolicyExceeded=${(qiGuard as any).g4PolicyExceeded === true}`,
           `g4ComputedExceeded=${(qiGuard as any).g4ComputedExceeded === true}`,
@@ -1392,6 +1479,9 @@ export async function evaluateWarpViability(
           `applicabilityReasonCode=${qiGuard.applicabilityReasonCode ?? "none"}`,
           `curvatureOk=${qiGuard.curvatureOk ?? "unknown"}`,
           `curvatureRatio=${qiGuard.curvatureRatio ?? "n/a"}`,
+          `curvatureScalar=${(qiGuard as any).curvatureScalar ?? "n/a"}`,
+          `curvatureRadius_m=${(qiGuard as any).curvatureRadius_m ?? "n/a"}`,
+          `curvatureFlatSpaceEquivalent=${(qiGuard as any).curvatureFlatSpaceEquivalent === true}`,
           `curvatureEnforced=${curvatureEnforced}`,
           `tau_s=${Number.isFinite((qiGuard as any).tau_s) ? Number((qiGuard as any).tau_s) : Number.isFinite((pipeline as any).qi?.tau_s_ms) ? Number((pipeline as any).qi?.tau_s_ms) / 1000 : "n/a"}`,
           `tauConfigured_s=${(qiGuard as any).tauConfigured_s ?? "n/a"}`,

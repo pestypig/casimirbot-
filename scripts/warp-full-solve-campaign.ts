@@ -113,6 +113,28 @@ type EvidencePack = {
     marginRatio?: number;
     marginRatioRaw?: number;
     marginRatioRawComputed?: number;
+    uncertaintySigma_Jm3?: number;
+    uncertaintySigmaMeasurement_Jm3?: number;
+    uncertaintySigmaModel_Jm3?: number;
+    uncertaintySigmaBridge_Jm3?: number;
+    uncertaintySigmaTau_Jm3?: number;
+    uncertaintyModelSigmaConfigured_Jm3?: number;
+    uncertaintyModelSigmaSource?: string;
+    uncertaintyModelSigmaRationale?: string;
+    uncertaintyModelSigmaRequired?: boolean;
+    uncertaintyModelSigmaProvenanceReady?: boolean;
+    uncertaintyModelSigmaProvenanceMissing?: string;
+    uncertaintyDominantComponent?: 'measurement' | 'model' | 'bridge' | 'tau' | 'none';
+    uncertaintyBandKSigma?: number;
+    uncertaintySlackPolicy_Jm3?: number;
+    uncertaintySlackComputed_Jm3?: number;
+    uncertaintyBandLowerPolicy_Jm3?: number;
+    uncertaintyBandUpperPolicy_Jm3?: number;
+    uncertaintyBandLowerComputed_Jm3?: number;
+    uncertaintyBandUpperComputed_Jm3?: number;
+    uncertaintyDecisionClass?: 'robust_pass' | 'indeterminate' | 'robust_fail';
+    uncertaintyCouldFlip?: boolean;
+    uncertaintyInputsMissing?: string;
     g4FloorDominated?: boolean;
     g4PolicyExceeded?: boolean;
     g4ComputedExceeded?: boolean;
@@ -159,6 +181,9 @@ type EvidencePack = {
     applicabilityStatus?: string;
     curvatureOk?: boolean;
     curvatureRatio?: number;
+    curvatureScalar?: number;
+    curvatureRadius_m?: number;
+    curvatureFlatSpaceEquivalent?: boolean;
     curvatureEnforced?: boolean;
     tau_s?: number;
     tauConfigured_s?: number;
@@ -219,6 +244,28 @@ type QiForensicsArtifact = {
   boundFloorApplied: boolean | null;
   marginRatioRaw: number | null;
   marginRatioRawComputed: number | null;
+  uncertaintySigma_Jm3: number | null;
+  uncertaintySigmaMeasurement_Jm3: number | null;
+  uncertaintySigmaModel_Jm3: number | null;
+  uncertaintySigmaBridge_Jm3: number | null;
+  uncertaintySigmaTau_Jm3: number | null;
+  uncertaintyModelSigmaConfigured_Jm3: number | null;
+  uncertaintyModelSigmaSource: string | null;
+  uncertaintyModelSigmaRationale: string | null;
+  uncertaintyModelSigmaRequired: boolean | null;
+  uncertaintyModelSigmaProvenanceReady: boolean | null;
+  uncertaintyModelSigmaProvenanceMissing: string | null;
+  uncertaintyDominantComponent: string | null;
+  uncertaintyBandKSigma: number | null;
+  uncertaintySlackPolicy_Jm3: number | null;
+  uncertaintySlackComputed_Jm3: number | null;
+  uncertaintyBandLowerPolicy_Jm3: number | null;
+  uncertaintyBandUpperPolicy_Jm3: number | null;
+  uncertaintyBandLowerComputed_Jm3: number | null;
+  uncertaintyBandUpperComputed_Jm3: number | null;
+  uncertaintyDecisionClass: string | null;
+  uncertaintyCouldFlip: boolean | null;
+  uncertaintyInputsMissing: string | null;
   g4FloorDominated: boolean | null;
   g4PolicyExceeded: boolean | null;
   g4ComputedExceeded: boolean | null;
@@ -279,6 +326,7 @@ type QiForensicsArtifact = {
   curvatureRadius_m: number | null;
   curvatureRatio: number | null;
   curvatureRatioNonDegenerate: boolean | null;
+  curvatureFlatSpaceEquivalent: boolean | null;
   curvatureEnforced: boolean | null;
   curvatureOk: boolean | null;
   applicabilityStatus: string | null;
@@ -444,12 +492,16 @@ const REQUIRED_SIGNAL_KEYS = [
   'operator_semantic_comparable',
   'operator_bridge_ready',
   'operator_mapping_derivation_ref',
+  'uncertainty_model_sigma_source',
+  'uncertainty_model_sigma_rationale',
+  'uncertainty_model_sigma_required',
+  'uncertainty_model_sigma_provenance_ready',
 ] as const;
 
 
 const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOptions }> = {
   A: {
-    runCount: 1,
+    runCount: 2,
     options: {
       maxIterations: 1,
       commitAccepted: false,
@@ -472,7 +524,7 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
     },
   },
   B: {
-    runCount: 1,
+    runCount: 2,
     options: {
       maxIterations: 2,
       commitAccepted: false,
@@ -1379,6 +1431,22 @@ export const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null, lates
     parseSignalBoolean('quantitySemanticBridgeReady');
   const operatorMappingDerivationRef =
     finalState?.qi_coupling_equation_ref ?? snapshot?.qi_coupling_equation_ref ?? parseSignalField('couplingEquationRef');
+  const uncertaintyModelSigmaSource =
+    finalState?.qi_uncertainty_model_sigma_source ??
+    snapshot?.qi_uncertainty_model_sigma_source ??
+    parseSignalField('uncertaintyModelSigmaSource');
+  const uncertaintyModelSigmaRationale =
+    finalState?.qi_uncertainty_model_sigma_rationale ??
+    snapshot?.qi_uncertainty_model_sigma_rationale ??
+    parseSignalField('uncertaintyModelSigmaRationale');
+  const uncertaintyModelSigmaRequired =
+    finalState?.qi_uncertainty_model_sigma_required ??
+    snapshot?.qi_uncertainty_model_sigma_required ??
+    parseSignalBoolean('uncertaintyModelSigmaRequired');
+  const uncertaintyModelSigmaProvenanceReady =
+    finalState?.qi_uncertainty_model_sigma_provenance_ready ??
+    snapshot?.qi_uncertainty_model_sigma_provenance_ready ??
+    parseSignalBoolean('uncertaintyModelSigmaProvenanceReady');
 
   // Producer/consumer contract: these keys are authoritative and deterministic for gate fail-closed wiring.
   const requiredSignals: EvidencePack['requiredSignals'] = {
@@ -1454,6 +1522,22 @@ export const collectRequiredSignals = (attempt: GrAgentLoopAttempt | null, lates
     operator_mapping_derivation_ref: {
       required: true,
       present: isMeaningfulValue(operatorMappingDerivationRef),
+    },
+    uncertainty_model_sigma_source: {
+      required: true,
+      present: isMeaningfulValue(uncertaintyModelSigmaSource),
+    },
+    uncertainty_model_sigma_rationale: {
+      required: true,
+      present: isMeaningfulValue(uncertaintyModelSigmaRationale),
+    },
+    uncertainty_model_sigma_required: {
+      required: true,
+      present: typeof uncertaintyModelSigmaRequired === 'boolean',
+    },
+    uncertainty_model_sigma_provenance_ready: {
+      required: true,
+      present: typeof uncertaintyModelSigmaProvenanceReady === 'boolean',
     },
   };
   const missingSignals = REQUIRED_SIGNAL_KEYS
@@ -1590,6 +1674,10 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
       .filter((item) => item.length > 0 && item.toLowerCase() !== 'n/a');
     return items.length > 0 ? items : [];
   };
+  const readUncertaintyDecisionClass = (): EvidencePack['g4Diagnostics']['uncertaintyDecisionClass'] => {
+    const raw = readSnapshotString(snapshot?.qi_uncertainty_decision_class) ?? parseFordField('uncertaintyDecisionClass');
+    return raw === 'robust_pass' || raw === 'indeterminate' || raw === 'robust_fail' ? raw : undefined;
+  };
   const hasSynthesizedTag = [ford, theta].some((entry) => typeof entry?.note === 'string' && entry.note.includes('source=synthesized_unknown'));
   const missingAnyHardSource = !ford || !theta;
   const source: EvidencePack['g4Diagnostics']['source'] = hasSynthesizedTag || missingAnyHardSource ? 'synthesized_unknown' : 'evaluator_constraints';
@@ -1623,6 +1711,79 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
     marginRatioRawComputed:
       readCanonicalNumber(snapshot?.qi_margin_ratio_raw_computed, 'marginRatioRawComputed') ??
       parseNumberField('marginRatioRawComputed'),
+    uncertaintySigma_Jm3:
+      readCanonicalNumber(snapshot?.qi_uncertainty_sigma_Jm3, 'uncertaintySigma_Jm3') ??
+      parseNumberField('uncertaintySigma_Jm3'),
+    uncertaintySigmaMeasurement_Jm3:
+      readCanonicalNumber(snapshot?.qi_uncertainty_sigma_measurement_Jm3, 'uncertaintySigmaMeasurement_Jm3') ??
+      parseNumberField('uncertaintySigmaMeasurement_Jm3'),
+    uncertaintySigmaModel_Jm3:
+      readCanonicalNumber(snapshot?.qi_uncertainty_sigma_model_Jm3, 'uncertaintySigmaModel_Jm3') ??
+      parseNumberField('uncertaintySigmaModel_Jm3'),
+    uncertaintySigmaBridge_Jm3:
+      readCanonicalNumber(snapshot?.qi_uncertainty_sigma_bridge_Jm3, 'uncertaintySigmaBridge_Jm3') ??
+      parseNumberField('uncertaintySigmaBridge_Jm3'),
+    uncertaintySigmaTau_Jm3:
+      readCanonicalNumber(snapshot?.qi_uncertainty_sigma_tau_Jm3, 'uncertaintySigmaTau_Jm3') ??
+      parseNumberField('uncertaintySigmaTau_Jm3'),
+    uncertaintyModelSigmaConfigured_Jm3:
+      readCanonicalNumber(
+        snapshot?.qi_uncertainty_model_sigma_configured_Jm3,
+        'uncertaintyModelSigmaConfigured_Jm3',
+      ) ?? parseNumberField('uncertaintyModelSigmaConfigured_Jm3'),
+    uncertaintyModelSigmaSource:
+      readSnapshotString(snapshot?.qi_uncertainty_model_sigma_source) ??
+      (parseFordField('uncertaintyModelSigmaSource') ?? undefined),
+    uncertaintyModelSigmaRationale:
+      readSnapshotString(snapshot?.qi_uncertainty_model_sigma_rationale) ??
+      (parseFordField('uncertaintyModelSigmaRationale') ?? undefined),
+    uncertaintyModelSigmaRequired:
+      readCanonicalBoolean(snapshot?.qi_uncertainty_model_sigma_required, 'uncertaintyModelSigmaRequired'),
+    uncertaintyModelSigmaProvenanceReady:
+      readCanonicalBoolean(
+        snapshot?.qi_uncertainty_model_sigma_provenance_ready,
+        'uncertaintyModelSigmaProvenanceReady',
+      ),
+    uncertaintyModelSigmaProvenanceMissing:
+      readSnapshotString(snapshot?.qi_uncertainty_model_sigma_provenance_missing) ??
+      (parseFordField('uncertaintyModelSigmaProvenanceMissing') ?? undefined),
+    uncertaintyDominantComponent:
+      ((readSnapshotString(snapshot?.qi_uncertainty_dominant_component) ??
+        parseFordField('uncertaintyDominantComponent') ??
+        undefined) as 'measurement' | 'model' | 'bridge' | 'tau' | 'none' | undefined),
+    uncertaintyBandKSigma:
+      readCanonicalNumber(snapshot?.qi_uncertainty_k_sigma, 'uncertaintyBandKSigma') ??
+      parseNumberField('uncertaintyBandKSigma'),
+    uncertaintySlackPolicy_Jm3:
+      readCanonicalNumber(snapshot?.qi_uncertainty_slack_policy_Jm3, 'uncertaintySlackPolicy_Jm3') ??
+      parseNumberField('uncertaintySlackPolicy_Jm3'),
+    uncertaintySlackComputed_Jm3:
+      readCanonicalNumber(snapshot?.qi_uncertainty_slack_computed_Jm3, 'uncertaintySlackComputed_Jm3') ??
+      parseNumberField('uncertaintySlackComputed_Jm3'),
+    uncertaintyBandLowerPolicy_Jm3:
+      readCanonicalNumber(snapshot?.qi_uncertainty_band_lower_policy_Jm3, 'uncertaintyBandLowerPolicy_Jm3') ??
+      parseNumberField('uncertaintyBandLowerPolicy_Jm3'),
+    uncertaintyBandUpperPolicy_Jm3:
+      readCanonicalNumber(snapshot?.qi_uncertainty_band_upper_policy_Jm3, 'uncertaintyBandUpperPolicy_Jm3') ??
+      parseNumberField('uncertaintyBandUpperPolicy_Jm3'),
+    uncertaintyBandLowerComputed_Jm3:
+      readCanonicalNumber(snapshot?.qi_uncertainty_band_lower_computed_Jm3, 'uncertaintyBandLowerComputed_Jm3') ??
+      parseNumberField('uncertaintyBandLowerComputed_Jm3'),
+    uncertaintyBandUpperComputed_Jm3:
+      readCanonicalNumber(snapshot?.qi_uncertainty_band_upper_computed_Jm3, 'uncertaintyBandUpperComputed_Jm3') ??
+      parseNumberField('uncertaintyBandUpperComputed_Jm3'),
+    uncertaintyDecisionClass: readUncertaintyDecisionClass(),
+    uncertaintyCouldFlip:
+      typeof snapshot?.qi_uncertainty_could_flip === 'boolean'
+        ? snapshot.qi_uncertainty_could_flip
+        : parseFordField('uncertaintyCouldFlip') === 'true'
+          ? true
+          : parseFordField('uncertaintyCouldFlip') === 'false'
+            ? false
+            : undefined,
+    uncertaintyInputsMissing:
+      readSnapshotString(snapshot?.qi_uncertainty_inputs_missing) ??
+      (parseFordField('uncertaintyInputsMissing') ?? undefined),
     g4FloorDominated:
       typeof snapshot?.qi_g4_floor_dominated === 'boolean'
         ? snapshot.qi_g4_floor_dominated
@@ -1761,6 +1922,18 @@ export const deriveG4Diagnostics = (attempt: GrAgentLoopAttempt | null): Evidenc
             ? false
             : undefined,
     curvatureRatio: readCanonicalNumber(snapshot?.qi_curvature_ratio, 'curvatureRatio'),
+    curvatureScalar:
+      readCanonicalNumber(snapshot?.qi_curvature_scalar, 'curvatureScalar') ?? parseNumberField('curvatureScalar'),
+    curvatureRadius_m:
+      readCanonicalNumber(snapshot?.qi_curvature_radius_m, 'curvatureRadius_m') ?? parseNumberField('curvatureRadius_m'),
+    curvatureFlatSpaceEquivalent:
+      typeof snapshot?.qi_curvature_flat_space_equivalent === 'boolean'
+        ? snapshot.qi_curvature_flat_space_equivalent
+        : parseFordField('curvatureFlatSpaceEquivalent') === 'true'
+          ? true
+          : parseFordField('curvatureFlatSpaceEquivalent') === 'false'
+            ? false
+            : undefined,
     curvatureEnforced:
       typeof snapshot?.qi_curvature_enforced === 'boolean'
         ? snapshot.qi_curvature_enforced
@@ -1814,6 +1987,13 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
   const snapshot = (attempt as any)?.certificate?.payload?.snapshot ?? {};
   const guard = snapshot?.qiGuardrail ?? {};
   const curvatureRatio = finiteOrNull(pack.g4Diagnostics?.curvatureRatio);
+  const curvatureScalar =
+    finiteOrNull(snapshot?.qi_curvature_scalar) ?? finiteOrNull(pack.g4Diagnostics?.curvatureScalar);
+  const curvatureRadius_m =
+    finiteOrNull(snapshot?.qi_curvature_radius_m) ?? finiteOrNull(pack.g4Diagnostics?.curvatureRadius_m);
+  const curvatureFlatSpaceEquivalent =
+    booleanOrNull(snapshot?.qi_curvature_flat_space_equivalent) ??
+    booleanOrNull(pack.g4Diagnostics?.curvatureFlatSpaceEquivalent);
   const hasK = pack.g4Diagnostics?.K != null;
   const kProvenanceCommit = hasK
     ? stringOrNull(pack.commitSha) ?? resolveHeadCommitHash([process.cwd()])
@@ -1846,6 +2026,28 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
     boundFloorApplied: booleanOrNull(pack.g4Diagnostics?.boundFloorApplied),
     marginRatioRaw: finiteOrNull(pack.g4Diagnostics?.marginRatioRaw),
     marginRatioRawComputed: finiteOrNull(pack.g4Diagnostics?.marginRatioRawComputed),
+    uncertaintySigma_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintySigma_Jm3),
+    uncertaintySigmaMeasurement_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintySigmaMeasurement_Jm3),
+    uncertaintySigmaModel_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintySigmaModel_Jm3),
+    uncertaintySigmaBridge_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintySigmaBridge_Jm3),
+    uncertaintySigmaTau_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintySigmaTau_Jm3),
+    uncertaintyModelSigmaConfigured_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintyModelSigmaConfigured_Jm3),
+    uncertaintyModelSigmaSource: stringOrNull(pack.g4Diagnostics?.uncertaintyModelSigmaSource),
+    uncertaintyModelSigmaRationale: stringOrNull(pack.g4Diagnostics?.uncertaintyModelSigmaRationale),
+    uncertaintyModelSigmaRequired: booleanOrNull(pack.g4Diagnostics?.uncertaintyModelSigmaRequired),
+    uncertaintyModelSigmaProvenanceReady: booleanOrNull(pack.g4Diagnostics?.uncertaintyModelSigmaProvenanceReady),
+    uncertaintyModelSigmaProvenanceMissing: stringOrNull(pack.g4Diagnostics?.uncertaintyModelSigmaProvenanceMissing),
+    uncertaintyDominantComponent: stringOrNull(pack.g4Diagnostics?.uncertaintyDominantComponent),
+    uncertaintyBandKSigma: finiteOrNull(pack.g4Diagnostics?.uncertaintyBandKSigma),
+    uncertaintySlackPolicy_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintySlackPolicy_Jm3),
+    uncertaintySlackComputed_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintySlackComputed_Jm3),
+    uncertaintyBandLowerPolicy_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintyBandLowerPolicy_Jm3),
+    uncertaintyBandUpperPolicy_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintyBandUpperPolicy_Jm3),
+    uncertaintyBandLowerComputed_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintyBandLowerComputed_Jm3),
+    uncertaintyBandUpperComputed_Jm3: finiteOrNull(pack.g4Diagnostics?.uncertaintyBandUpperComputed_Jm3),
+    uncertaintyDecisionClass: stringOrNull(pack.g4Diagnostics?.uncertaintyDecisionClass),
+    uncertaintyCouldFlip: booleanOrNull(pack.g4Diagnostics?.uncertaintyCouldFlip),
+    uncertaintyInputsMissing: stringOrNull(pack.g4Diagnostics?.uncertaintyInputsMissing),
     g4FloorDominated: booleanOrNull(pack.g4Diagnostics?.g4FloorDominated),
     g4PolicyExceeded: booleanOrNull(pack.g4Diagnostics?.g4PolicyExceeded),
     g4ComputedExceeded: booleanOrNull(pack.g4Diagnostics?.g4ComputedExceeded),
@@ -1910,10 +2112,14 @@ export const buildQiForensicsArtifact = (pack: EvidencePack, attempt: GrAgentLoo
     KProvenanceCommit: kProvenanceCommit,
     KDerivation: hasK ? 'ford_roman_bound_constant_from_qi_guard' : null,
     safetySigma_Jm3: finiteOrNull(pack.g4Diagnostics?.safetySigma_Jm3),
-    curvatureScalar: finiteOrNull(snapshot?.qi_curvature_scalar),
-    curvatureRadius_m: finiteOrNull(snapshot?.qi_curvature_radius_m),
+    curvatureScalar,
+    curvatureRadius_m,
     curvatureRatio,
-    curvatureRatioNonDegenerate: curvatureRatio == null ? null : Math.abs(curvatureRatio) > 0,
+    curvatureRatioNonDegenerate:
+      curvatureRatio == null
+        ? null
+        : Math.abs(curvatureRatio) > 0 || curvatureFlatSpaceEquivalent === true,
+    curvatureFlatSpaceEquivalent,
     curvatureEnforced: booleanOrNull(pack.g4Diagnostics?.curvatureEnforced),
     curvatureOk: booleanOrNull(pack.g4Diagnostics?.curvatureOk),
     applicabilityStatus: stringOrNull(pack.g4Diagnostics?.applicabilityStatus),
@@ -2372,6 +2578,61 @@ const regenCampaign = (outDir: string, waves: Wave[]) => {
     .filter(([, count]) => typeof count === 'number' && Number.isFinite(count) && Number(count) > 0)
     .map(([field, count]) => `${field}:${count}`)
     .sort((a, b) => a.localeCompare(b));
+  const curvatureApplicabilityAuditPath = path.join(CANONICAL_ARTIFACT_ROOT, 'g4-curvature-applicability-audit-2026-03-02.json');
+  const curvatureApplicabilityAudit = fs.existsSync(curvatureApplicabilityAuditPath)
+    ? JSON.parse(fs.readFileSync(curvatureApplicabilityAuditPath, 'utf8'))
+    : null;
+  const curvatureApplicabilityBlockedReason =
+    typeof curvatureApplicabilityAudit?.blockedReason === 'string' && curvatureApplicabilityAudit.blockedReason.trim().length > 0
+      ? curvatureApplicabilityAudit.blockedReason
+      : null;
+  const curvatureApplicabilityStatus =
+    typeof curvatureApplicabilityAudit?.curvatureEvidenceStatus === 'string' && curvatureApplicabilityAudit.curvatureEvidenceStatus.length > 0
+      ? curvatureApplicabilityAudit.curvatureEvidenceStatus
+      : curvatureApplicabilityBlockedReason == null
+        ? 'pass'
+        : 'blocked';
+  const curvatureApplicabilityCommit =
+    typeof curvatureApplicabilityAudit?.provenance?.commitHash === 'string'
+      ? curvatureApplicabilityAudit.provenance.commitHash
+      : null;
+  const curvatureApplicabilityFresh = curvatureApplicabilityCommit != null && curvatureApplicabilityCommit === recoveryHeadCommit;
+  const curvatureApplicabilityTopRows = Array.isArray(curvatureApplicabilityAudit?.waves)
+    ? curvatureApplicabilityAudit.waves.slice(0, 4)
+    : [];
+  const curvatureApplicabilityMissingFields = curvatureApplicabilityAudit?.missingFieldCounts ?? {};
+  const curvatureApplicabilityMissingFieldRows = Object.entries(curvatureApplicabilityMissingFields as Record<string, unknown>)
+    .filter(([, count]) => typeof count === 'number' && Number.isFinite(count) && Number(count) > 0)
+    .map(([field, count]) => `${field}:${count}`)
+    .sort((a, b) => a.localeCompare(b));
+  const uncertaintyAuditPath = path.join(CANONICAL_ARTIFACT_ROOT, 'g4-uncertainty-audit-2026-03-02.json');
+  const uncertaintyAudit = fs.existsSync(uncertaintyAuditPath)
+    ? JSON.parse(fs.readFileSync(uncertaintyAuditPath, 'utf8'))
+    : null;
+  const uncertaintyAuditBlockedReason =
+    typeof uncertaintyAudit?.blockedReason === 'string' && uncertaintyAudit.blockedReason.trim().length > 0
+      ? uncertaintyAudit.blockedReason
+      : null;
+  const uncertaintyAuditStatus =
+    typeof uncertaintyAudit?.uncertaintyEvidenceStatus === 'string' && uncertaintyAudit.uncertaintyEvidenceStatus.length > 0
+      ? uncertaintyAudit.uncertaintyEvidenceStatus
+      : uncertaintyAuditBlockedReason == null
+        ? 'pass'
+        : 'blocked';
+  const uncertaintyAuditCommit =
+    typeof uncertaintyAudit?.provenance?.commitHash === 'string' ? uncertaintyAudit.provenance.commitHash : null;
+  const uncertaintyAuditFresh = uncertaintyAuditCommit != null && uncertaintyAuditCommit === recoveryHeadCommit;
+  const uncertaintyAuditTopRows = Array.isArray(uncertaintyAudit?.waves) ? uncertaintyAudit.waves.slice(0, 4) : [];
+  const uncertaintyAuditMissingFields = uncertaintyAudit?.missingFieldCounts ?? {};
+  const uncertaintyAuditMissingFieldRows = Object.entries(uncertaintyAuditMissingFields as Record<string, unknown>)
+    .filter(([, count]) => typeof count === 'number' && Number.isFinite(count) && Number(count) > 0)
+    .map(([field, count]) => `${field}:${count}`)
+    .sort((a, b) => a.localeCompare(b));
+  const uncertaintyAuditDecisionClassCounts = uncertaintyAudit?.decisionClassCounts ?? {};
+  const uncertaintyAuditDecisionClassRows = Object.entries(uncertaintyAuditDecisionClassCounts as Record<string, unknown>)
+    .filter(([, count]) => typeof count === 'number' && Number.isFinite(count) && Number(count) > 0)
+    .map(([decisionClass, count]) => `${decisionClass}:${count}`)
+    .sort((a, b) => a.localeCompare(b));
 
   if (sourceArtifactRoot === canonicalArtifactRoot) {
     writeMd(
@@ -2442,6 +2703,28 @@ ${g4WaveRows}
 - boundFloorApplied: ${bestCasePack?.g4Diagnostics?.boundFloorApplied ?? 'n/a'}
 - marginRatioRaw: ${bestCasePack?.g4Diagnostics?.marginRatioRaw ?? bestCasePack?.g4Diagnostics?.marginRatio ?? 'n/a'}
 - marginRatioRawComputed: ${bestCasePack?.g4Diagnostics?.marginRatioRawComputed ?? 'n/a'}
+- uncertaintySigma_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintySigma_Jm3 ?? 'n/a'}
+- uncertaintySigmaMeasurement_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintySigmaMeasurement_Jm3 ?? 'n/a'}
+- uncertaintySigmaModel_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintySigmaModel_Jm3 ?? 'n/a'}
+- uncertaintySigmaBridge_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintySigmaBridge_Jm3 ?? 'n/a'}
+- uncertaintySigmaTau_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintySigmaTau_Jm3 ?? 'n/a'}
+- uncertaintyModelSigmaConfigured_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintyModelSigmaConfigured_Jm3 ?? 'n/a'}
+- uncertaintyModelSigmaSource: ${bestCasePack?.g4Diagnostics?.uncertaintyModelSigmaSource ?? 'n/a'}
+- uncertaintyModelSigmaRationale: ${bestCasePack?.g4Diagnostics?.uncertaintyModelSigmaRationale ?? 'n/a'}
+- uncertaintyModelSigmaRequired: ${bestCasePack?.g4Diagnostics?.uncertaintyModelSigmaRequired ?? 'n/a'}
+- uncertaintyModelSigmaProvenanceReady: ${bestCasePack?.g4Diagnostics?.uncertaintyModelSigmaProvenanceReady ?? 'n/a'}
+- uncertaintyModelSigmaProvenanceMissing: ${bestCasePack?.g4Diagnostics?.uncertaintyModelSigmaProvenanceMissing ?? 'none'}
+- uncertaintyDominantComponent: ${bestCasePack?.g4Diagnostics?.uncertaintyDominantComponent ?? 'n/a'}
+- uncertaintyBandKSigma: ${bestCasePack?.g4Diagnostics?.uncertaintyBandKSigma ?? 'n/a'}
+- uncertaintySlackPolicy_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintySlackPolicy_Jm3 ?? 'n/a'}
+- uncertaintySlackComputed_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintySlackComputed_Jm3 ?? 'n/a'}
+- uncertaintyBandLowerPolicy_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintyBandLowerPolicy_Jm3 ?? 'n/a'}
+- uncertaintyBandUpperPolicy_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintyBandUpperPolicy_Jm3 ?? 'n/a'}
+- uncertaintyBandLowerComputed_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintyBandLowerComputed_Jm3 ?? 'n/a'}
+- uncertaintyBandUpperComputed_Jm3: ${bestCasePack?.g4Diagnostics?.uncertaintyBandUpperComputed_Jm3 ?? 'n/a'}
+- uncertaintyDecisionClass: ${bestCasePack?.g4Diagnostics?.uncertaintyDecisionClass ?? 'n/a'}
+- uncertaintyCouldFlip: ${bestCasePack?.g4Diagnostics?.uncertaintyCouldFlip ?? 'n/a'}
+- uncertaintyInputsMissing: ${bestCasePack?.g4Diagnostics?.uncertaintyInputsMissing ?? 'none'}
 - applicabilityStatus: ${bestCasePack?.g4Diagnostics?.applicabilityStatus ?? 'UNKNOWN'}
 - congruentSolvePolicyMarginPass: ${bestCasePack?.g4Diagnostics?.congruentSolvePolicyMarginPass ?? 'n/a'}
 - congruentSolveComputedMarginPass: ${bestCasePack?.g4Diagnostics?.congruentSolveComputedMarginPass ?? 'n/a'}
@@ -2540,6 +2823,64 @@ ${kernelProvenanceTopRows
   )
   .join('\n')}
 - canonical-authoritative statement: canonical campaign decision remains authoritative; sampling/K provenance evidence is fail-closed.
+
+## G4 curvature applicability summary
+- curvature applicability audit artifact: ${fs.existsSync(curvatureApplicabilityAuditPath) ? curvatureApplicabilityAuditPath.replace(/\\/g, '/') : 'missing'}
+- curvature evidence status: ${curvatureApplicabilityStatus}
+- blocked reason (fail-closed): ${curvatureApplicabilityBlockedReason ?? 'none'}
+- canonical missing waves: ${Array.isArray(curvatureApplicabilityAudit?.canonicalMissingWaves) ? curvatureApplicabilityAudit.canonicalMissingWaves.join(',') || 'none' : 'n/a'}
+- all applicability PASS: ${curvatureApplicabilityAudit?.allApplicabilityPass ?? 'n/a'}
+- all curvature comparable: ${curvatureApplicabilityAudit?.allCurvatureComparable ?? 'n/a'}
+- all ratio non-degenerate evidence: ${curvatureApplicabilityAudit?.allRatioNonDegenerateEvidence ?? 'n/a'}
+- all scalar/radius present: ${curvatureApplicabilityAudit?.allScalarRadiusPresent ?? 'n/a'}
+- all window evidence ready: ${curvatureApplicabilityAudit?.allWindowEvidenceReady ?? 'n/a'}
+- min curvatureRatio: ${curvatureApplicabilityAudit?.minCurvatureRatio ?? 'n/a'}
+- max curvatureRatio: ${curvatureApplicabilityAudit?.maxCurvatureRatio ?? 'n/a'}
+- missing field counts: ${curvatureApplicabilityMissingFieldRows.join(', ') || 'none'}
+- curvature applicability provenance commit: ${curvatureApplicabilityCommit ?? 'n/a'}
+- curvature applicability provenance freshness vs HEAD: ${curvatureApplicabilityFresh ? 'fresh' : 'stale_or_missing'}
+${curvatureApplicabilityTopRows
+  .map(
+    (row: any, idx: number) =>
+      `- wave[${idx + 1}] ${row?.wave ?? 'n/a'}: applicability=${row?.applicabilityStatus ?? 'n/a'}; curvatureEnforced=${row?.curvatureEnforced ?? 'n/a'}; curvatureOk=${row?.curvatureOk ?? 'n/a'}; curvatureRatio=${row?.curvatureRatio ?? 'n/a'}; nonDegenerate=${row?.curvatureRatioNonDegenerate ?? 'n/a'}; flatSpaceEquivalent=${row?.curvatureFlatSpaceEquivalent ?? 'n/a'}; curvatureScalar=${row?.curvatureScalar ?? 'n/a'}; curvatureRadius_m=${row?.curvatureRadius_m ?? 'n/a'}; windowEvidenceReady=${row?.windowEvidenceReady ?? 'n/a'}; blockedTokens=${Array.isArray(row?.blockedReasonTokens) ? row.blockedReasonTokens.join('|') || 'none' : 'n/a'}`,
+  )
+  .join('\n')}
+- canonical-authoritative statement: canonical campaign decision remains authoritative; curvature applicability evidence is fail-closed.
+
+## G4 uncertainty-band summary
+- uncertainty audit artifact: ${fs.existsSync(uncertaintyAuditPath) ? uncertaintyAuditPath.replace(/\\/g, '/') : 'missing'}
+- uncertainty evidence status: ${uncertaintyAuditStatus}
+- blocked reason (fail-closed): ${uncertaintyAuditBlockedReason ?? 'none'}
+- canonical missing waves: ${Array.isArray(uncertaintyAudit?.canonicalMissingWaves) ? uncertaintyAudit.canonicalMissingWaves.join(',') || 'none' : 'n/a'}
+- all applicability PASS: ${uncertaintyAudit?.allApplicabilityPass ?? 'n/a'}
+- all decision classes robust_pass: ${uncertaintyAudit?.allDecisionRobustPass ?? 'n/a'}
+- any uncertainty could flip: ${uncertaintyAudit?.anyCouldFlip ?? 'n/a'}
+- all uncertainty slack positive: ${uncertaintyAudit?.allSlackPositive ?? 'n/a'}
+- robust pass wave count: ${uncertaintyAudit?.robustPassWaveCount ?? 'n/a'}
+- could flip wave count: ${uncertaintyAudit?.couldFlipWaveCount ?? 'n/a'}
+- min uncertaintySlackPolicy_Jm3: ${uncertaintyAudit?.minUncertaintySlackPolicy_Jm3 ?? 'n/a'}
+- min uncertaintySlackComputed_Jm3: ${uncertaintyAudit?.minUncertaintySlackComputed_Jm3 ?? 'n/a'}
+- max uncertaintySigma_Jm3: ${uncertaintyAudit?.maxUncertaintySigma_Jm3 ?? 'n/a'}
+- max uncertaintySigmaMeasurement_Jm3: ${uncertaintyAudit?.maxUncertaintySigmaMeasurement_Jm3 ?? 'n/a'}
+- max uncertaintySigmaModel_Jm3: ${uncertaintyAudit?.maxUncertaintySigmaModel_Jm3 ?? 'n/a'}
+- max uncertaintySigmaBridge_Jm3: ${uncertaintyAudit?.maxUncertaintySigmaBridge_Jm3 ?? 'n/a'}
+- max uncertaintySigmaTau_Jm3: ${uncertaintyAudit?.maxUncertaintySigmaTau_Jm3 ?? 'n/a'}
+- dominant component counts: ${Object.entries((uncertaintyAudit?.dominantComponentCounts ?? {}) as Record<string, unknown>)
+  .filter(([, count]) => typeof count === 'number' && Number.isFinite(count) && Number(count) > 0)
+  .map(([component, count]) => `${component}:${count}`)
+  .sort((a, b) => a.localeCompare(b))
+  .join(', ') || 'none'}
+- decision class counts: ${uncertaintyAuditDecisionClassRows.join(', ') || 'none'}
+- missing field counts: ${uncertaintyAuditMissingFieldRows.join(', ') || 'none'}
+- uncertainty audit provenance commit: ${uncertaintyAuditCommit ?? 'n/a'}
+- uncertainty audit provenance freshness vs HEAD: ${uncertaintyAuditFresh ? 'fresh' : 'stale_or_missing'}
+${uncertaintyAuditTopRows
+  .map(
+    (row: any, idx: number) =>
+      `- wave[${idx + 1}] ${row?.wave ?? 'n/a'}: applicability=${row?.applicabilityStatus ?? 'n/a'}; decision=${row?.uncertaintyDecisionClass ?? 'n/a'}; couldFlip=${row?.uncertaintyCouldFlip ?? 'n/a'}; sigmaMeasurement=${row?.uncertaintySigmaMeasurement_Jm3 ?? 'n/a'}; sigmaModel=${row?.uncertaintySigmaModel_Jm3 ?? 'n/a'}; sigmaBridge=${row?.uncertaintySigmaBridge_Jm3 ?? 'n/a'}; sigmaTau=${row?.uncertaintySigmaTau_Jm3 ?? 'n/a'}; modelSigmaSource=${row?.uncertaintyModelSigmaSource ?? 'n/a'}; modelSigmaRequired=${row?.uncertaintyModelSigmaRequired ?? 'n/a'}; modelSigmaProvenanceReady=${row?.uncertaintyModelSigmaProvenanceReady ?? 'n/a'}; dominant=${row?.uncertaintyDominantComponent ?? 'n/a'}; slackPolicy=${row?.uncertaintySlackPolicy_Jm3 ?? 'n/a'}; slackComputed=${row?.uncertaintySlackComputed_Jm3 ?? 'n/a'}; blockedTokens=${Array.isArray(row?.blockedReasonTokens) ? row.blockedReasonTokens.join('|') || 'none' : 'n/a'}`,
+  )
+  .join('\n')}
+- canonical-authoritative statement: canonical campaign decision remains authoritative; uncertainty evidence is fail-closed.
 
 ## Operator translation
 - What failed: ${aggregateFirstFail.firstFail} (${aggregateFirstFail.reason})

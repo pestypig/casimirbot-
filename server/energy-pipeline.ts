@@ -7052,6 +7052,7 @@ type QiCurvatureInfo = {
   source?: string;
   note?: string;
   scalar?: number;
+  flatSpaceEquivalent?: boolean;
   signalState?: "available" | "missing";
   reasonCode?: "G4_QI_CURVATURE_WINDOW_FAIL" | "G4_QI_SIGNAL_MISSING";
 };
@@ -7093,9 +7094,9 @@ function resolveQiCurvature(
     return {
       source,
       scalar,
-      radius_m: Number.POSITIVE_INFINITY,
       ratio: 0,
       ok: true,
+      flatSpaceEquivalent: true,
       signalState: "available",
       note: "zero curvature scalar",
     };
@@ -7729,6 +7730,28 @@ export function evaluateQiGuardrail(
   marginRatio: number;
   marginRatioRaw: number;
   marginRatioRawComputed: number;
+  uncertaintySigma_Jm3: number | null;
+  uncertaintySigmaMeasurement_Jm3: number | null;
+  uncertaintySigmaModel_Jm3: number | null;
+  uncertaintySigmaBridge_Jm3: number | null;
+  uncertaintySigmaTau_Jm3: number | null;
+  uncertaintyModelSigmaConfigured_Jm3: number | null;
+  uncertaintyModelSigmaSource: string;
+  uncertaintyModelSigmaRationale: string;
+  uncertaintyModelSigmaRequired: boolean;
+  uncertaintyModelSigmaProvenanceReady: boolean;
+  uncertaintyModelSigmaProvenanceMissing: string[];
+  uncertaintyDominantComponent: "measurement" | "model" | "bridge" | "tau" | "none";
+  uncertaintyBandKSigma: number;
+  uncertaintySlackPolicy_Jm3: number | null;
+  uncertaintySlackComputed_Jm3: number | null;
+  uncertaintyBandLowerPolicy_Jm3: number | null;
+  uncertaintyBandUpperPolicy_Jm3: number | null;
+  uncertaintyBandLowerComputed_Jm3: number | null;
+  uncertaintyBandUpperComputed_Jm3: number | null;
+  uncertaintyDecisionClass: "robust_pass" | "indeterminate" | "robust_fail";
+  uncertaintyCouldFlip: boolean;
+  uncertaintyInputsMissing: string[];
   g4FloorDominated: boolean;
   g4PolicyExceeded: boolean;
   g4ComputedExceeded: boolean;
@@ -7749,6 +7772,8 @@ export function evaluateQiGuardrail(
   rhoOnDuty?: number;
   curvatureRadius_m?: number;
   curvatureRatio?: number;
+  curvatureScalar?: number;
+  curvatureFlatSpaceEquivalent?: boolean;
   curvatureOk?: boolean;
   curvatureSource?: string;
   curvatureNote?: string;
@@ -7915,9 +7940,13 @@ export function evaluateQiGuardrail(
   const dt_s = pattern.dt_s;
   const sumWindowDt = pattern.window.reduce((acc, v) => acc + v * dt_s, 0);
   let lhs = 0;
+  let maskedSamplingWeight = 0;
   for (let i = 0; i < pattern.mask.length; i += 1) {
-    const rho = pattern.mask[i] ? rhoOn * pattern.mask[i] : 0;
-    lhs += rho * pattern.window[i] * dt_s;
+    const maskWeight = pattern.mask[i];
+    const windowWeight = pattern.window[i] * dt_s;
+    const rho = maskWeight ? rhoOn * maskWeight : 0;
+    lhs += rho * windowWeight;
+    maskedSamplingWeight += maskWeight * windowWeight;
   }
   if (
     DEBUG_PIPE &&
@@ -7968,6 +7997,168 @@ export function evaluateQiGuardrail(
     boundComputed_Jm3 < 0 && Number.isFinite(boundComputed_Jm3)
       ? Math.abs(lhs) / Math.abs(boundComputed_Jm3)
       : Infinity;
+  const uncertaintyInputsMissing: string[] = [];
+  if (!Number.isFinite(boundResult.safetySigma_Jm3)) {
+    uncertaintyInputsMissing.push("non_finite_safety_sigma");
+  }
+  const uncertaintyRequireModelSigma = (process.env.QI_UNCERTAINTY_REQUIRE_MODEL_SIGMA ?? "0") !== "0";
+  const uncertaintyModelRaw = process.env.QI_UNCERTAINTY_SIGMA_MODEL_JM3;
+  const uncertaintyModelParsed =
+    typeof uncertaintyModelRaw === "string" && uncertaintyModelRaw.trim().length > 0
+      ? Number(uncertaintyModelRaw)
+      : null;
+  const uncertaintyModelSigmaConfigured_Jm3 =
+    uncertaintyModelParsed != null &&
+    Number.isFinite(uncertaintyModelParsed) &&
+    uncertaintyModelParsed >= 0
+      ? uncertaintyModelParsed
+      : null;
+  const uncertaintyModelSigmaProvenanceReady = uncertaintyModelSigmaConfigured_Jm3 != null;
+  const uncertaintyModelSigmaProvenanceMissing: string[] = [];
+  if (!uncertaintyModelSigmaProvenanceReady) {
+    uncertaintyModelSigmaProvenanceMissing.push(
+      uncertaintyModelParsed == null ? "model_sigma_unconfigured" : "model_sigma_invalid",
+    );
+  }
+  if (uncertaintyRequireModelSigma && !uncertaintyModelSigmaProvenanceReady) {
+    uncertaintyModelSigmaProvenanceMissing.push("model_sigma_required_but_missing");
+  }
+  const uncertaintyModelSigmaSource =
+    uncertaintyModelSigmaConfigured_Jm3 != null
+      ? "env:QI_UNCERTAINTY_SIGMA_MODEL_JM3"
+      : uncertaintyModelParsed == null
+        ? "default_zero_unconfigured"
+        : "invalid_env_value";
+  const uncertaintyModelSigmaRationale =
+    uncertaintyModelSigmaConfigured_Jm3 != null
+      ? "configured_model_sigma_applied"
+      : uncertaintyRequireModelSigma
+        ? "model_sigma_required_but_missing"
+        : "model_sigma_unconfigured_default_zero";
+  const uncertaintySigmaModel_Jm3 =
+    uncertaintyModelSigmaConfigured_Jm3 != null ? uncertaintyModelSigmaConfigured_Jm3 : 0;
+  if (
+    uncertaintyModelParsed != null &&
+    (!Number.isFinite(uncertaintyModelParsed) || uncertaintyModelParsed < 0)
+  ) {
+    uncertaintyInputsMissing.push("invalid_model_sigma");
+  }
+  const couplingGapAbs =
+    Number.isFinite(couplingDiagnostics.metricRho_Jm3) &&
+    Number.isFinite(couplingDiagnostics.proxyRho_Jm3)
+      ? Math.abs(Number(couplingDiagnostics.metricRho_Jm3) - Number(couplingDiagnostics.proxyRho_Jm3))
+      : 0;
+  const couplingGapWindowMappedAbs =
+    Number.isFinite(couplingGapAbs) && Number.isFinite(maskedSamplingWeight)
+      ? couplingGapAbs * Math.abs(maskedSamplingWeight)
+      : Number.NaN;
+  if (!(Number.isFinite(couplingDiagnostics.metricRho_Jm3) && Number.isFinite(couplingDiagnostics.proxyRho_Jm3))) {
+    uncertaintyInputsMissing.push("coupling_channels_missing");
+  }
+  if (!Number.isFinite(maskedSamplingWeight)) {
+    uncertaintyInputsMissing.push("coupling_window_weight_non_finite");
+  }
+  const uncertaintySigmaBridge_Jm3 = Number.isFinite(couplingGapWindowMappedAbs)
+    ? couplingGapWindowMappedAbs
+    : 0;
+  const uncertaintyMeasurementRaw = process.env.QI_UNCERTAINTY_SIGMA_MEASUREMENT_JM3;
+  const uncertaintyMeasurementParsed =
+    typeof uncertaintyMeasurementRaw === "string" && uncertaintyMeasurementRaw.trim().length > 0
+      ? Number(uncertaintyMeasurementRaw)
+      : null;
+  const uncertaintySigmaMeasurement_Jm3 =
+    uncertaintyMeasurementParsed == null
+      ? 0
+      : Number.isFinite(uncertaintyMeasurementParsed) && uncertaintyMeasurementParsed >= 0
+        ? uncertaintyMeasurementParsed
+        : 0;
+  if (
+    uncertaintyMeasurementParsed != null &&
+    (!Number.isFinite(uncertaintyMeasurementParsed) || uncertaintyMeasurementParsed < 0)
+  ) {
+    uncertaintyInputsMissing.push("invalid_measurement_sigma");
+  }
+  const boundConfiguredResult = qiBound_Jm3({
+    tau_s: tauConfigured_s,
+    fieldType,
+    kernelType: sampler,
+  });
+  const boundConfiguredComputed_Jm3 = boundConfiguredResult.bound_Jm3 - Math.abs(boundConfiguredResult.safetySigma_Jm3);
+  const tauSelectionDeltaAbs =
+    Number.isFinite(boundComputed_Jm3) && Number.isFinite(boundConfiguredComputed_Jm3)
+      ? Math.abs(boundComputed_Jm3 - boundConfiguredComputed_Jm3)
+      : Number.NaN;
+  const uncertaintySigmaTau_Jm3 = tauSelectorFallbackApplied
+    ? Number.isFinite(tauSelectionDeltaAbs)
+      ? tauSelectionDeltaAbs
+      : 0
+    : 0;
+  if (tauSelectorFallbackApplied && !Number.isFinite(tauSelectionDeltaAbs)) {
+    uncertaintyInputsMissing.push("tau_selection_delta_non_finite");
+  }
+  if (!Number.isFinite(lhs)) uncertaintyInputsMissing.push("non_finite_lhs");
+  if (!Number.isFinite(bound_Jm3)) uncertaintyInputsMissing.push("non_finite_bound_used");
+  if (!Number.isFinite(boundComputed_Jm3)) uncertaintyInputsMissing.push("non_finite_bound_computed");
+  const uncertaintySigma_Jm3 = Math.max(
+    uncertaintySigmaMeasurement_Jm3,
+    uncertaintySigmaModel_Jm3,
+    uncertaintySigmaBridge_Jm3,
+    uncertaintySigmaTau_Jm3,
+  );
+  const uncertaintyDominantComponent: "measurement" | "model" | "bridge" | "tau" | "none" =
+    uncertaintySigma_Jm3 <= 0
+      ? "none"
+      : uncertaintySigmaMeasurement_Jm3 >= uncertaintySigmaModel_Jm3 &&
+          uncertaintySigmaMeasurement_Jm3 >= uncertaintySigmaBridge_Jm3 &&
+          uncertaintySigmaMeasurement_Jm3 >= uncertaintySigmaTau_Jm3
+        ? "measurement"
+        : uncertaintySigmaModel_Jm3 >= uncertaintySigmaBridge_Jm3 &&
+            uncertaintySigmaModel_Jm3 >= uncertaintySigmaTau_Jm3
+          ? "model"
+          : uncertaintySigmaBridge_Jm3 >= uncertaintySigmaTau_Jm3
+            ? "bridge"
+            : "tau";
+  const uncertaintyBandKSigmaRaw = Number(process.env.QI_UNCERTAINTY_KSIGMA);
+  const uncertaintyBandKSigma =
+    Number.isFinite(uncertaintyBandKSigmaRaw) && uncertaintyBandKSigmaRaw > 0
+      ? clampNumber(uncertaintyBandKSigmaRaw, 1, 10)
+      : 3;
+  const uncertaintySlackPolicy_Jm3 =
+    Number.isFinite(lhs) && Number.isFinite(bound_Jm3) ? lhs - bound_Jm3 : Number.NaN;
+  const uncertaintySlackComputed_Jm3 =
+    Number.isFinite(lhs) && Number.isFinite(boundComputed_Jm3) ? lhs - boundComputed_Jm3 : Number.NaN;
+  const uncertaintyBandLowerPolicy_Jm3 = Number.isFinite(uncertaintySlackPolicy_Jm3)
+    ? uncertaintySlackPolicy_Jm3 - uncertaintyBandKSigma * uncertaintySigma_Jm3
+    : Number.NaN;
+  const uncertaintyBandUpperPolicy_Jm3 = Number.isFinite(uncertaintySlackPolicy_Jm3)
+    ? uncertaintySlackPolicy_Jm3 + uncertaintyBandKSigma * uncertaintySigma_Jm3
+    : Number.NaN;
+  const uncertaintyBandLowerComputed_Jm3 = Number.isFinite(uncertaintySlackComputed_Jm3)
+    ? uncertaintySlackComputed_Jm3 - uncertaintyBandKSigma * uncertaintySigma_Jm3
+    : Number.NaN;
+  const uncertaintyBandUpperComputed_Jm3 = Number.isFinite(uncertaintySlackComputed_Jm3)
+    ? uncertaintySlackComputed_Jm3 + uncertaintyBandKSigma * uncertaintySigma_Jm3
+    : Number.NaN;
+  let uncertaintyDecisionClass: "robust_pass" | "indeterminate" | "robust_fail" =
+    Number.isFinite(uncertaintyBandLowerPolicy_Jm3) && Number.isFinite(uncertaintyBandUpperPolicy_Jm3)
+      ? uncertaintyBandLowerPolicy_Jm3 > 0
+        ? "robust_pass"
+        : uncertaintyBandUpperPolicy_Jm3 < 0
+          ? "robust_fail"
+          : "indeterminate"
+      : "indeterminate";
+  let uncertaintyCouldFlip = uncertaintyDecisionClass === "indeterminate";
+  if (uncertaintyRequireModelSigma && !uncertaintyModelSigmaProvenanceReady) {
+    uncertaintyDecisionClass = "indeterminate";
+    uncertaintyCouldFlip = true;
+    uncertaintyInputsMissing.push("model_sigma_provenance_missing");
+  }
+  if (
+    !Number.isFinite(uncertaintyBandLowerPolicy_Jm3) ||
+    !Number.isFinite(uncertaintyBandUpperPolicy_Jm3)
+  ) {
+    uncertaintyInputsMissing.push("uncertainty_band_non_finite");
+  }
   const g4FloorDominated = boundFloorApplied && bound_Jm3 !== boundComputed_Jm3;
   const g4PolicyExceeded = rawRatio >= 1;
   const g4ComputedExceeded = rawRatioComputed >= 1;
@@ -8148,6 +8339,29 @@ export function evaluateQiGuardrail(
     marginRatio: Number.isFinite(marginRatio) ? marginRatio : Infinity,
     marginRatioRaw: Number.isFinite(rawRatio) ? rawRatio : Infinity,
     marginRatioRawComputed: Number.isFinite(rawRatioComputed) ? rawRatioComputed : Infinity,
+    uncertaintySigma_Jm3: Number.isFinite(uncertaintySigma_Jm3) ? uncertaintySigma_Jm3 : null,
+    uncertaintySigmaMeasurement_Jm3: Number.isFinite(uncertaintySigmaMeasurement_Jm3) ? uncertaintySigmaMeasurement_Jm3 : null,
+    uncertaintySigmaModel_Jm3: Number.isFinite(uncertaintySigmaModel_Jm3) ? uncertaintySigmaModel_Jm3 : null,
+    uncertaintySigmaBridge_Jm3: Number.isFinite(uncertaintySigmaBridge_Jm3) ? uncertaintySigmaBridge_Jm3 : null,
+    uncertaintySigmaTau_Jm3: Number.isFinite(uncertaintySigmaTau_Jm3) ? uncertaintySigmaTau_Jm3 : null,
+    uncertaintyModelSigmaConfigured_Jm3:
+      Number.isFinite(uncertaintyModelSigmaConfigured_Jm3) ? uncertaintyModelSigmaConfigured_Jm3 : null,
+    uncertaintyModelSigmaSource,
+    uncertaintyModelSigmaRationale,
+    uncertaintyModelSigmaRequired: uncertaintyRequireModelSigma,
+    uncertaintyModelSigmaProvenanceReady,
+    uncertaintyModelSigmaProvenanceMissing,
+    uncertaintyDominantComponent,
+    uncertaintyBandKSigma,
+    uncertaintySlackPolicy_Jm3: Number.isFinite(uncertaintySlackPolicy_Jm3) ? uncertaintySlackPolicy_Jm3 : null,
+    uncertaintySlackComputed_Jm3: Number.isFinite(uncertaintySlackComputed_Jm3) ? uncertaintySlackComputed_Jm3 : null,
+    uncertaintyBandLowerPolicy_Jm3: Number.isFinite(uncertaintyBandLowerPolicy_Jm3) ? uncertaintyBandLowerPolicy_Jm3 : null,
+    uncertaintyBandUpperPolicy_Jm3: Number.isFinite(uncertaintyBandUpperPolicy_Jm3) ? uncertaintyBandUpperPolicy_Jm3 : null,
+    uncertaintyBandLowerComputed_Jm3: Number.isFinite(uncertaintyBandLowerComputed_Jm3) ? uncertaintyBandLowerComputed_Jm3 : null,
+    uncertaintyBandUpperComputed_Jm3: Number.isFinite(uncertaintyBandUpperComputed_Jm3) ? uncertaintyBandUpperComputed_Jm3 : null,
+    uncertaintyDecisionClass,
+    uncertaintyCouldFlip,
+    uncertaintyInputsMissing: Array.from(new Set(uncertaintyInputsMissing)),
     g4FloorDominated,
     g4PolicyExceeded,
     g4ComputedExceeded,
@@ -8168,6 +8382,8 @@ export function evaluateQiGuardrail(
     rhoOnDuty: rhoSourceIsDutyFallback(rhoDebug) ? rhoOn * duty : undefined,
     curvatureRadius_m: curvatureInfo.radius_m,
     curvatureRatio,
+    curvatureScalar: curvatureInfo.scalar,
+    curvatureFlatSpaceEquivalent: curvatureInfo.flatSpaceEquivalent === true,
     curvatureOk,
     curvatureSource: curvatureInfo.source,
     curvatureNote,

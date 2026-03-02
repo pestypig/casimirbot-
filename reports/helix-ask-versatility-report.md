@@ -1,15 +1,17 @@
 # Helix Ask Versatility Evaluation Report
 
 - summary_schema_version: 2
-- git_branch: work
-- git_head: a9448a2
-- git_origin_main: missing
-- git_ahead_behind: missing
-- provenance_gate_pass: false
-- provenance_warnings: git_origin_remote_missing, git_origin_main_ref_missing
-- decision_grade_ready: false
-- provenance_blocked: true
-- run_id: versatility-1771461446899
+- git_branch: main
+- git_head: 75557ef5
+- git_origin_main: 75557ef5
+- git_ahead_behind: 0	0
+- provenance_gate_pass: true
+- provenance_warnings: none
+- decision_grade_ready: true
+- provenance_blocked: false
+- provenance_hard_blocker_reason: none
+- ship_recommendation_blocked_by_hard_blocker: false
+- run_id: versatility-1772431929234
 - base_url: http://127.0.0.1:5173
 - prompts: 90
 - seeds: 7,11,13
@@ -18,48 +20,45 @@
 - total_runs: 270
 - run_complete: true
 - completion_rate: 100.00%
-- run_duration_ms: 221500
+- run_duration_ms: 725790
 - terminated_early_reason: none
 - global_cooldown_applied_ms: 0
 - resumed_from_latest: false
 - resumed_runs: 0
-- output_run_dir: /workspace/casimirbot-/artifacts/experiments/helix-ask-versatility/versatility-1771461446899
+- output_run_dir: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\experiments\helix-ask-versatility\versatility-1772431929234
 
 ## Aggregate by Prompt Family
 | family | runs | pass_rate | intent_correct_rate | report_mode_correct_rate | stub_rate | latency_p50_ms | latency_p95_ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| relation | 90 | 86.7% | 93.3% | 100.0% | 0.0% | 452 | 613 |
-| repo_technical | 90 | 83.3% | 0.0% | 83.3% | 0.0% | 797 | 2073 |
-| ambiguous_general | 90 | 83.3% | 0.0% | 93.3% | 0.0% | 870 | 1648 |
+| relation | 90 | 90.0% | 90.0% | 100.0% | 0.0% | 1285 | 3024 |
+| repo_technical | 90 | 70.0% | 0.0% | 100.0% | 0.0% | 1567 | 11805 |
+| ambiguous_general | 90 | 40.0% | 0.0% | 96.7% | 0.0% | 3893 | 5432 |
 
 ## Core Metrics
-- intent_id_correct_rate: 93.33%
-- report_mode_correct_rate: 92.22%
-- relation_packet_built_rate: 86.67%
-- relation_dual_domain_ok_rate: 86.67%
+- intent_id_correct_rate: 90.00%
+- report_mode_correct_rate: 98.89%
+- relation_packet_built_rate: 100.00%
+- relation_dual_domain_ok_rate: 100.00%
 - avg_attempts_per_run: 1.00
 - p95_attempts_per_run: 1
 - stub_text_detected_rate: 0.00%
-- deterministic_fallback_relation_rate: 86.67%
+- deterministic_fallback_relation_rate: 83.33%
 - contract_parse_fail_relation_rate: 0.00%
 - citation_repair_rate: 0.00%
-- citation_presence_rate: 96.67%
+- citation_presence_rate: 74.44%
 - min_text_length_pass_rate: 100.00%
-- latency_total_p50_ms: 669
-- latency_total_p95_ms: 1931
-- latency_retrieval_p50_ms: 218 (samples=258)
-- latency_retrieval_p95_ms: 408 (samples=258)
-- latency_synthesis_p50_ms: 1 (samples=270)
-- latency_synthesis_p95_ms: 4 (samples=270)
+- latency_total_p50_ms: 1584
+- latency_total_p95_ms: 8547
+- latency_retrieval_p50_ms: 184 (samples=230)
+- latency_retrieval_p95_ms: 774 (samples=230)
+- latency_synthesis_p50_ms: 1 (samples=258)
+- latency_synthesis_p95_ms: 1 (samples=258)
 
 ## Top Failure Signatures
-- report_mode_mismatch: 21
-- relation_packet_built: 12
-- relation_dual_domain: 12
-- bridge_count_low: 12
-- evidence_count_low: 12
-- citation_missing: 9
-- intent_mismatch: 6
+- citation_missing: 69
+- runtime_fallback_answer: 12
+- intent_mismatch: 9
+- report_mode_mismatch: 3
 
 ## Tie-in vs Prior Reports
 - This campaign extends relation-mode coverage beyond goal-zone by adding repo-technical and ambiguous prompt families at production endpoint scale.
@@ -67,312 +66,327 @@
 - Decision should prefer real-model reruns for release-grade quality gates whenever stub-text rate is non-zero.
 
 ## 15 Worst Examples
-### Worst #1: relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer
-- family: relation
-- question: Explain warp bubble + mission ethos for a skeptical engineer.
-- failures: intent_mismatch:hybrid.concept_plus_system_mapping, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+### Worst #1: ambiguous_04_what-is-stability
+- family: ambiguous_general
+- question: What is stability?
+- failures: report_mode_mismatch:true, citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=true relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
+Stability constraints determine how small time steps must be to avoid numerical blow-up. How is the timestep chosen and which limits are enforced? Notes...
 
-The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
+Stability constraints determine how small time steps must be to avoid numerical blow-up. How is the timestep chosen and which limits are enforced? Notes...
 
-Notes: Tags: stewardship, compassion; , beginners-mind, struggle-testament, devotion-course, worldview-integrity (+28 more).
+Mechanism: Stability constraints determine how small time steps must be to avoid numerical blow-up. How is the timestep chosen and which limits are enforced? Notes... -> constrained interaction dynamics -> Stability constraints determine how small time steps m.
 
-Mechanism: The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. -> coupled constraints and feedback operators -> observable outcomes tied to docs/ethos/ideology.json, because feedback loops shape the resulting behavior.
+Mechanism: Stability constraints determine how small time steps must be to avoid numerical blow-up. How is the timestep chosen and which limits are enforced? Notes... -> coupled constraints and feedback operators -> observable outcomes tied to, because feedback loops shape the resulting behavior.
 
 Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached.
 
 Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity.
-
-Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md, modules/warp/warp-module.ts, modules/warp/natario-warp.ts, docs/warp-console-architecture.md, server/routes/ethos.ts, docs/knowledge/ethos/ethos-knowledge-tree.json
 ```
 
-### Worst #2: relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer
-- family: relation
-- question: Explain warp bubble + mission ethos for a skeptical engineer.
-- failures: intent_mismatch:hybrid.concept_plus_system_mapping, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+### Worst #2: repo_tech_14_what-determines-relation-packet-bridge-count-and-evidence-count
+- family: repo_technical
+- question: What determines relation_packet_bridge_count and evidence_count?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
 
-The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
-
-Notes: Tags: stewardship, compassion; , beginners-mind, struggle-testament, devotion-course, worldview-integrity (+28 more).
-
-Mechanism: The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. -> coupled constraints and feedback operators -> observable outcomes tied to docs/ethos/ideology.json, because feedback loops shape the resulting behavior.
-
-Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached.
-
-Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity.
-
-Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md, modules/warp/warp-module.ts, modules/warp/natario-warp.ts, docs/warp-console-architecture.md, server/routes/ethos.ts, docs/knowledge/ethos/ethos-knowledge-tree.json
-```
-
-### Worst #3: relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented
-- family: relation
-- question: Could warp bubble progress violate mission ethos? How is that prevented?
-- failures: intent_mismatch:repo.ideology_reference, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=repo.ideology_reference intent_strategy=repo_rag report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-In plain language, Mission Ethos means the warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
-
-This is in the ideology scope.
-
-Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md
-```
-
-### Worst #4: relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented
-- family: relation
-- question: Could warp bubble progress violate mission ethos? How is that prevented?
-- failures: intent_mismatch:repo.ideology_reference, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=repo.ideology_reference intent_strategy=repo_rag report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-In plain language, Mission Ethos means the warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
-
-This is in the ideology scope.
-
-Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md
-```
-
-### Worst #5: relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented
-- family: relation
-- question: Could warp bubble progress violate mission ethos? How is that prevented?
-- failures: intent_mismatch:repo.ideology_reference, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=repo.ideology_reference intent_strategy=repo_rag report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-In plain language, Mission Ethos means the warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
-
-This is in the ideology scope.
-
-Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md
-```
-
-### Worst #6: relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer
-- family: relation
-- question: Explain warp bubble + mission ethos for a skeptical engineer.
-- failures: intent_mismatch:hybrid.concept_plus_system_mapping, relation_packet_built:undefined, relation_dual_domain:undefined, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
-
-The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
-
-Notes: Tags: stewardship, compassion; , beginners-mind, struggle-testament, devotion-course, worldview-integrity (+28 more).
-
-Mechanism: The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. -> coupled constraints and feedback operators -> observable outcomes tied to docs/ethos/ideology.json, because feedback loops shape the resulting behavior.
-
-Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached.
-
-Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity.
-
-Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md, modules/warp/warp-module.ts, modules/warp/natario-warp.ts, docs/warp-console-architecture.md, server/routes/ethos.ts, docs/knowledge/ethos/ethos-knowledge-tree.json
-```
-
-### Worst #7: relation_18_warp-ethos-relation-prompt-test-explain-links-and-guardrails
-- family: relation
-- question: warp/ethos relation prompt test: explain links and guardrails
-- failures: relation_packet_built:false, relation_dual_domain:false, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
-
-- Definition: The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
-- Evidence: Notes: Tags: stewardship, compassion; , beginners-mind, struggle-testament, devotion-course, worldview-integrity (+28 more).
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
 
 In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 
-Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
 
-Sources: docs/knowledge/ethos/mission-ethos.md
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 ```
 
-### Worst #8: relation_18_warp-ethos-relation-prompt-test-explain-links-and-guardrails
-- family: relation
-- question: warp/ethos relation prompt test: explain links and guardrails
-- failures: relation_packet_built:false, relation_dual_domain:false, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+### Worst #3: repo_tech_17_explain-retrieval-confidence-and-deterministic-contract-signal-threshold
+- family: repo_technical
+- question: Explain retrieval confidence and deterministic contract signal thresholds.
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
 
-- Definition: The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
-- Evidence: Notes: Tags: stewardship, compassion; , beginners-mind, struggle-testament, devotion-course, worldview-integrity (+28 more).
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
 
 In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 
-Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
 
-Sources: docs/knowledge/ethos/mission-ethos.md
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 ```
 
-### Worst #9: relation_18_warp-ethos-relation-prompt-test-explain-links-and-guardrails
-- family: relation
-- question: warp/ethos relation prompt test: explain links and guardrails
-- failures: relation_packet_built:false, relation_dual_domain:false, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+### Worst #4: repo_tech_16_where-are-citation-allowlists-normalized-before-sanitizesourcesline
+- family: repo_technical
+- question: Where are citation allowlists normalized before sanitizeSourcesLine?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
 
-- Definition: The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion.
-- Evidence: Notes: Tags: stewardship, compassion; , beginners-mind, struggle-testament, devotion-course, worldview-integrity (+28 more).
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
 
 In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
+
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
 Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
-
-Sources: docs/knowledge/ethos/mission-ethos.md
 ```
 
-### Worst #10: relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics
-- family: relation
-- question: How do we connect Natario warp bubble constraints to mission ethics?
-- failures: relation_packet_built:false, relation_dual_domain:false, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+### Worst #5: ambiguous_23_what-is-a-practical-debug-payload-used-for
+- family: ambiguous_general
+- question: What is a practical debug payload used for?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. Key questions include: Which bubble model is used and where are its constraints checked? See modules/warp/warp-module.ts and modules/warp/natario-warp.ts for the implementation.
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
 
-In practice, those standards guide how evidence and justification are weighed in specific contexts.
+In practice, coupled constraints and feedback loops determine how outcomes evolve over time.
 
-Sources: docs/knowledge/warp/warp-bubble.md, modules/warp/warp-module.ts, modules/warp/natario-warp.ts, docs/knowledge/warp/natario-zero-expansion.md, docs/stellar-consciousness-orch-or-review.md, docs/warp-console-architecture.md, docs/knowledge/warp/shift-vector-expansion-scalar.md, docs/knowledge/warp/warp-mechanics-tree.json
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
+
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+Missing evidence: add directly relevant repo paths or artifact refs to raise confidence.
 ```
 
-### Worst #11: relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics
-- family: relation
-- question: How do we connect Natario warp bubble constraints to mission ethics?
-- failures: relation_packet_built:false, relation_dual_domain:false, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+### Worst #6: ambiguous_27_what-s-a-robust-pass-criterion-for-prompts
+- family: ambiguous_general
+- question: What's a robust pass criterion for prompts?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. Key questions include: Which bubble model is used and where are its constraints checked? See modules/warp/warp-module.ts and modules/warp/natario-warp.ts for the implementation.
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
 
-In practice, those standards guide how evidence and justification are weighed in specific contexts.
+In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 
-Sources: docs/knowledge/warp/warp-bubble.md, modules/warp/warp-module.ts, modules/warp/natario-warp.ts, docs/knowledge/warp/natario-zero-expansion.md, docs/stellar-consciousness-orch-or-review.md, docs/warp-console-architecture.md, docs/knowledge/warp/shift-vector-expansion-scalar.md, docs/knowledge/warp/warp-mechanics-tree.json
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
+
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 ```
 
-### Worst #12: relation_04_how-do-we-connect-natario-warp-bubble-constraints-to-mission-ethics
-- family: relation
-- question: How do we connect Natario warp bubble constraints to mission ethics?
-- failures: relation_packet_built:false, relation_dual_domain:false, bridge_count_low:0, evidence_count_low:0
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.warp_ethos_relation intent_strategy=hybrid_explain report_mode=false relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+### Worst #7: ambiguous_26_how-do-seeds-help-evaluation-reliability
+- family: ambiguous_general
+- question: How do seeds help evaluation reliability?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.general_how_to_process intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints. Key questions include: Which bubble model is used and where are its constraints checked? See modules/warp/warp-module.ts and modules/warp/natario-warp.ts for the implementation.
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
 
-In practice, those standards guide how evidence and justification are weighed in specific contexts.
+1. Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
 
-Sources: docs/knowledge/warp/warp-bubble.md, modules/warp/warp-module.ts, modules/warp/natario-warp.ts, docs/knowledge/warp/natario-zero-expansion.md, docs/stellar-consciousness-orch-or-review.md, docs/warp-console-architecture.md, docs/knowledge/warp/shift-vector-expansion-scalar.md, docs/knowledge/warp/warp-mechanics-tree.json
+In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
+
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
+
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 ```
 
-### Worst #13: repo_tech_15_how-does-the-system-prevent-report-scaffold-responses-for-relation-promp
+### Worst #8: ambiguous_06_help-me-compare-precision-and-recall-quickly
+- family: ambiguous_general
+- question: Help me compare precision and recall quickly.
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+Viability in this repo means the constraint gates pass and a certificate is admissible; it is not a claim of real-world feasibility. Which gates must pa...
+
+- Evidence: Energy conditions (NEC, WEC, SEC, DEC) are inequalities that restrict stress-energy tensors to physically reasonable regimes. Which conditions are check...
+- Constraint: Numerical precision describes how floating-point rounding and truncation affect reported values. What tolerances are assumed and where are they enforced...
+
+In practice, Energy conditions (NEC, WEC, SEC, DEC) are inequalities that restrict stress-energy tensors to physically reasonable regimes. Which conditions are check...
+
+Mechanism: Viability in this repo means the constraint gates pass and a certificate is admissible; it is not a claim of real-world feasibility. Which gates must pa... -> constrained interaction dynamics -> Energy conditions (NEC, WEC, SEC, DEC) are inequalitie.
+
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+Missing evidence: add directly relevant repo paths or artifact refs to raise confidence.
+```
+
+### Worst #9: ambiguous_29_explain-why-short-prompts-can-confuse-routing
+- family: ambiguous_general
+- question: Explain why short prompts can confuse routing.
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
+
+In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
+
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
+
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
+```
+
+### Worst #10: repo_tech_26_explain-how-answer-path-is-populated-and-useful-for-diagnostics
 - family: repo_technical
-- question: How does the system prevent report-scaffold responses for relation prompts?
-- failures: report_mode_mismatch:true
-- likely_root_cause: routing_or_report_mode_policy
-- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=true relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- question: Explain how answer_path is populated and useful for diagnostics.
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-# Trace and Essence System Tree.
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
 
-# Trace and Essence System Tree.
+In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 
-Mechanism: # Trace and Essence System Tree. -> constrained interaction dynamics -> # Trace and Essence System Tree., because linked constraints amplify or dampen outcomes over time.
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
 
-Mechanism: # Trace and Essence System Tree. -> coupled constraints and feedback operators -> observable outcomes tied to docs/knowledge/trace-system-tree.json, because feedback loops shape the resulting behavior.
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
 
-Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached.
-
-Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity.
-
-Sources: docs/knowledge/trees/trace-system-tree.md, docs/knowledge/trace-system-tree.json, client/src/lib/agi/api.ts, client/src/components/agi/essence.tsx, client/src/components/agi/JobsBudgetModal.tsx, server/db/agi.ts, client/src/components/agi/DebateView.tsx, server/services/essence/solar-surface-coherence.ts
+Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 ```
 
-### Worst #14: repo_tech_15_how-does-the-system-prevent-report-scaffold-responses-for-relation-promp
-- family: repo_technical
-- question: How does the system prevent report-scaffold responses for relation prompts?
-- failures: report_mode_mismatch:true
-- likely_root_cause: routing_or_report_mode_policy
-- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=true relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+### Worst #11: ambiguous_01_define-lattice
+- family: ambiguous_general
+- question: Define lattice.
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-# Trace and Essence System Tree.
+How many sectors are active and...
 
-# Trace and Essence System Tree.
+In practice, coupled constraints and feedback loops determine how outcomes evolve over time.
 
-Mechanism: # Trace and Essence System Tree. -> constrained interaction dynamics -> # Trace and Essence System Tree., because linked constraints amplify or dampen outcomes over time.
+Mechanism: How many sectors are active and... -> constrained interaction dynamics -> How many sectors are active and..., because linked constraints amplify or dampen outcomes over time.
 
-Mechanism: # Trace and Essence System Tree. -> coupled constraints and feedback operators -> observable outcomes tied to docs/knowledge/trace-system-tree.json, because feedback loops shape the resulting behavior.
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
 
-Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached.
-
-Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity.
-
-Sources: docs/knowledge/trees/trace-system-tree.md, docs/knowledge/trace-system-tree.json, client/src/lib/agi/api.ts, client/src/components/agi/essence.tsx, client/src/components/agi/JobsBudgetModal.tsx, server/db/agi.ts, client/src/components/agi/DebateView.tsx, server/services/essence/solar-surface-coherence.ts
+Missing evidence: add directly relevant repo paths or artifact refs to raise confidence.
 ```
 
-### Worst #15: repo_tech_15_how-does-the-system-prevent-report-scaffold-responses-for-relation-promp
-- family: repo_technical
-- question: How does the system prevent report-scaffold responses for relation prompts?
-- failures: report_mode_mismatch:true
-- likely_root_cause: routing_or_report_mode_policy
-- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=hybrid.concept_plus_system_mapping intent_strategy=hybrid_explain report_mode=true relation_packet_built=false relation_dual_domain_ok=false deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+### Worst #12: ambiguous_03_explain-resonance-in-simple-terms
+- family: ambiguous_general
+- question: Explain resonance in simple terms.
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-# Trace and Essence System Tree.
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
 
-# Trace and Essence System Tree.
+In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 
-Mechanism: # Trace and Essence System Tree. -> constrained interaction dynamics -> # Trace and Essence System Tree., because linked constraints amplify or dampen outcomes over time.
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
 
-Mechanism: # Trace and Essence System Tree. -> coupled constraints and feedback operators -> observable outcomes tied to docs/knowledge/trace-system-tree.json, because feedback loops shape the resulting behavior.
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
 
-Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached.
+Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
+```
 
-Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity.
+### Worst #13: ambiguous_09_can-you-explain-system-integrity-for-non-experts
+- family: ambiguous_general
+- question: Can you explain system integrity for non-experts?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
 
-Sources: docs/knowledge/trees/trace-system-tree.md, docs/knowledge/trace-system-tree.json, client/src/lib/agi/api.ts, client/src/components/agi/essence.tsx, client/src/components/agi/JobsBudgetModal.tsx, server/db/agi.ts, client/src/components/agi/DebateView.tsx, server/services/essence/solar-surface-coherence.ts
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
+
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
+
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
+```
+
+### Worst #14: ambiguous_16_how-can-ambiguity-be-reduced-in-prompts
+- family: ambiguous_general
+- question: How can ambiguity be reduced in prompts?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
+
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
+
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
+
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
+```
+
+### Worst #15: ambiguous_17_when-should-i-request-citations
+- family: ambiguous_general
+- question: When should I request citations?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.
+
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+In practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
+
+Mechanism: Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete. -> constrained interaction dynamics -> Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete., because linked constraints amplify or dampen outcomes over time.
+
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
+
+Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.
 ```
 
 ## Recommendation
-- decision: needs_patch
-- [0] Validation provenance gate: Require origin/main + HEAD provenance in reports before accepting decision-grade outcomes.
+- decision: ship
 - [1] Relation-mode fallback hardening: Increase deterministic fallback usage when relation intent is selected but generated answer omits warp/ethos linkage signals.
 - [2] Citation persistence guard: Guarantee hybrid/repo responses keep at least one valid Sources line after final cleanup and repairs.
 - [3] Stub environment policy split: Separate decision-grade campaigns from stub-mode smoke runs to avoid polluted quality metrics.

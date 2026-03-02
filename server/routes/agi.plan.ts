@@ -21668,7 +21668,9 @@ const executeHelixAsk = async ({
         debugPayload.preflight_reuse = true;
       }
     }
-    if (!promptIngested && intentDomain === "general" && baseQuestion) {
+    // Keep deterministic math routing available even when pre-intent routing temporarily
+    // steers domain away from `general` (e.g., short ambiguous prompts).
+    if (!promptIngested && baseQuestion) {
       mathSolveResult = await solveHelixAskMathQuestion(baseQuestion);
       if (mathSolveResult?.ok) {
         formatSpec = { format: "brief", stageTags: false };
@@ -21695,11 +21697,7 @@ const executeHelixAsk = async ({
     let constraintEvidenceText = "";
     let constraintEvidenceRefs: string[] = [];
     const mathSolverOk = mathSolveResult?.ok === true;
-    const warpDelegationRequested =
-      mathSolveResult?.reason === "warp_delegation_required" &&
-      /\b(physically viable|viab(?:le|ility)|admissib(?:le|ility)|certificate|ford-roman|qi bound|hard constraint)\b/i.test(
-        baseQuestion ?? "",
-      );
+    const warpDelegationRequested = mathSolveResult?.reason === "warp_delegation_required";
     if (mathSolveResult && (mathSolveResult.ok || warpDelegationRequested)) {
       forcedAnswer = buildHelixAskMathAnswer(mathSolveResult);
       forcedAnswerIsHard = true;
@@ -21721,9 +21719,15 @@ const executeHelixAsk = async ({
       }
     }
     const shouldRunConstraintLoop =
-      !dryRun && (intentStrategy === "constraint_report" || compositeConstraintRequested);
+      !dryRun &&
+      (intentStrategy === "constraint_report" || compositeConstraintRequested) &&
+      !warpDelegationRequested;
     if (!shouldRunConstraintLoop && (intentStrategy === "constraint_report" || compositeConstraintRequested)) {
-      logEvent("Constraint loop", "skipped", "dry_run");
+      logEvent(
+        "Constraint loop",
+        "skipped",
+        dryRun ? "dry_run" : warpDelegationRequested ? "math_warp_guard" : "not_applicable",
+      );
     }
     if (shouldRunConstraintLoop) {
       const constraintStart = Date.now();
@@ -21893,7 +21897,7 @@ const executeHelixAsk = async ({
         : buildGeneralAskPrompt(question, formatSpec.format, formatSpec.stageTags, verbosity);
       prompt = ensureFinalMarker(basePrompt);
     }
-    if (!prompt) {
+    if (!prompt && !forcedAnswer) {
       responder.send(400, {
         error: "bad_request",
         details: [{ path: ["prompt"], message: "prompt required" }],
@@ -26076,7 +26080,7 @@ const executeHelixAsk = async ({
         : repoScaffold;
       if (intentStrategy === "hybrid_explain" && generalEvidence) {
         const hasRepoEvidence = !forceHybridNoEvidence && Boolean(String(repoScaffoldForPrompt ?? "").trim());
-        if (conceptMatch) {
+        if (!forcedAnswer && conceptMatch) {
           const coreSentences: string[] = [];
           if (conceptMatch.card.definition) {
             coreSentences.push(ensureSentence(conceptMatch.card.definition));
@@ -26476,33 +26480,41 @@ const executeHelixAsk = async ({
       Boolean(fallbackAnswer) &&
       (() => {
         const forcedRule = answerPath.find((entry) => entry.startsWith("forcedAnswer:")) ?? null;
+        const isMathForcedRule =
+          forcedRule === "forcedAnswer:math_solver" ||
+          forcedRule === "forcedAnswer:math_solver_warp_guard";
         const hasClarifyOrFailClosedPath = answerPath.some(
           (entry) => entry.startsWith("clarify:") || entry.startsWith("failClosed:"),
         );
         const hardForcedShortCircuitRules = new Set([
           "forcedAnswer:math_solver",
+          "forcedAnswer:math_solver_warp_guard",
           "forcedAnswer:constraint_report",
           "forcedAnswer:helix_pipeline",
         ]);
         const hardForcedShortCircuit =
           forcedAnswerIsHard &&
-          !hasClarifyOrFailClosedPath &&
+          (!hasClarifyOrFailClosedPath || isMathForcedRule) &&
           Boolean(forcedRule) &&
           hardForcedShortCircuitRules.has(forcedRule);
         return hardForcedShortCircuit || (!prompt && !isIdeologyReferenceIntent);
       })();
     const forcedRule = answerPath.find((entry) => entry.startsWith("forcedAnswer:")) ?? null;
+    const isMathForcedRule =
+      forcedRule === "forcedAnswer:math_solver" ||
+      forcedRule === "forcedAnswer:math_solver_warp_guard";
     const hasClarifyOrFailClosedPath = answerPath.some(
       (entry) => entry.startsWith("clarify:") || entry.startsWith("failClosed:"),
     );
     const hardForcedShortCircuitRules = new Set([
       "forcedAnswer:math_solver",
+      "forcedAnswer:math_solver_warp_guard",
       "forcedAnswer:constraint_report",
       "forcedAnswer:helix_pipeline",
     ]);
     const forcedAnswerShortCircuitEligible =
       forcedAnswerIsHard &&
-      !hasClarifyOrFailClosedPath &&
+      (!hasClarifyOrFailClosedPath || isMathForcedRule) &&
       Boolean(forcedRule) &&
       hardForcedShortCircuitRules.has(forcedRule);
     const shortCircuitReasonTokens: string[] = [];
@@ -30261,6 +30273,14 @@ const executeHelixAsk = async ({
         answerPath.push("policy:non_report_scaffold_guard");
       }
       cleaned = finalNonReportGuard.text;
+      const forcedWarpGuardActive = answerPath.includes("forcedAnswer:math_solver_warp_guard");
+      if (forcedWarpGuardActive) {
+        cleaned = buildHelixAskMathAnswer({
+          ok: false,
+          reason: "warp_delegation_required",
+        } as HelixAskMathSolveResult);
+        answerPath.push("forcedAnswer:math_solver_warp_guard_preserve");
+      }
       const securityOpenWorldBypassEligible =
         isSecurityRiskPrompt(baseQuestion) &&
         intentDomain === "general" &&

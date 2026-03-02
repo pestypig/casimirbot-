@@ -10,6 +10,7 @@ const CANONICAL_FIRST_FAIL = path.join('artifacts/research/full-solve', 'campaig
 const INFLUENCE_PATH = path.join('artifacts/research/full-solve', 'g4-influence-scan-2026-02-26.json');
 const RECOVERY_PATH = path.join('artifacts/research/full-solve', 'g4-recovery-search-2026-02-27.json');
 const COUPLING_ABLATION_PATH = path.join('artifacts/research/full-solve', 'g4-coupling-ablation-2026-02-27.json');
+const GOVERNANCE_PATH = path.join('artifacts/research/full-solve', 'g4-governance-matrix-2026-02-27.json');
 
 export const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
@@ -25,6 +26,7 @@ type GenerateG4DecisionLedgerOptions = {
   influencePath?: string;
   recoveryPath?: string;
   couplingAblationPath?: string;
+  governancePath?: string;
   getCommitHash?: () => string;
 };
 
@@ -73,6 +75,23 @@ const classifyCanonical = (waveRows: Record<string, any>): DecisionClass => {
   return minRaw >= 1 ? 'margin_limited' : 'candidate_pass_found';
 };
 
+const mapGovernanceClassToDecisionClass = (
+  governanceClass: string | null,
+  waveRows: Record<string, any>,
+): DecisionClass | null => {
+  if (!governanceClass) return null;
+  if (governanceClass === 'evidence_path_blocked') return 'evidence_path_blocked';
+  if (governanceClass === 'both' || governanceClass === 'policy-floor dominated' || governanceClass === 'computed-bound dominated') {
+    return 'margin_limited';
+  }
+  if (governanceClass === 'neither') {
+    const rows = REQUIRED_WAVES.map((w) => waveRows[w]).filter(Boolean);
+    const applicabilityPass = rows.length > 0 && rows.every((row) => String(row?.applicabilityStatus ?? 'UNKNOWN').toUpperCase() === 'PASS');
+    return applicabilityPass ? 'candidate_pass_found' : 'applicability_limited';
+  }
+  return null;
+};
+
 const deriveScan = (influence: any): {
   scanDecisionClass: DecisionClass;
   scanCandidatePassFound: boolean;
@@ -111,6 +130,7 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
   const influencePath = options.influencePath ?? path.join(rootDir, INFLUENCE_PATH);
   const recoveryPath = options.recoveryPath ?? path.join(rootDir, RECOVERY_PATH);
   const couplingAblationPath = options.couplingAblationPath ?? path.join(rootDir, COUPLING_ABLATION_PATH);
+  const governancePath = options.governancePath ?? path.join(rootDir, GOVERNANCE_PATH);
   const getCommitHash =
     options.getCommitHash ??
     (() => execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
@@ -125,6 +145,7 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
   const influence = fs.existsSync(influencePath) ? readJson(influencePath) : null;
   const recovery = fs.existsSync(recoveryPath) ? readJson(recoveryPath) : null;
   const couplingAblation = fs.existsSync(couplingAblationPath) ? readJson(couplingAblationPath) : null;
+  const governance = fs.existsSync(governancePath) ? readJson(governancePath) : null;
   const recoveryBlockedReason = stringOrNull(recovery?.blockedReason);
   const couplingAblationBlockedReason = stringOrNull(couplingAblation?.blockedReason);
 
@@ -157,8 +178,13 @@ export const generateG4DecisionLedger = (options: GenerateG4DecisionLedgerOption
     };
   }
 
-  const canonicalMissingWaves = getCanonicalMissingWaves(waves);
-  const canonicalDecisionClass = classifyCanonical(waves);
+  const canonicalMissingWaves =
+    Array.isArray(governance?.canonicalMissingWaves)
+      ? governance.canonicalMissingWaves.filter((wave: unknown): wave is Wave => wave === 'A' || wave === 'B' || wave === 'C' || wave === 'D')
+      : getCanonicalMissingWaves(waves);
+  const governanceCanonicalClass = stringOrNull(governance?.canonicalAuthoritativeClass);
+  const canonicalDecisionClass =
+    mapGovernanceClassToDecisionClass(governanceCanonicalClass, waves) ?? classifyCanonical(waves);
   const scan = deriveScan(influence);
   const finalDecisionClass = canonicalMissingWaves.length > 0 ? 'evidence_path_blocked' : canonicalDecisionClass;
   const classificationMismatch = scan.scanDecisionClass !== canonicalDecisionClass;

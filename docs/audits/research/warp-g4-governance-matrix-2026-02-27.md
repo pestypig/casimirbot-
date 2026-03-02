@@ -12,7 +12,7 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 ## Per-wave matrix
 | Wave | lhs_Jm3 | boundComputed_Jm3 | boundUsed_Jm3 | floorApplied | marginRaw | marginRawComputed | applicability | canonical authoritative class | computed-only counterfactual class (non-authoritative) | mismatch | mismatch explanation |
 | --- | ---: | ---: | ---: | --- | ---: | ---: | --- | --- | --- | --- | --- |
-| A | -3.0937631287227165 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998561 | 0.12890679702998561 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
-| B | -3.0937631287227165 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998561 | 0.12890679702998561 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
-| C | -3.0937631287227165 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998561 | 0.12890679702998561 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
-| D | -3.0937631287227165 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998561 | 0.12890679702998561 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
+| A | -3.093763128722717 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998564 | 0.12890679702998564 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
+| B | -3.093763128722717 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998564 | 0.12890679702998564 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
+| C | -3.093763128722717 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998564 | 0.12890679702998564 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
+| D | -3.093763128722717 | -24.00000000002375 | -24.00000000002375 | false | 0.12890679702998564 | 0.12890679702998564 | PASS | neither | neither | false | canonical_matches_counterfactual;class=neither |
