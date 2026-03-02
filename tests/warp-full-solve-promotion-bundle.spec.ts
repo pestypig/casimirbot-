@@ -4,6 +4,9 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runPromotionBundle } from '../scripts/warp-full-solve-promotion-bundle';
 
+const SOLUTION_CATEGORY = 'Needle Hull Mark 2';
+const PROFILE_VERSION = 'NHM2-2026-03-01';
+
 const writeJson = (filePath: string, payload: unknown) => {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`);
@@ -26,6 +29,8 @@ describe('warp-full-solve-promotion-bundle', () => {
     expect(result.blockedReason).toBe('promotion_check_missing_after_generation');
     expect(result.promotionLaneExecuted).toBe(false);
     expect(result.candidateId).toBeNull();
+    expect(result.solutionCategory).toBe(SOLUTION_CATEGORY);
+    expect(result.promotedProfileVersion).toBe(PROFILE_VERSION);
     expect(fs.existsSync(outPath)).toBe(true);
   });
 
@@ -59,6 +64,8 @@ describe('warp-full-solve-promotion-bundle', () => {
     expect(result.blockedReason).toBe('promotion_check_not_ready:ready=false;stable=false');
     expect(result.promotionLaneExecuted).toBe(false);
     expect(result.candidateId).toBeNull();
+    expect(result.solutionCategory).toBe(SOLUTION_CATEGORY);
+    expect(result.promotedProfileVersion).toBe(PROFILE_VERSION);
   });
 
   it('runs promoted lane and emits deterministic summary when promotion check is ready', () => {
@@ -117,6 +124,8 @@ describe('warp-full-solve-promotion-bundle', () => {
     expect(result.promotionLaneDecision).toBe('REDUCED_ORDER_ADMISSIBLE');
     expect(result.promotionLaneFirstFail).toBe('none');
     expect(result.promotionLaneG4ComparablePassAllWaves).toBe(true);
+    expect(result.solutionCategory).toBe(SOLUTION_CATEGORY);
+    expect(result.promotedProfileVersion).toBe(PROFILE_VERSION);
     expect(result.promotionLaneCounts?.PASS).toBe(8);
     expect(commandCalls).toHaveLength(2);
     expect(commandCalls[0]).toContain('warp:full-solve:g4-candidate-promotion-check');
@@ -125,6 +134,8 @@ describe('warp-full-solve-promotion-bundle', () => {
 
     const persisted = JSON.parse(fs.readFileSync(outPath, 'utf8')) as Record<string, unknown>;
     expect(persisted.blockedReason).toBeNull();
+    expect((persisted as any).solutionCategory).toBe(SOLUTION_CATEGORY);
+    expect((persisted as any).promotedProfileVersion).toBe(PROFILE_VERSION);
     expect((persisted as any).governance?.canonicalDecisionRemainsAuthoritative).toBe(true);
   });
 });

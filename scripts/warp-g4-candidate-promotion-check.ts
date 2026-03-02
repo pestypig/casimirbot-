@@ -17,6 +17,7 @@ import {
   extractLatestAttempt,
   summarizeScoreboard,
 } from './warp-full-solve-campaign.js';
+import { PROMOTED_WARP_PROFILE_VERSION, WARP_SOLUTION_CATEGORY } from '../shared/warp-promoted-profile.js';
 
 type Wave = 'A' | 'B' | 'C' | 'D';
 type GateStatus = 'PASS' | 'FAIL' | 'UNKNOWN' | 'NOT_READY' | 'NOT_APPLICABLE';
@@ -539,6 +540,8 @@ export const runCandidatePromotionCheck = async (
       runId: `g4-candidate-promotion-check-${DATE_STAMP}`,
       generatedAt: new Date().toISOString(),
       boundaryStatement: BOUNDARY_STATEMENT,
+      solutionCategory: WARP_SOLUTION_CATEGORY,
+      promotedProfileVersion: PROMOTED_WARP_PROFILE_VERSION,
       blockedReason: 'recovery_artifact_missing',
       recoveryPath,
       candidateId: null,
@@ -568,6 +571,8 @@ export const runCandidatePromotionCheck = async (
       runId: `g4-candidate-promotion-check-${DATE_STAMP}`,
       generatedAt: new Date().toISOString(),
       boundaryStatement: BOUNDARY_STATEMENT,
+      solutionCategory: WARP_SOLUTION_CATEGORY,
+      promotedProfileVersion: PROMOTED_WARP_PROFILE_VERSION,
       blockedReason: selected.blockedReason,
       recoveryPath,
       candidateId: requestedCandidateId,
@@ -610,6 +615,8 @@ export const runCandidatePromotionCheck = async (
     runId: `g4-candidate-promotion-check-${DATE_STAMP}`,
     generatedAt: new Date().toISOString(),
     boundaryStatement: BOUNDARY_STATEMENT,
+    solutionCategory: WARP_SOLUTION_CATEGORY,
+    promotedProfileVersion: PROMOTED_WARP_PROFILE_VERSION,
     blockedReason: null,
     recoveryPath,
     candidate: {

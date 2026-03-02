@@ -3,6 +3,7 @@ import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { runCommandWithRetry } from './warp-full-solve-canonical-bundle.js';
+import { PROMOTED_WARP_PROFILE_VERSION, WARP_SOLUTION_CATEGORY } from '../shared/warp-promoted-profile.js';
 
 type Wave = 'A' | 'B' | 'C' | 'D';
 
@@ -40,6 +41,8 @@ type PromotionBundleResult = {
   promotionLaneFirstFail: string | null;
   promotionLaneCounts: Record<string, number> | null;
   promotionLaneG4ComparablePassAllWaves: boolean | null;
+  solutionCategory: string;
+  promotedProfileVersion: string;
   boundaryStatement: string;
   commitHash: string;
 };
@@ -165,6 +168,8 @@ const buildBlockedPayload = (
     promotionLaneFirstFail: null,
     promotionLaneCounts: null,
     promotionLaneG4ComparablePassAllWaves: null,
+    solutionCategory: WARP_SOLUTION_CATEGORY,
+    promotedProfileVersion: PROMOTED_WARP_PROFILE_VERSION,
     boundaryStatement: BOUNDARY_STATEMENT,
     commitHash,
   };
@@ -301,6 +306,8 @@ export const runPromotionBundle = (options: PromotionBundleOptions = {}): Promot
     promotionLaneFirstFail: extractPromotionFirstFail(firstFail),
     promotionLaneCounts: extractPromotionCounts(scoreboard),
     promotionLaneG4ComparablePassAllWaves,
+    solutionCategory: WARP_SOLUTION_CATEGORY,
+    promotedProfileVersion: PROMOTED_WARP_PROFILE_VERSION,
     boundaryStatement: BOUNDARY_STATEMENT,
     commitHash,
     promotionLaneWaveRows: waveRows,

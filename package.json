@@ -131,6 +131,7 @@
     "warp:full-solve:g4-semantic-bridge-matrix": "tsx scripts/warp-g4-semantic-bridge-matrix.ts",
     "warp:full-solve:g4-candidate-promotion-check": "tsx scripts/warp-g4-candidate-promotion-check.ts",
     "warp:full-solve:promotion-bundle": "tsx scripts/warp-full-solve-promotion-bundle.ts",
+    "warp:full-solve:calculator": "tsx scripts/warp-full-solve-calculator.ts",
     "warp:full-solve:g4-autoloop": "tsx scripts/warp-g4-autoloop.ts",
     "warp:full-solve:g4-autoloop:status": "npm run warp:full-solve:g4-autoloop -- --mode status",
     "warp:full-solve:g4-autoloop:cycle": "tsx scripts/warp-g4-autoloop.ts --mode cycle"
