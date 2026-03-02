@@ -128,6 +128,7 @@
     "warp:full-solve:g4-stepA-summary": "tsx scripts/warp-g4-stepA-summary.ts",
     "warp:full-solve:g4-recovery-search": "tsx scripts/warp-g4-recovery-search.ts",
     "warp:full-solve:g4-recovery-parity": "tsx scripts/warp-g4-recovery-parity.ts",
+    "warp:full-solve:g4-first-divergence": "tsx scripts/warp-g4-first-divergence.ts",
     "warp:full-solve:g4-metric-decomp-diff": "tsx scripts/warp-g4-metric-decomp-diff.ts",
     "warp:full-solve:g4-coupling-localization": "tsx scripts/warp-g4-coupling-localization.ts",
     "warp:full-solve:g4-coupling-ablation": "tsx scripts/warp-g4-coupling-ablation.ts",
