@@ -1,0 +1,130 @@
+{
+  "version": "helix_ask_math_router_battery/1",
+  "description": "Prompt battery for Helix Ask math-router evidence capture and tuning.",
+  "cases": [
+    {
+      "id": "sym_det_literal",
+      "label": "symbolic determinant literal",
+      "class": "deterministic_compute",
+      "question": "det([[a,b],[c,d]])",
+      "expect": {
+        "expectMathSolverOk": true,
+        "expectMathReasonIn": ["symbolic_lane:determinant"],
+        "expectForcedMath": true,
+        "expectAnswerIncludes": ["a*d - b*c"]
+      }
+    },
+    {
+      "id": "sym_det_matrix_call",
+      "label": "symbolic determinant matrix-call",
+      "class": "deterministic_compute",
+      "question": "det(matrix([a,b],[c,d]))",
+      "expect": {
+        "expectMathSolverOk": true,
+        "expectMathReasonIn": ["symbolic_lane:determinant"],
+        "expectForcedMath": true,
+        "expectAnswerIncludes": ["a*d - b*c"]
+      }
+    },
+    {
+      "id": "sym_derivative_e_symbol",
+      "label": "derivative with e as symbol",
+      "class": "deterministic_compute",
+      "question": "treat e as variable and derivative of e^x",
+      "expect": {
+        "expectMathSolverOk": true,
+        "expectMathReasonIn": ["symbolic_lane:derivative"],
+        "expectForcedMath": true
+      }
+    },
+    {
+      "id": "algebra_solve_linear",
+      "label": "linear solve",
+      "class": "deterministic_compute",
+      "question": "solve for x: 2x + 5 = 17",
+      "expect": {
+        "expectMathSolverOk": true,
+        "expectMathReasonIn": ["js_solver"],
+        "expectForcedMath": true,
+        "expectAnswerIncludes": ["x = 6"]
+      }
+    },
+    {
+      "id": "numeric_eval_simple",
+      "label": "numeric evaluate",
+      "class": "deterministic_compute",
+      "question": "calculate (2+3)*4",
+      "expect": {
+        "expectMathSolverOk": true,
+        "expectMathReasonIn": ["js_solver", "numeric_lane:evaluate"],
+        "expectForcedMath": true,
+        "expectAnswerIncludes": ["20"]
+      }
+    },
+    {
+      "id": "numeric_det_shape_only",
+      "label": "numeric determinant shape-only",
+      "class": "deterministic_compute",
+      "question": "determinant of 50x50 numeric matrix",
+      "expect": {
+        "expectMathSolverOk": false,
+        "expectMathReasonEq": "matrix_entries_required",
+        "expectForcedMath": false
+      }
+    },
+    {
+      "id": "generic_natario_explain",
+      "label": "generic natario explanation",
+      "class": "generic_reasoning",
+      "question": "explain natario shift vector in plain terms",
+      "expect": {
+        "expectMathSolverOk": false,
+        "expectForcedMath": false
+      }
+    },
+    {
+      "id": "generic_repo_pipeline",
+      "label": "generic repo question",
+      "class": "generic_reasoning",
+      "question": "How does the Helix Ask pipeline work in this repo?",
+      "expect": {
+        "expectMathSolverOk": false,
+        "expectForcedMath": false
+      }
+    },
+    {
+      "id": "generic_open_world_safety",
+      "label": "open world safety prompt",
+      "class": "generic_reasoning",
+      "question": "How can I protect myself from AI-driven financial fraud?",
+      "expect": {
+        "expectMathSolverOk": false,
+        "expectForcedMath": false
+      }
+    },
+    {
+      "id": "warp_viability_guard",
+      "label": "warp viability guard",
+      "class": "warp_certificate_required",
+      "question": "is this warp configuration physically viable?",
+      "expect": {
+        "expectMathSolverOk": false,
+        "expectMathReasonEq": "warp_delegation_required",
+        "expectForcedMath": true,
+        "expectAnswerIncludes": ["NOT_CERTIFIED", "FordRomanQI"]
+      }
+    },
+    {
+      "id": "warp_certificate_guard",
+      "label": "warp certificate guard",
+      "class": "warp_certificate_required",
+      "question": "generate an admissibility certificate for this warp bubble configuration",
+      "expect": {
+        "expectMathSolverOk": false,
+        "expectMathReasonEq": "warp_delegation_required",
+        "expectForcedMath": true,
+        "expectAnswerIncludes": ["NOT_CERTIFIED", "physics.warp.viability"]
+      }
+    }
+  ]
+}
