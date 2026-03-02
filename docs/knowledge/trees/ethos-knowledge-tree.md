@@ -160,6 +160,16 @@ Ethos knowledge docs supporting governance and integrity practices. Minimal arti
 - type: concept
 - summary: Citizens Arc Stress Test guidance (docs/knowledge/ethos/citizens-arc-stress-test.md). Minimal artifact: Citizens Arc Stress Test summary.
 
+### Node: Citizens Arc Maturation Under Constraint
+- id: citizens-arc-maturation-under-constraint
+- type: concept
+- summary: Citizens Arc Maturation Under Constraint guidance (docs/knowledge/ethos/citizens-arc-maturation-under-constraint.md). Minimal artifact: Citizens Arc Maturation Under Constraint summary.
+
+### Node: Citizens Arc Derived Principles
+- id: citizens-arc-derived-principles
+- type: concept
+- summary: Citizens Arc Derived Principles guidance (docs/knowledge/ethos/citizens-arc-derived-principles.md). Minimal artifact: Citizens Arc Derived Principles summary.
+
 ### Node: Civic Memory Continuity
 - id: civic-memory-continuity
 - type: concept

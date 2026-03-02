@@ -396,7 +396,7 @@
       "slug": "citizens-arc",
       "title": "Citizen's Arc",
       "excerpt": "A dignity-floor civilization that runs voluntary trials to select stewards and keeps power revisable.",
-      "bodyMD": "The citizen's arc is the societal ladder: soft ground, hard tests, clear mirrors.\n\nThe floor ends coercive scarcity, the ladder reveals competence, and the roof keeps tradeoffs explicit. This view is the civic mirror that keeps Mission Ethos honest.\n\nAddenda: [[node:citizens-arc-anti-mutation]] and [[node:citizens-arc-stress-test]].\n\nSee [[node:interbeing-systems]], [[node:scarcity-justice]], [[node:capability-ambition-gradient]], [[node:struggle-testament]], [[node:promise-trials]], [[node:koan-governance]], [[node:values-over-images]], [[node:worldview-integrity]], [[node:sangha-architecture]], [[node:no-bypass-guardrail]], [[node:integrity-protocols]], [[node:inner-spark]], [[node:lifetime-trust-ledger]], [[node:solitude-to-signal]], and [[node:habit-pressure-break]].",
+      "bodyMD": "The citizen's arc is the societal ladder: soft ground, hard tests, clear mirrors.\n\nThe floor ends coercive scarcity, the ladder reveals competence, and the roof keeps tradeoffs explicit. This view is the civic mirror that keeps Mission Ethos honest.\n\nAddenda: [[node:citizens-arc-anti-mutation]], [[node:citizens-arc-stress-test]], and [[node:citizens-arc-maturation-under-constraint]].\n\nSee [[node:interbeing-systems]], [[node:scarcity-justice]], [[node:capability-ambition-gradient]], [[node:struggle-testament]], [[node:promise-trials]], [[node:koan-governance]], [[node:values-over-images]], [[node:worldview-integrity]], [[node:sangha-architecture]], [[node:no-bypass-guardrail]], [[node:integrity-protocols]], [[node:inner-spark]], [[node:lifetime-trust-ledger]], [[node:solitude-to-signal]], and [[node:habit-pressure-break]].",
       "tags": [
         "society",
         "civic",
@@ -406,7 +406,8 @@
       ],
       "children": [
         "citizens-arc-anti-mutation",
-        "citizens-arc-stress-test"
+        "citizens-arc-stress-test",
+        "citizens-arc-maturation-under-constraint"
       ],
       "links": [
         {
@@ -480,6 +481,10 @@
         {
           "rel": "child",
           "to": "citizens-arc-stress-test"
+        },
+        {
+          "rel": "child",
+          "to": "citizens-arc-maturation-under-constraint"
         }
       ],
       "summary": "A dignity-floor civilization that runs voluntary trials to select stewards and keeps power revisable.",
@@ -717,6 +722,292 @@
           "type": "doc",
           "path": "docs/ethos/ideology.json",
           "contains": "citizens-arc-stress-test",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "citizens-arc-maturation-under-constraint",
+      "slug": "citizens-arc-maturation-under-constraint",
+      "title": "Citizen's Arc: Maturation Under Constraint",
+      "excerpt": "Leadership legitimacy is formed by constrained service before authority is granted.",
+      "bodyMD": "Maturation under constraint keeps leadership formation honest: service first, title later. Candidate stewards should rise through real constraints, learning judgment, coordination, and repair without early access to unchecked power.\n\nThis is not secrecy-as-privilege. It is graduated visibility: lower symbolic exposure while a person is still in formation, then full accountability once authority is real.\n\nZen application: right effort aligns aspiration with conditions. Desire alone does not authorize action; disciplined practice inside reality does.\n\nAnti-pattern: title inflation, where symbolic status appears before tested competence.\n\nMinimal artifact: Constrained Ascent Dossier (mission logs, constraint context, visibility thresholds, accountability trigger, and reversal criteria).\n\nDerived links: [[node:citizens-arc-derived-principles]].\n\nSee [[node:interbeing-systems]], [[node:promise-trials]], [[node:koan-governance]], [[node:capability-ambition-gradient]], [[node:stewardship-ledger]], [[node:values-over-images]], and [[node:citizens-arc-anti-mutation]].",
+      "tags": [
+        "governance",
+        "ladder",
+        "constraint",
+        "leadership",
+        "zen"
+      ],
+      "children": [
+        "citizens-arc-derived-principles"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "citizens-arc"
+        },
+        {
+          "rel": "see-also",
+          "to": "interbeing-systems"
+        },
+        {
+          "rel": "see-also",
+          "to": "promise-trials"
+        },
+        {
+          "rel": "see-also",
+          "to": "koan-governance"
+        },
+        {
+          "rel": "see-also",
+          "to": "capability-ambition-gradient"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "values-over-images"
+        },
+        {
+          "rel": "see-also",
+          "to": "citizens-arc-anti-mutation"
+        },
+        {
+          "rel": "child",
+          "to": "citizens-arc-derived-principles"
+        }
+      ],
+      "summary": "Leadership legitimacy is formed by constrained service before authority is granted.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "citizens-arc"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "contains": "citizens-arc-maturation-under-constraint",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "citizens-arc-derived-principles",
+      "slug": "citizens-arc-derived-principles",
+      "title": "Citizen's Arc: Derived Principles",
+      "excerpt": "Additional conclusions from maturation under constraint, mapped to existing ideology rails.",
+      "bodyMD": "This addendum captures secondary conclusions linked from maturation under constraint.\n\n1. Legitimacy is phase-based, not title-based: pre-authority means constrained formation; post-authority means full public accountability.\n2. Visibility controls must be lawful and bounded: graduated visibility is process discipline, not immunity.\n3. Evolutionary pressure needs an ethics filter: preserve adaptive coherence while reducing coercive harm.\n4. Zen adds tempo discipline: aspiration must synchronize with conditions and timeframe.\n5. Capability creates stewardship duty under inevitability: failing to shape inevitable tools is itself a governance decision.\n6. Selection signals must evidence service, not obedience: patronage-proof competency signals beat informal favor channels.\n\nMinimal artifact: Derived Principles Crosswalk mapping each principle to policy checks, audit hooks, and reversal triggers.\n\nSee [[node:promise-trials]], [[node:integrity-protocols]], [[node:verification-checklist]], [[node:lawful-interface-protocol]], [[node:data-dignity]], [[node:no-bypass-guardrail]], [[node:values-over-images]], [[node:restorative-harm-repair]], [[node:scarcity-justice]], [[node:beginners-mind]], [[node:koan-governance]], [[node:civic-memory-continuity]], [[node:capability-ambition-gradient]], [[node:stewardship-ledger]], [[node:verification-based-diplomacy]], [[node:citizens-arc-anti-mutation]], [[node:capture-resistance]], and [[node:three-tenets-loop]].",
+      "tags": [
+        "governance",
+        "derived",
+        "legitimacy",
+        "zen",
+        "stewardship"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "citizens-arc-maturation-under-constraint"
+        },
+        {
+          "rel": "see-also",
+          "to": "promise-trials"
+        },
+        {
+          "rel": "see-also",
+          "to": "integrity-protocols"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "lawful-interface-protocol"
+        },
+        {
+          "rel": "see-also",
+          "to": "data-dignity"
+        },
+        {
+          "rel": "see-also",
+          "to": "no-bypass-guardrail"
+        },
+        {
+          "rel": "see-also",
+          "to": "values-over-images"
+        },
+        {
+          "rel": "see-also",
+          "to": "restorative-harm-repair"
+        },
+        {
+          "rel": "see-also",
+          "to": "scarcity-justice"
+        },
+        {
+          "rel": "see-also",
+          "to": "beginners-mind"
+        },
+        {
+          "rel": "see-also",
+          "to": "koan-governance"
+        },
+        {
+          "rel": "see-also",
+          "to": "civic-memory-continuity"
+        },
+        {
+          "rel": "see-also",
+          "to": "capability-ambition-gradient"
+        },
+        {
+          "rel": "see-also",
+          "to": "stewardship-ledger"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-based-diplomacy"
+        },
+        {
+          "rel": "see-also",
+          "to": "citizens-arc-anti-mutation"
+        },
+        {
+          "rel": "see-also",
+          "to": "capture-resistance"
+        },
+        {
+          "rel": "see-also",
+          "to": "three-tenets-loop"
+        }
+      ],
+      "summary": "Additional conclusions from maturation under constraint, mapped to existing ideology rails.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "citizens-arc-maturation-under-constraint"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "contains": "citizens-arc-derived-principles",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },

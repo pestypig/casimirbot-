@@ -136,6 +136,8 @@
         "citizens-arc",
         "citizens-arc-anti-mutation",
         "citizens-arc-stress-test",
+        "citizens-arc-maturation-under-constraint",
+        "citizens-arc-derived-principles",
         "civic-memory-continuity",
         "civic-signal-loop",
         "federal-civic-listening-circuit",
@@ -1502,6 +1504,108 @@
           "path": "docs/knowledge/ethos/citizens-arc-stress-test.md",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:c917e9eb24ad5b16a646132a85c39ccce544213c0f2695f8783ac6f2b6897581"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "civic-governance-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "citizens-arc-maturation-under-constraint",
+      "slug": "citizens-arc-maturation-under-constraint",
+      "title": "Citizens Arc Maturation Under Constraint",
+      "excerpt": "Guidance on Citizens Arc Maturation Under Constraint.",
+      "bodyMD": "Citizens Arc Maturation Under Constraint guidance (docs/knowledge/ethos/citizens-arc-maturation-under-constraint.md).\n\nMinimal artifact: Citizens Arc Maturation Under Constraint summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ],
+      "summary": "Guidance on Citizens Arc Maturation Under Constraint.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/citizens-arc-maturation-under-constraint.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:190147d903058d9ee69e291e80c6d6942410bbc8fbb01278255709e914b02a99"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "civic-governance-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "citizens-arc-derived-principles",
+      "slug": "citizens-arc-derived-principles",
+      "title": "Citizens Arc Derived Principles",
+      "excerpt": "Guidance on Citizens Arc Derived Principles.",
+      "bodyMD": "Citizens Arc Derived Principles guidance (docs/knowledge/ethos/citizens-arc-derived-principles.md).\n\nMinimal artifact: Citizens Arc Derived Principles summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ],
+      "summary": "Guidance on Citizens Arc Derived Principles.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/citizens-arc-derived-principles.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b04c0ba330c6f6c4382bf27b18cd6fb9e1b2f93f6dfdefbe89c1ab4698dc07ad"
         }
       ],
       "inputs": [],

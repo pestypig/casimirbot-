@@ -8,4 +8,4 @@ topicTags: ["ideology"]
 mustIncludeFiles: ["docs/ethos/ideology.json"]
 ---
 Definition: A dignity-floor civilization that runs voluntary trials to select stewards and keeps power revisable.
-Notes: Tags: society, civic, stewardship, trials, governance; Children: citizens-arc-anti-mutation, citizens-arc-stress-test.
+Notes: Tags: society, civic, stewardship, trials, governance; Children: citizens-arc-anti-mutation, citizens-arc-stress-test, citizens-arc-maturation-under-constraint.
