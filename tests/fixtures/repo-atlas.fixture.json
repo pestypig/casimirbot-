@@ -1,0 +1,18 @@
+{
+  "version": "repo-atlas/1",
+  "snapshot": {
+    "generatedAt": "2026-01-01T00:00:00.000Z",
+    "commitHash": "fixture"
+  },
+  "nodes": [
+    { "id": "file:src/a.ts", "kind": "file", "label": "a.ts", "path": "src/a.ts" },
+    { "id": "symbol:producer", "kind": "symbol", "label": "producer", "path": "src/a.ts" },
+    { "id": "symbol:consumer", "kind": "symbol", "label": "consumer", "path": "src/b.ts" },
+    { "id": "gate:test-a", "kind": "gate", "label": "test-a", "path": "tests/a.spec.ts" }
+  ],
+  "edges": [
+    { "source": "symbol:producer", "target": "file:src/a.ts", "kind": "defines", "sourceSystem": "fixture" },
+    { "source": "symbol:consumer", "target": "symbol:producer", "kind": "imports", "sourceSystem": "fixture" },
+    { "source": "gate:test-a", "target": "symbol:consumer", "kind": "tests", "sourceSystem": "fixture" }
+  ]
+}

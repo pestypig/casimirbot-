@@ -27,6 +27,12 @@ type RepoGraph = {
   builtAt: number;
 };
 
+export type RepoGraphSnapshot = {
+  builtAt: number;
+  nodes: RepoGraphNode[];
+  edges: RepoGraphEdge[];
+};
+
 type SearchHit = {
   id: string;
   snippet: string;
@@ -453,6 +459,19 @@ export async function searchRepoGraph(params: SearchParams): Promise<{
 
   const collapse_inputs = { text: packets.map((p) => p.essence_id) };
   return { nodes: ranked.map((r) => ({ ...r.node, score: r.score })), edges: edgesSubset, hits, packets, collapse_inputs };
+}
+
+export async function getRepoGraphSnapshot(): Promise<RepoGraphSnapshot> {
+  const now = Date.now();
+  if (!cache || now - cache.builtAt > CACHE_TTL_MS) {
+    await buildRepoGraph();
+  }
+  const graph = cache ?? (await buildRepoGraph());
+  return {
+    builtAt: graph.builtAt,
+    nodes: [...graph.nodes.values()],
+    edges: [...graph.edges],
+  };
 }
 
 function nodeMatchesQuery(node: RepoGraphNode, query: string): boolean {
