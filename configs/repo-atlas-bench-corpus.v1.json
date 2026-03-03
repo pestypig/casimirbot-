@@ -1,0 +1,1150 @@
+{
+  "version": "repo-atlas-bench-corpus/1",
+  "generatedAt": "2026-03-03T00:00:00.000Z",
+  "tasks": [
+    {
+      "id": "atlas_task_001",
+      "domain": "server",
+      "prompt": "Find the backend entry point handling API behavior for this repo area. Task 1.",
+      "expected_files": [
+        "server/horizons-proxy.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_002",
+      "domain": "server",
+      "prompt": "Find the backend entry point handling API behavior for this repo area. Task 2.",
+      "expected_files": [
+        "server/utils/horizons-proxy.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_003",
+      "domain": "server",
+      "prompt": "Find the backend entry point handling API behavior for this repo area. Task 3.",
+      "expected_files": [
+        "server/utils/run-python.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_004",
+      "domain": "server",
+      "prompt": "Find the backend entry point handling API behavior for this repo area. Task 4.",
+      "expected_files": [
+        "server/utils/physics-const-safe.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_005",
+      "domain": "server",
+      "prompt": "Find the backend entry point handling API behavior for this repo area. Task 5.",
+      "expected_files": [
+        "server/utils/stable-json.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_006",
+      "domain": "server",
+      "prompt": "Find the backend entry point handling API behavior for this repo area. Task 6.",
+      "expected_files": [
+        "server/utils/information-boundary.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_007",
+      "domain": "server",
+      "prompt": "Find the backend entry point handling API behavior for this repo area. Task 7.",
+      "expected_files": [
+        "server/utils/express-async-guard.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_008",
+      "domain": "server",
+      "prompt": "Find the backend entry point handling API behavior for this repo area. Task 8.",
+      "expected_files": [
+        "server/utils/phase-calibration.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_009",
+      "domain": "server",
+      "prompt": "Find the backend entry point handling API behavior for this repo area. Task 9.",
+      "expected_files": [
+        "server/gr/constraint-evaluator.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_010",
+      "domain": "server",
+      "prompt": "Find the backend entry point handling API behavior for this repo area. Task 10.",
+      "expected_files": [
+        "server/gr/gr-os-payload.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_011",
+      "domain": "server",
+      "prompt": "Find the backend entry point handling API behavior for this repo area. Task 11.",
+      "expected_files": [
+        "server/gr/gr-agent-loop-schema.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_012",
+      "domain": "client",
+      "prompt": "Find the frontend implementation point for this UI/store behavior. Task 12.",
+      "expected_files": [
+        "client/src/store/useQiStore.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_013",
+      "domain": "client",
+      "prompt": "Find the frontend implementation point for this UI/store behavior. Task 13.",
+      "expected_files": [
+        "client/src/store/useFlightDirectorStore.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_014",
+      "domain": "client",
+      "prompt": "Find the frontend implementation point for this UI/store behavior. Task 14.",
+      "expected_files": [
+        "client/src/store/useHull3DSharedStore.test.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_015",
+      "domain": "client",
+      "prompt": "Find the frontend implementation point for this UI/store behavior. Task 15.",
+      "expected_files": [
+        "client/src/store/useHull3DSharedStore.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_016",
+      "domain": "client",
+      "prompt": "Find the frontend implementation point for this UI/store behavior. Task 16.",
+      "expected_files": [
+        "client/src/store/useDriveSyncStore.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_017",
+      "domain": "client",
+      "prompt": "Find the frontend implementation point for this UI/store behavior. Task 17.",
+      "expected_files": [
+        "client/src/store/useDesktopStore.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_018",
+      "domain": "client",
+      "prompt": "Find the frontend implementation point for this UI/store behavior. Task 18.",
+      "expected_files": [
+        "client/src/store/useNavPoseStore.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_019",
+      "domain": "client",
+      "prompt": "Find the frontend implementation point for this UI/store behavior. Task 19.",
+      "expected_files": [
+        "client/src/store/useDocViewerStore.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_020",
+      "domain": "client",
+      "prompt": "Find the frontend implementation point for this UI/store behavior. Task 20.",
+      "expected_files": [
+        "client/src/store/useMobileAppStore.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_021",
+      "domain": "client",
+      "prompt": "Find the frontend implementation point for this UI/store behavior. Task 21.",
+      "expected_files": [
+        "client/src/store/useKnowledgeProjectsStore.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_022",
+      "domain": "client",
+      "prompt": "Find the frontend implementation point for this UI/store behavior. Task 22.",
+      "expected_files": [
+        "client/src/store/useAgiChatStore.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_023",
+      "domain": "scripts",
+      "prompt": "Find the automation script that controls this workflow. Task 23.",
+      "expected_files": [
+        "scripts/validate-ideology-verifiers.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_024",
+      "domain": "scripts",
+      "prompt": "Find the automation script that controls this workflow. Task 24.",
+      "expected_files": [
+        "scripts/build-code-lattice.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_025",
+      "domain": "scripts",
+      "prompt": "Find the automation script that controls this workflow. Task 25.",
+      "expected_files": [
+        "scripts/build-panel-tree.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_026",
+      "domain": "scripts",
+      "prompt": "Find the automation script that controls this workflow. Task 26.",
+      "expected_files": [
+        "scripts/warp-full-solve-single-runner.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_027",
+      "domain": "scripts",
+      "prompt": "Find the automation script that controls this workflow. Task 27.",
+      "expected_files": [
+        "scripts/warp-evidence-pack.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_028",
+      "domain": "scripts",
+      "prompt": "Find the automation script that controls this workflow. Task 28.",
+      "expected_files": [
+        "scripts/agi-gguf-bench.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_029",
+      "domain": "scripts",
+      "prompt": "Find the automation script that controls this workflow. Task 29.",
+      "expected_files": [
+        "scripts/helix-ask-utility-ab.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_030",
+      "domain": "scripts",
+      "prompt": "Find the automation script that controls this workflow. Task 30.",
+      "expected_files": [
+        "scripts/warp-full-solve-campaign-cli.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_031",
+      "domain": "scripts",
+      "prompt": "Find the automation script that controls this workflow. Task 31.",
+      "expected_files": [
+        "scripts/build-math-congruence-matrix.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_032",
+      "domain": "scripts",
+      "prompt": "Find the automation script that controls this workflow. Task 32.",
+      "expected_files": [
+        "scripts/guard-helix-core-deprecated.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_033",
+      "domain": "scripts",
+      "prompt": "Find the automation script that controls this workflow. Task 33.",
+      "expected_files": [
+        "scripts/validate-agent-context-checklist.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_034",
+      "domain": "docs",
+      "prompt": "Find the canonical documentation source for this policy/workflow. Task 34.",
+      "expected_files": [
+        "docs/replit-runtime-constraints.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_035",
+      "domain": "docs",
+      "prompt": "Find the canonical documentation source for this policy/workflow. Task 35.",
+      "expected_files": [
+        "docs/casimir-tile-roadmap.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_036",
+      "domain": "docs",
+      "prompt": "Find the canonical documentation source for this policy/workflow. Task 36.",
+      "expected_files": [
+        "docs/warp-tree-dag-walk-rules.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_037",
+      "domain": "docs",
+      "prompt": "Find the canonical documentation source for this policy/workflow. Task 37.",
+      "expected_files": [
+        "docs/warp-tree-dag-schema.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_038",
+      "domain": "docs",
+      "prompt": "Find the canonical documentation source for this policy/workflow. Task 38.",
+      "expected_files": [
+        "docs/solar-pipeline.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_039",
+      "domain": "docs",
+      "prompt": "Find the canonical documentation source for this policy/workflow. Task 39.",
+      "expected_files": [
+        "docs/architecture/agibot-knowledge-linking-contract-v1.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_040",
+      "domain": "docs",
+      "prompt": "Find the canonical documentation source for this policy/workflow. Task 40.",
+      "expected_files": [
+        "docs/architecture/helix-ask-dottie-callout-templates.v1.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_041",
+      "domain": "docs",
+      "prompt": "Find the canonical documentation source for this policy/workflow. Task 41.",
+      "expected_files": [
+        "docs/architecture/helix-ask-quake-balancing-primitives.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_042",
+      "domain": "docs",
+      "prompt": "Find the canonical documentation source for this policy/workflow. Task 42.",
+      "expected_files": [
+        "docs/architecture/agibot-x1-runtime-bridge-contract-v1.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_043",
+      "domain": "docs",
+      "prompt": "Find the canonical documentation source for this policy/workflow. Task 43.",
+      "expected_files": [
+        "docs/architecture/helix-ask-stellar-toe-workstream-tracker.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_044",
+      "domain": "docs",
+      "prompt": "Find the canonical documentation source for this policy/workflow. Task 44.",
+      "expected_files": [
+        "docs/architecture/voice-bundle-format.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_045",
+      "domain": "warp-gr",
+      "prompt": "Find the warp/GR guardrail or validation source that governs this behavior. Task 45.",
+      "expected_files": [
+        "configs/warp-primitive-manifest.v1.json"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_046",
+      "domain": "warp-gr",
+      "prompt": "Find the warp/GR guardrail or validation source that governs this behavior. Task 46.",
+      "expected_files": [
+        "configs/physics-root-leaf-manifest.v1.json"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_047",
+      "domain": "warp-gr",
+      "prompt": "Find the warp/GR guardrail or validation source that governs this behavior. Task 47.",
+      "expected_files": [
+        "configs/warp-validation-baseline.json"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_048",
+      "domain": "warp-gr",
+      "prompt": "Find the warp/GR guardrail or validation source that governs this behavior. Task 48.",
+      "expected_files": [
+        "scripts/warp-full-solve-single-runner.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_049",
+      "domain": "warp-gr",
+      "prompt": "Find the warp/GR guardrail or validation source that governs this behavior. Task 49.",
+      "expected_files": [
+        "scripts/warp-evidence-pack.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_050",
+      "domain": "warp-gr",
+      "prompt": "Find the warp/GR guardrail or validation source that governs this behavior. Task 50.",
+      "expected_files": [
+        "scripts/warp-full-solve-campaign-cli.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_051",
+      "domain": "warp-gr",
+      "prompt": "Find the warp/GR guardrail or validation source that governs this behavior. Task 51.",
+      "expected_files": [
+        "scripts/warp-g4-first-divergence.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_052",
+      "domain": "warp-gr",
+      "prompt": "Find the warp/GR guardrail or validation source that governs this behavior. Task 52.",
+      "expected_files": [
+        "scripts/warp-g4-kernel-provenance-audit.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_053",
+      "domain": "warp-gr",
+      "prompt": "Find the warp/GR guardrail or validation source that governs this behavior. Task 53.",
+      "expected_files": [
+        "scripts/warp-g4-candidate-promotion-check.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_054",
+      "domain": "warp-gr",
+      "prompt": "Find the warp/GR guardrail or validation source that governs this behavior. Task 54.",
+      "expected_files": [
+        "scripts/warp-g4-semantic-bridge-matrix.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_055",
+      "domain": "warp-gr",
+      "prompt": "Find the warp/GR guardrail or validation source that governs this behavior. Task 55.",
+      "expected_files": [
+        "scripts/warp-canonical-runtime-snapshot.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_056",
+      "domain": "helix-ask",
+      "prompt": "Find the Helix Ask routing or policy source relevant to this behavior. Task 56.",
+      "expected_files": [
+        "docs/architecture/helix-ask-dottie-callout-templates.v1.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_057",
+      "domain": "helix-ask",
+      "prompt": "Find the Helix Ask routing or policy source relevant to this behavior. Task 57.",
+      "expected_files": [
+        "docs/architecture/helix-ask-quake-balancing-primitives.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_058",
+      "domain": "helix-ask",
+      "prompt": "Find the Helix Ask routing or policy source relevant to this behavior. Task 58.",
+      "expected_files": [
+        "docs/architecture/helix-ask-stellar-toe-workstream-tracker.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_059",
+      "domain": "helix-ask",
+      "prompt": "Find the Helix Ask routing or policy source relevant to this behavior. Task 59.",
+      "expected_files": [
+        "docs/architecture/helix-ask-proof-packet-rfc.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_060",
+      "domain": "helix-ask",
+      "prompt": "Find the Helix Ask routing or policy source relevant to this behavior. Task 60.",
+      "expected_files": [
+        "docs/architecture/helix-ask-mission-systems-integration-plan.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_061",
+      "domain": "helix-ask",
+      "prompt": "Find the Helix Ask routing or policy source relevant to this behavior. Task 61.",
+      "expected_files": [
+        "docs/architecture/helix-ask-math-router-contract.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_062",
+      "domain": "helix-ask",
+      "prompt": "Find the Helix Ask routing or policy source relevant to this behavior. Task 62.",
+      "expected_files": [
+        "docs/architecture/helix-ask-universal-constraints-build-plan-2026-02-17.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_063",
+      "domain": "helix-ask",
+      "prompt": "Find the Helix Ask routing or policy source relevant to this behavior. Task 63.",
+      "expected_files": [
+        "docs/architecture/helix-ask-natural-philosophy-gap-closure-playbook.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_064",
+      "domain": "helix-ask",
+      "prompt": "Find the Helix Ask routing or policy source relevant to this behavior. Task 64.",
+      "expected_files": [
+        "docs/architecture/helix-ask-dottie-prompt-style-contract.v1.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_065",
+      "domain": "helix-ask",
+      "prompt": "Find the Helix Ask routing or policy source relevant to this behavior. Task 65.",
+      "expected_files": [
+        "docs/helix-ask-readiness-debug-loop.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_066",
+      "domain": "helix-ask",
+      "prompt": "Find the Helix Ask routing or policy source relevant to this behavior. Task 66.",
+      "expected_files": [
+        "docs/helix-ask-reasoning-latency-2026-02-16.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": true
+      }
+    },
+    {
+      "id": "atlas_task_067",
+      "domain": "mission-control",
+      "prompt": "Find the mission-control/go-board source that defines operator behavior. Task 67.",
+      "expected_files": [
+        "docs/architecture/mission-go-board-spec.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_068",
+      "domain": "mission-control",
+      "prompt": "Find the mission-control/go-board source that defines operator behavior. Task 68.",
+      "expected_files": [
+        "docs/architecture/helix-ask-mission-systems-integration-plan.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_069",
+      "domain": "mission-control",
+      "prompt": "Find the mission-control/go-board source that defines operator behavior. Task 69.",
+      "expected_files": [
+        "docs/architecture/mission-systems-contract-diff-2026-02-22.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_070",
+      "domain": "mission-control",
+      "prompt": "Find the mission-control/go-board source that defines operator behavior. Task 70.",
+      "expected_files": [
+        "docs/runbooks/mission-overwatch-slo-2026-02-23.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_071",
+      "domain": "mission-control",
+      "prompt": "Find the mission-control/go-board source that defines operator behavior. Task 71.",
+      "expected_files": [
+        "docs/runbooks/mission-overwatch-slo-2026-02-22.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_072",
+      "domain": "mission-control",
+      "prompt": "Find the mission-control/go-board source that defines operator behavior. Task 72.",
+      "expected_files": [
+        "docs/runbooks/mission-overwatch-wave3a-slo-2026-02-23.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_073",
+      "domain": "mission-control",
+      "prompt": "Find the mission-control/go-board source that defines operator behavior. Task 73.",
+      "expected_files": [
+        "client/src/lib/mission-overwatch/index.ts"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_074",
+      "domain": "mission-control",
+      "prompt": "Find the mission-control/go-board source that defines operator behavior. Task 74.",
+      "expected_files": [
+        "docs/audits/research/helix-ask-mission-overwatch-v1-wave3a-codex-cloud-autorun-batch-prompt-pack-2026-02-23.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_075",
+      "domain": "mission-control",
+      "prompt": "Find the mission-control/go-board source that defines operator behavior. Task 75.",
+      "expected_files": [
+        "docs/audits/research/helix-ask-mission-systems-codex-cloud-autorun-batch-prompt-pack-2026-02-22.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_076",
+      "domain": "mission-control",
+      "prompt": "Find the mission-control/go-board source that defines operator behavior. Task 76.",
+      "expected_files": [
+        "docs/audits/research/helix-ask-mission-systems-research-annex-2026-02-22.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_077",
+      "domain": "mission-control",
+      "prompt": "Find the mission-control/go-board source that defines operator behavior. Task 77.",
+      "expected_files": [
+        "docs/audits/research/helix-ask-mission-overwatch-v1-closure-wave2b-codex-cloud-autorun-batch-prompt-pack-2026-02-23.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_078",
+      "domain": "voice",
+      "prompt": "Find the voice-callout or voice-policy source for this behavior. Task 78.",
+      "expected_files": [
+        "docs/architecture/voice-bundle-format.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_079",
+      "domain": "voice",
+      "prompt": "Find the voice-callout or voice-policy source for this behavior. Task 79.",
+      "expected_files": [
+        "docs/architecture/voice-service-contract.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_080",
+      "domain": "voice",
+      "prompt": "Find the voice-callout or voice-policy source for this behavior. Task 80.",
+      "expected_files": [
+        "docs/runbooks/voice-eval-gates-2026-02-23.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_081",
+      "domain": "voice",
+      "prompt": "Find the voice-callout or voice-policy source for this behavior. Task 81.",
+      "expected_files": [
+        "docs/runbooks/voice-train-prod-lane-2026-02-23.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_082",
+      "domain": "voice",
+      "prompt": "Find the voice-callout or voice-policy source for this behavior. Task 82.",
+      "expected_files": [
+        "docs/runbooks/voice-local-ownership-serving.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_083",
+      "domain": "voice",
+      "prompt": "Find the voice-callout or voice-policy source for this behavior. Task 83.",
+      "expected_files": [
+        "docs/runbooks/voice-train-vertex-setup-2026-02-23.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_084",
+      "domain": "voice",
+      "prompt": "Find the voice-callout or voice-policy source for this behavior. Task 84.",
+      "expected_files": [
+        "docs/runbooks/reports/codex-cloud-voice-train-objective-2026-02-23-report.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_085",
+      "domain": "voice",
+      "prompt": "Find the voice-callout or voice-policy source for this behavior. Task 85.",
+      "expected_files": [
+        "docs/runbooks/reports/tts-prod-stack-wave1-closure-2026-02-24.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_086",
+      "domain": "voice",
+      "prompt": "Find the voice-callout or voice-policy source for this behavior. Task 86.",
+      "expected_files": [
+        "docs/runbooks/codex-cloud-voice-train-objective-2026-02-23.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_087",
+      "domain": "voice",
+      "prompt": "Find the voice-callout or voice-policy source for this behavior. Task 87.",
+      "expected_files": [
+        "docs/runbooks/voice-provider-policy-2026-02-22.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    },
+    {
+      "id": "atlas_task_088",
+      "domain": "voice",
+      "prompt": "Find the voice-callout or voice-policy source for this behavior. Task 88.",
+      "expected_files": [
+        "docs/runbooks/voice-train-colab-bootstrap-2026-02-23.md"
+      ],
+      "success_check": {
+        "file_hit": true,
+        "command": null,
+        "hard_gate": false
+      }
+    }
+  ]
+}

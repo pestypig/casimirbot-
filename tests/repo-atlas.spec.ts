@@ -2,6 +2,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildRepoAtlasFromSources, isDirectExecution as isBuildDirectExecution } from "../scripts/repo-atlas-build";
+import { evaluateRegressionGate, loadCorpus, runAtlasBench, validateCorpus, type AtlasBenchCorpus } from "../scripts/atlas-bench";
 import {
   firstDivergenceG4,
   isDirectExecution as isQueryDirectExecution,
@@ -240,5 +241,130 @@ describe("repo atlas", () => {
     expect(isQueryDirectExecution(queryUrl, queryPath)).toBe(true);
     expect(isBuildDirectExecution(buildUrl, queryPath)).toBe(false);
     expect(isQueryDirectExecution(queryUrl, buildPath)).toBe(false);
+  });
+});
+
+
+describe("repo atlas benchmark", () => {
+  it("loads and validates the repo-wide corpus", async () => {
+    const corpus = await loadCorpus();
+    expect(corpus.version).toBe("repo-atlas-bench-corpus/1");
+    expect(corpus.tasks.length).toBeGreaterThanOrEqual(80);
+    expect(new Set(corpus.tasks.map((task) => task.id)).size).toBe(corpus.tasks.length);
+  });
+
+  it("rejects invalid corpus payloads", () => {
+    const invalid = {
+      version: "repo-atlas-bench-corpus/1",
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      tasks: [
+        {
+          id: "dup",
+          domain: "docs",
+          prompt: "find file",
+          expected_files: ["docs/atlas-operator-guide.md"],
+          success_check: { file_hit: true },
+        },
+        {
+          id: "dup",
+          domain: "docs",
+          prompt: "find file",
+          expected_files: ["docs/atlas-operator-guide.md"],
+          success_check: { file_hit: true },
+        },
+      ],
+    } satisfies AtlasBenchCorpus;
+
+    expect(() => validateCorpus(invalid)).toThrow(/Duplicate or missing task id/);
+  });
+
+  it("evaluates regression thresholds correctly", () => {
+    const passing = evaluateRegressionGate(
+      {
+        baseline: {
+          lane: "baseline",
+          task_count: 20,
+          pass_rate: 0.5,
+          hard_gate_pass_rate: 0.6,
+          median_time_to_first_correct_file_ms: 100,
+          p90_time_to_first_correct_file_ms: 200,
+          median_time_to_first_valid_patch_ms: 110,
+          p90_time_to_first_valid_patch_ms: 210,
+          median_files_opened_count: 6,
+          median_commands_run_count: 1,
+        },
+        atlas: {
+          lane: "atlas",
+          task_count: 20,
+          pass_rate: 0.8,
+          hard_gate_pass_rate: 0.6,
+          median_time_to_first_correct_file_ms: 70,
+          p90_time_to_first_correct_file_ms: 120,
+          median_time_to_first_valid_patch_ms: 75,
+          p90_time_to_first_valid_patch_ms: 130,
+          median_files_opened_count: 3,
+          median_commands_run_count: 1,
+        },
+      },
+      {
+        version: "repo-atlas-bench-policy/1",
+        thresholds: {
+          median_time_to_first_correct_file_improvement_pct: 25,
+          task_pass_rate_improvement_pct: 15,
+          hard_gate_pass_rate_drop_allowed_pct: 0,
+        },
+      },
+    );
+    expect(passing.verdict).toBe("PASS");
+
+    const failing = evaluateRegressionGate(
+      {
+        baseline: {
+          lane: "baseline",
+          task_count: 20,
+          pass_rate: 0.8,
+          hard_gate_pass_rate: 1,
+          median_time_to_first_correct_file_ms: 100,
+          p90_time_to_first_correct_file_ms: 200,
+          median_time_to_first_valid_patch_ms: 110,
+          p90_time_to_first_valid_patch_ms: 210,
+          median_files_opened_count: 6,
+          median_commands_run_count: 1,
+        },
+        atlas: {
+          lane: "atlas",
+          task_count: 20,
+          pass_rate: 0.81,
+          hard_gate_pass_rate: 0.9,
+          median_time_to_first_correct_file_ms: 90,
+          p90_time_to_first_correct_file_ms: 120,
+          median_time_to_first_valid_patch_ms: 95,
+          p90_time_to_first_valid_patch_ms: 130,
+          median_files_opened_count: 3,
+          median_commands_run_count: 1,
+        },
+      },
+      {
+        version: "repo-atlas-bench-policy/1",
+        thresholds: {
+          median_time_to_first_correct_file_improvement_pct: 25,
+          task_pass_rate_improvement_pct: 15,
+          hard_gate_pass_rate_drop_allowed_pct: 0,
+        },
+      },
+    );
+    expect(failing.verdict).toBe("FAIL");
+    expect(failing.reasons.length).toBeGreaterThan(0);
+  });
+
+  it("emits deterministic artifact schema for sampled runs", async () => {
+    const artifact = await runAtlasBench({
+      sample: 3,
+      atlasPath: fixturePath,
+      outPath: path.join(process.cwd(), "artifacts", "repo-atlas", "atlas-bench.test.json"),
+    });
+    expect(artifact.version).toBe("repo-atlas-bench/1");
+    expect(artifact.tasks).toHaveLength(6);
+    expect(artifact.tasks[0]?.task_id <= artifact.tasks[1]?.task_id || artifact.tasks[0]?.lane === "atlas").toBe(true);
   });
 });
