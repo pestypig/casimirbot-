@@ -64,6 +64,17 @@ jobs:
           npm run dev:agi:5173 > /tmp/agi.log 2>&1 &
           node -e "const url='http://localhost:5173/api/agi/constraint-packs'; const timeoutMs=60000; const start=Date.now(); const delay=ms=>new Promise(r=>setTimeout(r,ms)); (async()=>{ while(true){ try { const res=await fetch(url); if(res.ok){ console.log('AGI API is up'); process.exit(0);} } catch {} if(Date.now()-start>timeoutMs){ console.error('Timed out waiting for AGI API'); process.exit(1);} await delay(1000);} })();"
 
+      - name: Run Helix Ask patch probe (strict)
+        env:
+          HELIX_ASK_BASE_URL: http://localhost:5173
+          HELIX_ASK_PATCH_PROBE_REQUIRE_PLAN_CONTEXT: "1"
+          HELIX_ASK_PATCH_PROBE_FAIL_ON_MISS: "1"
+          HELIX_ASK_PATCH_PROBE_SAMPLES: "10"
+          HELIX_ASK_PATCH_PROBE_SEED: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          npm run helix:ask:patch-probe:strict
+
       - name: Run Casimir verify
         env:
           ADAPTER_VERIFY_URL: http://localhost:5173/api/agi/adapter/run
@@ -125,6 +136,14 @@ jobs:
         with:
           name: training-trace
           path: artifacts/training-trace.jsonl
+          if-no-files-found: warn
+
+      - name: Upload helix ask patch probe artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: helix-ask-patch-probe
+          path: artifacts/experiments/helix-ask-patch-probe
           if-no-files-found: warn
 
       - name: Upload evolution report

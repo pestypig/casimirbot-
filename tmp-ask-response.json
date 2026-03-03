@@ -1,0 +1,1170 @@
+{
+    "text":  "To condition a child\u0027s vulnerability to celebrating love, society can create an environment that nurtures emotional openness and connection. This can be achieved through various means, such as promoting healthy relationships within families and communities. When children observe loving interactions among adults, they learn to associate love with safety and support, which encourages them to embrace their own feelings and express them freely.\n\nEducational institutions play a crucial role in this process by incorporating social-emotional learning into their curricula. Programs that teach children about empathy, kindness, and emotional intelligence can help them understand the importance of love and vulnerability. By engaging in activities that promote teamwork and collaboration, children can experience the joy of connection and learn to appreciate the value of loving relationships.\n\nMedia and storytelling also significantly influence how children perceive love. By exposing them to narratives that celebrate love in various forms—whether familial, platonic, or romantic—society can help children develop a broader understanding of love\u0027s significance. Positive representations of love in books, movies, and other media can inspire children to look forward to celebrating love in their own lives.\n\nCommunity events and traditions that emphasize love and togetherness can further reinforce this conditioning. Celebrations such as family gatherings, community festivals, or even simple acts of kindness can create a culture where love is openly expressed and valued. When children participate in these activities, they learn that love is not only a personal experience but also a communal one, fostering a sense of belonging and connection.\n\nUltimately, by creating a supportive environment that encourages emotional expression, education, positive media representation, and community engagement, society can help children develop a healthy vulnerability to love. This foundation will enable them to celebrate love throughout their lives, fostering deeper connections and enriching their emotional experiences.",
+    "usage":  {
+                  "prompt_tokens":  230,
+                  "completion_tokens":  309,
+                  "total_tokens":  539,
+                  "prompt_tokens_details":  {
+                                                "cached_tokens":  0,
+                                                "audio_tokens":  0
+                                            },
+                  "completion_tokens_details":  {
+                                                    "reasoning_tokens":  0,
+                                                    "audio_tokens":  0,
+                                                    "accepted_prediction_tokens":  0,
+                                                    "rejected_prediction_tokens":  0
+                                                }
+              },
+    "model":  "gpt-4o-mini",
+    "essence_id":  "d1a2ea8f-8b8a-4962-9e09-34c4a31880a8",
+    "status":  200,
+    "__llm_backend":  "http",
+    "__llm_provider_called":  true,
+    "__llm_provider":  "openai_compatible",
+    "__llm_routed_via":  "llm.local.generate",
+    "envelope":  {
+                     "mode":  "extended",
+                     "tier":  "F0",
+                     "answer":  "To condition a child\u0027s vulnerability to celebrating love, society can create an environment that nurtures emotional openness and connection. This can be achieved through various means, such as promoting healthy relationships within families and communities. When children observe loving interactions among adults, they learn to associate love with safety and support, which encourages them to embrace their own feelings and express them freely.",
+                     "sections":  [
+                                      {
+                                          "title":  "Tree Walk",
+                                          "body":  "Tree Walk: Physics Foundations Walk (tree-derived; source: docs/knowledge/physics/physics-foundations-tree.json)\nChain scaffold: root_to_anchor | continuity: fallback FAIL_NODE_MISSING_EQUATION_REF\n1. Hint: Physics Foundations Tree - Navigation hint only; no doc span bound. (docs/knowledge/physics/physics-foundations-tree.json)\n\nTree Walk: Uncertainty Mechanics Walk (tree-derived; source: docs/knowledge/physics/uncertainty-mechanics-tree.json)\nChain scaffold: root_to_anchor | continuity: fallback FAIL_NODE_MISSING_EQUATION_REF\n1. Walk: Uncertainty Mechanics Tree - Classical, statistical, and quantum-stochastic uncertainty mapped to physics constraints. (docs/knowledge/physics/uncertainty-mechanics-tree.json)\n\nTree Walk: Sector Control Runtime Walk (tree-derived; source: docs/knowledge/sector-control-runtime-tree.json)\nChain scaffold: root_to_leaf\n1. Hint: Sector Control Runtime Tree - Navigation hint only; no doc span bound. (docs/knowledge/sector-control-runtime-tree.json)",
+                                          "citations":  [
+                                                            "docs/knowledge/physics/physics-foundations-tree.json",
+                                                            "docs/knowledge/physics/uncertainty-mechanics-tree.json",
+                                                            "docs/knowledge/sector-control-runtime-tree.json"
+                                                        ],
+                                          "layer":  "details",
+                                          "defaultOpen":  true
+                                      },
+                                      {
+                                          "title":  "Details",
+                                          "body":  "Educational institutions play a crucial role in this process by incorporating social-emotional learning into their curricula. Programs that teach children about empathy, kindness, and emotional intelligence can help them understand the importance of love and vulnerability. By engaging in activities that promote teamwork and collaboration, children can experience the joy of connection and learn to appreciate the value of loving relationships.",
+                                          "layer":  "details",
+                                          "defaultOpen":  true
+                                      },
+                                      {
+                                          "title":  "Details",
+                                          "body":  "Media and storytelling also significantly influence how children perceive love. By exposing them to narratives that celebrate love in various forms—whether familial, platonic, or romantic—society can help children develop a broader understanding of love\u0027s significance. Positive representations of love in books, movies, and other media can inspire children to look forward to celebrating love in their own lives.",
+                                          "layer":  "details",
+                                          "defaultOpen":  true
+                                      },
+                                      {
+                                          "title":  "Details",
+                                          "body":  "Community events and traditions that emphasize love and togetherness can further reinforce this conditioning. Celebrations such as family gatherings, community festivals, or even simple acts of kindness can create a culture where love is openly expressed and valued. When children participate in these activities, they learn that love is not only a personal experience but also a communal one, fostering a sense of belonging and connection.",
+                                          "layer":  "details",
+                                          "defaultOpen":  true
+                                      },
+                                      {
+                                          "title":  "Details",
+                                          "body":  "Ultimately, by creating a supportive environment that encourages emotional expression, education, positive media representation, and community engagement, society can help children develop a healthy vulnerability to love. This foundation will enable them to celebrate love throughout their lives, fostering deeper connections and enriching their emotional experiences.",
+                                          "layer":  "details",
+                                          "defaultOpen":  true
+                                      }
+                                  ],
+                     "extension":  {
+                                       "available":  true,
+                                       "title":  "Additional Repo Context",
+                                       "body":  "Additional repo context:\n- Evidence: Section: Overview Span: L9-L11 Definition: Boundary conditions restrict the allowed field modes, which changes the energy spectrum and drives Casimir forces. Key questions: What boundary assumptions are used, a... (see docs/knowledge/physics/boundary-conditions-modes.md)\n- Evidence: Section: Overview Span: L9-L11 Definition: Energy conditions (NEC, WEC, SEC, DEC) are inequalities that restrict stress-energy tensors to physically reasonable regimes. Key questions: Which conditions are check... (see docs/knowledge/physics/energy-conditions.md)\n- Evidence: Section: Overview Span: L9-L11 Definition: The Ford-Roman quantum inequality bounds how much negative energy can persist over a sampling time, limiting exotic configurations. Key questions: What sampling time i... (see docs/knowledge/physics/ford-roman-quantum-inequality.md)",
+                                       "citations":  [
+                                                         "docs/knowledge/physics/boundary-conditions-modes.md",
+                                                         "docs/knowledge/physics/energy-conditions.md",
+                                                         "docs/knowledge/physics/ford-roman-quantum-inequality.md"
+                                                     ]
+                                   }
+                 },
+    "prompt_ingested":  false,
+    "concept":  {
+                    "id":  "energy-conditions",
+                    "source_path":  "docs/knowledge/physics/energy-conditions.md",
+                    "provenance_class":  "inferred",
+                    "claim_tier":  "diagnostic",
+                    "certifying":  false
+                },
+    "provenance_class":  "inferred",
+    "claim_tier":  "diagnostic",
+    "certifying":  false,
+    "debug":  {
+                  "two_pass":  false,
+                  "micro_pass":  true,
+                  "trace_id":  "ask:93aaf28d-8cfb-4857-9226-55df0a9a5c0a",
+                  "llm_route_expected_backend":  "http",
+                  "llm_runtime_env":  "http",
+                  "llm_policy_env":  "http",
+                  "llm_http_base_present":  true,
+                  "llm_http_base_host":  "api.openai.com",
+                  "llm_api_key_present":  true,
+                  "llm_invoke_attempted":  true,
+                  "llm_force_probe_requested":  false,
+                  "llm_force_probe_enabled":  false,
+                  "tuning_enabled":  false,
+                  "fast_quality_mode":  false,
+                  "arbiter_repo_ratio":  0.45,
+                  "arbiter_hybrid_ratio":  0.25,
+                  "retry_topk_bonus":  4,
+                  "format_enforcement":  "strict",
+                  "soft_expansion":  0,
+                  "scaffold_tokens":  512,
+                  "evidence_tokens":  512,
+                  "repair_tokens":  192,
+                  "hypothesis_enabled":  false,
+                  "agent_loop_enabled":  true,
+                  "agent_loop_max_steps":  3,
+                  "agent_loop_budget_ms":  120000,
+                  "agent_action_budget_ms":  20000,
+                  "clocka_tool_cap":  2,
+                  "agent_loop_steps":  0,
+                  "agent_loop_actions":  [
+                                             {
+                                                 "action":  "expand_heading_aliases",
+                                                 "reason":  "doc_heading_seed_slots",
+                                                 "expectedGain":  "seed_slot_aliases",
+                                                 "overBudget":  false,
+                                                 "ok":  true,
+                                                 "ts":  "2026-03-03T00:59:25.988Z"
+                                             }
+                                         ],
+                  "agent_action_counts":  {
+                                              "expand_heading_aliases":  1
+                                          },
+                  "agent_attempts":  [
+                                         "expand_heading_aliases"
+                                     ],
+                  "single_llm":  true,
+                  "definition_focus":  false,
+                  "block_scoped":  false,
+                  "report_mode":  false,
+                  "report_blocks_count":  0,
+                  "slot_plan_pass_used":  false,
+                  "session_memory_used":  false,
+                  "explicit_repo_expectation":  false,
+                  "repo_expectation_score":  0,
+                  "repo_expectation_level":  "low",
+                  "repo_expectation_signals":  [
+
+                                               ],
+                  "explicit_repo_paths":  [
+
+                                          ],
+                  "ambiguity_resolver_applied":  false,
+                  "ambiguity_resolver_token_count":  10,
+                  "ambiguity_resolver_short_prompt":  false,
+                  "ambiguity_resolver_top_score":  18,
+                  "ambiguity_resolver_margin":  0,
+                  "slot_dominance_margin":  0,
+                  "ambiguity_resolver_candidates":  [
+                                                        "energy-conditions",
+                                                        "energy condition",
+                                                        "energy conditions"
+                                                    ],
+                  "format":  "brief",
+                  "stage_tags":  false,
+                  "verbosity":  "extended",
+                  "intent_id":  "general.fallback",
+                  "intent_domain":  "general",
+                  "intent_tier":  "F0",
+                  "intent_strategy":  "general_explain",
+                  "intent_reason":  "default",
+                  "frontier_theory_lens_source":  "none",
+                  "frontier_theory_lens_requested":  false,
+                  "frontier_theory_lens_active":  false,
+                  "frontier_session_lens_locked":  false,
+                  "frontier_session_followup_requested":  false,
+                  "frontier_session_reset_requested":  false,
+                  "frontier_session_lock_next":  false,
+                  "frontier_required_slots":  [
+                                                  "definitions",
+                                                  "baseline",
+                                                  "hypothesis",
+                                                  "anti_hypothesis",
+                                                  "falsifiers",
+                                                  "uncertainty_band",
+                                                  "claim_tier"
+                                              ],
+                  "is_repo_question":  false,
+                  "concept_id":  "energy-conditions",
+                  "concept_label":  "energy-conditions",
+                  "concept_source":  "docs/knowledge/physics/energy-conditions.md",
+                  "topic_tags":  [
+                                     "physics"
+                                 ],
+                  "topic_allowlist_tiers":  2,
+                  "topic_must_include_files":  [
+                                                   "docs/stellar-consciousness-ii.md",
+                                                   "docs/stellar-consciousness-orch-or-review.md",
+                                                   "docs/knowledge/dag-node-schema.md",
+                                                   "docs/knowledge/physics/math-tree.json",
+                                                   "docs/knowledge/physics/math-maturity-stages.md",
+                                                   "docs/knowledge/physics/physics-foundations-tree.json",
+                                                   "docs/knowledge/bridges/ideology-physics-bridge-tree.json",
+                                                   "docs/ethos/ideology.json",
+                                                   "WARP_AGENTS.md",
+                                                   "server/gr/gr-constraint-policy.ts",
+                                                   "server/gr/gr-evaluation.ts"
+                                               ],
+                  "graph_pack_lock":  {
+                                          "requested":  [
+
+                                                        ],
+                                          "applied":  [
+                                                          "physics-foundations",
+                                                          "uncertainty-mechanics",
+                                                          "sector-control-runtime"
+                                                      ]
+                                      },
+                  "graph_congruence_region":  {
+                                                  "B_equals_1":  true,
+                                                  "qi_metric_derived_equals_true":  true,
+                                                  "qi_strict_ok_equals_true":  true,
+                                                  "theta_geom_equals_true":  true,
+                                                  "vdb_two_wall_support_equals_true":  true,
+                                                  "ts_metric_derived_equals_true":  true,
+                                                  "cl3_metric_t00_available_equals_true":  true,
+                                                  "cl3_rho_gate_equals_true":  false
+                                              },
+                  "graph_congruence_chart":  "comoving_cartesian",
+                  "graph_framework":  {
+                                          "primary":  "physics-foundations",
+                                          "trees":  [
+                                                        {
+                                                            "tree":  "physics-foundations",
+                                                            "anchors":  [
+                                                                            "energy-conditions",
+                                                                            "energy-conditions-stack",
+                                                                            "boundary-conditions-modes"
+                                                                        ],
+                                                            "nodes":  [
+                                                                          "physics-foundations-tree"
+                                                                      ],
+                                                            "source":  "docs/knowledge/physics/physics-foundations-tree.json",
+                                                            "score":  248.60000000000002,
+                                                            "pathMode":  "root_to_anchor",
+                                                            "pathFallbackReason":  "FAIL_NODE_MISSING_EQUATION_REF",
+                                                            "congruence":  {
+                                                                               "inventory":  {
+                                                                                                 "nodesCount":  45,
+                                                                                                 "evaluatedEdges":  117,
+                                                                                                 "blockedLinkCount":  0
+                                                                                             },
+                                                                               "allowedEdges":  10,
+                                                                               "blockedEdges":  107,
+                                                                               "resolvedInTreeEdges":  0,
+                                                                               "resolvedCrossTreeEdges":  10,
+                                                                               "blockedByReason":  {
+                                                                                                       "blocked_link":  0,
+                                                                                                       "conceptual_disallowed":  102,
+                                                                                                       "proxy_disallowed":  0,
+                                                                                                       "cl_exceeds_allowed":  0,
+                                                                                                       "chart_mismatch":  0,
+                                                                                                       "condition_unsatisfied":  0,
+                                                                                                       "unresolved_target":  0,
+                                                                                                       "node_missing_equation_ref":  5,
+                                                                                                       "node_missing_claim_ids":  0
+                                                                                                   },
+                                                                               "blockedByCondition":  {
+
+                                                                                                      },
+                                                                               "strictSignals":  {
+                                                                                                     "B_equals_1":  true,
+                                                                                                     "qi_metric_derived_equals_true":  true,
+                                                                                                     "qi_strict_ok_equals_true":  true,
+                                                                                                     "theta_geom_equals_true":  true,
+                                                                                                     "vdb_two_wall_support_equals_true":  true,
+                                                                                                     "ts_metric_derived_equals_true":  true,
+                                                                                                     "cl3_metric_t00_available_equals_true":  true,
+                                                                                                     "cl3_rho_gate_equals_true":  false
+                                                                                                 }
+                                                                           }
+                                                        },
+                                                        {
+                                                            "tree":  "uncertainty-mechanics",
+                                                            "anchors":  [
+                                                                            "uncertainty-energy-conditions",
+                                                                            "uncertainty-boundary-conditions",
+                                                                            "uncertainty-classical-stack"
+                                                                        ],
+                                                            "nodes":  [
+                                                                          "uncertainty-mechanics-tree"
+                                                                      ],
+                                                            "source":  "docs/knowledge/physics/uncertainty-mechanics-tree.json",
+                                                            "score":  142.8,
+                                                            "pathMode":  "root_to_anchor",
+                                                            "pathFallbackReason":  "FAIL_NODE_MISSING_EQUATION_REF",
+                                                            "congruence":  {
+                                                                               "inventory":  {
+                                                                                                 "nodesCount":  30,
+                                                                                                 "evaluatedEdges":  69,
+                                                                                                 "blockedLinkCount":  0
+                                                                                             },
+                                                                               "allowedEdges":  4,
+                                                                               "blockedEdges":  65,
+                                                                               "resolvedInTreeEdges":  0,
+                                                                               "resolvedCrossTreeEdges":  4,
+                                                                               "blockedByReason":  {
+                                                                                                       "blocked_link":  0,
+                                                                                                       "conceptual_disallowed":  62,
+                                                                                                       "proxy_disallowed":  0,
+                                                                                                       "cl_exceeds_allowed":  0,
+                                                                                                       "chart_mismatch":  0,
+                                                                                                       "condition_unsatisfied":  0,
+                                                                                                       "unresolved_target":  0,
+                                                                                                       "node_missing_equation_ref":  3,
+                                                                                                       "node_missing_claim_ids":  0
+                                                                                                   },
+                                                                               "blockedByCondition":  {
+
+                                                                                                      },
+                                                                               "strictSignals":  {
+                                                                                                     "B_equals_1":  true,
+                                                                                                     "qi_metric_derived_equals_true":  true,
+                                                                                                     "qi_strict_ok_equals_true":  true,
+                                                                                                     "theta_geom_equals_true":  true,
+                                                                                                     "vdb_two_wall_support_equals_true":  true,
+                                                                                                     "ts_metric_derived_equals_true":  true,
+                                                                                                     "cl3_metric_t00_available_equals_true":  true,
+                                                                                                     "cl3_rho_gate_equals_true":  false
+                                                                                                 }
+                                                                           }
+                                                        },
+                                                        {
+                                                            "tree":  "sector-control-runtime",
+                                                            "anchors":  [
+                                                                            "sector-control-runtime-tree",
+                                                                            "sector-control-planner-tooling",
+                                                                            "sector-control-mode-preflight",
+                                                                            "sector-control-helix-ask-tree-dag"
+                                                                        ],
+                                                            "nodes":  [
+                                                                          "sector-control-runtime-tree"
+                                                                      ],
+                                                            "source":  "docs/knowledge/sector-control-runtime-tree.json",
+                                                            "score":  72,
+                                                            "pathMode":  "root_to_leaf",
+                                                            "pathFallbackReason":  null,
+                                                            "congruence":  {
+                                                                               "inventory":  {
+                                                                                                 "nodesCount":  7,
+                                                                                                 "evaluatedEdges":  19,
+                                                                                                 "blockedLinkCount":  0
+                                                                                             },
+                                                                               "allowedEdges":  0,
+                                                                               "blockedEdges":  19,
+                                                                               "resolvedInTreeEdges":  0,
+                                                                               "resolvedCrossTreeEdges":  0,
+                                                                               "blockedByReason":  {
+                                                                                                       "blocked_link":  0,
+                                                                                                       "conceptual_disallowed":  19,
+                                                                                                       "proxy_disallowed":  0,
+                                                                                                       "cl_exceeds_allowed":  0,
+                                                                                                       "chart_mismatch":  0,
+                                                                                                       "condition_unsatisfied":  0,
+                                                                                                       "unresolved_target":  0,
+                                                                                                       "node_missing_equation_ref":  0,
+                                                                                                       "node_missing_claim_ids":  0
+                                                                                                   },
+                                                                               "blockedByCondition":  {
+
+                                                                                                      },
+                                                                               "strictSignals":  {
+                                                                                                     "B_equals_1":  true,
+                                                                                                     "qi_metric_derived_equals_true":  true,
+                                                                                                     "qi_strict_ok_equals_true":  true,
+                                                                                                     "theta_geom_equals_true":  true,
+                                                                                                     "vdb_two_wall_support_equals_true":  true,
+                                                                                                     "ts_metric_derived_equals_true":  true,
+                                                                                                     "cl3_metric_t00_available_equals_true":  true,
+                                                                                                     "cl3_rho_gate_equals_true":  false
+                                                                                                 }
+                                                                           }
+                                                        }
+                                                    ]
+                                      },
+                  "graph_congruence_diagnostics":  {
+                                                       "treeCount":  3,
+                                                       "allowedEdges":  14,
+                                                       "blockedEdges":  191,
+                                                       "resolvedInTreeEdges":  0,
+                                                       "resolvedCrossTreeEdges":  14,
+                                                       "blockedByReason":  {
+                                                                               "blocked_link":  0,
+                                                                               "conceptual_disallowed":  183,
+                                                                               "proxy_disallowed":  0,
+                                                                               "cl_exceeds_allowed":  0,
+                                                                               "chart_mismatch":  0,
+                                                                               "condition_unsatisfied":  0,
+                                                                               "unresolved_target":  0,
+                                                                               "node_missing_equation_ref":  8,
+                                                                               "node_missing_claim_ids":  0
+                                                                           },
+                                                       "blockedByCondition":  {
+
+                                                                              },
+                                                       "strictSignals":  {
+                                                                             "B_equals_1":  true,
+                                                                             "qi_metric_derived_equals_true":  true,
+                                                                             "qi_strict_ok_equals_true":  true,
+                                                                             "theta_geom_equals_true":  true,
+                                                                             "vdb_two_wall_support_equals_true":  true,
+                                                                             "ts_metric_derived_equals_true":  true,
+                                                                             "cl3_metric_t00_available_equals_true":  true,
+                                                                             "cl3_rho_gate_equals_true":  false
+                                                                         }
+                                                   },
+                  "tree_walk_mode":  "root_to_anchor",
+                  "tree_walk_max_steps":  0,
+                  "bridge_traversal_candidates":  [
+
+                                                  ],
+                  "bridge_traversal_budget":  {
+                                                  "maxCandidates":  12,
+                                                  "maxDepth":  2
+                                              },
+                  "verification_anchor_required":  false,
+                  "preflight_repo_search_terms":  [
+                                                      "energy condition",
+                                                      "vulnerability"
+                                                  ],
+                  "preflight_repo_search_paths":  [
+                                                      "docs/knowledge/physics",
+                                                      "docs/knowledge/warp",
+                                                      "modules/core",
+                                                      "shared",
+                                                      "docs/stellar-consciousness-ii.md",
+                                                      "docs/stellar-consciousness-orch-or-review.md",
+                                                      "docs/knowledge/dag-node-schema.md",
+                                                      "docs/knowledge/physics/math-tree.json",
+                                                      "docs/knowledge/physics/math-maturity-stages.md",
+                                                      "docs/knowledge/physics/physics-foundations-tree.json",
+                                                      "docs/knowledge/bridges/ideology-physics-bridge-tree.json",
+                                                      "docs/ethos/ideology.json",
+                                                      "WARP_AGENTS.md",
+                                                      "server/gr/gr-constraint-policy.ts",
+                                                      "server/gr/gr-evaluation.ts"
+                                                  ],
+                  "preflight_repo_search_reason":  "preflight",
+                  "preflight_repo_search_hits":  0,
+                  "preflight_repo_search_truncated":  false,
+                  "preflight_repo_search_error":  "rg_not_found",
+                  "preflight_queries":  [
+                                            "If a child would look forward to celebrating love, how can a society condition this vulnerability?",
+                                            "docs/stellar-consciousness-orch-or-review.md",
+                                            "docs/stellar-consciousness-ii.md",
+                                            "docs/stellar-fact-check.md",
+                                            "docs/papers.md",
+                                            "docs/papers",
+                                            "docs/knowledge/stellar-restoration-tree.json",
+                                            "docs/knowledge/trees/stellar-restoration-tree.md"
+                                        ],
+                  "preflight_files":  [
+                                          "client/src/components/ElectronOrbitalPanel.tsx",
+                                          "client/src/hooks/useElectronOrbitSim.ts",
+                                          "docs/stellar-consciousness-orch-or-review.md",
+                                          "docs/knowledge/trees/stellar-restoration-tree.md",
+                                          "docs/stellar-consciousness-ii.md",
+                                          "docs/papers.md",
+                                          "docs/knowledge/physics/physics-foundations-tree.json",
+                                          "docs/knowledge/physics/uncertainty-mechanics-tree.json",
+                                          "docs/knowledge/sector-control-runtime-tree.json"
+                                      ],
+                  "preflight_file_count":  9,
+                  "preflight_doc_share":  0.7777777777777778,
+                  "preflight_evidence_ok":  false,
+                  "preflight_evidence_ratio":  0.21428571428571427,
+                  "preflight_retrieval_upgrade":  false,
+                  "context_deferred":  false,
+                  "micro_pass_enabled":  true,
+                  "fast_quality_plan_pass_suppressed":  false,
+                  "plan_pass_used":  true,
+                  "plan_pass_forced":  true,
+                  "micro_pass_auto":  false,
+                  "micro_pass_reason":  "general",
+                  "graph_node_acceptance_rate":  1,
+                  "graph_node_acceptance_total":  13,
+                  "graph_node_acceptance_rejected":  0,
+                  "graph_node_acceptance_missing":  [
+
+                                                    ],
+                  "graph_evidence_count":  17,
+                  "graph_evidence_doc_blocks":  6,
+                  "graph_evidence_types":  [
+                                               "code",
+                                               "doc",
+                                               "test"
+                                           ],
+                  "tree_walk":  {
+                                    "treeCount":  3,
+                                    "nodeCount":  3,
+                                    "nodesWithText":  3,
+                                    "nodesWithoutText":  0,
+                                    "stepCount":  3,
+                                    "treeIds":  [
+                                                    "physics-foundations",
+                                                    "uncertainty-mechanics",
+                                                    "sector-control-runtime"
+                                                ],
+                                    "primaryTreeId":  "physics-foundations",
+                                    "boundCount":  1
+                                },
+                  "tree_walk_lines":  9,
+                  "tree_walk_block_present":  true,
+                  "tree_walk_bound_nodes":  1,
+                  "tree_walk_binding_rate":  0.333,
+                  "code_alignment_applied":  true,
+                  "code_alignment_symbols":  [
+                                                 "L11",
+                                                 "Constraint",
+                                                 "Casimir",
+                                                 "Which",
+                                                 "chartDependency",
+                                                 "WARP_AGENTS"
+                                             ],
+                  "code_alignment_resolved":  [
+                                                  "client/src/lib/qi/qi-auto-tuner.ts",
+                                                  "tests/viability-validation.ts",
+                                                  "modules/dynamic/dynamic-casimir.ts"
+                                              ],
+                  "code_spans_added":  3,
+                  "prompt_items":  [
+                                       {
+                                           "type":  "intent",
+                                           "hash":  "b62ff90c5bec",
+                                           "size":  46
+                                       },
+                                       {
+                                           "type":  "retrieval_summary",
+                                           "hash":  "e98b6d3dc44a",
+                                           "size":  328
+                                       },
+                                       {
+                                           "type":  "selected_trees",
+                                           "hash":  "158554e7a7e1",
+                                           "size":  66
+                                       },
+                                       {
+                                           "type":  "doc_spans",
+                                           "hash":  "b2d007cbe543",
+                                           "size":  431
+                                       },
+                                       {
+                                           "type":  "code_spans",
+                                           "hash":  "bdae4f10a456",
+                                           "size":  179
+                                       }
+                                   ],
+                  "prompt_item_count":  5,
+                  "tool_results_block":  "TOOL_RESULTS\n[retrieval_summary]\nfiles: docs/knowledge/physics/viability-definition.md, docs/knowledge/physics/energy-conditions.md, docs/knowledge/physics/ford-roman-quantum-inequality.md, docs/knowledge/physics/boundary-conditions-modes.md, docs/knowledge/physics/uncertainty-mechanics-tree.json, docs/knowledge/physics/numerical-precision.md\nconfidence: 0.00\n\n[doc_spans]\n- Section: Overview (docs/knowledge/physics/viability-definition.md)\n- Section: Overview (docs/knowledge/physics/energy-conditions.md)\n- Section: Overview (docs/knowledge/physics/ford-roman-quantum-inequality.md)\n- Section: Overview (docs/knowledge/physics/boundary-conditions-modes.md)\n- Section: Overview (docs/knowledge/physics/uncertainty-mechanics-tree.json)\n- Section: Overview (docs/knowledge/physics/numerical-precision.md)\n\n[code_spans]\n- Constraint Span: L3-L7 (client/src/lib/qi/qi-auto-tuner.ts)\n- Constraint Span: L18-L22 (tests/viability-validation.ts)\n- Casimir Span: L1-L4 (modules/dynamic/dynamic-casimir.ts)\n\nEND_TOOL_RESULTS",
+                  "tool_results_present":  true,
+                  "tool_results_items":  [
+                                             "retrieval_summary",
+                                             "doc_spans",
+                                             "code_spans"
+                                         ],
+                  "tool_results_hash":  "bf36ab913519",
+                  "synthesis_mode":  "deterministic_scaffold",
+                  "synthesis_mode_reasons":  [
+                                                 "single_llm"
+                                             ],
+                  "synthesis_reason":  "mode=deterministic_scaffold | repo=none | prompt=none | general=none | repo_scaffold=no | prompt_scaffold=no | general_scaffold=yes",
+                  "synthesis_repo_path":  "none",
+                  "synthesis_prompt_path":  "none",
+                  "synthesis_general_path":  "none",
+                  "ambiguity_resolver_bypassed":  "open_world_explainer_mode",
+                  "needle_natario_relation_proof":  {
+                                                        "applicable":  false,
+                                                        "ok":  true,
+                                                        "outcome":  "not_applicable",
+                                                        "matched_edge_ids":  [
+
+                                                                             ],
+                                                        "missing_edge_ids":  [
+
+                                                                             ]
+                                                    },
+                  "evidence_cards":  "- Interpretation: \"energy condition\" is treated as energy-conditions.\n- Definition: Energy conditions (NEC, WEC, SEC, DEC) are inequalities that restrict stress-energy tensors to physically reasonable regimes.\n- Key questions: Which conditions are checked and how do they map to repo constraint gates?\n- Notes: Constraint policies live in server/gr/gr-constraint-policy.ts and server/gr/gr-evaluation.ts.\n- Scope: constraints on allowable stress-energy configurations",
+                  "answer_token_budget":  4096,
+                  "answer_token_cap":  4096,
+                  "answer_token_base":  4096,
+                  "answer_token_boosts":  [
+                                              "force_full_floor"
+                                          ],
+                  "answer_token_reason":  "auto:force_full_floor",
+                  "llm_backend_used":  "http",
+                  "llm_provider_called":  true,
+                  "llm_model":  "gpt-4o-mini",
+                  "llm_http_status":  200,
+                  "llm_routed_via":  "llm.local.generate",
+                  "llm_call_stage":  "answer_rescue",
+                  "llm_invoke_started_at":  "2026-03-03T00:59:32.782Z",
+                  "llm_invoke_ended_at":  "2026-03-03T00:59:40.335Z",
+                  "llm_invoke_duration_ms":  7553,
+                  "llm_calls":  [
+                                    {
+                                        "stage":  "answer",
+                                        "backend":  "http",
+                                        "providerCalled":  true,
+                                        "model":  "gpt-4o-mini",
+                                        "status":  200,
+                                        "routedVia":  "llm.local.generate",
+                                        "startedAtIso":  "2026-03-03T00:59:26.556Z",
+                                        "endedAtIso":  "2026-03-03T00:59:32.774Z",
+                                        "durationMs":  6218
+                                    },
+                                    {
+                                        "stage":  "answer_rescue",
+                                        "backend":  "http",
+                                        "providerCalled":  true,
+                                        "model":  "gpt-4o-mini",
+                                        "status":  200,
+                                        "routedVia":  "llm.local.generate",
+                                        "startedAtIso":  "2026-03-03T00:59:32.782Z",
+                                        "endedAtIso":  "2026-03-03T00:59:40.335Z",
+                                        "durationMs":  7553
+                                    }
+                                ],
+                  "answer_retry_applied":  false,
+                  "answer_short_sentences":  16,
+                  "answer_short_tokens":  477,
+                  "answer_contract_primary_applied":  false,
+                  "answer_raw_text":  "To condition a child\u0027s vulnerability to celebrating love, society can create an environment that nurtures emotional openness and connection. This involves fostering relationships that emphasize trust, empathy, and understanding. By encouraging children to express their feelings and share experiences, society can help them develop a positive association with love and vulnerability.\n\nOne way to achieve this is through educational programs that teach emotional intelligence. These programs can provide children with the tools to recognize and articulate their emotions, as well as understand the feelings of others. By integrating lessons on love and relationships into the curriculum, children can learn the importance of love as a fundamental human experience.\n\nAdditionally, community events that celebrate love in various forms can reinforce this conditioning. Activities such as family gatherings, friendship days, or community service projects can highlight the significance of love and connection. By participating in these events, children can witness and engage in acts of love, further solidifying their understanding and appreciation of it.\n\nParental involvement is also crucial in this process. Parents can model healthy relationships and demonstrate love through their actions and words. When children see their caregivers expressing love and vulnerability, they are more likely to adopt similar behaviors and attitudes towards love in their own lives.\n\nIn practice, creating a society that conditions children to embrace vulnerability in love requires a multifaceted approach. It involves educational initiatives, community engagement, and positive role modeling by parents and caregivers. By embedding these values into the fabric of society, children can grow up with a healthy understanding of love, making them more open to celebrating it throughout their lives.",
+                  "answer_contract_applied":  false,
+                  "report_mode_mismatch":  false,
+                  "report_scaffold_guard_triggered":  false,
+                  "answer_after_format":  "To condition a child\u0027s vulnerability to celebrating love, society can create an environment that nurtures emotional openness and connection. This involves fostering relationships that emphasize trust, empathy, and understanding. By encouraging children to express their feelings and share experiences, society can help them develop a positive association with love and vulnerability.\n\nOne way to achieve this is through educational programs that teach emotional intelligence. These programs can provide children with the tools to recognize and articulate their emotions, as well as understand the feelings of others. By integrating lessons on love and relationships into the curriculum, children can learn the importance of love as a fundamental human experience.\n\nAdditionally, community events that celebrate love in various forms can reinforce this conditioning. Activities such as family gatherings, friendship days, or community service projects can highlight the significance of love and connection. By participating in these events, children can witness and engage in acts of love, further solidifying their understanding and appreciation of it.\n\nParental involvement is also crucial in this process. Parents can model healthy relationships and demonstrate love through their actions and words. When children see their caregivers expressing love and vulnerability, they are more likely to adopt similar behaviors and attitudes towards love in their own lives.\n\nIn practice, creating a society that conditions children to embrace vulnerability in love requires a multifaceted approach. It involves educational initiatives, community engagement, and positive role modeling by parents and caregivers. By embedding these values into the fabric of society, children can grow up with a healthy understanding of love, making them more open to celebrating it throughout their lives.",
+                  "frontier_lens_required":  false,
+                  "frontier_lens_candidate_count":  0,
+                  "claim_ref_rate":  0,
+                  "answer_after_fallback":  "To condition a child\u0027s vulnerability to celebrating love, society can create an environment that nurtures emotional openness and connection. This involves fostering relationships that emphasize trust, empathy, and understanding. By encouraging children to express their feelings and share experiences, society can help them develop a positive association with love and vulnerability.",
+                  "junk_clean_applied":  false,
+                  "junk_clean_reasons":  [
+
+                                         ],
+                  "concept_lint_applied":  true,
+                  "concept_lint_reasons":  [
+                                               "sentence_limit"
+                                           ],
+                  "physics_lint_applied":  false,
+                  "physics_lint_reasons":  [
+
+                                           ],
+                  "drift_repair_applied":  false,
+                  "drift_repair_attempts":  0,
+                  "drift_repair_improved":  false,
+                  "coverage_token_count":  10,
+                  "coverage_key_count":  8,
+                  "coverage_missing_key_count":  7,
+                  "coverage_ratio":  0.125,
+                  "coverage_missing_keys":  [
+                                                "child",
+                                                "would",
+                                                "look",
+                                                "forward",
+                                                "celebrat",
+                                                "love"
+                                            ],
+                  "coverage_gate_applied":  false,
+                  "claim_ledger":  [
+                                       {
+                                           "id":  "claim:1",
+                                           "type":  "fact",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+
+                                                             ],
+                                           "proof":  "source:missing -\u003e verify -\u003e claim:1"
+                                       },
+                                       {
+                                           "id":  "claim:2",
+                                           "type":  "fact",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+
+                                                             ],
+                                           "proof":  "source:missing -\u003e verify -\u003e claim:2"
+                                       },
+                                       {
+                                           "id":  "claim:3",
+                                           "type":  "inference",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+
+                                                             ],
+                                           "proof":  "source:missing -\u003e verify -\u003e claim:3"
+                                       }
+                                   ],
+                  "uncertainty_register":  [
+                                               {
+                                                   "id":  "claim:1",
+                                                   "type":  "fact",
+                                                   "reason":  "missing_evidence"
+                                               },
+                                               {
+                                                   "id":  "claim:2",
+                                                   "type":  "fact",
+                                                   "reason":  "missing_evidence"
+                                               },
+                                               {
+                                                   "id":  "claim:3",
+                                                   "type":  "inference",
+                                                   "reason":  "missing_evidence"
+                                               }
+                                           ],
+                  "constraint_matrix":  {
+                                            "section_count":  1,
+                                            "constraints":  [
+
+                                                            ]
+                                        },
+                  "belief_claim_count":  3,
+                  "belief_supported_count":  0,
+                  "belief_unsupported_count":  3,
+                  "belief_unsupported_rate":  1,
+                  "belief_contradictions":  0,
+                  "belief_gate_applied":  false,
+                  "belief_graph_node_count":  5,
+                  "belief_graph_edge_count":  1,
+                  "belief_graph_claim_count":  3,
+                  "belief_graph_definition_count":  0,
+                  "belief_graph_conclusion_count":  1,
+                  "belief_graph_evidence_ref_count":  2,
+                  "belief_graph_constraint_count":  0,
+                  "belief_graph_supports":  0,
+                  "belief_graph_contradicts":  0,
+                  "belief_graph_depends_on":  1,
+                  "belief_graph_maps_to":  0,
+                  "belief_graph_claim_ids":  [
+                                                 "claim:1",
+                                                 "claim:2",
+                                                 "claim:3"
+                                             ],
+                  "belief_graph_unsupported_claim_ids":  [
+                                                             "claim:1",
+                                                             "claim:2",
+                                                             "claim:3"
+                                                         ],
+                  "belief_graph_contradiction_ids":  [
+
+                                                     ],
+                  "rattling_score":  1,
+                  "rattling_gate_applied":  false,
+                  "grounded_sentence_rate":  0,
+                  "tree_citation_share":  0,
+                  "tree_citation_total":  0,
+                  "tree_citation_tree":  0,
+                  "tree_citation_non_tree":  0,
+                  "rattling_base_distance":  0.9864864864864865,
+                  "rattling_perturbation_distance":  1,
+                  "rattling_claim_set_count":  2,
+                  "variant_selection_applied":  false,
+                  "variant_selection_reason":  "general_domain",
+                  "variant_selection_candidate_count":  1,
+                  "gates":  {
+                                "evidence":  {
+
+                                             },
+                                "coverage":  {
+                                                 "applied":  false,
+                                                 "ratio":  0.125,
+                                                 "tokenCount":  10,
+                                                 "keyCount":  8,
+                                                 "missingKeyCount":  7,
+                                                 "missingKeys":  [
+                                                                     "child",
+                                                                     "would",
+                                                                     "look",
+                                                                     "forward",
+                                                                     "celebrat",
+                                                                     "love"
+                                                                 ]
+                                             },
+                                "belief":  {
+                                               "applied":  false,
+                                               "unsupportedRate":  1,
+                                               "unsupportedCount":  3,
+                                               "supportedCount":  0,
+                                               "claimCount":  3,
+                                               "contradictions":  0
+                                           },
+                                "beliefGraph":  {
+                                                    "nodeCount":  5,
+                                                    "edgeCount":  1,
+                                                    "claimCount":  3,
+                                                    "definitionCount":  0,
+                                                    "conclusionCount":  1,
+                                                    "evidenceRefCount":  2,
+                                                    "constraintCount":  0,
+                                                    "supports":  0,
+                                                    "contradicts":  0,
+                                                    "dependsOn":  1,
+                                                    "mapsTo":  0
+                                                },
+                                "rattling":  {
+                                                 "applied":  false,
+                                                 "score":  1,
+                                                 "baseDistance":  0.9864864864864865,
+                                                 "perturbationDistance":  1,
+                                                 "claimSetCount":  2
+                                             },
+                                "lint":  {
+                                             "conceptApplied":  true,
+                                             "conceptReasons":  [
+                                                                    "sentence_limit"
+                                                                ],
+                                             "physicsApplied":  false,
+                                             "physicsReasons":  [
+
+                                                                ]
+                                         },
+                                "variant":  {
+                                                "applied":  false,
+                                                "reason":  "general_domain",
+                                                "candidateCount":  1
+                                            },
+                                "ambiguity":  {
+                                                  "resolverApplied":  false,
+                                                  "resolverTokenCount":  10,
+                                                  "resolverShortPrompt":  false,
+                                                  "resolverTopScore":  18,
+                                                  "resolverMargin":  0,
+                                                  "resolverCandidates":  [
+                                                                             "energy-conditions",
+                                                                             "energy condition",
+                                                                             "energy conditions"
+                                                                         ]
+                                              }
+                            },
+                  "answer_path":  [
+                                      "intent:general.fallback",
+                                      "domain:general",
+                                      "strategy:general_explain",
+                                      "concept:energy-conditions",
+                                      "answer:llm",
+                                      "citationRepair:skipped(intent)",
+                                      "platonic:gates",
+                                      "answerExtension:appended",
+                                      "moveSelector:direct_answer",
+                                      "answer_rescue:llm_second_pass",
+                                      "semanticQuality:fail:CLAIM_CITATION_LINK_MISSING,unsupported_claim_rate_high",
+                                      "citationScrub:general_sources_suppressed"
+                                  ],
+                  "fuzzy_move_selector":  {
+                                              "selected":  "direct_answer",
+                                              "selected_move":  "direct_answer",
+                                              "move_scores":  {
+                                                                  "direct_answer":  0.7640999999999999,
+                                                                  "retrieve_more":  0.7178000000000002,
+                                                                  "fail_closed":  0.17769,
+                                                                  "relation_build":  -0.21260000000000007,
+                                                                  "clarify":  -0.37670000000000003
+                                                              },
+                                              "rejected_moves":  [
+                                                                     "retrieve_more",
+                                                                     "fail_closed",
+                                                                     "relation_build",
+                                                                     "clarify"
+                                                                 ],
+                                              "reject_reasons":  {
+                                                                     "direct_answer":  [
+
+                                                                                       ],
+                                                                     "retrieve_more":  [
+                                                                                           "lower_score"
+                                                                                       ],
+                                                                     "relation_build":  [
+                                                                                            "lower_score",
+                                                                                            "relation_intent_inactive"
+                                                                                        ],
+                                                                     "clarify":  [
+                                                                                     "lower_score"
+                                                                                 ],
+                                                                     "fail_closed":  [
+                                                                                         "lower_score",
+                                                                                         "risk_below_fail_closed_threshold"
+                                                                                     ]
+                                                                 },
+                                              "budget_pressure":  0.15,
+                                              "stop_reason":  "goal_satisfied",
+                                              "dynamic_biases":  {
+                                                                     "relationBuildBias":  0,
+                                                                     "retrieveMoreBias":  0,
+                                                                     "bridgeGap":  1,
+                                                                     "evidenceGap":  1,
+                                                                     "dualDomainGap":  0
+                                                                 },
+                                              "dynamic_bias_relation_build":  0,
+                                              "dynamic_bias_retrieve_more":  0,
+                                              "gaps":  {
+                                                           "bridge":  1,
+                                                           "evidence":  1,
+                                                           "dual_domain":  0
+                                                       },
+                                              "scores":  {
+                                                             "groundedness":  1,
+                                                             "uncertainty":  0,
+                                                             "safety":  0.3,
+                                                             "coverage":  0
+                                                         }
+                                          },
+                  "second_pass_attempted":  false,
+                  "second_pass_skipped_reason":  "move_not_eligible",
+                  "second_pass_result":  "not_run",
+                  "answer_runtime_fallback_pinned":  false,
+                  "answer_rescue_eligible":  true,
+                  "answer_rescue_trigger":  "adaptive_quality_risk",
+                  "answer_rescue_quality_reasons":  [
+                                                        "citation_missing",
+                                                        "open_world_claim_floor"
+                                                    ],
+                  "answer_rescue_attempted":  true,
+                  "answer_rescue_applied":  true,
+                  "answer_rescue_reason":  "adaptive_quality_risk",
+                  "runtime_clock_a":  {
+                                          "budget_ms":  0,
+                                          "complete_contract_on_budget":  true
+                                      },
+                  "runtime_clock_b":  {
+                                          "enabled":  true,
+                                          "deep_work_queued":  true,
+                                          "bridge_expansion_candidates":  0,
+                                          "non_blocking":  true
+                                      },
+                  "answer_rescue_pinned":  true,
+                  "answer_quality_floor_bypassed":  true,
+                  "answer_quality_floor_bypass_reason":  "open_world_provider_success",
+                  "claim_citation_link_claim_count":  5,
+                  "claim_citation_link_citation_count":  17,
+                  "claim_citation_link_linked_count":  5,
+                  "claim_citation_link_ok":  true,
+                  "claim_citation_link_missing":  [
+
+                                                  ],
+                  "semantic_quality":  {
+                                           "claim_citation_link_rate":  0,
+                                           "deterministic_claim_citation_link_rate":  0,
+                                           "deterministic_claim_count":  14,
+                                           "deterministic_linked_claim_count":  0,
+                                           "unsupported_claim_rate":  1,
+                                           "repetition_penalty_fail":  false,
+                                           "contradiction_flag":  false,
+                                           "fail_reasons":  [
+                                                                "CLAIM_CITATION_LINK_MISSING",
+                                                                "unsupported_claim_rate_high"
+                                                            ]
+                                       },
+                  "answer_final_text":  "To condition a child\u0027s vulnerability to celebrating love, society can create an environment that nurtures emotional openness and connection. This can be achieved through various means, such as promoting healthy relationships within families and communities. When children observe loving interactions among adults, they learn to associate love with safety and support, which encourages them to embrace their own feelings and express them freely.\n\nEducational institutions play a crucial role in this process by incorporating social-emotional learning into their curricula. Programs that teach children about empathy, kindness, and emotional intelligence can help them understand the importance of love and vulnerability. By engaging in activities that promote teamwork and collaboration, children can experience the joy of connection and learn to appreciate the value of loving relationships.\n\nMedia and storytelling also significantly influence how children perceive love. By exposing them to narratives that celebrate love in various forms—whether familial, platonic, or romantic—society can help children develop a broader understanding of love\u0027s significance. Positive representations of love in books, movies, and other media can inspire children to look forward to celebrating love in their own lives.\n\nCommunity events and traditions that emphasize love and togetherness can further reinforce this conditioning. Celebrations such as family gatherings, community festivals, or even simple acts of kindness can create a culture where love is openly expressed and valued. When children participate in these activities, they learn that love is not only a personal experience but also a communal one, fostering a sense of belonging and connection.\n\nUltimately, by creating a supportive environment that encourages emotional expression, education, positive media representation, and community engagement, society can help children develop a healthy vulnerability to love. This foundation will enable them to celebrate love throughout their lives, fostering deeper connections and enriching their emotional experiences.",
+                  "answer_extension_available":  true,
+                  "answer_extension_items":  3,
+                  "answer_extension_doc_items":  3,
+                  "answer_extension_code_items":  0,
+                  "answer_extension_appended":  true,
+                  "live_events":  [
+                                      {
+                                          "ts":  "2026-03-03T00:59:26.088Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Preflight retrieval",
+                                          "detail":  "start",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: Preflight retrieval - start",
+                                          "meta":  {
+                                                       "elapsedMs":  0
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-03T00:59:26.360Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Concept card ready",
+                                          "detail":  "energy-conditions",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: Concept card ready - energy-conditions",
+                                          "meta":  {
+                                                       "elapsedMs":  0
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-03T00:59:26.556Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Generating answer",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: Generating answer"
+                                      },
+                                      {
+                                          "ts":  "2026-03-03T00:59:26.556Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "LLM answer",
+                                          "detail":  "start",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: LLM answer - start",
+                                          "meta":  {
+                                                       "elapsedMs":  0
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-03T00:59:32.774Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "LLM answer",
+                                          "detail":  "done",
+                                          "ok":  true,
+                                          "durationMs":  6218,
+                                          "text":  "Helix Ask: LLM answer - done",
+                                          "meta":  {
+                                                       "elapsedMs":  6218
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-03T00:59:32.774Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Answer ready",
+                                          "durationMs":  6218,
+                                          "text":  "Helix Ask: Answer ready",
+                                          "meta":  {
+                                                       "elapsedMs":  6218
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-03T00:59:32.782Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "LLM answer rescue",
+                                          "detail":  "start",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: LLM answer rescue - start",
+                                          "meta":  {
+                                                       "elapsedMs":  0
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-03T00:59:40.337Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "LLM answer rescue",
+                                          "detail":  "done",
+                                          "ok":  true,
+                                          "durationMs":  7555,
+                                          "text":  "Helix Ask: LLM answer rescue - done",
+                                          "meta":  {
+                                                       "elapsedMs":  7555
+                                                   }
+                                      }
+                                  ],
+                  "trace_events":  [
+                                       {
+                                           "ts":  "2026-03-03T00:59:26.088Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Preflight retrieval",
+                                           "detail":  "start",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: Preflight retrieval - start",
+                                           "meta":  {
+                                                        "elapsedMs":  0
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-03T00:59:26.360Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Concept card ready",
+                                           "detail":  "energy-conditions",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: Concept card ready - energy-conditions",
+                                           "meta":  {
+                                                        "elapsedMs":  0
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-03T00:59:26.556Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Generating answer",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: Generating answer"
+                                       },
+                                       {
+                                           "ts":  "2026-03-03T00:59:26.556Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "LLM answer",
+                                           "detail":  "start",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: LLM answer - start",
+                                           "meta":  {
+                                                        "elapsedMs":  0
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-03T00:59:32.774Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "LLM answer",
+                                           "detail":  "done",
+                                           "ok":  true,
+                                           "durationMs":  6218,
+                                           "text":  "Helix Ask: LLM answer - done",
+                                           "meta":  {
+                                                        "elapsedMs":  6218
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-03T00:59:32.774Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Answer ready",
+                                           "durationMs":  6218,
+                                           "text":  "Helix Ask: Answer ready",
+                                           "meta":  {
+                                                        "elapsedMs":  6218
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-03T00:59:32.782Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "LLM answer rescue",
+                                           "detail":  "start",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: LLM answer rescue - start",
+                                           "meta":  {
+                                                        "elapsedMs":  0
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-03T00:59:40.337Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "LLM answer rescue",
+                                           "detail":  "done",
+                                           "ok":  true,
+                                           "durationMs":  7555,
+                                           "text":  "Helix Ask: LLM answer rescue - done",
+                                           "meta":  {
+                                                        "elapsedMs":  7555
+                                                    }
+                                       }
+                                   ],
+                  "trace_summary":  [
+
+                                    ],
+                  "event_stable_fields":  {
+                                              "retrieval_route":  "graph:physics-foundations",
+                                              "fallback_decision":  "none",
+                                              "contract_renderer_path":  "unknown",
+                                              "gate_outcomes":  {
+                                                                    "evidence_gate_ok":  true,
+                                                                    "claim_gate_ok":  true,
+                                                                    "doc_slot_gate_ok":  true
+                                                                }
+                                          },
+                  "event_journal":  {
+                                        "version":  "quake_frame_loop_v1",
+                                        "replay_parity":  true,
+                                        "deterministic":  true,
+                                        "event_count":  8,
+                                        "event_hash":  "sha256:5c0155f5ae15bc29938e3bd81d2e18cdf5623b385edaea043c904f077dae6e7e",
+                                        "stable_fields":  {
+                                                              "retrieval_route":  "graph:physics-foundations",
+                                                              "fallback_decision":  "none",
+                                                              "contract_renderer_path":  "unknown",
+                                                              "gate_outcomes":  {
+                                                                                    "evidence_gate_ok":  true,
+                                                                                    "claim_gate_ok":  true,
+                                                                                    "doc_slot_gate_ok":  true
+                                                                                }
+                                                          }
+                                    },
+                  "helix_ask_fail_reason":  null,
+                  "helix_ask_fail_class":  null,
+                  "fallback_reason":  "none",
+                  "fallback_reason_taxonomy":  "none"
+              },
+    "report_mode":  false
+}

@@ -375,16 +375,6 @@ const buildConceptMatchTokenScore = (
   }
   if (overlap <= 0) return 0;
 
-  let score = overlap * 12;
-  const overlapRatio = overlap / termTokens.length;
-  if (overlapRatio >= 1) {
-    score += 22;
-  } else if (overlapRatio >= 0.6) {
-    score += 12;
-  } else if (overlapRatio >= 0.4) {
-    score += 6;
-  }
-
   let phraseScore = 0;
   for (const variant of variants) {
     if (!variant || variant.length < 3) continue;
@@ -398,6 +388,22 @@ const buildConceptMatchTokenScore = (
         questionQuestionNorm === variant ? 48 : boundary.test(questionQuestionNorm) ? 28 : 12,
       );
     }
+  }
+  const strongPhraseMatch = phraseScore >= 24;
+  // Guard against single-token hijacks for multi-token concepts
+  // (for example, "condition" matching "energy condition").
+  if (termTokens.length >= 2 && overlap < 2 && !strongPhraseMatch) {
+    return 0;
+  }
+
+  let score = overlap * 12;
+  const overlapRatio = overlap / termTokens.length;
+  if (overlapRatio >= 1) {
+    score += 22;
+  } else if (overlapRatio >= 0.6) {
+    score += 12;
+  } else if (overlapRatio >= 0.4) {
+    score += 6;
   }
   score += phraseScore;
   if (field === "id") {

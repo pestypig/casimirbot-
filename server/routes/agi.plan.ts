@@ -3337,6 +3337,12 @@ const HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE =
   /\b(?:how|why|impact|affect|effects?|societ(y|al)|community|governance|public|policy|scenario|example|examples|trust|rumor|decision|in\s+real\s+world|for\s+a|for\s+an|for\s+the|platform|team|council|school)\b/i;
 const HELIX_ASK_IDEOLOGY_QUERY_CUE_RE =
   /\b(?:mission\s+ethos|ethos|ideology|feedback\s+loop\s+hygiene|civic\s+signal|lifetime\s+trust\s+ledger|radiance\s+to\s+the\s+sun)\b/i;
+const HELIX_ASK_SOCIAL_GOVERNANCE_CUE_RE =
+  /\b(?:society|community|governance|policy|policies|council|school|city|public|institution|culture|famil(?:y|ies)|parent(?:s)?|caregiver(?:s)?)\b/i;
+const HELIX_ASK_SOCIAL_VULNERABILITY_CUE_RE =
+  /\b(?:child|children|youth|vulnerab(?:le|ility)|love|affection|empathy|compassion|care|trust|belonging)\b/i;
+const HELIX_ASK_PHYSICS_QUERY_CUE_RE =
+  /\b(?:energy\s+condition|stress[-\s]?energy|quantum\s+inequality|ford[-\s]?roman|casimir|general\s+relativity|riemann|ricci|einstein\s+tensor|warp|alcubierre|natario)\b/i;
 const HELIX_ASK_RELATION_QUERY_RE =
   /\b(?:relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay|fit\s+in\s+with|fit\s+together|constrain(?:ed|s|t)?|govern(?:ed|ance|s)?|cohere(?:nce)?|bind(?:ing|s)?|dependency|aligned?|alignment|how .* relates?|how .* fit)\b/i;
 const HELIX_ASK_RELATION_WARP_QUERY_RE =
@@ -3752,11 +3758,22 @@ function shouldHelixAskCompositeSynthesis(
   if (!question.trim()) {
     return { enabled: false, topics: [] };
   }
-  if (!HELIX_ASK_COMPOSITE_HINT.test(question)) {
+  const normalized = question.toLowerCase();
+  const hasCompositeCue = HELIX_ASK_COMPOSITE_HINT.test(question);
+  const compositeDomainCueCount = [
+    /\b(warp|warp viability|alcubierre|natario|spacetime)\b/i,
+    /\b(ideology|ethos|governance|mission(?:\s+ethos)?|civic)\b/i,
+    /\b(save the sun|save-the-sun|solar restoration|star|stellar|sun ledger)\b/i,
+    /\b(uncertainty|stochastic|confidence|probability)\b/i,
+  ].reduce((count, pattern) => count + (pattern.test(normalized) ? 1 : 0), 0);
+  if (!hasCompositeCue && compositeDomainCueCount < HELIX_ASK_COMPOSITE_MIN_TOPICS) {
     return { enabled: false, topics: [] };
   }
   const compositeTopics = topicTags.filter((tag) => tag !== "helix_ask");
-  if (compositeTopics.length < HELIX_ASK_COMPOSITE_MIN_TOPICS) {
+  if (
+    compositeTopics.length < HELIX_ASK_COMPOSITE_MIN_TOPICS &&
+    compositeDomainCueCount < HELIX_ASK_COMPOSITE_MIN_TOPICS
+  ) {
     return { enabled: false, topics: compositeTopics };
   }
   return { enabled: true, topics: compositeTopics };
@@ -11400,6 +11417,48 @@ function buildHelixAskIdeologySynthesisPrompt(
   return lines.join("\n");
 }
 
+function buildHelixAskIdeologyDeterministicAnswer(args: {
+  question: string;
+  scaffold: string;
+  conceptMatch?: HelixAskConceptMatch | null;
+  contextFiles: string[];
+}): string {
+  const introSeed = buildIdeologyConversationSeed(args.conceptMatch ?? null);
+  const intro =
+    introSeed ||
+    "In civic terms, protect vulnerability by using verified signals, transparent norms, and accountable feedback loops.";
+  const mechanismCollapsed = collapseEvidenceBullets(args.scaffold);
+  const mechanism = clipAskText(
+    stripPromptEchoFromAnswer(mechanismCollapsed || args.scaffold, args.question).trim(),
+    560,
+  );
+  let example = "";
+  if (
+    /\b(child|children|youth)\b/i.test(args.question) &&
+    /\b(love|affection|care)\b/i.test(args.question)
+  ) {
+    example =
+      "Example: a school and family network can teach empathy and care while keeping clear boundaries, consent norms, and regular caregiver check-ins.";
+  } else {
+    const scenarioSeed = extractIdeologyScenarioSeed(args.question);
+    if (scenarioSeed) {
+      example = `Example: in ${scenarioSeed}, close each policy loop with verified signals, clear ownership, and a rollback path if harm rises.`;
+    }
+  }
+  const docSources = filterExistingEvidencePaths(
+    args.contextFiles.filter((entry) =>
+      String(entry ?? "")
+        .replace(/\\/g, "/")
+        .toLowerCase()
+        .startsWith("docs/"),
+    ),
+  ).slice(0, 6);
+  return [intro, mechanism, example, docSources.length ? `Sources: ${docSources.join(", ")}` : ""]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
 function buildHelixAskSynthesisPrompt(
   question: string,
   scaffold: string,
@@ -18965,10 +19024,16 @@ const executeHelixAsk = async ({
       },
     );
     const ideologyCueDetected = HELIX_ASK_IDEOLOGY_QUERY_CUE_RE.test(initialReportQuestion);
+    const ideologySocialScenarioCueDetected =
+      !HELIX_ASK_PHYSICS_QUERY_CUE_RE.test(initialReportQuestion) &&
+      HELIX_ASK_SOCIAL_GOVERNANCE_CUE_RE.test(initialReportQuestion) &&
+      HELIX_ASK_SOCIAL_VULNERABILITY_CUE_RE.test(initialReportQuestion);
     const isIdeologyConversationalCandidate =
       !initialRepoCueDetected &&
       ideologyConversationalSeed &&
-      (Boolean(ideologyConversationCandidate) || ideologyCueDetected);
+      (Boolean(ideologyConversationCandidate) ||
+        ideologyCueDetected ||
+        ideologySocialScenarioCueDetected);
     if (
       isIdeologyConversationalCandidate &&
       !blockScoped &&
@@ -20347,6 +20412,34 @@ const executeHelixAsk = async ({
         intentReasonBase = `${intentReasonBase}|relation:warp_ethos`;
       }
     }
+    const ideologyScenarioPromotionEligible =
+      ideologySocialScenarioCueDetected &&
+      !HELIX_ASK_PHYSICS_QUERY_CUE_RE.test(baseQuestion) &&
+      !explicitRepoExpectation &&
+      !hasFilePathHints &&
+      intentProfile.domain === "general" &&
+      intentProfile.strategy !== "constraint_report";
+    if (ideologyScenarioPromotionEligible) {
+      const ideologyProfile = getHelixAskIntentProfileById("repo.ideology_reference");
+      if (ideologyProfile) {
+        intentProfile = ideologyProfile;
+        intentReasonBase = `${intentReasonBase}|social_ideology_scenario`;
+        // Keep ideology retrieval, but allow open-world uncertainty bypass
+        // when strict repo-alignment would otherwise fail on social prompts.
+        requiresRepoEvidence = false;
+        hasRepoHints = true;
+        repoExpectationLevel =
+          repoExpectationLevel === "high" ? "high" : "medium";
+        if (!repoExpectationSignals.includes("social_ideology_scenario")) {
+          repoExpectationSignals.push("social_ideology_scenario");
+        }
+        if (!topicTags.includes("ideology")) {
+          topicTags = [...topicTags, "ideology"];
+          topicProfile = buildHelixAskTopicProfile(topicTags);
+        }
+        logEvent("Fallback", "social_scenario -> ideology", `profile=${ideologyProfile.id}`);
+      }
+    }
     let isIdeologyReferenceIntent = intentProfile.id === "repo.ideology_reference";
     const isIdeologyConversationalMode = isIdeologyReferenceIntent && ideologyConversationalMode;
     const explicitIdeologyFileMappingRequested =
@@ -20400,6 +20493,7 @@ const executeHelixAsk = async ({
     }
     const ideologyConversationalOpenWorldMode =
       ideologyConversationalMode &&
+      !ideologySocialScenarioCueDetected &&
       !frontierTheoryLensRequested &&
       !explicitRepoExpectation &&
       !hasFilePathHints &&
@@ -21700,7 +21794,9 @@ const executeHelixAsk = async ({
     const warpDelegationRequested = mathSolveResult?.reason === "warp_delegation_required";
     if (mathSolveResult && (mathSolveResult.ok || warpDelegationRequested)) {
       forcedAnswer = buildHelixAskMathAnswer(mathSolveResult);
-      forcedAnswerIsHard = true;
+      // Keep hard short-circuit only for explicit constraint-report math flows.
+      forcedAnswerIsHard =
+        mathSolveResult.ok || (warpDelegationRequested && intentStrategy === "constraint_report");
       answerPath.push(warpDelegationRequested ? "forcedAnswer:math_solver_warp_guard" : "forcedAnswer:math_solver");
     }
     if (conceptFastPath && conceptMatch && !forcedAnswer) {
@@ -24388,10 +24484,16 @@ const executeHelixAsk = async ({
           !hasFilePathHints &&
           endpointHints.length === 0 &&
           (frontierTheoryLensRequested || frontierSessionLensLocked || frontierSessionFollowupRequested);
+        const ideologySocialOpenWorldTolerance =
+          intentProfile.id === "repo.ideology_reference" &&
+          ideologySocialScenarioCueDetected &&
+          !explicitRepoExpectation &&
+          !hasFilePathHints &&
+          endpointHints.length === 0;
         requiresRepoEvidence =
           requiresRepoEvidence ||
-          intentDomain === "repo" ||
-          intentDomain === "hybrid" ||
+          ((intentDomain === "repo" || intentDomain === "hybrid") &&
+            !ideologySocialOpenWorldTolerance) ||
           (intentDomain === "falsifiable" && !frontierOpenWorldMode);
         const userExpectsRepo =
           intentDomain === "falsifiable" || requiresRepoEvidence;
@@ -24694,11 +24796,15 @@ const executeHelixAsk = async ({
         answerPath.push(`arbiter:${arbiterMode}`);
         if (arbiterMode === "hybrid" || arbiterMode === "clarify") {
           const relationFallbackProfile =
-            warpEthosRelationQuery
+            warpEthosRelationQuery && !compositeRequest.enabled
               ? getHelixAskIntentProfileById("hybrid.warp_ethos_relation")
               : null;
+          const compositeFallbackProfile = compositeRequest.enabled
+            ? getHelixAskIntentProfileById("hybrid.composite_system_synthesis")
+            : null;
           const fallbackProfile =
             relationFallbackProfile ??
+            compositeFallbackProfile ??
             (intentProfile.domain === "repo" || intentProfile.domain === "falsifiable"
               ? intentProfile
               : resolveFallbackIntentProfile("hybrid"));
@@ -26159,6 +26265,26 @@ const executeHelixAsk = async ({
           answerPath.push("forcedAnswer:helix_pipeline");
         }
         const ideologySynthesis = intentProfile.id === "repo.ideology_reference";
+        if (
+          ideologySynthesis &&
+          ideologySocialScenarioCueDetected &&
+          !forcedAnswer &&
+          String(repoScaffoldForPrompt ?? "").trim()
+        ) {
+          forcedAnswer = buildHelixAskIdeologyDeterministicAnswer({
+            question: baseQuestion,
+            scaffold: repoScaffoldForPrompt,
+            conceptMatch,
+            contextFiles,
+          });
+          // Let the LLM run long-form synthesis when available; keep this as fallback text.
+          forcedAnswerIsHard = false;
+          answerPath.push("forcedAnswer:ideology_social_deterministic");
+          if (debugPayload) {
+            (debugPayload as Record<string, unknown>).ideology_deterministic_first_pass = true;
+          }
+          logEvent("Deterministic ideology", "first_pass", "social_scenario");
+        }
         if (ideologySynthesis) {
           prompt = ensureFinalMarker(
             buildHelixAskIdeologySynthesisPrompt(
@@ -28793,6 +28919,13 @@ const executeHelixAsk = async ({
         }
       }
       cleaned = platonicResult.answer;
+      const ideologyDeterministicFirstPassFromPath = answerPath.includes(
+        "forcedAnswer:ideology_social_deterministic",
+      );
+      if (ideologyDeterministicFirstPassFromPath && forcedAnswer) {
+        cleaned = stripPromptEchoFromAnswer(String(forcedAnswer), baseQuestion).trim();
+        answerPath.push("platonic:template_preserve");
+      }
       if (
         intentProfile.id === "repo.ideology_reference" &&
         !shouldAllowIdeologyTechnicalNotes(baseQuestion)
@@ -30274,7 +30407,11 @@ const executeHelixAsk = async ({
       }
       cleaned = finalNonReportGuard.text;
       const forcedWarpGuardActive = answerPath.includes("forcedAnswer:math_solver_warp_guard");
-      if (forcedWarpGuardActive) {
+      const preserveWarpGuardAsFinal =
+        forcedWarpGuardActive &&
+        (intentStrategy === "constraint_report" ||
+          intentProfile.id === "falsifiable.constraints.gr_viability_certificate");
+      if (preserveWarpGuardAsFinal) {
         cleaned = buildHelixAskMathAnswer({
           ok: false,
           reason: "warp_delegation_required",
@@ -30294,9 +30431,17 @@ const executeHelixAsk = async ({
           debugPayload.open_world_bypass_mode = openWorldBypassMode;
         }
       }
+      const ideologyDeterministicFirstPassActive = answerPath.includes(
+        "forcedAnswer:ideology_social_deterministic",
+      );
       if (openWorldBypassMode === "active") {
-        cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
-        cleaned = ensureOpenWorldBypassUncertainty(cleaned);
+        if (!ideologyDeterministicFirstPassActive) {
+          cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
+          cleaned = ensureOpenWorldBypassUncertainty(cleaned);
+        } else if (debugPayload) {
+          (debugPayload as Record<string, unknown>).open_world_bypass_note =
+            "ideology_deterministic_first_pass_preserved";
+        }
       }
       const runtimeFallbackNoiseDetected =
         HELIX_ASK_RUNTIME_FALLBACK_NOISE_TEST_RE.test(cleaned) ||

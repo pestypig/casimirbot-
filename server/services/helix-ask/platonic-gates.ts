@@ -165,6 +165,7 @@ const VARIANT_MIN_RATIO = clampNumber(
 const QUESTION_ALIGNMENT_MIN_TOKENS = 1;
 const QUESTION_ALIGNMENT_MIN_RATIO = 0.15;
 const CONCEPT_MAX_SENTENCES = 3;
+const IDEOLOGY_INTENT_ID = "repo.ideology_reference";
 
 const SYSTEM_TERMS =
   /\b(helix ask|this system|repo|repository|codebase|server\/|client\/|api\/|endpoint|constraint gate|certificate|admissible|verified|integrity_ok)\b/i;
@@ -265,6 +266,43 @@ const COMMON_QUERY_TOKENS = new Set([
   "sections",
   "ts",
   "tsx",
+  "can",
+  "would",
+  "could",
+  "look",
+  "forward",
+]);
+
+const IDEOLOGY_COVERAGE_ANCHOR_SLOTS = [
+  "ideology",
+  "ethos",
+  "governance",
+  "society",
+];
+
+const IDEOLOGY_SCENARIO_SLOT_STOP_TOKENS = new Set([
+  "child",
+  "children",
+  "youth",
+  "teen",
+  "teens",
+  "kid",
+  "kids",
+  "love",
+  "affection",
+  "care",
+  "celebrate",
+  "celebrating",
+  "celebration",
+  "celebrat",
+  "would",
+  "could",
+  "look",
+  "forward",
+  "condition",
+  "condit",
+  "vulnerability",
+  "vulnerab",
 ]);
 
 const CONCEPTUAL_TOKENS = new Set([
@@ -437,6 +475,46 @@ const hasProofPointer = (text?: string): boolean =>
 const shouldAllowTokenSupport = (input: HelixAskPlatonicInput): boolean =>
   input.domain === "general" && input.requiresRepoEvidence !== true;
 
+const shouldAllowCitationOnlyRepoSupport = (input: HelixAskPlatonicInput): boolean => {
+  if (input.requiresRepoEvidence !== true) return false;
+  if (input.intentId === IDEOLOGY_INTENT_ID) return true;
+  if (input.intentId === "hybrid.concept_plus_system_mapping") return true;
+  if (input.intentId === "hybrid.composite_system_synthesis") return true;
+  return false;
+};
+
+const hasRepoEvidenceSupport = (
+  input: HelixAskPlatonicInput,
+  hasEvidenceRef: boolean,
+  proofPointerPresent: boolean,
+): boolean => {
+  if (!hasEvidenceRef) return false;
+  if (input.requiresRepoEvidence !== true) return true;
+  return proofPointerPresent || shouldAllowCitationOnlyRepoSupport(input);
+};
+
+const buildIdeologyCoverageSlots = (
+  question: string,
+  conceptMatch: HelixAskConceptMatch | null | undefined,
+): string[] => {
+  const slots = new Set<string>(IDEOLOGY_COVERAGE_ANCHOR_SLOTS);
+  const conceptLabel = conceptMatch?.card.label ?? conceptMatch?.card.id ?? "";
+  if (conceptLabel.trim()) {
+    slots.add(normalizeCoverageSlot(conceptLabel));
+  }
+  const questionTokens = filterSignalTokens(tokenizeAskQuery(question))
+    .map((token) => normalizeCoverageToken(token))
+    .filter((token): token is string => Boolean(token))
+    .filter((token) => token.length >= 4)
+    .filter((token) => !COMMON_QUERY_TOKENS.has(token))
+    .filter((token) => !IDEOLOGY_SCENARIO_SLOT_STOP_TOKENS.has(token))
+    .slice(0, 3);
+  for (const token of questionTokens) {
+    slots.add(normalizeCoverageSlot(token));
+  }
+  return Array.from(slots).filter(Boolean).slice(0, COVERAGE_SLOT_MAX);
+};
+
 const buildClaimLedger = (
   input: HelixAskPlatonicInput,
   claims: ClaimNode[],
@@ -463,7 +541,7 @@ const buildClaimLedger = (
       ? isClaimSupported(claim.tokens, evidenceTokens)
       : false;
     const supported = enforceEvidenceRefs
-      ? claimEvidenceRefs.length > 0 && proofPointerPresent
+      ? hasRepoEvidenceSupport(input, claimEvidenceRefs.length > 0, proofPointerPresent)
       : claimEvidenceRefs.length > 0 || supportedByTokens;
     const type = classifyClaimType(claim);
     const entry: HelixAskClaimLedgerEntry = {
@@ -1153,14 +1231,15 @@ function computeCoverageSummary(input: HelixAskPlatonicInput): HelixAskCoverageS
   const questionTokens = filterSignalTokens(tokenizeAskQuery(input.question));
   const tokenCount = questionTokens.length;
   const repoApiLookupCoverageMode = input.intentId === "repo.repo_api_lookup";
-  const explicitSlots =
-    repoApiLookupCoverageMode
-      ? undefined
-      : input.coverageSlots;
-  const includeQuestionTokens =
-    repoApiLookupCoverageMode
-      ? true
-      : !(input.coverageSlots && input.coverageSlots.length > 0);
+  const ideologyCoverageMode = input.intentId === IDEOLOGY_INTENT_ID;
+  let explicitSlots = repoApiLookupCoverageMode ? undefined : input.coverageSlots;
+  let includeQuestionTokens = repoApiLookupCoverageMode
+    ? true
+    : !(input.coverageSlots && input.coverageSlots.length > 0);
+  if (ideologyCoverageMode && (!explicitSlots || explicitSlots.length === 0)) {
+    explicitSlots = buildIdeologyCoverageSlots(input.question, input.conceptMatch);
+    includeQuestionTokens = explicitSlots.length === 0;
+  }
   const referenceText = [
     input.evidenceText,
     input.repoScaffold,
@@ -1314,7 +1393,7 @@ function computeBeliefSummary(input: HelixAskPlatonicInput): HelixAskBeliefSumma
     const claimRefs = extractFilePathsFromText(claim);
     const hasEvidenceRef = claimRefs.length > 0 || globalEvidenceRefs.length > 0;
     if (enforceEvidenceRefs) {
-      if (hasEvidenceRef && proofPointerPresent) {
+      if (hasRepoEvidenceSupport(input, hasEvidenceRef, proofPointerPresent)) {
         supportedCount += 1;
       } else {
         unsupportedCount += 1;
@@ -1416,7 +1495,7 @@ function buildBeliefGraphSummary(
       ? isClaimSupported(claim.tokens, evidenceTokens)
       : false;
     const supported = enforceEvidenceRefs
-      ? hasEvidenceRef && proofPointerPresent
+      ? hasRepoEvidenceSupport(input, hasEvidenceRef, proofPointerPresent)
       : hasEvidenceRef || supportedByTokens;
     if (supported) {
       supports += 1;
@@ -1660,7 +1739,11 @@ const chooseVariantCandidate = (
       const claimEvidenceRefs =
         claim.evidenceRefs.length > 0 ? claim.evidenceRefs : globalEvidenceRefs;
       if (enforceEvidenceRefs) {
-        return claimEvidenceRefs.length > 0 && proofPointerPresent;
+        return hasRepoEvidenceSupport(
+          input,
+          claimEvidenceRefs.length > 0,
+          proofPointerPresent,
+        );
       }
       if (claimEvidenceRefs.length > 0) return true;
       return allowTokenSupport && isClaimSupported(claim.tokens, evidenceTokens);

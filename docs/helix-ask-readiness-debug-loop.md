@@ -6,6 +6,9 @@ debug telemetry into a readiness verdict with probabilities, not anecdotes.
 Use this when changing Helix Ask routing, retrieval, scaffolds, fallback, output
 cleaning, or ideology/frontier response behavior.
 
+Required context anchor for current malfunction class:
+- `docs/helix-ask-retrieval-objective-resolution-plan-2026-03-03.md`
+
 ## Objective
 
 1. Detect regressions quickly (`contract battery`).
@@ -91,6 +94,28 @@ Companion reference:
 
 1. `docs/audits/research/helix-ask-forward-facing-prompt-batch-2026-02-27.md`
 
+## Loop B3: Per-Patch Randomized Probe
+
+Run a seeded random sample every patch to check whether outcomes stay aligned
+with the current retrieval objective plan (especially ideology/social prompts
+avoiding physics concept drift).
+
+```powershell
+$env:HELIX_ASK_BASE_URL="http://localhost:5050"
+$env:HELIX_ASK_PATCH_PROBE_SAMPLES="10"
+$env:HELIX_ASK_PATCH_PROBE_REQUIRE_PLAN_CONTEXT="1"
+$env:HELIX_ASK_PATCH_PROBE_FAIL_ON_MISS="1"
+npx tsx scripts/helix-ask-patch-probe.ts
+```
+
+Record:
+
+1. sample seed
+2. pass/fail counts and pass rate
+3. failed case signatures (`intent_domain`, `intent_id`, `concept_id`)
+4. plan context hash (`sha256`) from the active plan file
+5. artifact directory under `artifacts/experiments/helix-ask-patch-probe/*`
+
 ## Loop C: Casimir Gate (Required)
 
 Run for every patch:
@@ -162,9 +187,10 @@ Use this structure for each run:
 2. `Contract battery`: pass/fail with failing labels
 3. `Variety battery`: key probabilities by family
 4. `Hotspots`: top 3 failure buckets with counts
-5. `Casimir`: verdict, runId, certificate hash, integrity
-6. `Final verdict`: `READY | PARTIAL_READY | NOT_READY`
-7. `Next fix list`: explicit failing contracts/routes
+5. `Patch probe`: seed, pass rate, top failed signatures
+6. `Casimir`: verdict, runId, certificate hash, integrity
+7. `Final verdict`: `READY | PARTIAL_READY | NOT_READY`
+8. `Next fix list`: explicit failing contracts/routes
 
 ## Minimum Artifact Bundle
 
@@ -172,6 +198,7 @@ Keep these paths in every handoff:
 
 1. regression command output
 2. variety `summary.json` and `failures.json`
-3. Casimir verify output with certificate hash/integrity
-4. one prompt/output/verdict evidence pack for representative failures
+3. patch probe `summary.json` and `report.md`
+4. Casimir verify output with certificate hash/integrity
+5. one prompt/output/verdict evidence pack for representative failures
 
