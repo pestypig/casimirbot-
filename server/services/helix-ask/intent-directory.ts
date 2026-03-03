@@ -135,6 +135,9 @@ const IDEOLOGY_NODE_MATCHERS = buildIdeologyNodeMatchers();
 
 const WARP_ETHOS_RELATION_COUPLED_RE = /\b(warp|warp bubble|warp drive|alcubierre|natario)\b[\s\S]{0,120}\b(mission ethos|ethos|ideology)\b|\b(mission ethos|ethos|ideology)\b[\s\S]{0,120}\b(warp|warp bubble|warp drive|alcubierre|natario)\b/i;
 
+const REPO_TECHNICAL_HINT_RE =
+  /\b(repo|repository|codebase|module|file|path|symbol|function|class|test|spec|routing|retrieval|rerank|arbiter|intent directory)\b/i;
+
 const INTENT_PROFILES: HelixAskIntentProfile[] = [
   {
     id: "general.conceptual_define_compare",
@@ -229,7 +232,7 @@ const INTENT_PROFILES: HelixAskIntentProfile[] = [
       allowedEvidenceKinds: ["repo_chunk", "prompt_chunk"],
     },
     matchers: [
-      /\b(relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay)\b/i,
+      /\b(relate|relation|relationship|related|connect(?:ed|ion)?|link(?:ed|ing)?|tied?|tie|association|associated|mapping|map to|interplay|shape(?:s|d)?|govern(?:s|ed)?|influenc(?:e|es|ed|ing))\b/i,
       /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i,
       /\b(mission ethos|ethos|ideology)\b/i,
     ],
@@ -571,6 +574,7 @@ export function matchHelixAskIntent(input: HelixAskIntentMatchInput): HelixAskIn
   }
   let best: HelixAskIntentMatch | null = null;
   const normalized = question.toLowerCase();
+  const inferredRepoHint = input.hasRepoHints || REPO_TECHNICAL_HINT_RE.test(normalized);
   const relationProfile = INTENT_PROFILES.find((profile) => profile.id === "hybrid.warp_ethos_relation");
   if (relationProfile && WARP_ETHOS_RELATION_COUPLED_RE.test(normalized)) {
     best = { profile: relationProfile, score: 999, reason: "warp_ethos_coupled" };
@@ -578,7 +582,7 @@ export function matchHelixAskIntent(input: HelixAskIntentMatchInput): HelixAskIn
   for (const profile of INTENT_PROFILES) {
     const matches = countMatches(profile.matchers, normalized);
     if (matches <= 0) continue;
-    if (profile.requireRepoHints && !input.hasRepoHints) continue;
+    if (profile.requireRepoHints && !inferredRepoHint) continue;
     if (profile.requireFilePath && !input.hasFilePathHints) continue;
     if (profile.requiresAllMatchers && matches < profile.matchers.length) continue;
     const score = matches * 10 + (profile.priority ?? 0);

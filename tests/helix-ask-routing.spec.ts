@@ -52,6 +52,15 @@ const cases: IntentCase[] = [
     expectStageTags: false,
   },
   {
+    question: "Which module implements helix ask intent directory routing logic?",
+    hasRepoHints: false,
+    hasFilePathHints: false,
+    expectedId: "repo.helix_ask_routing_explain",
+    expectedDomain: "repo",
+    expectedFormat: "brief",
+    expectStageTags: false,
+  },
+  {
     question: "How does Helix Ask route intent → topic → format? Cite files.",
     hasRepoHints: true,
     hasFilePathHints: false,
@@ -224,5 +233,4 @@ describe("Helix Ask intent routing", () => {
     expect(match.profile.strictProvenanceFailReason).toBe(STRICT_PACKAGES_PROVENANCE_FAIL_REASON);
   });
 });
-
 

@@ -356,6 +356,15 @@ export function extractRepoSearchTerms(
   const tokens = filterSignalTokens(tokenizeAskQuery(question)).map((token) =>
     sanitizeSearchTerm(token),
   );
+  const tokenPhrases: string[] = [];
+  for (let i = 0; i < tokens.length - 1; i += 1) {
+    const left = tokens[i] ?? "";
+    const right = tokens[i + 1] ?? "";
+    if (left.length < 4 || right.length < 4) continue;
+    const phrase = sanitizeSearchTerm(`${left} ${right}`);
+    if (phrase.length >= 9) tokenPhrases.push(phrase);
+  }
+  terms.push(...tokenPhrases.slice(0, 6));
   for (const token of tokens) {
     if (!token) continue;
     if (token.length < 4) continue;
