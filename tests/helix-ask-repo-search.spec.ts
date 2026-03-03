@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRepoSearchPlan,
+  extractRepoSearchTerms,
   PACKAGES_RETRIEVAL_FAIL_REASON,
   runGitTrackedRepoSearch,
   resolvePackagesRetrievalMetadata,
@@ -68,5 +69,11 @@ describe("helix ask repo search", () => {
       expect(result.hits[0]?.filePath.length).toBeGreaterThan(0);
       expect(result.hits[0]?.line).toBeGreaterThan(0);
     }
+  });
+
+  it("derives deterministic phrase search terms from adjacent query tokens", () => {
+    const terms = extractRepoSearchTerms("How does intent directory routing work in helix ask?", null);
+    expect(terms).toContain("intent directory");
+    expect(terms).toContain("directory routing");
   });
 });
