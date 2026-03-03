@@ -135,8 +135,9 @@ const IDEOLOGY_NODE_MATCHERS = buildIdeologyNodeMatchers();
 
 const WARP_ETHOS_RELATION_COUPLED_RE = /\b(warp|warp bubble|warp drive|alcubierre|natario)\b[\s\S]{0,120}\b(mission ethos|ethos|ideology)\b|\b(mission ethos|ethos|ideology)\b[\s\S]{0,120}\b(warp|warp bubble|warp drive|alcubierre|natario)\b/i;
 
-const REPO_TECHNICAL_HINT_RE =
-  /\b(repo|repository|codebase|module|file|path|symbol|function|class|test|spec|routing|retrieval|rerank|arbiter|intent directory)\b/i;
+const REPO_ANCHOR_HINT_RE =
+  /\b(repo|repository|codebase|module|file|path|symbol|api|endpoint|server|client|helix ask|helixask|\/api\/)\b/i;
+
 
 const INTENT_PROFILES: HelixAskIntentProfile[] = [
   {
@@ -574,7 +575,8 @@ export function matchHelixAskIntent(input: HelixAskIntentMatchInput): HelixAskIn
   }
   let best: HelixAskIntentMatch | null = null;
   const normalized = question.toLowerCase();
-  const inferredRepoHint = input.hasRepoHints || REPO_TECHNICAL_HINT_RE.test(normalized);
+  const hasRepoAnchorHint = REPO_ANCHOR_HINT_RE.test(normalized);
+  const inferredRepoHint = input.hasRepoHints || hasRepoAnchorHint;
   const relationProfile = INTENT_PROFILES.find((profile) => profile.id === "hybrid.warp_ethos_relation");
   if (relationProfile && WARP_ETHOS_RELATION_COUPLED_RE.test(normalized)) {
     best = { profile: relationProfile, score: 999, reason: "warp_ethos_coupled" };

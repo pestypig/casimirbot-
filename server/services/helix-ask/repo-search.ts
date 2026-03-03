@@ -344,42 +344,72 @@ const sanitizeSearchTerm = (value: string): string => {
   return cleaned;
 };
 
+const LOW_VALUE_PHRASE_TOKEN_RE = /^(work|works?|working|does|how|what|where|when|why|ask)$/;
+
+const isLowValueGluePhrase = (phrase: string): boolean => {
+  const parts = phrase.split(" ").filter(Boolean);
+  if (parts.length !== 2) return false;
+  const [left, right] = parts;
+  return LOW_VALUE_PHRASE_TOKEN_RE.test(left ?? "") || LOW_VALUE_PHRASE_TOKEN_RE.test(right ?? "");
+};
+
 export function extractRepoSearchTerms(
   question: string,
   conceptMatch?: HelixAskConceptMatch | null,
 ): string[] {
-  const terms: string[] = [];
+  const phraseTerms: string[] = [];
+  const unigramTerms: string[] = [];
   if (conceptMatch?.matchedTerm) {
     const normalized = sanitizeSearchTerm(conceptMatch.matchedTerm);
-    if (normalized) terms.push(normalized);
+    if (normalized) phraseTerms.push(normalized);
   }
   const tokens = filterSignalTokens(tokenizeAskQuery(question)).map((token) =>
     sanitizeSearchTerm(token),
   );
-  const tokenPhrases: string[] = [];
   for (let i = 0; i < tokens.length - 1; i += 1) {
     const left = tokens[i] ?? "";
     const right = tokens[i + 1] ?? "";
     if (left.length < 4 || right.length < 4) continue;
     const phrase = sanitizeSearchTerm(`${left} ${right}`);
-    if (phrase.length >= 9) tokenPhrases.push(phrase);
+    if (phrase.length < 9) continue;
+    if (isLowValueGluePhrase(phrase)) continue;
+    phraseTerms.push(phrase);
   }
-  terms.push(...tokenPhrases.slice(0, 6));
   for (const token of tokens) {
     if (!token) continue;
     if (token.length < 4) continue;
     if (/^\d+$/.test(token)) continue;
-    terms.push(token);
+    unigramTerms.push(token);
   }
-  const deduped: string[] = [];
-  const seen = new Set<string>();
-  for (const term of terms) {
-    if (seen.has(term)) continue;
-    seen.add(term);
-    deduped.push(term);
+
+  const dedupe = (values: string[]): string[] => {
+    const deduped: string[] = [];
+    const seen = new Set<string>();
+    for (const value of values) {
+      if (seen.has(value)) continue;
+      seen.add(value);
+      deduped.push(value);
+    }
+    return deduped;
+  };
+
+  const uniquePhrases = dedupe(phraseTerms);
+  const uniqueUnigrams = dedupe(unigramTerms);
+
+  const phraseCap = Math.max(1, REPO_SEARCH_MAX_TERMS - 1);
+  const selectedPhrases = uniquePhrases.slice(0, phraseCap);
+  const selectedPhraseTokenSet = new Set<string>();
+  for (const phrase of selectedPhrases) {
+    for (const part of phrase.split(" ")) {
+      if (part) selectedPhraseTokenSet.add(part);
+    }
   }
-  deduped.sort((a, b) => b.length - a.length);
-  return deduped.slice(0, REPO_SEARCH_MAX_TERMS);
+  const prioritizedUnigrams = [
+    ...uniqueUnigrams.filter((term) => !selectedPhraseTokenSet.has(term)),
+    ...uniqueUnigrams.filter((term) => selectedPhraseTokenSet.has(term)),
+  ];
+  const combined = dedupe([...selectedPhrases, ...prioritizedUnigrams]);
+  return combined.slice(0, REPO_SEARCH_MAX_TERMS);
 }
 
 export function selectRepoSearchPaths(

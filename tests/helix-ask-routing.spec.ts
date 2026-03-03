@@ -216,6 +216,27 @@ describe("Helix Ask intent routing", () => {
     expect(match.profile.domain).toBe("repo");
   });
 
+
+  it("does not infer repo change intent from generic writing prompt terms", () => {
+    const question = "How can I improve class relationships in my essay?";
+    const match = matchHelixAskIntent({
+      question,
+      hasRepoHints: false,
+      hasFilePathHints: false,
+    });
+    expect(match.profile.id).not.toBe("repo.repo_change_request");
+  });
+
+  it("keeps helix ask routing internals prompt on repo routing explain intent", () => {
+    const question = "Which module implements helix ask intent directory routing logic?";
+    const match = matchHelixAskIntent({
+      question,
+      hasRepoHints: false,
+      hasFilePathHints: false,
+    });
+    expect(match.profile.id).toBe("repo.helix_ask_routing_explain");
+  });
+
   it("keeps repo routing behavior while exposing additive packages provenance contract", () => {
     const question = "Where is the packages API route and module path?";
     const match = matchHelixAskIntent({
