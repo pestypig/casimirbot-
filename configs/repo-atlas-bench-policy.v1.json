@@ -1,0 +1,8 @@
+{
+  "version": "repo-atlas-bench-policy/1",
+  "thresholds": {
+    "median_time_to_first_correct_file_improvement_pct": 25,
+    "task_pass_rate_improvement_pct": 15,
+    "hard_gate_pass_rate_drop_allowed_pct": 0
+  }
+}
