@@ -76,4 +76,9 @@ describe("helix ask repo search", () => {
     expect(terms).toContain("intent directory");
     expect(terms).toContain("directory routing");
   });
+
+  it("retains key unigrams alongside phrases for constrained top-N term sets", () => {
+    const terms = extractRepoSearchTerms("How does intent directory routing work in helix ask?", null);
+    expect(terms.some((term) => term === "routing" || term === "helix")).toBe(true);
+  });
 });
