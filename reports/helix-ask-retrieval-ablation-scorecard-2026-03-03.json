@@ -1,0 +1,483 @@
+{
+  "runId": "retrieval-ablation-1772581353082",
+  "generatedAt": "2026-03-03T23:42:33.082Z",
+  "seeds": [
+    7,
+    11,
+    13
+  ],
+  "temperatures": [
+    0.2
+  ],
+  "variants": {
+    "baseline_atlas_git_on": {
+      "scenarios": [
+        {
+          "seed": 7,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        },
+        {
+          "seed": 11,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        },
+        {
+          "seed": 13,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "gold_file_recall_at_10": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "consequential_file_retention_rate": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "rerank_mrr10": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "retrieval_confidence_mean": {
+          "point_estimate": 0.6500000000000001,
+          "ci95": {
+            "low": 0.6500000000000001,
+            "high": 0.6500000000000001
+          }
+        },
+        "retrieval_doc_share_mean": {
+          "point_estimate": 0.05555555555555555,
+          "ci95": {
+            "low": 0.05555555555555555,
+            "high": 0.05555555555555555
+          }
+        }
+      },
+      "diagnostics": {
+        "unmatched_expected_file_rate": 1
+      }
+    },
+    "atlas_off_git_on": {
+      "scenarios": [
+        {
+          "seed": 7,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        },
+        {
+          "seed": 11,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        },
+        {
+          "seed": 13,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "gold_file_recall_at_10": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "consequential_file_retention_rate": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "rerank_mrr10": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "retrieval_confidence_mean": {
+          "point_estimate": 0.6500000000000001,
+          "ci95": {
+            "low": 0.6500000000000001,
+            "high": 0.6500000000000001
+          }
+        },
+        "retrieval_doc_share_mean": {
+          "point_estimate": 0.05555555555555555,
+          "ci95": {
+            "low": 0.05555555555555555,
+            "high": 0.05555555555555555
+          }
+        }
+      },
+      "diagnostics": {
+        "unmatched_expected_file_rate": 1
+      }
+    },
+    "atlas_on_git_off": {
+      "scenarios": [
+        {
+          "seed": 7,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        },
+        {
+          "seed": 11,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        },
+        {
+          "seed": 13,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "gold_file_recall_at_10": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "consequential_file_retention_rate": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "rerank_mrr10": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "retrieval_confidence_mean": {
+          "point_estimate": 0.6500000000000001,
+          "ci95": {
+            "low": 0.6500000000000001,
+            "high": 0.6500000000000001
+          }
+        },
+        "retrieval_doc_share_mean": {
+          "point_estimate": 0.05555555555555555,
+          "ci95": {
+            "low": 0.05555555555555555,
+            "high": 0.05555555555555555
+          }
+        }
+      },
+      "diagnostics": {
+        "unmatched_expected_file_rate": 1
+      }
+    },
+    "atlas_off_git_off": {
+      "scenarios": [
+        {
+          "seed": 7,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        },
+        {
+          "seed": 11,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        },
+        {
+          "seed": 13,
+          "temperature": 0.2,
+          "raw_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          },
+          "canonicalized_metrics": {
+            "gold_file_recall_at_5": 0,
+            "gold_file_recall_at_10": 0,
+            "consequential_file_retention_rate": 0,
+            "rerank_mrr10": 0,
+            "graph_edge_hit_rate": 0,
+            "retrieval_confidence_mean": 0.6500000000000001,
+            "retrieval_doc_share_mean": 0.05555555555555555,
+            "unmatched_expected_file_rate": 1
+          }
+        }
+      ],
+      "aggregate": {
+        "gold_file_recall_at_10": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "consequential_file_retention_rate": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "rerank_mrr10": {
+          "point_estimate": 0,
+          "ci95": {
+            "low": 0,
+            "high": 0
+          }
+        },
+        "retrieval_confidence_mean": {
+          "point_estimate": 0.6500000000000001,
+          "ci95": {
+            "low": 0.6500000000000001,
+            "high": 0.6500000000000001
+          }
+        },
+        "retrieval_doc_share_mean": {
+          "point_estimate": 0.05555555555555555,
+          "ci95": {
+            "low": 0.05555555555555555,
+            "high": 0.05555555555555555
+          }
+        }
+      },
+      "diagnostics": {
+        "unmatched_expected_file_rate": 1
+      }
+    }
+  },
+  "driver_verdict": {
+    "retrieval_lift_proven": "no",
+    "dominant_channel": "git",
+    "confidence_statement": "95% bootstrap intervals computed over seed/temperature scenarios."
+  }
+}

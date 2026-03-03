@@ -152,7 +152,8 @@
     "atlas:trace": "tsx scripts/repo-atlas-query.ts trace",
     "atlas:first-divergence": "tsx scripts/repo-atlas-query.ts first-divergence",
     "atlas:bench": "tsx scripts/atlas-bench.ts",
-    "atlas:bench:ci": "tsx scripts/atlas-bench.ts --ci --sample 20"
+    "atlas:bench:ci": "tsx scripts/atlas-bench.ts --ci --sample 20",
+    "helix:ask:retrieval:ablation": "tsx scripts/helix-ask-retrieval-ablation.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",
