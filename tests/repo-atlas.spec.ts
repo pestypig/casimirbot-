@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildRepoAtlasFromSources, isDirectExecution as isBuildDirectExecution } from "../scripts/repo-atlas-build";
 import {
+  firstDivergenceG4,
   isDirectExecution as isQueryDirectExecution,
   loadAtlas,
   resolveIdentifier,
@@ -11,6 +12,24 @@ import {
 } from "../scripts/repo-atlas-query";
 
 const fixturePath = path.resolve(process.cwd(), "tests", "fixtures", "repo-atlas.fixture.json");
+const canonicalDivergenceFixture = {
+  wave: "A",
+  rhoSource: "warp.metric.T00.natario.shift",
+  metricT00Ref: "warp.metric.T00.natario.shift",
+  metricT00Si_Jm3: -1.87466334759679e17,
+  lhs_Jm3: -7.498650107089216e16,
+  boundComputed_Jm3: -24,
+  K: 3.8e-30,
+  tau_s: 0.005,
+  boundUsed_Jm3: -7.498650107089216e16,
+  boundFloorApplied: true,
+  boundPolicyFloor_Jm3: -7.498650107089216e16,
+  boundFloor_Jm3: -7.498650107089216e16,
+  marginRatioRawComputed: 3124437544620506.5,
+  marginRatioRaw: 1,
+  applicabilityStatus: "PASS",
+  reasonCode: ["G4_QI_MARGIN_EXCEEDED"],
+};
 
 describe("repo atlas", () => {
   it("builds deterministic shape for fixed source payload", () => {
@@ -167,6 +186,48 @@ describe("repo atlas", () => {
     );
 
     expect(node?.id).toBe("value:rhoSource");
+  });
+
+  it("computes first divergence for the qi margin route", () => {
+    const result = firstDivergenceG4(canonicalDivergenceFixture, {
+      cases: [
+        {
+          ...canonicalDivergenceFixture,
+          id: "case_0001",
+          rhoSource: "warp.metric.T00.natario_sdf.shift",
+          metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+        },
+      ],
+    });
+
+    expect("error" in result).toBe(false);
+    if ("error" in result) return;
+    expect(result.firstDivergence?.stageId).toBe("S0_source");
+    expect(result.firstDivergence?.differingFields).toContain("rhoSource");
+  });
+
+  it("supports same-rho-source selection for first divergence", () => {
+    const result = firstDivergenceG4(canonicalDivergenceFixture, {
+      cases: [
+        {
+          ...canonicalDivergenceFixture,
+          id: "case_mismatch",
+          rhoSource: "warp.metric.T00.natario_sdf.shift",
+          metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+        },
+        {
+          ...canonicalDivergenceFixture,
+          id: "case_match",
+        },
+      ],
+      bestCandidate: { id: "case_mismatch" },
+    });
+
+    expect("error" in result).toBe(false);
+    if ("error" in result) return;
+    expect(result.recoveryCaseIdSelected).toBe("case_match");
+    expect(result.selectionReason).toBe("same_rho_source");
+    expect(result.firstDivergence).toBeNull();
   });
 
   it("direct execution guard handles Windows-style argv paths", () => {

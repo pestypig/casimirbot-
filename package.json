@@ -149,7 +149,8 @@
     "warp:full-solve:g4-autoloop:cycle": "tsx scripts/warp-g4-autoloop.ts --mode cycle",
     "atlas:build": "tsx scripts/repo-atlas-build.ts",
     "atlas:why": "tsx scripts/repo-atlas-query.ts why",
-    "atlas:trace": "tsx scripts/repo-atlas-query.ts trace"
+    "atlas:trace": "tsx scripts/repo-atlas-query.ts trace",
+    "atlas:first-divergence": "tsx scripts/repo-atlas-query.ts first-divergence"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",

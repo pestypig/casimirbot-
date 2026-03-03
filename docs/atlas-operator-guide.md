@@ -36,7 +36,17 @@ Identifier resolution prefers exact id/label/path matches before fuzzy partial m
 npm run atlas:why -- <identifier>
 npm run atlas:trace -- <identifier> --upstream
 npm run atlas:trace -- <identifier> --downstream
+npm run atlas:first-divergence -- <canonical.json> <recovery.json> --selector same-rho-source
 ```
+
+`atlas:first-divergence` supports the `qi_margin` route and reports the first stage
+that diverges across:
+- `S0_source`
+- `S1_qi_sample`
+- `S2_bound_computed`
+- `S3_bound_policy`
+- `S4_margin`
+- `S5_gate`
 
 ## Failure modes
 
@@ -44,3 +54,4 @@ npm run atlas:trace -- <identifier> --downstream
 - **identifier not found**: use exact/partial id, label, or path from atlas nodes.
 - **stale data**: rebuild atlas after repo updates.
 - **graph sparsity**: upstream systems may not expose all node/edge families yet in Phase 1.1.
+- **first-divergence recovery case missing**: use `--recovery-case-id`, or provide a recovery payload with a `cases[]` array.
