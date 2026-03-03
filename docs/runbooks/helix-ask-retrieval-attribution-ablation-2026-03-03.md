@@ -149,3 +149,26 @@ It is complementary to:
 ## Completion Gate Reminder
 Per repository policy, every patch still requires Casimir verification PASS with
 certificate hash and `integrityOk=true` before completion is claimed.
+
+## Fidelity Hardening Rules (Prompt 2 update)
+To avoid false-zero retrieval attribution from path-shape drift, compute two views:
+
+1. **Raw metrics** (exact file path match only)
+2. **Canonicalized metrics** (exact OR normalized OR alias)
+
+Canonicalization policy:
+- normalize slash direction (`\\` -> `/`)
+- trim leading `./`
+- compare case-insensitively on normalized form
+- apply known alias family mapping where relevant (current rule set includes
+  `server/` <-> `server/utils/` projection)
+
+Required diagnostics per variant:
+- `unmatched_expected_file_rate`
+- `expected_file_match_mode` distribution (`exact|normalized|alias|none`)
+- per-task mismatch reasons when no match is found
+
+Interpretation update:
+- Use canonicalized metrics for attribution verdicts.
+- Use raw-vs-canonicalized deltas as fidelity health signals; large gaps indicate
+  eval-shape mismatch rather than true retrieval failure.
