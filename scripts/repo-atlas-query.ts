@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import type { RepoAtlas } from "./repo-atlas-build";
 
 const DEFAULT_ATLAS_PATH = path.join(process.cwd(), "artifacts", "repo-atlas", "repo-atlas.v1.json");
@@ -13,13 +14,32 @@ export const loadAtlas = async (atlasPath = DEFAULT_ATLAS_PATH): Promise<RepoAtl
   return JSON.parse(raw) as RepoAtlas;
 };
 
+const rankFieldMatch = (value: string, needle: string, fieldWeight: number): number => {
+  const normalized = normalize(value);
+  if (!normalized) return -1;
+  if (normalized === needle) return 1000 + fieldWeight;
+  if (normalized.startsWith(needle)) return 500 + fieldWeight - Math.max(0, normalized.length - needle.length);
+  if (normalized.includes(needle)) return 100 + fieldWeight - Math.max(0, normalized.length - needle.length);
+  return -1;
+};
+
 export const resolveIdentifier = (atlas: RepoAtlas, identifier: string) => {
   const needle = normalize(identifier);
-  return atlas.nodes.find((node) =>
-    [node.id, node.label, node.path]
-      .filter((row): row is string => Boolean(row))
-      .some((row) => normalize(row) === needle || normalize(row).includes(needle)),
-  );
+  if (!needle) return undefined;
+
+  const ranked = atlas.nodes
+    .map((node) => {
+      const score = Math.max(
+        rankFieldMatch(node.id, needle, 30),
+        rankFieldMatch(node.label, needle, 20),
+        rankFieldMatch(node.path ?? "", needle, 10),
+      );
+      return { node, score };
+    })
+    .filter((row) => row.score >= 0)
+    .sort((a, b) => b.score - a.score || a.node.id.localeCompare(b.node.id));
+
+  return ranked[0]?.node;
 };
 
 const buildAdjacency = (atlas: RepoAtlas, direction: Direction): Map<string, string[]> => {
@@ -113,6 +133,11 @@ async function main() {
   process.exitCode = 1;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+export const isDirectExecution = (importMetaUrl: string, argvPath = process.argv[1]): boolean => {
+  if (!argvPath) return false;
+  return importMetaUrl === pathToFileURL(path.resolve(argvPath)).href;
+};
+
+if (isDirectExecution(import.meta.url)) {
   void main();
 }
