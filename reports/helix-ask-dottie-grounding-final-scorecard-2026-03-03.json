@@ -1,0 +1,21 @@
+{
+  "date": "2026-03-03",
+  "label": "final",
+  "source": "helix-ask-regression",
+  "cases_total": 15,
+  "cases_failed": 15,
+  "mode_precision": 0,
+  "coverage_ratio": null,
+  "unsupported_claim_rate": null,
+  "contradiction_rate": null,
+  "latency_ms": { "p50": null, "p95": null },
+  "llm_call_count_distribution": null,
+  "deltas_vs_baseline": {
+    "cases_failed": 0,
+    "mode_precision": 0
+  },
+  "notes": [
+    "Final scorecard captured after prompt-scope patches.",
+    "No readiness uplift observed in contract battery metrics for this run."
+  ]
+}

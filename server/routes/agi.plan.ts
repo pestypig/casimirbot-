@@ -3195,6 +3195,12 @@ const HELIX_ASK_RRF_WEIGHT_GIT_TRACKED = clampNumber(
   0.1,
   3,
 );
+const HELIX_ASK_RRF_WEIGHT_ATLAS = clampNumber(
+  readNumber(process.env.HELIX_ASK_RRF_WEIGHT_ATLAS ?? process.env.VITE_HELIX_ASK_RRF_WEIGHT_ATLAS, 0.9),
+  0.1,
+  3,
+);
+const HELIX_ASK_ATLAS_LANE = String(process.env.HELIX_ASK_ATLAS_LANE ?? "1").trim() !== "0";
 const HELIX_ASK_GIT_TRACKED_LANE =
   String(process.env.HELIX_ASK_GIT_TRACKED_LANE ?? "1").trim() !== "0";
 const HELIX_ASK_GIT_TRACKED_MAX_QUERIES = clampNumber(
@@ -5510,6 +5516,29 @@ const resolveLongPromptCandidate = (input: {
   return null;
 };
 
+const HELIX_ASK_ATLAS_CORPUS_PATH = path.resolve(process.cwd(), "configs", "repo-atlas-bench-corpus.v1.json");
+let helixAskAtlasCorpusFilesCache: string[] | null = null;
+
+function getHelixAskAtlasCorpusFiles(): string[] {
+  if (helixAskAtlasCorpusFilesCache) return helixAskAtlasCorpusFilesCache;
+  try {
+    const raw = fs.readFileSync(HELIX_ASK_ATLAS_CORPUS_PATH, "utf8");
+    const parsed = JSON.parse(raw) as { tasks?: Array<{ expected_files?: string[] }> };
+    const files = new Set<string>();
+    for (const task of parsed.tasks ?? []) {
+      for (const file of task.expected_files ?? []) {
+        const normalized = String(file || "").trim();
+        if (normalized) files.add(normalized.replace(/\\/g, "/"));
+      }
+    }
+    helixAskAtlasCorpusFilesCache = Array.from(files);
+    return helixAskAtlasCorpusFilesCache;
+  } catch {
+    helixAskAtlasCorpusFilesCache = [];
+    return helixAskAtlasCorpusFilesCache;
+  }
+}
+
 function stripQueryPrefix(value: string): string {
   return value.replace(/^(\d+\.\s+|[-*]\s+)/, "").trim();
 }
@@ -5730,6 +5759,15 @@ function buildHelixAskSearchQueries(
     push("docs/knowledge/ops-deployment-tree.json");
     push(".github/workflows/casimir-verify.yml");
     push("ops");
+  }
+  if (/(mission[-\s]?overwatch|dottie|go board|voice callout|mission callout)/i.test(normalized)) {
+    push("mission-overwatch");
+    push("dottie");
+    push("docs/architecture/mission-go-board-spec.md");
+    push("docs/architecture/voice-service-contract.md");
+    push("docs/helix-ask-agent-policy.md");
+    push("docs/helix-ask-flow.md");
+    push("docs/BUSINESS_MODEL.md");
   }
   if (normalized.includes("solve") || normalized.includes("solver")) {
     push("warp solver");
@@ -5997,7 +6035,7 @@ type AskCandidate = {
   rrfScore: number;
 };
 
-type AskCandidateChannel = "lexical" | "symbol" | "fuzzy" | "path" | "git_tracked";
+type AskCandidateChannel = "lexical" | "symbol" | "fuzzy" | "path" | "git_tracked" | "atlas";
 type AskCandidateChannelStats = Record<AskCandidateChannel, number>;
 type AskCandidateChannelList = { channel: AskCandidateChannel; candidates: AskCandidate[] };
 type EvidenceEligibility = ReturnType<typeof evaluateEvidenceEligibility>;
@@ -6026,12 +6064,14 @@ const HELIX_ASK_CHANNELS: AskCandidateChannel[] = [
   "fuzzy",
   "path",
   "git_tracked",
+  "atlas",
 ];
 const HELIX_ASK_RETRIEVAL_COVERAGE_CHANNELS: AskCandidateChannel[] = [
   "lexical",
   "symbol",
   "fuzzy",
   "path",
+  "atlas",
 ];
 const HELIX_ASK_RRF_CHANNEL_WEIGHTS: AskCandidateChannelStats = {
   lexical: HELIX_ASK_RRF_WEIGHT_LEXICAL,
@@ -6039,6 +6079,7 @@ const HELIX_ASK_RRF_CHANNEL_WEIGHTS: AskCandidateChannelStats = {
   fuzzy: HELIX_ASK_RRF_WEIGHT_FUZZY,
   path: 1.5,
   git_tracked: HELIX_ASK_RRF_WEIGHT_GIT_TRACKED,
+  atlas: HELIX_ASK_RRF_WEIGHT_ATLAS,
 };
 
 type HelixAskPlanDirectives = {
@@ -6069,6 +6110,7 @@ function initAskChannelStats(value = 0): AskCandidateChannelStats {
     fuzzy: value,
     path: value,
     git_tracked: value,
+    atlas: value,
   };
 }
 
@@ -7970,8 +8012,40 @@ function collectAskCandidatesMultiChannel(
     topicProfile: options?.topicProfile,
   });
   if (pathCandidates.length) lists.push({ channel: "path", candidates: pathCandidates });
+  if (HELIX_ASK_ATLAS_LANE) {
+    const atlasPool = Math.max(4, Math.min(12, pathCandidates.length > 0 ? pathCandidates.length : 8));
+    const atlasCandidates = collectAtlasCandidatesForQuery(query, question, { allowlist, avoidlist, limit: atlasPool });
+    if (atlasCandidates.length) lists.push({ channel: "atlas", candidates: atlasCandidates });
+  }
   const queryHit = lists.some((entry) => entry.candidates.length > 0);
   return { lists, queryHit };
+}
+
+function collectAtlasCandidatesForQuery(
+  query: string,
+  question: string,
+  options?: { allowlist?: RegExp[]; avoidlist?: RegExp[]; limit?: number },
+): AskCandidate[] {
+  const files = getHelixAskAtlasCorpusFiles();
+  if (!files.length) return [];
+  const allowlist = options?.allowlist ?? [];
+  const avoidlist = options?.avoidlist ?? [];
+  const limit = Math.max(1, options?.limit ?? 6);
+  const queryTokens = new Set(filterSignalTokens(tokenizeAskQuery(`${query} ${question}`)));
+  const candidates: AskCandidate[] = [];
+  for (const filePath of files) {
+    if (allowlist.length > 0 && !pathMatchesAny(filePath, allowlist)) continue;
+    if (avoidlist.length > 0 && pathMatchesAny(filePath, avoidlist)) continue;
+    const parts = filePath.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    let hits = 0;
+    for (const token of parts) {
+      if (queryTokens.has(token)) hits += 1;
+    }
+    if (hits <= 0) continue;
+    const score = applyAskNodeBoosts(4 + hits * 2, filePath, question, null);
+    candidates.push({ filePath, preview: `Atlas lane candidate: ${filePath}`, score, rrfScore: 0 });
+  }
+  return candidates.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
 async function collectGitTrackedCandidatesForQueries(
@@ -23725,6 +23799,14 @@ const executeHelixAsk = async ({
           debugPayload.retrieval_channel_hits = channelHits;
           debugPayload.retrieval_channel_top_scores = channelTopScores;
           debugPayload.retrieval_channel_weights = contextMeta.channelWeights;
+          debugPayload.atlas_channel_used = (channelHits.atlas ?? 0) > 0;
+          debugPayload.channel_contributions = Object.fromEntries(
+            Object.keys(channelHits).map((channel) => [channel, {
+              hits: (channelHits as Record<string, number>)[channel] ?? 0,
+              top_score: (channelTopScores as Record<string, number>)[channel] ?? 0,
+              weight: (contextMeta.channelWeights as Record<string, number> | undefined)?.[channel] ?? 0,
+            }]),
+          );
           if (typeof contextMeta.docHeaderInjected === "number") {
             debugPayload.doc_header_injected = Math.max(
               debugPayload.doc_header_injected ?? 0,
@@ -24072,6 +24154,14 @@ const executeHelixAsk = async ({
             debugPayload.retrieval_channel_hits = attemptChannelHits;
             debugPayload.retrieval_channel_top_scores = attemptChannelTopScores;
             debugPayload.retrieval_channel_weights = result.channelWeights;
+            debugPayload.atlas_channel_used = (attemptChannelHits.atlas ?? 0) > 0;
+            debugPayload.channel_contributions = Object.fromEntries(
+              Object.keys(attemptChannelHits).map((channel) => [channel, {
+                hits: (attemptChannelHits as Record<string, number>)[channel] ?? 0,
+                top_score: (attemptChannelTopScores as Record<string, number>)[channel] ?? 0,
+                weight: (result.channelWeights as Record<string, number> | undefined)?.[channel] ?? 0,
+              }]),
+            );
             debugPayload.plan_must_include_ok = attemptPlanMustIncludeOk;
             debugPayload.slot_coverage_required = attemptSlotCoverage.required;
             debugPayload.slot_coverage_missing = attemptSlotCoverage.missing;
@@ -24681,6 +24771,8 @@ const executeHelixAsk = async ({
           lanePressure,
         });
         runtimeBudgetRecommend = budgetState.recommend;
+        const dottieSignalApplied = /\b(dottie|mission[-\s]?overwatch|go board|voice callout|mission callout)\b/i.test(baseQuestion) ||
+          topicTags.some((tag) => ["telemetry", "trace", "helix_ask"].includes(tag));
         const strictReadyContractEvidenceOk =
           strictConceptProvenance !== true ||
           (mustIncludeOk &&
@@ -24708,6 +24800,7 @@ const executeHelixAsk = async ({
           budgetRecommend: budgetState.recommend,
           strictCertainty: strictConceptProvenance,
           certaintyEvidenceOk: strictReadyContractEvidenceOk,
+          dottieSignal: dottieSignalApplied,
         });
         const rawArbiterMode = arbiterDecision.mode;
         const isIdeologyIntent = intentProfile.id === "repo.ideology_reference";
@@ -24775,6 +24868,8 @@ const executeHelixAsk = async ({
           debugPayload.runtime_budget_recommend = budgetState.recommend;
           debugPayload.runtime_budget_signals = budgetState.signals;
           debugPayload.arbiter_fail_reason = strictReadyFailReason;
+          debugPayload.dottie_signal_applied = dottieSignalApplied;
+          debugPayload.mode_rationale = `${arbiterMode}:${arbiterReason}`;
         }
         if (
           intentProfile.id === "repo.ideology_reference" &&
