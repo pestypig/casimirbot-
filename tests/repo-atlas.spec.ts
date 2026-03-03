@@ -2,7 +2,14 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildRepoAtlasFromSources, isDirectExecution as isBuildDirectExecution } from "../scripts/repo-atlas-build";
-import { evaluateRegressionGate, loadCorpus, runAtlasBench, validateCorpus, type AtlasBenchCorpus } from "../scripts/atlas-bench";
+import {
+  evaluateRegressionGate,
+  loadCorpus,
+  runAtlasBench,
+  selectSampleTasks,
+  validateCorpus,
+  type AtlasBenchCorpus,
+} from "../scripts/atlas-bench";
 import {
   firstDivergenceG4,
   isDirectExecution as isQueryDirectExecution,
@@ -253,6 +260,13 @@ describe("repo atlas benchmark", () => {
     expect(new Set(corpus.tasks.map((task) => task.id)).size).toBe(corpus.tasks.length);
   });
 
+  it("selects sampled tasks with hard-gate coverage when available", async () => {
+    const corpus = await loadCorpus();
+    const sampled = selectSampleTasks(corpus.tasks, 20, { ensureHardGateCoverage: true });
+    expect(sampled).toHaveLength(20);
+    expect(sampled.some((task) => task.success_check.hard_gate === true)).toBe(true);
+  });
+
   it("rejects invalid corpus payloads", () => {
     const invalid = {
       version: "repo-atlas-bench-corpus/1",
@@ -284,6 +298,7 @@ describe("repo atlas benchmark", () => {
         baseline: {
           lane: "baseline",
           task_count: 20,
+          hard_gate_task_count: 8,
           pass_rate: 0.5,
           hard_gate_pass_rate: 0.6,
           median_time_to_first_correct_file_ms: 100,
@@ -296,6 +311,7 @@ describe("repo atlas benchmark", () => {
         atlas: {
           lane: "atlas",
           task_count: 20,
+          hard_gate_task_count: 8,
           pass_rate: 0.8,
           hard_gate_pass_rate: 0.6,
           median_time_to_first_correct_file_ms: 70,
@@ -314,6 +330,10 @@ describe("repo atlas benchmark", () => {
           hard_gate_pass_rate_drop_allowed_pct: 0,
         },
       },
+      {
+        hardGateTasksInCorpus: 8,
+        hardGateTasksInSample: 8,
+      },
     );
     expect(passing.verdict).toBe("PASS");
 
@@ -322,6 +342,7 @@ describe("repo atlas benchmark", () => {
         baseline: {
           lane: "baseline",
           task_count: 20,
+          hard_gate_task_count: 8,
           pass_rate: 0.8,
           hard_gate_pass_rate: 1,
           median_time_to_first_correct_file_ms: 100,
@@ -334,6 +355,7 @@ describe("repo atlas benchmark", () => {
         atlas: {
           lane: "atlas",
           task_count: 20,
+          hard_gate_task_count: 8,
           pass_rate: 0.81,
           hard_gate_pass_rate: 0.9,
           median_time_to_first_correct_file_ms: 90,
@@ -352,9 +374,61 @@ describe("repo atlas benchmark", () => {
           hard_gate_pass_rate_drop_allowed_pct: 0,
         },
       },
+      {
+        hardGateTasksInCorpus: 8,
+        hardGateTasksInSample: 8,
+      },
     );
     expect(failing.verdict).toBe("FAIL");
     expect(failing.reasons.length).toBeGreaterThan(0);
+  });
+
+  it("fails closed when sampled benchmark misses hard-gate coverage", () => {
+    const gated = evaluateRegressionGate(
+      {
+        baseline: {
+          lane: "baseline",
+          task_count: 20,
+          hard_gate_task_count: 0,
+          pass_rate: 0.7,
+          hard_gate_pass_rate: null,
+          median_time_to_first_correct_file_ms: 120,
+          p90_time_to_first_correct_file_ms: 200,
+          median_time_to_first_valid_patch_ms: 130,
+          p90_time_to_first_valid_patch_ms: 210,
+          median_files_opened_count: 10,
+          median_commands_run_count: 0,
+        },
+        atlas: {
+          lane: "atlas",
+          task_count: 20,
+          hard_gate_task_count: 0,
+          pass_rate: 0.9,
+          hard_gate_pass_rate: null,
+          median_time_to_first_correct_file_ms: 80,
+          p90_time_to_first_correct_file_ms: 140,
+          median_time_to_first_valid_patch_ms: 95,
+          p90_time_to_first_valid_patch_ms: 150,
+          median_files_opened_count: 8,
+          median_commands_run_count: 0,
+        },
+      },
+      {
+        version: "repo-atlas-bench-policy/1",
+        thresholds: {
+          median_time_to_first_correct_file_improvement_pct: 25,
+          task_pass_rate_improvement_pct: 15,
+          hard_gate_pass_rate_drop_allowed_pct: 0,
+        },
+      },
+      {
+        hardGateTasksInCorpus: 5,
+        hardGateTasksInSample: 0,
+      },
+    );
+
+    expect(gated.verdict).toBe("FAIL");
+    expect(gated.reasons.join(" ")).toMatch(/hard-gate/i);
   });
 
   it("emits deterministic artifact schema for sampled runs", async () => {
@@ -365,6 +439,8 @@ describe("repo atlas benchmark", () => {
     });
     expect(artifact.version).toBe("repo-atlas-bench/1");
     expect(artifact.tasks).toHaveLength(6);
+    expect(artifact.sampling.strategy).toBe("stratified_hard_gate");
+    expect(artifact.limits.max_files_to_open).toBeGreaterThan(0);
     expect(artifact.tasks[0]?.task_id <= artifact.tasks[1]?.task_id || artifact.tasks[0]?.lane === "atlas").toBe(true);
   });
 });
