@@ -66,6 +66,37 @@ describe("Helix Ask arbiter", () => {
     expect(result.mode).toBe("clarify");
   });
 
+  it("routes weak evidence to hybrid when dottie soft signal is enabled", () => {
+    const result = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.05,
+      hasRepoHints: false,
+      conceptMatch: false,
+      userExpectsRepo: false,
+      dottieSignal: true,
+      dottieSoftSignal: true,
+      intentDomain: "general",
+    });
+    expect(result.mode).toBe("hybrid");
+    expect(result.reason).toBe("dottie_soft_signal");
+    expect(result.dottie_signal_applied).toBe(true);
+  });
+
+  it("keeps budget force clarify as a hard override over dottie soft signal", () => {
+    const result = resolveHelixAskArbiter({
+      ...baseInput,
+      retrievalConfidence: 0.05,
+      dottieSignal: true,
+      dottieSoftSignal: true,
+      budgetLevel: "OVER",
+      budgetRecommend: "force_clarify",
+      intentDomain: "repo",
+    });
+    expect(result.mode).toBe("clarify");
+    expect(result.reason).toBe("budget_force_clarify");
+    expect(result.dottie_signal_applied).toBe(false);
+  });
+
   it("forces repo_grounded for high-stakes constraints", () => {
     const result = resolveHelixAskArbiter({
       ...baseInput,

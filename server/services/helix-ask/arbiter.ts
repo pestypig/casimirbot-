@@ -16,9 +16,10 @@ export type HelixAskArbiterInput = {
   intentDomain?: "general" | "repo" | "hybrid" | "falsifiable";
   budgetLevel?: "OK" | "WARNING" | "OVER";
   budgetRecommend?: "none" | "reduce_tool_calls" | "force_clarify" | "queue_deep_work";
+  dottieSignal?: boolean;
+  dottieSoftSignal?: boolean;
   strictCertainty?: boolean;
   certaintyEvidenceOk?: boolean;
-  dottieSignal?: boolean;
 };
 
 export type HelixAskArbiterResult = {
@@ -33,6 +34,7 @@ export type HelixAskArbiterResult = {
   provenance_class: "measured" | "proxy" | "inferred";
   claim_tier: "diagnostic" | "reduced-order" | "certified";
   certifying: boolean;
+  dottie_signal_applied: boolean;
   fail_reason?: string;
 };
 
@@ -61,6 +63,8 @@ export function resolveHelixAskArbiter(input: HelixAskArbiterInput): HelixAskArb
         : "med";
   let mode: HelixAskArbiterResult["mode"] = "general";
   let reason = "no_repo_expectation";
+  let dottieSignalApplied = false;
+  const dottieEligible = input.dottieSignal === true && input.dottieSoftSignal !== false;
   if (input.hasHighStakesConstraints) {
     mode = "repo_grounded";
     reason = "high_stakes";
@@ -76,9 +80,10 @@ export function resolveHelixAskArbiter(input: HelixAskArbiterInput): HelixAskArb
   } else if (hybridOk) {
     mode = "hybrid";
     reason = "hybrid_ratio";
-  } else if (input.dottieSignal) {
+  } else if (dottieEligible) {
     mode = "hybrid";
     reason = "dottie_soft_signal";
+    dottieSignalApplied = true;
   } else if (input.userExpectsRepo) {
     mode = "clarify";
     reason = "expect_repo_weak_evidence";
@@ -95,6 +100,7 @@ export function resolveHelixAskArbiter(input: HelixAskArbiterInput): HelixAskArb
   if (strictMode && strictFailReason && mode !== "clarify") {
     mode = "clarify";
     reason = "strict_ready_contract_missing";
+    dottieSignalApplied = false;
   }
 
   return {
@@ -109,6 +115,7 @@ export function resolveHelixAskArbiter(input: HelixAskArbiterInput): HelixAskArb
     provenance_class: "inferred",
     claim_tier: "diagnostic",
     certifying: false,
+    dottie_signal_applied: dottieSignalApplied,
     fail_reason: strictFailReason,
   };
 }

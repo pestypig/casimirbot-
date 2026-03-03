@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { isFastModeRuntimeMissingSymbolError } from "../server/services/helix-ask/runtime-errors";
-import { __testOnlyNonReportGuard } from "../server/routes/agi.plan";
+import {
+  __testHelixAskReliabilityGuards,
+  __testOnlyNonReportGuard,
+} from "../server/routes/agi.plan";
 
 describe("isFastModeRuntimeMissingSymbolError", () => {
   it("detects missing runHelperWithinStageBudget symbol from Node reference errors", () => {
@@ -57,5 +60,195 @@ describe("non-report guard ordering for runtime fallback", () => {
     expect(context.reportModeEnabled).toBe(true);
     expect(guarded.text).toBe(answer);
     expect(guarded.hadScaffold).toBe(false);
+  });
+});
+
+describe("helix ask reliability guards", () => {
+  it("overrides clarify for grounded repo-required evidence under alignment fail", () => {
+    const shouldOverride =
+      __testHelixAskReliabilityGuards.shouldOverrideClarifyForGroundedEvidence(
+        {
+          alignmentGateDecision: "FAIL",
+          openWorldBypassMode: "off",
+          atlasRequirementFailed: false,
+          requiresRepoEvidence: true,
+          evidenceGateOk: true,
+          mustIncludeOk: true,
+          viabilityMustIncludeOk: true,
+          topicMustIncludeOk: true,
+          retrievalConfidence: 0.9,
+          repoThreshold: 0.6,
+          hasRepoHints: true,
+          hasFilePathHints: true,
+          contextFileCount: 2,
+        },
+      );
+    expect(shouldOverride).toBe(true);
+  });
+
+  it("does not override clarify when evidence is weak", () => {
+    const shouldOverride =
+      __testHelixAskReliabilityGuards.shouldOverrideClarifyForGroundedEvidence(
+        {
+          alignmentGateDecision: "FAIL",
+          openWorldBypassMode: "off",
+          atlasRequirementFailed: false,
+          requiresRepoEvidence: true,
+          evidenceGateOk: false,
+          mustIncludeOk: true,
+          viabilityMustIncludeOk: true,
+          topicMustIncludeOk: true,
+          retrievalConfidence: 0.4,
+          repoThreshold: 0.6,
+          hasRepoHints: false,
+          hasFilePathHints: false,
+          contextFileCount: 0,
+        },
+      );
+    expect(shouldOverride).toBe(false);
+  });
+
+  it("does not override clarify for open-world requests", () => {
+    const shouldOverride =
+      __testHelixAskReliabilityGuards.shouldOverrideClarifyForGroundedEvidence(
+        {
+          alignmentGateDecision: "FAIL",
+          openWorldBypassMode: "off",
+          atlasRequirementFailed: false,
+          requiresRepoEvidence: false,
+          evidenceGateOk: true,
+          mustIncludeOk: true,
+          viabilityMustIncludeOk: true,
+          topicMustIncludeOk: true,
+          retrievalConfidence: 0.95,
+          repoThreshold: 0.6,
+          hasRepoHints: true,
+          hasFilePathHints: true,
+          contextFileCount: 2,
+        },
+      );
+    expect(shouldOverride).toBe(false);
+  });
+
+  it("builds deterministic repo runtime fallback from evidence", () => {
+    const fallback =
+      __testHelixAskReliabilityGuards.buildDeterministicRepoRuntimeFallback({
+        question: "What is a warp bubble Natario solve?",
+        format: "brief",
+        definitionFocus: true,
+        docBlocks: [
+          {
+            path: "docs/knowledge/warp/warp-bubble.md",
+            block:
+              "docs/knowledge/warp/warp-bubble.md\nDefinition: In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints.",
+          },
+        ],
+        codeAlignment: null,
+        evidenceText:
+          "Definition: In this repo, a warp bubble is a modeled spacetime region.\nSources: docs/knowledge/warp/warp-bubble.md",
+        anchorFiles: ["docs/knowledge/warp/warp-bubble.md"],
+      });
+    expect(fallback).toBeTruthy();
+    expect(fallback).not.toMatch(/Runtime fallback: Unable to complete a repo-grounded LLM pass/i);
+    expect(fallback).toMatch(/docs\/knowledge\/warp\/warp-bubble\.md/i);
+  });
+
+  it("builds evidence packet v2 with canonical retrieval and coverage snapshot", () => {
+    const packet = __testHelixAskReliabilityGuards.buildHelixAskEvidencePacketV2({
+      route: "repo",
+      question: "What is a warp bubble Natario solve?",
+      intentId: "repo.warp_definition_docs_first",
+      intentDomain: "repo",
+      contextFiles: ["docs/knowledge/warp/warp-bubble.md"],
+      contextText:
+        "Definition docs: docs/knowledge/warp/warp-bubble.md\nSources: docs/knowledge/warp/warp-bubble.md",
+      docBlocks: [
+        {
+          path: "docs/knowledge/warp/warp-bubble.md",
+          block:
+            "docs/knowledge/warp/warp-bubble.md\nDefinition: In this repo, a warp bubble model is represented with Natario-compatible shift and guardrail checks.",
+        },
+      ],
+      retrievalConfidence: 0.91,
+      retrievalDocShare: 0.88,
+      slotCoverage: { ratio: 0.75, missingSlots: ["warp_equation_anchor"] },
+      docCoverage: { ratio: 1, missingSlots: [] },
+      channelContributions: { atlas: { hits: 4, used: true } },
+      sections: [
+        {
+          id: "repo",
+          label: "Repo evidence",
+          content:
+            "Definition: docs/knowledge/warp/warp-bubble.md describes the repo-specific warp bubble abstraction.\nSources: docs/knowledge/warp/warp-bubble.md",
+        },
+        {
+          id: "constraint",
+          label: "Constraint evidence",
+          content: "Constraint path: server/routes/agi.plan.ts",
+        },
+      ],
+      preferredEvidenceText:
+        "Definition: docs/knowledge/warp/warp-bubble.md describes the repo-specific warp bubble abstraction.\nSources: docs/knowledge/warp/warp-bubble.md",
+    });
+
+    expect(packet.version).toBe("repo_atlas_evidence_packet_v2");
+    expect(packet.route).toBe("repo");
+    expect(packet.sections.map((section) => section.id)).toEqual(["repo", "constraint"]);
+    expect(packet.evidenceText).toContain("warp-bubble.md");
+    expect(packet.evidenceCardsText).toMatch(/Repo evidence:/);
+    expect(packet.contextFiles).toContain("docs/knowledge/warp/warp-bubble.md");
+    expect(packet.sources).toContain("docs/knowledge/warp/warp-bubble.md");
+    expect(packet.coverage.slotMissing).toEqual(["warp_equation_anchor"]);
+    expect(packet.retrieval.confidence).toBeGreaterThan(0.8);
+  });
+
+  it("scores evidence mass higher when source diversity and coverage are strong", () => {
+    const rich = __testHelixAskReliabilityGuards.computeHelixAskEvidenceMassScore({
+      sourceCount: 10,
+      independentSourceCount: 6,
+      slotCoverageRatio: 0.92,
+      docCoverageRatio: 0.88,
+      retrievalConfidence: 0.9,
+      retrievalDocShare: 0.7,
+    });
+    const thin = __testHelixAskReliabilityGuards.computeHelixAskEvidenceMassScore({
+      sourceCount: 1,
+      independentSourceCount: 1,
+      slotCoverageRatio: 0.2,
+      docCoverageRatio: 0.15,
+      retrievalConfidence: 0.25,
+      retrievalDocShare: 0.1,
+    });
+    expect(rich.score).toBeGreaterThan(thin.score);
+    expect(rich.band).toBe("rich");
+    expect(thin.band).toBe("thin");
+  });
+
+  it("moves unsupported contract claims into uncertainty when grounding is enforced", () => {
+    const grounded = __testHelixAskReliabilityGuards.applyHelixAskClaimGroundingGate({
+      contract: {
+        summary: "Repo answer summary.",
+        claims: [
+          {
+            text: "Supported claim from route logic.",
+            evidence: ["server/routes/agi.plan.ts"],
+          },
+          {
+            text: "Ungrounded claim with no evidence mapping.",
+          },
+        ],
+        sources: ["server/routes/agi.plan.ts"],
+      },
+      allowedCitations: ["server/routes/agi.plan.ts", "docs/helix-ask-flow.md"],
+      evidenceText:
+        "Sources: server/routes/agi.plan.ts\nRoute pipeline and citation repair behavior are defined in this file.",
+      enforce: true,
+    });
+
+    expect(grounded.groundedCount).toBe(1);
+    expect(grounded.unsupportedCount).toBe(1);
+    expect(grounded.contract.claims?.length).toBe(1);
+    expect(grounded.contract.claims?.[0]?.evidence).toContain("server/routes/agi.plan.ts");
+    expect(grounded.contract.uncertainty ?? "").toMatch(/Unsupported claims moved to uncertainty/i);
   });
 });
