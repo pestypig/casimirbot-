@@ -18,7 +18,6 @@ export type HelixAskArbiterInput = {
   budgetRecommend?: "none" | "reduce_tool_calls" | "force_clarify" | "queue_deep_work";
   strictCertainty?: boolean;
   certaintyEvidenceOk?: boolean;
-  dottieSignal?: boolean;
 };
 
 export type HelixAskArbiterResult = {
@@ -76,9 +75,6 @@ export function resolveHelixAskArbiter(input: HelixAskArbiterInput): HelixAskArb
   } else if (hybridOk) {
     mode = "hybrid";
     reason = "hybrid_ratio";
-  } else if (input.dottieSignal) {
-    mode = "hybrid";
-    reason = "dottie_soft_signal";
   } else if (input.userExpectsRepo) {
     mode = "clarify";
     reason = "expect_repo_weak_evidence";
