@@ -1,0 +1,1150 @@
+{
+    "version":  "repo-atlas-bench-corpus/2",
+    "generatedAt":  "2026-03-04T06:45:30.1452650Z",
+    "tasks":  [
+                  {
+                      "id":  "atlas_task_001",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, locate the server file implementing horizons proxy (horizons-proxy.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/horizons-proxy.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_002",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, locate the server file implementing horizons proxy (horizons-proxy.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/utils/horizons-proxy.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_003",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, locate the server file implementing run python (run-python.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/utils/run-python.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_004",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, locate the server file implementing physics const safe (physics-const-safe.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/utils/physics-const-safe.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_005",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, locate the server file implementing stable json (stable-json.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/utils/stable-json.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_006",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, locate the server file implementing information boundary (information-boundary.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/utils/information-boundary.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_007",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, locate the server file implementing express async guard (express-async-guard.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/utils/express-async-guard.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_008",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, locate the server file implementing phase calibration (phase-calibration.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/utils/phase-calibration.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_009",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, locate the server file implementing constraint evaluator (constraint-evaluator.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/gr/constraint-evaluator.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_010",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, locate the server file implementing payload (gr-os-payload.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/gr/gr-os-payload.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_011",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, locate the server file implementing agent loop schema (gr-agent-loop-schema.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/gr/gr-agent-loop-schema.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_012",
+                      "domain":  "client",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing use store (useQiStore.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/store/useQiStore.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_013",
+                      "domain":  "client",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing use flight director store (useFlightDirectorStore.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/store/useFlightDirectorStore.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_014",
+                      "domain":  "client",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing use hull3dshared store test (useHull3DSharedStore.test.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/store/useHull3DSharedStore.test.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_015",
+                      "domain":  "client",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing use hull3dshared store (useHull3DSharedStore.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/store/useHull3DSharedStore.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_016",
+                      "domain":  "client",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing use drive sync store (useDriveSyncStore.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/store/useDriveSyncStore.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_017",
+                      "domain":  "client",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing use desktop store (useDesktopStore.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/store/useDesktopStore.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_018",
+                      "domain":  "client",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing use nav pose store (useNavPoseStore.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/store/useNavPoseStore.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_019",
+                      "domain":  "client",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing use doc viewer store (useDocViewerStore.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/store/useDocViewerStore.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_020",
+                      "domain":  "client",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing use mobile app store (useMobileAppStore.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/store/useMobileAppStore.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_021",
+                      "domain":  "client",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing use knowledge projects store (useKnowledgeProjectsStore.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/store/useKnowledgeProjectsStore.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_022",
+                      "domain":  "client",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing use agi chat store (useAgiChatStore.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/store/useAgiChatStore.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_023",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing validate ideology verifiers (validate-ideology-verifiers.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/validate-ideology-verifiers.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_024",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing build code lattice (build-code-lattice.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/build-code-lattice.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_025",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing build panel tree (build-panel-tree.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/build-panel-tree.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_026",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp full solve single runner (warp-full-solve-single-runner.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-full-solve-single-runner.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_027",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp evidence pack (warp-evidence-pack.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-evidence-pack.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_028",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing agi gguf bench (agi-gguf-bench.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/agi-gguf-bench.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_029",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing helix ask utility (helix-ask-utility-ab.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/helix-ask-utility-ab.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_030",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp full solve campaign cli (warp-full-solve-campaign-cli.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-full-solve-campaign-cli.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_031",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing build math congruence matrix (build-math-congruence-matrix.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/build-math-congruence-matrix.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_032",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing guard helix core deprecated (guard-helix-core-deprecated.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/guard-helix-core-deprecated.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_033",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing validate agent context checklist (validate-agent-context-checklist.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/validate-agent-context-checklist.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_034",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing replit runtime constraints (replit-runtime-constraints.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/replit-runtime-constraints.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_035",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing casimir tile roadmap (casimir-tile-roadmap.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/casimir-tile-roadmap.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_036",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing warp tree dag walk rules (warp-tree-dag-walk-rules.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/warp-tree-dag-walk-rules.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_037",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing warp tree dag schema (warp-tree-dag-schema.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/warp-tree-dag-schema.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_038",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing solar pipeline (solar-pipeline.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/solar-pipeline.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_039",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing agibot knowledge linking contract (agibot-knowledge-linking-contract-v1.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/agibot-knowledge-linking-contract-v1.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_040",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask dottie callout templates (helix-ask-dottie-callout-templates.v1.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-dottie-callout-templates.v1.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_041",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask quake balancing primitives (helix-ask-quake-balancing-primitives.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-quake-balancing-primitives.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_042",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing agibot runtime bridge contract (agibot-x1-runtime-bridge-contract-v1.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/agibot-x1-runtime-bridge-contract-v1.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_043",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask stellar toe workstream tracker (helix-ask-stellar-toe-workstream-tracker.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-stellar-toe-workstream-tracker.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_044",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing voice bundle format (voice-bundle-format.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/voice-bundle-format.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_045",
+                      "domain":  "warp-gr",
+                      "prompt":  "For retrieval attribution benchmarking, locate the configs file implementing warp primitive manifest (warp-primitive-manifest.v1.json). Return the exact repository path.",
+                      "expected_files":  [
+                                             "configs/warp-primitive-manifest.v1.json"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_046",
+                      "domain":  "warp-gr",
+                      "prompt":  "For retrieval attribution benchmarking, locate the configs file implementing physics root leaf manifest (physics-root-leaf-manifest.v1.json). Return the exact repository path.",
+                      "expected_files":  [
+                                             "configs/physics-root-leaf-manifest.v1.json"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_047",
+                      "domain":  "warp-gr",
+                      "prompt":  "For retrieval attribution benchmarking, locate the configs file implementing warp validation baseline (warp-validation-baseline.json). Return the exact repository path.",
+                      "expected_files":  [
+                                             "configs/warp-validation-baseline.json"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_048",
+                      "domain":  "warp-gr",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp full solve single runner (warp-full-solve-single-runner.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-full-solve-single-runner.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_049",
+                      "domain":  "warp-gr",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp evidence pack (warp-evidence-pack.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-evidence-pack.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_050",
+                      "domain":  "warp-gr",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp full solve campaign cli (warp-full-solve-campaign-cli.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-full-solve-campaign-cli.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_051",
+                      "domain":  "warp-gr",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp first divergence (warp-g4-first-divergence.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-g4-first-divergence.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_052",
+                      "domain":  "warp-gr",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp kernel provenance audit (warp-g4-kernel-provenance-audit.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-g4-kernel-provenance-audit.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_053",
+                      "domain":  "warp-gr",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp candidate promotion check (warp-g4-candidate-promotion-check.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-g4-candidate-promotion-check.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_054",
+                      "domain":  "warp-gr",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp semantic bridge matrix (warp-g4-semantic-bridge-matrix.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-g4-semantic-bridge-matrix.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_055",
+                      "domain":  "warp-gr",
+                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp canonical runtime snapshot (warp-canonical-runtime-snapshot.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-canonical-runtime-snapshot.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_056",
+                      "domain":  "helix-ask",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask dottie callout templates (helix-ask-dottie-callout-templates.v1.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-dottie-callout-templates.v1.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_057",
+                      "domain":  "helix-ask",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask quake balancing primitives (helix-ask-quake-balancing-primitives.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-quake-balancing-primitives.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_058",
+                      "domain":  "helix-ask",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask stellar toe workstream tracker (helix-ask-stellar-toe-workstream-tracker.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-stellar-toe-workstream-tracker.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_059",
+                      "domain":  "helix-ask",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask proof packet rfc (helix-ask-proof-packet-rfc.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-proof-packet-rfc.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_060",
+                      "domain":  "helix-ask",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask mission systems integration plan (helix-ask-mission-systems-integration-plan.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-mission-systems-integration-plan.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_061",
+                      "domain":  "helix-ask",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask math router contract (helix-ask-math-router-contract.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-math-router-contract.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_062",
+                      "domain":  "helix-ask",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask universal constraints build plan 2026 (helix-ask-universal-constraints-build-plan-2026-02-17.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-universal-constraints-build-plan-2026-02-17.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_063",
+                      "domain":  "helix-ask",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask natural philosophy gap closure playbook (helix-ask-natural-philosophy-gap-closure-playbook.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-natural-philosophy-gap-closure-playbook.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_064",
+                      "domain":  "helix-ask",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask dottie prompt style contract (helix-ask-dottie-prompt-style-contract.v1.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-dottie-prompt-style-contract.v1.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_065",
+                      "domain":  "helix-ask",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask readiness debug loop (helix-ask-readiness-debug-loop.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/helix-ask-readiness-debug-loop.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_066",
+                      "domain":  "helix-ask",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask reasoning latency 2026 (helix-ask-reasoning-latency-2026-02-16.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/helix-ask-reasoning-latency-2026-02-16.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  true
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_067",
+                      "domain":  "mission-control",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing mission board spec (mission-go-board-spec.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/mission-go-board-spec.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_068",
+                      "domain":  "mission-control",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask mission systems integration plan (helix-ask-mission-systems-integration-plan.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/helix-ask-mission-systems-integration-plan.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_069",
+                      "domain":  "mission-control",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing mission systems contract diff 2026 (mission-systems-contract-diff-2026-02-22.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/mission-systems-contract-diff-2026-02-22.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_070",
+                      "domain":  "mission-control",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing mission overwatch slo 2026 (mission-overwatch-slo-2026-02-23.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/mission-overwatch-slo-2026-02-23.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_071",
+                      "domain":  "mission-control",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing mission overwatch slo 2026 (mission-overwatch-slo-2026-02-22.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/mission-overwatch-slo-2026-02-22.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_072",
+                      "domain":  "mission-control",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing mission overwatch wave3a slo 2026 (mission-overwatch-wave3a-slo-2026-02-23.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/mission-overwatch-wave3a-slo-2026-02-23.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_073",
+                      "domain":  "mission-control",
+                      "prompt":  "For retrieval attribution benchmarking, locate the client file implementing index (index.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "client/src/lib/mission-overwatch/index.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_074",
+                      "domain":  "mission-control",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask mission overwatch wave3a codex cloud autorun batch prompt pack 2026 (helix-ask-mission-overwatch-v1-wave3a-codex-cloud-autorun-batch-prompt-pack-2026-02-23.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/audits/research/helix-ask-mission-overwatch-v1-wave3a-codex-cloud-autorun-batch-prompt-pack-2026-02-23.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_075",
+                      "domain":  "mission-control",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask mission systems codex cloud autorun batch prompt pack 2026 (helix-ask-mission-systems-codex-cloud-autorun-batch-prompt-pack-2026-02-22.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/audits/research/helix-ask-mission-systems-codex-cloud-autorun-batch-prompt-pack-2026-02-22.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_076",
+                      "domain":  "mission-control",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask mission systems research annex 2026 (helix-ask-mission-systems-research-annex-2026-02-22.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/audits/research/helix-ask-mission-systems-research-annex-2026-02-22.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_077",
+                      "domain":  "mission-control",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask mission overwatch closure wave2b codex cloud autorun batch prompt pack 2026 (helix-ask-mission-overwatch-v1-closure-wave2b-codex-cloud-autorun-batch-prompt-pack-2026-02-23.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/audits/research/helix-ask-mission-overwatch-v1-closure-wave2b-codex-cloud-autorun-batch-prompt-pack-2026-02-23.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_078",
+                      "domain":  "voice",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing voice bundle format (voice-bundle-format.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/voice-bundle-format.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_079",
+                      "domain":  "voice",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing voice service contract (voice-service-contract.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/architecture/voice-service-contract.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_080",
+                      "domain":  "voice",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing voice eval gates 2026 (voice-eval-gates-2026-02-23.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/voice-eval-gates-2026-02-23.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_081",
+                      "domain":  "voice",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing voice train prod lane 2026 (voice-train-prod-lane-2026-02-23.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/voice-train-prod-lane-2026-02-23.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_082",
+                      "domain":  "voice",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing voice local ownership serving (voice-local-ownership-serving.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/voice-local-ownership-serving.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_083",
+                      "domain":  "voice",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing voice train vertex setup 2026 (voice-train-vertex-setup-2026-02-23.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/voice-train-vertex-setup-2026-02-23.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_084",
+                      "domain":  "voice",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing codex cloud voice train objective 2026 report (codex-cloud-voice-train-objective-2026-02-23-report.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/reports/codex-cloud-voice-train-objective-2026-02-23-report.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_085",
+                      "domain":  "voice",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing tts prod stack wave1 closure 2026 (tts-prod-stack-wave1-closure-2026-02-24.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/reports/tts-prod-stack-wave1-closure-2026-02-24.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_086",
+                      "domain":  "voice",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing codex cloud voice train objective 2026 (codex-cloud-voice-train-objective-2026-02-23.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/codex-cloud-voice-train-objective-2026-02-23.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_087",
+                      "domain":  "voice",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing voice provider policy 2026 (voice-provider-policy-2026-02-22.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/voice-provider-policy-2026-02-22.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_088",
+                      "domain":  "voice",
+                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing voice train colab bootstrap 2026 (voice-train-colab-bootstrap-2026-02-23.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/runbooks/voice-train-colab-bootstrap-2026-02-23.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  }
+              ]
+}

@@ -5672,7 +5672,23 @@ const resolveLongPromptCandidate = (input: {
   return null;
 };
 
-const HELIX_ASK_ATLAS_CORPUS_PATH = path.resolve(process.cwd(), "configs", "repo-atlas-bench-corpus.v1.json");
+const HELIX_ASK_ATLAS_CORPUS_PATH = (() => {
+  const configured = String(
+    process.env.HELIX_ASK_ATLAS_CORPUS_PATH ?? "configs/repo-atlas-bench-corpus.v1.json",
+  ).trim();
+  if (!configured) {
+    return path.resolve(process.cwd(), "configs", "repo-atlas-bench-corpus.v1.json");
+  }
+  return path.isAbsolute(configured)
+    ? configured
+    : path.resolve(process.cwd(), configured);
+})();
+const HELIX_ASK_ATLAS_GRAPH_EXPANSION = process.env.HELIX_ASK_ATLAS_GRAPH_EXPANSION !== "0";
+const HELIX_ASK_ATLAS_GRAPH_EXPANSION_LIMIT = clampNumber(
+  Number(process.env.HELIX_ASK_ATLAS_GRAPH_EXPANSION_LIMIT ?? 24),
+  4,
+  64,
+);
 let helixAskAtlasCorpusFilesCache: string[] | null = null;
 
 function getHelixAskAtlasCorpusFiles(): string[] {
@@ -8208,25 +8224,41 @@ async function collectAskCandidatesMultiChannel(
   if (pathCandidates.length) lists.push({ channel: "path", candidates: pathCandidates });
   if (HELIX_ASK_ATLAS_LANE) {
     const atlasPool = Math.max(4, Math.min(12, pathCandidates.length > 0 ? pathCandidates.length : 8));
-    const atlasCandidates = collectAtlasCandidatesForQuery(query, question, { allowlist, avoidlist, limit: atlasPool });
+    const atlasCandidates = await collectAtlasCandidatesForQuery(query, question, {
+      allowlist,
+      avoidlist,
+      limit: atlasPool,
+      topicProfile: options?.topicProfile,
+    });
     if (atlasCandidates.length) lists.push({ channel: "atlas", candidates: atlasCandidates });
   }
   const queryHit = lists.some((entry) => entry.candidates.length > 0);
   return { lists, queryHit };
 }
 
-function collectAtlasCandidatesForQuery(
+async function collectAtlasCandidatesForQuery(
   query: string,
   question: string,
-  options?: { allowlist?: RegExp[]; avoidlist?: RegExp[]; limit?: number },
-): AskCandidate[] {
+  options?: {
+    allowlist?: RegExp[];
+    avoidlist?: RegExp[];
+    limit?: number;
+    topicProfile?: HelixAskTopicProfile | null;
+  },
+): Promise<AskCandidate[]> {
   const files = getHelixAskAtlasCorpusFiles();
-  if (!files.length) return [];
   const allowlist = options?.allowlist ?? [];
   const avoidlist = options?.avoidlist ?? [];
   const limit = Math.max(1, options?.limit ?? 6);
   const queryTokens = new Set(filterSignalTokens(tokenizeAskQuery(`${query} ${question}`)));
-  const candidates: AskCandidate[] = [];
+  const byPath = new Map<string, AskCandidate>();
+  const upsert = (candidate: AskCandidate) => {
+    const existing = byPath.get(candidate.filePath);
+    if (!existing || candidate.score > existing.score) {
+      byPath.set(candidate.filePath, candidate);
+    }
+  };
+  const atlasCorpusSet = new Set(files.map((entry) => entry.toLowerCase()));
   for (const filePath of files) {
     if (allowlist.length > 0 && !pathMatchesAny(filePath, allowlist)) continue;
     if (avoidlist.length > 0 && pathMatchesAny(filePath, avoidlist)) continue;
@@ -8236,10 +8268,57 @@ function collectAtlasCandidatesForQuery(
       if (queryTokens.has(token)) hits += 1;
     }
     if (hits <= 0) continue;
-    const score = applyAskNodeBoosts(4 + hits * 2, filePath, question, null);
-    candidates.push({ filePath, preview: `Atlas lane candidate: ${filePath}`, score, rrfScore: 0 });
+    const score = applyAskNodeBoosts(4 + hits * 2, filePath, question, options?.topicProfile);
+    upsert({
+      filePath,
+      preview: `Atlas lane candidate: ${filePath}`,
+      score,
+      rrfScore: 0,
+    });
   }
-  return candidates.sort((a, b) => b.score - a.score).slice(0, limit);
+
+  const staticAtlasCandidateCount = byPath.size;
+  if (HELIX_ASK_ATLAS_GRAPH_EXPANSION && staticAtlasCandidateCount < limit) {
+    try {
+      const graphLimit = Math.max(limit * 2, HELIX_ASK_ATLAS_GRAPH_EXPANSION_LIMIT);
+      const graphResult = await searchRepoGraph({
+        query: `${query} ${question}`.trim(),
+        limit: graphLimit,
+      });
+      for (const hit of graphResult.hits ?? []) {
+        const filePath = String(hit.file_path ?? hit.path ?? "").trim().replace(/\\/g, "/");
+        if (!filePath) continue;
+        if (allowlist.length > 0 && !pathMatchesAny(filePath, allowlist)) continue;
+        if (avoidlist.length > 0 && pathMatchesAny(filePath, avoidlist)) continue;
+        const pathTokens = filePath.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+        let tokenHits = 0;
+        for (const token of pathTokens) {
+          if (queryTokens.has(token)) tokenHits += 1;
+        }
+        const atlasMembershipBoost = atlasCorpusSet.has(filePath.toLowerCase()) ? 4 : 0;
+        if (atlasMembershipBoost <= 0 && tokenHits <= 0) continue;
+        const graphScore = Number.isFinite(hit.score) ? hit.score : 0;
+        if (graphScore <= 0) continue;
+        const score = applyAskNodeBoosts(
+          4 + graphScore * 4 + tokenHits + atlasMembershipBoost,
+          filePath,
+          question,
+          options?.topicProfile,
+        );
+        upsert({
+          filePath,
+          preview: `Atlas graph candidate: ${filePath}`,
+          score,
+          rrfScore: 0,
+        });
+      }
+    } catch {
+      // Keep Atlas lane deterministic even if graph retrieval is unavailable.
+    }
+  }
+  return Array.from(byPath.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 }
 
 async function collectGitTrackedCandidatesForQueries(
