@@ -32,7 +32,11 @@ type TaskResult = {
   rawRR: number;
   canonRR: number;
   mode: MatchMode;
-  mismatchReasons: string[];
+  mismatchReasons: Array<{
+    expected: string;
+    reason: "path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch";
+    detail?: string;
+  }>;
   graphEdgeHit: boolean;
   confidence: number | null;
   docShare: number | null;
@@ -47,6 +51,7 @@ const TEMPS = String(process.env.HELIX_ASK_RETRIEVAL_TEMPERATURES ?? "0.2").spli
 const READY_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_READY_TIMEOUT_MS ?? 240_000);
 const ASK_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_ASK_TIMEOUT_MS ?? 15_000);
 const ASK_RETRY_ATTEMPTS = Number(process.env.HELIX_ASK_RETRIEVAL_ASK_RETRY_ATTEMPTS ?? 1);
+const VARIANT_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_VARIANT_TIMEOUT_MS ?? 12 * 60_000);
 
 const VARIANTS: VariantSpec[] = [
   { name: "baseline_atlas_git_on", atlasLane: "1", gitTrackedLane: "1" },
@@ -57,7 +62,7 @@ const VARIANTS: VariantSpec[] = [
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
-const normalize = (s: string) => s.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+const normalize = (s: string) => s.replace(/\\/g, "/").replace(/^\.\//, "").replace(/^\//, "").replace(/\/+/g, "/").trim().toLowerCase();
 const EPS = 1e-9;
 const require = createRequire(import.meta.url);
 const TSX_CLI = require.resolve("tsx/cli");
@@ -82,16 +87,38 @@ const findOpenPort = async (): Promise<number> =>
 
 const numberOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
+const evidenceIdNormalize = (value: string) => {
+  const trimmed = value.trim();
+  const withoutPrefix = trimmed.includes(":") && !trimmed.startsWith("http") ? trimmed.split(":").slice(1).join(":") : trimmed;
+  return normalize(withoutPrefix);
+};
+const canonicalPathForms = (value: string) => {
+  const base = evidenceIdNormalize(value);
+  const forms = new Set<string>([base]);
+  forms.add(base.replace(/^\.\//, ""));
+  forms.add(base.replace(/^src\//, ""));
+  forms.add(base.replace(/^server\//, ""));
+  forms.add(base.replace(/^client\//, ""));
+  return forms;
+};
 const aliasSet = (s: string) => {
-  const n = normalize(s); const set = new Set([n]);
-  if (n.startsWith("server/utils/")) set.add(n.replace("server/utils/", "server/"));
-  if (n.startsWith("server/")) set.add(n.replace("server/", "server/utils/"));
+  const forms = canonicalPathForms(s);
+  const set = new Set<string>(forms);
+  for (const n of forms) {
+    if (n.startsWith("server/utils/")) set.add(n.replace("server/utils/", "server/"));
+    if (n.startsWith("server/")) set.add(n.replace("server/", "server/utils/"));
+    if (n.startsWith("docs/runbooks/")) set.add(n.replace("docs/runbooks/", "docs/"));
+    if (n.startsWith("docs/")) set.add(n.replace("docs/", "docs/runbooks/"));
+    if (n.startsWith("scripts/")) set.add(n.replace("scripts/", "tools/"));
+    if (n.startsWith("tools/")) set.add(n.replace("tools/", "scripts/"));
+  }
   return set;
 };
 const bestMode = (expected: string, candidates: string[]): MatchMode => {
   if (candidates.includes(expected)) return "exact";
-  const cn = candidates.map(normalize);
-  if (cn.includes(normalize(expected))) return "normalized";
+  const cn = candidates.map(evidenceIdNormalize);
+  const expectedForms = canonicalPathForms(expected);
+  if (cn.some((candidate) => expectedForms.has(candidate))) return "normalized";
   const aliases = aliasSet(expected);
   return cn.some((c) => aliases.has(c)) ? "alias" : "none";
 };
@@ -201,7 +228,6 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), ASK_TIMEOUT_MS);
       const res = await fetch(askUrl, { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ question: task.prompt, dryRun:true, debug:true, topK:TOP_K, seed, temperature, sessionId:`retrieval-ablation:${task.id}:${seed}:${temperature}` }), signal: controller.signal });
-      clearTimeout(timeout);
       payload = (await res.json()) as {
         debug?: {
           context_files?: unknown;
@@ -212,7 +238,9 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
         };
       };
       break;
-    } catch { await sleep(500 * (attempt + 1)); }
+    } catch {
+      await sleep(500 * (attempt + 1));
+    }
   }
   if (!payload) {
     return {
@@ -227,26 +255,36 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       rawRR: 0,
       canonRR: 0,
       mode: "none",
-      mismatchReasons: task.expected_files.map((expected) => `${expected}:request_failed`),
+      mismatchReasons: task.expected_files.map((expected) => ({
+        expected,
+        reason: "retrieval_miss",
+        detail: "request_failed",
+      })),
       graphEdgeHit: false,
       confidence: null,
       docShare: null,
     };
   }
+  const contextShapeMismatch = Array.isArray(payload.debug?.context_files)
+    ? payload.debug!.context_files.some((v) => typeof v !== "string")
+    : Boolean(payload.debug && payload.debug.context_files != null);
   const top10 = Array.isArray(payload.debug?.context_files) ? payload.debug!.context_files.filter((v): v is string => typeof v === "string").slice(0,10) : [];
   const top5 = top10.slice(0,5);
   const modes = task.expected_files.map((e)=>bestMode(e, top10));
   const mismatchReasons = task.expected_files.flatMap((expected) => {
     const mode = bestMode(expected, top10);
     if (mode !== "none") return [];
-    if (!top10.length) return [`${expected}:retrieval_empty_top10`];
-    if (top10.some((candidate) => normalize(candidate) === normalize(expected))) {
-      return [`${expected}:normalization_only`];
+    if (contextShapeMismatch) {
+      return [{ expected, reason: "context_shape_mismatch" as const }];
     }
-    if (top10.some((candidate) => aliasSet(expected).has(normalize(candidate)))) {
-      return [`${expected}:alias_only`];
+    if (!top10.length) return [{ expected, reason: "retrieval_miss" as const, detail: "retrieval_empty_top10" }];
+    if (top10.some((candidate) => canonicalPathForms(expected).has(evidenceIdNormalize(candidate)))) {
+      return [{ expected, reason: "path_form_mismatch" as const }];
     }
-    return [`${expected}:not_present_top10`];
+    if (top10.some((candidate) => aliasSet(expected).has(evidenceIdNormalize(candidate)))) {
+      return [{ expected, reason: "alias_unmapped" as const }];
+    }
+    return [{ expected, reason: "retrieval_miss" as const, detail: "not_present_top10" }];
   });
   const rawHits10 = task.expected_files.filter((e)=>top10.includes(e)).length;
   const rawHits5 = task.expected_files.filter((e)=>top5.includes(e)).length;
@@ -294,27 +332,77 @@ const summarize = (results: TaskResult[], canonical: boolean): ScenarioMetrics =
   };
 };
 
+const withTimeout = async <T>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+  let timeoutHandle: NodeJS.Timeout | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => reject(new Error(`${label}:watchdog_timeout_ms=${ms}`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+};
+
+
+const inferStageFaultMatrix = (variant: any) => {
+  const tasks = variant?.diagnostics?.mismatch_reasons ?? [];
+  const total = tasks.length || 1;
+  const reasonCount = (name: string) => tasks.reduce((n: number, t: any) => n + (Array.isArray(t.mismatchReasons) ? t.mismatchReasons.filter((r: any) => r.reason === name).length : 0), 0);
+  const retrieval = reasonCount("retrieval_miss") / total;
+  const candidateFiltering = reasonCount("alias_unmapped") / total;
+  const rerank = reasonCount("path_form_mismatch") / total;
+  const synthesisPacking = reasonCount("context_shape_mismatch") / total;
+  const finalCleanup = Math.max(0, 1 - Math.min(1, retrieval + candidateFiltering + rerank + synthesisPacking));
+  return {
+    retrieval,
+    candidate_filtering: candidateFiltering,
+    rerank,
+    synthesis_packing: synthesisPacking,
+    final_cleanup: finalCleanup,
+  };
+};
+
+const classifyFaultOwner = (matrix: { retrieval: number; candidate_filtering: number; rerank: number; synthesis_packing: number; final_cleanup: number }) => {
+  const retrievalMass = matrix.retrieval;
+  const routingMass = matrix.candidate_filtering;
+  const postProcessingMass = matrix.rerank + matrix.synthesis_packing + matrix.final_cleanup;
+  if (retrievalMass >= routingMass && retrievalMass >= postProcessingMass) return "retrieval";
+  if (routingMass >= postProcessingMass) return "routing";
+  return "post_processing";
+};
+
 const main = async () => {
   const corpus = JSON.parse(await fs.readFile(CORPUS_PATH, "utf8")) as Corpus;
   const tasks = [...corpus.tasks].sort((a,b)=>a.id.localeCompare(b.id));
   const scoped = MAX_TASKS>0?tasks.slice(0,MAX_TASKS):tasks;
   const runId=`retrieval-ablation-${Date.now()}`; const outDir=path.join(OUTPUT_ROOT,runId); await fs.mkdir(outDir,{recursive:true});
-  const score: any = { runId, generatedAt:new Date().toISOString(), seeds:SEEDS, temperatures:TEMPS, variants:{} };
+  const score: any = {
+    runId,
+    generatedAt:new Date().toISOString(),
+    seeds:SEEDS,
+    temperatures:TEMPS,
+    variants:{},
+    run_complete: false,
+    blocked: null,
+  };
 
   for (const variant of VARIANTS) {
     const server = await startServer(variant);
-    await waitReady(server);
     try {
+      await waitReady(server);
       const scenarios:any[]=[];
-      for (const seed of SEEDS) for (const temperature of TEMPS) {
-        console.log(`[ablation] variant=${variant.name} seed=${seed} temperature=${temperature} tasks=${scoped.length}`);
-        const results:TaskResult[]=[];
-        for (const task of scoped) {
-          results.push(await runTask(server.askUrl, task,seed,temperature));
+      await withTimeout((async () => {
+        for (const seed of SEEDS) for (const temperature of TEMPS) {
+          console.log(`[ablation] variant=${variant.name} seed=${seed} temperature=${temperature} tasks=${scoped.length}`);
+          const results:TaskResult[]=[];
+          for (const task of scoped) {
+            results.push(await runTask(server.askUrl, task,seed,temperature));
+          }
+          const raw = summarize(results,false); const canon = summarize(results,true);
+          scenarios.push({ seed, temperature, raw_metrics: raw, canonicalized_metrics: canon, task_results: results });
         }
-        const raw = summarize(results,false); const canon = summarize(results,true);
-        scenarios.push({ seed, temperature, raw_metrics: raw, canonicalized_metrics: canon, task_results: results });
-      }
+      })(), VARIANT_TIMEOUT_MS, `variant=${variant.name}`);
       const metrics = [
         "gold_file_recall_at_5",
         "gold_file_recall_at_10",
@@ -336,10 +424,7 @@ const main = async () => {
           mismatchReasons: taskResult.mismatchReasons,
         })),
       );
-      score.variants[variant.name]={
-        scenarios,
-        aggregate,
-        diagnostics: {
+      const diagnostics = {
           unmatched_expected_file_rate: avg(scenarios.map((s)=>s.raw_metrics.unmatched_expected_file_rate)),
           expected_file_match_mode: {
             exact: flattenedTaskResults.filter((task) => task.mode === "exact").length,
@@ -348,15 +433,37 @@ const main = async () => {
             none: flattenedTaskResults.filter((task) => task.mode === "none").length,
           },
           mismatch_reasons: flattenedTaskResults.filter((task) => task.mismatchReasons.length > 0),
-        },
+        };
+      const stage_fault_matrix = inferStageFaultMatrix({ diagnostics });
+      const fault_owner = classifyFaultOwner(stage_fault_matrix);
+      score.variants[variant.name]={
+        scenarios,
+        aggregate,
+        diagnostics,
+        stage_fault_matrix,
+        fault_owner,
       };
       await fs.writeFile(path.join(outDir,`${variant.name}.json`),JSON.stringify(score.variants[variant.name],null,2)+"\n");
+    } catch (error) {
+      score.blocked = {
+        variant: variant.name,
+        stage: "variant_execution",
+        reason: error instanceof Error ? error.message : String(error),
+      };
+      break;
     } finally { await stopServer(server); }
   }
 
-  const base = score.variants.baseline_atlas_git_on.aggregate.gold_file_recall_at_10.point_estimate;
-  const atlasOff = score.variants.atlas_off_git_on.aggregate.gold_file_recall_at_10.point_estimate;
-  const gitOff = score.variants.atlas_on_git_off.aggregate.gold_file_recall_at_10.point_estimate;
+  const requiredScenarios = VARIANTS.length * SEEDS.length * TEMPS.length;
+  const completedScenarios = Object.values(score.variants).reduce(
+    (count: number, variant: any) => count + (Array.isArray(variant.scenarios) ? variant.scenarios.length : 0),
+    0,
+  );
+  score.run_complete = completedScenarios === requiredScenarios && !score.blocked;
+
+  const base = score.variants.baseline_atlas_git_on?.aggregate?.gold_file_recall_at_10?.point_estimate ?? 0;
+  const atlasOff = score.variants.atlas_off_git_on?.aggregate?.gold_file_recall_at_10?.point_estimate ?? 0;
+  const gitOff = score.variants.atlas_on_git_off?.aggregate?.gold_file_recall_at_10?.point_estimate ?? 0;
   const atlasContribution = base - atlasOff;
   const gitContribution = base - gitOff;
   const maxContribution = Math.max(atlasContribution, gitContribution);
@@ -365,12 +472,22 @@ const main = async () => {
     if (Math.abs(atlasContribution - gitContribution) <= EPS) dominantChannel = "mixed";
     else dominantChannel = atlasContribution > gitContribution ? "atlas" : "git";
   }
+  const baseline = score.variants.baseline_atlas_git_on;
+  const ci = baseline?.aggregate?.gold_file_recall_at_10?.ci95;
+  const boundedConfidence = Boolean(ci && Number.isFinite(ci.low) && Number.isFinite(ci.high) && (ci.high - ci.low) <= 0.25);
+  const laneDeltaPositive = atlasContribution > EPS || gitContribution > EPS;
+  const faultOwnerRetrieval = baseline?.fault_owner === "retrieval";
   score.driver_verdict = {
-    retrieval_lift_proven: maxContribution > EPS && base > EPS ? "yes" : "no",
+    retrieval_lift_proven: laneDeltaPositive && boundedConfidence && faultOwnerRetrieval ? "yes" : "no",
     dominant_channel: dominantChannel,
     contributions: {
       atlas: atlasContribution,
       git_tracked: gitContribution,
+    },
+    attribution_guard: {
+      lane_ablation_delta_positive: laneDeltaPositive,
+      bounded_confidence: boundedConfidence,
+      fault_owner_retrieval: faultOwnerRetrieval,
     },
     confidence_statement: "95% bootstrap intervals computed over seed/temperature scenarios.",
   };
@@ -378,25 +495,37 @@ const main = async () => {
   const jsonPath="reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.json";
   const mdPath="reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.md";
   await fs.writeFile(path.join(outDir,"summary.comparison.json"),JSON.stringify(score,null,2)+"\n");
-  await fs.writeFile(jsonPath,JSON.stringify(score,null,2)+"\n");
+  if (score.run_complete) {
+    await fs.writeFile(jsonPath,JSON.stringify(score,null,2)+"\n");
+  } else {
+    await fs.writeFile(path.join(outDir,"scorecard.partial.json"),JSON.stringify(score,null,2)+"\n");
+  }
   const rows=Object.entries(score.variants).map(([name,v]:any)=>`| ${name} | ${v.aggregate.gold_file_recall_at_10.point_estimate.toFixed(6)} | ${v.aggregate.gold_file_recall_at_10.ci95.low.toFixed(6)} | ${v.aggregate.gold_file_recall_at_10.ci95.high.toFixed(6)} | ${v.diagnostics.unmatched_expected_file_rate.toFixed(6)} |`);
-  await fs.writeFile(
-    mdPath,
-    [
+  const mdContent = [
       `# Helix Ask Retrieval Ablation Scorecard (2026-03-03)`,
       "",
       `Run: ${runId}`,
       "",
+      `run_complete=${score.run_complete}`,
+      ...(score.blocked ? [`blocked=${JSON.stringify(score.blocked)}`, ""] : []),
       "| Variant | recall@10 point | ci95 low | ci95 high | unmatched_expected_file_rate |",
       "| --- | ---: | ---: | ---: | ---: |",
       ...rows,
       "",
       `Driver verdict: retrieval_lift_proven=${score.driver_verdict.retrieval_lift_proven}, dominant_channel=${score.driver_verdict.dominant_channel}.`,
+      `Attribution guard: lane_ablation_delta_positive=${score.driver_verdict.attribution_guard.lane_ablation_delta_positive}, bounded_confidence=${score.driver_verdict.attribution_guard.bounded_confidence}, fault_owner_retrieval=${score.driver_verdict.attribution_guard.fault_owner_retrieval}.`,
       `Contributions: atlas=${score.driver_verdict.contributions.atlas.toFixed(6)}, git_tracked=${score.driver_verdict.contributions.git_tracked.toFixed(6)}.`,
       "",
-    ].join("\n"),
-  );
-  await fs.writeFile(path.join(outDir,"summary.comparison.md"),await fs.readFile(mdPath,"utf8"));
+    ].join("\n");
+  if (score.run_complete) {
+    await fs.writeFile(
+    mdPath,
+      mdContent,
+    );
+  } else {
+    await fs.writeFile(path.join(outDir,"scorecard.partial.md"), mdContent);
+  }
+  await fs.writeFile(path.join(outDir,"summary.comparison.md"), mdContent);
   console.log(`Ablation artifacts written to ${outDir}`);
 };
 
