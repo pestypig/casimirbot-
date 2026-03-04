@@ -1,11 +1,8 @@
 # Helix Ask Retrieval Ablation Scorecard (2026-03-03)
 
-Run: retrieval-ablation-1772591247635
-run_complete=true
+Run: retrieval-ablation-1772596117022
+run_complete=false
+blocked_reason=variant_failed:baseline_atlas_git_on:watchdog_timeout:variant:baseline_atlas_git_on:seed:7:temp:0.2:120000ms
+completedScenarioCount=0/12
 
-| Variant | recall@10 point | ci95 low | ci95 high | unmatched_expected_file_rate |
-| --- | ---: | ---: | ---: | ---: |
-
-Driver verdict: retrieval_lift_proven=no, dominant_channel=none.
-Contributions: atlas=0.000000, git_tracked=0.000000.
-Strict gate: positive_lane_ablation_delta=false, bounded_confidence=false, fault_owner_points_to_retrieval=true.
+Driver verdict: retrieval_lift_proven=no, dominant_channel=none (blocked run).
