@@ -344,7 +344,23 @@ const sanitizeSearchTerm = (value: string): string => {
   return cleaned;
 };
 
-const LOW_VALUE_PHRASE_TOKEN_RE = /^(work|works?|working|does|how|what|where|when|why|ask)$/;
+const LOW_VALUE_PHRASE_TOKEN_RE = /^(work|works?|working|does|how|what|where|when|why|explain)$/;
+const LOW_VALUE_UNIGRAM_RE = /^(work|works?|working|does|how|what|where|when|why|explain)$/;
+
+const HIGH_SIGNAL_UNIGRAM_RANK = new Map<string, number>([
+  ["helix", 0],
+  ["routing", 1],
+  ["pipeline", 2],
+  ["retrieval", 3],
+  ["rerank", 4],
+  ["arbiter", 5],
+  ["evidence", 6],
+  ["citation", 7],
+  ["repo", 8],
+  ["module", 9],
+  ["path", 10],
+  ["intent", 11],
+]);
 
 const isLowValueGluePhrase = (phrase: string): boolean => {
   const parts = phrase.split(" ").filter(Boolean);
@@ -353,11 +369,22 @@ const isLowValueGluePhrase = (phrase: string): boolean => {
   return LOW_VALUE_PHRASE_TOKEN_RE.test(left ?? "") || LOW_VALUE_PHRASE_TOKEN_RE.test(right ?? "");
 };
 
+const rankUnigrams = (values: string[]): string[] =>
+  [...values].sort((a, b) => {
+    const rankA = HIGH_SIGNAL_UNIGRAM_RANK.get(a) ?? Number.MAX_SAFE_INTEGER;
+    const rankB = HIGH_SIGNAL_UNIGRAM_RANK.get(b) ?? Number.MAX_SAFE_INTEGER;
+    if (rankA !== rankB) return rankA - rankB;
+    if (a.length !== b.length) return b.length - a.length;
+    return a.localeCompare(b);
+  });
+
 export function extractRepoSearchTerms(
   question: string,
   conceptMatch?: HelixAskConceptMatch | null,
 ): string[] {
   const phraseTerms: string[] = [];
+  const normalizedQuestion = sanitizeSearchTerm(question);
+  if (/\bhelix ask\b/i.test(normalizedQuestion)) phraseTerms.push("helix ask");
   const unigramTerms: string[] = [];
   if (conceptMatch?.matchedTerm) {
     const normalized = sanitizeSearchTerm(conceptMatch.matchedTerm);
@@ -379,6 +406,7 @@ export function extractRepoSearchTerms(
     if (!token) continue;
     if (token.length < 4) continue;
     if (/^\d+$/.test(token)) continue;
+    if (LOW_VALUE_UNIGRAM_RE.test(token)) continue;
     unigramTerms.push(token);
   }
 
@@ -404,9 +432,15 @@ export function extractRepoSearchTerms(
       if (part) selectedPhraseTokenSet.add(part);
     }
   }
+  const nonCoveredUnigrams = rankUnigrams(
+    uniqueUnigrams.filter((term) => !selectedPhraseTokenSet.has(term)),
+  );
+  const coveredUnigrams = rankUnigrams(
+    uniqueUnigrams.filter((term) => selectedPhraseTokenSet.has(term)),
+  );
   const prioritizedUnigrams = [
-    ...uniqueUnigrams.filter((term) => !selectedPhraseTokenSet.has(term)),
-    ...uniqueUnigrams.filter((term) => selectedPhraseTokenSet.has(term)),
+    ...nonCoveredUnigrams,
+    ...coveredUnigrams,
   ];
   const combined = dedupe([...selectedPhrases, ...prioritizedUnigrams]);
   return combined.slice(0, REPO_SEARCH_MAX_TERMS);

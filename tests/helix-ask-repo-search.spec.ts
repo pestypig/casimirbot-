@@ -80,5 +80,11 @@ describe("helix ask repo search", () => {
   it("retains key unigrams alongside phrases for constrained top-N term sets", () => {
     const terms = extractRepoSearchTerms("How does intent directory routing work in helix ask?", null);
     expect(terms.some((term) => term === "routing" || term === "helix")).toBe(true);
+    expect(terms).not.toContain("work");
+  });
+
+  it("retains the explicit 'helix ask' phrase when present in the query", () => {
+    const terms = extractRepoSearchTerms("Explain the helix ask routing path", null);
+    expect(terms).toContain("helix ask");
   });
 });

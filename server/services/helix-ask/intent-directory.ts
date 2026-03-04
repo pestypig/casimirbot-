@@ -136,7 +136,7 @@ const IDEOLOGY_NODE_MATCHERS = buildIdeologyNodeMatchers();
 const WARP_ETHOS_RELATION_COUPLED_RE = /\b(warp|warp bubble|warp drive|alcubierre|natario)\b[\s\S]{0,120}\b(mission ethos|ethos|ideology)\b|\b(mission ethos|ethos|ideology)\b[\s\S]{0,120}\b(warp|warp bubble|warp drive|alcubierre|natario)\b/i;
 
 const REPO_ANCHOR_HINT_RE =
-  /\b(repo|repository|codebase|module|file|path|symbol|api|endpoint|server|client|helix ask|helixask|\/api\/)\b/i;
+  /\b(repo|repository|codebase|source tree|project files?|module path|file path|intent directory|helix ask|helixask|api route|api endpoint|\/api\/|arbiter|retrieval lane|rerank(?:ing)?)\b/i;
 
 
 const INTENT_PROFILES: HelixAskIntentProfile[] = [
