@@ -3,9 +3,9 @@
 ## Intake and correction lock (Prompt 0)
 
 Repository merge-state verification (latest retrieval-attribution wave):
-- latest merged PR anchor: `d4e262dd` (`Merge pull request #430`)
-- latest retrieval-attribution patch commit: `f360d2fe`
-- latest scorecard run id: `retrieval-ablation-1772584380302`
+- latest merged PR anchor: `465f1900` (`Merge pull request #434`)
+- latest retrieval-attribution patch commit: `ade486cc`
+- latest scorecard run id: `retrieval-ablation-1772598123282` (bounded smoke)
 - prior verdict fields:
   - `retrieval_lift_proven=no`
   - `dominant_channel=none`
@@ -14,7 +14,7 @@ Repository merge-state verification (latest retrieval-attribution wave):
   - `unmatched_expected_file_rate=1.0`
 
 Strict decision fork evaluation:
-1. `unmatched_expected_file_rate > 0.6` ✅
+1. `unmatched_expected_file_rate > 0.6` [x]
 2. Required lane: **Eval-Fidelity v2 only**.
 3. Coverage-Adaptive Retrieval and Rerank+Packing Convergence are deferred until fidelity gates improve.
 

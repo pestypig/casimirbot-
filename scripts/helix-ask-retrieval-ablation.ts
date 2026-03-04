@@ -387,29 +387,78 @@ const withTimeout = async <T>(promise: Promise<T>, ms: number, label: string): P
 };
 
 
+const MISMATCH_REASON_NAMES = new Set([
+  "path_form_mismatch",
+  "alias_unmapped",
+  "retrieval_miss",
+  "context_shape_mismatch",
+]);
+
 const parseMismatchReason = (reason: unknown): string | null => {
-  if (typeof reason !== "string") return null;
-  const segments = reason.split(":");
-  return segments.length ? segments[segments.length - 1] ?? null : null;
+  const raw =
+    typeof reason === "string"
+      ? reason
+      : reason && typeof reason === "object"
+        ? typeof (reason as any).reason === "string"
+          ? (reason as any).reason
+          : typeof (reason as any).code === "string"
+            ? (reason as any).code
+            : typeof (reason as any).type === "string"
+              ? (reason as any).type
+              : null
+        : null;
+  if (!raw) return null;
+  const segments = raw
+    .split(":")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  for (let i = segments.length - 1; i >= 0; i -= 1) {
+    const segment = segments[i];
+    if (segment && MISMATCH_REASON_NAMES.has(segment)) return segment;
+  }
+  return null;
 };
 
 const inferStageFaultMatrix = (variant: any) => {
-  const tasks = variant?.diagnostics?.mismatch_reasons ?? [];
-  const total = tasks.length || 1;
-  const reasonCount = (name: string) =>
-    tasks.reduce(
-      (n: number, t: any) =>
-        n +
-        (Array.isArray(t.mismatchReasons)
-          ? t.mismatchReasons.filter((r: any) => parseMismatchReason(r) === name).length
-          : 0),
-      0,
+  const tasks = Array.isArray(variant?.diagnostics?.mismatch_reasons) ? variant.diagnostics.mismatch_reasons : [];
+  if (!tasks.length) {
+    return {
+      retrieval: 0,
+      candidate_filtering: 0,
+      rerank: 0,
+      synthesis_packing: 0,
+      final_cleanup: 0,
+    };
+  }
+  let retrievalCount = 0;
+  let candidateFilteringCount = 0;
+  let rerankCount = 0;
+  let synthesisPackingCount = 0;
+  let finalCleanupCount = 0;
+  for (const task of tasks) {
+    const reasonSet = new Set(
+      Array.isArray(task?.mismatchReasons)
+        ? task.mismatchReasons.map((reason: unknown) => parseMismatchReason(reason)).filter(Boolean)
+        : [],
     );
-  const retrieval = reasonCount("retrieval_miss") / total;
-  const candidateFiltering = reasonCount("alias_unmapped") / total;
-  const rerank = reasonCount("path_form_mismatch") / total;
-  const synthesisPacking = reasonCount("context_shape_mismatch") / total;
-  const finalCleanup = Math.max(0, 1 - Math.min(1, retrieval + candidateFiltering + rerank + synthesisPacking));
+    const hasRetrieval = reasonSet.has("retrieval_miss");
+    const hasCandidateFiltering = reasonSet.has("alias_unmapped");
+    const hasRerank = reasonSet.has("path_form_mismatch");
+    const hasSynthesisPacking = reasonSet.has("context_shape_mismatch");
+    if (hasRetrieval) retrievalCount += 1;
+    if (hasCandidateFiltering) candidateFilteringCount += 1;
+    if (hasRerank) rerankCount += 1;
+    if (hasSynthesisPacking) synthesisPackingCount += 1;
+    if (!hasRetrieval && !hasCandidateFiltering && !hasRerank && !hasSynthesisPacking) {
+      finalCleanupCount += 1;
+    }
+  }
+  const total = tasks.length;
+  const retrieval = retrievalCount / total;
+  const candidateFiltering = candidateFilteringCount / total;
+  const rerank = rerankCount / total;
+  const synthesisPacking = synthesisPackingCount / total;
+  const finalCleanup = finalCleanupCount / total;
   return {
     retrieval,
     candidate_filtering: candidateFiltering,
@@ -630,7 +679,8 @@ const main = async () => {
         "",
       ].join("\n"),
     );
-    console.log(`Ablation blocked artifacts written to ${outDir}`);
+    console.error(`Ablation blocked artifacts written to ${outDir}`);
+    process.exitCode = 1;
     return;
   }
 
@@ -651,18 +701,20 @@ const main = async () => {
   const atlasDeltaCI = { low: baseCI.low - atlasOffCI.high, high: baseCI.high - atlasOffCI.low };
   const gitDeltaCI = { low: baseCI.low - gitOffCI.high, high: baseCI.high - gitOffCI.low };
   const boundedConfidence = atlasDeltaCI.low > 0 || gitDeltaCI.low > 0;
-  const unmatchedRate = score.variants.baseline_atlas_git_on.diagnostics.unmatched_expected_file_rate;
+  const baselineVariant = score.variants.baseline_atlas_git_on;
+  const unmatchedRate = baselineVariant.diagnostics.unmatched_expected_file_rate;
   const recall10 = score.variants.baseline_atlas_git_on.aggregate.gold_file_recall_at_10.point_estimate;
   const retention = score.variants.baseline_atlas_git_on.aggregate.consequential_file_retention_rate.point_estimate;
   const retrievalStageFault = 1 - Math.max(0, 1 - unmatchedRate) * Math.max(0, recall10);
-  const stage_fault_matrix = {
+  const heuristicStageFaultMatrix = {
     retrieval: retrievalStageFault,
     candidate_filtering: 1 - recall10,
     rerank: 1 - score.variants.baseline_atlas_git_on.aggregate.rerank_mrr10.point_estimate,
     synthesis_packing: 1 - retention,
     final_cleanup: 1 - score.variants.baseline_atlas_git_on.aggregate.retrieval_doc_share_mean.point_estimate,
   };
-  const fault_owner = retrievalStageFault >= 0.5 ? "retrieval" : retention < 0.5 ? "post_processing" : "routing";
+  const stage_fault_matrix = baselineVariant.stage_fault_matrix ?? heuristicStageFaultMatrix;
+  const fault_owner = baselineVariant.fault_owner ?? classifyFaultOwner(stage_fault_matrix);
   const retrievalLiftProven = maxContribution > EPS && base > EPS && boundedConfidence && fault_owner === "retrieval";
   score.driver_verdict = {
     retrieval_lift_proven: retrievalLiftProven ? "yes" : "no",
