@@ -36,6 +36,8 @@ type TaskResult = {
   mismatchTaxonomy: Array<"path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch">;
   expectedNormalized: string[];
   retrievedNormalizedTop10: string[];
+  contextSource: "retrieval_context_files" | "context_files" | "none";
+  top10Fingerprint: string;
   graphEdgeHit: boolean;
   confidence: number | null;
   docShare: number | null;
@@ -51,6 +53,11 @@ const READY_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_READY_TIMEOUT_MS
 const ASK_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_ASK_TIMEOUT_MS ?? 15_000);
 const ASK_RETRY_ATTEMPTS = Number(process.env.HELIX_ASK_RETRIEVAL_ASK_RETRY_ATTEMPTS ?? 1);
 const VARIANT_WATCHDOG_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_VARIANT_TIMEOUT_MS ?? 600_000);
+const QUALITY_FLOOR_MAX_UNMATCHED = Number(process.env.HELIX_ASK_RETRIEVAL_QUALITY_FLOOR_MAX_UNMATCHED ?? 0.6);
+const QUALITY_FLOOR_MIN_RECALL10 = Number(process.env.HELIX_ASK_RETRIEVAL_QUALITY_FLOOR_MIN_RECALL10 ?? 0.1);
+const QUALITY_FLOOR_MIN_RETENTION = Number(process.env.HELIX_ASK_RETRIEVAL_QUALITY_FLOOR_MIN_RETENTION ?? 0.2);
+const CORPUS_MAX_TEMPLATE_COLLISION = Number(process.env.HELIX_ASK_RETRIEVAL_CORPUS_MAX_TEMPLATE_COLLISION ?? 0.6);
+const CORPUS_MIN_EXPECTED_TOKEN_HIT = Number(process.env.HELIX_ASK_RETRIEVAL_CORPUS_MIN_EXPECTED_TOKEN_HIT ?? 0.15);
 
 const VARIANTS: VariantSpec[] = [
   { name: "baseline_atlas_git_on", atlasLane: "1", gitTrackedLane: "1" },
@@ -136,6 +143,109 @@ const bestMode = (expected: string, candidates: string[]): MatchMode => {
   const aliases = aliasSet(expected);
   return cn.some((c) => aliases.has(c)) ? "alias" : "none";
 };
+const normalizePromptTemplate = (prompt: string) =>
+  prompt
+    .toLowerCase()
+    .replace(/\btask\s*\d+\b\.?/gi, "task")
+    .replace(/\s+/g, " ")
+    .trim();
+const splitStemTokens = (value: string) =>
+  value
+    .replace(/\.[a-z0-9]+$/i, "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 3);
+const splitPromptTokens = (value: string) =>
+  value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 3);
+const buildCorpusFidelity = (tasks: CorpusTask[]) => {
+  const templates = tasks.map((task) => normalizePromptTemplate(task.prompt));
+  const uniqueTemplateCount = new Set(templates).size;
+  const templateCollisionRate = tasks.length ? 1 - uniqueTemplateCount / tasks.length : 0;
+  const expectedTokenHitCount = tasks.filter((task) => {
+    const promptTokens = new Set(splitPromptTokens(task.prompt));
+    const expectedTokens = task.expected_files.flatMap((pathValue) => splitStemTokens(pathBase(pathValue)));
+    return expectedTokens.some((token) => promptTokens.has(token));
+  }).length;
+  const expectedTokenHitRate = tasks.length ? expectedTokenHitCount / tasks.length : 0;
+  const pass =
+    templateCollisionRate <= CORPUS_MAX_TEMPLATE_COLLISION &&
+    expectedTokenHitRate >= CORPUS_MIN_EXPECTED_TOKEN_HIT;
+  return {
+    thresholds: {
+      max_template_collision_rate: CORPUS_MAX_TEMPLATE_COLLISION,
+      min_expected_token_hit_rate: CORPUS_MIN_EXPECTED_TOKEN_HIT,
+    },
+    observed: {
+      task_count: tasks.length,
+      prompt_template_unique_count: uniqueTemplateCount,
+      prompt_template_collision_rate: Number(templateCollisionRate.toFixed(6)),
+      expected_token_hit_count: expectedTokenHitCount,
+      expected_token_hit_rate: Number(expectedTokenHitRate.toFixed(6)),
+    },
+    checks: {
+      template_collision_ok: templateCollisionRate <= CORPUS_MAX_TEMPLATE_COLLISION,
+      expected_token_hit_ok: expectedTokenHitRate >= CORPUS_MIN_EXPECTED_TOKEN_HIT,
+    },
+    pass,
+  };
+};
+const coerceDebugPathList = (value: unknown) => {
+  if (!Array.isArray(value)) return { paths: [] as string[], shapeMismatch: false };
+  const paths: string[] = [];
+  let shapeMismatch = false;
+  for (const entry of value) {
+    if (typeof entry === "string") {
+      const trimmed = entry.trim();
+      if (trimmed) paths.push(trimmed);
+      continue;
+    }
+    if (entry && typeof entry === "object") {
+      const candidate =
+        typeof (entry as any).filePath === "string"
+          ? (entry as any).filePath
+          : typeof (entry as any).path === "string"
+            ? (entry as any).path
+            : typeof (entry as any).file === "string"
+              ? (entry as any).file
+              : null;
+      if (candidate && candidate.trim()) {
+        paths.push(candidate.trim());
+        continue;
+      }
+    }
+    shapeMismatch = true;
+  }
+  return { paths: Array.from(new Set(paths)), shapeMismatch };
+};
+const selectDebugContextFiles = (debug: Record<string, unknown> | null | undefined) => {
+  const retrieval = coerceDebugPathList(debug?.retrieval_context_files);
+  if (retrieval.paths.length > 0) {
+    return {
+      source: "retrieval_context_files" as const,
+      paths: retrieval.paths,
+      shapeMismatch: retrieval.shapeMismatch,
+    };
+  }
+  const context = coerceDebugPathList(debug?.context_files);
+  if (context.paths.length > 0) {
+    return {
+      source: "context_files" as const,
+      paths: context.paths,
+      shapeMismatch: retrieval.shapeMismatch || context.shapeMismatch,
+    };
+  }
+  return {
+    source: "none" as const,
+    paths: [] as string[],
+    shapeMismatch: retrieval.shapeMismatch || context.shapeMismatch,
+  };
+};
+const fingerprintTop10 = (paths: string[]) =>
+  paths.length ? paths.map(normalizeEvidenceId).slice(0, 10).join("|") : "<empty>";
 
 const quantile = (vals: number[], q: number) => {
   if (!vals.length) return 0; const s=[...vals].sort((a,b)=>a-b); const i=(s.length-1)*q; const lo=Math.floor(i), hi=Math.ceil(i); if(lo===hi) return s[lo]; return s[lo]+(s[hi]-s[lo])*(i-lo);
@@ -231,6 +341,7 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
   let payload: {
     debug?: {
       context_files?: unknown;
+      retrieval_context_files?: unknown;
       belief_graph_edge_count?: unknown;
       graph_evidence_count?: unknown;
       retrieval_confidence?: unknown;
@@ -245,6 +356,7 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       payload = (await res.json()) as {
         debug?: {
           context_files?: unknown;
+          retrieval_context_files?: unknown;
           belief_graph_edge_count?: unknown;
           graph_evidence_count?: unknown;
           retrieval_confidence?: unknown;
@@ -273,14 +385,16 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       mismatchTaxonomy: ["retrieval_miss"],
       expectedNormalized: task.expected_files.map(normalizeEvidenceId),
       retrievedNormalizedTop10: [],
+      contextSource: "none",
+      top10Fingerprint: "<empty>",
       graphEdgeHit: false,
       confidence: null,
       docShare: null,
     };
   }
-  const contextFiles = Array.isArray(payload.debug?.context_files) ? payload.debug!.context_files : [];
-  const contextShapeMismatch = contextFiles.some((v) => typeof v !== "string");
-  const top10 = contextFiles.filter((v): v is string => typeof v === "string").slice(0,10);
+  const selectedContext = selectDebugContextFiles((payload.debug ?? null) as Record<string, unknown> | null);
+  const contextShapeMismatch = selectedContext.shapeMismatch;
+  const top10 = selectedContext.paths.slice(0, 10);
   const top5 = top10.slice(0,5);
   const modes = task.expected_files.map((e)=>bestMode(e, top10));
   const mismatchTaxonomy = new Set<"path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch">();
@@ -337,6 +451,8 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
     mismatchTaxonomy: [...mismatchTaxonomy],
     expectedNormalized: task.expected_files.map(normalizeEvidenceId),
     retrievedNormalizedTop10: top10.map(normalizeEvidenceId),
+    contextSource: selectedContext.source,
+    top10Fingerprint: fingerprintTop10(top10),
     graphEdgeHit: edgeCount > 0,
     confidence: numberOrNull(payload.debug?.retrieval_confidence),
     docShare: numberOrNull(payload.debug?.retrieval_doc_share),
@@ -481,6 +597,7 @@ const main = async () => {
   const corpus = JSON.parse(await fs.readFile(CORPUS_PATH, "utf8")) as Corpus;
   const tasks = [...corpus.tasks].sort((a,b)=>a.id.localeCompare(b.id));
   const scoped = MAX_TASKS>0?tasks.slice(0,MAX_TASKS):tasks;
+  const corpusFidelity = buildCorpusFidelity(scoped);
   const runId=`retrieval-ablation-${Date.now()}`; const outDir=path.join(OUTPUT_ROOT,runId); await fs.mkdir(outDir,{recursive:true});
   const score: any = {
     runId,
@@ -490,6 +607,7 @@ const main = async () => {
     maxTasks: MAX_TASKS,
     expectedTaskCount: scoped.length,
     expectedScenarioCount: VARIANTS.length * SEEDS.length * TEMPS.length,
+    corpus_fidelity: corpusFidelity,
     run_complete: false,
     blocked_reason: null,
     variants:{},
@@ -537,6 +655,8 @@ const main = async () => {
           mismatchTaxonomy: taskResult.mismatchTaxonomy,
           expectedNormalized: taskResult.expectedNormalized,
           retrievedNormalizedTop10: taskResult.retrievedNormalizedTop10,
+          contextSource: taskResult.contextSource,
+          top10Fingerprint: taskResult.top10Fingerprint,
         })),
       );
       const mismatchCounts = flattenedTaskResults.reduce(
@@ -561,6 +681,41 @@ const main = async () => {
           context_shape_mismatch: 0,
         },
       );
+      const contextSourceCounts = flattenedTaskResults.reduce(
+        (
+          counts: Record<"retrieval_context_files" | "context_files" | "none", number>,
+          task,
+        ) => {
+          const key =
+            task.contextSource === "retrieval_context_files" ||
+            task.contextSource === "context_files" ||
+            task.contextSource === "none"
+              ? task.contextSource
+              : "none";
+          counts[key] += 1;
+          return counts;
+        },
+        {
+          retrieval_context_files: 0,
+          context_files: 0,
+          none: 0,
+        },
+      );
+      const fingerprintCounts = flattenedTaskResults.reduce((counts: Map<string, number>, task) => {
+        const key = typeof task.top10Fingerprint === "string" && task.top10Fingerprint.length > 0 ? task.top10Fingerprint : "<empty>";
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+        return counts;
+      }, new Map<string, number>());
+      const fingerprintEntries = [...fingerprintCounts.entries()].sort((a, b) => b[1] - a[1]);
+      const [dominantFingerprint, dominantFingerprintCount] = fingerprintEntries[0] ?? ["<empty>", 0];
+      const fingerprintTotal = flattenedTaskResults.length;
+      const fingerprintUniqueCount = fingerprintEntries.length;
+      const fingerprintUniqueRate = fingerprintTotal > 0 ? fingerprintUniqueCount / fingerprintTotal : 0;
+      const fingerprintDominantShare = fingerprintTotal > 0 ? dominantFingerprintCount / fingerprintTotal : 0;
+      const dominantFingerprintSample =
+        dominantFingerprint === "<empty>"
+          ? "<empty>"
+          : dominantFingerprint.split("|").slice(0, 3).join("|");
       const diagnostics = {
         unmatched_expected_file_rate: avg(scenarios.map((s)=>s.raw_metrics.unmatched_expected_file_rate)),
         expected_file_match_mode: {
@@ -570,6 +725,14 @@ const main = async () => {
           none: flattenedTaskResults.filter((task) => task.mode === "none").length,
         },
         mismatch_taxonomy_counts: mismatchCounts,
+        context_file_source_counts: contextSourceCounts,
+        top10_fingerprint_unique_count: fingerprintUniqueCount,
+        top10_fingerprint_total_count: fingerprintTotal,
+        top10_fingerprint_unique_rate: Number(fingerprintUniqueRate.toFixed(6)),
+        top10_fingerprint_dominant_count: dominantFingerprintCount,
+        top10_fingerprint_dominant_share: Number(fingerprintDominantShare.toFixed(6)),
+        top10_fingerprint_dominant_sample: dominantFingerprintSample,
+        top10_fingerprint_collapse_flag: fingerprintDominantShare >= 0.8,
         mismatch_reasons: flattenedTaskResults.filter((task) => task.mismatchReasons.length > 0),
       };
       const stage_fault_matrix = inferStageFaultMatrix({ diagnostics });
@@ -613,7 +776,24 @@ const main = async () => {
         positive_lane_ablation_delta: false,
         bounded_confidence: false,
         fault_owner_points_to_retrieval: false,
+        quality_floor_passed: false,
+        eval_fidelity_passed: score.corpus_fidelity?.pass === true,
       },
+      quality_floor: {
+        thresholds: {
+          max_unmatched_expected_file_rate: QUALITY_FLOOR_MAX_UNMATCHED,
+          min_gold_file_recall_at_10: QUALITY_FLOOR_MIN_RECALL10,
+          min_consequential_file_retention_rate: QUALITY_FLOOR_MIN_RETENTION,
+        },
+        observed: null,
+        checks: {
+          unmatched_expected_file_rate_ok: false,
+          gold_file_recall_at_10_ok: false,
+          consequential_file_retention_rate_ok: false,
+        },
+        pass: false,
+      },
+      corpus_fidelity: score.corpus_fidelity,
       stage_fault_matrix: null,
       fault_owner: "unknown",
       status: "blocked",
@@ -647,6 +827,8 @@ const main = async () => {
         `completedScenarioCount=${completedScenarioCount}/${score.expectedScenarioCount}`,
         "",
         "Driver verdict: retrieval_lift_proven=no, dominant_channel=none (blocked run).",
+        `Quality floor pass: false (run blocked).`,
+        `Corpus fidelity pass: ${Boolean(score.corpus_fidelity?.pass)}.`,
         "",
       ].join("\n"),
     );
@@ -674,6 +856,8 @@ const main = async () => {
         "retrieval_lift_proven=no",
         "dominant_channel=none",
         "fault_owner=unknown",
+        "quality_floor_pass=false",
+        `eval_fidelity_pass=${Boolean(score.corpus_fidelity?.pass)}`,
         "",
         "Decision: NO-GO for retrieval-lift claim (run blocked before complete scenario set).",
         "",
@@ -705,6 +889,16 @@ const main = async () => {
   const unmatchedRate = baselineVariant.diagnostics.unmatched_expected_file_rate;
   const recall10 = score.variants.baseline_atlas_git_on.aggregate.gold_file_recall_at_10.point_estimate;
   const retention = score.variants.baseline_atlas_git_on.aggregate.consequential_file_retention_rate.point_estimate;
+  const qualityFloorChecks = {
+    unmatched_expected_file_rate_ok: unmatchedRate <= QUALITY_FLOOR_MAX_UNMATCHED,
+    gold_file_recall_at_10_ok: recall10 >= QUALITY_FLOOR_MIN_RECALL10,
+    consequential_file_retention_rate_ok: retention >= QUALITY_FLOOR_MIN_RETENTION,
+  };
+  const qualityFloorPassed =
+    qualityFloorChecks.unmatched_expected_file_rate_ok &&
+    qualityFloorChecks.gold_file_recall_at_10_ok &&
+    qualityFloorChecks.consequential_file_retention_rate_ok;
+  const evalFidelityPassed = score.corpus_fidelity?.pass === true;
   const retrievalStageFault = 1 - Math.max(0, 1 - unmatchedRate) * Math.max(0, recall10);
   const heuristicStageFaultMatrix = {
     retrieval: retrievalStageFault,
@@ -715,7 +909,13 @@ const main = async () => {
   };
   const stage_fault_matrix = baselineVariant.stage_fault_matrix ?? heuristicStageFaultMatrix;
   const fault_owner = baselineVariant.fault_owner ?? classifyFaultOwner(stage_fault_matrix);
-  const retrievalLiftProven = maxContribution > EPS && base > EPS && boundedConfidence && fault_owner === "retrieval";
+  const retrievalLiftProven =
+    maxContribution > EPS &&
+    base > EPS &&
+    boundedConfidence &&
+    fault_owner === "retrieval" &&
+    qualityFloorPassed &&
+    evalFidelityPassed;
   score.driver_verdict = {
     retrieval_lift_proven: retrievalLiftProven ? "yes" : "no",
     dominant_channel: dominantChannel,
@@ -732,7 +932,24 @@ const main = async () => {
       positive_lane_ablation_delta: maxContribution > EPS,
       bounded_confidence: boundedConfidence,
       fault_owner_points_to_retrieval: fault_owner === "retrieval",
+      quality_floor_passed: qualityFloorPassed,
+      eval_fidelity_passed: evalFidelityPassed,
     },
+    quality_floor: {
+      thresholds: {
+        max_unmatched_expected_file_rate: QUALITY_FLOOR_MAX_UNMATCHED,
+        min_gold_file_recall_at_10: QUALITY_FLOOR_MIN_RECALL10,
+        min_consequential_file_retention_rate: QUALITY_FLOOR_MIN_RETENTION,
+      },
+      observed: {
+        unmatched_expected_file_rate: unmatchedRate,
+        gold_file_recall_at_10: recall10,
+        consequential_file_retention_rate: retention,
+      },
+      checks: qualityFloorChecks,
+      pass: qualityFloorPassed,
+    },
+    corpus_fidelity: score.corpus_fidelity,
     stage_fault_matrix,
     fault_owner,
     confidence_statement: "95% bootstrap intervals computed over seed/temperature scenarios.",
@@ -760,7 +977,12 @@ const main = async () => {
       "",
       `Driver verdict: retrieval_lift_proven=${score.driver_verdict.retrieval_lift_proven}, dominant_channel=${score.driver_verdict.dominant_channel}.`,
       `Contributions: atlas=${score.driver_verdict.contributions.atlas.toFixed(6)}, git_tracked=${score.driver_verdict.contributions.git_tracked.toFixed(6)}.`,
-      `Strict gate: positive_lane_ablation_delta=${score.driver_verdict.strict_gate.positive_lane_ablation_delta}, bounded_confidence=${score.driver_verdict.strict_gate.bounded_confidence}, fault_owner_points_to_retrieval=${score.driver_verdict.strict_gate.fault_owner_points_to_retrieval}.`,
+      `Strict gate: positive_lane_ablation_delta=${score.driver_verdict.strict_gate.positive_lane_ablation_delta}, bounded_confidence=${score.driver_verdict.strict_gate.bounded_confidence}, fault_owner_points_to_retrieval=${score.driver_verdict.strict_gate.fault_owner_points_to_retrieval}, quality_floor_passed=${score.driver_verdict.strict_gate.quality_floor_passed}.`,
+      `Quality floor thresholds: unmatched<=${score.driver_verdict.quality_floor.thresholds.max_unmatched_expected_file_rate.toFixed(6)}, recall@10>=${score.driver_verdict.quality_floor.thresholds.min_gold_file_recall_at_10.toFixed(6)}, retention>=${score.driver_verdict.quality_floor.thresholds.min_consequential_file_retention_rate.toFixed(6)}.`,
+      `Quality floor observed: unmatched=${score.driver_verdict.quality_floor.observed.unmatched_expected_file_rate.toFixed(6)}, recall@10=${score.driver_verdict.quality_floor.observed.gold_file_recall_at_10.toFixed(6)}, retention=${score.driver_verdict.quality_floor.observed.consequential_file_retention_rate.toFixed(6)}.`,
+      `Corpus fidelity: pass=${Boolean(score.driver_verdict.corpus_fidelity?.pass)}, template_collision=${Number(score.driver_verdict.corpus_fidelity?.observed?.prompt_template_collision_rate ?? 0).toFixed(6)}, expected_token_hit=${Number(score.driver_verdict.corpus_fidelity?.observed?.expected_token_hit_rate ?? 0).toFixed(6)}.`,
+      `Top10 collapse (baseline): dominant_share=${(score.variants.baseline_atlas_git_on?.diagnostics?.top10_fingerprint_dominant_share ?? 0).toFixed(6)}, unique_rate=${(score.variants.baseline_atlas_git_on?.diagnostics?.top10_fingerprint_unique_rate ?? 0).toFixed(6)}, collapse_flag=${Boolean(score.variants.baseline_atlas_git_on?.diagnostics?.top10_fingerprint_collapse_flag)}.`,
+      `Context source counts (baseline): retrieval_context_files=${score.variants.baseline_atlas_git_on?.diagnostics?.context_file_source_counts?.retrieval_context_files ?? 0}, context_files=${score.variants.baseline_atlas_git_on?.diagnostics?.context_file_source_counts?.context_files ?? 0}, none=${score.variants.baseline_atlas_git_on?.diagnostics?.context_file_source_counts?.none ?? 0}.`,
       "",
     ].join("\n");
   await fs.writeFile(path.join(outDir,"summary.comparison.md"),`${mdContent}\n`);
@@ -800,6 +1022,26 @@ const main = async () => {
       `- positive lane-ablation delta: ${score.driver_verdict.strict_gate.positive_lane_ablation_delta}`,
       `- bounded confidence: ${score.driver_verdict.strict_gate.bounded_confidence}`,
       `- stage-fault owner points to retrieval: ${score.driver_verdict.strict_gate.fault_owner_points_to_retrieval}`,
+      `- absolute quality floor passed: ${score.driver_verdict.strict_gate.quality_floor_passed}`,
+      `- eval fidelity passed: ${score.driver_verdict.strict_gate.eval_fidelity_passed}`,
+      "",
+      "Absolute quality floor:",
+      `- unmatched_expected_file_rate <= ${score.driver_verdict.quality_floor.thresholds.max_unmatched_expected_file_rate}`,
+      `- gold_file_recall_at_10 >= ${score.driver_verdict.quality_floor.thresholds.min_gold_file_recall_at_10}`,
+      `- consequential_file_retention_rate >= ${score.driver_verdict.quality_floor.thresholds.min_consequential_file_retention_rate}`,
+      "",
+      "Observed baseline quality:",
+      `- unmatched_expected_file_rate = ${score.driver_verdict.quality_floor.observed.unmatched_expected_file_rate.toFixed(6)}`,
+      `- gold_file_recall_at_10 = ${score.driver_verdict.quality_floor.observed.gold_file_recall_at_10.toFixed(6)}`,
+      `- consequential_file_retention_rate = ${score.driver_verdict.quality_floor.observed.consequential_file_retention_rate.toFixed(6)}`,
+      "",
+      "Corpus fidelity gate:",
+      `- prompt_template_collision_rate <= ${score.driver_verdict.corpus_fidelity.thresholds.max_template_collision_rate}`,
+      `- expected_token_hit_rate >= ${score.driver_verdict.corpus_fidelity.thresholds.min_expected_token_hit_rate}`,
+      "",
+      "Observed corpus fidelity:",
+      `- prompt_template_collision_rate = ${score.driver_verdict.corpus_fidelity.observed.prompt_template_collision_rate.toFixed(6)}`,
+      `- expected_token_hit_rate = ${score.driver_verdict.corpus_fidelity.observed.expected_token_hit_rate.toFixed(6)}`,
       "",
       score.driver_verdict.retrieval_lift_proven === "yes"
         ? "Decision: GO for retrieval-lift claim (strict gate passed)."

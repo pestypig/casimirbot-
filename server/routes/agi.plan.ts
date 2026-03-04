@@ -19218,6 +19218,7 @@ const executeHelixAsk = async ({
       evidence_claim_missing?: string[];
       retrieval_confidence?: number;
       retrieval_doc_share?: number;
+      retrieval_context_files?: string[];
       retrieval_doc_hits?: number;
       retrieval_context_file_count?: number;
       retrieval_query_hit_count?: number;
@@ -24602,6 +24603,7 @@ const executeHelixAsk = async ({
           debugPayload.evidence_match_preview = matchedPreview.slice(0, 12);
           debugPayload.retrieval_confidence = retrievalConfidence;
           debugPayload.retrieval_doc_share = docShare;
+          debugPayload.retrieval_context_files = contextFilesSnapshot.slice(0, 64);
           debugPayload.retrieval_doc_hits = docsHits.length;
           debugPayload.retrieval_context_file_count = contextFilesSnapshot.length;
           debugPayload.retrieval_query_hit_count = queryHitCount;
@@ -24979,6 +24981,7 @@ const executeHelixAsk = async ({
             debugPayload.queries = queries;
             debugPayload.retrieval_confidence = retrievalConfidence;
             debugPayload.retrieval_doc_share = attemptDocShare;
+            debugPayload.retrieval_context_files = attemptFiles.slice(0, 64);
             debugPayload.retrieval_doc_hits = attemptDocFiles.length;
             debugPayload.retrieval_context_file_count = attemptFiles.length;
             debugPayload.retrieval_query_hit_count = attemptQueryHits;
