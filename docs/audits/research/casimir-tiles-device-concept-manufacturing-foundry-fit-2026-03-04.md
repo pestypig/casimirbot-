@@ -1,5 +1,16 @@
 # Casimir tiles: device concept, manufacturing expectations, and foundry fit for Nvidia
 
+## Reference Annex Normalization
+
+This document is a research annex. Authoritative manufacturing definitions and acceptance gates now live in:
+
+- `docs/specs/casimir-tile-spec-v1.md`
+- `docs/specs/casimir-tile-manufacturing-delta-v1.md`
+- `docs/specs/casimir-tile-test-vehicle-plan-v1.md`
+- `docs/specs/casimir-tile-rfq-pack-v1.md`
+
+Use this annex for context and source mapping, but use `docs/specs/*` as the governance contract for implementation and foundry handoff.
+
 ## What the codebase means by a Casimir tile
 
 In the CasimirBot/Helix codebase, "Casimir tiles" are first defined as sectorized lattice elements used for grid visualization and telemetry - units in the dashboard/ledger that track per-tile quantities such as pressure and pipeline state fields.
@@ -119,6 +130,10 @@ Final fit summary:
 
 ### Repo sources
 
+- `docs/specs/casimir-tile-spec-v1.md`
+- `docs/specs/casimir-tile-manufacturing-delta-v1.md`
+- `docs/specs/casimir-tile-test-vehicle-plan-v1.md`
+- `docs/specs/casimir-tile-rfq-pack-v1.md`
 - `docs/knowledge/casimir-tiles.md`
 - `docs/guarded-casimir-tile-code-mapped.md`
 - `docs/casimir-tile-mechanism.md`

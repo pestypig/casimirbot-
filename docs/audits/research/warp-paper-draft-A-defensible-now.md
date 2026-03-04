@@ -3,7 +3,7 @@
 "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim."
 
 ## Evidence Scope
-- Commit pin: `5506e72cafd8dc7534572d9285d932de2b858407`
+- Commit pin: `83ad2276e89f6766b863d0b10ab7a09d569585da`
 - Primary evidence summary: `docs/audits/research/warp-evidence-pack-2026-03-02.json`
 - Snapshot companion: `docs/audits/research/warp-evidence-snapshot-2026-03-02.md`
 - Claim-governance contract: `docs/audits/research/warp-paper-authoring-contract-2026-03-02.md`
@@ -104,12 +104,20 @@ UNKNOWN handling rule:
 2. Provides explicit source-quality hierarchy (primary/standard first) for manuscript claims.
 3. Improves reproducibility framing by adding deterministic staleness/conflict reporting expectations.
 4. Strengthens closure planning by mapping unresolved items to falsifier-driven upgrade steps.
+5. Adds a manufacturing-spec package (`docs/specs/*`) that converts tile novelty claims into measurable requirements, acceptance gates, and falsifiers.
 
 ## What Remains Unresolved
+Semantic blockers:
 1. Cross-disciplinary consensus for renormalized stress-energy semantics in this reduced-order context.
 2. Standardized stress-tensor fluctuation thresholds suitable for campaign-level hard gating.
-3. Fully commit-tracked trace payloads when runtime artifacts are ignored by git.
-4. Independent external replication package for strong-claim scientific escalation.
+
+Methodological blockers:
+1. External adjudication package for operator mapping, kernel provenance, and applicability parity is not yet independently reproduced.
+2. Materials-bounds closure still contains `UNKNOWN` rows for thermal/structural limits in commit-tracked evidence.
+
+Reproducibility blockers:
+1. Fully commit-tracked trace payloads can still be absent when runtime artifacts are ignored by git.
+2. Independent external replication package for strong-claim scientific escalation is not yet complete.
 
 ## Non-Goals
 - No full-system physical-feasibility claim from this campaign alone.

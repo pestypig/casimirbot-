@@ -6,7 +6,7 @@
 Generate a literature-backed scientific manuscript package from the current repo state while preserving strict claim-tier governance and fail-closed evidence handling.
 
 ## Commit Pin
-- `5506e72cafd8dc7534572d9285d932de2b858407`
+- `83ad2276e89f6766b863d0b10ab7a09d569585da`
 
 ## Repository Accessibility Rule (important)
 Use only files that are committed and readable at the commit pin.
@@ -83,6 +83,10 @@ Citation admissibility checks:
 - `docs/audits/research/warp-g4-curvature-applicability-audit-2026-03-02.md`
 - `docs/audits/research/warp-g4-uncertainty-audit-2026-03-02.md`
 - `docs/audits/research/warp-g4-literature-parity-replay-2026-03-02.md`
+- `docs/specs/casimir-tile-spec-v1.md`
+- `docs/specs/casimir-tile-manufacturing-delta-v1.md`
+- `docs/specs/casimir-tile-test-vehicle-plan-v1.md`
+- `docs/specs/casimir-tile-rfq-pack-v1.md`
 
 ## Optional Local Overlays (use when present)
 - `artifacts/research/full-solve/warp-evidence-snapshot-2026-03-02.json`
@@ -103,6 +107,7 @@ Citation admissibility checks:
    - QI/QEI foundational papers (Ford/Roman, Fewster lineage)
    - curved-spacetime renormalization semantics (Wald/Birrell-Davies lineage)
    - VVUQ/uncertainty standards (NASA/ASME/GUM lineage)
+5. For manufacturing claims, anchor to the `docs/specs/*` package first, then external standards.
 
 ## Output Requirements
 Generate two outputs.

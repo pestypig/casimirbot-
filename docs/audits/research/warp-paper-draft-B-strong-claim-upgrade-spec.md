@@ -6,7 +6,7 @@
 This document defines what must be added beyond current reduced-order closure to support stronger scientific claim quality. It uses current repo status as baseline and then defines external-closure requirements.
 
 ## Baseline at Commit Pin
-- Commit pin: `5506e72cafd8dc7534572d9285d932de2b858407`
+- Commit pin: `83ad2276e89f6766b863d0b10ab7a09d569585da`
 - Current snapshot: `blocked=false`, `strongClaimClosure.passAll=true`
 - Closure specs status:
   - A operator mapping: pass
@@ -130,6 +130,8 @@ Fail condition:
 | Reduced-order to full-solve transition gate | K | deterministic transition rule for error, convergence, and uncertainty stability | transition executed without satisfying all criteria | `docs/audits/research/warp-standards-alignment-ledger-2026-03-04.md` | high |
 | Explicit RSET semantic declaration | L | renormalization scheme, state assumptions, and regularization declared | missing semantic declaration for stress-energy source | `docs/audits/research/warp-g4-operator-mapping-audit-2026-03-02.md` | medium |
 | Stress-tensor fluctuation consistency criterion (exploratory) | L, M | exploratory threshold and reporting path defined; not a hard gate | treated as hard pass criterion before validation | `docs/audits/research/warp-standards-alignment-ledger-2026-03-04.md` | low |
+| Casimir tile manufacturing delta closure | M | each requirement has target, validation test, acceptance criterion, and falsifier | requirement row lacks measurable acceptance criterion | `docs/specs/casimir-tile-manufacturing-delta-v1.md` | high |
+| Foundry RFQ governance lock | N | process substitutions and change-control policy are explicit and enforceable | silent process drift accepted without requalification | `docs/specs/casimir-tile-rfq-pack-v1.md` | high |
 | Evidence-governance ledger enforcement | N | every promotion/claim delta has artifact, owner, status, and commit pin | claim promoted without ledger-backed artifact path | `docs/audits/research/warp-standards-alignment-ledger-2026-03-04.md` | high |
 
 PCS/QMU policy in this phase:
