@@ -21,6 +21,7 @@ type ScenarioMetrics = {
 };
 
 type TaskResult = {
+  taskId: string;
   expected_files: string[];
   top5: string[];
   top10: string[];
@@ -31,6 +32,7 @@ type TaskResult = {
   rawRR: number;
   canonRR: number;
   mode: MatchMode;
+  mismatchReasons: string[];
   graphEdgeHit: boolean;
   confidence: number | null;
   docShare: number | null;
@@ -42,6 +44,9 @@ const TOP_K = Number(process.env.HELIX_ASK_RETRIEVAL_TOPK ?? 18);
 const MAX_TASKS = Number(process.env.HELIX_ASK_RETRIEVAL_MAX_TASKS ?? 0);
 const SEEDS = String(process.env.HELIX_ASK_RETRIEVAL_SEEDS ?? "7,11,13").split(",").map((v) => Number(v.trim())).filter(Number.isFinite);
 const TEMPS = String(process.env.HELIX_ASK_RETRIEVAL_TEMPERATURES ?? "0.2").split(",").map((v) => Number(v.trim())).filter(Number.isFinite);
+const READY_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_READY_TIMEOUT_MS ?? 240_000);
+const ASK_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_ASK_TIMEOUT_MS ?? 15_000);
+const ASK_RETRY_ATTEMPTS = Number(process.env.HELIX_ASK_RETRIEVAL_ASK_RETRY_ATTEMPTS ?? 1);
 
 const VARIANTS: VariantSpec[] = [
   { name: "baseline_atlas_git_on", atlasLane: "1", gitTrackedLane: "1" },
@@ -124,10 +129,11 @@ const startServer = async (variant: VariantSpec): Promise<ServerHandle> => {
     ...process.env,
     NODE_ENV: "development",
     PORT: String(port),
-    SKIP_VITE_MIDDLEWARE: "1",
+    SKIP_VITE_MIDDLEWARE: process.env.SKIP_VITE_MIDDLEWARE ?? "0",
     DISABLE_VITE_HMR: "1",
     HELIX_ASK_ATLAS_LANE: variant.atlasLane,
     HELIX_ASK_GIT_TRACKED_LANE: variant.gitTrackedLane,
+    SKIP_MODULE_INIT: process.env.SKIP_MODULE_INIT ?? "1",
   };
   const child = spawn(process.execPath, [TSX_CLI, "server/index.ts"], {
     env,
@@ -159,7 +165,8 @@ const stopServer = async (handle: ServerHandle) => {
 };
 
 const waitReady = async (handle: ServerHandle) => {
-  for (let i = 0; i < 120; i += 1) {
+  const attempts = Math.max(1, Math.ceil(READY_TIMEOUT_MS / 1000));
+  for (let i = 0; i < attempts; i += 1) {
     if (handle.child.exitCode !== null) {
       throw new Error(
         `variant server exited before ready (port=${handle.port}, code=${handle.child.exitCode}) stderr=${handle.stderrTail.join(
@@ -176,7 +183,7 @@ const waitReady = async (handle: ServerHandle) => {
     }
     await sleep(1000);
   }
-  throw new Error(`ready timeout (port=${handle.port})`);
+  throw new Error(`ready timeout (port=${handle.port}) stderr=${handle.stderrTail.join(" | ")}`);
 };
 
 const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperature: number): Promise<TaskResult> => {
@@ -189,9 +196,12 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       retrieval_doc_share?: unknown;
     };
   } | null = null;
-  for (let attempt=0; attempt<3; attempt+=1) {
+  for (let attempt=0; attempt<ASK_RETRY_ATTEMPTS; attempt+=1) {
     try {
-      const res = await fetch(askUrl, { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ question: task.prompt, dryRun:true, debug:true, topK:TOP_K, seed, temperature, sessionId:`retrieval-ablation:${task.id}:${seed}:${temperature}` }) });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), ASK_TIMEOUT_MS);
+      const res = await fetch(askUrl, { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ question: task.prompt, dryRun:true, debug:true, topK:TOP_K, seed, temperature, sessionId:`retrieval-ablation:${task.id}:${seed}:${temperature}` }), signal: controller.signal });
+      clearTimeout(timeout);
       payload = (await res.json()) as {
         debug?: {
           context_files?: unknown;
@@ -204,10 +214,40 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       break;
     } catch { await sleep(500 * (attempt + 1)); }
   }
-  if (!payload) throw new Error(`ask failed for ${task.id}`);
+  if (!payload) {
+    return {
+      taskId: task.id,
+      expected_files: task.expected_files,
+      top5: [],
+      top10: [],
+      rawHits5: 0,
+      rawHits10: 0,
+      canonHits5: 0,
+      canonHits10: 0,
+      rawRR: 0,
+      canonRR: 0,
+      mode: "none",
+      mismatchReasons: task.expected_files.map((expected) => `${expected}:request_failed`),
+      graphEdgeHit: false,
+      confidence: null,
+      docShare: null,
+    };
+  }
   const top10 = Array.isArray(payload.debug?.context_files) ? payload.debug!.context_files.filter((v): v is string => typeof v === "string").slice(0,10) : [];
   const top5 = top10.slice(0,5);
   const modes = task.expected_files.map((e)=>bestMode(e, top10));
+  const mismatchReasons = task.expected_files.flatMap((expected) => {
+    const mode = bestMode(expected, top10);
+    if (mode !== "none") return [];
+    if (!top10.length) return [`${expected}:retrieval_empty_top10`];
+    if (top10.some((candidate) => normalize(candidate) === normalize(expected))) {
+      return [`${expected}:normalization_only`];
+    }
+    if (top10.some((candidate) => aliasSet(expected).has(normalize(candidate)))) {
+      return [`${expected}:alias_only`];
+    }
+    return [`${expected}:not_present_top10`];
+  });
   const rawHits10 = task.expected_files.filter((e)=>top10.includes(e)).length;
   const rawHits5 = task.expected_files.filter((e)=>top5.includes(e)).length;
   const canonHits10 = modes.filter((m)=>m!=="none").length;
@@ -220,6 +260,7 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
     numberOrNull(payload.debug?.graph_evidence_count) ??
     0;
   return {
+    taskId: task.id,
     expected_files: task.expected_files,
     top5,
     top10,
@@ -230,6 +271,7 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
     rawRR: rank(top10),
     canonRR: canonRank(),
     mode,
+    mismatchReasons,
     graphEdgeHit: edgeCount > 0,
     confidence: numberOrNull(payload.debug?.retrieval_confidence),
     docShare: numberOrNull(payload.debug?.retrieval_doc_share),
@@ -265,14 +307,49 @@ const main = async () => {
     try {
       const scenarios:any[]=[];
       for (const seed of SEEDS) for (const temperature of TEMPS) {
-        const results:TaskResult[]=[]; for (const task of scoped) results.push(await runTask(server.askUrl, task,seed,temperature));
+        console.log(`[ablation] variant=${variant.name} seed=${seed} temperature=${temperature} tasks=${scoped.length}`);
+        const results:TaskResult[]=[];
+        for (const task of scoped) {
+          results.push(await runTask(server.askUrl, task,seed,temperature));
+        }
         const raw = summarize(results,false); const canon = summarize(results,true);
-        scenarios.push({ seed, temperature, raw_metrics: raw, canonicalized_metrics: canon });
+        scenarios.push({ seed, temperature, raw_metrics: raw, canonicalized_metrics: canon, task_results: results });
       }
-      const metrics = ["gold_file_recall_at_10","consequential_file_retention_rate","rerank_mrr10","retrieval_confidence_mean","retrieval_doc_share_mean"] as const;
+      const metrics = [
+        "gold_file_recall_at_5",
+        "gold_file_recall_at_10",
+        "consequential_file_retention_rate",
+        "rerank_mrr10",
+        "graph_edge_hit_rate",
+        "retrieval_confidence_mean",
+        "retrieval_doc_share_mean",
+        "unmatched_expected_file_rate",
+      ] as const;
       const aggregate:any={};
       for(const m of metrics){ const vals=scenarios.map((s)=>s.canonicalized_metrics[m] ?? s.raw_metrics[m]); aggregate[m]={ point_estimate:avg(vals), ci95:ci95(vals) }; }
-      score.variants[variant.name]={ scenarios, aggregate, diagnostics: { unmatched_expected_file_rate: avg(scenarios.map((s)=>s.raw_metrics.unmatched_expected_file_rate)) } };
+      const flattenedTaskResults = scenarios.flatMap((scenario) =>
+        scenario.task_results.map((taskResult: TaskResult) => ({
+          seed: scenario.seed,
+          temperature: scenario.temperature,
+          taskId: taskResult.taskId,
+          mode: taskResult.mode,
+          mismatchReasons: taskResult.mismatchReasons,
+        })),
+      );
+      score.variants[variant.name]={
+        scenarios,
+        aggregate,
+        diagnostics: {
+          unmatched_expected_file_rate: avg(scenarios.map((s)=>s.raw_metrics.unmatched_expected_file_rate)),
+          expected_file_match_mode: {
+            exact: flattenedTaskResults.filter((task) => task.mode === "exact").length,
+            normalized: flattenedTaskResults.filter((task) => task.mode === "normalized").length,
+            alias: flattenedTaskResults.filter((task) => task.mode === "alias").length,
+            none: flattenedTaskResults.filter((task) => task.mode === "none").length,
+          },
+          mismatch_reasons: flattenedTaskResults.filter((task) => task.mismatchReasons.length > 0),
+        },
+      };
       await fs.writeFile(path.join(outDir,`${variant.name}.json`),JSON.stringify(score.variants[variant.name],null,2)+"\n");
     } finally { await stopServer(server); }
   }
