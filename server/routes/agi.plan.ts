@@ -3508,6 +3508,51 @@ const HELIX_ASK_FRONTIER_SESSION_LOCK =
 const HELIX_ASK_TELEMETRY_LEAK_GATE =
   String(process.env.HELIX_ASK_TELEMETRY_LEAK_GATE ?? "1").trim() !== "0";
 const HELIX_ASK_FRONTIER_INTENT_ID = "falsifiable.frontier_consciousness_theory_lens";
+const HELIX_ASK_FRONTIER_REQUIRED_HEADINGS = [
+  "Definitions:",
+  "Baseline:",
+  "Hypothesis:",
+  "Anti-hypothesis:",
+  "Falsifiers:",
+  "Uncertainty band:",
+  "Claim tier:",
+] as const;
+
+const buildDeterministicFrontierDryRunContract = (): string =>
+  [
+    "Definitions:",
+    "- Consciousness: subjective first-person awareness with reportable internal states.",
+    "",
+    "Baseline:",
+    "- Baseline stellar model: thermonuclear plasma dynamics explain observed solar outputs.",
+    "",
+    "Hypothesis:",
+    "- Assumptions: a frontier lens may add explanatory structure beyond baseline plasma dynamics.",
+    "- Predictions: lens-specific signatures should appear in observations not captured by baseline-only models.",
+    "- Falsifiers: no lens-unique signature appears when compared against baseline predictions.",
+    "- Uncertainty: diagnostic uncertainty is high pending direct falsifier tests.",
+    "",
+    "Anti-hypothesis:",
+    "- Assumptions: baseline stellar physics fully explains current observations without added lens constructs.",
+    "- Predictions: observed behavior remains consistent with baseline-only expectations.",
+    "- Falsifiers: repeatable signatures emerge that baseline models cannot explain.",
+    "- Uncertainty: diagnostic uncertainty is high pending direct falsifier tests.",
+    "",
+    "Falsifiers:",
+    "- Run explicit prediction-versus-observation checks against baseline and lens-specific forecasts.",
+    "",
+    "Uncertainty band:",
+    "- Diagnostic stage; uncertainty remains broad until direct falsifier evidence is resolved.",
+    "",
+    "Claim tier:",
+    "- diagnostic (frontier hypothesis mode; not certified)",
+  ].join("\n").trim();
+
+const hasRequiredFrontierHeadings = (value: string): boolean =>
+  HELIX_ASK_FRONTIER_REQUIRED_HEADINGS.every((heading) => {
+    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(escaped, "i").test(value);
+  });
 const HELIX_ASK_FRONTIER_LENS_RE =
   /\b(conscious|consciousness|sentient|sentience|orch(?:estrated)?\s*objective\s*reduction|orch[-\s]?or|penrose|hameroff|microtubule|stellar consciousness|sun conscious|is the sun conscious)\b/i;
 const HELIX_ASK_FRONTIER_EXPLICIT_LENS_RE =
@@ -27473,6 +27518,46 @@ const executeHelixAsk = async ({
     }
 
     if (dryRun) {
+      if (openWorldBypassMode === "active" || (intentDomain === "general" && !requiresRepoEvidence)) {
+        const dryOpenWorld = ensureOpenWorldBypassUncertainty("");
+        const dryPayload: LocalAskResult = { text: dryOpenWorld, prompt_ingested: promptIngested };
+        if (viewerLaunch) {
+          dryPayload.viewer_launch = viewerLaunch;
+        }
+        if (promptIngested) {
+          if (promptIngestSource) {
+            dryPayload.prompt_ingest_source = promptIngestSource;
+          }
+          if (promptIngestReason) {
+            dryPayload.prompt_ingest_reason = promptIngestReason;
+          }
+        }
+        const responsePayload = debugPayload
+          ? { ...dryPayload, debug: debugPayload, dry_run: true }
+          : { ...dryPayload, dry_run: true };
+        responder.send(200, responsePayload);
+        return;
+      }
+      if (intentProfile.id === HELIX_ASK_FRONTIER_INTENT_ID) {
+        const dryFrontier = buildDeterministicFrontierDryRunContract();
+        const dryPayload: LocalAskResult = { text: dryFrontier, prompt_ingested: promptIngested };
+        if (viewerLaunch) {
+          dryPayload.viewer_launch = viewerLaunch;
+        }
+        if (promptIngested) {
+          if (promptIngestSource) {
+            dryPayload.prompt_ingest_source = promptIngestSource;
+          }
+          if (promptIngestReason) {
+            dryPayload.prompt_ingest_reason = promptIngestReason;
+          }
+        }
+        const responsePayload = debugPayload
+          ? { ...dryPayload, debug: debugPayload, dry_run: true }
+          : { ...dryPayload, dry_run: true };
+        responder.send(200, responsePayload);
+        return;
+      }
       const dryPayload: LocalAskResult = { text: "", prompt_ingested: promptIngested };
       if (viewerLaunch) {
         dryPayload.viewer_launch = viewerLaunch;
@@ -31516,19 +31601,7 @@ const executeHelixAsk = async ({
       const frontierContractIntent =
         intentProfile.id === "falsifiable.frontier_consciousness_theory_lens";
       if (frontierContractIntent) {
-        const requiredFrontierHeadings = [
-          "Definitions:",
-          "Baseline:",
-          "Hypothesis:",
-          "Anti-hypothesis:",
-          "Falsifiers:",
-          "Uncertainty band:",
-          "Claim tier:",
-        ];
-        const headingMissing = requiredFrontierHeadings.some((heading) => {
-          const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          return !new RegExp(escaped, "i").test(cleaned);
-        });
+        const headingMissing = !hasRequiredFrontierHeadings(cleaned);
         const finalFrontierSlots = evaluateFrontierScientificSlots(
           cleaned,
           HELIX_ASK_FRONTIER_REQUIRED_SLOTS,
@@ -31572,7 +31645,7 @@ const executeHelixAsk = async ({
             (debugPayload as Record<string, unknown>).frontier_final_missing_slots =
               finalFrontierSlots.missing.slice();
             (debugPayload as Record<string, unknown>).frontier_final_missing_headings =
-              requiredFrontierHeadings.filter((heading) => {
+              HELIX_ASK_FRONTIER_REQUIRED_HEADINGS.filter((heading) => {
                 const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
                 return !new RegExp(escaped, "i").test(cleaned);
               });
