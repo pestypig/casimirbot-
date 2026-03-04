@@ -46,7 +46,7 @@ type TaskResult = {
   atlasGraphEdgeTypeCounts: Record<string, number>;
 };
 
-const CORPUS_PATH = process.env.HELIX_ASK_RETRIEVAL_CORPUS ?? "configs/repo-atlas-bench-corpus.v1.json";
+const CORPUS_PATH = process.env.HELIX_ASK_RETRIEVAL_CORPUS ?? "configs/repo-atlas-bench-corpus.v2.json";
 const OUTPUT_ROOT = process.env.HELIX_ASK_RETRIEVAL_ABLATION_OUT_ROOT ?? "artifacts/experiments/helix-ask-retrieval-ablation";
 const TOP_K = Number(process.env.HELIX_ASK_RETRIEVAL_TOPK ?? 18);
 const MAX_TASKS = Number(process.env.HELIX_ASK_RETRIEVAL_MAX_TASKS ?? 0);

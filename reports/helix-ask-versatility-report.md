@@ -2,8 +2,8 @@
 
 - summary_schema_version: 2
 - git_branch: main
-- git_head: 6a8846dd
-- git_origin_main: 6a8846dd
+- git_head: edfc7b2b
+- git_origin_main: edfc7b2b
 - git_ahead_behind: 0	0
 - provenance_gate_pass: true
 - provenance_warnings: none
@@ -11,7 +11,7 @@
 - provenance_blocked: false
 - provenance_hard_blocker_reason: none
 - ship_recommendation_blocked_by_hard_blocker: false
-- run_id: versatility-1772616419710
+- run_id: versatility-1772653439964
 - base_url: http://127.0.0.1:5050
 - prompts: 90
 - seeds: 7,11,13
@@ -20,19 +20,19 @@
 - total_runs: 270
 - run_complete: true
 - completion_rate: 100.00%
-- run_duration_ms: 3595720
+- run_duration_ms: 3502855
 - terminated_early_reason: none
 - global_cooldown_applied_ms: 0
 - resumed_from_latest: false
 - resumed_runs: 0
-- output_run_dir: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\experiments\helix-ask-versatility\versatility-1772616419710
+- output_run_dir: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\experiments\helix-ask-versatility\versatility-1772653439964
 
 ## Aggregate by Prompt Family
 | family | runs | pass_rate | intent_correct_rate | report_mode_correct_rate | stub_rate | latency_p50_ms | latency_p95_ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| relation | 90 | 0.0% | 0.0% | 100.0% | 0.0% | 8126 | 15006 |
-| repo_technical | 90 | 70.0% | 0.0% | 100.0% | 0.0% | 12683 | 15013 |
-| ambiguous_general | 90 | 11.1% | 0.0% | 100.0% | 0.0% | 15001 | 15015 |
+| relation | 90 | 0.0% | 0.0% | 100.0% | 0.0% | 8307 | 15005 |
+| repo_technical | 90 | 70.0% | 0.0% | 100.0% | 0.0% | 12636 | 15014 |
+| ambiguous_general | 90 | 13.3% | 0.0% | 100.0% | 0.0% | 15002 | 15016 |
 
 ## Core Metrics
 - intent_id_correct_rate: 0.00%
@@ -45,17 +45,17 @@
 - deterministic_fallback_relation_rate: 0.00%
 - contract_parse_fail_relation_rate: 0.00%
 - citation_repair_rate: 0.00%
-- citation_presence_rate: 57.04%
+- citation_presence_rate: 57.78%
 - min_text_length_pass_rate: 96.67%
-- latency_total_p50_ms: 11361
-- latency_total_p95_ms: 15012
-- latency_retrieval_p50_ms: 297 (samples=250)
-- latency_retrieval_p95_ms: 1508 (samples=250)
-- latency_synthesis_p50_ms: 7003 (samples=270)
-- latency_synthesis_p95_ms: 14364 (samples=270)
+- latency_total_p50_ms: 10744
+- latency_total_p95_ms: 15014
+- latency_retrieval_p50_ms: 305 (samples=251)
+- latency_retrieval_p95_ms: 1888 (samples=251)
+- latency_synthesis_p50_ms: 6928 (samples=270)
+- latency_synthesis_p95_ms: 14805 (samples=270)
 
 ## Top Failure Signatures
-- citation_missing: 116
+- citation_missing: 114
 - intent_mismatch: 90
 - text_too_short: 9
 - relation_packet_built: 6
@@ -102,24 +102,7 @@ Warp viability claims require the physics.warp.viability certificate path. Statu
 Warp viability claims require the physics.warp.viability certificate path. Status: NOT_CERTIFIED (no certificate). First failing HARD constraint: FordRomanQI (not evaluated without certificate).
 ```
 
-### Worst #4: relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer
-- family: relation
-- question: Explain warp bubble + mission ethos for a skeptical engineer.
-- failures: intent_mismatch:hybrid.composite_system_synthesis, relation_packet_built:undefined
-- likely_root_cause: relation_topology_or_context_gap
-- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
-- debug: intent_id=hybrid.composite_system_synthesis intent_strategy=hybrid_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-Confirmed:
-- The concept of a warp bubble is fundamentally about creating a space-time distortion that allows for faster-than-light travel. [docs/knowledge/ethos/mission-ethos.md] - This theoretical framework relies on manipulating the fabric of space-time itself, enabling a vessel to move through the universe in a way that circumvents the traditional limitations imposed by the speed of light. [docs/knowledge/ethos/mission-ethos.md] - The mission ethos surrounding this technology emphasizes a commitment to stewardship and compassion, suggesting that the pursuit of advanced physics is not merely for exploration but also for the betterment of humanity and the universe. [docs/knowledge/ethos/mission-ethos.md] Reasoned connections (bounded):
-- The concept of a warp bubble is fundamentally about creating a space-time distortion that allows for faster-than-light travel. [docs/knowledge/ethos/mission-ethos.md] (see docs/knowledge/ethos/ethos-knowledge-tree.json). This theoretical framework relies on manipulating the fabric of space-time itself, enabling a vessel to move through the universe in a way that circumvents the... [docs/knowledge/ethos/mission-ethos.md] (see docs/knowledge/ethos/ethos-knowledge-tree.json). Bounded linkage supported by cited evidence. [docs/knowledge/ethos/mission-ethos.md] Next evidence:
-- Searched terms: mission overwatch intent context, warp bubble, calculateNatarioWarpBubble
-- Checked files:,, docs/warp-console-architecture.md, docs/ethos/ideology.json
-- Check files under docs. - Search docs headings for "Mission Ethos". [docs/knowledge/ethos/mission-ethos.md] - Search docs headings for "Mission". [docs/knowledge/ethos/mission-ethos.md] - Search docs headings for "Mission Ethos Seeds". [docs/knowledge/ethos/mission-ethos.md] Sources: docs/knowledge
-```
-
-### Worst #5: relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented
+### Worst #4: relation_24_could-warp-bubble-progress-violate-mission-ethos-how-is-that-prevented
 - family: relation
 - question: Could warp bubble progress violate mission ethos? How is that prevented?
 - failures: intent_mismatch:hybrid.composite_system_synthesis, relation_packet_built:undefined
@@ -129,192 +112,43 @@ Confirmed:
 - final_answer:
 ```text
 Confirmed:
-- The concept of a warp vessel embodies a commitment to ethical principles, specifically the mission ethos that emphasizes a return to the Sun, symbolizing a blend of scientific advancement and compassion. [docs/knowledge/ethos/mission-ethos.md] - This ethos serves as a guiding framework to ensure that technological progress, such as the development of warp bubbles, aligns with core values of stewardship and integrity. [docs/knowledge/ethos/mission-ethos.md] - By integrating these principles into the mission, the potential for any progress to violate the mission ethos is mitigated, as the focus remains on responsible innovation that respects both the environment and societal needs. [docs/knowledge/ethos/mission-ethos.md] Reasoned connections (bounded):
-- The concept of a warp vessel embodies a commitment to ethical principles, specifically the mission ethos that emphasizes a return to the Sun, symbolizing a blen... [docs/knowledge/ethos/mission-ethos.md] (see docs/knowledge/ethos/ethos-knowledge-tree.json). This ethos serves as a guiding framework to ensure that technological progress, such as the development of warp bubbles, aligns with core values of stewardship... [docs/knowledge/ethos/mission-ethos.md] (see docs/knowledge/ethos/ethos-knowledge-tree.json). Bounded linkage supported by cited evidence. [docs/knowledge/ethos/mission-ethos.md] Next evidence:
+- The warp vessel embodies a commitment to uphold mission ethos, which emphasizes the integration of physics with compassion. [docs/knowledge/ethos/mission-ethos.md] - This ethos serves as a guiding principle, ensuring that technological advancements, such as warp bubble progress, align with the broader values of stewardship and integrity. [docs/knowledge/ethos/mission-ethos.md] - By framing the mission as a vow to return radiance to the Sun, it establishes a moral compass that directs decision-making and actions within the project. [docs/knowledge/ethos/mission-ethos.md] Reasoned connections (bounded):
+- The warp vessel embodies a commitment to uphold mission ethos, which emphasizes the integration of physics with compassion. [docs/knowledge/ethos/mission-ethos.md] (see docs/knowledge/ethos/ethos-knowledge-tree.json). This ethos serves as a guiding principle, ensuring that technological advancements, such as warp bubble progress, align with the broader values of stewardship a... [docs/knowledge/ethos/mission-ethos.md] (see docs/knowledge/ethos/ethos-knowledge-tree.json). Bounded linkage supported by cited evidence. [docs/knowledge/ethos/mission-ethos.md] Next evidence:
 - Searched terms: mission overwatch intent context, warp bubble, calculateNatarioWarpBubble
 - Checked files:,, docs/warp-console-architecture.md, docs/ethos/ideology.json
-- Check files under docs. - Search docs headings for "Mission Ethos". [docs/knowledge/ethos/mission-ethos.md] - Search docs headings for "Mission". [docs/knowledge/ethos/mission-ethos.md] - Search docs headings for "Mission Ethos Seeds". 
+- Check files under docs. - Search docs headings for "Mission Ethos". [docs/knowledge/ethos/mission-ethos.md] - Search docs headings for "Mission". [docs/knowledge/ethos/mission-ethos.md] - Search docs headings for "Mission Ethos Seeds". [docs/knowledge/ethos/mission-ethos.md] Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md, docs/knowledge/ethos/ethos-knowledge-tree.json, docs/knowl
 ```
 
-### Worst #6: relation_03_warp-bubble-ideology-relation-what-is-the-bridge
+### Worst #5: relation_15_explain-warp-bubble-mission-ethos-for-a-skeptical-engineer
 - family: relation
-- question: Warp bubble ↔ ideology relation: what is the bridge?
+- question: Explain warp bubble + mission ethos for a skeptical engineer.
+- failures: intent_mismatch:hybrid.composite_system_synthesis, relation_packet_built:undefined
+- likely_root_cause: relation_topology_or_context_gap
+- patch_suggestion: Add relation-specific fallback enforcement when intent_id resolves to hybrid.warp_ethos_relation.
+- debug: intent_id=hybrid.composite_system_synthesis intent_strategy=hybrid_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+Confirmed:
+- The concept of a warp bubble is rooted in advanced theoretical physics, specifically in the idea of manipulating spacetime to allow for faster-than-light travel. [docs/knowledge/ethos/mission-ethos.md] - This involves creating a bubble around a spacecraft that contracts space in front of it while expanding space behind it, effectively allowing the vessel to move through the universe without violating the laws of physics as we understand them. [docs/knowledge/ethos/mission-ethos.md] - The mission ethos associated with this technology emphasizes a commitment to stewardship and compassion, framing the warp vessel as a means to return radiance to the Sun, which symbolizes a broader responsibility to the cosmos and humanity. [docs/knowledge/ethos/mission-ethos.md] Reasoned connections (bounded):
+- The concept of a warp bubble is rooted in advanced theoretical physics, specifically in the idea of manipulating spacetime to allow for faster-than-light travel... [docs/knowledge/ethos/mission-ethos.md] (see docs/knowledge/ethos/ethos-knowledge-tree.json). This involves creating a bubble around a spacecraft that contracts space in front of it while expanding space behind it, effectively allowing the vessel to move... [docs/knowledge/ethos/mission-ethos.md] (see docs/knowledge/ethos/ethos-knowledge-tree.json). Bounded linkage supported by cited evidence. [docs/knowledge/ethos/mission-ethos.md] Next evidence:
+- Searched terms: mission overwatch intent context, warp bubble, calculateNatarioWarpBubble
+- Checked files:,, docs/warp-console-architecture.md, docs/ethos/ideology.json
+- Check files under docs. - Search docs headings for "Mission Ethos". [docs/knowledge/ethos/mission-ethos.md] - Search docs headings for "Mission". [docs/knowledge/ethos/mission-ethos.md] - Search
+```
+
+### Worst #6: relation_01_how-does-a-warp-bubble-fit-in-with-the-mission-ethos
+- family: relation
+- question: How does a warp bubble fit in with the mission ethos?
 - failures: intent_mismatch:hybrid.composite_system_synthesis
 - likely_root_cause: mixed
 - patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
 - debug: intent_id=hybrid.composite_system_synthesis intent_strategy=hybrid_explain report_mode=false relation_packet_built=true relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-what_is_warp_bubble: Ideology Physics Bridge. [docs/knowledge/warp/warp-bubble.md] - What it is: what_is_mission_ethos: docs/ethos/ideology.json. - Why it matters: how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [docs/knowledge/warp/warp-bubble.md] Warp viability certificates enable ethos commitments by binding claims to reproducible evidence. [docs/knowledge/warp/warp-bubble.md] Verification hooks translate design ambition into. [docs/knowledge/warp/warp-bubble.md] - Constraint: constraints_and_falsifiability: Physics bounds: Ford-Roman QI, theta calibration, and GR constraint gates must pass before viability claims. [docs/knowledge/warp/warp-bubble.md] Policy bounds: mission ethos requires stewardship, non-harm, and traceable evidence for operational decisions. [docs/knowledge/warp/warp-bubble.md] Re-run /. In practice, what_is_mission_ethos: docs/ethos/ideology.json. Mechanism: what_is_mission_ethos: docs/ethos/ideology.json. -> constrained interaction dynamics -> how_they_connect: Mission ethos constrains warp development to measured, auditable checkpoints before deployment. [docs/knowledge/warp/warp-bubble.md] Warp viability certificates enable ethos commit. [docs/knowledge/warp/warp-bubble.md] Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [docs/knowledge/warp/warp-bubble.md] Missing evidence: add directly relevant repo paths or artifact refs to raise confidence. [docs/knowledge/warp/warp-bubble.md] Sources: docs/ethos/ideology.json, docs/ethos/why.md, docs/knowledge/ethos/stewardship-ledger.md, docs/knowledge/ethos/verification-checklist.md, docs/knowledge/bridges/ideology-physics-bridge-tree.json, docs/knowledge/physics/math-maturity-
+"ideology" Sources: docs/knowledge/ethos/ethos-knowledge-tree.json, docs/knowledge/ethos/mission-ethos.md, docs/knowledge/warp/warp-mechanics-tree.json, docs/knowledge/warp/alcubierre-metric.md, docs/knowledge/ethos/stew... "ideology" Sources: docs/knowledge/ethos/ethos-knowledge-tree.json, docs/knowledge/ethos/mission-ethos.md, docs/knowledge/warp/warp-mechanics-tree.json, docs/knowledge/warp/alcubierre-metric.md, docs/knowledge/ethos/stew... The warp vessel is a vow to return radiance to the Sun, pairing physics with compassion. [docs/knowledge/ethos/mission-ethos.md] Mechanism: "ideology" Sources: docs/knowledge/ethos/ethos-knowledge-tree.json, docs/knowledge/ethos/mission-ethos.md, docs/knowledge/warp/warp-mechanics-tree.json, docs/knowledge/warp/alcubierre-metric.md, docs/knowledge/ethos/stew... -> coupled constraints and feedback operators -> observable outcomes tied to docs/ethos/ideology.json, be. Maturity (exploratory): this answer is mechanism-grounded but remains non-certified until dedicated tests and certificate-linked evidence are attached. [docs/knowledge/ethos/mission-ethos.md] Missing evidence: provide higher-fidelity measurements and verification artifacts to move toward diagnostic/certified maturity. [docs/knowledge/ethos/mission-ethos.md] Sources: docs/knowledge/ethos/mission-ethos.md, docs/ethos/ideology.json, docs/ethos/why.md, docs/knowledge/ethos/ethos-knowledge-tree.json, docs/knowledge/warp/warp-mechanics-tree.json, docs/knowledge/warp/alcubierre-metric.md, docs/knowledge/ethos/stewardship-ledger.md, docs/warp-console-architecture.md
 ```
 
-### Worst #7: ambiguous_30_what-s-the-difference-between-routing-and-assembly
-- family: ambiguous_general
-- question: What's the difference between routing and assembly?
-- failures: citation_missing
-- likely_root_cause: citation_cleanup_or_contract_fill_gap
-- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
-- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-Routing and assembly are two critical processes in the manufacturing of electronic devices, particularly in the context of printed circuit boards (PCBs). Routing specifically involves the design and creation of electrical pathways on a PCB. This process includes determining the layout of the circuit, establishing how various components will connect, and ensuring that signals can travel efficiently without interference. The routing process is essential for optimizing the performance of the circuit, as it directly affects signal integrity and overall functionality.
-
-On the other hand, assembly refers to the physical process of placing and securing electronic components onto the PCB after routing has been completed. This includes soldering components such as resistors, capacitors, and integrated circuits onto the board. Assembly can be done manually or through automated processes, such as surface mount technology (SMT) or through-hole technology. The assembly stage is crucial for ensuring that all components are correctly positioned and securely attached, which is vital for the device's reliability and performance.
-
-The differences between routing and assembly can be summarized as follows:
-
-- **Purpose**: Routing focuses on designing electrical pathways, while assembly is about physically attaching components.
-
-- **Process**: Routing is a design phase, whereas assembly is a manufacturing phase.
-
-- **Tools Used**: Routing often involves CAD software for design, while assembly may use soldering tools and machinery.
-
-- **Outcome**: Successful routing results in an optimized circuit layout, while successful assembly results in a completed electronic device.
-
-- **Timing**: Routing occurs before assembly in the manufacturing timeline.
-
-In summary, routing and assembly are interc
-```
-
-### Worst #8: ambiguous_23_what-is-a-practical-debug-payload-used-for
-- family: ambiguous_general
-- question: What is a practical debug payload used for?
-- failures: citation_missing
-- likely_root_cause: citation_cleanup_or_contract_fill_gap
-- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
-- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-A practical debug payload is a tool or script designed to assist developers and security professionals in testing, analyzing, and troubleshooting applications or systems. It typically includes a series of commands or code snippets that can be executed to collect information about the system's state, identify bugs, or exploit vulnerabilities. These payloads are especially valuable during the development phase, as they help uncover issues that may not surface during standard testing procedures.
-
-Debug payloads can be used to simulate various conditions and inputs, allowing developers to observe how their applications respond under different scenarios. This can include testing for edge cases, performance bottlenecks, or security vulnerabilities. By executing a debug payload, developers can gather detailed logs, monitor system behavior, and pinpoint the root causes of issues more effectively.
-
-In addition to aiding in development, debug payloads are also crucial in security assessments. Security professionals use them to identify potential vulnerabilities in applications or systems, allowing for proactive measures to be taken before an exploit can be leveraged by malicious actors. This can involve testing for common vulnerabilities, such as SQL injection or cross-site scripting, and ensuring that appropriate security measures are in place.
-
-Some common features of practical debug payloads include:
-
-- Logging capabilities to capture system output and errors.
-
-- Input validation checks to test how the application handles unexpected data.
-
-- Performance monitoring to identify slow or resource-intensive operations.
-
-- Security testing tools to probe for vulnerabilities.
-
-- Automation scripts to streamline repetitive testing tasks.
-
-Overall, practical debug payloads serve as ess
-```
-
-### Worst #9: ambiguous_03_explain-resonance-in-simple-terms
-- family: ambiguous_general
-- question: Explain resonance in simple terms.
-- failures: citation_missing
-- likely_root_cause: citation_cleanup_or_contract_fill_gap
-- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
-- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-Resonance is a phenomenon that occurs when an object or system vibrates at its natural frequency due to an external force. Every object has a specific frequency at which it naturally tends to oscillate, known as its natural frequency. When an external force, such as sound or mechanical vibrations, matches this frequency, the object can start to vibrate more intensely, leading to a dramatic increase in amplitude.
-
-This effect can be observed in various everyday situations. For example, when a musician plays a note on a guitar, the strings vibrate at their natural frequencies, producing sound. If the frequency of the note matches the natural frequency of the guitar body, it can amplify the sound significantly. Similarly, in engineering, bridges can experience resonance when wind or traffic creates vibrations that match the bridge's natural frequency, potentially leading to structural issues.
-
-Resonance is not limited to physical objects; it also occurs in molecular structures. In chemistry, certain molecules can absorb energy at specific frequencies, leading to vibrational modes that can be observed in spectroscopy. This principle is crucial for understanding how molecules interact with light and other forms of energy.
-
-In summary, resonance is a powerful effect that can enhance vibrations when external forces align with an object's natural frequency. It plays a critical role in music, engineering, and molecular interactions, demonstrating how frequency matching can lead to significant changes in behavior and energy transfer. Understanding resonance helps us harness its effects in various applications, from designing musical instruments to ensuring the safety of structures.
-```
-
-### Worst #10: repo_tech_06_describe-how-answer-contract-primary-and-field-repair-work-in-sequence
-- family: repo_technical
-- question: Describe how answer contract primary and field repair work in sequence.
-- failures: citation_missing
-- likely_root_cause: citation_cleanup_or_contract_fill_gap
-- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
-- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-In the context of contract work, particularly in fields like construction or maintenance, the process begins with the establishment of an answer contract. This contract outlines the obligations and expectations between the parties involved, detailing the scope of work, timelines, and payment structures. It serves as a formal agreement that ensures all parties are aligned on project requirements and deliverables, providing a framework for accountability and performance.
-
-Once the answer contract is in place, the next step involves field repair work. This phase typically begins with a thorough assessment of the site to identify specific issues that need addressing. Skilled professionals conduct inspections and evaluations to determine the extent of repairs required, ensuring that all necessary resources and materials are prepared for the job. This assessment is crucial as it informs the planning and execution of the repair tasks.
-
-After the assessment, the actual field repair work commences. This involves mobilizing the workforce and equipment to the site, where technicians and laborers carry out the necessary repairs according to the specifications outlined in the answer contract. Effective communication and coordination among team members are essential during this phase to ensure that the work is completed efficiently and meets quality standards.
-
-Upon completion of the field repair work, a final inspection is conducted to verify that all tasks have been executed as per the contract requirements. This step is vital for ensuring that the repairs are not only functional but also compliant with any relevant regulations or standards. Once the inspection is passed, the project can be formally closed, and final payments can be processed, marking the successful completion of t
-```
-
-### Worst #11: ambiguous_04_what-is-stability
-- family: ambiguous_general
-- question: What is stability?
-- failures: citation_missing
-- likely_root_cause: citation_cleanup_or_contract_fill_gap
-- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
-- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-Stability is a fundamental concept that can be applied across various fields, including mathematics, physics, engineering, and economics. In general terms, stability refers to the ability of a system to maintain its state or return to it after being disturbed. A stable system will resist changes and return to equilibrium, while an unstable system may experience significant deviations from its original state when subjected to external influences or internal fluctuations.
-
-In the context of numerical simulations, stability is particularly important as it relates to the behavior of algorithms used to approximate solutions to mathematical problems. A stable numerical method ensures that small changes in input do not lead to disproportionately large changes in output. This is crucial for the reliability of simulations, as instability can result in numerical blow-up, where errors grow exponentially, leading to nonsensical results.
-
-Stability can be categorized into several types, including:
-
-- **Lyapunov Stability**: A system is considered Lyapunov stable if, after a small disturbance, it remains close to its original state.
-
-- **Asymptotic Stability**: A system is asymptotically stable if it not only remains close to its original state after a disturbance but also returns to that state over time.
-
-- **Exponential Stability**: A stronger form of stability where the system returns to equilibrium at an exponential rate.
-
-- **Structural Stability**: Refers to the persistence of the qualitative behavior of a system under small perturbations.
-
-- **Numerical Stability**: Involves the behavior of numerical algorithms, ensuring that errors do not grow uncontrollably.
-
-In practical applications, ensuring stability often involves selecting appropriate parameters, such as time steps in 
-```
-
-### Worst #12: ambiguous_07_how-do-constraints-help-decision-making
-- family: ambiguous_general
-- question: How do constraints help decision making?
-- failures: citation_missing
-- likely_root_cause: citation_cleanup_or_contract_fill_gap
-- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
-- debug: intent_id=general.general_how_to_process intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-1. Constraints establish clear parameters that guide decision-making processes. By defining what is possible and what is not, they help individuals and teams to concentrate on realistic options rather than getting lost in an overwhelming number of possibilities.
-
-2. They promote efficiency by reducing the time spent on evaluating alternatives. When options are limited, decision-makers can quickly assess the feasibility of each choice, leading to faster conclusions and actions.
-
-3. Constraints can enhance creativity by forcing individuals to think outside the box. When faced with limitations, people often come up with innovative solutions that they might not have considered in a more open-ended scenario.
-
-4. They help prioritize objectives by clarifying what is most important. With constraints in place, decision-makers can focus on achieving key goals rather than getting sidetracked by less critical factors.
-
-5. Constraints can reduce the risk of decision fatigue. By limiting the number of choices, they help prevent the overwhelming feeling that can come from too many options, allowing for clearer thinking and better outcomes.
-
-6. They encourage accountability by establishing specific criteria for success. When decisions are made within defined limits, it becomes easier to measure results and hold individuals or teams responsible for their choices.
-
-7. Constraints can facilitate collaboration by providing a common framework for discussion. When everyone understands the boundaries within which they are operating, it fosters teamwork and collective problem-solving.
-
-8. They can lead to more informed decisions by highlighting potential trade-offs. Constraints force decision-makers to consider the implications of their choices, leading to a deeper understanding of the conseq
-```
-
-### Worst #13: ambiguous_25_when-is-deterministic-fallback-preferable
-- family: ambiguous_general
-- question: When is deterministic fallback preferable?
-- failures: citation_missing
-- likely_root_cause: citation_cleanup_or_contract_fill_gap
-- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
-- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-Deterministic fallback is preferable in situations where consistent performance and reliability are critical. For instance, in safety-critical systems such as aviation or medical devices, any failure in the primary operation could lead to severe consequences. By implementing a deterministic fallback, these systems can switch to a predefined alternative method or process, ensuring that they continue to function safely and effectively even in the event of a failure.
-
-Another scenario where deterministic fallback is beneficial is in real-time data processing applications. In environments where data must be processed without delay, such as financial trading systems, having a fallback mechanism allows for uninterrupted service. If the primary data processing algorithm encounters an error or becomes slow, the system can automatically revert to a backup algorithm that is known to work, thus maintaining the flow of operations and minimizing potential losses.
-
-Deterministic fallback is also advantageous in user-facing applications where user experience is paramount. For example, in web applications, if a primary feature fails to load, a fallback feature can provide users with an alternative that still meets their needs. This approach not only enhances user satisfaction but also helps maintain trust in the application by demonstrating reliability even in adverse conditions.
-
-Lastly, deterministic fallback is useful in environments with varying resource availability. In cloud computing, for instance, if a primary service becomes unavailable due to resource constraints, a deterministic fallback can redirect requests to a backup service that is less resource-intensive. This ensures that users continue to receive service without interruption, even when the primary service is compromi
-```
-
-### Worst #14: relation_18_warp-ethos-relation-prompt-test-explain-links-and-guardrails
+### Worst #7: relation_18_warp-ethos-relation-prompt-test-explain-links-and-guardrails
 - family: relation
 - question: warp/ethos relation prompt test: explain links and guardrails
 - failures: intent_mismatch:hybrid.composite_system_synthesis
@@ -326,6 +160,160 @@ Lastly, deterministic fallback is useful in environments with varying resource a
 Evidence: Section: Mission Ethos Seeds Span: L2-L5 These whispers mirror the copy and intent of `` so the build step can harvest the same language for offline banks and remote scoring. (see docs/ethos/why.md). Code: Span: L1-L5 import { useEffect, useState } from "react";. [modules/warp/warp-module.ts] Code: Span: L1-L5 import { useEffect, useState } from "react";. [modules/warp/warp-module.ts] Sources: modules/warp/warp-module.ts, client/src/lib/warp-uniforms-gate.ts, server/auth/jwt.ts, server/routes/ethos.ts, server/security/hull-guard.ts, server/energy-pipeline.ts, client/src/hooks/use-ideology.ts, modules/warp/natario-warp.ts
 ```
 
+### Worst #8: ambiguous_06_help-me-compare-precision-and-recall-quickly
+- family: ambiguous_general
+- question: Help me compare precision and recall quickly.
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+Precision and recall are critical metrics for assessing the performance of classification models, especially in scenarios where the balance between false positives and false negatives is crucial. Precision quantifies the accuracy of the positive predictions made by the model, defined as the ratio of true positive predictions to the total number of positive predictions (true positives plus false positives). In contrast, recall measures the model's ability to identify all relevant instances, calculated as the ratio of true positive predictions to the total number of actual positive instances (true positives plus false negatives).
+
+The distinction between precision and recall becomes particularly important in different contexts. For example, in medical diagnostics, a high recall is essential to ensure that most patients with a disease are correctly identified, even if it means accepting some false positives. Conversely, in spam detection, high precision is often prioritized to minimize the chances of legitimate emails being incorrectly classified as spam, even if some spam emails are missed.
+
+Here’s a quick comparison of precision and recall:
+
+- **Precision**: Focuses on the accuracy of positive predictions.
+
+- **Recall**: Focuses on the ability to find all relevant instances.
+
+- **Use Case**: Precision is critical in applications like spam detection; recall is vital in medical testing.
+
+- **Trade-off**: Increasing precision often decreases recall and vice versa.
+
+- **Formula**: Precision = TP / (TP + FP); Recall = TP / (TP + FN).
+
+In practice, the choice between precision and recall depends on the specific requirements of the task at hand. For instance, in scenarios where false positives are costly, such as fraud detection, precision may be prioritized. On the other hand,
+```
+
+### Worst #9: ambiguous_15_difference-between-hypothesis-and-verified-claim
+- family: ambiguous_general
+- question: Difference between hypothesis and verified claim?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+A hypothesis is a proposed explanation or prediction based on limited evidence, serving as a starting point for further investigation. It is formulated in a way that allows for testing through experimentation or observation. In scientific research, hypotheses generate predictions that can be validated or refuted through empirical data, making them inherently uncertain until rigorously tested. They are often speculative and can lead to multiple outcomes, reflecting the exploratory nature of scientific inquiry.
+
+In contrast, a verified claim is a statement that has been substantiated through evidence and is generally accepted as true within a specific context. This claim has undergone scrutiny and has been supported by data or observations that confirm its accuracy. Verified claims result from extensive research and analysis, contributing to the body of knowledge in a particular field. Unlike hypotheses, verified claims are considered reliable and can serve as a foundation for further inquiry or application.
+
+The differences between a hypothesis and a verified claim can be summarized as follows:
+
+- A hypothesis is a tentative explanation; a verified claim is an established fact.
+
+- Hypotheses are subject to testing and experimentation; verified claims have already undergone this process.
+
+- A hypothesis is often speculative; a verified claim is supported by evidence.
+
+- Hypotheses can lead to multiple outcomes; verified claims are accepted as true.
+
+- The status of a hypothesis can change with new evidence; verified claims are stable until disproven.
+
+In practice, the distinction between a hypothesis and a verified claim is crucial in scientific discourse. Researchers begin with hypotheses to explore new ideas and test their validity through experimentation. Once sufficie
+```
+
+### Worst #10: ambiguous_27_what-s-a-robust-pass-criterion-for-prompts
+- family: ambiguous_general
+- question: What's a robust pass criterion for prompts?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+A robust pass criterion for prompts should encompass several critical dimensions to ensure they effectively elicit the desired responses. First, clarity is paramount; prompts must be straightforward and easily understood by the target audience. This involves using simple language and avoiding jargon that could confuse respondents. A clear prompt sets the stage for accurate and relevant responses, reducing the likelihood of misinterpretation.
+
+Relevance is another crucial aspect of a robust pass criterion. Prompts should be closely aligned with the objectives of the task or assessment. This means they should directly relate to the subject matter and the specific information or skills being evaluated. When prompts are relevant, they not only engage respondents but also ensure that the responses gathered are meaningful and useful for analysis.
+
+Engagement is also vital in assessing prompts. A good prompt should stimulate interest and encourage respondents to think critically or creatively. This can be achieved by framing questions in a way that invites exploration and personal reflection. Engaging prompts often lead to richer, more nuanced responses, which can provide deeper insights into the subject matter.
+
+Lastly, the ability to provoke thoughtful responses is essential. Prompts should challenge respondents to analyze, synthesize, or evaluate information rather than simply recall facts. This can be measured by the depth and complexity of the responses generated. A robust pass criterion should include an evaluation of whether the prompt successfully encourages this level of critical thinking.
+
+In summary, a robust pass criterion for prompts should focus on:
+
+- Clarity: Ensuring prompts are easily understood.
+
+- Relevance: Aligning prompts with the task objectives.
+
+- Eng
+```
+
+### Worst #11: ambiguous_28_how-can-i-identify-high-impact-failure-categories
+- family: ambiguous_general
+- question: How can I identify high-impact failure categories?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+To identify high-impact failure categories, organizations should start by analyzing historical data on failures, including incidents, defects, or service interruptions. This analysis should focus on both the frequency of these failures and their severity, which can be measured in terms of operational disruption, financial loss, and customer dissatisfaction. By compiling this data, organizations can create a comprehensive overview of which failure categories have historically led to the most significant negative outcomes.
+
+Next, organizations can employ techniques such as root cause analysis to delve deeper into the underlying reasons for these failures. This involves not only looking at what went wrong but also understanding why it happened. By identifying common patterns or causes across different incidents, organizations can categorize failures more effectively and prioritize those that have the potential to cause the most harm if not addressed.
+
+In addition to historical analysis, organizations should engage stakeholders from various departments to gather insights on perceived risks and potential failure points. This collaborative approach can help uncover blind spots that may not be evident from data alone. Stakeholders can provide valuable context regarding how failures impact their specific areas, which can inform a more nuanced categorization of high-impact failures.
+
+Finally, organizations should continuously monitor and reassess their failure categories over time. As business environments and technologies evolve, new failure modes may emerge, and previously identified categories may change in their impact. By establishing a regular review process, organizations can ensure that their focus remains on the most critical failure categories, allowing them to allocat
+```
+
+### Worst #12: ambiguous_08_what-s-a-good-way-to-summarize-evidence
+- family: ambiguous_general
+- question: What's a good way to summarize evidence?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.conceptual_define_compare intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+Summarizing evidence effectively requires distilling complex information into clear and concise points that emphasize the main findings and implications. A well-crafted summary should capture the essence of the evidence while retaining critical details, ensuring it is accessible to a wider audience. This process involves identifying key themes, trends, or results from the data and understanding the context in which the evidence was gathered.
+
+To create a strong summary, start by reviewing the evidence thoroughly to identify the most significant points. Focus on the main arguments or conclusions drawn from the data, and consider the relevance of each point to the overall narrative. It can be helpful to categorize the evidence into themes or sections, which can make it easier to present the information logically and coherently.
+
+Another effective strategy is to use bullet points or numbered lists to highlight key findings. This format allows readers to quickly grasp the essential information without wading through dense text. Additionally, including brief explanations or interpretations of each point can enhance understanding and provide context for the evidence presented.
+
+Finally, ensure that the summary is tailored to the intended audience. Consider their level of expertise and what information they may find most valuable. By doing so, you can create a summary that not only informs but also engages the reader, making the evidence more impactful and memorable.
+```
+
+### Worst #13: ambiguous_19_what-makes-a-good-guardrail
+- family: ambiguous_general
+- question: What makes a good guardrail?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+A good guardrail is essential for enhancing safety in areas where there is a risk of vehicles veering off the road or falling from elevated surfaces. Its primary function is to absorb impact and redirect vehicles back onto the roadway, thereby preventing accidents and minimizing injuries. To achieve this, a guardrail must be designed with specific characteristics that ensure it can withstand the forces exerted during a collision.
+
+One of the most important aspects of a good guardrail is its structural integrity. This means that the materials used must be strong enough to endure significant impacts without failing. Common materials include steel and concrete, which provide durability and resistance to wear over time. Additionally, the design should account for the expected speed and weight of vehicles in the area, ensuring that the guardrail can effectively manage these variables.
+
+Height and placement are also critical factors in guardrail effectiveness. A guardrail should be tall enough to prevent vehicles from easily climbing over it, yet not so high that it becomes ineffective in redirecting vehicles. Proper installation is crucial; guardrails must be positioned at the correct angle and distance from the roadway to maximize their protective capabilities. This careful consideration helps to ensure that they function as intended during an accident.
+
+Environmental conditions play a significant role in the longevity and performance of guardrails. A good guardrail should be resistant to corrosion, rust, and other forms of degradation caused by weather elements. This often involves using coatings or treatments that enhance the material's durability. Regular maintenance and inspections are also necessary to ensure that guardrails remain effective over time, addressing any w
+```
+
+### Worst #14: repo_tech_14_what-determines-relation-packet-bridge-count-and-evidence-count
+- family: repo_technical
+- question: What determines relation_packet_bridge_count and evidence_count?
+- failures: citation_missing
+- likely_root_cause: citation_cleanup_or_contract_fill_gap
+- patch_suggestion: Strengthen citation fallback append after final cleaning for hybrid/repo outputs.
+- debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+The parameters relation_packet_bridge_count and evidence_count are influenced by several factors related to network design and data management practices. The relation_packet_bridge_count typically indicates the number of packet bridges or connections established between different nodes in a network. This count can vary based on the network architecture, the number of devices connected, and the specific protocols employed. For instance, a more complex network with multiple segments and devices may have a higher count due to the increased number of connections required for efficient data transmission.
+
+On the other hand, evidence_count generally refers to the number of data packets or pieces of information that have been validated or verified within a system. This count can be affected by the volume of data being processed, the mechanisms in place for data validation, and the overall efficiency of the data management system. For example, in a high-traffic network, the evidence_count may increase as more data packets are transmitted and subsequently validated.
+
+Both parameters are crucial for assessing the performance and reliability of a network. A higher relation_packet_bridge_count can indicate a more interconnected network, which may enhance data flow but could also lead to increased complexity and potential bottlenecks. Conversely, a robust evidence_count suggests effective data validation processes, which are essential for maintaining data integrity and ensuring that the transmitted information is accurate and reliable.
+
+In summary, the relation_packet_bridge_count is determined by the network's structure and the number of active connections, while the evidence_count is influenced by the volume of data and the validation processes in place. Understanding these parame
+```
+
 ### Worst #15: repo_tech_18_how-does-fast-quality-mode-alter-answer-generation-deadlines
 - family: repo_technical
 - question: How does fast quality mode alter answer generation deadlines?
@@ -335,23 +323,21 @@ Evidence: Section: Mission Ethos Seeds Span: L2-L5 These whispers mirror the cop
 - debug: intent_id=general.fallback intent_strategy=general_explain report_mode=false relation_packet_built=undefined relation_dual_domain_ok=undefined deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
 - final_answer:
 ```text
-1. Fast quality mode focuses on minimizing response times by streamlining the processing of user inputs. This involves optimizing algorithms to quickly analyze and interpret the data provided.
+1. Fast quality mode reduces the time allocated for generating answers by streamlining processing steps. This means that certain computational resources are focused on delivering responses more quickly rather than on extensive quality checks.
 
-2. The mode reduces the complexity of certain computations, allowing for faster execution. By simplifying the decision-making processes, it can generate answers more rapidly without extensive deliberation.
+2. The algorithm may simplify the reasoning process, allowing for faster conclusions to be drawn. This can involve using heuristics or approximations that speed up decision-making without significantly compromising the overall accuracy.
 
-3. In this mode, the system may prioritize certain types of queries that can be answered quickly over more complex ones. This ensures that users receive timely responses, even if it means sacrificing some depth of analysis.
+3. In this mode, the system may limit the depth of context considered for each query. By narrowing the scope of information analyzed, the response time is decreased, which is beneficial for users needing immediate answers.
 
-4. Fast quality mode may limit the amount of context considered when generating answers. By narrowing the scope of information, the system can produce responses more swiftly.
+4. Fast quality mode can also prioritize certain types of queries over others. For example, it may handle straightforward questions more efficiently while allocating less time to complex inquiries, thus optimizing the overall response time.
 
-5. The trade-off for speed often involves a reduction in the thoroughness of the answer. While users receive quicker responses, the quality of information may not be as comprehensive as in standard modes.
+5. The trade-off in this mode is that while speed is enhanced, the richness of the answer may be slightly diminished. Users might receive less detailed explanations or fewer examples compared to standard quality modes.
 
-6. This mode can also implement caching strategies, where previously generated answers are reused for similar queries. This significantly cuts down on processing time for frequently asked questions.
+6. Fast quality mode can utilize more aggressive caching strategies, where previously generated answers are reused for similar queries. This reduces the need for real-time computation and speeds up response delivery.
 
-7. Users may notice that while answers are generated faster, they might lack nuanced insights or detailed explanations. This is a direct result of the prioritization of speed over depth.
+7. The system may also employ parallel processing techniques to handle multiple queries simultaneously. By distributing the workload across various processors, the time taken to generate answers is significantly reduced.
 
-8. Fast quality mode is particularly useful in scenarios where immediate feedback is essential, such as customer support or real-time information retrieval. It allows for a more dynamic interaction with users.
-
-9. Overall, fast quality mode alters answer generation deadlines by establishing a balance between speed and quality, favoring rapid response times while potentially compromising on the richnes
+8. Feedback mechanisms may be adjusted to prioritize speed over thoroughness in evaluation. This means that while answers are generated quickly, they may not undergo the same rigorous checks a
 ```
 
 ## Recommendation

@@ -5674,10 +5674,10 @@ const resolveLongPromptCandidate = (input: {
 
 const HELIX_ASK_ATLAS_CORPUS_PATH = (() => {
   const configured = String(
-    process.env.HELIX_ASK_ATLAS_CORPUS_PATH ?? "configs/repo-atlas-bench-corpus.v1.json",
+    process.env.HELIX_ASK_ATLAS_CORPUS_PATH ?? "configs/repo-atlas-bench-corpus.v2.json",
   ).trim();
   if (!configured) {
-    return path.resolve(process.cwd(), "configs", "repo-atlas-bench-corpus.v1.json");
+    return path.resolve(process.cwd(), "configs", "repo-atlas-bench-corpus.v2.json");
   }
   return path.isAbsolute(configured)
     ? configured
@@ -5694,7 +5694,13 @@ const HELIX_ASK_ATLAS_GRAPH_RUNTIME_LINK_BOOST = clampNumber(
   0,
   8,
 );
+const HELIX_ASK_ATLAS_FILENAME_MATCH_BASE_SCORE = clampNumber(
+  Number(process.env.HELIX_ASK_ATLAS_FILENAME_MATCH_BASE_SCORE ?? 28),
+  8,
+  64,
+);
 let helixAskAtlasCorpusFilesCache: string[] | null = null;
+let helixAskAtlasCorpusByBaseNameCache: Map<string, string[]> | null = null;
 
 function getHelixAskAtlasCorpusFiles(): string[] {
   if (helixAskAtlasCorpusFilesCache) return helixAskAtlasCorpusFilesCache;
@@ -5714,6 +5720,39 @@ function getHelixAskAtlasCorpusFiles(): string[] {
     helixAskAtlasCorpusFilesCache = [];
     return helixAskAtlasCorpusFilesCache;
   }
+}
+
+function getHelixAskAtlasCorpusByBaseName(): Map<string, string[]> {
+  if (helixAskAtlasCorpusByBaseNameCache) return helixAskAtlasCorpusByBaseNameCache;
+  const out = new Map<string, string[]>();
+  for (const filePath of getHelixAskAtlasCorpusFiles()) {
+    const normalized = normalizeAtlasRepoPath(filePath);
+    if (!normalized) continue;
+    const baseName = path.posix.basename(normalized).toLowerCase();
+    if (!baseName) continue;
+    const list = out.get(baseName) ?? [];
+    list.push(normalized);
+    out.set(baseName, list);
+  }
+  helixAskAtlasCorpusByBaseNameCache = out;
+  return helixAskAtlasCorpusByBaseNameCache;
+}
+
+const HELIX_ASK_BARE_FILENAME_HINT_RE =
+  /\b[a-z0-9][a-z0-9._-]*\.(?:tsx?|jsx?|md|json|ya?ml|mjs|cjs|py)\b/gi;
+
+function extractBareFilenameHints(value: string): string[] {
+  if (!value) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const match of value.matchAll(HELIX_ASK_BARE_FILENAME_HINT_RE)) {
+    const raw = (match[0] ?? "").trim().toLowerCase();
+    if (!raw) continue;
+    if (seen.has(raw)) continue;
+    seen.add(raw);
+    out.push(raw);
+  }
+  return out;
 }
 
 function stripQueryPrefix(value: string): string {
@@ -8030,14 +8069,31 @@ function collectPathCandidatesForQuery(
 ): AskCandidate[] {
   const allowlist = options?.allowlist ?? [];
   const avoidlist = options?.avoidlist ?? [];
-  const pathHints = extractFilePathsFromText(query);
-  if (!pathHints.length && looksLikePathHint(query)) {
-    pathHints.push(query.trim());
+  const pathHints: Array<{ value: string; explicit: boolean }> = [];
+  for (const hint of extractFilePathsFromText(query)) {
+    pathHints.push({ value: hint, explicit: true });
   }
+  for (const hint of extractFilePathsFromText(question)) {
+    pathHints.push({ value: hint, explicit: true });
+  }
+  if (!pathHints.length && looksLikePathHint(query)) {
+    pathHints.push({ value: query.trim(), explicit: true });
+  }
+  const byBaseName = getHelixAskAtlasCorpusByBaseName();
+  for (const fileNameHint of extractBareFilenameHints(`${query}\n${question}`)) {
+    const matches = byBaseName.get(fileNameHint) ?? [];
+    if (matches.length !== 1) continue;
+    pathHints.push({ value: matches[0], explicit: true });
+  }
+  const seenHints = new Set<string>();
   const candidates: AskCandidate[] = [];
   for (const hint of pathHints) {
-    const normalized = hint.replace(/\\/g, "/");
-    if (allowlist.length > 0 && !pathMatchesAny(normalized, allowlist)) continue;
+    const normalized = normalizeAtlasRepoPath(hint.value);
+    if (!normalized) continue;
+    const dedupeKey = normalized.toLowerCase();
+    if (seenHints.has(dedupeKey)) continue;
+    seenHints.add(dedupeKey);
+    if (!hint.explicit && allowlist.length > 0 && !pathMatchesAny(normalized, allowlist)) continue;
     if (avoidlist.length > 0 && pathMatchesAny(normalized, avoidlist)) continue;
     const fullPath = path.resolve(process.cwd(), normalized);
     if (!fs.existsSync(fullPath)) continue;
@@ -8204,20 +8260,23 @@ async function collectAskCandidatesMultiChannel(
   if (!tokens.length) return { lists: [], queryHit: false };
   const allowlist = options?.allowlist ?? [];
   const avoidlist = options?.avoidlist ?? [];
+  const isValidRepoFilePath = buildAtlasRepoFilePathValidator();
   const byPathLexical = new Map<string, AskCandidate>();
   const byPathSymbol = new Map<string, AskCandidate>();
   const byPathFuzzy = new Map<string, AskCandidate>();
   for (const node of snapshot.nodes) {
-    const filePath = node.filePath ?? "";
+    const filePath = normalizeAtlasRepoPath(node.filePath ?? "");
     if (!filePath) continue;
+    if (!isValidRepoFilePath(filePath)) continue;
     if (allowlist.length > 0 && !pathMatchesAny(filePath, allowlist)) continue;
     if (avoidlist.length > 0 && pathMatchesAny(filePath, avoidlist)) continue;
-    const lexicalScore = scoreAskNodeLexical(node, tokens, question, options?.topicProfile);
-    if (lexicalScore > 0) upsertAskCandidate(byPathLexical, node, lexicalScore);
-    const symbolScore = scoreAskNodeSymbol(node, tokens, question, options?.topicProfile);
-    if (symbolScore > 0) upsertAskCandidate(byPathSymbol, node, symbolScore);
-    const fuzzyScore = scoreAskNodeFuzzy(node, query, question, options?.topicProfile);
-    if (fuzzyScore > 0) upsertAskCandidate(byPathFuzzy, node, fuzzyScore);
+    const normalizedNode = filePath === node.filePath ? node : { ...node, filePath };
+    const lexicalScore = scoreAskNodeLexical(normalizedNode, tokens, question, options?.topicProfile);
+    if (lexicalScore > 0) upsertAskCandidate(byPathLexical, normalizedNode, lexicalScore);
+    const symbolScore = scoreAskNodeSymbol(normalizedNode, tokens, question, options?.topicProfile);
+    if (symbolScore > 0) upsertAskCandidate(byPathSymbol, normalizedNode, symbolScore);
+    const fuzzyScore = scoreAskNodeFuzzy(normalizedNode, query, question, options?.topicProfile);
+    if (fuzzyScore > 0) upsertAskCandidate(byPathFuzzy, normalizedNode, fuzzyScore);
   }
   const lexical = Array.from(byPathLexical.values()).sort((a, b) => b.score - a.score);
   const symbol = Array.from(byPathSymbol.values()).sort((a, b) => b.score - a.score);
@@ -8311,6 +8370,84 @@ function hasAtlasGraphRuntimeLink(args: {
   return symbolOverlap || (queryHasRuntimeCue && runtimeSnippet) || (queryHasRuntimeCue && edgeTypeRuntime);
 }
 
+function normalizeAtlasRepoPath(filePath: string): string {
+  return filePath.replace(/\\/g, "/").replace(/^\.\//, "").replace(/^\/+/, "").trim();
+}
+
+function isAtlasRepoPathSafe(filePath: string): boolean {
+  if (!filePath) return false;
+  if (path.isAbsolute(filePath)) return false;
+  if (filePath === ".." || filePath.startsWith("../")) return false;
+  if (filePath.includes("/../") || filePath.includes("..\\")) return false;
+  return true;
+}
+
+function buildAtlasRepoFilePathValidator(): (filePath: string) => boolean {
+  const cache = new Map<string, boolean>();
+  return (filePath: string): boolean => {
+    const normalized = normalizeAtlasRepoPath(filePath);
+    const cached = cache.get(normalized);
+    if (typeof cached === "boolean") return cached;
+    let ok = false;
+    if (isAtlasRepoPathSafe(normalized)) {
+      const absolute = path.resolve(process.cwd(), normalized);
+      const relative = path.relative(process.cwd(), absolute).replace(/\\/g, "/");
+      if (relative && !relative.startsWith("../") && !path.isAbsolute(relative) && fs.existsSync(absolute)) {
+        try {
+          ok = fs.statSync(absolute).isFile();
+        } catch {
+          ok = false;
+        }
+      }
+    }
+    cache.set(normalized, ok);
+    return ok;
+  };
+}
+
+function buildAtlasQueryTokenSet(queryText: string): Set<string> {
+  const out = new Set<string>();
+  for (const token of filterSignalTokens(tokenizeAskQuery(queryText))) {
+    const normalized = token.trim().toLowerCase();
+    if (!normalized) continue;
+    out.add(normalized);
+    for (const part of normalized.split(/[./:_-]+/)) {
+      const cleaned = part.trim();
+      if (cleaned.length >= 3) out.add(cleaned);
+    }
+  }
+  return out;
+}
+
+function scoreAtlasFilenameIntent(filePath: string, normalizedQuery: string, queryTokens: Set<string>): number {
+  const normalizedPath = normalizeAtlasRepoPath(filePath).toLowerCase();
+  if (!normalizedPath) return 0;
+  const baseName = path.posix.basename(normalizedPath).toLowerCase();
+  if (!baseName) return 0;
+  const stem = baseName.replace(/\.[a-z0-9]+$/i, "");
+  let boost = 0;
+  if (normalizedQuery.includes(baseName)) boost += 8;
+  if (stem.length >= 4 && normalizedQuery.includes(stem)) boost += 6;
+  if (normalizedQuery.includes(normalizedPath)) boost += 4;
+  let partHits = 0;
+  for (const part of stem.split(/[^a-z0-9]+/)) {
+    const cleaned = part.trim();
+    if (cleaned.length >= 3 && queryTokens.has(cleaned)) partHits += 1;
+  }
+  if (partHits >= 2) {
+    boost += 2 + Math.min(2, partHits - 2);
+  }
+  return Math.min(12, boost);
+}
+
+function hasAtlasExactFilenameMention(filePath: string, normalizedQuery: string): boolean {
+  const normalizedPath = normalizeAtlasRepoPath(filePath).toLowerCase();
+  if (!normalizedPath) return false;
+  const baseName = path.posix.basename(normalizedPath).toLowerCase();
+  if (!baseName) return false;
+  return normalizedQuery.includes(baseName);
+}
+
 async function collectAtlasCandidatesForQuery(
   query: string,
   question: string,
@@ -8325,7 +8462,10 @@ async function collectAtlasCandidatesForQuery(
   const allowlist = options?.allowlist ?? [];
   const avoidlist = options?.avoidlist ?? [];
   const limit = Math.max(1, options?.limit ?? 6);
-  const queryTokens = new Set(filterSignalTokens(tokenizeAskQuery(`${query} ${question}`)));
+  const queryText = `${query} ${question}`.trim();
+  const queryTokens = buildAtlasQueryTokenSet(queryText);
+  const normalizedQuery = queryText.toLowerCase();
+  const isValidRepoFilePath = buildAtlasRepoFilePathValidator();
   const byPath = new Map<string, AskCandidate>();
   const upsert = (candidate: AskCandidate) => {
     const existing = byPath.get(candidate.filePath);
@@ -8333,8 +8473,10 @@ async function collectAtlasCandidatesForQuery(
       byPath.set(candidate.filePath, candidate);
     }
   };
-  const atlasCorpusSet = new Set(files.map((entry) => entry.toLowerCase()));
-  for (const filePath of files) {
+  const atlasCorpusSet = new Set(files.map((entry) => normalizeAtlasRepoPath(entry).toLowerCase()).filter(Boolean));
+  for (const filePathRaw of files) {
+    const filePath = normalizeAtlasRepoPath(filePathRaw);
+    if (!isValidRepoFilePath(filePath)) continue;
     if (allowlist.length > 0 && !pathMatchesAny(filePath, allowlist)) continue;
     if (avoidlist.length > 0 && pathMatchesAny(filePath, avoidlist)) continue;
     const parts = filePath.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -8342,8 +8484,11 @@ async function collectAtlasCandidatesForQuery(
     for (const token of parts) {
       if (queryTokens.has(token)) hits += 1;
     }
-    if (hits <= 0) continue;
-    const score = applyAskNodeBoosts(4 + hits * 2, filePath, question, options?.topicProfile);
+    const exactFilenameMention = hasAtlasExactFilenameMention(filePath, normalizedQuery);
+    const filenameBoost = scoreAtlasFilenameIntent(filePath, normalizedQuery, queryTokens);
+    if (hits <= 0 && filenameBoost <= 0) continue;
+    const baseScore = exactFilenameMention ? HELIX_ASK_ATLAS_FILENAME_MATCH_BASE_SCORE : 4 + hits * 2 + filenameBoost;
+    const score = applyAskNodeBoosts(baseScore, filePath, question, options?.topicProfile);
     upsert({
       filePath,
       preview: `Atlas lane candidate: ${filePath}`,
@@ -8362,8 +8507,9 @@ async function collectAtlasCandidatesForQuery(
         limit: graphLimit,
       });
       for (const hit of graphResult.hits ?? []) {
-        const filePath = String(hit.file_path ?? hit.path ?? "").trim().replace(/\\/g, "/");
+        const filePath = normalizeAtlasRepoPath(String(hit.file_path ?? hit.path ?? "").trim());
         if (!filePath) continue;
+        if (!isValidRepoFilePath(filePath)) continue;
         if (allowlist.length > 0 && !pathMatchesAny(filePath, allowlist)) continue;
         if (avoidlist.length > 0 && pathMatchesAny(filePath, avoidlist)) continue;
         const pathTokens = filePath.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -8371,8 +8517,10 @@ async function collectAtlasCandidatesForQuery(
         for (const token of pathTokens) {
           if (queryTokens.has(token)) tokenHits += 1;
         }
+        const exactFilenameMention = hasAtlasExactFilenameMention(filePath, normalizedQuery);
+        const filenameBoost = scoreAtlasFilenameIntent(filePath, normalizedQuery, queryTokens);
         const atlasMembershipBoost = atlasCorpusSet.has(filePath.toLowerCase()) ? 4 : 0;
-        if (atlasMembershipBoost <= 0 && tokenHits <= 0) continue;
+        if (atlasMembershipBoost <= 0 && tokenHits <= 0 && filenameBoost <= 0) continue;
         const graphScore = Number.isFinite(hit.score) ? hit.score : 0;
         if (graphScore <= 0) continue;
         const symbolName = String((hit as { symbol_name?: unknown }).symbol_name ?? "").trim();
@@ -8387,8 +8535,9 @@ async function collectAtlasCandidatesForQuery(
         });
         const runtimeBoost = runtimeLink ? HELIX_ASK_ATLAS_GRAPH_RUNTIME_LINK_BOOST : 0;
         const edgeTypeBoost = Math.min(1.5, edgeTypes.length * 0.3);
+        const exactFilenameBoost = exactFilenameMention ? HELIX_ASK_ATLAS_FILENAME_MATCH_BASE_SCORE * 0.5 : 0;
         const score = applyAskNodeBoosts(
-          4 + graphScore * 4 + tokenHits + atlasMembershipBoost + runtimeBoost + edgeTypeBoost,
+          4 + graphScore * 4 + tokenHits + atlasMembershipBoost + runtimeBoost + edgeTypeBoost + filenameBoost + exactFilenameBoost,
           filePath,
           question,
           options?.topicProfile,
