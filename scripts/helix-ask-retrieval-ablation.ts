@@ -242,7 +242,6 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), ASK_TIMEOUT_MS);
       const res = await fetch(askUrl, { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ question: task.prompt, dryRun:true, debug:true, topK:TOP_K, seed, temperature, sessionId:`retrieval-ablation:${task.id}:${seed}:${temperature}` }), signal: controller.signal });
-      clearTimeout(timeout);
       payload = (await res.json()) as {
         debug?: {
           context_files?: unknown;
@@ -253,7 +252,9 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
         };
       };
       break;
-    } catch { await sleep(500 * (attempt + 1)); }
+    } catch {
+      await sleep(500 * (attempt + 1));
+    }
   }
   if (!payload) {
     return {
@@ -373,6 +374,46 @@ const summarize = (results: TaskResult[], canonical: boolean): ScenarioMetrics =
   };
 };
 
+const withTimeout = async <T>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+  let timeoutHandle: NodeJS.Timeout | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => reject(new Error(`${label}:watchdog_timeout_ms=${ms}`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+};
+
+
+const inferStageFaultMatrix = (variant: any) => {
+  const tasks = variant?.diagnostics?.mismatch_reasons ?? [];
+  const total = tasks.length || 1;
+  const reasonCount = (name: string) => tasks.reduce((n: number, t: any) => n + (Array.isArray(t.mismatchReasons) ? t.mismatchReasons.filter((r: any) => r.reason === name).length : 0), 0);
+  const retrieval = reasonCount("retrieval_miss") / total;
+  const candidateFiltering = reasonCount("alias_unmapped") / total;
+  const rerank = reasonCount("path_form_mismatch") / total;
+  const synthesisPacking = reasonCount("context_shape_mismatch") / total;
+  const finalCleanup = Math.max(0, 1 - Math.min(1, retrieval + candidateFiltering + rerank + synthesisPacking));
+  return {
+    retrieval,
+    candidate_filtering: candidateFiltering,
+    rerank,
+    synthesis_packing: synthesisPacking,
+    final_cleanup: finalCleanup,
+  };
+};
+
+const classifyFaultOwner = (matrix: { retrieval: number; candidate_filtering: number; rerank: number; synthesis_packing: number; final_cleanup: number }) => {
+  const retrievalMass = matrix.retrieval;
+  const routingMass = matrix.candidate_filtering;
+  const postProcessingMass = matrix.rerank + matrix.synthesis_packing + matrix.final_cleanup;
+  if (retrievalMass >= routingMass && retrievalMass >= postProcessingMass) return "retrieval";
+  if (routingMass >= postProcessingMass) return "routing";
+  return "post_processing";
+};
+
 const main = async () => {
   const corpus = JSON.parse(await fs.readFile(CORPUS_PATH, "utf8")) as Corpus;
   const tasks = [...corpus.tasks].sort((a,b)=>a.id.localeCompare(b.id));
@@ -470,7 +511,15 @@ const main = async () => {
           },
           mismatch_taxonomy_counts: mismatchCounts,
           mismatch_reasons: flattenedTaskResults.filter((task) => task.mismatchReasons.length > 0),
-        },
+        };
+      const stage_fault_matrix = inferStageFaultMatrix({ diagnostics });
+      const fault_owner = classifyFaultOwner(stage_fault_matrix);
+      score.variants[variant.name]={
+        scenarios,
+        aggregate,
+        diagnostics,
+        stage_fault_matrix,
+        fault_owner,
       };
       await fs.writeFile(path.join(outDir,`${variant.name}.json`),JSON.stringify(score.variants[variant.name],null,2)+"\n");
     } catch (error) {
@@ -629,21 +678,26 @@ const main = async () => {
   const jsonPath="reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.json";
   const mdPath="reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.md";
   await fs.writeFile(path.join(outDir,"summary.comparison.json"),JSON.stringify(score,null,2)+"\n");
-  await fs.writeFile(jsonPath,JSON.stringify(score,null,2)+"\n");
+  if (score.run_complete) {
+    await fs.writeFile(jsonPath,JSON.stringify(score,null,2)+"\n");
+  } else {
+    await fs.writeFile(path.join(outDir,"scorecard.partial.json"),JSON.stringify(score,null,2)+"\n");
+  }
   const rows=Object.entries(score.variants).map(([name,v]:any)=>`| ${name} | ${v.aggregate.gold_file_recall_at_10.point_estimate.toFixed(6)} | ${v.aggregate.gold_file_recall_at_10.ci95.low.toFixed(6)} | ${v.aggregate.gold_file_recall_at_10.ci95.high.toFixed(6)} | ${v.diagnostics.unmatched_expected_file_rate.toFixed(6)} |`);
-  await fs.writeFile(
-    mdPath,
-    [
+  const mdContent = [
       `# Helix Ask Retrieval Ablation Scorecard (2026-03-03)`,
       "",
       `Run: ${runId}`,
       `run_complete=${score.run_complete}`,
       "",
+      `run_complete=${score.run_complete}`,
+      ...(score.blocked ? [`blocked=${JSON.stringify(score.blocked)}`, ""] : []),
       "| Variant | recall@10 point | ci95 low | ci95 high | unmatched_expected_file_rate |",
       "| --- | ---: | ---: | ---: | ---: |",
       ...rows,
       "",
       `Driver verdict: retrieval_lift_proven=${score.driver_verdict.retrieval_lift_proven}, dominant_channel=${score.driver_verdict.dominant_channel}.`,
+      `Attribution guard: lane_ablation_delta_positive=${score.driver_verdict.attribution_guard.lane_ablation_delta_positive}, bounded_confidence=${score.driver_verdict.attribution_guard.bounded_confidence}, fault_owner_retrieval=${score.driver_verdict.attribution_guard.fault_owner_retrieval}.`,
       `Contributions: atlas=${score.driver_verdict.contributions.atlas.toFixed(6)}, git_tracked=${score.driver_verdict.contributions.git_tracked.toFixed(6)}.`,
       `Strict gate: positive_lane_ablation_delta=${score.driver_verdict.strict_gate.positive_lane_ablation_delta}, bounded_confidence=${score.driver_verdict.strict_gate.bounded_confidence}, fault_owner_points_to_retrieval=${score.driver_verdict.strict_gate.fault_owner_points_to_retrieval}.`,
       "",
