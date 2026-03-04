@@ -15,6 +15,56 @@ Per-patch validation order:
 CI enforcement:
 - `.github/workflows/casimir-verify.yml` runs `helix:ask:patch-probe:strict` before Casimir verify.
 
+## Attribution Policy Update (v2)
+This plan now uses a strict attribution contract so quality lifts are not
+misattributed to retrieval when they are caused by post-retrieval processing.
+
+### Evidence ledger split (required)
+Keep two ledgers separate until synthesis:
+1. `external_frontier_evidence`
+- papers, benchmark docs, official documentation
+2. `repo_forensic_evidence`
+- repo code, repo docs, run artifacts, reports
+
+Rule:
+- implementation-state claims must be led by repo evidence, not frontier claims.
+
+### Claim typing contract (required)
+Every non-trivial claim in attribution reports must be labeled:
+1. `FACT-EXT`
+2. `FACT-REPO`
+3. `INFERENCE`
+4. `RECOMMENDATION`
+
+And for each claim include:
+1. evidence IDs
+2. confidence (`high|medium|low`)
+3. contradiction flag (`yes|no`)
+
+Unknowns must be reported as `UNKNOWN` (no guess fill).
+
+### Regression comparison gate (required)
+For every retrieval patch cycle, compare:
+1. latest run
+2. immediately previous run
+3. anchored historical delta for March 2, 2026 to March 3, 2026 when artifacts exist
+
+No promotion claim may rely on a single run snapshot.
+
+### Recommendation mapping contract (required)
+Every recommendation must map to:
+1. exact file path(s)
+2. function/class/symbol targets when discoverable
+3. test target(s)
+4. expected metric impact
+
+### Replayability contract (required)
+Attribution evidence must remain replayable with:
+1. `commit_sha`
+2. `evidence_ids`
+3. `routing_decision`
+4. `gate_outcome`
+
 ## Decision Log (From Current Discussion)
 1. Do not rely on manually enumerating every concept alias up front.
 2. Add an intent-semantic categorization layer (deterministic scorer plus optional LLM root classifier) to infer likely root families.
@@ -88,6 +138,23 @@ Role split:
 - gates: answer integrity and policy enforcement
 
 ## Workstreams
+### WS0 - Attribution and Measurement Hardening
+Goal:
+- make retrieval causality claims testable and replayable
+
+Tasks:
+- enforce two-ledger evidence separation in attribution reports
+- enforce claim typing (`FACT-EXT|FACT-REPO|INFERENCE|RECOMMENDATION`)
+- run latest vs previous run comparison with March 2 to March 3 anchor
+- enforce file/symbol/test mapping for each recommended change
+- keep replayability fields in every decision bundle
+
+Primary files:
+- `docs/helix-ask-retrieval-objective-resolution-plan-2026-03-03.md`
+- `docs/runbooks/helix-ask-retrieval-attribution-ablation-2026-03-03.md`
+- `reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.json`
+- `reports/helix-ask-retrieval-attribution-go-no-go-2026-03-03.md`
+
 ### WS1 - Repro and Baseline
 Goal:
 - lock deterministic failing cases and baseline metrics
@@ -168,6 +235,40 @@ Tasks:
 - targeted misroute suite (social prompts, ideology prompts, hybrid prompts)
 - canary rollout with shadow scoring and mismatch logs
 
+## Strict Decision Fork (Post-Run)
+After each retrieval attribution sweep, choose the next build wave using this
+strict fork:
+
+1. If `unmatched_expected_file_rate > 0.6`:
+- next wave is `Eval-Fidelity v2`
+- priority focus: path canonicalization, alias expansion, evidence-id
+  normalization, per-stage mismatch diagnostics
+
+2. Else if `gold_file_recall_at_10 < 0.10` or
+   `consequential_file_retention < 0.20`:
+- next wave is `Coverage-Adaptive Retrieval`
+- priority focus: continue retrieval until marginal slot/evidence gain stalls
+
+3. Else:
+- next wave is `Rerank + Packing Convergence`
+- priority focus: graph-path support, symbol overlap, slot-gain weighting,
+  consequential-file retention floor
+
+4. Retrieval-lift claim policy:
+- `retrieval_lift_proven` may be `yes` only when lane-ablation deltas are
+  positive with bounded confidence and stage-fault attribution points to
+  retrieval rather than post-processing.
+
+Current branch decision anchor (latest merged sweep):
+1. merge commit: `d4e262dd`
+2. scorecard run id: `retrieval-ablation-1772584380302`
+3. `retrieval_lift_proven=no`
+4. `dominant_channel=none`
+5. `unmatched_expected_file_rate=1.0`
+
+Result:
+- next required wave is `Eval-Fidelity v2` before any retrieval-lift claim.
+
 ## Acceptance Criteria
 Mandatory for this malfunction class:
 1. The reproduced failing prompt no longer routes to physics concept first unless explicitly physics-framed.
@@ -182,14 +283,32 @@ Mandatory for this malfunction class:
 6. No regression in existing repo-tech and physics prompt suites.
 
 ## Metrics
-Track before/after:
-- route correctness for social/ideology family
-- concept false-positive rate
-- retrieval domain diversity score
-- grounded citation rate
-- `coverage_ratio`
-- `belief_unsupported_rate`
-- clarifications/fail-closed rate
+Use these definitions explicitly in scorecards and readiness decisions:
+1. `route_correctness_by_family`
+- selected intent family is correct before synthesis
+2. `intent_correctness`
+- final chosen intent matches the task
+3. `citation_link_rate`
+- factual claims retaining valid citations after cleanup
+4. `unsupported_claim_rate`
+- unsupported factual claims / total factual claims
+5. `coverage_ratio`
+- supported required facets / expected required facets
+6. `fallback_leakage`
+- fallback/open-world behavior despite sufficient repo evidence
+7. `consequential_file_retention`
+- second-order critical files retained through rerank into synthesis context
+8. `call_count_distribution`
+- retrieval/search/tool call counts including tail behavior
+9. `p50_latency` and `p95_latency`
+
+Attribution diagnostics (required):
+1. `stage_fault_matrix`
+- retrieval -> candidate filtering -> rerank -> synthesis packing -> final cleanup
+2. `fault_owner`
+- classify each failure as `routing`, `retrieval`, or `post_processing`
+3. `retrieval_lift_proven`
+- only true when retrieval metrics improve vs lane-ablation controls with bounded confidence
 
 ## Rollout Plan
 Phase 0:
@@ -232,3 +351,9 @@ Mitigation:
 3. Whole-repo recall path is active by design (Atlas + git lane + index/lattice).
 4. Answer-time gates still enforce grounded output quality.
 5. Casimir verification and integrity checks pass for merged patch.
+6. Attribution report passes v2 contract:
+- two evidence ledgers
+- claim typing + confidence + contradiction flags
+- run-over-run comparison (latest vs previous, with March 2 to March 3 anchor where available)
+- recommendation mapping to file/symbol/test/metric impact
+- replayability fields (`commit_sha`, `evidence_ids`, `routing_decision`, `gate_outcome`)
