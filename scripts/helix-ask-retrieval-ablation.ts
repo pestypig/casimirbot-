@@ -387,10 +387,24 @@ const withTimeout = async <T>(promise: Promise<T>, ms: number, label: string): P
 };
 
 
+const parseMismatchReason = (reason: unknown): string | null => {
+  if (typeof reason !== "string") return null;
+  const segments = reason.split(":");
+  return segments.length ? segments[segments.length - 1] ?? null : null;
+};
+
 const inferStageFaultMatrix = (variant: any) => {
   const tasks = variant?.diagnostics?.mismatch_reasons ?? [];
   const total = tasks.length || 1;
-  const reasonCount = (name: string) => tasks.reduce((n: number, t: any) => n + (Array.isArray(t.mismatchReasons) ? t.mismatchReasons.filter((r: any) => r.reason === name).length : 0), 0);
+  const reasonCount = (name: string) =>
+    tasks.reduce(
+      (n: number, t: any) =>
+        n +
+        (Array.isArray(t.mismatchReasons)
+          ? t.mismatchReasons.filter((r: any) => parseMismatchReason(r) === name).length
+          : 0),
+      0,
+    );
   const retrieval = reasonCount("retrieval_miss") / total;
   const candidateFiltering = reasonCount("alias_unmapped") / total;
   const rerank = reasonCount("path_form_mismatch") / total;

@@ -55,7 +55,7 @@ Execution lock for this wave:
 - status: blocked (deterministic)
 - required command executed with target settings:
   - `HELIX_ASK_RETRIEVAL_MAX_TASKS=40 HELIX_ASK_RETRIEVAL_SEEDS=7,11,13 HELIX_ASK_RETRIEVAL_TEMPERATURES=0.2 npm run helix:ask:retrieval:ablation`
-- blocked artifact run id: `retrieval-ablation-1772589415848`
+- blocked artifact run id: `retrieval-ablation-1772596117022`
 - blocked reason:
   - `variant_failed:baseline_atlas_git_on:watchdog_timeout:variant:baseline_atlas_git_on:seed:7:temp:0.2:120000ms`
 - completion state:
