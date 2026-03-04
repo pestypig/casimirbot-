@@ -1,14 +1,17 @@
 {
-  "runId": "retrieval-ablation-1772584380302",
-  "generatedAt": "2026-03-04T00:33:00.302Z",
+  "runId": "retrieval-ablation-1772588895208",
+  "generatedAt": "2026-03-04T01:48:15.208Z",
   "seeds": [
-    7,
-    11,
-    13
+    7
   ],
   "temperatures": [
     0.2
   ],
+  "maxTasks": 2,
+  "expectedTaskCount": 2,
+  "expectedScenarioCount": 4,
+  "run_complete": true,
+  "blocked_reason": null,
   "variants": {
     "baseline_atlas_git_on": {
       "scenarios": [
@@ -20,7 +23,7 @@
             "gold_file_recall_at_10": 0,
             "consequential_file_retention_rate": 0,
             "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
+            "graph_edge_hit_rate": 0.5,
             "retrieval_confidence_mean": 0.6500000000000001,
             "retrieval_doc_share_mean": 0.058823529411764705,
             "unmatched_expected_file_rate": 1
@@ -30,7 +33,7 @@
             "gold_file_recall_at_10": 0,
             "consequential_file_retention_rate": 0,
             "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
+            "graph_edge_hit_rate": 0.5,
             "retrieval_confidence_mean": 0.6500000000000001,
             "retrieval_doc_share_mean": 0.058823529411764705,
             "unmatched_expected_file_rate": 1
@@ -41,25 +44,8 @@
               "expected_files": [
                 "server/horizons-proxy.ts"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
+              "top5": [],
+              "top10": [],
               "rawHits5": 0,
               "rawHits10": 0,
               "canonHits5": 0,
@@ -68,11 +54,18 @@
               "canonRR": 0,
               "mode": "none",
               "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
+                "server/horizons-proxy.ts:retrieval_miss"
               ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.058823529411764705
+              "mismatchTaxonomy": [
+                "retrieval_miss"
+              ],
+              "expectedNormalized": [
+                "server/horizons-proxy.ts"
+              ],
+              "retrievedNormalizedTop10": [],
+              "graphEdgeHit": false,
+              "confidence": null,
+              "docShare": null
             },
             {
               "taskId": "atlas_task_002",
@@ -106,89 +99,15 @@
               "canonRR": 0,
               "mode": "none",
               "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
+                "server/utils/horizons-proxy.ts:retrieval_miss"
               ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.058823529411764705
-            }
-          ]
-        },
-        {
-          "seed": 11,
-          "temperature": 0.2,
-          "raw_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.058823529411764705,
-            "unmatched_expected_file_rate": 1
-          },
-          "canonicalized_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.058823529411764705,
-            "unmatched_expected_file_rate": 1
-          },
-          "task_results": [
-            {
-              "taskId": "atlas_task_001",
-              "expected_files": [
-                "server/horizons-proxy.ts"
+              "mismatchTaxonomy": [
+                "retrieval_miss"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
-              ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.058823529411764705
-            },
-            {
-              "taskId": "atlas_task_002",
-              "expected_files": [
+              "expectedNormalized": [
                 "server/utils/horizons-proxy.ts"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
+              "retrievedNormalizedTop10": [
                 "modules/core/physics-constants.ts",
                 "server/helix-core.ts",
                 "modules/dynamic/dynamic-casimir.ts",
@@ -198,119 +117,7 @@
                 "server/auth/jwt.ts",
                 "server/config/knowledge.ts",
                 "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
-              ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.058823529411764705
-            }
-          ]
-        },
-        {
-          "seed": 13,
-          "temperature": 0.2,
-          "raw_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.058823529411764705,
-            "unmatched_expected_file_rate": 1
-          },
-          "canonicalized_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.058823529411764705,
-            "unmatched_expected_file_rate": 1
-          },
-          "task_results": [
-            {
-              "taskId": "atlas_task_001",
-              "expected_files": [
-                "server/horizons-proxy.ts"
-              ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
-              ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.058823529411764705
-            },
-            {
-              "taskId": "atlas_task_002",
-              "expected_files": [
-                "server/utils/horizons-proxy.ts"
-              ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
+                "client/src/lib/docs/docmanifest.ts"
               ],
               "graphEdgeHit": true,
               "confidence": 0.6500000000000001,
@@ -349,10 +156,10 @@
           }
         },
         "graph_edge_hit_rate": {
-          "point_estimate": 1,
+          "point_estimate": 0.5,
           "ci95": {
-            "low": 1,
-            "high": 1
+            "low": 0.5,
+            "high": 0.5
           }
         },
         "retrieval_confidence_mean": {
@@ -363,10 +170,10 @@
           }
         },
         "retrieval_doc_share_mean": {
-          "point_estimate": 0.0588235294117647,
+          "point_estimate": 0.058823529411764705,
           "ci95": {
-            "low": 0.0588235294117647,
-            "high": 0.0588235294117647
+            "low": 0.058823529411764705,
+            "high": 0.058823529411764705
           }
         },
         "unmatched_expected_file_rate": {
@@ -383,7 +190,7 @@
           "exact": 0,
           "normalized": 0,
           "alias": 0,
-          "none": 6
+          "none": 2
         },
         "mismatch_reasons": [
           {
@@ -392,8 +199,15 @@
             "taskId": "atlas_task_001",
             "mode": "none",
             "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
-            ]
+              "server/horizons-proxy.ts:retrieval_miss"
+            ],
+            "mismatchTaxonomy": [
+              "retrieval_miss"
+            ],
+            "expectedNormalized": [
+              "server/horizons-proxy.ts"
+            ],
+            "retrievedNormalizedTop10": []
           },
           {
             "seed": 7,
@@ -401,43 +215,25 @@
             "taskId": "atlas_task_002",
             "mode": "none",
             "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 11,
-            "temperature": 0.2,
-            "taskId": "atlas_task_001",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 11,
-            "temperature": 0.2,
-            "taskId": "atlas_task_002",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 13,
-            "temperature": 0.2,
-            "taskId": "atlas_task_001",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 13,
-            "temperature": 0.2,
-            "taskId": "atlas_task_002",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
+              "server/utils/horizons-proxy.ts:retrieval_miss"
+            ],
+            "mismatchTaxonomy": [
+              "retrieval_miss"
+            ],
+            "expectedNormalized": [
+              "server/utils/horizons-proxy.ts"
+            ],
+            "retrievedNormalizedTop10": [
+              "modules/core/physics-constants.ts",
+              "server/helix-core.ts",
+              "modules/dynamic/dynamic-casimir.ts",
+              "modules/sim_core/static-casimir.ts",
+              "modules/warp/natario-warp.ts",
+              "server/db/agi.ts",
+              "server/auth/jwt.ts",
+              "server/config/knowledge.ts",
+              "shared/schema.ts",
+              "client/src/lib/docs/docmanifest.ts"
             ]
           }
         ]
@@ -453,7 +249,7 @@
             "gold_file_recall_at_10": 0,
             "consequential_file_retention_rate": 0,
             "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
+            "graph_edge_hit_rate": 0.5,
             "retrieval_confidence_mean": 0.6500000000000001,
             "retrieval_doc_share_mean": 0.058823529411764705,
             "unmatched_expected_file_rate": 1
@@ -463,7 +259,7 @@
             "gold_file_recall_at_10": 0,
             "consequential_file_retention_rate": 0,
             "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
+            "graph_edge_hit_rate": 0.5,
             "retrieval_confidence_mean": 0.6500000000000001,
             "retrieval_doc_share_mean": 0.058823529411764705,
             "unmatched_expected_file_rate": 1
@@ -474,25 +270,8 @@
               "expected_files": [
                 "server/horizons-proxy.ts"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
+              "top5": [],
+              "top10": [],
               "rawHits5": 0,
               "rawHits10": 0,
               "canonHits5": 0,
@@ -501,11 +280,18 @@
               "canonRR": 0,
               "mode": "none",
               "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
+                "server/horizons-proxy.ts:retrieval_miss"
               ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.058823529411764705
+              "mismatchTaxonomy": [
+                "retrieval_miss"
+              ],
+              "expectedNormalized": [
+                "server/horizons-proxy.ts"
+              ],
+              "retrievedNormalizedTop10": [],
+              "graphEdgeHit": false,
+              "confidence": null,
+              "docShare": null
             },
             {
               "taskId": "atlas_task_002",
@@ -539,89 +325,15 @@
               "canonRR": 0,
               "mode": "none",
               "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
+                "server/utils/horizons-proxy.ts:retrieval_miss"
               ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.058823529411764705
-            }
-          ]
-        },
-        {
-          "seed": 11,
-          "temperature": 0.2,
-          "raw_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.058823529411764705,
-            "unmatched_expected_file_rate": 1
-          },
-          "canonicalized_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.058823529411764705,
-            "unmatched_expected_file_rate": 1
-          },
-          "task_results": [
-            {
-              "taskId": "atlas_task_001",
-              "expected_files": [
-                "server/horizons-proxy.ts"
+              "mismatchTaxonomy": [
+                "retrieval_miss"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
-              ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.058823529411764705
-            },
-            {
-              "taskId": "atlas_task_002",
-              "expected_files": [
+              "expectedNormalized": [
                 "server/utils/horizons-proxy.ts"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
+              "retrievedNormalizedTop10": [
                 "modules/core/physics-constants.ts",
                 "server/helix-core.ts",
                 "modules/dynamic/dynamic-casimir.ts",
@@ -631,119 +343,7 @@
                 "server/auth/jwt.ts",
                 "server/config/knowledge.ts",
                 "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
-              ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.058823529411764705
-            }
-          ]
-        },
-        {
-          "seed": 13,
-          "temperature": 0.2,
-          "raw_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.058823529411764705,
-            "unmatched_expected_file_rate": 1
-          },
-          "canonicalized_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.058823529411764705,
-            "unmatched_expected_file_rate": 1
-          },
-          "task_results": [
-            {
-              "taskId": "atlas_task_001",
-              "expected_files": [
-                "server/horizons-proxy.ts"
-              ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
-              ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.058823529411764705
-            },
-            {
-              "taskId": "atlas_task_002",
-              "expected_files": [
-                "server/utils/horizons-proxy.ts"
-              ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
+                "client/src/lib/docs/docmanifest.ts"
               ],
               "graphEdgeHit": true,
               "confidence": 0.6500000000000001,
@@ -782,10 +382,10 @@
           }
         },
         "graph_edge_hit_rate": {
-          "point_estimate": 1,
+          "point_estimate": 0.5,
           "ci95": {
-            "low": 1,
-            "high": 1
+            "low": 0.5,
+            "high": 0.5
           }
         },
         "retrieval_confidence_mean": {
@@ -796,10 +396,10 @@
           }
         },
         "retrieval_doc_share_mean": {
-          "point_estimate": 0.0588235294117647,
+          "point_estimate": 0.058823529411764705,
           "ci95": {
-            "low": 0.0588235294117647,
-            "high": 0.0588235294117647
+            "low": 0.058823529411764705,
+            "high": 0.058823529411764705
           }
         },
         "unmatched_expected_file_rate": {
@@ -816,7 +416,7 @@
           "exact": 0,
           "normalized": 0,
           "alias": 0,
-          "none": 6
+          "none": 2
         },
         "mismatch_reasons": [
           {
@@ -825,8 +425,15 @@
             "taskId": "atlas_task_001",
             "mode": "none",
             "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
-            ]
+              "server/horizons-proxy.ts:retrieval_miss"
+            ],
+            "mismatchTaxonomy": [
+              "retrieval_miss"
+            ],
+            "expectedNormalized": [
+              "server/horizons-proxy.ts"
+            ],
+            "retrievedNormalizedTop10": []
           },
           {
             "seed": 7,
@@ -834,43 +441,25 @@
             "taskId": "atlas_task_002",
             "mode": "none",
             "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 11,
-            "temperature": 0.2,
-            "taskId": "atlas_task_001",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 11,
-            "temperature": 0.2,
-            "taskId": "atlas_task_002",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 13,
-            "temperature": 0.2,
-            "taskId": "atlas_task_001",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 13,
-            "temperature": 0.2,
-            "taskId": "atlas_task_002",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
+              "server/utils/horizons-proxy.ts:retrieval_miss"
+            ],
+            "mismatchTaxonomy": [
+              "retrieval_miss"
+            ],
+            "expectedNormalized": [
+              "server/utils/horizons-proxy.ts"
+            ],
+            "retrievedNormalizedTop10": [
+              "modules/core/physics-constants.ts",
+              "server/helix-core.ts",
+              "modules/dynamic/dynamic-casimir.ts",
+              "modules/sim_core/static-casimir.ts",
+              "modules/warp/natario-warp.ts",
+              "server/db/agi.ts",
+              "server/auth/jwt.ts",
+              "server/config/knowledge.ts",
+              "shared/schema.ts",
+              "client/src/lib/docs/docmanifest.ts"
             ]
           }
         ]
@@ -934,89 +523,15 @@
               "canonRR": 0,
               "mode": "none",
               "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
+                "server/horizons-proxy.ts:retrieval_miss"
               ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.05555555555555555
-            },
-            {
-              "taskId": "atlas_task_002",
-              "expected_files": [
-                "server/utils/horizons-proxy.ts"
+              "mismatchTaxonomy": [
+                "retrieval_miss"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
-              ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.05555555555555555
-            }
-          ]
-        },
-        {
-          "seed": 11,
-          "temperature": 0.2,
-          "raw_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.05555555555555555,
-            "unmatched_expected_file_rate": 1
-          },
-          "canonicalized_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.05555555555555555,
-            "unmatched_expected_file_rate": 1
-          },
-          "task_results": [
-            {
-              "taskId": "atlas_task_001",
-              "expected_files": [
+              "expectedNormalized": [
                 "server/horizons-proxy.ts"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
+              "retrievedNormalizedTop10": [
                 "modules/core/physics-constants.ts",
                 "server/helix-core.ts",
                 "modules/dynamic/dynamic-casimir.ts",
@@ -1026,17 +541,7 @@
                 "server/auth/jwt.ts",
                 "server/config/knowledge.ts",
                 "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
+                "client/src/lib/docs/docmanifest.ts"
               ],
               "graphEdgeHit": true,
               "confidence": 0.6500000000000001,
@@ -1074,89 +579,15 @@
               "canonRR": 0,
               "mode": "none",
               "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
+                "server/utils/horizons-proxy.ts:retrieval_miss"
               ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.05555555555555555
-            }
-          ]
-        },
-        {
-          "seed": 13,
-          "temperature": 0.2,
-          "raw_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.05555555555555555,
-            "unmatched_expected_file_rate": 1
-          },
-          "canonicalized_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.05555555555555555,
-            "unmatched_expected_file_rate": 1
-          },
-          "task_results": [
-            {
-              "taskId": "atlas_task_001",
-              "expected_files": [
-                "server/horizons-proxy.ts"
+              "mismatchTaxonomy": [
+                "retrieval_miss"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
-              ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.05555555555555555
-            },
-            {
-              "taskId": "atlas_task_002",
-              "expected_files": [
+              "expectedNormalized": [
                 "server/utils/horizons-proxy.ts"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
+              "retrievedNormalizedTop10": [
                 "modules/core/physics-constants.ts",
                 "server/helix-core.ts",
                 "modules/dynamic/dynamic-casimir.ts",
@@ -1166,17 +597,7 @@
                 "server/auth/jwt.ts",
                 "server/config/knowledge.ts",
                 "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
+                "client/src/lib/docs/docmanifest.ts"
               ],
               "graphEdgeHit": true,
               "confidence": 0.6500000000000001,
@@ -1249,7 +670,7 @@
           "exact": 0,
           "normalized": 0,
           "alias": 0,
-          "none": 6
+          "none": 2
         },
         "mismatch_reasons": [
           {
@@ -1258,7 +679,25 @@
             "taskId": "atlas_task_001",
             "mode": "none",
             "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
+              "server/horizons-proxy.ts:retrieval_miss"
+            ],
+            "mismatchTaxonomy": [
+              "retrieval_miss"
+            ],
+            "expectedNormalized": [
+              "server/horizons-proxy.ts"
+            ],
+            "retrievedNormalizedTop10": [
+              "modules/core/physics-constants.ts",
+              "server/helix-core.ts",
+              "modules/dynamic/dynamic-casimir.ts",
+              "modules/sim_core/static-casimir.ts",
+              "modules/warp/natario-warp.ts",
+              "server/db/agi.ts",
+              "server/auth/jwt.ts",
+              "server/config/knowledge.ts",
+              "shared/schema.ts",
+              "client/src/lib/docs/docmanifest.ts"
             ]
           },
           {
@@ -1267,43 +706,25 @@
             "taskId": "atlas_task_002",
             "mode": "none",
             "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 11,
-            "temperature": 0.2,
-            "taskId": "atlas_task_001",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 11,
-            "temperature": 0.2,
-            "taskId": "atlas_task_002",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 13,
-            "temperature": 0.2,
-            "taskId": "atlas_task_001",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 13,
-            "temperature": 0.2,
-            "taskId": "atlas_task_002",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
+              "server/utils/horizons-proxy.ts:retrieval_miss"
+            ],
+            "mismatchTaxonomy": [
+              "retrieval_miss"
+            ],
+            "expectedNormalized": [
+              "server/utils/horizons-proxy.ts"
+            ],
+            "retrievedNormalizedTop10": [
+              "modules/core/physics-constants.ts",
+              "server/helix-core.ts",
+              "modules/dynamic/dynamic-casimir.ts",
+              "modules/sim_core/static-casimir.ts",
+              "modules/warp/natario-warp.ts",
+              "server/db/agi.ts",
+              "server/auth/jwt.ts",
+              "server/config/knowledge.ts",
+              "shared/schema.ts",
+              "client/src/lib/docs/docmanifest.ts"
             ]
           }
         ]
@@ -1367,89 +788,15 @@
               "canonRR": 0,
               "mode": "none",
               "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
+                "server/horizons-proxy.ts:retrieval_miss"
               ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.05555555555555555
-            },
-            {
-              "taskId": "atlas_task_002",
-              "expected_files": [
-                "server/utils/horizons-proxy.ts"
+              "mismatchTaxonomy": [
+                "retrieval_miss"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
-              ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.05555555555555555
-            }
-          ]
-        },
-        {
-          "seed": 11,
-          "temperature": 0.2,
-          "raw_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.05555555555555555,
-            "unmatched_expected_file_rate": 1
-          },
-          "canonicalized_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.05555555555555555,
-            "unmatched_expected_file_rate": 1
-          },
-          "task_results": [
-            {
-              "taskId": "atlas_task_001",
-              "expected_files": [
+              "expectedNormalized": [
                 "server/horizons-proxy.ts"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
+              "retrievedNormalizedTop10": [
                 "modules/core/physics-constants.ts",
                 "server/helix-core.ts",
                 "modules/dynamic/dynamic-casimir.ts",
@@ -1459,17 +806,7 @@
                 "server/auth/jwt.ts",
                 "server/config/knowledge.ts",
                 "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
+                "client/src/lib/docs/docmanifest.ts"
               ],
               "graphEdgeHit": true,
               "confidence": 0.6500000000000001,
@@ -1507,89 +844,15 @@
               "canonRR": 0,
               "mode": "none",
               "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
+                "server/utils/horizons-proxy.ts:retrieval_miss"
               ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.05555555555555555
-            }
-          ]
-        },
-        {
-          "seed": 13,
-          "temperature": 0.2,
-          "raw_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.05555555555555555,
-            "unmatched_expected_file_rate": 1
-          },
-          "canonicalized_metrics": {
-            "gold_file_recall_at_5": 0,
-            "gold_file_recall_at_10": 0,
-            "consequential_file_retention_rate": 0,
-            "rerank_mrr10": 0,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.6500000000000001,
-            "retrieval_doc_share_mean": 0.05555555555555555,
-            "unmatched_expected_file_rate": 1
-          },
-          "task_results": [
-            {
-              "taskId": "atlas_task_001",
-              "expected_files": [
-                "server/horizons-proxy.ts"
+              "mismatchTaxonomy": [
+                "retrieval_miss"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts",
-                "server/db/agi.ts",
-                "server/auth/jwt.ts",
-                "server/config/knowledge.ts",
-                "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/horizons-proxy.ts:not_present_top10"
-              ],
-              "graphEdgeHit": true,
-              "confidence": 0.6500000000000001,
-              "docShare": 0.05555555555555555
-            },
-            {
-              "taskId": "atlas_task_002",
-              "expected_files": [
+              "expectedNormalized": [
                 "server/utils/horizons-proxy.ts"
               ],
-              "top5": [
-                "modules/core/physics-constants.ts",
-                "server/helix-core.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "modules/sim_core/static-casimir.ts",
-                "modules/warp/natario-warp.ts"
-              ],
-              "top10": [
+              "retrievedNormalizedTop10": [
                 "modules/core/physics-constants.ts",
                 "server/helix-core.ts",
                 "modules/dynamic/dynamic-casimir.ts",
@@ -1599,17 +862,7 @@
                 "server/auth/jwt.ts",
                 "server/config/knowledge.ts",
                 "shared/schema.ts",
-                "client/src/lib/docs/docManifest.ts"
-              ],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/utils/horizons-proxy.ts:not_present_top10"
+                "client/src/lib/docs/docmanifest.ts"
               ],
               "graphEdgeHit": true,
               "confidence": 0.6500000000000001,
@@ -1682,7 +935,7 @@
           "exact": 0,
           "normalized": 0,
           "alias": 0,
-          "none": 6
+          "none": 2
         },
         "mismatch_reasons": [
           {
@@ -1691,7 +944,25 @@
             "taskId": "atlas_task_001",
             "mode": "none",
             "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
+              "server/horizons-proxy.ts:retrieval_miss"
+            ],
+            "mismatchTaxonomy": [
+              "retrieval_miss"
+            ],
+            "expectedNormalized": [
+              "server/horizons-proxy.ts"
+            ],
+            "retrievedNormalizedTop10": [
+              "modules/core/physics-constants.ts",
+              "server/helix-core.ts",
+              "modules/dynamic/dynamic-casimir.ts",
+              "modules/sim_core/static-casimir.ts",
+              "modules/warp/natario-warp.ts",
+              "server/db/agi.ts",
+              "server/auth/jwt.ts",
+              "server/config/knowledge.ts",
+              "shared/schema.ts",
+              "client/src/lib/docs/docmanifest.ts"
             ]
           },
           {
@@ -1700,49 +971,32 @@
             "taskId": "atlas_task_002",
             "mode": "none",
             "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 11,
-            "temperature": 0.2,
-            "taskId": "atlas_task_001",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 11,
-            "temperature": 0.2,
-            "taskId": "atlas_task_002",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 13,
-            "temperature": 0.2,
-            "taskId": "atlas_task_001",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/horizons-proxy.ts:not_present_top10"
-            ]
-          },
-          {
-            "seed": 13,
-            "temperature": 0.2,
-            "taskId": "atlas_task_002",
-            "mode": "none",
-            "mismatchReasons": [
-              "server/utils/horizons-proxy.ts:not_present_top10"
+              "server/utils/horizons-proxy.ts:retrieval_miss"
+            ],
+            "mismatchTaxonomy": [
+              "retrieval_miss"
+            ],
+            "expectedNormalized": [
+              "server/utils/horizons-proxy.ts"
+            ],
+            "retrievedNormalizedTop10": [
+              "modules/core/physics-constants.ts",
+              "server/helix-core.ts",
+              "modules/dynamic/dynamic-casimir.ts",
+              "modules/sim_core/static-casimir.ts",
+              "modules/warp/natario-warp.ts",
+              "server/db/agi.ts",
+              "server/auth/jwt.ts",
+              "server/config/knowledge.ts",
+              "shared/schema.ts",
+              "client/src/lib/docs/docmanifest.ts"
             ]
           }
         ]
       }
     }
   },
+  "completedScenarioCount": 4,
   "driver_verdict": {
     "retrieval_lift_proven": "no",
     "dominant_channel": "none",
@@ -1750,6 +1004,30 @@
       "atlas": 0,
       "git_tracked": 0
     },
+    "contribution_ci95": {
+      "atlas": {
+        "low": 0,
+        "high": 0
+      },
+      "git_tracked": {
+        "low": 0,
+        "high": 0
+      }
+    },
+    "bounded_confidence": false,
+    "strict_gate": {
+      "positive_lane_ablation_delta": false,
+      "bounded_confidence": false,
+      "fault_owner_points_to_retrieval": true
+    },
+    "stage_fault_matrix": {
+      "retrieval": 1,
+      "candidate_filtering": 1,
+      "rerank": 1,
+      "synthesis_packing": 1,
+      "final_cleanup": 0.9411764705882353
+    },
+    "fault_owner": "retrieval",
     "confidence_statement": "95% bootstrap intervals computed over seed/temperature scenarios."
   }
 }
