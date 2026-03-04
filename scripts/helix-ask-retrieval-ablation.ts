@@ -32,11 +32,10 @@ type TaskResult = {
   rawRR: number;
   canonRR: number;
   mode: MatchMode;
-  mismatchReasons: Array<{
-    expected: string;
-    reason: "path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch";
-    detail?: string;
-  }>;
+  mismatchReasons: string[];
+  mismatchTaxonomy: Array<"path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch">;
+  expectedNormalized: string[];
+  retrievedNormalizedTop10: string[];
   graphEdgeHit: boolean;
   confidence: number | null;
   docShare: number | null;
@@ -51,7 +50,7 @@ const TEMPS = String(process.env.HELIX_ASK_RETRIEVAL_TEMPERATURES ?? "0.2").spli
 const READY_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_READY_TIMEOUT_MS ?? 240_000);
 const ASK_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_ASK_TIMEOUT_MS ?? 15_000);
 const ASK_RETRY_ATTEMPTS = Number(process.env.HELIX_ASK_RETRIEVAL_ASK_RETRY_ATTEMPTS ?? 1);
-const VARIANT_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_VARIANT_TIMEOUT_MS ?? 12 * 60_000);
+const VARIANT_WATCHDOG_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_VARIANT_TIMEOUT_MS ?? 600_000);
 
 const VARIANTS: VariantSpec[] = [
   { name: "baseline_atlas_git_on", atlasLane: "1", gitTrackedLane: "1" },
@@ -62,7 +61,7 @@ const VARIANTS: VariantSpec[] = [
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
-const normalize = (s: string) => s.replace(/\\/g, "/").replace(/^\.\//, "").replace(/^\//, "").replace(/\/+/g, "/").trim().toLowerCase();
+const normalizePath = (s: string) => s.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+/g, "/").replace(/\/$/, "").toLowerCase();
 const EPS = 1e-9;
 const require = createRequire(import.meta.url);
 const TSX_CLI = require.resolve("tsx/cli");
@@ -87,37 +86,52 @@ const findOpenPort = async (): Promise<number> =>
 
 const numberOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
-const evidenceIdNormalize = (value: string) => {
-  const trimmed = value.trim();
-  const withoutPrefix = trimmed.includes(":") && !trimmed.startsWith("http") ? trimmed.split(":").slice(1).join(":") : trimmed;
-  return normalize(withoutPrefix);
+const EVIDENCE_PREFIX = /^(file:|evidence:|repo:|path:)/i;
+const REPO_PREFIX = /^\/?workspace\/casimirbot-\//i;
+const TRAILING_LINE_SUFFIX = /:(\d+)(:\d+)?$/;
+const normalizeEvidenceId = (raw: string) =>
+  normalizePath(raw.trim().replace(/^`|`$/g, "").replace(EVIDENCE_PREFIX, "").replace(REPO_PREFIX, ""));
+const normalizePathLoose = (raw: string) =>
+  normalizePath(
+    normalizeEvidenceId(raw)
+      .replace(/[#?].*$/, "")
+      .replace(TRAILING_LINE_SUFFIX, "")
+      .replace(/\(\s*line\s+\d+\s*\)$/i, ""),
+  );
+const pathSegments = (raw: string) => normalizePathLoose(raw).split("/").filter(Boolean);
+const pathTail = (raw: string, depth = 2) => {
+  const parts = pathSegments(raw);
+  return parts.slice(-depth).join("/");
 };
-const canonicalPathForms = (value: string) => {
-  const base = evidenceIdNormalize(value);
-  const forms = new Set<string>([base]);
-  forms.add(base.replace(/^\.\//, ""));
-  forms.add(base.replace(/^src\//, ""));
-  forms.add(base.replace(/^server\//, ""));
-  forms.add(base.replace(/^client\//, ""));
-  return forms;
+const pathBase = (raw: string) => {
+  const parts = pathSegments(raw);
+  return parts.length ? parts[parts.length - 1] : normalizePathLoose(raw);
+};
+const canonicalPathSet = (s: string) => {
+  const n = normalizeEvidenceId(s);
+  const set = new Set([n]);
+  set.add(n.replace(/^\.\//, ""));
+  if (n.startsWith("./")) set.add(n.slice(2));
+  if (n.startsWith("server/src/")) set.add(n.replace("server/src/", "server/"));
+  if (n.startsWith("src/server/")) set.add(n.replace("src/server/", "server/"));
+  if (n.startsWith("client/src/")) set.add(n.replace("client/src/", "client/"));
+  if (n.startsWith("client/")) set.add(`client/src/${n.slice("client/".length)}`);
+  return set;
 };
 const aliasSet = (s: string) => {
-  const forms = canonicalPathForms(s);
-  const set = new Set<string>(forms);
-  for (const n of forms) {
+  const set = canonicalPathSet(s);
+  for (const n of [...set]) {
     if (n.startsWith("server/utils/")) set.add(n.replace("server/utils/", "server/"));
     if (n.startsWith("server/")) set.add(n.replace("server/", "server/utils/"));
-    if (n.startsWith("docs/runbooks/")) set.add(n.replace("docs/runbooks/", "docs/"));
-    if (n.startsWith("docs/")) set.add(n.replace("docs/", "docs/runbooks/"));
-    if (n.startsWith("scripts/")) set.add(n.replace("scripts/", "tools/"));
-    if (n.startsWith("tools/")) set.add(n.replace("tools/", "scripts/"));
+    if (n.startsWith("docs/audits/")) set.add(n.replace("docs/audits/", "docs/reports/"));
+    if (n.startsWith("docs/reports/")) set.add(n.replace("docs/reports/", "docs/audits/"));
   }
   return set;
 };
 const bestMode = (expected: string, candidates: string[]): MatchMode => {
   if (candidates.includes(expected)) return "exact";
-  const cn = candidates.map(evidenceIdNormalize);
-  const expectedForms = canonicalPathForms(expected);
+  const cn = candidates.map(normalizeEvidenceId);
+  const expectedForms = canonicalPathSet(expected);
   if (cn.some((candidate) => expectedForms.has(candidate))) return "normalized";
   const aliases = aliasSet(expected);
   return cn.some((c) => aliases.has(c)) ? "alias" : "none";
@@ -255,36 +269,46 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       rawRR: 0,
       canonRR: 0,
       mode: "none",
-      mismatchReasons: task.expected_files.map((expected) => ({
-        expected,
-        reason: "retrieval_miss",
-        detail: "request_failed",
-      })),
+      mismatchReasons: task.expected_files.map((expected) => `${expected}:retrieval_miss`),
+      mismatchTaxonomy: ["retrieval_miss"],
+      expectedNormalized: task.expected_files.map(normalizeEvidenceId),
+      retrievedNormalizedTop10: [],
       graphEdgeHit: false,
       confidence: null,
       docShare: null,
     };
   }
-  const contextShapeMismatch = Array.isArray(payload.debug?.context_files)
-    ? payload.debug!.context_files.some((v) => typeof v !== "string")
-    : Boolean(payload.debug && payload.debug.context_files != null);
-  const top10 = Array.isArray(payload.debug?.context_files) ? payload.debug!.context_files.filter((v): v is string => typeof v === "string").slice(0,10) : [];
+  const contextFiles = Array.isArray(payload.debug?.context_files) ? payload.debug!.context_files : [];
+  const contextShapeMismatch = contextFiles.some((v) => typeof v !== "string");
+  const top10 = contextFiles.filter((v): v is string => typeof v === "string").slice(0,10);
   const top5 = top10.slice(0,5);
   const modes = task.expected_files.map((e)=>bestMode(e, top10));
+  const mismatchTaxonomy = new Set<"path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch">();
+  if (contextShapeMismatch) mismatchTaxonomy.add("context_shape_mismatch");
   const mismatchReasons = task.expected_files.flatMap((expected) => {
     const mode = bestMode(expected, top10);
     if (mode !== "none") return [];
-    if (contextShapeMismatch) {
-      return [{ expected, reason: "context_shape_mismatch" as const }];
+    if (!top10.length) {
+      mismatchTaxonomy.add("retrieval_miss");
+      return [`${expected}:retrieval_miss`];
     }
-    if (!top10.length) return [{ expected, reason: "retrieval_miss" as const, detail: "retrieval_empty_top10" }];
-    if (top10.some((candidate) => canonicalPathForms(expected).has(evidenceIdNormalize(candidate)))) {
-      return [{ expected, reason: "path_form_mismatch" as const }];
+    const looseExpected = normalizePathLoose(expected);
+    const looseCandidates = top10.map(normalizePathLoose);
+    if (looseCandidates.includes(looseExpected)) {
+      mismatchTaxonomy.add("path_form_mismatch");
+      return [`${expected}:path_form_mismatch`];
     }
-    if (top10.some((candidate) => aliasSet(expected).has(evidenceIdNormalize(candidate)))) {
-      return [{ expected, reason: "alias_unmapped" as const }];
+    const expectedBase = pathBase(expected);
+    const expectedTail = pathTail(expected, 2);
+    const aliasCandidatePresent = looseCandidates.some(
+      (candidate) => pathBase(candidate) === expectedBase || pathTail(candidate, 2) === expectedTail,
+    );
+    if (aliasCandidatePresent) {
+      mismatchTaxonomy.add("alias_unmapped");
+      return [`${expected}:alias_unmapped`];
     }
-    return [{ expected, reason: "retrieval_miss" as const, detail: "not_present_top10" }];
+    mismatchTaxonomy.add("retrieval_miss");
+    return [`${expected}:retrieval_miss`];
   });
   const rawHits10 = task.expected_files.filter((e)=>top10.includes(e)).length;
   const rawHits5 = task.expected_files.filter((e)=>top5.includes(e)).length;
@@ -310,10 +334,28 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
     canonRR: canonRank(),
     mode,
     mismatchReasons,
+    mismatchTaxonomy: [...mismatchTaxonomy],
+    expectedNormalized: task.expected_files.map(normalizeEvidenceId),
+    retrievedNormalizedTop10: top10.map(normalizeEvidenceId),
     graphEdgeHit: edgeCount > 0,
     confidence: numberOrNull(payload.debug?.retrieval_confidence),
     docShare: numberOrNull(payload.debug?.retrieval_doc_share),
   };
+};
+
+
+const withWatchdog = async <T>(label: string, fn: () => Promise<T>): Promise<T> => {
+  let timer: NodeJS.Timeout | null = null;
+  try {
+    return await Promise.race([
+      fn(),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`watchdog_timeout:${label}:${VARIANT_WATCHDOG_TIMEOUT_MS}ms`)), VARIANT_WATCHDOG_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 };
 
 const summarize = (results: TaskResult[], canonical: boolean): ScenarioMetrics => {
@@ -382,27 +424,34 @@ const main = async () => {
     generatedAt:new Date().toISOString(),
     seeds:SEEDS,
     temperatures:TEMPS,
-    variants:{},
+    maxTasks: MAX_TASKS,
+    expectedTaskCount: scoped.length,
+    expectedScenarioCount: VARIANTS.length * SEEDS.length * TEMPS.length,
     run_complete: false,
-    blocked: null,
+    blocked_reason: null,
+    variants:{},
   };
+  let completedScenarioCount = 0;
 
   for (const variant of VARIANTS) {
     const server = await startServer(variant);
     try {
-      await waitReady(server);
+      await withWatchdog(`variant:${variant.name}:ready`, async () => {
+        await waitReady(server);
+      });
       const scenarios:any[]=[];
-      await withTimeout((async () => {
-        for (const seed of SEEDS) for (const temperature of TEMPS) {
-          console.log(`[ablation] variant=${variant.name} seed=${seed} temperature=${temperature} tasks=${scoped.length}`);
-          const results:TaskResult[]=[];
+      for (const seed of SEEDS) for (const temperature of TEMPS) {
+        console.log(`[ablation] variant=${variant.name} seed=${seed} temperature=${temperature} tasks=${scoped.length}`);
+        const results:TaskResult[]=[];
+        await withWatchdog(`variant:${variant.name}:seed:${seed}:temp:${temperature}`, async () => {
           for (const task of scoped) {
             results.push(await runTask(server.askUrl, task,seed,temperature));
           }
-          const raw = summarize(results,false); const canon = summarize(results,true);
-          scenarios.push({ seed, temperature, raw_metrics: raw, canonicalized_metrics: canon, task_results: results });
-        }
-      })(), VARIANT_TIMEOUT_MS, `variant=${variant.name}`);
+        });
+        const raw = summarize(results,false); const canon = summarize(results,true);
+        scenarios.push({ seed, temperature, raw_metrics: raw, canonicalized_metrics: canon, task_results: results });
+        completedScenarioCount += 1;
+      }
       const metrics = [
         "gold_file_recall_at_5",
         "gold_file_recall_at_10",
@@ -422,9 +471,37 @@ const main = async () => {
           taskId: taskResult.taskId,
           mode: taskResult.mode,
           mismatchReasons: taskResult.mismatchReasons,
+          mismatchTaxonomy: taskResult.mismatchTaxonomy,
+          expectedNormalized: taskResult.expectedNormalized,
+          retrievedNormalizedTop10: taskResult.retrievedNormalizedTop10,
         })),
       );
-      const diagnostics = {
+      const mismatchCounts = flattenedTaskResults.reduce(
+        (
+          counts: Record<
+            "path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch",
+            number
+          >,
+          task,
+        ) => {
+          for (const reason of task.mismatchTaxonomy as Array<
+            "path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch"
+          >) {
+            counts[reason] += 1;
+          }
+          return counts;
+        },
+        {
+          path_form_mismatch: 0,
+          alias_unmapped: 0,
+          retrieval_miss: 0,
+          context_shape_mismatch: 0,
+        },
+      );
+      score.variants[variant.name]={
+        scenarios,
+        aggregate,
+        diagnostics: {
           unmatched_expected_file_rate: avg(scenarios.map((s)=>s.raw_metrics.unmatched_expected_file_rate)),
           expected_file_match_mode: {
             exact: flattenedTaskResults.filter((task) => task.mode === "exact").length,
@@ -432,6 +509,7 @@ const main = async () => {
             alias: flattenedTaskResults.filter((task) => task.mode === "alias").length,
             none: flattenedTaskResults.filter((task) => task.mode === "none").length,
           },
+          mismatch_taxonomy_counts: mismatchCounts,
           mismatch_reasons: flattenedTaskResults.filter((task) => task.mismatchReasons.length > 0),
         };
       const stage_fault_matrix = inferStageFaultMatrix({ diagnostics });
@@ -445,25 +523,109 @@ const main = async () => {
       };
       await fs.writeFile(path.join(outDir,`${variant.name}.json`),JSON.stringify(score.variants[variant.name],null,2)+"\n");
     } catch (error) {
-      score.blocked = {
-        variant: variant.name,
-        stage: "variant_execution",
-        reason: error instanceof Error ? error.message : String(error),
+      const message = error instanceof Error ? error.message : String(error);
+      score.blocked_reason = `variant_failed:${variant.name}:${message}`;
+      score.variants[variant.name] = {
+        ...(score.variants[variant.name] ?? {}),
+        status: "blocked",
+        fail_reason: message,
       };
+      await fs.writeFile(path.join(outDir,"summary.partial.json"),JSON.stringify({ ...score, completedScenarioCount },null,2)+"\n");
+      console.error(`[ablation] blocked ${score.blocked_reason}`);
       break;
     } finally { await stopServer(server); }
   }
 
-  const requiredScenarios = VARIANTS.length * SEEDS.length * TEMPS.length;
-  const completedScenarios = Object.values(score.variants).reduce(
-    (count: number, variant: any) => count + (Array.isArray(variant.scenarios) ? variant.scenarios.length : 0),
-    0,
-  );
-  score.run_complete = completedScenarios === requiredScenarios && !score.blocked;
+  score.completedScenarioCount = completedScenarioCount;
+  score.run_complete = score.blocked_reason === null && completedScenarioCount === score.expectedScenarioCount;
 
-  const base = score.variants.baseline_atlas_git_on?.aggregate?.gold_file_recall_at_10?.point_estimate ?? 0;
-  const atlasOff = score.variants.atlas_off_git_on?.aggregate?.gold_file_recall_at_10?.point_estimate ?? 0;
-  const gitOff = score.variants.atlas_on_git_off?.aggregate?.gold_file_recall_at_10?.point_estimate ?? 0;
+  if (!score.run_complete) {
+    score.driver_verdict = {
+      retrieval_lift_proven: "no",
+      dominant_channel: "none",
+      contributions: { atlas: 0, git_tracked: 0 },
+      contribution_ci95: {
+        atlas: { low: 0, high: 0 },
+        git_tracked: { low: 0, high: 0 },
+      },
+      bounded_confidence: false,
+      strict_gate: {
+        positive_lane_ablation_delta: false,
+        bounded_confidence: false,
+        fault_owner_points_to_retrieval: false,
+      },
+      stage_fault_matrix: null,
+      fault_owner: "unknown",
+      status: "blocked",
+      blocked_reason: score.blocked_reason ?? "unknown",
+      confidence_statement: "run blocked before complete scenario set",
+    };
+    const jsonPath = "reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.json";
+    const mdPath = "reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.md";
+    await fs.writeFile(path.join(outDir,"summary.comparison.json"),JSON.stringify(score,null,2)+"\n");
+    await fs.writeFile(
+      path.join(outDir,"summary.comparison.md"),
+      [
+        `# Helix Ask Retrieval Ablation Summary (BLOCKED)`,
+        "",
+        `Run: ${runId}`,
+        `run_complete=false`,
+        `blocked_reason=${score.blocked_reason ?? "unknown"}`,
+        `completedScenarioCount=${completedScenarioCount}/${score.expectedScenarioCount}`,
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(jsonPath,JSON.stringify(score,null,2)+"\n");
+    await fs.writeFile(
+      mdPath,
+      [
+        "# Helix Ask Retrieval Ablation Scorecard (2026-03-03)",
+        "",
+        `Run: ${runId}`,
+        "run_complete=false",
+        `blocked_reason=${score.blocked_reason ?? "unknown"}`,
+        `completedScenarioCount=${completedScenarioCount}/${score.expectedScenarioCount}`,
+        "",
+        "Driver verdict: retrieval_lift_proven=no, dominant_channel=none (blocked run).",
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(
+      "reports/helix-ask-retrieval-stage-fault-matrix-2026-03-04.md",
+      [
+        "# Helix Ask Retrieval Stage-Fault Matrix (2026-03-04)",
+        "",
+        `Run: ${runId}`,
+        "Fault owner: unknown (blocked run)",
+        "",
+        "No stage matrix emitted because run was blocked before full scenario completion.",
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(
+      "reports/helix-ask-retrieval-attribution-go-no-go-2026-03-03.md",
+      [
+        "# Helix Ask Retrieval Attribution Go/No-Go (2026-03-03)",
+        "",
+        `Run: ${runId}`,
+        "run_complete=false",
+        `blocked_reason=${score.blocked_reason ?? "unknown"}`,
+        "",
+        "retrieval_lift_proven=no",
+        "dominant_channel=none",
+        "fault_owner=unknown",
+        "",
+        "Decision: NO-GO for retrieval-lift claim (run blocked before complete scenario set).",
+        "",
+      ].join("\n"),
+    );
+    console.log(`Ablation blocked artifacts written to ${outDir}`);
+    return;
+  }
+
+  const base = score.variants.baseline_atlas_git_on.aggregate.gold_file_recall_at_10.point_estimate;
+  const atlasOff = score.variants.atlas_off_git_on.aggregate.gold_file_recall_at_10.point_estimate;
+  const gitOff = score.variants.atlas_on_git_off.aggregate.gold_file_recall_at_10.point_estimate;
   const atlasContribution = base - atlasOff;
   const gitContribution = base - gitOff;
   const maxContribution = Math.max(atlasContribution, gitContribution);
@@ -472,23 +634,44 @@ const main = async () => {
     if (Math.abs(atlasContribution - gitContribution) <= EPS) dominantChannel = "mixed";
     else dominantChannel = atlasContribution > gitContribution ? "atlas" : "git";
   }
-  const baseline = score.variants.baseline_atlas_git_on;
-  const ci = baseline?.aggregate?.gold_file_recall_at_10?.ci95;
-  const boundedConfidence = Boolean(ci && Number.isFinite(ci.low) && Number.isFinite(ci.high) && (ci.high - ci.low) <= 0.25);
-  const laneDeltaPositive = atlasContribution > EPS || gitContribution > EPS;
-  const faultOwnerRetrieval = baseline?.fault_owner === "retrieval";
+  const baseCI = score.variants.baseline_atlas_git_on.aggregate.gold_file_recall_at_10.ci95;
+  const atlasOffCI = score.variants.atlas_off_git_on.aggregate.gold_file_recall_at_10.ci95;
+  const gitOffCI = score.variants.atlas_on_git_off.aggregate.gold_file_recall_at_10.ci95;
+  const atlasDeltaCI = { low: baseCI.low - atlasOffCI.high, high: baseCI.high - atlasOffCI.low };
+  const gitDeltaCI = { low: baseCI.low - gitOffCI.high, high: baseCI.high - gitOffCI.low };
+  const boundedConfidence = atlasDeltaCI.low > 0 || gitDeltaCI.low > 0;
+  const unmatchedRate = score.variants.baseline_atlas_git_on.diagnostics.unmatched_expected_file_rate;
+  const recall10 = score.variants.baseline_atlas_git_on.aggregate.gold_file_recall_at_10.point_estimate;
+  const retention = score.variants.baseline_atlas_git_on.aggregate.consequential_file_retention_rate.point_estimate;
+  const retrievalStageFault = 1 - Math.max(0, 1 - unmatchedRate) * Math.max(0, recall10);
+  const stage_fault_matrix = {
+    retrieval: retrievalStageFault,
+    candidate_filtering: 1 - recall10,
+    rerank: 1 - score.variants.baseline_atlas_git_on.aggregate.rerank_mrr10.point_estimate,
+    synthesis_packing: 1 - retention,
+    final_cleanup: 1 - score.variants.baseline_atlas_git_on.aggregate.retrieval_doc_share_mean.point_estimate,
+  };
+  const fault_owner = retrievalStageFault >= 0.5 ? "retrieval" : retention < 0.5 ? "post_processing" : "routing";
+  const retrievalLiftProven = maxContribution > EPS && base > EPS && boundedConfidence && fault_owner === "retrieval";
   score.driver_verdict = {
-    retrieval_lift_proven: laneDeltaPositive && boundedConfidence && faultOwnerRetrieval ? "yes" : "no",
+    retrieval_lift_proven: retrievalLiftProven ? "yes" : "no",
     dominant_channel: dominantChannel,
     contributions: {
       atlas: atlasContribution,
       git_tracked: gitContribution,
     },
-    attribution_guard: {
-      lane_ablation_delta_positive: laneDeltaPositive,
-      bounded_confidence: boundedConfidence,
-      fault_owner_retrieval: faultOwnerRetrieval,
+    contribution_ci95: {
+      atlas: atlasDeltaCI,
+      git_tracked: gitDeltaCI,
     },
+    bounded_confidence: boundedConfidence,
+    strict_gate: {
+      positive_lane_ablation_delta: maxContribution > EPS,
+      bounded_confidence: boundedConfidence,
+      fault_owner_points_to_retrieval: fault_owner === "retrieval",
+    },
+    stage_fault_matrix,
+    fault_owner,
     confidence_statement: "95% bootstrap intervals computed over seed/temperature scenarios.",
   };
 
@@ -505,6 +688,7 @@ const main = async () => {
       `# Helix Ask Retrieval Ablation Scorecard (2026-03-03)`,
       "",
       `Run: ${runId}`,
+      `run_complete=${score.run_complete}`,
       "",
       `run_complete=${score.run_complete}`,
       ...(score.blocked ? [`blocked=${JSON.stringify(score.blocked)}`, ""] : []),
@@ -515,17 +699,51 @@ const main = async () => {
       `Driver verdict: retrieval_lift_proven=${score.driver_verdict.retrieval_lift_proven}, dominant_channel=${score.driver_verdict.dominant_channel}.`,
       `Attribution guard: lane_ablation_delta_positive=${score.driver_verdict.attribution_guard.lane_ablation_delta_positive}, bounded_confidence=${score.driver_verdict.attribution_guard.bounded_confidence}, fault_owner_retrieval=${score.driver_verdict.attribution_guard.fault_owner_retrieval}.`,
       `Contributions: atlas=${score.driver_verdict.contributions.atlas.toFixed(6)}, git_tracked=${score.driver_verdict.contributions.git_tracked.toFixed(6)}.`,
+      `Strict gate: positive_lane_ablation_delta=${score.driver_verdict.strict_gate.positive_lane_ablation_delta}, bounded_confidence=${score.driver_verdict.strict_gate.bounded_confidence}, fault_owner_points_to_retrieval=${score.driver_verdict.strict_gate.fault_owner_points_to_retrieval}.`,
       "",
-    ].join("\n");
-  if (score.run_complete) {
-    await fs.writeFile(
-    mdPath,
-      mdContent,
-    );
-  } else {
-    await fs.writeFile(path.join(outDir,"scorecard.partial.md"), mdContent);
-  }
-  await fs.writeFile(path.join(outDir,"summary.comparison.md"), mdContent);
+    ].join("\n"),
+  );
+  await fs.writeFile(path.join(outDir,"summary.comparison.md"),await fs.readFile(mdPath,"utf8"));
+  await fs.writeFile(
+    "reports/helix-ask-retrieval-stage-fault-matrix-2026-03-04.md",
+    [
+      "# Helix Ask Retrieval Stage-Fault Matrix (2026-03-04)",
+      "",
+      `Run: ${runId}`,
+      `Fault owner: ${score.driver_verdict.fault_owner}`,
+      "",
+      "| Stage | Fault score |",
+      "| --- | ---: |",
+      `| retrieval | ${score.driver_verdict.stage_fault_matrix.retrieval.toFixed(6)} |`,
+      `| candidate_filtering | ${score.driver_verdict.stage_fault_matrix.candidate_filtering.toFixed(6)} |`,
+      `| rerank | ${score.driver_verdict.stage_fault_matrix.rerank.toFixed(6)} |`,
+      `| synthesis_packing | ${score.driver_verdict.stage_fault_matrix.synthesis_packing.toFixed(6)} |`,
+      `| final_cleanup | ${score.driver_verdict.stage_fault_matrix.final_cleanup.toFixed(6)} |`,
+      "",
+    ].join("\n"),
+  );
+  await fs.writeFile(
+    "reports/helix-ask-retrieval-attribution-go-no-go-2026-03-03.md",
+    [
+      "# Helix Ask Retrieval Attribution Go/No-Go (2026-03-03)",
+      "",
+      `Run: ${runId}`,
+      "",
+      `retrieval_lift_proven=${score.driver_verdict.retrieval_lift_proven}`,
+      `dominant_channel=${score.driver_verdict.dominant_channel}`,
+      `fault_owner=${score.driver_verdict.fault_owner}`,
+      "",
+      "Strict retrieval-lift claim gate:",
+      `- positive lane-ablation delta: ${score.driver_verdict.strict_gate.positive_lane_ablation_delta}`,
+      `- bounded confidence: ${score.driver_verdict.strict_gate.bounded_confidence}`,
+      `- stage-fault owner points to retrieval: ${score.driver_verdict.strict_gate.fault_owner_points_to_retrieval}`,
+      "",
+      score.driver_verdict.retrieval_lift_proven === "yes"
+        ? "Decision: GO for retrieval-lift claim (strict gate passed)."
+        : "Decision: NO-GO for retrieval-lift claim (strict gate not satisfied).",
+      "",
+    ].join("\n"),
+  );
   console.log(`Ablation artifacts written to ${outDir}`);
 };
 
