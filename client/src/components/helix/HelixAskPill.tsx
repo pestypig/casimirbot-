@@ -644,6 +644,283 @@ const LUMA_MOOD_PALETTE: Record<LumaMood, LumaMoodPalette> = {
       "bg-[radial-gradient(120%_160%_at_12%_16%,rgba(249,168,212,0.12)_0%,rgba(15,23,42,0.68)_72%)]",
   },
 };
+
+type ReasoningTheaterStance = "winning" | "contested" | "losing" | "fail_closed";
+type ReasoningTheaterArchetype =
+  | "ambiguity"
+  | "missing_evidence"
+  | "coverage_gap"
+  | "contradiction"
+  | "overload";
+type ReasoningTheaterSuppressionReason =
+  | "context_ineligible"
+  | "dedupe_cooldown"
+  | "mission_rate_limited"
+  | "voice_rate_limited"
+  | "voice_budget_exceeded"
+  | "voice_backend_error"
+  | "missing_evidence"
+  | "contract_violation"
+  | "agi_overload_admission_control";
+
+type ReasoningTheaterState = {
+  stance: ReasoningTheaterStance;
+  archetype: ReasoningTheaterArchetype;
+  suppressionReason: ReasoningTheaterSuppressionReason | null;
+  momentum: number;
+  ambiguityPressure: number;
+  battleIndex: number;
+  pulseHz: number;
+  fogOpacity: number;
+  particleCount: number;
+  symbolicLine: string;
+  seed: number;
+};
+
+type ReasoningTheaterParticle = {
+  id: string;
+  leftPct: number;
+  topPct: number;
+  sizePx: number;
+  opacity: number;
+  delayS: number;
+  durationS: number;
+};
+
+const REASONING_THEATER_STANCE_META: Record<
+  ReasoningTheaterStance,
+  { badge: string; bar: string; panelBorder: string; label: string }
+> = {
+  winning: {
+    badge: "border-emerald-300/40 bg-emerald-400/15 text-emerald-100",
+    bar: "bg-emerald-300/80",
+    panelBorder: "border-emerald-300/35",
+    label: "Winning",
+  },
+  contested: {
+    badge: "border-sky-300/40 bg-sky-400/15 text-sky-100",
+    bar: "bg-sky-300/80",
+    panelBorder: "border-sky-300/35",
+    label: "Contested",
+  },
+  losing: {
+    badge: "border-amber-300/40 bg-amber-400/15 text-amber-100",
+    bar: "bg-amber-300/80",
+    panelBorder: "border-amber-300/35",
+    label: "Losing",
+  },
+  fail_closed: {
+    badge: "border-rose-300/45 bg-rose-400/20 text-rose-100",
+    bar: "bg-rose-300/80",
+    panelBorder: "border-rose-300/40",
+    label: "Fail-closed",
+  },
+};
+
+const REASONING_THEATER_ARCHETYPE_LABEL: Record<ReasoningTheaterArchetype, string> = {
+  ambiguity: "ambiguity",
+  missing_evidence: "missing evidence",
+  coverage_gap: "coverage gap",
+  contradiction: "contradiction",
+  overload: "overload",
+};
+
+const REASONING_THEATER_SUPPRESSION_LABEL: Record<ReasoningTheaterSuppressionReason, string> = {
+  context_ineligible: "context ineligible",
+  dedupe_cooldown: "dedupe cooldown",
+  mission_rate_limited: "mission rate limited",
+  voice_rate_limited: "voice rate limited",
+  voice_budget_exceeded: "voice budget exceeded",
+  voice_backend_error: "voice backend error",
+  missing_evidence: "missing evidence",
+  contract_violation: "contract violation",
+  agi_overload_admission_control: "agi overload admission control",
+};
+
+const REASONING_THEATER_SUPPRESSION_PATTERNS: Array<{
+  reason: ReasoningTheaterSuppressionReason;
+  pattern: RegExp;
+}> = [
+  { reason: "context_ineligible", pattern: /context[_\s-]?ineligible|voice_context_ineligible/i },
+  { reason: "dedupe_cooldown", pattern: /dedupe[_\s-]?cooldown/i },
+  { reason: "mission_rate_limited", pattern: /mission[_\s-]?rate[_\s-]?limited/i },
+  { reason: "voice_rate_limited", pattern: /voice[_\s-]?rate[_\s-]?limited/i },
+  { reason: "voice_budget_exceeded", pattern: /voice[_\s-]?budget[_\s-]?exceeded/i },
+  { reason: "voice_backend_error", pattern: /voice[_\s-]?backend[_\s-]?error/i },
+  { reason: "missing_evidence", pattern: /missing[_\s-]?evidence/i },
+  { reason: "contract_violation", pattern: /contract[_\s-]?violation/i },
+  { reason: "agi_overload_admission_control", pattern: /agi[_\s-]?overload[_\s-]?admission[_\s-]?control/i },
+];
+
+function clamp01(value: number): number {
+  return clampNumber(value, 0, 1);
+}
+
+function hash32(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6d2b79f5;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function resolveReasoningTheaterSuppressionReason(
+  text: string,
+): ReasoningTheaterSuppressionReason | null {
+  for (const entry of REASONING_THEATER_SUPPRESSION_PATTERNS) {
+    if (entry.pattern.test(text)) return entry.reason;
+  }
+  return null;
+}
+
+function deriveReasoningTheaterState(input: {
+  askBusy: boolean;
+  askStatus: string | null;
+  askLiveDraft: string;
+  askElapsedMs: number | null;
+  askLiveEvents: AskLiveEventEntry[];
+  askLiveTraceId: string | null;
+}): ReasoningTheaterState | null {
+  if (!input.askBusy) return null;
+  const allText = [
+    input.askStatus ?? "",
+    input.askLiveDraft,
+    ...input.askLiveEvents.map((event) => event.text ?? ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  const suppressionReason = resolveReasoningTheaterSuppressionReason(allText);
+  const passHits = (allText.match(/\b(pass|passed|resolved|verified|complete(?:d)?|ok)\b/g) ?? []).length;
+  const failHits = (allText.match(/\b(fail|failed|error|blocked|timeout|fallback|clarify)\b/g) ?? []).length;
+  const ambiguityHits = (allText.match(/\b(ambigu|unclear|unknown|unsure|question)\w*/g) ?? []).length;
+  const gapHits = (allText.match(/\b(gap|missing|coverage|unresolved)\w*/g) ?? []).length;
+  const contradictionHits = (allText.match(/\b(contradict|conflict|inconsisten)\w*/g) ?? []).length;
+  const overloadHits = (allText.match(/\b(overload|rate[_\s-]?limit|cooldown|queue|admission)\w*/g) ?? []).length;
+  const evidenceHits = (allText.match(/\b(evidence|citation|anchor)\w*/g) ?? []).length;
+  const progressHits = (allText.match(/\b(retrieve|synthes|verify|analysis|gate|progress|scaffold)\w*/g) ?? []).length;
+
+  let stageTransitions = 0;
+  for (let i = 1; i < input.askLiveEvents.length; i += 1) {
+    const currentTool = input.askLiveEvents[i]?.tool ?? "";
+    const previousTool = input.askLiveEvents[i - 1]?.tool ?? "";
+    if (currentTool && currentTool !== previousTool) {
+      stageTransitions += 1;
+    }
+  }
+
+  const latencyPenalty = clamp01(((input.askElapsedMs ?? 0) - 10_000) / 30_000);
+  const suppressionPenalty = suppressionReason ? 1 : 0;
+  const momentum = clamp01(
+    0.2 +
+      passHits * 0.11 +
+      Math.min(0.22, (progressHits + stageTransitions) * 0.025) +
+      Math.min(0.08, evidenceHits * 0.02) -
+      failHits * 0.06 -
+      latencyPenalty * 0.14,
+  );
+  const ambiguityPressure = clamp01(
+    0.17 +
+      ambiguityHits * 0.08 +
+      gapHits * 0.05 +
+      contradictionHits * 0.07 +
+      failHits * 0.045 +
+      overloadHits * 0.06 +
+      suppressionPenalty * 0.18 +
+      latencyPenalty * 0.2,
+  );
+  const battleIndex = clampNumber(momentum - ambiguityPressure, -1, 1);
+
+  const failClosed =
+    suppressionReason === "missing_evidence" ||
+    suppressionReason === "contract_violation" ||
+    /\b(verdict:\s*fail|integrity:\s*failed|firstfail|fail[-\s]?closed|hard constraint)\b/i.test(allText);
+
+  const stance: ReasoningTheaterStance = failClosed
+    ? "fail_closed"
+    : battleIndex >= 0.25
+      ? "winning"
+      : battleIndex <= -0.25
+        ? "losing"
+        : "contested";
+
+  const archetype: ReasoningTheaterArchetype =
+    overloadHits > 0 ||
+    suppressionReason === "agi_overload_admission_control" ||
+    suppressionReason === "mission_rate_limited" ||
+    suppressionReason === "dedupe_cooldown"
+      ? "overload"
+      : suppressionReason === "missing_evidence" || /\b(missing evidence|evidence gate|citation)\b/i.test(allText)
+        ? "missing_evidence"
+        : gapHits > 0
+          ? "coverage_gap"
+          : contradictionHits > 0
+            ? "contradiction"
+            : "ambiguity";
+
+  const symbolicLine =
+    stance === "fail_closed"
+      ? "Seal engaged: deterministic fail reason surfaced."
+      : stance === "winning"
+        ? "Momentum is clearing the fog around the objective."
+        : stance === "losing"
+          ? "Ambiguity pressure is pushing back; tighten evidence."
+          : "Battle is contested; keep resolving the highest-signal gaps.";
+
+  const pulseHz = 0.8 + 1.4 * clamp01(Math.abs(battleIndex));
+  const fogOpacity = clamp01(0.12 + 0.75 * ambiguityPressure);
+  const particleCount = clampNumber(Math.round(6 + momentum * 16), 4, 24);
+  const seed = hash32(
+    `${input.askLiveTraceId ?? "no-trace"}:${input.askLiveEvents.length}:${archetype}:${stance}`,
+  );
+
+  return {
+    stance,
+    archetype,
+    suppressionReason,
+    momentum,
+    ambiguityPressure,
+    battleIndex,
+    pulseHz,
+    fogOpacity,
+    particleCount,
+    symbolicLine,
+    seed,
+  };
+}
+
+function buildReasoningTheaterParticles(
+  seed: number,
+  count: number,
+): ReasoningTheaterParticle[] {
+  const rng = mulberry32(seed);
+  const particles: ReasoningTheaterParticle[] = [];
+  for (let i = 0; i < count; i += 1) {
+    particles.push({
+      id: `particle-${i}`,
+      leftPct: Math.round(rng() * 1000) / 10,
+      topPct: Math.round(rng() * 1000) / 10,
+      sizePx: 1.8 + rng() * 3.6,
+      opacity: 0.15 + rng() * 0.55,
+      delayS: rng() * 1.2,
+      durationS: 1.2 + rng() * 1.8,
+    });
+  }
+  return particles;
+}
+
 const HELIX_ASK_OUTPUT_TOKENS = clampNumber(
   readNumber(
     (import.meta as any)?.env?.VITE_HELIX_ASK_OUTPUT_TOKENS,
@@ -1419,6 +1696,28 @@ export function HelixAskPill({
   const moodLabel = moodAsset?.label ?? "Helix mood";
   const moodPalette = LUMA_MOOD_PALETTE[askMood] ?? LUMA_MOOD_PALETTE.question;
   const moodRingClass = moodPalette.ring;
+  const reasoningTheater = useMemo(
+    () =>
+      deriveReasoningTheaterState({
+        askBusy,
+        askStatus,
+        askLiveDraft,
+        askElapsedMs,
+        askLiveEvents,
+        askLiveTraceId,
+      }),
+    [askBusy, askElapsedMs, askLiveDraft, askLiveEvents, askLiveTraceId, askStatus],
+  );
+  const reasoningTheaterParticles = useMemo(() => {
+    if (!reasoningTheater) return [];
+    return buildReasoningTheaterParticles(
+      reasoningTheater.seed,
+      reasoningTheater.particleCount,
+    );
+  }, [reasoningTheater]);
+  const reasoningTheaterMeter = reasoningTheater
+    ? clampNumber(Math.round(((reasoningTheater.battleIndex + 1) / 2) * 100), 0, 100)
+    : 50;
 
   useEffect(() => {
     if (!askBusy) return;
@@ -2585,6 +2884,69 @@ export function HelixAskPill({
                 aria-hidden
               />
               <div className="relative">
+                {reasoningTheater ? (
+                  <div
+                    className={`relative mb-2 overflow-hidden rounded-md border px-2 py-2 ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].panelBorder}`}
+                  >
+                    <div className="pointer-events-none absolute inset-0" aria-hidden>
+                      <div
+                        className="absolute inset-0 bg-[radial-gradient(130%_180%_at_50%_8%,rgba(125,211,252,0.2)_0%,rgba(15,23,42,0.86)_72%)]"
+                        style={{ opacity: reasoningTheater.fogOpacity }}
+                      />
+                      <div className="absolute inset-0">
+                        {reasoningTheaterParticles.map((particle) => (
+                          <span
+                            key={particle.id}
+                            className="absolute rounded-full bg-cyan-200/80 animate-pulse"
+                            style={{
+                              left: `${particle.leftPct}%`,
+                              top: `${particle.topPct}%`,
+                              width: `${particle.sizePx}px`,
+                              height: `${particle.sizePx}px`,
+                              opacity: particle.opacity,
+                              animationDelay: `${particle.delayS}s`,
+                              animationDuration: `${particle.durationS}s`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
+                          Reasoning theater
+                        </span>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].badge}`}
+                        >
+                          {REASONING_THEATER_STANCE_META[reasoningTheater.stance].label}
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-200">
+                          {REASONING_THEATER_ARCHETYPE_LABEL[reasoningTheater.archetype]}
+                        </span>
+                        {reasoningTheater.suppressionReason ? (
+                          <span className="rounded-full border border-rose-300/35 bg-rose-400/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-rose-100">
+                            {REASONING_THEATER_SUPPRESSION_LABEL[reasoningTheater.suppressionReason]}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-200/90">
+                        {reasoningTheater.symbolicLine}
+                      </p>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/45">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ease-out ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].bar}`}
+                          style={{ width: `${reasoningTheaterMeter}%` }}
+                        />
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-300/90">
+                        <span>momentum {Math.round(reasoningTheater.momentum * 100)}%</span>
+                        <span>ambiguity {Math.round(reasoningTheater.ambiguityPressure * 100)}%</span>
+                        <span>pulse {reasoningTheater.pulseHz.toFixed(1)}Hz</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
                     Live

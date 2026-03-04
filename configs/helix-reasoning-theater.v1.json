@@ -1,0 +1,310 @@
+{
+  "version": "reasoning_theater.v1",
+  "deterministic": true,
+  "id_fields": [
+    "trace_id",
+    "event_id",
+    "phase",
+    "archetype",
+    "stance",
+    "certainty_class",
+    "suppression_reason"
+  ],
+  "axes": {
+    "phase": [
+      "observe",
+      "plan",
+      "retrieve",
+      "gate",
+      "synthesize",
+      "verify",
+      "execute",
+      "debrief"
+    ],
+    "archetype": [
+      "ambiguity",
+      "missing_evidence",
+      "coverage_gap",
+      "contradiction",
+      "overload"
+    ],
+    "stance": [
+      "winning",
+      "contested",
+      "losing",
+      "fail_closed"
+    ],
+    "certainty_class": [
+      "confirmed",
+      "reasoned",
+      "hypothesis",
+      "unknown"
+    ],
+    "mood_skin": [
+      "mad",
+      "upset",
+      "shock",
+      "question",
+      "happy",
+      "friend",
+      "love"
+    ],
+    "suppression_state": [
+      "none",
+      "context_ineligible",
+      "dedupe_cooldown",
+      "mission_rate_limited",
+      "missing_evidence",
+      "contract_violation"
+    ]
+  },
+  "index_formula": {
+    "momentum": "clamp01(0.26*evidence + 0.22*coverage + 0.16*claim_support + 0.14*graph_health + 0.12*alignment_health + 0.10*proof_pass)",
+    "ambiguity_pressure": "clamp01(0.24*ambiguity_load + 0.20*unsupported + 0.14*contradiction + 0.14*(1-coverage) + 0.10*suppression_penalty + 0.10*latency_penalty + 0.08*integrity_penalty)",
+    "battle_index": "clamp(-1,1,momentum-ambiguity_pressure)"
+  },
+  "stance_rules": [
+    {
+      "if_any": [
+        "proof_verdict==FAIL",
+        "certificate_integrity_ok==false",
+        "suppression_reason==missing_evidence",
+        "suppression_reason==contract_violation"
+      ],
+      "stance": "fail_closed"
+    },
+    {
+      "if_all": [
+        "battle_index>=0.25"
+      ],
+      "stance": "winning"
+    },
+    {
+      "if_all": [
+        "battle_index<=-0.25"
+      ],
+      "stance": "losing"
+    },
+    {
+      "default": true,
+      "stance": "contested"
+    }
+  ],
+  "templates": [
+    {
+      "id": "encounter.scout_lens",
+      "archetype": "ambiguity",
+      "priority": 80,
+      "trigger": {
+        "all": [
+          "phase==observe",
+          "ambiguity_term_count>=2"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.35,
+        "particle_rate": 0.2,
+        "glyph_entropy": 0.4,
+        "arc_clarity": 0.3
+      },
+      "label": "Unknown territory detected"
+    },
+    {
+      "id": "encounter.fog_shred",
+      "archetype": "ambiguity",
+      "priority": 70,
+      "trigger": {
+        "all": [
+          "momentum_delta>0",
+          "ambiguity_pressure_delta<0"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.2,
+        "particle_rate": 0.7,
+        "glyph_entropy": 0.25,
+        "arc_clarity": 0.7
+      },
+      "label": "Ambiguity being resolved"
+    },
+    {
+      "id": "encounter.shield_crack",
+      "archetype": "missing_evidence",
+      "priority": 95,
+      "trigger": {
+        "all": [
+          "evidence_gate_ok==false"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.55,
+        "particle_rate": 0.25,
+        "shield_integrity": 0.2,
+        "glyph_entropy": 0.65
+      },
+      "label": "Evidence posture breached"
+    },
+    {
+      "id": "encounter.lockpick_gap",
+      "archetype": "coverage_gap",
+      "priority": 88,
+      "trigger": {
+        "all": [
+          "coverage_ratio<0.55"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.45,
+        "particle_rate": 0.35,
+        "shield_integrity": 0.45,
+        "arc_clarity": 0.4
+      },
+      "label": "Coverage keys missing"
+    },
+    {
+      "id": "encounter.mirror_parry",
+      "archetype": "contradiction",
+      "priority": 90,
+      "trigger": {
+        "all": [
+          "belief_contradictions>0"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.5,
+        "particle_rate": 0.3,
+        "glyph_entropy": 0.75,
+        "arc_clarity": 0.35
+      },
+      "label": "Contradictory claims colliding"
+    },
+    {
+      "id": "encounter.chain_relay",
+      "archetype": "coverage_gap",
+      "priority": 65,
+      "trigger": {
+        "all": [
+          "graph_cross_tree_ratio>=0.5",
+          "graph_block_ratio<=0.3"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.18,
+        "particle_rate": 0.8,
+        "shield_integrity": 0.72,
+        "arc_clarity": 0.85
+      },
+      "label": "Cross-tree coherence established"
+    },
+    {
+      "id": "encounter.sandstorm_overload",
+      "archetype": "overload",
+      "priority": 93,
+      "trigger": {
+        "any": [
+          "suppression_reason==agi_overload_admission_control",
+          "latency_penalty>=0.8"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.7,
+        "particle_rate": 0.6,
+        "glyph_entropy": 0.7,
+        "arc_clarity": 0.2
+      },
+      "label": "Runtime pressure event"
+    },
+    {
+      "id": "encounter.cooldown_echo",
+      "archetype": "overload",
+      "priority": 75,
+      "trigger": {
+        "any": [
+          "suppression_reason==dedupe_cooldown",
+          "suppression_reason==mission_rate_limited"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.3,
+        "particle_rate": 0.15,
+        "shield_integrity": 0.62,
+        "arc_clarity": 0.5
+      },
+      "label": "Low-noise guard active"
+    },
+    {
+      "id": "encounter.clarify_fallback",
+      "archetype": "ambiguity",
+      "priority": 92,
+      "trigger": {
+        "any": [
+          "arbiter_mode==clarify",
+          "alignment_decision==FAIL"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.6,
+        "particle_rate": 0.2,
+        "shield_integrity": 0.35,
+        "arc_clarity": 0.25
+      },
+      "label": "Clarification required before progression"
+    },
+    {
+      "id": "encounter.last_mile_gate",
+      "archetype": "missing_evidence",
+      "priority": 82,
+      "trigger": {
+        "all": [
+          "phase==verify",
+          "proof_verdict==null"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.28,
+        "particle_rate": 0.55,
+        "shield_integrity": 0.6,
+        "arc_clarity": 0.7
+      },
+      "label": "Verification in progress"
+    },
+    {
+      "id": "encounter.certificate_bloom",
+      "archetype": "missing_evidence",
+      "priority": 99,
+      "trigger": {
+        "all": [
+          "proof_verdict==PASS",
+          "certificate_integrity_ok==true"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.05,
+        "particle_rate": 0.95,
+        "shield_integrity": 0.98,
+        "arc_clarity": 0.95
+      },
+      "label": "Verified closure"
+    },
+    {
+      "id": "encounter.fail_closed_seal",
+      "archetype": "missing_evidence",
+      "priority": 100,
+      "trigger": {
+        "any": [
+          "proof_verdict==FAIL",
+          "certificate_integrity_ok==false",
+          "suppression_reason==missing_evidence",
+          "suppression_reason==contract_violation"
+        ]
+      },
+      "effects": {
+        "fog_density": 0.8,
+        "particle_rate": 0.05,
+        "shield_integrity": 0.05,
+        "arc_clarity": 0.1
+      },
+      "label": "Hard stop with deterministic fail reason"
+    }
+  ]
+}
