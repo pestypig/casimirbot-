@@ -1,6 +1,6 @@
 # Helix Ask Retrieval Ablation Scorecard (2026-03-03)
 
-Run: retrieval-ablation-1772588895208
+Run: retrieval-ablation-1772591247635
 run_complete=true
 
 | Variant | recall@10 point | ci95 low | ci95 high | unmatched_expected_file_rate |

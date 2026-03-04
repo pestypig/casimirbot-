@@ -1,6 +1,6 @@
 # Helix Ask Retrieval Attribution Go/No-Go (2026-03-03)
 
-Run: retrieval-ablation-1772588895208
+Run: retrieval-ablation-1772591247635
 
 retrieval_lift_proven=no
 dominant_channel=none

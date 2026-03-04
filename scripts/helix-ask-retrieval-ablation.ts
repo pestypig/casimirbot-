@@ -88,8 +88,25 @@ const numberOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 const EVIDENCE_PREFIX = /^(file:|evidence:|repo:|path:)/i;
 const REPO_PREFIX = /^\/?workspace\/casimirbot-\//i;
+const TRAILING_LINE_SUFFIX = /:(\d+)(:\d+)?$/;
 const normalizeEvidenceId = (raw: string) =>
   normalizePath(raw.trim().replace(/^`|`$/g, "").replace(EVIDENCE_PREFIX, "").replace(REPO_PREFIX, ""));
+const normalizePathLoose = (raw: string) =>
+  normalizePath(
+    normalizeEvidenceId(raw)
+      .replace(/[#?].*$/, "")
+      .replace(TRAILING_LINE_SUFFIX, "")
+      .replace(/\(\s*line\s+\d+\s*\)$/i, ""),
+  );
+const pathSegments = (raw: string) => normalizePathLoose(raw).split("/").filter(Boolean);
+const pathTail = (raw: string, depth = 2) => {
+  const parts = pathSegments(raw);
+  return parts.slice(-depth).join("/");
+};
+const pathBase = (raw: string) => {
+  const parts = pathSegments(raw);
+  return parts.length ? parts[parts.length - 1] : normalizePathLoose(raw);
+};
 const canonicalPathSet = (s: string) => {
   const n = normalizeEvidenceId(s);
   const set = new Set([n]);
@@ -274,13 +291,18 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       mismatchTaxonomy.add("retrieval_miss");
       return [`${expected}:retrieval_miss`];
     }
-    const normalizedExpected = canonicalPathSet(expected);
-    const normalizedCandidates = top10.map(normalizeEvidenceId);
-    if (normalizedCandidates.some((candidate) => normalizedExpected.has(candidate))) {
+    const looseExpected = normalizePathLoose(expected);
+    const looseCandidates = top10.map(normalizePathLoose);
+    if (looseCandidates.includes(looseExpected)) {
       mismatchTaxonomy.add("path_form_mismatch");
       return [`${expected}:path_form_mismatch`];
     }
-    if (normalizedCandidates.some((candidate) => aliasSet(expected).has(candidate))) {
+    const expectedBase = pathBase(expected);
+    const expectedTail = pathTail(expected, 2);
+    const aliasCandidatePresent = looseCandidates.some(
+      (candidate) => pathBase(candidate) === expectedBase || pathTail(candidate, 2) === expectedTail,
+    );
+    if (aliasCandidatePresent) {
       mismatchTaxonomy.add("alias_unmapped");
       return [`${expected}:alias_unmapped`];
     }
@@ -413,6 +435,28 @@ const main = async () => {
           retrievedNormalizedTop10: taskResult.retrievedNormalizedTop10,
         })),
       );
+      const mismatchCounts = flattenedTaskResults.reduce(
+        (
+          counts: Record<
+            "path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch",
+            number
+          >,
+          task,
+        ) => {
+          for (const reason of task.mismatchTaxonomy as Array<
+            "path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch"
+          >) {
+            counts[reason] += 1;
+          }
+          return counts;
+        },
+        {
+          path_form_mismatch: 0,
+          alias_unmapped: 0,
+          retrieval_miss: 0,
+          context_shape_mismatch: 0,
+        },
+      );
       score.variants[variant.name]={
         scenarios,
         aggregate,
@@ -424,6 +468,7 @@ const main = async () => {
             alias: flattenedTaskResults.filter((task) => task.mode === "alias").length,
             none: flattenedTaskResults.filter((task) => task.mode === "none").length,
           },
+          mismatch_taxonomy_counts: mismatchCounts,
           mismatch_reasons: flattenedTaskResults.filter((task) => task.mismatchReasons.length > 0),
         },
       };
@@ -446,6 +491,28 @@ const main = async () => {
   score.run_complete = score.blocked_reason === null && completedScenarioCount === score.expectedScenarioCount;
 
   if (!score.run_complete) {
+    score.driver_verdict = {
+      retrieval_lift_proven: "no",
+      dominant_channel: "none",
+      contributions: { atlas: 0, git_tracked: 0 },
+      contribution_ci95: {
+        atlas: { low: 0, high: 0 },
+        git_tracked: { low: 0, high: 0 },
+      },
+      bounded_confidence: false,
+      strict_gate: {
+        positive_lane_ablation_delta: false,
+        bounded_confidence: false,
+        fault_owner_points_to_retrieval: false,
+      },
+      stage_fault_matrix: null,
+      fault_owner: "unknown",
+      status: "blocked",
+      blocked_reason: score.blocked_reason ?? "unknown",
+      confidence_statement: "run blocked before complete scenario set",
+    };
+    const jsonPath = "reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.json";
+    const mdPath = "reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.md";
     await fs.writeFile(path.join(outDir,"summary.comparison.json"),JSON.stringify(score,null,2)+"\n");
     await fs.writeFile(
       path.join(outDir,"summary.comparison.md"),
@@ -456,6 +523,50 @@ const main = async () => {
         `run_complete=false`,
         `blocked_reason=${score.blocked_reason ?? "unknown"}`,
         `completedScenarioCount=${completedScenarioCount}/${score.expectedScenarioCount}`,
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(jsonPath,JSON.stringify(score,null,2)+"\n");
+    await fs.writeFile(
+      mdPath,
+      [
+        "# Helix Ask Retrieval Ablation Scorecard (2026-03-03)",
+        "",
+        `Run: ${runId}`,
+        "run_complete=false",
+        `blocked_reason=${score.blocked_reason ?? "unknown"}`,
+        `completedScenarioCount=${completedScenarioCount}/${score.expectedScenarioCount}`,
+        "",
+        "Driver verdict: retrieval_lift_proven=no, dominant_channel=none (blocked run).",
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(
+      "reports/helix-ask-retrieval-stage-fault-matrix-2026-03-04.md",
+      [
+        "# Helix Ask Retrieval Stage-Fault Matrix (2026-03-04)",
+        "",
+        `Run: ${runId}`,
+        "Fault owner: unknown (blocked run)",
+        "",
+        "No stage matrix emitted because run was blocked before full scenario completion.",
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(
+      "reports/helix-ask-retrieval-attribution-go-no-go-2026-03-03.md",
+      [
+        "# Helix Ask Retrieval Attribution Go/No-Go (2026-03-03)",
+        "",
+        `Run: ${runId}`,
+        "run_complete=false",
+        `blocked_reason=${score.blocked_reason ?? "unknown"}`,
+        "",
+        "retrieval_lift_proven=no",
+        "dominant_channel=none",
+        "fault_owner=unknown",
+        "",
+        "Decision: NO-GO for retrieval-lift claim (run blocked before complete scenario set).",
         "",
       ].join("\n"),
     );
