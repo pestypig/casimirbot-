@@ -1,6 +1,7 @@
 {
   "date": "2026-03-03",
   "execution_mode": "DEV_KEYLESS",
+  "run_id": "run-20260304T0028Z",
   "baseline": {
     "intent_id_correct_rate": 0,
     "intent_mismatch": 90,
@@ -11,19 +12,13 @@
       "mrr10": 0.001894
     }
   },
-  "prompt1": {
-    "status": "completed",
-    "changes": [
-      "repo-technical hint inference in intent matcher",
-      "expanded relation-family verb matcher coverage"
-    ]
+  "contract_closure": {
+    "open_world_uncertainty_snippets": "PASS",
+    "frontier_seven_section_labels": "PASS",
+    "harness_status": "WARN_INTERMITTENT_503"
   },
-  "prompt2": {
-    "status": "completed",
-    "changes": [
-      "adjacent-token phrase extraction for deterministic repo search terms"
-    ],
-    "retrieval_ablation_run": "run-20260303T233346Z",
-    "retrieval_ablation_summary": "artifacts/experiments/helix-ask-keyless-chain/run-20260303T233346Z/retrieval-ablation/summary.comparison.json"
+  "artifacts": {
+    "run_root": "artifacts/experiments/helix-ask-keyless-chain/run-20260304T0028Z",
+    "contract_checks": "artifacts/experiments/helix-ask-keyless-chain/run-20260304T0028Z/contract-checks.json"
   }
 }
