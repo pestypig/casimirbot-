@@ -1,0 +1,661 @@
+{
+  "version": 1,
+  "rootId": "scientific-method-policy-tree",
+  "nodes": [
+    {
+      "id": "scientific-method-policy-tree",
+      "slug": "scientific-method-policy-tree",
+      "title": "Scientific Method Policy Tree",
+      "excerpt": "Canonical hub for falsifiability, measurement policy, reproducibility, and predictable system development.",
+      "bodyMD": "This tree links ideology roots to measurable development policy: claims must be testable, measurements must be governable, disagreement must route through proofs, and outputs must stay reproducible.\n\nMinimal artifact: testable-claim map + measurement policy register + reproducibility controls + uncertainty register.",
+      "tags": [
+        "scientific-method",
+        "verification",
+        "measurement",
+        "reproducibility",
+        "predictability"
+      ],
+      "children": [
+        "method-cycle-policy",
+        "truth-convergence-pathways",
+        "verification-checklist",
+        "reproducibility-controls",
+        "measurement-governance",
+        "uncertainty-discipline",
+        "applicability-map"
+      ],
+      "links": [
+        {
+          "rel": "contains",
+          "to": "method-cycle-policy"
+        },
+        {
+          "rel": "contains",
+          "to": "truth-convergence-pathways"
+        },
+        {
+          "rel": "contains",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "contains",
+          "to": "reproducibility-controls"
+        },
+        {
+          "rel": "contains",
+          "to": "measurement-governance"
+        },
+        {
+          "rel": "contains",
+          "to": "uncertainty-discipline"
+        },
+        {
+          "rel": "contains",
+          "to": "applicability-map"
+        }
+      ],
+      "summary": "Canonical hub for falsifiability, measurement policy, reproducibility, and predictable system development.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "method-cycle-policy",
+      "slug": "method-cycle-policy",
+      "title": "Method Cycle Policy",
+      "excerpt": "Operational loop: claim -> test -> falsify or strengthen -> revise.",
+      "bodyMD": "Policy requirement: every material claim ships with observables, error bounds, and explicit invalidators. Decisions are revisable by new evidence, not protected by status.",
+      "tags": [
+        "scientific-method",
+        "falsifiability",
+        "revision"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "scientific-method-policy-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "three-tenets-loop"
+        }
+      ],
+      "summary": "Operational loop: claim -> test -> falsify or strengthen -> revise.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "truth-convergence-pathways",
+      "slug": "truth-convergence-pathways",
+      "title": "Truth Convergence Pathways",
+      "excerpt": "Plural inquiry converges where evidence stabilizes across observers.",
+      "bodyMD": "Scientific-method policy anchor in ideology: many hypotheses are allowed, but convergence is evidence-driven and reproducible.",
+      "tags": [
+        "truth",
+        "convergence",
+        "evidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "scientific-method-policy-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "citizens-arc-convergence-compact"
+        }
+      ],
+      "summary": "Plural inquiry converges where evidence stabilizes across observers.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "verification-checklist",
+      "slug": "verification-checklist",
+      "title": "Verification Checklist",
+      "excerpt": "Claims require measurable checks, falsifiers, and response plans.",
+      "bodyMD": "Verification is the minimum contract for non-propaganda reasoning.",
+      "tags": [
+        "verification",
+        "falsifiability"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "scientific-method-policy-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "integrity-protocols"
+        }
+      ],
+      "summary": "Claims require measurable checks, falsifiers, and response plans.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "reproducibility-controls",
+      "slug": "reproducibility-controls",
+      "title": "Reproducibility Controls",
+      "excerpt": "Traceability and liveness controls keep claims replayable.",
+      "bodyMD": "Reproducibility policy requires provenance, live-source checks, and feedback loop hygiene so results can be independently reconstructed.",
+      "tags": [
+        "reproducibility",
+        "provenance",
+        "liveness"
+      ],
+      "children": [
+        "provenance-protocol",
+        "liveness-or-it-didnt-happen",
+        "feedback-loop-hygiene"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "scientific-method-policy-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "integrity-protocols"
+        }
+      ],
+      "summary": "Traceability and liveness controls keep claims replayable.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "provenance-protocol",
+      "slug": "provenance-protocol",
+      "title": "Provenance Protocol",
+      "excerpt": "Claims carry source lineage.",
+      "bodyMD": "Source lineage is mandatory for reproducibility audits.",
+      "tags": [
+        "provenance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "reproducibility-controls"
+        }
+      ],
+      "summary": "Claims carry source lineage.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "liveness-or-it-didnt-happen",
+      "slug": "liveness-or-it-didnt-happen",
+      "title": "Liveness Or It Didnt Happen",
+      "excerpt": "Stale evidence is not evidence.",
+      "bodyMD": "Time-sensitive claims require liveness checks to stay valid.",
+      "tags": [
+        "liveness"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "reproducibility-controls"
+        }
+      ],
+      "summary": "Stale evidence is not evidence.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "feedback-loop-hygiene",
+      "slug": "feedback-loop-hygiene",
+      "title": "Feedback Loop Hygiene",
+      "excerpt": "Close loops only on verified signals.",
+      "bodyMD": "Feedback routing must avoid self-reinforcing rumor loops.",
+      "tags": [
+        "feedback",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "reproducibility-controls"
+        }
+      ],
+      "summary": "Close loops only on verified signals.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "measurement-governance",
+      "slug": "measurement-governance",
+      "title": "Measurement Governance",
+      "excerpt": "Metrics are bounded by legitimacy and anti-coercion rules.",
+      "bodyMD": "Measurement policy aligns observables, public explanation, and ethical limits so optimization does not become predation.",
+      "tags": [
+        "measurement",
+        "metrics",
+        "governance"
+      ],
+      "children": [
+        "metric-integrity-guardrail",
+        "civic-signal-loop",
+        "right-speech-infrastructure",
+        "three-tenets-loop",
+        "citizens-arc-convergence-compact"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "scientific-method-policy-tree"
+        },
+        {
+          "rel": "see-also",
+          "to": "data-dignity"
+        }
+      ],
+      "summary": "Metrics are bounded by legitimacy and anti-coercion rules.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "metric-integrity-guardrail",
+      "slug": "metric-integrity-guardrail",
+      "title": "Metric Integrity Guardrail",
+      "excerpt": "Metrics need explicit invalidators and review triggers.",
+      "bodyMD": "Headline counts alone are not proof; metric definitions must be auditable.",
+      "tags": [
+        "metrics",
+        "integrity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "measurement-governance"
+        }
+      ],
+      "summary": "Metrics need explicit invalidators and review triggers.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "civic-signal-loop",
+      "slug": "civic-signal-loop",
+      "title": "Civic Signal Loop",
+      "excerpt": "Listening inputs route into measurable action and correction.",
+      "bodyMD": "Societal observables are meaningful only when they produce accountable updates.",
+      "tags": [
+        "signals",
+        "civic",
+        "measurement"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "measurement-governance"
+        }
+      ],
+      "summary": "Listening inputs route into measurable action and correction.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "right-speech-infrastructure",
+      "slug": "right-speech-infrastructure",
+      "title": "Right Speech Infrastructure",
+      "excerpt": "Public communication includes uncertainty and corrections.",
+      "bodyMD": "Measurement outputs must be communicated without propaganda certainty.",
+      "tags": [
+        "communication",
+        "uncertainty"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "measurement-governance"
+        }
+      ],
+      "summary": "Public communication includes uncertainty and corrections.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "three-tenets-loop",
+      "slug": "three-tenets-loop",
+      "title": "Three Tenets Loop",
+      "excerpt": "Not-knowing, witness, action maps directly to disciplined inquiry.",
+      "bodyMD": "This loop provides the behavioral policy around scientific uncertainty.",
+      "tags": [
+        "inquiry",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "measurement-governance"
+        }
+      ],
+      "summary": "Not-knowing, witness, action maps directly to disciplined inquiry.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "citizens-arc-convergence-compact",
+      "slug": "citizens-arc-convergence-compact",
+      "title": "Citizens Arc Convergence Compact",
+      "excerpt": "Disagreement is routed into proof literacy, not punishment.",
+      "bodyMD": "Contestability is a core policy for durable shared truth.",
+      "tags": [
+        "contestability",
+        "dissent"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "measurement-governance"
+        }
+      ],
+      "summary": "Disagreement is routed into proof literacy, not punishment.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "uncertainty-discipline",
+      "slug": "uncertainty-discipline",
+      "title": "Uncertainty Discipline",
+      "excerpt": "Predictability requires explicit uncertainty handling at every stage.",
+      "bodyMD": "Policy requires certainty grading, uncertainty registers, and bounded claims across runtime and science workflows.",
+      "tags": [
+        "uncertainty",
+        "certainty",
+        "predictability"
+      ],
+      "children": [
+        "certainty-framework-tree",
+        "uncertainty-mechanics-stack",
+        "uncertainty-register"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "scientific-method-policy-tree"
+        }
+      ],
+      "summary": "Predictability requires explicit uncertainty handling at every stage.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "certainty-framework-tree",
+      "slug": "certainty-framework-tree",
+      "title": "Degree of Certainty Framework",
+      "excerpt": "Confidence is graded with explicit gates.",
+      "bodyMD": "Certainty gates ensure claims carry confidence, coverage, and uncertainty annotations.",
+      "tags": [
+        "certainty",
+        "gates"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-discipline"
+        }
+      ],
+      "summary": "Confidence is graded with explicit gates.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "uncertainty-mechanics-stack",
+      "slug": "uncertainty-mechanics-stack",
+      "title": "Uncertainty Mechanics Stack",
+      "excerpt": "Classical, statistical, and quantum uncertainty pathways.",
+      "bodyMD": "Development predictability depends on structured uncertainty propagation.",
+      "tags": [
+        "uncertainty",
+        "physics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-discipline"
+        }
+      ],
+      "summary": "Classical, statistical, and quantum uncertainty pathways.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "uncertainty-register",
+      "slug": "uncertainty-register",
+      "title": "Uncertainty Register",
+      "excerpt": "Unsupported or partial claims are explicitly recorded.",
+      "bodyMD": "Unknowns are first-class outputs, not hidden residuals.",
+      "tags": [
+        "uncertainty",
+        "register"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-discipline"
+        }
+      ],
+      "summary": "Unsupported or partial claims are explicitly recorded.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "applicability-map",
+      "slug": "applicability-map",
+      "title": "Applicability Map",
+      "excerpt": "Where scientific-method policy is applied in active systems.",
+      "bodyMD": "This map points to runtime systems where reproducibility and predictability are actively solved for through contracts, traces, and verification flows.",
+      "tags": [
+        "applications",
+        "runtime",
+        "coverage"
+      ],
+      "children": [
+        "helix-ask-certainty-stack",
+        "pipeline-ledger-tree",
+        "trace-system-tree",
+        "ui-backend-binding-tree",
+        "simulation-systems-tree",
+        "resonance-tree",
+        "warp-mechanics-tree",
+        "physics-foundations-tree",
+        "verification-based-diplomacy"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "scientific-method-policy-tree"
+        }
+      ],
+      "summary": "Where scientific-method policy is applied in active systems.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "helix-ask-certainty-stack",
+      "slug": "helix-ask-certainty-stack",
+      "title": "Helix Ask Certainty Stack",
+      "excerpt": "Runtime certainty gates for answer quality and confidence.",
+      "bodyMD": "Applied certainty policy in inference-time routing and validation.",
+      "tags": [
+        "helix",
+        "certainty"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "applicability-map"
+        }
+      ],
+      "summary": "Runtime certainty gates for answer quality and confidence.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "pipeline-ledger-tree",
+      "slug": "pipeline-ledger-tree",
+      "title": "Pipeline Ledger Tree",
+      "excerpt": "Pipeline calculations and ledger reporting tied to verification.",
+      "bodyMD": "Applied verification policy for pipeline-to-ledger coherence.",
+      "tags": [
+        "pipeline",
+        "ledger"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "applicability-map"
+        }
+      ],
+      "summary": "Pipeline calculations and ledger reporting tied to verification.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "trace-system-tree",
+      "slug": "trace-system-tree",
+      "title": "Trace System Tree",
+      "excerpt": "Trace evidence and replayability policy.",
+      "bodyMD": "Applied reproducibility and auditability in trace collection and replay.",
+      "tags": [
+        "trace",
+        "replay"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "applicability-map"
+        }
+      ],
+      "summary": "Trace evidence and replayability policy.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "ui-backend-binding-tree",
+      "slug": "ui-backend-binding-tree",
+      "title": "UI Backend Binding Tree",
+      "excerpt": "Verification outputs surfaced in user-facing interfaces.",
+      "bodyMD": "Applied measurement policy from backend evidence to UI artifacts.",
+      "tags": [
+        "ui",
+        "backend",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "applicability-map"
+        }
+      ],
+      "summary": "Verification outputs surfaced in user-facing interfaces.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "simulation-systems-tree",
+      "slug": "simulation-systems-tree",
+      "title": "Simulation Systems Tree",
+      "excerpt": "Simulation contracts with verification anchors.",
+      "bodyMD": "Applied scientific-method controls in simulation streaming, APIs, and UI surfaces.",
+      "tags": [
+        "simulation",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "applicability-map"
+        }
+      ],
+      "summary": "Simulation contracts with verification anchors.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "resonance-tree",
+      "slug": "resonance-tree",
+      "title": "Resonance Tree",
+      "excerpt": "Resonance workflows linked to verification contracts.",
+      "bodyMD": "Applied verification anchors across resonance engine, IO, and tests.",
+      "tags": [
+        "resonance",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "applicability-map"
+        }
+      ],
+      "summary": "Resonance workflows linked to verification contracts.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "warp-mechanics-tree",
+      "slug": "warp-mechanics-tree",
+      "title": "Warp Mechanics Tree",
+      "excerpt": "Constraint-checked warp development with verification anchors.",
+      "bodyMD": "Applied predictability and verification in warp-control and viability pipelines.",
+      "tags": [
+        "warp",
+        "verification",
+        "predictability"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "applicability-map"
+        }
+      ],
+      "summary": "Constraint-checked warp development with verification anchors.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "physics-foundations-tree",
+      "slug": "physics-foundations-tree",
+      "title": "Physics Foundations Tree",
+      "excerpt": "Foundational GR and numerical checks linked to verification.",
+      "bodyMD": "Applied scientific method in foundational physics assumptions, tests, and constraints.",
+      "tags": [
+        "physics",
+        "foundations",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "applicability-map"
+        }
+      ],
+      "summary": "Foundational GR and numerical checks linked to verification.",
+      "nodeType": "concept"
+    },
+    {
+      "id": "verification-based-diplomacy",
+      "slug": "verification-based-diplomacy",
+      "title": "Verification-Based Diplomacy",
+      "excerpt": "Low-trust coordination uses verification over rhetoric.",
+      "bodyMD": "Scientific-method policy extends to geopolitical coordination when trust is low.",
+      "tags": [
+        "diplomacy",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "applicability-map"
+        }
+      ],
+      "summary": "Low-trust coordination uses verification over rhetoric.",
+      "nodeType": "concept"
+    }
+  ]
+}

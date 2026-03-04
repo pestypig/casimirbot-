@@ -285,6 +285,14 @@ type IdeologyNode = {
   tags?: string[];
 };
 
+type KnowledgeTreeNode = {
+  id: string;
+  title?: string;
+  excerpt?: string;
+  bodyMD?: string;
+  tags?: string[];
+};
+
 const ideologyEntries = async (): Promise<RepoSearchEntry[]> => {
   try {
     const payload = await fs.readFile(path.resolve("docs/ethos/ideology.json"), "utf8");
@@ -299,6 +307,27 @@ const ideologyEntries = async (): Promise<RepoSearchEntry[]> => {
         node.bodyMD,
         node.tags,
         { nodeId: node.id },
+      ),
+    );
+  } catch {
+    return [];
+  }
+};
+
+const scientificMethodPolicyEntries = async (): Promise<RepoSearchEntry[]> => {
+  try {
+    const payload = await fs.readFile(path.resolve("docs/knowledge/scientific-method-policy-tree.json"), "utf8");
+    const parsed = JSON.parse(payload) as { nodes?: KnowledgeTreeNode[] };
+    const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : [];
+    return nodes.map((node) =>
+      buildEntry(
+        `scientific-method-policy:${node.id}`,
+        "ideology-node",
+        node.title ?? node.id,
+        node.excerpt,
+        node.bodyMD,
+        node.tags,
+        { nodeId: node.id, tree: "scientific-method-policy-tree" },
       ),
     );
   } catch {
@@ -573,12 +602,13 @@ const codeEntries = async (): Promise<RepoSearchEntry[]> => {
 };
 
 const buildIndex = async (): Promise<RepoSearchEntry[]> => {
-  const [ideology, docs, code] = await Promise.all([
+  const [ideology, scientificMethodPolicy, docs, code] = await Promise.all([
     ideologyEntries(),
+    scientificMethodPolicyEntries(),
     docEntries(),
     codeEntries(),
   ]);
-  return [...artifactEntries(), ...ideology, ...docs, ...code];
+  return [...artifactEntries(), ...ideology, ...scientificMethodPolicy, ...docs, ...code];
 };
 
 const filterByTags = (entry: RepoSearchEntry, tags?: string[]): boolean => {

@@ -3,12 +3,13 @@
 "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim."
 
 ## Evidence Scope
-- Commit pin: `36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e`
-- Primary snapshot: `artifacts/research/full-solve/warp-evidence-snapshot-2026-03-02.json`
+- Commit pin: `5506e72cafd8dc7534572d9285d932de2b858407`
+- Primary evidence summary: `docs/audits/research/warp-evidence-pack-2026-03-02.json`
+- Snapshot companion: `docs/audits/research/warp-evidence-snapshot-2026-03-02.md`
 - Claim-governance contract: `docs/audits/research/warp-paper-authoring-contract-2026-03-02.md`
 
 ## Abstract
-This draft reports the current reduced-order campaign state using only repository artifacts pinned to one commit. Canonical adjudication is `REDUCED_ORDER_ADMISSIBLE` with gate counts `PASS=8`, `FAIL=0`, `UNKNOWN=0`, `NOT_READY=0`, `NOT_APPLICABLE=1`. Promoted candidate and promotion lane also report admissible status at the same commit pin. Certification traces report `PASS`, certificate hash `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`, and `integrityOk=true`. Strong-claim closure indicators A-G are all pass in the snapshot. This is a reduced-order admissibility and reproducibility result with explicit falsifiers and an upgrade path; it is not, by itself, a full-system physical feasibility claim.
+This draft reports the current reduced-order campaign state using commit-tracked repository evidence at one pin. Canonical adjudication is `REDUCED_ORDER_ADMISSIBLE` with gate counts `PASS=8`, `FAIL=0`, `UNKNOWN=0`, `NOT_READY=0`, `NOT_APPLICABLE=1`. The work is scientifically useful as a reproducible reduced-order closure with explicit falsifiers and a standards-aligned upgrade path; it is not, by itself, a full-system physical feasibility claim.
 
 ## Methods
 1. Parse the commit-pinned evidence snapshot and required sub-artifacts.
@@ -18,6 +19,11 @@ This draft reports the current reduced-order campaign state using only repositor
    - `exploratory`: parity overlays and interpretation hypotheses.
 3. Reject any claim that requires missing numeric evidence; mark such rows `UNKNOWN`.
 4. Use deterministic artifact fields only (no narrative substitution).
+5. Resolve contradictions by canonical precedence:
+   - canonical campaign execution report
+   - decision ledger
+   - governance matrix
+   - then summary packs.
 
 ## Results
 
@@ -29,7 +35,7 @@ This draft reports the current reduced-order campaign state using only repositor
 - Snapshot blocked state: `blocked=false`
 
 Source:
-- `artifacts/research/full-solve/warp-evidence-snapshot-2026-03-02.json`
+- `docs/audits/research/warp-evidence-pack-2026-03-02.json`
 - `artifacts/research/full-solve/g4-decision-ledger-2026-02-26.json`
 
 ## Promoted-candidate
@@ -43,8 +49,8 @@ Source:
   - `applicabilityStatus=PASS`
 
 Source:
-- `artifacts/research/full-solve/warp-evidence-snapshot-2026-03-02.json`
-- `artifacts/research/full-solve/g4-promotion-bundle-2026-03-01.json`
+- `docs/audits/research/warp-evidence-pack-2026-03-02.json`
+- `docs/audits/research/warp-evidence-snapshot-2026-03-02.md`
 - `artifacts/research/full-solve/g4-decision-ledger-2026-02-26.json`
 
 ## Exploratory
@@ -52,7 +58,7 @@ Source:
 - Scan classification still records a canonical/scan mismatch structure in ledger (`classificationMismatch=true`), with canonical class retained as authoritative by policy.
 
 Source:
-- `artifacts/research/full-solve/g4-literature-parity-replay-2026-03-02.json`
+- `docs/audits/research/warp-g4-literature-parity-replay-2026-03-02.md`
 - `artifacts/research/full-solve/g4-decision-ledger-2026-02-26.json`
 
 ## Certification
@@ -64,9 +70,8 @@ Source:
   - `status=GREEN`
 
 Source:
-- `artifacts/research/full-solve/warp-evidence-snapshot-2026-03-02.json`
-- `artifacts/training-trace.jsonl`
-- `artifacts/training-trace-export.jsonl`
+- `docs/audits/research/warp-evidence-pack-2026-03-02.json`
+- `docs/audits/research/warp-evidence-snapshot-2026-03-02.md`
 
 ## Materials-Bounds Constraints Table
 
@@ -80,6 +85,10 @@ Source:
 | Thermal envelope | max dissipation/cooling | UNKNOWN | UNKNOWN | UNKNOWN | no dedicated artifact in required set | UNKNOWN |
 | Structural envelope | hoop/strain/stress limits | UNKNOWN | UNKNOWN | UNKNOWN | no dedicated artifact in required set | UNKNOWN |
 
+UNKNOWN handling rule:
+- Unknown values remain `UNKNOWN` unless a commit-tracked numeric artifact exists.
+- Unresolved RSET semantics and stress-tensor fluctuation thresholds are not collapsed into PASS claims.
+
 ## Falsifier Matrix
 
 | Falsifier | Deterministic trigger | Invalidates |
@@ -89,6 +98,18 @@ Source:
 | Applicability falsifier | curvature applicability audit blocked/not-pass | Any claim that applicability domain is satisfied |
 | Uncertainty falsifier | uncertainty audit blocked or decision band unresolved | Any robust-pass claim |
 | Reproducibility falsifier | snapshot blocked, provenance mismatch, or trace integrity failure | Any reproducibility claim |
+
+## What This Research Improves Now
+1. Adds standards-oriented governance language without changing reduced-order gate semantics.
+2. Provides explicit source-quality hierarchy (primary/standard first) for manuscript claims.
+3. Improves reproducibility framing by adding deterministic staleness/conflict reporting expectations.
+4. Strengthens closure planning by mapping unresolved items to falsifier-driven upgrade steps.
+
+## What Remains Unresolved
+1. Cross-disciplinary consensus for renormalized stress-energy semantics in this reduced-order context.
+2. Standardized stress-tensor fluctuation thresholds suitable for campaign-level hard gating.
+3. Fully commit-tracked trace payloads when runtime artifacts are ignored by git.
+4. Independent external replication package for strong-claim scientific escalation.
 
 ## Non-Goals
 - No full-system physical-feasibility claim from this campaign alone.

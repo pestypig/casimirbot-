@@ -8,4 +8,4 @@ topicTags: ["ideology"]
 mustIncludeFiles: ["docs/ethos/ideology.json"]
 ---
 Definition: Additional conclusions from maturation under constraint mapped to existing ideology rails.
-Notes: Tags: governance, derived, legitimacy, zen, stewardship; Emphasis: phase-based legitimacy, lawful visibility bounds, ethics-filtered evolution, tempo discipline, stewardship under inevitability, service-based selection signals.
+Notes: Tags: governance, derived, legitimacy, zen, stewardship; Emphasis: phase-based legitimacy, lawful visibility bounds, ethics-filtered evolution, tempo discipline, stewardship under inevitability, service-based selection signals; Children: citizens-arc-convergence-compact.

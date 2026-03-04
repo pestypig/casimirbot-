@@ -125,6 +125,11 @@ Ethos knowledge docs supporting governance and integrity practices. Minimal arti
 - type: concept
 - summary: Mission Ethos guidance (docs/knowledge/ethos/mission-ethos.md). Minimal artifact: Mission Ethos summary.
 
+### Node: Truth Convergence Pathways
+- id: truth-convergence-pathways
+- type: concept
+- summary: Truth Convergence Pathways guidance (docs/knowledge/ethos/truth-convergence-pathways.md). Minimal artifact: Truth Convergence Pathways summary.
+
 ### Node: Integration Ladder
 - id: integration-ladder
 - type: concept
@@ -169,6 +174,11 @@ Ethos knowledge docs supporting governance and integrity practices. Minimal arti
 - id: citizens-arc-derived-principles
 - type: concept
 - summary: Citizens Arc Derived Principles guidance (docs/knowledge/ethos/citizens-arc-derived-principles.md). Minimal artifact: Citizens Arc Derived Principles summary.
+
+### Node: Citizens Arc Convergence And Contestability Compact
+- id: citizens-arc-convergence-compact
+- type: concept
+- summary: Citizens Arc Convergence And Contestability Compact guidance (docs/knowledge/ethos/citizens-arc-convergence-compact.md). Minimal artifact: Citizens Arc Convergence And Contestability Compact summary.
 
 ### Node: Civic Memory Continuity
 - id: civic-memory-continuity

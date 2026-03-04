@@ -80,7 +80,8 @@
         "civic-memory-continuity",
         "skillful-mediation",
         "external-interface-integrity",
-        "verification-based-diplomacy"
+        "verification-based-diplomacy",
+        "truth-convergence-pathways"
       ],
       "links": [
         {
@@ -98,6 +99,10 @@
         {
           "rel": "see-also",
           "to": "integrity-protocols"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
         }
       ],
       "references": [
@@ -133,6 +138,136 @@
           "title": "Mission Ethos Seeds",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:d17c7c7f5804f27879b281fccae65e2ac25e170660b1a5397c80b1d6b532b72d"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "truth-convergence-pathways",
+      "slug": "truth-convergence-pathways",
+      "title": "Truth Convergence Pathways",
+      "excerpt": "Many exploratory paths can remain open while converging on shared, testable truths.",
+      "bodyMD": "Truth discovery should be generative, not coercive: many hypotheses, many methods, one public discipline of measurement and revision.\n\nA viable path is any path that preserves falsifiability, transparent error bands, and reproducible checks. Plural inquiry is protected; convergence happens where evidence repeatedly stabilizes across observers.\n\nThe aim is not forced agreement. The aim is durable coordination: feed people, reduce harm, and let open minds contest observables under common rules.\n\nAnti-pattern: punishing dissent instead of improving proofs.\n\nMinimal artifact: Truth Convergence Map, linking claims to observables, uncertainty bounds, replication status, dissent notes, and decision triggers.\n\nSee [[node:verification-checklist]], [[node:right-speech-infrastructure]], [[node:civic-signal-loop]], [[node:three-tenets-loop]], [[node:integrity-protocols]], [[node:koan-governance]], [[node:skillful-mediation]], [[node:verification-based-diplomacy]], [[node:civic-memory-continuity]], and [[node:citizens-arc-convergence-compact]].",
+      "tags": [
+        "truth",
+        "convergence",
+        "epistemic",
+        "governance",
+        "generative"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "mission-ethos"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "right-speech-infrastructure"
+        },
+        {
+          "rel": "see-also",
+          "to": "civic-signal-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "three-tenets-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "integrity-protocols"
+        },
+        {
+          "rel": "see-also",
+          "to": "koan-governance"
+        },
+        {
+          "rel": "see-also",
+          "to": "skillful-mediation"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-based-diplomacy"
+        },
+        {
+          "rel": "see-also",
+          "to": "civic-memory-continuity"
+        },
+        {
+          "rel": "see-also",
+          "to": "citizens-arc-convergence-compact"
+        }
+      ],
+      "summary": "Many exploratory paths can remain open while converging on shared, testable truths.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "mission-ethos"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "contains": "truth-convergence-pathways",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
         },
         {
           "type": "code",
@@ -703,6 +838,10 @@
         {
           "rel": "see-also",
           "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
         }
       ],
       "summary": "Attack packets map predictable failure modes into checks the civic system must pass.",
@@ -904,7 +1043,7 @@
       "slug": "citizens-arc-derived-principles",
       "title": "Citizen's Arc: Derived Principles",
       "excerpt": "Additional conclusions from maturation under constraint, mapped to existing ideology rails.",
-      "bodyMD": "This addendum captures secondary conclusions linked from maturation under constraint.\n\n1. Legitimacy is phase-based, not title-based: pre-authority means constrained formation; post-authority means full public accountability.\n2. Visibility controls must be lawful and bounded: graduated visibility is process discipline, not immunity.\n3. Evolutionary pressure needs an ethics filter: preserve adaptive coherence while reducing coercive harm.\n4. Zen adds tempo discipline: aspiration must synchronize with conditions and timeframe.\n5. Capability creates stewardship duty under inevitability: failing to shape inevitable tools is itself a governance decision.\n6. Selection signals must evidence service, not obedience: patronage-proof competency signals beat informal favor channels.\n\nMinimal artifact: Derived Principles Crosswalk mapping each principle to policy checks, audit hooks, and reversal triggers.\n\nSee [[node:promise-trials]], [[node:integrity-protocols]], [[node:verification-checklist]], [[node:lawful-interface-protocol]], [[node:data-dignity]], [[node:no-bypass-guardrail]], [[node:values-over-images]], [[node:restorative-harm-repair]], [[node:scarcity-justice]], [[node:beginners-mind]], [[node:koan-governance]], [[node:civic-memory-continuity]], [[node:capability-ambition-gradient]], [[node:stewardship-ledger]], [[node:verification-based-diplomacy]], [[node:citizens-arc-anti-mutation]], [[node:capture-resistance]], and [[node:three-tenets-loop]].",
+      "bodyMD": "This addendum captures secondary conclusions linked from maturation under constraint.\n\n1. Legitimacy is phase-based, not title-based: pre-authority means constrained formation; post-authority means full public accountability.\n2. Visibility controls must be lawful and bounded: graduated visibility is process discipline, not immunity.\n3. Evolutionary pressure needs an ethics filter: preserve adaptive coherence while reducing coercive harm.\n4. Zen adds tempo discipline: aspiration must synchronize with conditions and timeframe.\n5. Capability creates stewardship duty under inevitability: failing to shape inevitable tools is itself a governance decision.\n6. Selection signals must evidence service, not obedience: patronage-proof competency signals beat informal favor channels.\n\nMinimal artifact: Derived Principles Crosswalk mapping each principle to policy checks, audit hooks, and reversal triggers.\n\nConvergence addendum: [[node:citizens-arc-convergence-compact]].\n\nSee [[node:promise-trials]], [[node:integrity-protocols]], [[node:verification-checklist]], [[node:lawful-interface-protocol]], [[node:data-dignity]], [[node:no-bypass-guardrail]], [[node:values-over-images]], [[node:restorative-harm-repair]], [[node:scarcity-justice]], [[node:beginners-mind]], [[node:koan-governance]], [[node:civic-memory-continuity]], [[node:capability-ambition-gradient]], [[node:stewardship-ledger]], [[node:verification-based-diplomacy]], [[node:citizens-arc-anti-mutation]], [[node:capture-resistance]], and [[node:three-tenets-loop]].",
       "tags": [
         "governance",
         "derived",
@@ -912,7 +1051,9 @@
         "zen",
         "stewardship"
       ],
-      "children": [],
+      "children": [
+        "citizens-arc-convergence-compact"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -989,6 +1130,10 @@
         {
           "rel": "see-also",
           "to": "three-tenets-loop"
+        },
+        {
+          "rel": "child",
+          "to": "citizens-arc-convergence-compact"
         }
       ],
       "summary": "Additional conclusions from maturation under constraint, mapped to existing ideology rails.",
@@ -1062,11 +1207,141 @@
       }
     },
     {
+      "id": "citizens-arc-convergence-compact",
+      "slug": "citizens-arc-convergence-compact",
+      "title": "Citizen's Arc: Convergence and Contestability Compact",
+      "excerpt": "Shared observables, non-punitive dissent, and fair contest over evidence make progress durable.",
+      "bodyMD": "Progress velocity should not threaten legitimate governance when advancement is competence-gated, auditable, and oriented to public stability.\n\nLaw should prefer predictable rules with explicit error margins. Truth cannot be forced into appreciation; it is learned through utility, education, and demonstrated outcomes that serve personal agency and collective benefit.\n\nConvergent evidence marks the points where observers can reliably agree. At those points, coordination improves: people are fed, open inquiry remains safe, and development capacity compounds with experience.\n\nBecause evidence convergence creates durable value, dissent should not be punished as identity failure. Divergence is a training signal: route disagreement through proof literacy, test design, and transparent adjudication.\n\nSociety cannot command reality into compliance. The broadest shared view emerges from fair allocation of access to contest observables under common rules, with reversible decisions and longevity-first stewardship.\n\nMinimal artifact: Convergence and Contestability Charter with error bands, dissent-to-proof pathways, and review triggers.\n\nSee [[node:verification-checklist]], [[node:metric-integrity-guardrail]], [[node:civic-signal-loop]], [[node:right-speech-infrastructure]], [[node:three-tenets-loop]], [[node:lawful-interface-protocol]], [[node:koan-governance]], [[node:scarcity-justice]], [[node:skillful-mediation]], and [[node:truth-convergence-pathways]].",
+      "tags": [
+        "governance",
+        "evidence",
+        "dissent",
+        "predictability",
+        "longevity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "citizens-arc-derived-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "metric-integrity-guardrail"
+        },
+        {
+          "rel": "see-also",
+          "to": "civic-signal-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "right-speech-infrastructure"
+        },
+        {
+          "rel": "see-also",
+          "to": "three-tenets-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "lawful-interface-protocol"
+        },
+        {
+          "rel": "see-also",
+          "to": "koan-governance"
+        },
+        {
+          "rel": "see-also",
+          "to": "scarcity-justice"
+        },
+        {
+          "rel": "see-also",
+          "to": "skillful-mediation"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
+        }
+      ],
+      "summary": "Shared observables, non-punitive dissent, and fair contest over evidence make progress durable.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "citizens-arc-derived-principles"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "contains": "citizens-arc-convergence-compact",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:ca5238a32ee259118bd490b9437d2b3830ab7e2aa8b2aae3b4cf30c37a2be51a"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/MissionEthosSourcePanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1af951ef33cb42d2e3a39608d75fd8d0173bafceb063a12fdf8b2453a97814a"
+        },
+        {
+          "type": "code",
+          "path": "client/src/hooks/use-ideology.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f096a27b3a2e042d8214cb3beaf043cef003d21ed7f80a6e59b1ed6a3bf67e08"
+        },
+        {
+          "type": "code",
+          "path": "client/src/lib/ideology-types.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:40bcf467abe313776000204470e8c3b7240e05bf45158682d9010c914000dbcd"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/ethos.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:8f4e339e0cd8c51e2b507d5f0ace6ca19050c64cc3114cdda22626f2db4c1e3f"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
       "id": "right-speech-infrastructure",
       "slug": "right-speech-infrastructure",
       "title": "Right Speech Infrastructure",
       "excerpt": "Speech is ethical action; trustworthy channels keep society coherent.",
-      "bodyMD": "Right speech is truth, non-harm, and timeliness expressed in systems. Society integrates through trustworthy channels: reporting, verification, public updates, and rumor-to-fact pipelines that do not default to censorship or propaganda.\n\nInforming is protective. Withholding material information is not neutral; it lets fear author the story. We prefer clear disclosure, stated uncertainty, visible corrections, and public indicators over rumor competition.\n\nAnti-pattern: information predation, where manipulation, extortion, or false certainty dominates the channel.\n\nMinimal artifact: Trusted Channel Protocol, with multi-channel intake, anonymity options, independent follow-up SLAs, and public stats on closure rates.\n\nSee [[node:voice-integrity]], [[node:compromised-channel-response]], and [[node:verification-checklist]].",
+      "bodyMD": "Right speech is truth, non-harm, and timeliness expressed in systems. Society integrates through trustworthy channels: reporting, verification, public updates, and rumor-to-fact pipelines that do not default to censorship or propaganda.\n\nInforming is protective. Withholding material information is not neutral; it lets fear author the story. We prefer clear disclosure, stated uncertainty, visible corrections, and public indicators over rumor competition.\n\nAnti-pattern: information predation, where manipulation, extortion, or false certainty dominates the channel.\n\nMinimal artifact: Trusted Channel Protocol, with multi-channel intake, anonymity options, independent follow-up SLAs, and public stats on closure rates.\n\nSee [[node:voice-integrity]], [[node:compromised-channel-response]], [[node:verification-checklist]], and [[node:truth-convergence-pathways]].",
       "tags": [
         "speech",
         "communication",
@@ -1091,6 +1366,10 @@
         {
           "rel": "see-also",
           "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
         }
       ],
       "summary": "Speech is ethical action; trustworthy channels keep society coherent.",
@@ -1507,6 +1786,10 @@
         {
           "rel": "see-also",
           "to": "feedback-loop-hygiene"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
         }
       ],
       "summary": "Not-knowing, bearing witness, taking action: a governance cycle that learns in public.",
@@ -2149,6 +2432,10 @@
         {
           "rel": "see-also",
           "to": "koan-governance"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
         }
       ],
       "summary": "Legitimacy survives when decision rationale survives turnover.",
@@ -2255,6 +2542,10 @@
         {
           "rel": "see-also",
           "to": "koan-governance"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
         }
       ],
       "summary": "Nonviolent dispute handling is a designed civic capability, not an afterthought.",
@@ -2491,6 +2782,10 @@
         {
           "rel": "see-also",
           "to": "interbeing-systems"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
         }
       ],
       "summary": "When trust is low, peace depends on verification, not handshakes.",
@@ -4232,6 +4527,10 @@
         {
           "rel": "parent",
           "to": "integrity-protocols"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
         }
       ],
       "references": [
@@ -4920,7 +5219,7 @@
       "slug": "verification-checklist",
       "title": "Verification Checklist",
       "excerpt": "Narratives must ship with verification hooks.",
-      "bodyMD": "A manifesto is only useful if it can be tested.\n\nEvery claim we publish should include:\n- What to measure\n- Where to read it\n- What would falsify it\n- What to do next if falsified\n\nThis makes the story portable without becoming propaganda.",
+      "bodyMD": "A manifesto is only useful if it can be tested.\n\nEvery claim we publish should include:\n- What to measure\n- Where to read it\n- What would falsify it\n- What to do next if falsified\n\nThis makes the story portable without becoming propaganda.\n\nSee [[node:truth-convergence-pathways]], [[node:right-speech-infrastructure]], and [[node:citizens-arc-convergence-compact]].",
       "tags": [
         "verification",
         "falsifiability"
@@ -4930,6 +5229,18 @@
         {
           "rel": "parent",
           "to": "integrity-protocols"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
+        },
+        {
+          "rel": "see-also",
+          "to": "right-speech-infrastructure"
+        },
+        {
+          "rel": "see-also",
+          "to": "citizens-arc-convergence-compact"
         }
       ],
       "references": [
@@ -6584,6 +6895,10 @@
         {
           "rel": "see-also",
           "to": "skillful-mediation"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
         }
       ],
       "summary": "Rights with access: counsel, language support, and clear timelines.",

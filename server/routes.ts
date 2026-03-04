@@ -28,6 +28,7 @@ import { helixQiRouter } from "./routes/helix/qi";
 import { helixMathRouter } from "./routes/helix/math";
 import { helixAuditTreeRouter } from "./routes/helix/audit-tree";
 import { helixTimeDilationRouter } from "./routes/helix/time-dilation";
+import { helixReasoningTheaterRouter } from "./routes/helix/reasoning-theater";
 import { warpViabilityRouter } from "./routes/warp-viability";
 import { curvatureRouter } from "./routes/physics.curvature";
 import { tokamakRouter } from "./routes/physics.tokamak";
@@ -1226,6 +1227,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/helix/math", helixMathRouter);
   app.use("/api/helix/audit", helixAuditTreeRouter);
   app.use("/api/helix/time-dilation", helixTimeDilationRouter);
+  app.use("/api/helix", helixReasoningTheaterRouter);
   app.use("/api/helix/hull-preview", hullPreviewRouter);
   app.use("/api/helix", grAgentRouter);
   app.use("/api/helix", trainingTraceRouter);

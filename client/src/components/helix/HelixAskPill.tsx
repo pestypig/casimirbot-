@@ -14,6 +14,7 @@ import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/
 import {
   askLocal,
   askMoodHint,
+  getReasoningTheaterConfig,
   getPendingHelixAskJob,
   resumeHelixAskJob,
   speakVoice,
@@ -39,6 +40,20 @@ import {
   type MissionContextTier,
   type MissionVoiceMode,
 } from "@/lib/mission-overwatch";
+import {
+  getDefaultReasoningTheaterConfig,
+  type ReasoningTheaterConfigResponse,
+  type ReasoningTheaterFrontierAction,
+  type ReasoningTheaterFrontierActionsConfig,
+} from "@/lib/helix/reasoning-theater-config";
+import {
+  advanceReasoningTheaterFrontierTracker,
+  clampFrontierMeterPct,
+  createReasoningTheaterFrontierTrackerState,
+  resolveReasoningTheaterFrontierIconPath,
+  resolveReasoningTheaterFrontierParticleProfile,
+  type ReasoningTheaterFrontierTrackerState,
+} from "@/lib/helix/reasoning-theater-frontier";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 
@@ -310,6 +325,8 @@ type AskLiveEventEntry = {
   text: string;
   tool?: string;
   ts?: string | number;
+  tsMs?: number;
+  seq?: number;
   durationMs?: number;
 };
 
@@ -662,10 +679,39 @@ type ReasoningTheaterSuppressionReason =
   | "missing_evidence"
   | "contract_violation"
   | "agi_overload_admission_control";
+type ReasoningTheaterPhase =
+  | "observe"
+  | "plan"
+  | "retrieve"
+  | "gate"
+  | "synthesize"
+  | "verify"
+  | "execute"
+  | "debrief";
+type ReasoningTheaterCertaintyClass =
+  | "confirmed"
+  | "reasoned"
+  | "hypothesis"
+  | "unknown";
+type ReasoningTheaterMedal =
+  | "scout"
+  | "anchor"
+  | "lattice"
+  | "prism"
+  | "fracture"
+  | "stitch"
+  | "relay"
+  | "gate"
+  | "seal"
+  | "lantern"
+  | "valve"
+  | "crown";
 
 type ReasoningTheaterState = {
   stance: ReasoningTheaterStance;
   archetype: ReasoningTheaterArchetype;
+  phase: ReasoningTheaterPhase;
+  certaintyClass: ReasoningTheaterCertaintyClass;
   suppressionReason: ReasoningTheaterSuppressionReason | null;
   momentum: number;
   ambiguityPressure: number;
@@ -673,9 +719,27 @@ type ReasoningTheaterState = {
   pulseHz: number;
   fogOpacity: number;
   particleCount: number;
+  passHits: number;
+  evidenceHits: number;
+  stageTransitions: number;
+  allText: string;
   symbolicLine: string;
   seed: number;
 };
+
+type ReasoningTheaterMedalEvent = {
+  medal: ReasoningTheaterMedal;
+  reason: string;
+};
+
+type ReasoningTheaterMedalPulse = ReasoningTheaterMedalEvent & {
+  token: string;
+  startedAt: number;
+  assetPath: string;
+  fading: boolean;
+};
+
+type ReasoningTheaterClockSource = "local" | "event_ts" | "event_seq";
 
 type ReasoningTheaterParticle = {
   id: string;
@@ -687,32 +751,34 @@ type ReasoningTheaterParticle = {
   durationS: number;
 };
 
+type ReasoningTheaterFrontierParticleNode = {
+  id: string;
+  phaseOffsetMs: number;
+  baseRadiusPx: number;
+};
+
 const REASONING_THEATER_STANCE_META: Record<
   ReasoningTheaterStance,
-  { badge: string; bar: string; panelBorder: string; label: string }
+  { badge: string; bar: string; label: string }
 > = {
   winning: {
-    badge: "border-emerald-300/40 bg-emerald-400/15 text-emerald-100",
+    badge: "text-emerald-200",
     bar: "bg-emerald-300/80",
-    panelBorder: "border-emerald-300/35",
     label: "Winning",
   },
   contested: {
-    badge: "border-sky-300/40 bg-sky-400/15 text-sky-100",
+    badge: "text-sky-200",
     bar: "bg-sky-300/80",
-    panelBorder: "border-sky-300/35",
     label: "Contested",
   },
   losing: {
-    badge: "border-amber-300/40 bg-amber-400/15 text-amber-100",
+    badge: "text-amber-200",
     bar: "bg-amber-300/80",
-    panelBorder: "border-amber-300/35",
     label: "Losing",
   },
   fail_closed: {
-    badge: "border-rose-300/45 bg-rose-400/20 text-rose-100",
+    badge: "text-rose-200",
     bar: "bg-rose-300/80",
-    panelBorder: "border-rose-300/40",
     label: "Fail-closed",
   },
 };
@@ -723,6 +789,24 @@ const REASONING_THEATER_ARCHETYPE_LABEL: Record<ReasoningTheaterArchetype, strin
   coverage_gap: "coverage gap",
   contradiction: "contradiction",
   overload: "overload",
+};
+
+const REASONING_THEATER_PHASE_LABEL: Record<ReasoningTheaterPhase, string> = {
+  observe: "observe",
+  plan: "plan",
+  retrieve: "retrieve",
+  gate: "gate",
+  synthesize: "synthesize",
+  verify: "verify",
+  execute: "execute",
+  debrief: "debrief",
+};
+
+const REASONING_THEATER_CERTAINTY_LABEL: Record<ReasoningTheaterCertaintyClass, string> = {
+  confirmed: "confirmed",
+  reasoned: "reasoned",
+  hypothesis: "hypothesis",
+  unknown: "unknown",
 };
 
 const REASONING_THEATER_SUPPRESSION_LABEL: Record<ReasoningTheaterSuppressionReason, string> = {
@@ -736,6 +820,64 @@ const REASONING_THEATER_SUPPRESSION_LABEL: Record<ReasoningTheaterSuppressionRea
   contract_violation: "contract violation",
   agi_overload_admission_control: "agi overload admission control",
 };
+
+const REASONING_THEATER_MEDAL_LABEL: Record<ReasoningTheaterMedal, string> = {
+  scout: "Scout",
+  anchor: "Anchor",
+  lattice: "Lattice",
+  prism: "Prism",
+  fracture: "Fracture",
+  stitch: "Stitch",
+  relay: "Relay",
+  gate: "Gate",
+  seal: "Seal",
+  lantern: "Lantern",
+  valve: "Valve",
+  crown: "Crown",
+};
+
+const REASONING_THEATER_MEDAL_ASSET: Record<ReasoningTheaterMedal, string> = {
+  scout: "/reasoning-theater/medals/scout.svg",
+  anchor: "/reasoning-theater/medals/anchor.svg",
+  lattice: "/reasoning-theater/medals/lattice.svg",
+  prism: "/reasoning-theater/medals/prism.svg",
+  fracture: "/reasoning-theater/medals/fracture.svg",
+  stitch: "/reasoning-theater/medals/stitch.svg",
+  relay: "/reasoning-theater/medals/relay.svg",
+  gate: "/reasoning-theater/medals/gate.svg",
+  seal: "/reasoning-theater/medals/seal.svg",
+  lantern: "/reasoning-theater/medals/lantern.svg",
+  valve: "/reasoning-theater/medals/valve.svg",
+  crown: "/reasoning-theater/medals/crown.svg",
+};
+
+const REASONING_THEATER_MEDAL_VISIBLE_MS = 4200;
+const REASONING_THEATER_MEDAL_FADE_MS = 900;
+const REASONING_THEATER_MEDAL_MAX_VISIBLE = 6;
+const REASONING_THEATER_CLOCK_FPS = 60;
+const REASONING_THEATER_CLOCK_STEP_MS = 1000 / REASONING_THEATER_CLOCK_FPS;
+const REASONING_THEATER_METER_GAIN_ALPHA = 0.16;
+const REASONING_THEATER_METER_LOSS_ALPHA = 0.24;
+const REASONING_THEATER_METER_EPSILON = 0.05;
+const REASONING_THEATER_CLOCK_SOURCE_LABEL: Record<ReasoningTheaterClockSource, string> = {
+  local: "local",
+  event_ts: "event-ts",
+  event_seq: "event-seq",
+};
+const REASONING_THEATER_FRONTIER_ACTION_LABEL: Record<ReasoningTheaterFrontierAction, string> = {
+  large_gain: "Large gain",
+  small_gain: "Small gain",
+  steady: "Steady",
+  small_loss: "Small loss",
+  large_loss: "Large loss",
+  hard_drop: "Hard drop",
+};
+const REASONING_THEATER_FRONTIER_CURSOR_PULSE_MS = 420;
+const REASONING_THEATER_FRONTIER_PARTICLE_COUNT = 8;
+const REASONING_THEATER_FRONTIER_ACTIONS_ENABLED = (() => {
+  const raw = (import.meta as any)?.env?.VITE_HELIX_THEATER_FRONTIER_ACTIONS;
+  return raw === undefined ? true : String(raw) !== "0";
+})();
 
 const REASONING_THEATER_SUPPRESSION_PATTERNS: Array<{
   reason: ReasoningTheaterSuppressionReason;
@@ -754,6 +896,19 @@ const REASONING_THEATER_SUPPRESSION_PATTERNS: Array<{
 
 function clamp01(value: number): number {
   return clampNumber(value, 0, 1);
+}
+
+function parseTimestampMs(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
 }
 
 function hash32(value: string): number {
@@ -781,6 +936,138 @@ function resolveReasoningTheaterSuppressionReason(
 ): ReasoningTheaterSuppressionReason | null {
   for (const entry of REASONING_THEATER_SUPPRESSION_PATTERNS) {
     if (entry.pattern.test(text)) return entry.reason;
+  }
+  return null;
+}
+
+function resolveReasoningTheaterPhase(
+  allText: string,
+  events: AskLiveEventEntry[],
+): ReasoningTheaterPhase {
+  const toolText = events
+    .map((event) => event.tool ?? "")
+    .join(" ")
+    .toLowerCase();
+  if (/\b(debrief|wrap[-\s]?up|final summary|final answer)\b/i.test(allText) || /\bdebrief\b/.test(toolText)) {
+    return "debrief";
+  }
+  if (/\b(execute|run tool|action required|apply now)\b/i.test(allText) || /\bexecute\b/.test(toolText)) {
+    return "execute";
+  }
+  if (/\b(verify|verification|proof|certificate|integrity)\b/i.test(allText) || /\bverify\b/.test(toolText)) {
+    return "verify";
+  }
+  if (/\b(gate|gating|threshold)\b/i.test(allText) || /\bgate\b/.test(toolText)) {
+    return "gate";
+  }
+  if (/\b(synthes|compose|assemble|combine answer)\w*/i.test(allText) || /\bsynthes/i.test(toolText)) {
+    return "synthesize";
+  }
+  if (/\b(retrieve|search|lookup|resonance|context files?)\b/i.test(allText) || /\bretrieve|search/.test(toolText)) {
+    return "retrieve";
+  }
+  if (/\b(plan|intent|router|strategy)\b/i.test(allText) || /\bplan|intent/.test(toolText)) {
+    return "plan";
+  }
+  return "observe";
+}
+
+function resolveReasoningTheaterCertaintyClass(input: {
+  allText: string;
+  suppressionReason: ReasoningTheaterSuppressionReason | null;
+  passHits: number;
+  failHits: number;
+  evidenceHits: number;
+  ambiguityHits: number;
+}): ReasoningTheaterCertaintyClass {
+  if (input.suppressionReason === "missing_evidence" || input.suppressionReason === "contract_violation") {
+    return "unknown";
+  }
+  if (/\b(confirmed|finalized|verdict:\s*pass|integrity:\s*ok|certificate:\s*[a-f0-9]{8,})\b/i.test(input.allText)) {
+    return "confirmed";
+  }
+  if (/\b(hypothes|maybe|possible|candidate|speculat)\w*/i.test(input.allText)) {
+    return "hypothesis";
+  }
+  if (input.evidenceHits > 0 || input.passHits > input.failHits) {
+    return "reasoned";
+  }
+  if (input.ambiguityHits > 0 || input.failHits > 0) {
+    return "unknown";
+  }
+  return "reasoned";
+}
+
+function resolveReasoningTheaterMedal(input: {
+  current: ReasoningTheaterState;
+  previous: ReasoningTheaterState | null;
+}): ReasoningTheaterMedalEvent | null {
+  const { current, previous } = input;
+  if (!previous) {
+    if (current.phase === "retrieve") {
+      return { medal: "scout", reason: "Retrieval/search engaged." };
+    }
+    if (current.phase === "observe" && (current.certaintyClass === "unknown" || current.certaintyClass === "hypothesis")) {
+      return { medal: "lantern", reason: "Uncertainty surfaced explicitly." };
+    }
+    return null;
+  }
+
+  if (
+    (previous.suppressionReason !== current.suppressionReason && current.suppressionReason) ||
+    (previous.stance !== "fail_closed" && current.stance === "fail_closed")
+  ) {
+    return { medal: "seal", reason: "Constraint block/fail-closed activated." };
+  }
+  if (previous.archetype !== "contradiction" && current.archetype === "contradiction") {
+    return { medal: "fracture", reason: "Contradiction surfaced." };
+  }
+  if (previous.archetype === "contradiction" && current.archetype !== "contradiction") {
+    return { medal: "stitch", reason: "Contradiction reconciled." };
+  }
+  if (previous.archetype !== "overload" && current.archetype === "overload") {
+    return { medal: "valve", reason: "Pressure handling/rate control engaged." };
+  }
+  if (previous.phase !== current.phase && current.phase === "retrieve") {
+    return { medal: "scout", reason: "Moved into retrieval phase." };
+  }
+  if (
+    current.evidenceHits >= previous.evidenceHits + 2 ||
+    (previous.archetype === "missing_evidence" && current.archetype !== "missing_evidence")
+  ) {
+    return { medal: "anchor", reason: "Grounding/evidence improved." };
+  }
+  if (previous.archetype === "coverage_gap" && current.archetype !== "coverage_gap") {
+    return { medal: "lattice", reason: "Coverage gap reduced." };
+  }
+  if (current.ambiguityPressure + 0.12 < previous.ambiguityPressure && current.archetype === "ambiguity") {
+    return { medal: "prism", reason: "Ambiguity resolving into distinction." };
+  }
+  if (previous.phase !== current.phase && (current.phase === "gate" || current.phase === "verify")) {
+    return { medal: "gate", reason: "Verification threshold encountered." };
+  }
+  if (current.passHits > previous.passHits && (current.phase === "gate" || current.phase === "verify")) {
+    return { medal: "gate", reason: "Gate/verification progress recorded." };
+  }
+  if (previous.phase !== current.phase && (current.phase === "synthesize" || current.phase === "execute")) {
+    return { medal: "relay", reason: "Reasoning relayed into next stage." };
+  }
+  if (
+    (previous.certaintyClass !== "confirmed" &&
+      current.certaintyClass === "confirmed" &&
+      current.stance === "winning") ||
+    (previous.phase !== "debrief" &&
+      current.phase === "debrief" &&
+      current.certaintyClass === "confirmed")
+  ) {
+    return { medal: "crown", reason: "Verified conclusion reached." };
+  }
+  if (
+    previous.phase !== "observe" &&
+    current.phase === "observe" &&
+    (current.certaintyClass === "unknown" || current.certaintyClass === "hypothesis")
+  ) {
+    return { medal: "lantern", reason: "Observation uncertainty surfaced." };
   }
   return null;
 }
@@ -882,13 +1169,24 @@ function deriveReasoningTheaterState(input: {
   const pulseHz = 0.8 + 1.4 * clamp01(Math.abs(battleIndex));
   const fogOpacity = clamp01(0.12 + 0.75 * ambiguityPressure);
   const particleCount = clampNumber(Math.round(6 + momentum * 16), 4, 24);
+  const phase = resolveReasoningTheaterPhase(allText, input.askLiveEvents);
+  const certaintyClass = resolveReasoningTheaterCertaintyClass({
+    allText,
+    suppressionReason,
+    passHits,
+    failHits,
+    evidenceHits,
+    ambiguityHits,
+  });
   const seed = hash32(
-    `${input.askLiveTraceId ?? "no-trace"}:${input.askLiveEvents.length}:${archetype}:${stance}`,
+    `${input.askLiveTraceId ?? "no-trace"}:${input.askLiveEvents.length}:${archetype}:${stance}:${phase}:${certaintyClass}`,
   );
 
   return {
     stance,
     archetype,
+    phase,
+    certaintyClass,
     suppressionReason,
     momentum,
     ambiguityPressure,
@@ -896,6 +1194,10 @@ function deriveReasoningTheaterState(input: {
     pulseHz,
     fogOpacity,
     particleCount,
+    passHits,
+    evidenceHits,
+    stageTransitions,
+    allText,
     symbolicLine,
     seed,
   };
@@ -919,6 +1221,22 @@ function buildReasoningTheaterParticles(
     });
   }
   return particles;
+}
+
+function buildReasoningTheaterFrontierParticles(
+  seed: number,
+  count: number,
+): ReasoningTheaterFrontierParticleNode[] {
+  const rng = mulberry32(seed ^ 0xa5a5a5a5);
+  const nodes: ReasoningTheaterFrontierParticleNode[] = [];
+  for (let i = 0; i < count; i += 1) {
+    nodes.push({
+      id: `frontier-particle-${i}`,
+      phaseOffsetMs: Math.round(rng() * 1200),
+      baseRadiusPx: 2 + rng() * 2.4,
+    });
+  }
+  return nodes;
 }
 
 const HELIX_ASK_OUTPUT_TOKENS = clampNumber(
@@ -1527,6 +1845,71 @@ export function HelixAskPill({
   const playbackReplyIdRef = useRef<string | null>(null);
   const contextSessionStreamRef = useRef<MediaStream | null>(null);
   const contextSessionStartInFlightRef = useRef(false);
+  const reasoningTheaterPrevRef = useRef<ReasoningTheaterState | null>(null);
+  const reasoningTheaterClockRafRef = useRef<number | null>(null);
+  const reasoningTheaterClockLastMsRef = useRef<number | null>(null);
+  const reasoningTheaterClockAccumulatorMsRef = useRef(0);
+  const reasoningTheaterClockElapsedMsRef = useRef(0);
+  const reasoningTheaterEventClockRef = useRef<{
+    baseElapsedMs: number;
+    anchorPerfMs: number | null;
+    lastSeq: number | null;
+    lastEventTsMs: number | null;
+    source: ReasoningTheaterClockSource;
+  }>({
+    baseElapsedMs: 0,
+    anchorPerfMs: null,
+    lastSeq: null,
+    lastEventTsMs: null,
+    source: "local",
+  });
+  const [reasoningTheaterClockDebug, setReasoningTheaterClockDebug] = useState<{
+    source: ReasoningTheaterClockSource;
+    seq: number | null;
+  }>({
+    source: "local",
+    seq: null,
+  });
+  const reasoningTheaterMeterTargetRef = useRef(50);
+  const reasoningTheaterMeterDisplayRef = useRef(50);
+  const reasoningTheaterPulseHzRef = useRef(1);
+  const reasoningTheaterBattleIndexRef = useRef(0);
+  const reasoningTheaterStanceRef = useRef<ReasoningTheaterStance>("contested");
+  const reasoningTheaterSuppressionReasonRef = useRef<ReasoningTheaterSuppressionReason | null>(null);
+  const reasoningTheaterMeterFillRef = useRef<HTMLDivElement | null>(null);
+  const reasoningTheaterMeterPatternRef = useRef<HTMLDivElement | null>(null);
+  const reasoningTheaterMedalTimersRef = useRef<
+    Record<string, { fadeTimer: number | null; removeTimer: number | null }>
+  >({});
+  const [reasoningTheaterMedalQueue, setReasoningTheaterMedalQueue] = useState<
+    ReasoningTheaterMedalPulse[]
+  >([]);
+  const [reasoningTheaterMedalBrokenByToken, setReasoningTheaterMedalBrokenByToken] = useState<
+    Record<string, boolean>
+  >({});
+  const [reasoningTheaterConfig, setReasoningTheaterConfig] = useState<ReasoningTheaterConfigResponse>(
+    () => getDefaultReasoningTheaterConfig(),
+  );
+  const [reasoningTheaterFrontierIconBrokenByPath, setReasoningTheaterFrontierIconBrokenByPath] = useState<
+    Record<string, boolean>
+  >({});
+  const [reasoningTheaterFrontierDebug, setReasoningTheaterFrontierDebug] = useState<{
+    action: ReasoningTheaterFrontierAction;
+    deltaPct: number;
+  }>({
+    action: "steady",
+    deltaPct: 0,
+  });
+  const reasoningTheaterFrontierTrackerRef = useRef<ReasoningTheaterFrontierTrackerState>(
+    createReasoningTheaterFrontierTrackerState("steady"),
+  );
+  const reasoningTheaterFrontierCursorRef = useRef<HTMLDivElement | null>(null);
+  const reasoningTheaterFrontierIconRef = useRef<HTMLImageElement | null>(null);
+  const reasoningTheaterFrontierTextRef = useRef<HTMLSpanElement | null>(null);
+  const reasoningTheaterFrontierParticleRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const reasoningTheaterFrontierBurstRef = useRef<HTMLDivElement | null>(null);
+  const reasoningTheaterFrontierPulseUntilMsRef = useRef(0);
+  const reasoningTheaterFrontierDebugUpdateAtRef = useRef(0);
 
   const getHelixAskSessionId = useCallback(() => {
     if (helixAskSessionRef.current) return helixAskSessionRef.current;
@@ -1554,6 +1937,23 @@ export function HelixAskPill({
   useEffect(() => {
     broadcastLumaMood(askMood);
   }, [askMood]);
+
+  useEffect(() => {
+    if (!REASONING_THEATER_FRONTIER_ACTIONS_ENABLED) return;
+    let active = true;
+    void getReasoningTheaterConfig()
+      .then((payload) => {
+        if (!active) return;
+        setReasoningTheaterConfig(payload);
+      })
+      .catch(() => {
+        if (!active) return;
+        setReasoningTheaterConfig(getDefaultReasoningTheaterConfig());
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const clearLiveDraftFlush = useCallback(() => {
     if (askLiveDraftFlushRef.current !== null && typeof window !== "undefined") {
@@ -1658,9 +2058,35 @@ export function HelixAskPill({
     }
   }, []);
 
+  const clearReasoningTheaterMedalTimers = useCallback((token?: string) => {
+    if (typeof window === "undefined") return;
+    if (token) {
+      const timers = reasoningTheaterMedalTimersRef.current[token];
+      if (timers?.fadeTimer !== null) {
+        window.clearTimeout(timers.fadeTimer);
+      }
+      if (timers?.removeTimer !== null) {
+        window.clearTimeout(timers.removeTimer);
+      }
+      delete reasoningTheaterMedalTimersRef.current[token];
+      return;
+    }
+    for (const key of Object.keys(reasoningTheaterMedalTimersRef.current)) {
+      const timers = reasoningTheaterMedalTimersRef.current[key];
+      if (timers?.fadeTimer !== null) {
+        window.clearTimeout(timers.fadeTimer);
+      }
+      if (timers?.removeTimer !== null) {
+        window.clearTimeout(timers.removeTimer);
+      }
+    }
+    reasoningTheaterMedalTimersRef.current = {};
+  }, []);
+
   useEffect(() => () => clearMoodTimer(), [clearMoodTimer]);
   useEffect(() => () => cancelMoodHint(), [cancelMoodHint]);
   useEffect(() => () => clearLiveDraftFlush(), [clearLiveDraftFlush]);
+  useEffect(() => () => clearReasoningTheaterMedalTimers(), [clearReasoningTheaterMedalTimers]);
   useEffect(() => {
     if (!askBusy) return;
     cancelMoodHint();
@@ -1715,9 +2141,414 @@ export function HelixAskPill({
       reasoningTheater.particleCount,
     );
   }, [reasoningTheater]);
-  const reasoningTheaterMeter = reasoningTheater
+  const reasoningTheaterFrontierParticles = useMemo(() => {
+    if (!reasoningTheater) return [];
+    return buildReasoningTheaterFrontierParticles(
+      reasoningTheater.seed,
+      REASONING_THEATER_FRONTIER_PARTICLE_COUNT,
+    );
+  }, [reasoningTheater]);
+  const reasoningTheaterMeterTarget = reasoningTheater
     ? clampNumber(Math.round(((reasoningTheater.battleIndex + 1) / 2) * 100), 0, 100)
     : 50;
+
+  const stopReasoningTheaterClock = useCallback(() => {
+    if (reasoningTheaterClockRafRef.current !== null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(reasoningTheaterClockRafRef.current);
+      reasoningTheaterClockRafRef.current = null;
+    }
+    reasoningTheaterClockLastMsRef.current = null;
+    reasoningTheaterClockAccumulatorMsRef.current = 0;
+  }, []);
+
+  const resetReasoningTheaterEventClock = useCallback(() => {
+    reasoningTheaterEventClockRef.current = {
+      baseElapsedMs: 0,
+      anchorPerfMs: null,
+      lastSeq: null,
+      lastEventTsMs: null,
+      source: "local",
+    };
+    setReasoningTheaterClockDebug({ source: "local", seq: null });
+  }, []);
+
+  const updateReasoningTheaterEventClock = useCallback(
+    (event: ToolLogEvent, startedAt: number, eventTsMs: number | null) => {
+      const nowPerfMs =
+        typeof performance !== "undefined" && typeof performance.now === "function"
+          ? performance.now()
+          : Date.now();
+      const clock = reasoningTheaterEventClockRef.current;
+      let nextSource: ReasoningTheaterClockSource = clock.source;
+      let nextElapsedMs = clock.baseElapsedMs;
+
+      if (
+        eventTsMs !== null &&
+        (clock.lastEventTsMs === null || eventTsMs >= clock.lastEventTsMs - 250)
+      ) {
+        const elapsedFromStartMs = Math.max(0, eventTsMs - startedAt);
+        nextElapsedMs = Math.max(nextElapsedMs, elapsedFromStartMs);
+        clock.lastEventTsMs = eventTsMs;
+        nextSource = "event_ts";
+      } else if (
+        typeof event.seq === "number" &&
+        Number.isFinite(event.seq) &&
+        clock.lastSeq !== null &&
+        event.seq > clock.lastSeq
+      ) {
+        const seqDelta = clampNumber(event.seq - clock.lastSeq, 1, 120);
+        nextElapsedMs += seqDelta * REASONING_THEATER_CLOCK_STEP_MS;
+        nextSource = "event_seq";
+      } else if (clock.anchorPerfMs !== null) {
+        const elapsedSinceAnchorMs = Math.max(0, nowPerfMs - clock.anchorPerfMs);
+        nextElapsedMs = Math.max(nextElapsedMs, clock.baseElapsedMs + elapsedSinceAnchorMs);
+      }
+
+      clock.baseElapsedMs = nextElapsedMs;
+      clock.anchorPerfMs = nowPerfMs;
+      if (typeof event.seq === "number" && Number.isFinite(event.seq)) {
+        if (clock.lastSeq === null || event.seq > clock.lastSeq) {
+          clock.lastSeq = event.seq;
+        }
+      }
+      clock.source = nextSource;
+      setReasoningTheaterClockDebug((prev) =>
+        prev.source === clock.source && prev.seq === clock.lastSeq
+          ? prev
+          : { source: clock.source, seq: clock.lastSeq },
+      );
+    },
+    [],
+  );
+
+  const applyReasoningTheaterMeterFrame = useCallback(
+    (meterValue: number, elapsedMs: number) => {
+      const clampedMeter = clampFrontierMeterPct(meterValue);
+      const fill = reasoningTheaterMeterFillRef.current;
+      if (fill) {
+        fill.style.width = `${clampedMeter.toFixed(2)}%`;
+      }
+      const pattern = reasoningTheaterMeterPatternRef.current;
+      if (pattern) {
+        const hz = clampNumber(reasoningTheaterPulseHzRef.current, 0.4, 4.5);
+        const speedPxPerSecond = 20 + hz * 26;
+        const direction = reasoningTheaterBattleIndexRef.current >= 0 ? 1 : -1;
+        const cyclePx = 56;
+        const driftPx = ((elapsedMs / 1000) * speedPxPerSecond) % cyclePx;
+        const shiftPx = direction > 0 ? driftPx : -driftPx;
+        pattern.style.transform = `translate3d(${shiftPx.toFixed(2)}px,0,0)`;
+        const intensity = clampNumber(
+          0.24 + Math.abs(reasoningTheaterBattleIndexRef.current) * 0.46,
+          0.24,
+          0.8,
+        );
+        pattern.style.opacity = intensity.toFixed(2);
+      }
+
+      if (!REASONING_THEATER_FRONTIER_ACTIONS_ENABLED) return;
+      const trackerResult = advanceReasoningTheaterFrontierTracker(
+        reasoningTheaterFrontierTrackerRef.current,
+        {
+          nowMs: elapsedMs,
+          meterPct: clampedMeter,
+          stance: reasoningTheaterStanceRef.current,
+          suppressionReason: reasoningTheaterSuppressionReasonRef.current,
+          config: reasoningTheaterConfig.frontier_actions,
+        },
+      );
+      reasoningTheaterFrontierTrackerRef.current = trackerResult.state;
+      const committedAction = trackerResult.state.committedAction;
+      if (trackerResult.actionChanged) {
+        reasoningTheaterFrontierPulseUntilMsRef.current =
+          elapsedMs + REASONING_THEATER_FRONTIER_CURSOR_PULSE_MS;
+      }
+      const windowDeltaPct = trackerResult.state.lastWindowDeltaPct;
+      const deltaRounded = Math.round(windowDeltaPct * 10) / 10;
+      const canPublishDebug =
+        trackerResult.actionChanged ||
+        elapsedMs - reasoningTheaterFrontierDebugUpdateAtRef.current >= 250;
+      if (canPublishDebug) {
+        reasoningTheaterFrontierDebugUpdateAtRef.current = elapsedMs;
+        setReasoningTheaterFrontierDebug((prev) =>
+          prev.action === committedAction && Math.abs(prev.deltaPct - deltaRounded) < 0.25
+            ? prev
+            : {
+                action: committedAction,
+                deltaPct: deltaRounded,
+              },
+        );
+      }
+
+      const iconPath = resolveReasoningTheaterFrontierIconPath(
+        committedAction,
+        reasoningTheaterConfig.frontier_actions,
+      );
+      const profile = resolveReasoningTheaterFrontierParticleProfile(
+        committedAction,
+        reasoningTheaterConfig.frontier_actions,
+      );
+      const iconBroken = reasoningTheaterFrontierIconBrokenByPath[iconPath] === true;
+      const cursor = reasoningTheaterFrontierCursorRef.current;
+      if (cursor) {
+        const pulseActive = elapsedMs <= reasoningTheaterFrontierPulseUntilMsRef.current;
+        const pulseScale = pulseActive ? 1.18 : 1;
+        cursor.style.left = `${clampedMeter.toFixed(2)}%`;
+        cursor.style.opacity = "1";
+        cursor.style.transform = `translate3d(-50%,-50%,0) scale(${pulseScale.toFixed(2)})`;
+      }
+
+      const icon = reasoningTheaterFrontierIconRef.current;
+      if (icon) {
+        if (!iconBroken) {
+          if (icon.getAttribute("src") !== iconPath) {
+            icon.setAttribute("src", iconPath);
+          }
+          icon.style.display = "block";
+        } else {
+          icon.style.display = "none";
+        }
+      }
+      const fallback = reasoningTheaterFrontierTextRef.current;
+      if (fallback) {
+        fallback.textContent = REASONING_THEATER_FRONTIER_ACTION_LABEL[committedAction];
+        fallback.style.display = iconBroken ? "inline-flex" : "none";
+        fallback.style.color = profile.color;
+      }
+
+      const densityRatio = clamp01(profile.emit_rate_hz / 30);
+      const activeParticleCount = Math.max(
+        1,
+        Math.round(densityRatio * reasoningTheaterFrontierParticleRefs.current.length),
+      );
+      for (let i = 0; i < reasoningTheaterFrontierParticleRefs.current.length; i += 1) {
+        const node = reasoningTheaterFrontierParticles[i];
+        const element = reasoningTheaterFrontierParticleRefs.current[i];
+        if (!node || !element) continue;
+        if (i >= activeParticleCount) {
+          element.style.opacity = "0";
+          continue;
+        }
+        const cycleMs = clampNumber(
+          980 - profile.speed_max_px_s * 2.8 + i * 40,
+          260,
+          1200,
+        );
+        const progress = ((elapsedMs + node.phaseOffsetMs) % cycleMs) / cycleMs;
+        const angleDrift = Math.sin((elapsedMs + node.phaseOffsetMs) * 0.003 + i) * profile.spread_deg;
+        const angleDeg =
+          profile.base_direction_deg + angleDrift * (0.45 + profile.turbulence * 0.75);
+        const angleRad = (angleDeg * Math.PI) / 180;
+        const speed =
+          profile.speed_min_px_s +
+          (profile.speed_max_px_s - profile.speed_min_px_s) *
+            (0.24 + ((i + 1) / (activeParticleCount + 1)) * 0.76);
+        const travelPx = speed * 0.22;
+        const jitter = Math.sin((elapsedMs + node.phaseOffsetMs) * 0.014 + i) * profile.turbulence * 5;
+        const x = Math.cos(angleRad) * travelPx * progress;
+        const y = Math.sin(angleRad) * travelPx * progress + jitter;
+        const alpha = (1 - progress) * (0.42 + densityRatio * 0.5);
+        const size = node.baseRadiusPx + profile.turbulence * 1.6;
+        element.style.width = `${size.toFixed(2)}px`;
+        element.style.height = `${size.toFixed(2)}px`;
+        element.style.backgroundColor = profile.color;
+        element.style.opacity = alpha.toFixed(2);
+        element.style.transform = `translate3d(${x.toFixed(2)}px,${y.toFixed(2)}px,0)`;
+      }
+
+      const burst = reasoningTheaterFrontierBurstRef.current;
+      if (burst) {
+        const pulseWindowMs = Math.max(1, REASONING_THEATER_FRONTIER_CURSOR_PULSE_MS);
+        const pulseProgress = clamp01(
+          (reasoningTheaterFrontierPulseUntilMsRef.current - elapsedMs) / pulseWindowMs,
+        );
+        const shouldShow = profile.transition_burst && pulseProgress > 0;
+        burst.style.opacity = shouldShow ? (pulseProgress * 0.7).toFixed(2) : "0";
+        burst.style.borderColor = profile.color;
+        const ringScale = 0.7 + (1 - pulseProgress) * (profile.shock_ring ? 1.45 : 0.9);
+        burst.style.transform = `translate3d(-50%,-50%,0) scale(${ringScale.toFixed(2)})`;
+      }
+    },
+    [
+      reasoningTheaterConfig,
+      reasoningTheaterFrontierIconBrokenByPath,
+      reasoningTheaterFrontierParticles,
+    ],
+  );
+
+  useEffect(() => {
+    if (!askBusy || !reasoningTheater) {
+      reasoningTheaterMeterTargetRef.current = 50;
+      reasoningTheaterPulseHzRef.current = 1;
+      reasoningTheaterBattleIndexRef.current = 0;
+      reasoningTheaterStanceRef.current = "contested";
+      reasoningTheaterSuppressionReasonRef.current = null;
+      reasoningTheaterMeterDisplayRef.current = 50;
+      reasoningTheaterClockElapsedMsRef.current = 0;
+      reasoningTheaterFrontierTrackerRef.current = createReasoningTheaterFrontierTrackerState("steady");
+      setReasoningTheaterFrontierDebug({ action: "steady", deltaPct: 0 });
+      setReasoningTheaterFrontierIconBrokenByPath({});
+      reasoningTheaterFrontierDebugUpdateAtRef.current = 0;
+      if (!askBusy) {
+        resetReasoningTheaterEventClock();
+      }
+      applyReasoningTheaterMeterFrame(50, 0);
+      return;
+    }
+    reasoningTheaterMeterTargetRef.current = reasoningTheaterMeterTarget;
+    reasoningTheaterPulseHzRef.current = reasoningTheater.pulseHz;
+    reasoningTheaterBattleIndexRef.current = reasoningTheater.battleIndex;
+    reasoningTheaterStanceRef.current = reasoningTheater.stance;
+    reasoningTheaterSuppressionReasonRef.current = reasoningTheater.suppressionReason;
+  }, [
+    applyReasoningTheaterMeterFrame,
+    askBusy,
+    resetReasoningTheaterEventClock,
+    reasoningTheater,
+    reasoningTheaterMeterTarget,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !askBusy) {
+      stopReasoningTheaterClock();
+      return;
+    }
+    stopReasoningTheaterClock();
+    const tick = (nowMs: number) => {
+      if (reasoningTheaterClockLastMsRef.current === null) {
+        reasoningTheaterClockLastMsRef.current = nowMs;
+        applyReasoningTheaterMeterFrame(
+          reasoningTheaterMeterDisplayRef.current,
+          reasoningTheaterClockElapsedMsRef.current,
+        );
+        reasoningTheaterClockRafRef.current = window.requestAnimationFrame(tick);
+        return;
+      }
+      const rawDelta = nowMs - reasoningTheaterClockLastMsRef.current;
+      reasoningTheaterClockLastMsRef.current = nowMs;
+      const frameDelta = clampNumber(
+        Number.isFinite(rawDelta) ? rawDelta : REASONING_THEATER_CLOCK_STEP_MS,
+        0,
+        120,
+      );
+      let simulationDelta = frameDelta;
+      const eventClock = reasoningTheaterEventClockRef.current;
+      if (eventClock.anchorPerfMs !== null) {
+        const elapsedSinceAnchorMs = Math.max(0, nowMs - eventClock.anchorPerfMs);
+        const eventTimelineElapsedMs = eventClock.baseElapsedMs + elapsedSinceAnchorMs;
+        const eventTimelineDelta = eventTimelineElapsedMs - reasoningTheaterClockElapsedMsRef.current;
+        if (Number.isFinite(eventTimelineDelta)) {
+          simulationDelta = clampNumber(eventTimelineDelta, 0, 240);
+        }
+      }
+      reasoningTheaterClockAccumulatorMsRef.current += simulationDelta;
+      let stepped = false;
+      while (reasoningTheaterClockAccumulatorMsRef.current >= REASONING_THEATER_CLOCK_STEP_MS) {
+        reasoningTheaterClockAccumulatorMsRef.current -= REASONING_THEATER_CLOCK_STEP_MS;
+        const target = reasoningTheaterMeterTargetRef.current;
+        const current = reasoningTheaterMeterDisplayRef.current;
+        const delta = target - current;
+        let next = current;
+        if (Math.abs(delta) <= REASONING_THEATER_METER_EPSILON) {
+          next = target;
+        } else {
+          const alpha =
+            delta >= 0
+              ? REASONING_THEATER_METER_GAIN_ALPHA
+              : REASONING_THEATER_METER_LOSS_ALPHA;
+          next = clampNumber(current + delta * alpha, 0, 100);
+        }
+        reasoningTheaterMeterDisplayRef.current = next;
+        reasoningTheaterClockElapsedMsRef.current += REASONING_THEATER_CLOCK_STEP_MS;
+        stepped = true;
+      }
+      if (stepped) {
+        applyReasoningTheaterMeterFrame(
+          reasoningTheaterMeterDisplayRef.current,
+          reasoningTheaterClockElapsedMsRef.current,
+        );
+      }
+      reasoningTheaterClockRafRef.current = window.requestAnimationFrame(tick);
+    };
+    reasoningTheaterClockRafRef.current = window.requestAnimationFrame(tick);
+    return () => stopReasoningTheaterClock();
+  }, [applyReasoningTheaterMeterFrame, askBusy, stopReasoningTheaterClock]);
+
+  useEffect(() => {
+    if (!askBusy || !reasoningTheater) {
+      reasoningTheaterPrevRef.current = null;
+      setReasoningTheaterMedalQueue([]);
+      setReasoningTheaterMedalBrokenByToken({});
+      clearReasoningTheaterMedalTimers();
+      return;
+    }
+    const previous = reasoningTheaterPrevRef.current;
+    const medalEvent = resolveReasoningTheaterMedal({
+      current: reasoningTheater,
+      previous,
+    });
+    reasoningTheaterPrevRef.current = reasoningTheater;
+    if (!medalEvent) return;
+
+    const startedAt = Date.now();
+    const token = `${reasoningTheater.seed}:${medalEvent.medal}:${askLiveEvents.length}:${startedAt}`;
+    const pulse: ReasoningTheaterMedalPulse = {
+      ...medalEvent,
+      token,
+      startedAt,
+      assetPath: REASONING_THEATER_MEDAL_ASSET[medalEvent.medal],
+      fading: false,
+    };
+
+    setReasoningTheaterMedalQueue((prevQueue) => {
+      const nextQueue = [...prevQueue, pulse];
+      if (nextQueue.length <= REASONING_THEATER_MEDAL_MAX_VISIBLE) return nextQueue;
+      const trimmedQueue = nextQueue.slice(-REASONING_THEATER_MEDAL_MAX_VISIBLE);
+      const keep = new Set(trimmedQueue.map((entry) => entry.token));
+      for (const entry of prevQueue) {
+        if (!keep.has(entry.token)) {
+          clearReasoningTheaterMedalTimers(entry.token);
+        }
+      }
+      return trimmedQueue;
+    });
+
+    if (typeof window !== "undefined") {
+      const fadeTimer = window.setTimeout(() => {
+        setReasoningTheaterMedalQueue((prevQueue) =>
+          prevQueue.map((entry) =>
+            entry.token === token ? { ...entry, fading: true } : entry,
+          ),
+        );
+      }, REASONING_THEATER_MEDAL_VISIBLE_MS);
+      const removeTimer = window.setTimeout(() => {
+        setReasoningTheaterMedalQueue((prevQueue) =>
+          prevQueue.filter((entry) => entry.token !== token),
+        );
+        setReasoningTheaterMedalBrokenByToken((prev) => {
+          if (!(token in prev)) return prev;
+          const next = { ...prev };
+          delete next[token];
+          return next;
+        });
+        clearReasoningTheaterMedalTimers(token);
+      }, REASONING_THEATER_MEDAL_VISIBLE_MS + REASONING_THEATER_MEDAL_FADE_MS);
+      reasoningTheaterMedalTimersRef.current[token] = { fadeTimer, removeTimer };
+    }
+  }, [
+    askBusy,
+    askLiveEvents.length,
+    clearReasoningTheaterMedalTimers,
+    reasoningTheater,
+  ]);
+  const latestReasoningTheaterMedal =
+    reasoningTheaterMedalQueue[reasoningTheaterMedalQueue.length - 1] ?? null;
+  const reasoningTheaterFrontierAction = reasoningTheaterFrontierDebug.action;
+  const reasoningTheaterFrontierIconPath = resolveReasoningTheaterFrontierIconPath(
+    reasoningTheaterFrontierAction,
+    reasoningTheaterConfig.frontier_actions,
+  );
+  const reasoningTheaterFrontierIconBroken =
+    reasoningTheaterFrontierIconBrokenByPath[reasoningTheaterFrontierIconPath] === true;
 
   useEffect(() => {
     if (!askBusy) return;
@@ -2129,15 +2960,11 @@ export function HelixAskPill({
       if (!isHelixTool && hasSessionFilter && !isLocalTool && event.sessionId !== askLiveSessionId) {
         return;
       }
-      const eventTs =
-        typeof event.ts === "number"
-          ? event.ts
-          : typeof event.ts === "string"
-            ? Date.parse(event.ts)
-            : undefined;
+      const eventTs = parseTimestampMs(event.ts);
       if (typeof eventTs === "number" && Number.isFinite(eventTs) && eventTs < startedAt - 500) {
         return;
       }
+      updateReasoningTheaterEventClock(event, startedAt, eventTs);
       if (toolName === "helix.ask.stream") {
         const chunk = (event.text ?? "").toString();
         if (!chunk.trim()) return;
@@ -2169,6 +2996,11 @@ export function HelixAskPill({
             text,
             tool: toolName || undefined,
             ts: event.ts,
+            tsMs: eventTs ?? undefined,
+            seq:
+              typeof event.seq === "number" && Number.isFinite(event.seq)
+                ? event.seq
+                : undefined,
             durationMs:
               typeof event.durationMs === "number" && Number.isFinite(event.durationMs)
                 ? event.durationMs
@@ -2186,7 +3018,13 @@ export function HelixAskPill({
       limit: 200,
     });
     return () => unsubscribe();
-  }, [askBusy, askLiveSessionId, askLiveTraceId, scheduleLiveDraftFlush]);
+  }, [
+    askBusy,
+    askLiveSessionId,
+    askLiveTraceId,
+    scheduleLiveDraftFlush,
+    updateReasoningTheaterEventClock,
+  ]);
 
   const askLiveStatusText = useMemo(() => {
     const statusTrimmed = askStatus?.trim() ?? "";
@@ -2235,6 +3073,7 @@ export function HelixAskPill({
         text,
         tool: entry.tool,
         ts: entry.ts,
+        tsMs: parseTimestampMs(entry.ts) ?? undefined,
         durationMs: entry.durationMs,
       };
     });
@@ -2264,6 +3103,7 @@ export function HelixAskPill({
       setAskError(null);
       setAskLiveEvents([]);
       askLiveEventsRef.current = [];
+      resetReasoningTheaterEventClock();
       setAskLiveDraft("");
       askLiveDraftRef.current = "";
       askLiveDraftBufferRef.current = "";
@@ -2378,6 +3218,7 @@ export function HelixAskPill({
       clearMoodTimer,
       getHelixAskSessionId,
       launchAtomicViewer,
+      resetReasoningTheaterEventClock,
       requestMoodHint,
       setActive,
       updateMoodFromText,
@@ -2402,6 +3243,7 @@ export function HelixAskPill({
       setAskError(null);
       setAskLiveEvents([]);
       askLiveEventsRef.current = [];
+      resetReasoningTheaterEventClock();
       setAskLiveDraft("");
       askLiveDraftRef.current = "";
       askLiveDraftBufferRef.current = "";
@@ -2528,6 +3370,7 @@ export function HelixAskPill({
       clearMoodTimer,
       getHelixAskSessionId,
       launchAtomicViewer,
+      resetReasoningTheaterEventClock,
       requestMoodHint,
       resizeTextarea,
       setActive,
@@ -2886,13 +3729,9 @@ export function HelixAskPill({
               <div className="relative">
                 {reasoningTheater ? (
                   <div
-                    className={`relative mb-2 overflow-hidden rounded-md border px-2 py-2 ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].panelBorder}`}
+                    className="relative mb-2 overflow-hidden px-1 py-1"
                   >
                     <div className="pointer-events-none absolute inset-0" aria-hidden>
-                      <div
-                        className="absolute inset-0 bg-[radial-gradient(130%_180%_at_50%_8%,rgba(125,211,252,0.2)_0%,rgba(15,23,42,0.86)_72%)]"
-                        style={{ opacity: reasoningTheater.fogOpacity }}
-                      />
                       <div className="absolute inset-0">
                         {reasoningTheaterParticles.map((particle) => (
                           <span
@@ -2903,7 +3742,7 @@ export function HelixAskPill({
                               top: `${particle.topPct}%`,
                               width: `${particle.sizePx}px`,
                               height: `${particle.sizePx}px`,
-                              opacity: particle.opacity,
+                              opacity: particle.opacity * (0.35 + reasoningTheater.fogOpacity * 0.35),
                               animationDelay: `${particle.delayS}s`,
                               animationDuration: `${particle.durationS}s`,
                             }}
@@ -2912,20 +3751,26 @@ export function HelixAskPill({
                       </div>
                     </div>
                     <div className="relative">
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
                           Reasoning theater
                         </span>
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].badge}`}
+                          className={`text-[10px] uppercase tracking-[0.18em] ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].badge}`}
                         >
                           {REASONING_THEATER_STANCE_META[reasoningTheater.stance].label}
                         </span>
-                        <span className="rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-200">
+                        <span className="text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
                           {REASONING_THEATER_ARCHETYPE_LABEL[reasoningTheater.archetype]}
                         </span>
+                        <span className="text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
+                          {REASONING_THEATER_PHASE_LABEL[reasoningTheater.phase]}
+                        </span>
+                        <span className="text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
+                          {REASONING_THEATER_CERTAINTY_LABEL[reasoningTheater.certaintyClass]}
+                        </span>
                         {reasoningTheater.suppressionReason ? (
-                          <span className="rounded-full border border-rose-300/35 bg-rose-400/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-rose-100">
+                          <span className="text-[10px] uppercase tracking-[0.16em] text-rose-200/95">
                             {REASONING_THEATER_SUPPRESSION_LABEL[reasoningTheater.suppressionReason]}
                           </span>
                         ) : null}
@@ -2933,16 +3778,136 @@ export function HelixAskPill({
                       <p className="mt-1 text-[11px] text-slate-200/90">
                         {reasoningTheater.symbolicLine}
                       </p>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/45">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ease-out ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].bar}`}
-                          style={{ width: `${reasoningTheaterMeter}%` }}
-                        />
+                      {reasoningTheaterMedalQueue.length > 0 ? (
+                        <div className="pointer-events-none mt-1 space-y-1 text-cyan-100/95">
+                          <div className="flex items-end gap-1.5">
+                            {reasoningTheaterMedalQueue.map((medalPulse) => {
+                              const broken = reasoningTheaterMedalBrokenByToken[medalPulse.token] === true;
+                              return (
+                                <div
+                                  key={medalPulse.token}
+                                  className="overflow-hidden transition-[width,opacity,transform] duration-700 ease-out"
+                                  style={{
+                                    width: medalPulse.fading ? 0 : 52,
+                                    opacity: medalPulse.fading ? 0 : 1,
+                                    transform: medalPulse.fading ? "scale(0.86)" : "scale(1)",
+                                  }}
+                                >
+                                  {!broken ? (
+                                    <img
+                                      src={medalPulse.assetPath}
+                                      alt={`${REASONING_THEATER_MEDAL_LABEL[medalPulse.medal]} medal`}
+                                      className="h-12 w-12 shrink-0 object-contain opacity-95 mix-blend-screen drop-shadow-[0_0_16px_rgba(34,211,238,0.5)]"
+                                      loading="lazy"
+                                      onError={() =>
+                                        setReasoningTheaterMedalBrokenByToken((prev) => ({
+                                          ...prev,
+                                          [medalPulse.token]: true,
+                                        }))
+                                      }
+                                    />
+                                  ) : (
+                                    <span className="inline-flex h-12 w-12 items-center justify-center text-[8px] uppercase tracking-[0.18em] text-cyan-100/90">
+                                      {REASONING_THEATER_MEDAL_LABEL[medalPulse.medal]}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {latestReasoningTheaterMedal ? (
+                            <div className="min-w-0 leading-tight">
+                              <p className="truncate text-[10px] uppercase tracking-[0.2em] text-cyan-200/90">
+                                {REASONING_THEATER_MEDAL_LABEL[latestReasoningTheaterMedal.medal]}
+                              </p>
+                              <p className="truncate text-[10px] text-cyan-100/80">
+                                {latestReasoningTheaterMedal.reason}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      <div className="mt-2 relative h-1.5 overflow-visible rounded-full bg-black/45">
+                        <div className="absolute inset-0 overflow-hidden rounded-full">
+                          <div
+                            ref={reasoningTheaterMeterFillRef}
+                            className={`relative h-full rounded-full ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].bar}`}
+                            style={{ width: `${reasoningTheaterMeterTarget}%` }}
+                          >
+                            <div
+                              ref={reasoningTheaterMeterPatternRef}
+                              className="pointer-events-none absolute inset-y-0 -left-12 w-[160%] bg-[repeating-linear-gradient(120deg,rgba(255,255,255,0.0)_0px,rgba(255,255,255,0.0)_8px,rgba(255,255,255,0.3)_10px,rgba(255,255,255,0.0)_16px)] mix-blend-screen"
+                              style={{ opacity: 0.3, transform: "translate3d(0,0,0)" }}
+                            />
+                          </div>
+                        </div>
+                        {REASONING_THEATER_FRONTIER_ACTIONS_ENABLED ? (
+                          <div
+                            ref={reasoningTheaterFrontierCursorRef}
+                            className="pointer-events-none absolute top-1/2 z-[2] will-change-transform"
+                            style={{ left: "50%", transform: "translate3d(-50%,-50%,0)" }}
+                          >
+                            <div
+                              ref={reasoningTheaterFrontierBurstRef}
+                              className="absolute left-1/2 top-1/2 h-7 w-7 rounded-full border border-cyan-200/70 opacity-0"
+                              style={{ transform: "translate3d(-50%,-50%,0) scale(0.7)" }}
+                            />
+                            {!reasoningTheaterFrontierIconBroken ? (
+                              <img
+                                ref={reasoningTheaterFrontierIconRef}
+                                src={reasoningTheaterFrontierIconPath}
+                                alt={`${REASONING_THEATER_FRONTIER_ACTION_LABEL[reasoningTheaterFrontierAction]} frontier action`}
+                                className="relative z-[3] h-6 w-6 object-contain mix-blend-screen drop-shadow-[0_0_16px_rgba(148,163,184,0.6)]"
+                                loading="lazy"
+                                onError={(event) =>
+                                  setReasoningTheaterFrontierIconBrokenByPath((prev) => {
+                                    const next = { ...prev };
+                                    next[reasoningTheaterFrontierIconPath] = true;
+                                    const currentSrc = event.currentTarget.currentSrc?.trim();
+                                    if (currentSrc) {
+                                      next[currentSrc] = true;
+                                    }
+                                    return next;
+                                  })
+                                }
+                              />
+                            ) : null}
+                            <span
+                              ref={reasoningTheaterFrontierTextRef}
+                              className="relative z-[3] hidden min-w-[56px] rounded-sm border border-white/25 bg-black/50 px-1 py-0.5 text-[8px] uppercase tracking-[0.16em]"
+                            />
+                            <div className="pointer-events-none absolute left-1/2 top-1/2 z-[2]">
+                              {reasoningTheaterFrontierParticles.map((particle, index) => (
+                                <span
+                                  key={particle.id}
+                                  ref={(node) => {
+                                    reasoningTheaterFrontierParticleRefs.current[index] = node;
+                                  }}
+                                  className="absolute left-0 top-0 block rounded-full"
+                                  style={{ opacity: 0, transform: "translate3d(0,0,0)" }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-300/90">
                         <span>momentum {Math.round(reasoningTheater.momentum * 100)}%</span>
                         <span>ambiguity {Math.round(reasoningTheater.ambiguityPressure * 100)}%</span>
                         <span>pulse {reasoningTheater.pulseHz.toFixed(1)}Hz</span>
+                        <span>clock {REASONING_THEATER_CLOCK_FPS}fps</span>
+                        <span>
+                          evt {REASONING_THEATER_CLOCK_SOURCE_LABEL[reasoningTheaterClockDebug.source]}
+                          {reasoningTheaterClockDebug.seq !== null
+                            ? ` #${reasoningTheaterClockDebug.seq}`
+                            : ""}
+                        </span>
+                        <span>
+                          frontier {reasoningTheaterFrontierAction} (
+                          {reasoningTheaterFrontierDebug.deltaPct >= 0 ? "+" : ""}
+                          {reasoningTheaterFrontierDebug.deltaPct.toFixed(1)}%/
+                          {reasoningTheaterConfig.frontier_actions.window_ms}ms)
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -2986,10 +3951,7 @@ export function HelixAskPill({
                         ? entry.tool.replace("helix.ask.", "").replace(/\./g, " ")
                         : entry.tool ?? "event";
                       return (
-                        <div
-                          key={entry.id}
-                          className="rounded-md border border-white/5 bg-white/[0.03] px-2 py-1"
-                        >
+                        <div key={entry.id} className="px-1 py-0.5">
                           <div className="text-[9px] uppercase tracking-[0.22em] text-slate-500">
                             {label}
                           </div>
@@ -3004,7 +3966,7 @@ export function HelixAskPill({
                   </p>
                 )}
                 {askLiveDraft ? (
-                  <div className="mt-2 max-h-28 overflow-hidden rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-slate-200">
+                  <div className="mt-2 max-h-28 overflow-hidden px-1 py-0.5 text-[11px] text-slate-200">
                     <p className="whitespace-pre-wrap leading-relaxed">{askLiveDraft}</p>
                   </div>
                 ) : null}

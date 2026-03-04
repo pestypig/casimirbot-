@@ -58,6 +58,82 @@
       "contract_violation"
     ]
   },
+  "medal_layer": {
+    "type": "event",
+    "description": "Momentary transition medals layered on top of persistent state art.",
+    "enum": [
+      "scout",
+      "anchor",
+      "lattice",
+      "prism",
+      "fracture",
+      "stitch",
+      "relay",
+      "gate",
+      "seal",
+      "lantern",
+      "valve",
+      "crown"
+    ],
+    "asset_paths": {
+      "scout": "/reasoning-theater/medals/scout.svg",
+      "anchor": "/reasoning-theater/medals/anchor.svg",
+      "lattice": "/reasoning-theater/medals/lattice.svg",
+      "prism": "/reasoning-theater/medals/prism.svg",
+      "fracture": "/reasoning-theater/medals/fracture.svg",
+      "stitch": "/reasoning-theater/medals/stitch.svg",
+      "relay": "/reasoning-theater/medals/relay.svg",
+      "gate": "/reasoning-theater/medals/gate.svg",
+      "seal": "/reasoning-theater/medals/seal.svg",
+      "lantern": "/reasoning-theater/medals/lantern.svg",
+      "valve": "/reasoning-theater/medals/valve.svg",
+      "crown": "/reasoning-theater/medals/crown.svg"
+    },
+    "bridge_mapping": {
+      "scout": [
+        "phase:retrieve"
+      ],
+      "anchor": [
+        "certainty:reasoned|confirmed",
+        "archetype:missing_evidence(resolving)"
+      ],
+      "lattice": [
+        "archetype:coverage_gap(resolving)"
+      ],
+      "prism": [
+        "archetype:ambiguity(resolving)"
+      ],
+      "fracture": [
+        "archetype:contradiction(appeared)"
+      ],
+      "stitch": [
+        "archetype:contradiction(resolved)"
+      ],
+      "relay": [
+        "phase:synthesize|execute(transition)"
+      ],
+      "gate": [
+        "phase:gate|verify"
+      ],
+      "seal": [
+        "suppression:*",
+        "stance:fail_closed"
+      ],
+      "lantern": [
+        "phase:observe",
+        "certainty:unknown|hypothesis"
+      ],
+      "valve": [
+        "archetype:overload",
+        "suppression:dedupe_cooldown|mission_rate_limited|agi_overload_admission_control"
+      ],
+      "crown": [
+        "certainty:confirmed",
+        "stance:winning",
+        "terminal:debrief"
+      ]
+    }
+  },
   "index_formula": {
     "momentum": "clamp01(0.26*evidence + 0.22*coverage + 0.16*claim_support + 0.14*graph_health + 0.12*alignment_health + 0.10*proof_pass)",
     "ambiguity_pressure": "clamp01(0.24*ambiguity_load + 0.20*unsupported + 0.14*contradiction + 0.14*(1-coverage) + 0.10*suppression_penalty + 0.10*latency_penalty + 0.08*integrity_penalty)",
@@ -306,5 +382,103 @@
       },
       "label": "Hard stop with deterministic fail reason"
     }
-  ]
+  ],
+  "frontier_actions": {
+    "window_ms": 200,
+    "switch_hold_frames": 4,
+    "min_action_ms": 180,
+    "thresholds": {
+      "hard_drop_delta_pct": -8.0,
+      "large_gain_delta_pct": 3.0,
+      "small_gain_delta_pct": 0.8,
+      "large_loss_delta_pct": -3.0,
+      "small_loss_delta_pct": -0.8
+    },
+    "actions": {
+      "large_gain": {
+        "icon_path": "/reasoning-theater/frontier-actions/large_gain.svg",
+        "particle_profile": {
+          "color": "#34D399",
+          "base_direction_deg": 0,
+          "spread_deg": 12,
+          "speed_min_px_s": 84,
+          "speed_max_px_s": 128,
+          "turbulence": 0.16,
+          "emit_rate_hz": 24,
+          "transition_burst": true,
+          "shock_ring": false
+        }
+      },
+      "small_gain": {
+        "icon_path": "/reasoning-theater/frontier-actions/small_gain.svg",
+        "particle_profile": {
+          "color": "#22D3EE",
+          "base_direction_deg": 0,
+          "spread_deg": 18,
+          "speed_min_px_s": 36,
+          "speed_max_px_s": 72,
+          "turbulence": 0.14,
+          "emit_rate_hz": 12,
+          "transition_burst": false,
+          "shock_ring": false
+        }
+      },
+      "steady": {
+        "icon_path": "/reasoning-theater/frontier-actions/steady.svg",
+        "particle_profile": {
+          "color": "#94A3B8",
+          "base_direction_deg": 0,
+          "spread_deg": 30,
+          "speed_min_px_s": 10,
+          "speed_max_px_s": 24,
+          "turbulence": 0.08,
+          "emit_rate_hz": 4,
+          "transition_burst": false,
+          "shock_ring": false
+        }
+      },
+      "small_loss": {
+        "icon_path": "/reasoning-theater/frontier-actions/small_loss.svg",
+        "particle_profile": {
+          "color": "#F59E0B",
+          "base_direction_deg": 180,
+          "spread_deg": 20,
+          "speed_min_px_s": 36,
+          "speed_max_px_s": 72,
+          "turbulence": 0.34,
+          "emit_rate_hz": 12,
+          "transition_burst": false,
+          "shock_ring": false
+        }
+      },
+      "large_loss": {
+        "icon_path": "/reasoning-theater/frontier-actions/large_loss.svg",
+        "particle_profile": {
+          "color": "#FB7185",
+          "base_direction_deg": 180,
+          "spread_deg": 16,
+          "speed_min_px_s": 72,
+          "speed_max_px_s": 118,
+          "turbulence": 0.55,
+          "emit_rate_hz": 22,
+          "transition_burst": true,
+          "shock_ring": false
+        }
+      },
+      "hard_drop": {
+        "icon_path": "/reasoning-theater/frontier-actions/hard_drop.svg",
+        "particle_profile": {
+          "color": "#EF4444",
+          "base_direction_deg": 205,
+          "spread_deg": 38,
+          "speed_min_px_s": 96,
+          "speed_max_px_s": 150,
+          "turbulence": 0.82,
+          "emit_rate_hz": 30,
+          "transition_burst": true,
+          "shock_ring": true
+        }
+      }
+    }
+  }
 }

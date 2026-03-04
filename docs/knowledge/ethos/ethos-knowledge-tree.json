@@ -129,6 +129,7 @@
       ],
       "children": [
         "mission-ethos",
+        "truth-convergence-pathways",
         "integration-ladder",
         "two-key-approval",
         "stewardship-ledger",
@@ -138,6 +139,7 @@
         "citizens-arc-stress-test",
         "citizens-arc-maturation-under-constraint",
         "citizens-arc-derived-principles",
+        "citizens-arc-convergence-compact",
         "civic-memory-continuity",
         "civic-signal-loop",
         "federal-civic-listening-circuit",
@@ -367,7 +369,9 @@
         "ethos",
         "integrity"
       ],
-      "children": [],
+      "children": [
+        "truth-convergence-pathways"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -1173,6 +1177,56 @@
       }
     },
     {
+      "id": "truth-convergence-pathways",
+      "slug": "truth-convergence-pathways",
+      "title": "Truth Convergence Pathways",
+      "excerpt": "Guidance on Truth Convergence Pathways.",
+      "bodyMD": "Truth Convergence Pathways guidance (docs/knowledge/ethos/truth-convergence-pathways.md).\n\nMinimal artifact: Truth Convergence Pathways summary.",
+      "tags": [
+        "ethos",
+        "verification",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "mission-ethos"
+        }
+      ],
+      "summary": "Guidance on Truth Convergence Pathways.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/truth-convergence-pathways.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "mission-ethos"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
       "id": "integration-ladder",
       "slug": "integration-ladder",
       "title": "Integration Ladder",
@@ -1606,6 +1660,57 @@
           "path": "docs/knowledge/ethos/citizens-arc-derived-principles.md",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:b04c0ba330c6f6c4382bf27b18cd6fb9e1b2f93f6dfdefbe89c1ab4698dc07ad"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "civic-governance-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "citizens-arc-convergence-compact",
+      "slug": "citizens-arc-convergence-compact",
+      "title": "Citizens Arc Convergence And Contestability Compact",
+      "excerpt": "Guidance on Citizens Arc Convergence And Contestability Compact.",
+      "bodyMD": "Citizens Arc Convergence And Contestability Compact guidance (docs/knowledge/ethos/citizens-arc-convergence-compact.md).\n\nMinimal artifact: Citizens Arc Convergence And Contestability Compact summary.",
+      "tags": [
+        "ethos",
+        "ethos",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "civic-governance-stack"
+        }
+      ],
+      "summary": "Guidance on Citizens Arc Convergence And Contestability Compact.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/ethos/citizens-arc-convergence-compact.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:cb1950c7e305594ec54de23913477dad831cc9bc3cdece716509d60a76c582f0"
         }
       ],
       "inputs": [],

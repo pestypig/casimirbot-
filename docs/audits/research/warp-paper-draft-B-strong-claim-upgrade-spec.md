@@ -6,7 +6,7 @@
 This document defines what must be added beyond current reduced-order closure to support stronger scientific claim quality. It uses current repo status as baseline and then defines external-closure requirements.
 
 ## Baseline at Commit Pin
-- Commit pin: `36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e`
+- Commit pin: `5506e72cafd8dc7534572d9285d932de2b858407`
 - Current snapshot: `blocked=false`, `strongClaimClosure.passAll=true`
 - Closure specs status:
   - A operator mapping: pass
@@ -18,7 +18,8 @@ This document defines what must be added beyond current reduced-order closure to
   - G promotion readiness/stability: pass
 
 Source:
-- `artifacts/research/full-solve/warp-evidence-snapshot-2026-03-02.json`
+- `docs/audits/research/warp-evidence-pack-2026-03-02.json`
+- `docs/audits/research/warp-evidence-snapshot-2026-03-02.md`
 
 ## Strong-Claim Upgrade Objective
 Move from internal reduced-order closure to externally defensible scientific-claim strength via independent reproducibility, explicit operator semantics closure against literature, and externally benchmarked uncertainty and validity domains.
@@ -119,6 +120,22 @@ Acceptance:
 Fail condition:
 - Ability to publish stronger claim language without evidence-tier support.
 
+## VVUQ/Standards Alignment Matrix (H-N)
+
+| Alignment item | Closure spec mapping | Acceptance criterion | Deterministic falsifier | Evidence artifact path | Confidence tier |
+|---|---|---|---|---|---|
+| Risk-based credibility mapping (ASME V&V 40 style) | H, N | claim tiers map to explicit credibility levels and required evidence depth | any tier lacks declared credibility requirement | `docs/audits/research/warp-standards-alignment-ledger-2026-03-04.md` | high |
+| VVUQ terminology normalization | H, I | manuscript terms mapped to canonical VVUQ vocabulary in appendix | undefined or conflicting term usage in methods/results | `docs/audits/research/warp-standards-alignment-ledger-2026-03-04.md` | high |
+| Multivariate validation metric adoption (VVUQ 20.1 style) | I, J | validation metric suite declared with threshold and acceptance rule | no thresholded validation metric for model-reference comparison | `docs/audits/research/warp-standards-alignment-ledger-2026-03-04.md` | medium |
+| Reduced-order to full-solve transition gate | K | deterministic transition rule for error, convergence, and uncertainty stability | transition executed without satisfying all criteria | `docs/audits/research/warp-standards-alignment-ledger-2026-03-04.md` | high |
+| Explicit RSET semantic declaration | L | renormalization scheme, state assumptions, and regularization declared | missing semantic declaration for stress-energy source | `docs/audits/research/warp-g4-operator-mapping-audit-2026-03-02.md` | medium |
+| Stress-tensor fluctuation consistency criterion (exploratory) | L, M | exploratory threshold and reporting path defined; not a hard gate | treated as hard pass criterion before validation | `docs/audits/research/warp-standards-alignment-ledger-2026-03-04.md` | low |
+| Evidence-governance ledger enforcement | N | every promotion/claim delta has artifact, owner, status, and commit pin | claim promoted without ledger-backed artifact path | `docs/audits/research/warp-standards-alignment-ledger-2026-03-04.md` | high |
+
+PCS/QMU policy in this phase:
+- Included as exploratory robustness overlays.
+- Not mandatory hard-pass criteria until domain validation artifacts are available.
+
 ## Phase Plan
 
 1. Phase 1: Independent reproduction pack (H)
@@ -145,6 +162,8 @@ Fail condition:
 | Applicability drift | independent domain classification differs | fail closed on applicability |
 | Uncertainty instability | pass/fail flips under modeled uncertainty | block robust-pass claim |
 | Materials unknowns | critical constraint rows remain UNKNOWN | block external-feasibility framing |
+| Tier-credibility mismatch | claim tier published without mapped credibility requirement | block standards-aligned governance claim |
+| Citation admissibility failure | normative claim lacks at least one primary/standard source | mark recommendation non-compliant |
 
 ## Non-Goals
 - No full-system physical-feasibility claim from this campaign lane alone.

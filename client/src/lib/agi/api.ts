@@ -9,6 +9,11 @@ import type { PromptSpec } from "@shared/prompt-spec";
 import type { ChatSession } from "@shared/agi-chat";
 import type { AgiRefineryRequest } from "@shared/agi-refinery";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
+import {
+  getDefaultReasoningTheaterConfig,
+  parseReasoningTheaterConfigPayload,
+  type ReasoningTheaterConfigResponse,
+} from "@/lib/helix/reasoning-theater-config";
 import { DEFAULT_DESKTOP_ID, pushConsoleTelemetry } from "@/lib/agi/consoleTelemetry";
 import { ensureLatestLattice } from "@/lib/agi/resonanceVersion";
 import { useResonanceStore } from "@/store/useResonanceStore";
@@ -372,6 +377,8 @@ export type ToolLogEvent = {
   stepId?: string;
   strategy?: string;
 };
+
+let reasoningTheaterConfigPromise: Promise<ReasoningTheaterConfigResponse> | null = null;
 
 export type PersonaSummary = {
   id: string;
@@ -1201,6 +1208,29 @@ export function subscribeToolLogs(
   return () => {
     source.close();
   };
+}
+
+export async function getReasoningTheaterConfig(
+  options?: { forceRefresh?: boolean },
+): Promise<ReasoningTheaterConfigResponse> {
+  if (!options?.forceRefresh && reasoningTheaterConfigPromise) {
+    return reasoningTheaterConfigPromise;
+  }
+  reasoningTheaterConfigPromise = (async () => {
+    try {
+      const response = await fetch("/api/helix/reasoning-theater/config", {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(`reasoning-theater-config-http-${response.status}`);
+      }
+      const payload = (await response.json()) as unknown;
+      return parseReasoningTheaterConfigPayload(payload);
+    } catch {
+      return getDefaultReasoningTheaterConfig();
+    }
+  })();
+  return reasoningTheaterConfigPromise;
 }
 
 export async function syncKnowledgeProjects(

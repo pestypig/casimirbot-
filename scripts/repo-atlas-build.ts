@@ -53,6 +53,13 @@ export type RepoAtlas = {
 
 export const DEFAULT_ATLAS_PATH = path.join(process.cwd(), "artifacts", "repo-atlas", "repo-atlas.v1.json");
 const DEFAULT_TREE_DAG_WALK_REPORT_PATH = path.join(process.cwd(), "docs", "warp-tree-dag-walk-report.json");
+const DEFAULT_IDEOLOGY_PATH = path.join(process.cwd(), "docs", "ethos", "ideology.json");
+const DEFAULT_SCIENTIFIC_METHOD_POLICY_PATH = path.join(
+  process.cwd(),
+  "docs",
+  "knowledge",
+  "scientific-method-policy-tree.json",
+);
 const SCRIPT_DOC_REF_SOURCE_SYSTEM = "script-doc-ref";
 const SOURCE_PATH_PREFIXES = ["scripts/", "docs/"] as const;
 const PATH_REF_EXTENSIONS = [
@@ -95,6 +102,20 @@ type TreeDagWalkReport = {
   visited?: TreeDagWalkVisitedNode[];
 };
 
+type IdeologyLink = {
+  rel?: string;
+  to?: string;
+};
+
+type IdeologyGraphNode = {
+  id?: string;
+  links?: IdeologyLink[];
+};
+
+type IdeologyGraph = {
+  nodes?: IdeologyGraphNode[];
+};
+
 type AtlasSources = {
   generatedAt: string;
   commitHash: string;
@@ -102,6 +123,8 @@ type AtlasSources = {
   repoGraph: Awaited<ReturnType<typeof getRepoGraphSnapshot>>;
   codeLattice: Awaited<ReturnType<typeof buildCodeLatticeSnapshot>>["snapshot"];
   treeDagWalk?: TreeDagWalkReport | null;
+  ideology?: IdeologyGraph | null;
+  scientificMethodPolicy?: IdeologyGraph | null;
 };
 
 const STAGE_HINT_FIELDS = ["S0_source", "S1_qi_sample", "S2_bound_computed", "S3_bound_policy", "S4_margin", "S5_gate"];
@@ -490,6 +513,36 @@ const addTreeDagWalkGraph = (
   }
 };
 
+const addLinkedGraphEdges = (
+  nodes: Map<string, AtlasNode>,
+  edges: Map<string, AtlasEdge>,
+  graph: IdeologyGraph | null | undefined,
+  prefix: string,
+  sourceSystem: string,
+) => {
+  const graphNodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+  for (const graphNode of graphNodes) {
+    const sourceRef = typeof graphNode.id === "string" ? graphNode.id.trim() : "";
+    if (!sourceRef) continue;
+    const sourceId = `index:${prefix}:${sourceRef}`;
+    if (!nodes.has(sourceId)) continue;
+    const links = Array.isArray(graphNode.links) ? graphNode.links : [];
+    for (const link of links) {
+      const targetRef = typeof link?.to === "string" ? link.to.trim() : "";
+      if (!targetRef || targetRef === sourceRef) continue;
+      const targetId = `index:${prefix}:${targetRef}`;
+      if (!nodes.has(targetId)) continue;
+      addEdge(edges, {
+        source: sourceId,
+        target: targetId,
+        kind: "causal",
+        sourceSystem,
+        meta: { rel: typeof link.rel === "string" ? link.rel : "related" },
+      });
+    }
+  }
+};
+
 export const buildRepoAtlasFromSources = (sources: AtlasSources): RepoAtlas => {
   const nodes = new Map<string, AtlasNode>();
   const edges = new Map<string, AtlasEdge>();
@@ -531,6 +584,15 @@ export const buildRepoAtlasFromSources = (sources: AtlasSources): RepoAtlas => {
       addEdge(edges, { source: nodeId, target: fileId, kind: "mentions", sourceSystem: "repo-index" });
     }
   }
+
+  addLinkedGraphEdges(nodes, edges, sources.ideology, "ideology", "ideology-links");
+  addLinkedGraphEdges(
+    nodes,
+    edges,
+    sources.scientificMethodPolicy,
+    "scientific-method-policy",
+    "scientific-method-policy-links",
+  );
 
   for (const node of sources.repoGraph.nodes) {
     const nodeId = node.kind === "file" && node.path ? `file:${node.path}` : `graph:${node.id}`;
@@ -661,14 +723,38 @@ const readTreeDagWalkReport = async (reportPath = DEFAULT_TREE_DAG_WALK_REPORT_P
   }
 };
 
+const readIdeologyGraph = async (ideologyPath = DEFAULT_IDEOLOGY_PATH): Promise<IdeologyGraph | null> => {
+  try {
+    const raw = await fs.readFile(ideologyPath, "utf8");
+    const parsed = JSON.parse(raw) as IdeologyGraph;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const readScientificMethodPolicyGraph = async (
+  policyPath = DEFAULT_SCIENTIFIC_METHOD_POLICY_PATH,
+): Promise<IdeologyGraph | null> => {
+  try {
+    const raw = await fs.readFile(policyPath, "utf8");
+    const parsed = JSON.parse(raw) as IdeologyGraph;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 async function main() {
   const generatedAt = new Date().toISOString();
   const commitHash = await resolveCommitHash();
-  const [repoIndex, repoGraph, codeLattice, treeDagWalk] = await Promise.all([
+  const [repoIndex, repoGraph, codeLattice, treeDagWalk, ideology, scientificMethodPolicy] = await Promise.all([
     getRepoSearchIndex(),
     getRepoGraphSnapshot(),
     buildCodeLatticeSnapshot().then((row) => row.snapshot),
     readTreeDagWalkReport(),
+    readIdeologyGraph(),
+    readScientificMethodPolicyGraph(),
   ]);
 
   const atlas = buildRepoAtlasFromSources({
@@ -678,6 +764,8 @@ async function main() {
     repoGraph,
     codeLattice,
     treeDagWalk,
+    ideology,
+    scientificMethodPolicy,
   });
   const outPath = DEFAULT_ATLAS_PATH;
   await fs.mkdir(path.dirname(outPath), { recursive: true });

@@ -1,0 +1,750 @@
+     1: import fs from "node:fs/promises";
+     2: import path from "node:path";
+     3: import net from "node:net";
+     4: import { spawn, type ChildProcess } from "node:child_process";
+     5: import { createRequire } from "node:module";
+     6: 
+     7: type CorpusTask = { id: string; prompt: string; expected_files: string[] };
+     8: type Corpus = { version: string; tasks: CorpusTask[] };
+     9: type VariantSpec = { name: string; atlasLane: "0" | "1"; gitTrackedLane: "0" | "1" };
+    10: type MatchMode = "exact" | "normalized" | "alias" | "none";
+    11: 
+    12: type ScenarioMetrics = {
+    13:   gold_file_recall_at_5: number;
+    14:   gold_file_recall_at_10: number;
+    15:   consequential_file_retention_rate: number;
+    16:   rerank_mrr10: number;
+    17:   graph_edge_hit_rate: number;
+    18:   retrieval_confidence_mean: number;
+    19:   retrieval_doc_share_mean: number;
+    20:   unmatched_expected_file_rate: number;
+    21: };
+    22: 
+    23: type TaskResult = {
+    24:   taskId: string;
+    25:   expected_files: string[];
+    26:   top5: string[];
+    27:   top10: string[];
+    28:   rawHits5: number;
+    29:   rawHits10: number;
+    30:   canonHits5: number;
+    31:   canonHits10: number;
+    32:   rawRR: number;
+    33:   canonRR: number;
+    34:   mode: MatchMode;
+    35:   mismatchReasons: string[];
+    36:   mismatchTaxonomy: Array<"path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch">;
+    37:   expectedNormalized: string[];
+    38:   retrievedNormalizedTop10: string[];
+    39:   graphEdgeHit: boolean;
+    40:   confidence: number | null;
+    41:   docShare: number | null;
+    42: };
+    43: 
+    44: const CORPUS_PATH = process.env.HELIX_ASK_RETRIEVAL_CORPUS ?? "configs/repo-atlas-bench-corpus.v1.json";
+    45: const OUTPUT_ROOT = process.env.HELIX_ASK_RETRIEVAL_ABLATION_OUT_ROOT ?? "artifacts/experiments/helix-ask-retrieval-ablation";
+    46: const TOP_K = Number(process.env.HELIX_ASK_RETRIEVAL_TOPK ?? 18);
+    47: const MAX_TASKS = Number(process.env.HELIX_ASK_RETRIEVAL_MAX_TASKS ?? 0);
+    48: const SEEDS = String(process.env.HELIX_ASK_RETRIEVAL_SEEDS ?? "7,11,13").split(",").map((v) => Number(v.trim())).filter(Number.isFinite);
+    49: const TEMPS = String(process.env.HELIX_ASK_RETRIEVAL_TEMPERATURES ?? "0.2").split(",").map((v) => Number(v.trim())).filter(Number.isFinite);
+    50: const READY_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_READY_TIMEOUT_MS ?? 240_000);
+    51: const ASK_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_ASK_TIMEOUT_MS ?? 15_000);
+    52: const ASK_RETRY_ATTEMPTS = Number(process.env.HELIX_ASK_RETRIEVAL_ASK_RETRY_ATTEMPTS ?? 1);
+    53: const VARIANT_WATCHDOG_TIMEOUT_MS = Number(process.env.HELIX_ASK_RETRIEVAL_VARIANT_TIMEOUT_MS ?? 600_000);
+    54: 
+    55: const VARIANTS: VariantSpec[] = [
+    56:   { name: "baseline_atlas_git_on", atlasLane: "1", gitTrackedLane: "1" },
+    57:   { name: "atlas_off_git_on", atlasLane: "0", gitTrackedLane: "1" },
+    58:   { name: "atlas_on_git_off", atlasLane: "1", gitTrackedLane: "0" },
+    59:   { name: "atlas_off_git_off", atlasLane: "0", gitTrackedLane: "0" },
+    60: ];
+    61: 
+    62: const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    63: const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+    64: const normalizePath = (s: string) => s.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+/g, "/").replace(/\/$/, "").toLowerCase();
+    65: const EPS = 1e-9;
+    66: const require = createRequire(import.meta.url);
+    67: const TSX_CLI = require.resolve("tsx/cli");
+    68: 
+    69: const findOpenPort = async (): Promise<number> =>
+    70:   new Promise((resolve, reject) => {
+    71:     const probe = net.createServer();
+    72:     probe.once("error", reject);
+    73:     probe.listen(0, "127.0.0.1", () => {
+    74:       const addr = probe.address();
+    75:       if (!addr || typeof addr === "string") {
+    76:         probe.close(() => reject(new Error("failed to determine an open port")));
+    77:         return;
+    78:       }
+    79:       const { port } = addr;
+    80:       probe.close((err) => {
+    81:         if (err) reject(err);
+    82:         else resolve(port);
+    83:       });
+    84:     });
+    85:   });
+    86: 
+    87: const numberOrNull = (value: unknown): number | null =>
+    88:   typeof value === "number" && Number.isFinite(value) ? value : null;
+    89: const EVIDENCE_PREFIX = /^(file:|evidence:|repo:|path:)/i;
+    90: const REPO_PREFIX = /^\/?workspace\/casimirbot-\//i;
+    91: const TRAILING_LINE_SUFFIX = /:(\d+)(:\d+)?$/;
+    92: const normalizeEvidenceId = (raw: string) =>
+    93:   normalizePath(raw.trim().replace(/^`|`$/g, "").replace(EVIDENCE_PREFIX, "").replace(REPO_PREFIX, ""));
+    94: const normalizePathLoose = (raw: string) =>
+    95:   normalizePath(
+    96:     normalizeEvidenceId(raw)
+    97:       .replace(/[#?].*$/, "")
+    98:       .replace(TRAILING_LINE_SUFFIX, "")
+    99:       .replace(/\(\s*line\s+\d+\s*\)$/i, ""),
+   100:   );
+   101: const pathSegments = (raw: string) => normalizePathLoose(raw).split("/").filter(Boolean);
+   102: const pathTail = (raw: string, depth = 2) => {
+   103:   const parts = pathSegments(raw);
+   104:   return parts.slice(-depth).join("/");
+   105: };
+   106: const pathBase = (raw: string) => {
+   107:   const parts = pathSegments(raw);
+   108:   return parts.length ? parts[parts.length - 1] : normalizePathLoose(raw);
+   109: };
+   110: const canonicalPathSet = (s: string) => {
+   111:   const n = normalizeEvidenceId(s);
+   112:   const set = new Set([n]);
+   113:   set.add(n.replace(/^\.\//, ""));
+   114:   if (n.startsWith("./")) set.add(n.slice(2));
+   115:   if (n.startsWith("server/src/")) set.add(n.replace("server/src/", "server/"));
+   116:   if (n.startsWith("src/server/")) set.add(n.replace("src/server/", "server/"));
+   117:   if (n.startsWith("client/src/")) set.add(n.replace("client/src/", "client/"));
+   118:   if (n.startsWith("client/")) set.add(`client/src/${n.slice("client/".length)}`);
+   119:   return set;
+   120: };
+   121: const aliasSet = (s: string) => {
+   122:   const set = canonicalPathSet(s);
+   123:   for (const n of [...set]) {
+   124:     if (n.startsWith("server/utils/")) set.add(n.replace("server/utils/", "server/"));
+   125:     if (n.startsWith("server/")) set.add(n.replace("server/", "server/utils/"));
+   126:     if (n.startsWith("docs/audits/")) set.add(n.replace("docs/audits/", "docs/reports/"));
+   127:     if (n.startsWith("docs/reports/")) set.add(n.replace("docs/reports/", "docs/audits/"));
+   128:   }
+   129:   return set;
+   130: };
+   131: const bestMode = (expected: string, candidates: string[]): MatchMode => {
+   132:   if (candidates.includes(expected)) return "exact";
+   133:   const cn = candidates.map(normalizeEvidenceId);
+   134:   const expectedForms = canonicalPathSet(expected);
+   135:   if (cn.some((candidate) => expectedForms.has(candidate))) return "normalized";
+   136:   const aliases = aliasSet(expected);
+   137:   return cn.some((c) => aliases.has(c)) ? "alias" : "none";
+   138: };
+   139: 
+   140: const quantile = (vals: number[], q: number) => {
+   141:   if (!vals.length) return 0; const s=[...vals].sort((a,b)=>a-b); const i=(s.length-1)*q; const lo=Math.floor(i), hi=Math.ceil(i); if(lo===hi) return s[lo]; return s[lo]+(s[hi]-s[lo])*(i-lo);
+   142: };
+   143: let rngState = 123456789;
+   144: const rng = () => { rngState = (1664525 * rngState + 1013904223) >>> 0; return rngState / 0xffffffff; };
+   145: const ci95 = (vals: number[]) => {
+   146:   if (vals.length < 2) return { low: vals[0] ?? 0, high: vals[0] ?? 0 };
+   147:   const boots:number[]=[];
+   148:   for(let i=0;i<400;i++){ const sample:number[]=[]; for(let j=0;j<vals.length;j++) sample.push(vals[Math.floor(rng()*vals.length)]); boots.push(avg(sample)); }
+   149:   return { low: quantile(boots,0.025), high: quantile(boots,0.975) };
+   150: };
+   151: 
+   152: type ServerHandle = {
+   153:   child: ChildProcess;
+   154:   port: number;
+   155:   askUrl: string;
+   156:   readyUrl: string;
+   157:   stderrTail: string[];
+   158: };
+   159: 
+   160: const appendTail = (buffer: string[], chunk: string) => {
+   161:   const trimmed = chunk.trim();
+   162:   if (!trimmed) return;
+   163:   buffer.push(trimmed);
+   164:   if (buffer.length > 12) buffer.shift();
+   165: };
+   166: 
+   167: const startServer = async (variant: VariantSpec): Promise<ServerHandle> => {
+   168:   const port = await findOpenPort();
+   169:   const env = {
+   170:     ...process.env,
+   171:     NODE_ENV: "development",
+   172:     PORT: String(port),
+   173:     SKIP_VITE_MIDDLEWARE: process.env.SKIP_VITE_MIDDLEWARE ?? "0",
+   174:     DISABLE_VITE_HMR: "1",
+   175:     HELIX_ASK_ATLAS_LANE: variant.atlasLane,
+   176:     HELIX_ASK_GIT_TRACKED_LANE: variant.gitTrackedLane,
+   177:     SKIP_MODULE_INIT: process.env.SKIP_MODULE_INIT ?? "1",
+   178:   };
+   179:   const child = spawn(process.execPath, [TSX_CLI, "server/index.ts"], {
+   180:     env,
+   181:     stdio: ["ignore", "pipe", "pipe"],
+   182:     windowsHide: true,
+   183:   });
+   184:   const stderrTail: string[] = [];
+   185:   child.stderr?.on("data", (chunk) => appendTail(stderrTail, String(chunk)));
+   186:   child.on("error", (err) => appendTail(stderrTail, `spawn error: ${err.message}`));
+   187:   const baseUrl = `http://127.0.0.1:${port}`;
+   188:   return {
+   189:     child,
+   190:     port,
+   191:     askUrl: new URL("/api/agi/ask", baseUrl).toString(),
+   192:     readyUrl: new URL("/api/ready", baseUrl).toString(),
+   193:     stderrTail,
+   194:   };
+   195: };
+   196: 
+   197: const stopServer = async (handle: ServerHandle) => {
+   198:   const { child } = handle;
+   199:   if (child.exitCode !== null) return;
+   200:   child.kill("SIGTERM");
+   201:   for (let i = 0; i < 30; i += 1) {
+   202:     if (child.exitCode !== null) return;
+   203:     await sleep(100);
+   204:   }
+   205:   if (child.exitCode === null) child.kill("SIGKILL");
+   206: };
+   207: 
+   208: const waitReady = async (handle: ServerHandle) => {
+   209:   const attempts = Math.max(1, Math.ceil(READY_TIMEOUT_MS / 1000));
+   210:   for (let i = 0; i < attempts; i += 1) {
+   211:     if (handle.child.exitCode !== null) {
+   212:       throw new Error(
+   213:         `variant server exited before ready (port=${handle.port}, code=${handle.child.exitCode}) stderr=${handle.stderrTail.join(
+   214:           " | ",
+   215:         )}`,
+   216:       );
+   217:     }
+   218:     try {
+   219:       const r = await fetch(handle.readyUrl);
+   220:       const j = (await r.json()) as { ready?: boolean };
+   221:       if (j.ready) return;
+   222:     } catch {
+   223:       // keep polling until timeout
+   224:     }
+   225:     await sleep(1000);
+   226:   }
+   227:   throw new Error(`ready timeout (port=${handle.port}) stderr=${handle.stderrTail.join(" | ")}`);
+   228: };
+   229: 
+   230: const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperature: number): Promise<TaskResult> => {
+   231:   let payload: {
+   232:     debug?: {
+   233:       context_files?: unknown;
+   234:       belief_graph_edge_count?: unknown;
+   235:       graph_evidence_count?: unknown;
+   236:       retrieval_confidence?: unknown;
+   237:       retrieval_doc_share?: unknown;
+   238:     };
+   239:   } | null = null;
+   240:   for (let attempt=0; attempt<ASK_RETRY_ATTEMPTS; attempt+=1) {
+   241:     try {
+   242:       const controller = new AbortController();
+   243:       const timeout = setTimeout(() => controller.abort(), ASK_TIMEOUT_MS);
+   244:       const res = await fetch(askUrl, { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ question: task.prompt, dryRun:true, debug:true, topK:TOP_K, seed, temperature, sessionId:`retrieval-ablation:${task.id}:${seed}:${temperature}` }), signal: controller.signal });
+   245:       payload = (await res.json()) as {
+   246:         debug?: {
+   247:           context_files?: unknown;
+   248:           belief_graph_edge_count?: unknown;
+   249:           graph_evidence_count?: unknown;
+   250:           retrieval_confidence?: unknown;
+   251:           retrieval_doc_share?: unknown;
+   252:         };
+   253:       };
+   254:       break;
+   255:     } catch {
+   256:       await sleep(500 * (attempt + 1));
+   257:     }
+   258:   }
+   259:   if (!payload) {
+   260:     return {
+   261:       taskId: task.id,
+   262:       expected_files: task.expected_files,
+   263:       top5: [],
+   264:       top10: [],
+   265:       rawHits5: 0,
+   266:       rawHits10: 0,
+   267:       canonHits5: 0,
+   268:       canonHits10: 0,
+   269:       rawRR: 0,
+   270:       canonRR: 0,
+   271:       mode: "none",
+   272:       mismatchReasons: task.expected_files.map((expected) => `${expected}:retrieval_miss`),
+   273:       mismatchTaxonomy: ["retrieval_miss"],
+   274:       expectedNormalized: task.expected_files.map(normalizeEvidenceId),
+   275:       retrievedNormalizedTop10: [],
+   276:       graphEdgeHit: false,
+   277:       confidence: null,
+   278:       docShare: null,
+   279:     };
+   280:   }
+   281:   const contextFiles = Array.isArray(payload.debug?.context_files) ? payload.debug!.context_files : [];
+   282:   const contextShapeMismatch = contextFiles.some((v) => typeof v !== "string");
+   283:   const top10 = contextFiles.filter((v): v is string => typeof v === "string").slice(0,10);
+   284:   const top5 = top10.slice(0,5);
+   285:   const modes = task.expected_files.map((e)=>bestMode(e, top10));
+   286:   const mismatchTaxonomy = new Set<"path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch">();
+   287:   if (contextShapeMismatch) mismatchTaxonomy.add("context_shape_mismatch");
+   288:   const mismatchReasons = task.expected_files.flatMap((expected) => {
+   289:     const mode = bestMode(expected, top10);
+   290:     if (mode !== "none") return [];
+   291:     if (!top10.length) {
+   292:       mismatchTaxonomy.add("retrieval_miss");
+   293:       return [`${expected}:retrieval_miss`];
+   294:     }
+   295:     const looseExpected = normalizePathLoose(expected);
+   296:     const looseCandidates = top10.map(normalizePathLoose);
+   297:     if (looseCandidates.includes(looseExpected)) {
+   298:       mismatchTaxonomy.add("path_form_mismatch");
+   299:       return [`${expected}:path_form_mismatch`];
+   300:     }
+   301:     const expectedBase = pathBase(expected);
+   302:     const expectedTail = pathTail(expected, 2);
+   303:     const aliasCandidatePresent = looseCandidates.some(
+   304:       (candidate) => pathBase(candidate) === expectedBase || pathTail(candidate, 2) === expectedTail,
+   305:     );
+   306:     if (aliasCandidatePresent) {
+   307:       mismatchTaxonomy.add("alias_unmapped");
+   308:       return [`${expected}:alias_unmapped`];
+   309:     }
+   310:     mismatchTaxonomy.add("retrieval_miss");
+   311:     return [`${expected}:retrieval_miss`];
+   312:   });
+   313:   const rawHits10 = task.expected_files.filter((e)=>top10.includes(e)).length;
+   314:   const rawHits5 = task.expected_files.filter((e)=>top5.includes(e)).length;
+   315:   const canonHits10 = modes.filter((m)=>m!=="none").length;
+   316:   const canonHits5 = task.expected_files.filter((e)=>bestMode(e, top5)!=="none").length;
+   317:   const rank = (cand:string[]) => { for(let i=0;i<cand.length;i++) if(task.expected_files.includes(cand[i])) return 1/(i+1); return 0; };
+   318:   const canonRank = () => { for(let i=0;i<top10.length;i++) if(task.expected_files.some((e)=>bestMode(e,[top10[i]])!=="none")) return 1/(i+1); return 0; };
+   319:   const mode:MatchMode = modes.includes("exact")?"exact":modes.includes("normalized")?"normalized":modes.includes("alias")?"alias":"none";
+   320:   const edgeCount =
+   321:     numberOrNull(payload.debug?.belief_graph_edge_count) ??
+   322:     numberOrNull(payload.debug?.graph_evidence_count) ??
+   323:     0;
+   324:   return {
+   325:     taskId: task.id,
+   326:     expected_files: task.expected_files,
+   327:     top5,
+   328:     top10,
+   329:     rawHits5,
+   330:     rawHits10,
+   331:     canonHits5,
+   332:     canonHits10,
+   333:     rawRR: rank(top10),
+   334:     canonRR: canonRank(),
+   335:     mode,
+   336:     mismatchReasons,
+   337:     mismatchTaxonomy: [...mismatchTaxonomy],
+   338:     expectedNormalized: task.expected_files.map(normalizeEvidenceId),
+   339:     retrievedNormalizedTop10: top10.map(normalizeEvidenceId),
+   340:     graphEdgeHit: edgeCount > 0,
+   341:     confidence: numberOrNull(payload.debug?.retrieval_confidence),
+   342:     docShare: numberOrNull(payload.debug?.retrieval_doc_share),
+   343:   };
+   344: };
+   345: 
+   346: 
+   347: const withWatchdog = async <T>(label: string, fn: () => Promise<T>): Promise<T> => {
+   348:   let timer: NodeJS.Timeout | null = null;
+   349:   try {
+   350:     return await Promise.race([
+   351:       fn(),
+   352:       new Promise<T>((_, reject) => {
+   353:         timer = setTimeout(() => reject(new Error(`watchdog_timeout:${label}:${VARIANT_WATCHDOG_TIMEOUT_MS}ms`)), VARIANT_WATCHDOG_TIMEOUT_MS);
+   354:       }),
+   355:     ]);
+   356:   } finally {
+   357:     if (timer) clearTimeout(timer);
+   358:   }
+   359: };
+   360: 
+   361: const summarize = (results: TaskResult[], canonical: boolean): ScenarioMetrics => {
+   362:   const expected = results.reduce((n,r)=>n+r.expected_files.length,0);
+   363:   const hit5 = results.reduce((n,r)=>n+(canonical?r.canonHits5:r.rawHits5),0);
+   364:   const hit10 = results.reduce((n,r)=>n+(canonical?r.canonHits10:r.rawHits10),0);
+   365:   return {
+   366:     gold_file_recall_at_5: expected?hit5/expected:0,
+   367:     gold_file_recall_at_10: expected?hit10/expected:0,
+   368:     consequential_file_retention_rate: results.length?results.filter((r)=>(canonical?r.canonHits10:r.rawHits10)>0).length/results.length:0,
+   369:     rerank_mrr10: avg(results.map((r)=>canonical?r.canonRR:r.rawRR)),
+   370:     graph_edge_hit_rate: avg(results.map((r)=>r.graphEdgeHit?1:0)),
+   371:     retrieval_confidence_mean: avg(results.flatMap((r)=>r.confidence==null?[]:[r.confidence])),
+   372:     retrieval_doc_share_mean: avg(results.flatMap((r)=>r.docShare==null?[]:[r.docShare])),
+   373:     unmatched_expected_file_rate: results.length?results.filter((r)=>r.mode==="none").length/results.length:0,
+   374:   };
+   375: };
+   376: 
+   377: const withTimeout = async <T>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+   378:   let timeoutHandle: NodeJS.Timeout | null = null;
+   379:   const timeoutPromise = new Promise<never>((_, reject) => {
+   380:     timeoutHandle = setTimeout(() => reject(new Error(`${label}:watchdog_timeout_ms=${ms}`)), ms);
+   381:   });
+   382:   try {
+   383:     return await Promise.race([promise, timeoutPromise]);
+   384:   } finally {
+   385:     if (timeoutHandle) clearTimeout(timeoutHandle);
+   386:   }
+   387: };
+   388: 
+   389: 
+   390: const inferStageFaultMatrix = (variant: any) => {
+   391:   const tasks = variant?.diagnostics?.mismatch_reasons ?? [];
+   392:   const total = tasks.length || 1;
+   393:   const reasonCount = (name: string) => tasks.reduce((n: number, t: any) => n + (Array.isArray(t.mismatchReasons) ? t.mismatchReasons.filter((r: any) => r.reason === name).length : 0), 0);
+   394:   const retrieval = reasonCount("retrieval_miss") / total;
+   395:   const candidateFiltering = reasonCount("alias_unmapped") / total;
+   396:   const rerank = reasonCount("path_form_mismatch") / total;
+   397:   const synthesisPacking = reasonCount("context_shape_mismatch") / total;
+   398:   const finalCleanup = Math.max(0, 1 - Math.min(1, retrieval + candidateFiltering + rerank + synthesisPacking));
+   399:   return {
+   400:     retrieval,
+   401:     candidate_filtering: candidateFiltering,
+   402:     rerank,
+   403:     synthesis_packing: synthesisPacking,
+   404:     final_cleanup: finalCleanup,
+   405:   };
+   406: };
+   407: 
+   408: const classifyFaultOwner = (matrix: { retrieval: number; candidate_filtering: number; rerank: number; synthesis_packing: number; final_cleanup: number }) => {
+   409:   const retrievalMass = matrix.retrieval;
+   410:   const routingMass = matrix.candidate_filtering;
+   411:   const postProcessingMass = matrix.rerank + matrix.synthesis_packing + matrix.final_cleanup;
+   412:   if (retrievalMass >= routingMass && retrievalMass >= postProcessingMass) return "retrieval";
+   413:   if (routingMass >= postProcessingMass) return "routing";
+   414:   return "post_processing";
+   415: };
+   416: 
+   417: const main = async () => {
+   418:   const corpus = JSON.parse(await fs.readFile(CORPUS_PATH, "utf8")) as Corpus;
+   419:   const tasks = [...corpus.tasks].sort((a,b)=>a.id.localeCompare(b.id));
+   420:   const scoped = MAX_TASKS>0?tasks.slice(0,MAX_TASKS):tasks;
+   421:   const runId=`retrieval-ablation-${Date.now()}`; const outDir=path.join(OUTPUT_ROOT,runId); await fs.mkdir(outDir,{recursive:true});
+   422:   const score: any = {
+   423:     runId,
+   424:     generatedAt:new Date().toISOString(),
+   425:     seeds:SEEDS,
+   426:     temperatures:TEMPS,
+   427:     maxTasks: MAX_TASKS,
+   428:     expectedTaskCount: scoped.length,
+   429:     expectedScenarioCount: VARIANTS.length * SEEDS.length * TEMPS.length,
+   430:     run_complete: false,
+   431:     blocked_reason: null,
+   432:     variants:{},
+   433:   };
+   434:   let completedScenarioCount = 0;
+   435: 
+   436:   for (const variant of VARIANTS) {
+   437:     const server = await startServer(variant);
+   438:     try {
+   439:       await withWatchdog(`variant:${variant.name}:ready`, async () => {
+   440:         await waitReady(server);
+   441:       });
+   442:       const scenarios:any[]=[];
+   443:       for (const seed of SEEDS) for (const temperature of TEMPS) {
+   444:         console.log(`[ablation] variant=${variant.name} seed=${seed} temperature=${temperature} tasks=${scoped.length}`);
+   445:         const results:TaskResult[]=[];
+   446:         await withWatchdog(`variant:${variant.name}:seed:${seed}:temp:${temperature}`, async () => {
+   447:           for (const task of scoped) {
+   448:             results.push(await runTask(server.askUrl, task,seed,temperature));
+   449:           }
+   450:         });
+   451:         const raw = summarize(results,false); const canon = summarize(results,true);
+   452:         scenarios.push({ seed, temperature, raw_metrics: raw, canonicalized_metrics: canon, task_results: results });
+   453:         completedScenarioCount += 1;
+   454:       }
+   455:       const metrics = [
+   456:         "gold_file_recall_at_5",
+   457:         "gold_file_recall_at_10",
+   458:         "consequential_file_retention_rate",
+   459:         "rerank_mrr10",
+   460:         "graph_edge_hit_rate",
+   461:         "retrieval_confidence_mean",
+   462:         "retrieval_doc_share_mean",
+   463:         "unmatched_expected_file_rate",
+   464:       ] as const;
+   465:       const aggregate:any={};
+   466:       for(const m of metrics){ const vals=scenarios.map((s)=>s.canonicalized_metrics[m] ?? s.raw_metrics[m]); aggregate[m]={ point_estimate:avg(vals), ci95:ci95(vals) }; }
+   467:       const flattenedTaskResults = scenarios.flatMap((scenario) =>
+   468:         scenario.task_results.map((taskResult: TaskResult) => ({
+   469:           seed: scenario.seed,
+   470:           temperature: scenario.temperature,
+   471:           taskId: taskResult.taskId,
+   472:           mode: taskResult.mode,
+   473:           mismatchReasons: taskResult.mismatchReasons,
+   474:           mismatchTaxonomy: taskResult.mismatchTaxonomy,
+   475:           expectedNormalized: taskResult.expectedNormalized,
+   476:           retrievedNormalizedTop10: taskResult.retrievedNormalizedTop10,
+   477:         })),
+   478:       );
+   479:       const mismatchCounts = flattenedTaskResults.reduce(
+   480:         (
+   481:           counts: Record<
+   482:             "path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch",
+   483:             number
+   484:           >,
+   485:           task,
+   486:         ) => {
+   487:           for (const reason of task.mismatchTaxonomy as Array<
+   488:             "path_form_mismatch" | "alias_unmapped" | "retrieval_miss" | "context_shape_mismatch"
+   489:           >) {
+   490:             counts[reason] += 1;
+   491:           }
+   492:           return counts;
+   493:         },
+   494:         {
+   495:           path_form_mismatch: 0,
+   496:           alias_unmapped: 0,
+   497:           retrieval_miss: 0,
+   498:           context_shape_mismatch: 0,
+   499:         },
+   500:       );
+   501:       score.variants[variant.name]={
+   502:         scenarios,
+   503:         aggregate,
+   504:         diagnostics: {
+   505:           unmatched_expected_file_rate: avg(scenarios.map((s)=>s.raw_metrics.unmatched_expected_file_rate)),
+   506:           expected_file_match_mode: {
+   507:             exact: flattenedTaskResults.filter((task) => task.mode === "exact").length,
+   508:             normalized: flattenedTaskResults.filter((task) => task.mode === "normalized").length,
+   509:             alias: flattenedTaskResults.filter((task) => task.mode === "alias").length,
+   510:             none: flattenedTaskResults.filter((task) => task.mode === "none").length,
+   511:           },
+   512:           mismatch_taxonomy_counts: mismatchCounts,
+   513:           mismatch_reasons: flattenedTaskResults.filter((task) => task.mismatchReasons.length > 0),
+   514:         };
+   515:       const stage_fault_matrix = inferStageFaultMatrix({ diagnostics });
+   516:       const fault_owner = classifyFaultOwner(stage_fault_matrix);
+   517:       score.variants[variant.name]={
+   518:         scenarios,
+   519:         aggregate,
+   520:         diagnostics,
+   521:         stage_fault_matrix,
+   522:         fault_owner,
+   523:       };
+   524:       await fs.writeFile(path.join(outDir,`${variant.name}.json`),JSON.stringify(score.variants[variant.name],null,2)+"\n");
+   525:     } catch (error) {
+   526:       const message = error instanceof Error ? error.message : String(error);
+   527:       score.blocked_reason = `variant_failed:${variant.name}:${message}`;
+   528:       score.variants[variant.name] = {
+   529:         ...(score.variants[variant.name] ?? {}),
+   530:         status: "blocked",
+   531:         fail_reason: message,
+   532:       };
+   533:       await fs.writeFile(path.join(outDir,"summary.partial.json"),JSON.stringify({ ...score, completedScenarioCount },null,2)+"\n");
+   534:       console.error(`[ablation] blocked ${score.blocked_reason}`);
+   535:       break;
+   536:     } finally { await stopServer(server); }
+   537:   }
+   538: 
+   539:   score.completedScenarioCount = completedScenarioCount;
+   540:   score.run_complete = score.blocked_reason === null && completedScenarioCount === score.expectedScenarioCount;
+   541: 
+   542:   if (!score.run_complete) {
+   543:     score.driver_verdict = {
+   544:       retrieval_lift_proven: "no",
+   545:       dominant_channel: "none",
+   546:       contributions: { atlas: 0, git_tracked: 0 },
+   547:       contribution_ci95: {
+   548:         atlas: { low: 0, high: 0 },
+   549:         git_tracked: { low: 0, high: 0 },
+   550:       },
+   551:       bounded_confidence: false,
+   552:       strict_gate: {
+   553:         positive_lane_ablation_delta: false,
+   554:         bounded_confidence: false,
+   555:         fault_owner_points_to_retrieval: false,
+   556:       },
+   557:       stage_fault_matrix: null,
+   558:       fault_owner: "unknown",
+   559:       status: "blocked",
+   560:       blocked_reason: score.blocked_reason ?? "unknown",
+   561:       confidence_statement: "run blocked before complete scenario set",
+   562:     };
+   563:     const jsonPath = "reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.json";
+   564:     const mdPath = "reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.md";
+   565:     await fs.writeFile(path.join(outDir,"summary.comparison.json"),JSON.stringify(score,null,2)+"\n");
+   566:     await fs.writeFile(
+   567:       path.join(outDir,"summary.comparison.md"),
+   568:       [
+   569:         `# Helix Ask Retrieval Ablation Summary (BLOCKED)`,
+   570:         "",
+   571:         `Run: ${runId}`,
+   572:         `run_complete=false`,
+   573:         `blocked_reason=${score.blocked_reason ?? "unknown"}`,
+   574:         `completedScenarioCount=${completedScenarioCount}/${score.expectedScenarioCount}`,
+   575:         "",
+   576:       ].join("\n"),
+   577:     );
+   578:     await fs.writeFile(jsonPath,JSON.stringify(score,null,2)+"\n");
+   579:     await fs.writeFile(
+   580:       mdPath,
+   581:       [
+   582:         "# Helix Ask Retrieval Ablation Scorecard (2026-03-03)",
+   583:         "",
+   584:         `Run: ${runId}`,
+   585:         "run_complete=false",
+   586:         `blocked_reason=${score.blocked_reason ?? "unknown"}`,
+   587:         `completedScenarioCount=${completedScenarioCount}/${score.expectedScenarioCount}`,
+   588:         "",
+   589:         "Driver verdict: retrieval_lift_proven=no, dominant_channel=none (blocked run).",
+   590:         "",
+   591:       ].join("\n"),
+   592:     );
+   593:     await fs.writeFile(
+   594:       "reports/helix-ask-retrieval-stage-fault-matrix-2026-03-04.md",
+   595:       [
+   596:         "# Helix Ask Retrieval Stage-Fault Matrix (2026-03-04)",
+   597:         "",
+   598:         `Run: ${runId}`,
+   599:         "Fault owner: unknown (blocked run)",
+   600:         "",
+   601:         "No stage matrix emitted because run was blocked before full scenario completion.",
+   602:         "",
+   603:       ].join("\n"),
+   604:     );
+   605:     await fs.writeFile(
+   606:       "reports/helix-ask-retrieval-attribution-go-no-go-2026-03-03.md",
+   607:       [
+   608:         "# Helix Ask Retrieval Attribution Go/No-Go (2026-03-03)",
+   609:         "",
+   610:         `Run: ${runId}`,
+   611:         "run_complete=false",
+   612:         `blocked_reason=${score.blocked_reason ?? "unknown"}`,
+   613:         "",
+   614:         "retrieval_lift_proven=no",
+   615:         "dominant_channel=none",
+   616:         "fault_owner=unknown",
+   617:         "",
+   618:         "Decision: NO-GO for retrieval-lift claim (run blocked before complete scenario set).",
+   619:         "",
+   620:       ].join("\n"),
+   621:     );
+   622:     console.log(`Ablation blocked artifacts written to ${outDir}`);
+   623:     return;
+   624:   }
+   625: 
+   626:   const base = score.variants.baseline_atlas_git_on.aggregate.gold_file_recall_at_10.point_estimate;
+   627:   const atlasOff = score.variants.atlas_off_git_on.aggregate.gold_file_recall_at_10.point_estimate;
+   628:   const gitOff = score.variants.atlas_on_git_off.aggregate.gold_file_recall_at_10.point_estimate;
+   629:   const atlasContribution = base - atlasOff;
+   630:   const gitContribution = base - gitOff;
+   631:   const maxContribution = Math.max(atlasContribution, gitContribution);
+   632:   let dominantChannel = "none";
+   633:   if (maxContribution > EPS) {
+   634:     if (Math.abs(atlasContribution - gitContribution) <= EPS) dominantChannel = "mixed";
+   635:     else dominantChannel = atlasContribution > gitContribution ? "atlas" : "git";
+   636:   }
+   637:   const baseCI = score.variants.baseline_atlas_git_on.aggregate.gold_file_recall_at_10.ci95;
+   638:   const atlasOffCI = score.variants.atlas_off_git_on.aggregate.gold_file_recall_at_10.ci95;
+   639:   const gitOffCI = score.variants.atlas_on_git_off.aggregate.gold_file_recall_at_10.ci95;
+   640:   const atlasDeltaCI = { low: baseCI.low - atlasOffCI.high, high: baseCI.high - atlasOffCI.low };
+   641:   const gitDeltaCI = { low: baseCI.low - gitOffCI.high, high: baseCI.high - gitOffCI.low };
+   642:   const boundedConfidence = atlasDeltaCI.low > 0 || gitDeltaCI.low > 0;
+   643:   const unmatchedRate = score.variants.baseline_atlas_git_on.diagnostics.unmatched_expected_file_rate;
+   644:   const recall10 = score.variants.baseline_atlas_git_on.aggregate.gold_file_recall_at_10.point_estimate;
+   645:   const retention = score.variants.baseline_atlas_git_on.aggregate.consequential_file_retention_rate.point_estimate;
+   646:   const retrievalStageFault = 1 - Math.max(0, 1 - unmatchedRate) * Math.max(0, recall10);
+   647:   const stage_fault_matrix = {
+   648:     retrieval: retrievalStageFault,
+   649:     candidate_filtering: 1 - recall10,
+   650:     rerank: 1 - score.variants.baseline_atlas_git_on.aggregate.rerank_mrr10.point_estimate,
+   651:     synthesis_packing: 1 - retention,
+   652:     final_cleanup: 1 - score.variants.baseline_atlas_git_on.aggregate.retrieval_doc_share_mean.point_estimate,
+   653:   };
+   654:   const fault_owner = retrievalStageFault >= 0.5 ? "retrieval" : retention < 0.5 ? "post_processing" : "routing";
+   655:   const retrievalLiftProven = maxContribution > EPS && base > EPS && boundedConfidence && fault_owner === "retrieval";
+   656:   score.driver_verdict = {
+   657:     retrieval_lift_proven: retrievalLiftProven ? "yes" : "no",
+   658:     dominant_channel: dominantChannel,
+   659:     contributions: {
+   660:       atlas: atlasContribution,
+   661:       git_tracked: gitContribution,
+   662:     },
+   663:     contribution_ci95: {
+   664:       atlas: atlasDeltaCI,
+   665:       git_tracked: gitDeltaCI,
+   666:     },
+   667:     bounded_confidence: boundedConfidence,
+   668:     strict_gate: {
+   669:       positive_lane_ablation_delta: maxContribution > EPS,
+   670:       bounded_confidence: boundedConfidence,
+   671:       fault_owner_points_to_retrieval: fault_owner === "retrieval",
+   672:     },
+   673:     stage_fault_matrix,
+   674:     fault_owner,
+   675:     confidence_statement: "95% bootstrap intervals computed over seed/temperature scenarios.",
+   676:   };
+   677: 
+   678:   const jsonPath="reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.json";
+   679:   const mdPath="reports/helix-ask-retrieval-ablation-scorecard-2026-03-03.md";
+   680:   await fs.writeFile(path.join(outDir,"summary.comparison.json"),JSON.stringify(score,null,2)+"\n");
+   681:   if (score.run_complete) {
+   682:     await fs.writeFile(jsonPath,JSON.stringify(score,null,2)+"\n");
+   683:   } else {
+   684:     await fs.writeFile(path.join(outDir,"scorecard.partial.json"),JSON.stringify(score,null,2)+"\n");
+   685:   }
+   686:   const rows=Object.entries(score.variants).map(([name,v]:any)=>`| ${name} | ${v.aggregate.gold_file_recall_at_10.point_estimate.toFixed(6)} | ${v.aggregate.gold_file_recall_at_10.ci95.low.toFixed(6)} | ${v.aggregate.gold_file_recall_at_10.ci95.high.toFixed(6)} | ${v.diagnostics.unmatched_expected_file_rate.toFixed(6)} |`);
+   687:   const mdContent = [
+   688:       `# Helix Ask Retrieval Ablation Scorecard (2026-03-03)`,
+   689:       "",
+   690:       `Run: ${runId}`,
+   691:       `run_complete=${score.run_complete}`,
+   692:       "",
+   693:       `run_complete=${score.run_complete}`,
+   694:       ...(score.blocked ? [`blocked=${JSON.stringify(score.blocked)}`, ""] : []),
+   695:       "| Variant | recall@10 point | ci95 low | ci95 high | unmatched_expected_file_rate |",
+   696:       "| --- | ---: | ---: | ---: | ---: |",
+   697:       ...rows,
+   698:       "",
+   699:       `Driver verdict: retrieval_lift_proven=${score.driver_verdict.retrieval_lift_proven}, dominant_channel=${score.driver_verdict.dominant_channel}.`,
+   700:       `Attribution guard: lane_ablation_delta_positive=${score.driver_verdict.attribution_guard.lane_ablation_delta_positive}, bounded_confidence=${score.driver_verdict.attribution_guard.bounded_confidence}, fault_owner_retrieval=${score.driver_verdict.attribution_guard.fault_owner_retrieval}.`,
+   701:       `Contributions: atlas=${score.driver_verdict.contributions.atlas.toFixed(6)}, git_tracked=${score.driver_verdict.contributions.git_tracked.toFixed(6)}.`,
+   702:       `Strict gate: positive_lane_ablation_delta=${score.driver_verdict.strict_gate.positive_lane_ablation_delta}, bounded_confidence=${score.driver_verdict.strict_gate.bounded_confidence}, fault_owner_points_to_retrieval=${score.driver_verdict.strict_gate.fault_owner_points_to_retrieval}.`,
+   703:       "",
+   704:     ].join("\n"),
+   705:   );
+   706:   await fs.writeFile(path.join(outDir,"summary.comparison.md"),await fs.readFile(mdPath,"utf8"));
+   707:   await fs.writeFile(
+   708:     "reports/helix-ask-retrieval-stage-fault-matrix-2026-03-04.md",
+   709:     [
+   710:       "# Helix Ask Retrieval Stage-Fault Matrix (2026-03-04)",
+   711:       "",
+   712:       `Run: ${runId}`,
+   713:       `Fault owner: ${score.driver_verdict.fault_owner}`,
+   714:       "",
+   715:       "| Stage | Fault score |",
+   716:       "| --- | ---: |",
+   717:       `| retrieval | ${score.driver_verdict.stage_fault_matrix.retrieval.toFixed(6)} |`,
+   718:       `| candidate_filtering | ${score.driver_verdict.stage_fault_matrix.candidate_filtering.toFixed(6)} |`,
+   719:       `| rerank | ${score.driver_verdict.stage_fault_matrix.rerank.toFixed(6)} |`,
+   720:       `| synthesis_packing | ${score.driver_verdict.stage_fault_matrix.synthesis_packing.toFixed(6)} |`,
+   721:       `| final_cleanup | ${score.driver_verdict.stage_fault_matrix.final_cleanup.toFixed(6)} |`,
+   722:       "",
+   723:     ].join("\n"),
+   724:   );
+   725:   await fs.writeFile(
+   726:     "reports/helix-ask-retrieval-attribution-go-no-go-2026-03-03.md",
+   727:     [
+   728:       "# Helix Ask Retrieval Attribution Go/No-Go (2026-03-03)",
+   729:       "",
+   730:       `Run: ${runId}`,
+   731:       "",
+   732:       `retrieval_lift_proven=${score.driver_verdict.retrieval_lift_proven}`,
+   733:       `dominant_channel=${score.driver_verdict.dominant_channel}`,
+   734:       `fault_owner=${score.driver_verdict.fault_owner}`,
+   735:       "",
+   736:       "Strict retrieval-lift claim gate:",
+   737:       `- positive lane-ablation delta: ${score.driver_verdict.strict_gate.positive_lane_ablation_delta}`,
+   738:       `- bounded confidence: ${score.driver_verdict.strict_gate.bounded_confidence}`,
+   739:       `- stage-fault owner points to retrieval: ${score.driver_verdict.strict_gate.fault_owner_points_to_retrieval}`,
+   740:       "",
+   741:       score.driver_verdict.retrieval_lift_proven === "yes"
+   742:         ? "Decision: GO for retrieval-lift claim (strict gate passed)."
+   743:         : "Decision: NO-GO for retrieval-lift claim (strict gate not satisfied).",
+   744:       "",
+   745:     ].join("\n"),
+   746:   );
+   747:   console.log(`Ablation artifacts written to ${outDir}`);
+   748: };
+   749: 
+   750: await main();

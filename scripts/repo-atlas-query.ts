@@ -120,7 +120,7 @@ const rankFieldMatch = (value: string, needle: string, fieldWeight: number): num
   if (!normalized) return -1;
   if (normalized === needle) return 1000 + fieldWeight;
   if (normalized.startsWith(needle)) return 500 + fieldWeight - Math.max(0, normalized.length - needle.length);
-  if (normalized.includes(needle)) return 100 + fieldWeight - Math.max(0, normalized.length - needle.length);
+  if (normalized.includes(needle)) return Math.max(1, 100 + fieldWeight - Math.max(0, normalized.length - needle.length));
   return -1;
 };
 

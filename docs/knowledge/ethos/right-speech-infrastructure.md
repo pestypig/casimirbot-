@@ -8,4 +8,4 @@ topicTags: ["ideology"]
 mustIncludeFiles: ["docs/ethos/ideology.json"]
 ---
 Definition: Speech is ethical action; trustworthy channels keep society coherent.
-Notes: Tags: speech, communication, ethics, verification, channels.
+Notes: Tags: speech, communication, ethics, verification, channels. Related: truth-convergence-pathways.

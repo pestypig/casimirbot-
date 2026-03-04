@@ -8,4 +8,4 @@ topicTags: ["ideology"]
 mustIncludeFiles: ["docs/ethos/ideology.json", "docs/casimir-tile-mechanism.md"]
 ---
 Definition: Narratives must ship with verification hooks.
-Notes: Tags: verification, falsifiability.
+Notes: Tags: verification, falsifiability. Related: truth-convergence-pathways; right-speech-infrastructure; citizens-arc-convergence-compact.
