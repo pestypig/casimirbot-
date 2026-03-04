@@ -498,20 +498,17 @@ const main = async () => {
           context_shape_mismatch: 0,
         },
       );
-      score.variants[variant.name]={
-        scenarios,
-        aggregate,
-        diagnostics: {
-          unmatched_expected_file_rate: avg(scenarios.map((s)=>s.raw_metrics.unmatched_expected_file_rate)),
-          expected_file_match_mode: {
-            exact: flattenedTaskResults.filter((task) => task.mode === "exact").length,
-            normalized: flattenedTaskResults.filter((task) => task.mode === "normalized").length,
-            alias: flattenedTaskResults.filter((task) => task.mode === "alias").length,
-            none: flattenedTaskResults.filter((task) => task.mode === "none").length,
-          },
-          mismatch_taxonomy_counts: mismatchCounts,
-          mismatch_reasons: flattenedTaskResults.filter((task) => task.mismatchReasons.length > 0),
-        };
+      const diagnostics = {
+        unmatched_expected_file_rate: avg(scenarios.map((s)=>s.raw_metrics.unmatched_expected_file_rate)),
+        expected_file_match_mode: {
+          exact: flattenedTaskResults.filter((task) => task.mode === "exact").length,
+          normalized: flattenedTaskResults.filter((task) => task.mode === "normalized").length,
+          alias: flattenedTaskResults.filter((task) => task.mode === "alias").length,
+          none: flattenedTaskResults.filter((task) => task.mode === "none").length,
+        },
+        mismatch_taxonomy_counts: mismatchCounts,
+        mismatch_reasons: flattenedTaskResults.filter((task) => task.mismatchReasons.length > 0),
+      };
       const stage_fault_matrix = inferStageFaultMatrix({ diagnostics });
       const fault_owner = classifyFaultOwner(stage_fault_matrix);
       score.variants[variant.name]={
@@ -690,20 +687,20 @@ const main = async () => {
       `Run: ${runId}`,
       `run_complete=${score.run_complete}`,
       "",
-      `run_complete=${score.run_complete}`,
-      ...(score.blocked ? [`blocked=${JSON.stringify(score.blocked)}`, ""] : []),
+      ...(score.blocked_reason ? [`blocked_reason=${score.blocked_reason}`, ""] : []),
       "| Variant | recall@10 point | ci95 low | ci95 high | unmatched_expected_file_rate |",
       "| --- | ---: | ---: | ---: | ---: |",
       ...rows,
       "",
       `Driver verdict: retrieval_lift_proven=${score.driver_verdict.retrieval_lift_proven}, dominant_channel=${score.driver_verdict.dominant_channel}.`,
-      `Attribution guard: lane_ablation_delta_positive=${score.driver_verdict.attribution_guard.lane_ablation_delta_positive}, bounded_confidence=${score.driver_verdict.attribution_guard.bounded_confidence}, fault_owner_retrieval=${score.driver_verdict.attribution_guard.fault_owner_retrieval}.`,
       `Contributions: atlas=${score.driver_verdict.contributions.atlas.toFixed(6)}, git_tracked=${score.driver_verdict.contributions.git_tracked.toFixed(6)}.`,
       `Strict gate: positive_lane_ablation_delta=${score.driver_verdict.strict_gate.positive_lane_ablation_delta}, bounded_confidence=${score.driver_verdict.strict_gate.bounded_confidence}, fault_owner_points_to_retrieval=${score.driver_verdict.strict_gate.fault_owner_points_to_retrieval}.`,
       "",
-    ].join("\n"),
-  );
-  await fs.writeFile(path.join(outDir,"summary.comparison.md"),await fs.readFile(mdPath,"utf8"));
+    ].join("\n");
+  await fs.writeFile(path.join(outDir,"summary.comparison.md"),`${mdContent}\n`);
+  if (score.run_complete) {
+    await fs.writeFile(mdPath,`${mdContent}\n`);
+  }
   await fs.writeFile(
     "reports/helix-ask-retrieval-stage-fault-matrix-2026-03-04.md",
     [
