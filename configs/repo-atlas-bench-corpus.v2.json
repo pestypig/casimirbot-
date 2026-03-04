@@ -291,7 +291,7 @@
                   {
                       "id":  "atlas_task_023",
                       "domain":  "scripts",
-                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing validate ideology verifiers (validate-ideology-verifiers.ts). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the script behind the ideology verifier gate used by npm run verify:ideology-verifiers (validate-ideology-verifiers.ts). Return the exact repository path.",
                       "expected_files":  [
                                              "scripts/validate-ideology-verifiers.ts"
                                          ],
@@ -304,7 +304,7 @@
                   {
                       "id":  "atlas_task_024",
                       "domain":  "scripts",
-                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing build code lattice (build-code-lattice.ts). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the script that builds the code lattice graph for Helix retrieval diagnostics (build-code-lattice.ts). Return the exact repository path.",
                       "expected_files":  [
                                              "scripts/build-code-lattice.ts"
                                          ],
@@ -317,7 +317,7 @@
                   {
                       "id":  "atlas_task_025",
                       "domain":  "scripts",
-                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing build panel tree (build-panel-tree.ts). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the script that rebuilds panel concept trees consumed by Helix Ask routing (build-panel-tree.ts). Return the exact repository path.",
                       "expected_files":  [
                                              "scripts/build-panel-tree.ts"
                                          ],
@@ -330,7 +330,7 @@
                   {
                       "id":  "atlas_task_026",
                       "domain":  "scripts",
-                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp full solve single runner (warp-full-solve-single-runner.ts). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the single-run entrypoint script used for warp full-solve execution (warp-full-solve-single-runner.ts). Return the exact repository path.",
                       "expected_files":  [
                                              "scripts/warp-full-solve-single-runner.ts"
                                          ],
@@ -343,7 +343,7 @@
                   {
                       "id":  "atlas_task_027",
                       "domain":  "scripts",
-                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp evidence pack (warp-evidence-pack.ts). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the script that emits the warp evidence pack artifacts and summaries (warp-evidence-pack.ts). Return the exact repository path.",
                       "expected_files":  [
                                              "scripts/warp-evidence-pack.ts"
                                          ],
@@ -356,7 +356,7 @@
                   {
                       "id":  "atlas_task_028",
                       "domain":  "scripts",
-                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing agi gguf bench (agi-gguf-bench.ts). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the script running AGI GGUF benchmark sweeps and report capture (agi-gguf-bench.ts). Return the exact repository path.",
                       "expected_files":  [
                                              "scripts/agi-gguf-bench.ts"
                                          ],
@@ -369,7 +369,7 @@
                   {
                       "id":  "atlas_task_029",
                       "domain":  "scripts",
-                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing helix ask utility (helix-ask-utility-ab.ts). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the script used for Helix Ask utility A/B attribution checks (helix-ask-utility-ab.ts). Return the exact repository path.",
                       "expected_files":  [
                                              "scripts/helix-ask-utility-ab.ts"
                                          ],
@@ -382,7 +382,7 @@
                   {
                       "id":  "atlas_task_030",
                       "domain":  "scripts",
-                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing warp full solve campaign cli (warp-full-solve-campaign-cli.ts). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the CLI script orchestrating warp full-solve campaign waves (warp-full-solve-campaign-cli.ts). Return the exact repository path.",
                       "expected_files":  [
                                              "scripts/warp-full-solve-campaign-cli.ts"
                                          ],
@@ -395,7 +395,7 @@
                   {
                       "id":  "atlas_task_031",
                       "domain":  "scripts",
-                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing build math congruence matrix (build-math-congruence-matrix.ts). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the script that builds the math congruence matrix for audit and replay checks (build-math-congruence-matrix.ts). Return the exact repository path.",
                       "expected_files":  [
                                              "scripts/build-math-congruence-matrix.ts"
                                          ],
@@ -408,7 +408,7 @@
                   {
                       "id":  "atlas_task_032",
                       "domain":  "scripts",
-                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing guard helix core deprecated (guard-helix-core-deprecated.ts). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the script enforcing Helix core deprecated guardrails in CI (guard-helix-core-deprecated.ts). Return the exact repository path.",
                       "expected_files":  [
                                              "scripts/guard-helix-core-deprecated.ts"
                                          ],
@@ -421,7 +421,7 @@
                   {
                       "id":  "atlas_task_033",
                       "domain":  "scripts",
-                      "prompt":  "For retrieval attribution benchmarking, locate the scripts file implementing validate agent context checklist (validate-agent-context-checklist.ts). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the script that validates AGENTS/WARP/PLAYBOOK context checklist compliance (validate-agent-context-checklist.ts). Return the exact repository path.",
                       "expected_files":  [
                                              "scripts/validate-agent-context-checklist.ts"
                                          ],
@@ -434,7 +434,7 @@
                   {
                       "id":  "atlas_task_034",
                       "domain":  "docs",
-                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing replit runtime constraints (replit-runtime-constraints.md). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the runtime limitation doc that constrains local lane execution budgets (replit-runtime-constraints.md). Return the exact repository path.",
                       "expected_files":  [
                                              "docs/replit-runtime-constraints.md"
                                          ],
@@ -447,7 +447,7 @@
                   {
                       "id":  "atlas_task_035",
                       "domain":  "docs",
-                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing casimir tile roadmap (casimir-tile-roadmap.md). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the roadmap doc for Casimir tile development milestones (casimir-tile-roadmap.md). Return the exact repository path.",
                       "expected_files":  [
                                              "docs/casimir-tile-roadmap.md"
                                          ],
@@ -460,7 +460,7 @@
                   {
                       "id":  "atlas_task_036",
                       "domain":  "docs",
-                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing warp tree dag walk rules (warp-tree-dag-walk-rules.md). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the doc that defines warp tree/DAG walk rules and traversal constraints (warp-tree-dag-walk-rules.md). Return the exact repository path.",
                       "expected_files":  [
                                              "docs/warp-tree-dag-walk-rules.md"
                                          ],
@@ -473,7 +473,7 @@
                   {
                       "id":  "atlas_task_037",
                       "domain":  "docs",
-                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing warp tree dag schema (warp-tree-dag-schema.md). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the schema document for warp tree/DAG node and edge structure (warp-tree-dag-schema.md). Return the exact repository path.",
                       "expected_files":  [
                                              "docs/warp-tree-dag-schema.md"
                                          ],
@@ -486,7 +486,7 @@
                   {
                       "id":  "atlas_task_038",
                       "domain":  "docs",
-                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing solar pipeline (solar-pipeline.md). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the docs page describing the solar pipeline flow and linked runtime surfaces (solar-pipeline.md). Return the exact repository path.",
                       "expected_files":  [
                                              "docs/solar-pipeline.md"
                                          ],
@@ -499,7 +499,7 @@
                   {
                       "id":  "atlas_task_039",
                       "domain":  "docs",
-                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing agibot knowledge linking contract (agibot-knowledge-linking-contract-v1.md). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the architecture contract document defining AGI bot knowledge-linking semantics (agibot-knowledge-linking-contract-v1.md). Return the exact repository path.",
                       "expected_files":  [
                                              "docs/architecture/agibot-knowledge-linking-contract-v1.md"
                                          ],
@@ -512,7 +512,7 @@
                   {
                       "id":  "atlas_task_040",
                       "domain":  "docs",
-                      "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask dottie callout templates (helix-ask-dottie-callout-templates.v1.md). Return the exact repository path.",
+                      "prompt":  "For retrieval attribution benchmarking, find the architecture doc containing Helix Ask Dottie callout templates (helix-ask-dottie-callout-templates.v1.md). Return the exact repository path.",
                       "expected_files":  [
                                              "docs/architecture/helix-ask-dottie-callout-templates.v1.md"
                                          ],
@@ -1139,6 +1139,84 @@
                       "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing voice train colab bootstrap 2026 (voice-train-colab-bootstrap-2026-02-23.md). Return the exact repository path.",
                       "expected_files":  [
                                              "docs/runbooks/voice-train-colab-bootstrap-2026-02-23.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_089",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, identify the server utility used to execute python subprocess calls for runtime adapters (run-python.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/utils/run-python.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_090",
+                      "domain":  "server",
+                      "prompt":  "For retrieval attribution benchmarking, identify the GR constraint evaluation surface that gates warp admissibility checks (constraint-evaluator.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "server/gr/constraint-evaluator.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_091",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, find the script that validates ideology verifier contracts and CI checks (validate-ideology-verifiers.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/validate-ideology-verifiers.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_092",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, find the script that compiles panel trees used by Helix concept routing (build-panel-tree.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/build-panel-tree.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_093",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, find the single-run warp full-solve script used by campaign orchestration lanes (warp-full-solve-single-runner.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/warp-full-solve-single-runner.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_094",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, find the Helix Ask utility script used for retrieval utility A/B attribution runs (helix-ask-utility-ab.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/helix-ask-utility-ab.ts"
                                          ],
                       "success_check":  {
                                             "file_hit":  true,

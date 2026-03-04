@@ -41,6 +41,9 @@ type TaskResult = {
   graphEdgeHit: boolean;
   confidence: number | null;
   docShare: number | null;
+  atlasGraphSelectedCount: number;
+  atlasGraphRuntimeLinkCount: number;
+  atlasGraphEdgeTypeCounts: Record<string, number>;
 };
 
 const CORPUS_PATH = process.env.HELIX_ASK_RETRIEVAL_CORPUS ?? "configs/repo-atlas-bench-corpus.v1.json";
@@ -93,6 +96,17 @@ const findOpenPort = async (): Promise<number> =>
 
 const numberOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
+const numberRecordOrEmpty = (value: unknown): Record<string, number> => {
+  if (!value || typeof value !== "object") return {};
+  const out: Record<string, number> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (!key) continue;
+    const numeric = Number(entry);
+    if (!Number.isFinite(numeric)) continue;
+    out[key] = numeric;
+  }
+  return out;
+};
 const EVIDENCE_PREFIX = /^(file:|evidence:|repo:|path:)/i;
 const REPO_PREFIX = /^\/?workspace\/casimirbot-\//i;
 const TRAILING_LINE_SUFFIX = /:(\d+)(:\d+)?$/;
@@ -113,6 +127,10 @@ const pathTail = (raw: string, depth = 2) => {
 const pathBase = (raw: string) => {
   const parts = pathSegments(raw);
   return parts.length ? parts[parts.length - 1] : normalizePathLoose(raw);
+};
+const pathRoot = (raw: string) => {
+  const parts = pathSegments(raw);
+  return parts.length ? parts[0] : "unknown";
 };
 const canonicalPathSet = (s: string) => {
   const n = normalizeEvidenceId(s);
@@ -346,6 +364,9 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       graph_evidence_count?: unknown;
       retrieval_confidence?: unknown;
       retrieval_doc_share?: unknown;
+      retrieval_atlas_graph_selected_count?: unknown;
+      retrieval_atlas_graph_runtime_link_count?: unknown;
+      retrieval_atlas_graph_edge_type_counts?: unknown;
     };
   } | null = null;
   for (let attempt=0; attempt<ASK_RETRY_ATTEMPTS; attempt+=1) {
@@ -361,6 +382,9 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
           graph_evidence_count?: unknown;
           retrieval_confidence?: unknown;
           retrieval_doc_share?: unknown;
+          retrieval_atlas_graph_selected_count?: unknown;
+          retrieval_atlas_graph_runtime_link_count?: unknown;
+          retrieval_atlas_graph_edge_type_counts?: unknown;
         };
       };
       break;
@@ -390,6 +414,9 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       graphEdgeHit: false,
       confidence: null,
       docShare: null,
+      atlasGraphSelectedCount: 0,
+      atlasGraphRuntimeLinkCount: 0,
+      atlasGraphEdgeTypeCounts: {},
     };
   }
   const selectedContext = selectDebugContextFiles((payload.debug ?? null) as Record<string, unknown> | null);
@@ -435,6 +462,15 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
     numberOrNull(payload.debug?.belief_graph_edge_count) ??
     numberOrNull(payload.debug?.graph_evidence_count) ??
     0;
+  const atlasGraphSelectedCount = Math.max(
+    0,
+    numberOrNull(payload.debug?.retrieval_atlas_graph_selected_count) ?? 0,
+  );
+  const atlasGraphRuntimeLinkCount = Math.max(
+    0,
+    numberOrNull(payload.debug?.retrieval_atlas_graph_runtime_link_count) ?? 0,
+  );
+  const atlasGraphEdgeTypeCounts = numberRecordOrEmpty(payload.debug?.retrieval_atlas_graph_edge_type_counts);
   return {
     taskId: task.id,
     expected_files: task.expected_files,
@@ -456,6 +492,9 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
     graphEdgeHit: edgeCount > 0,
     confidence: numberOrNull(payload.debug?.retrieval_confidence),
     docShare: numberOrNull(payload.debug?.retrieval_doc_share),
+    atlasGraphSelectedCount,
+    atlasGraphRuntimeLinkCount,
+    atlasGraphEdgeTypeCounts,
   };
 };
 
@@ -650,6 +689,7 @@ const main = async () => {
           seed: scenario.seed,
           temperature: scenario.temperature,
           taskId: taskResult.taskId,
+          expectedRoot: pathRoot(taskResult.expected_files[0] ?? ""),
           mode: taskResult.mode,
           mismatchReasons: taskResult.mismatchReasons,
           mismatchTaxonomy: taskResult.mismatchTaxonomy,
@@ -657,6 +697,9 @@ const main = async () => {
           retrievedNormalizedTop10: taskResult.retrievedNormalizedTop10,
           contextSource: taskResult.contextSource,
           top10Fingerprint: taskResult.top10Fingerprint,
+          atlasGraphSelectedCount: taskResult.atlasGraphSelectedCount,
+          atlasGraphRuntimeLinkCount: taskResult.atlasGraphRuntimeLinkCount,
+          atlasGraphEdgeTypeCounts: taskResult.atlasGraphEdgeTypeCounts,
         })),
       );
       const mismatchCounts = flattenedTaskResults.reduce(
@@ -716,6 +759,51 @@ const main = async () => {
         dominantFingerprint === "<empty>"
           ? "<empty>"
           : dominantFingerprint.split("|").slice(0, 3).join("|");
+      const missBucketCounts = flattenedTaskResults.reduce(
+        (
+          counts: Record<"scripts" | "docs" | "server" | "client" | "other", number>,
+          task,
+        ) => {
+          if (task.mode !== "none") return counts;
+          const root = String(task.expectedRoot ?? "other");
+          if (root === "scripts" || root === "docs" || root === "server" || root === "client") {
+            counts[root] += 1;
+          } else {
+            counts.other += 1;
+          }
+          return counts;
+        },
+        { scripts: 0, docs: 0, server: 0, client: 0, other: 0 },
+      );
+      const missTotal =
+        missBucketCounts.scripts +
+        missBucketCounts.docs +
+        missBucketCounts.server +
+        missBucketCounts.client +
+        missBucketCounts.other;
+      const missBucketRates = {
+        scripts: missTotal > 0 ? missBucketCounts.scripts / missTotal : 0,
+        docs: missTotal > 0 ? missBucketCounts.docs / missTotal : 0,
+        server: missTotal > 0 ? missBucketCounts.server / missTotal : 0,
+        client: missTotal > 0 ? missBucketCounts.client / missTotal : 0,
+        other: missTotal > 0 ? missBucketCounts.other / missTotal : 0,
+      };
+      const graphSelectedTaskCount = flattenedTaskResults.filter((task) => task.atlasGraphSelectedCount > 0).length;
+      const graphRuntimeLinkTaskCount = flattenedTaskResults.filter(
+        (task) => task.atlasGraphRuntimeLinkCount > 0,
+      ).length;
+      const graphEdgeTypeCounts = flattenedTaskResults.reduce((counts: Record<string, number>, task) => {
+        for (const [edgeType, count] of Object.entries(task.atlasGraphEdgeTypeCounts ?? {})) {
+          const numeric = Number(count);
+          if (!Number.isFinite(numeric)) continue;
+          counts[edgeType] = (counts[edgeType] ?? 0) + numeric;
+        }
+        return counts;
+      }, {});
+      const graphExpansionContributionRate =
+        flattenedTaskResults.length > 0 ? graphSelectedTaskCount / flattenedTaskResults.length : 0;
+      const graphRuntimeLinkRate =
+        flattenedTaskResults.length > 0 ? graphRuntimeLinkTaskCount / flattenedTaskResults.length : 0;
       const diagnostics = {
         unmatched_expected_file_rate: avg(scenarios.map((s)=>s.raw_metrics.unmatched_expected_file_rate)),
         expected_file_match_mode: {
@@ -733,6 +821,19 @@ const main = async () => {
         top10_fingerprint_dominant_share: Number(fingerprintDominantShare.toFixed(6)),
         top10_fingerprint_dominant_sample: dominantFingerprintSample,
         top10_fingerprint_collapse_flag: fingerprintDominantShare >= 0.8,
+        miss_bucket_counts: missBucketCounts,
+        miss_bucket_rates: {
+          scripts: Number(missBucketRates.scripts.toFixed(6)),
+          docs: Number(missBucketRates.docs.toFixed(6)),
+          server: Number(missBucketRates.server.toFixed(6)),
+          client: Number(missBucketRates.client.toFixed(6)),
+          other: Number(missBucketRates.other.toFixed(6)),
+        },
+        graph_expansion_contribution_rate: Number(graphExpansionContributionRate.toFixed(6)),
+        graph_runtime_link_rate: Number(graphRuntimeLinkRate.toFixed(6)),
+        graph_selected_task_count: graphSelectedTaskCount,
+        graph_runtime_link_task_count: graphRuntimeLinkTaskCount,
+        graph_edge_type_counts: graphEdgeTypeCounts,
         mismatch_reasons: flattenedTaskResults.filter((task) => task.mismatchReasons.length > 0),
       };
       const stage_fault_matrix = inferStageFaultMatrix({ diagnostics });
@@ -983,6 +1084,8 @@ const main = async () => {
       `Corpus fidelity: pass=${Boolean(score.driver_verdict.corpus_fidelity?.pass)}, template_collision=${Number(score.driver_verdict.corpus_fidelity?.observed?.prompt_template_collision_rate ?? 0).toFixed(6)}, expected_token_hit=${Number(score.driver_verdict.corpus_fidelity?.observed?.expected_token_hit_rate ?? 0).toFixed(6)}.`,
       `Top10 collapse (baseline): dominant_share=${(score.variants.baseline_atlas_git_on?.diagnostics?.top10_fingerprint_dominant_share ?? 0).toFixed(6)}, unique_rate=${(score.variants.baseline_atlas_git_on?.diagnostics?.top10_fingerprint_unique_rate ?? 0).toFixed(6)}, collapse_flag=${Boolean(score.variants.baseline_atlas_git_on?.diagnostics?.top10_fingerprint_collapse_flag)}.`,
       `Context source counts (baseline): retrieval_context_files=${score.variants.baseline_atlas_git_on?.diagnostics?.context_file_source_counts?.retrieval_context_files ?? 0}, context_files=${score.variants.baseline_atlas_git_on?.diagnostics?.context_file_source_counts?.context_files ?? 0}, none=${score.variants.baseline_atlas_git_on?.diagnostics?.context_file_source_counts?.none ?? 0}.`,
+      `Graph expansion contribution (baseline): selected_rate=${Number(score.variants.baseline_atlas_git_on?.diagnostics?.graph_expansion_contribution_rate ?? 0).toFixed(6)}, runtime_link_rate=${Number(score.variants.baseline_atlas_git_on?.diagnostics?.graph_runtime_link_rate ?? 0).toFixed(6)}, selected_tasks=${score.variants.baseline_atlas_git_on?.diagnostics?.graph_selected_task_count ?? 0}.`,
+      `Miss buckets (baseline): scripts=${score.variants.baseline_atlas_git_on?.diagnostics?.miss_bucket_counts?.scripts ?? 0}, docs=${score.variants.baseline_atlas_git_on?.diagnostics?.miss_bucket_counts?.docs ?? 0}, server=${score.variants.baseline_atlas_git_on?.diagnostics?.miss_bucket_counts?.server ?? 0}, client=${score.variants.baseline_atlas_git_on?.diagnostics?.miss_bucket_counts?.client ?? 0}, other=${score.variants.baseline_atlas_git_on?.diagnostics?.miss_bucket_counts?.other ?? 0}.`,
       "",
     ].join("\n");
   await fs.writeFile(path.join(outDir,"summary.comparison.md"),`${mdContent}\n`);

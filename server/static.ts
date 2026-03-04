@@ -14,6 +14,11 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+function resolveReasoningTheaterPath(): string | null {
+  const candidate = path.resolve(process.cwd(), "public", "reasoning-theater");
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
 function resolveDistPath(): string {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -38,8 +43,12 @@ function resolveDistPath(): string {
 
 export function serveStatic(app: Express) {
   const distPath = resolveDistPath();
+  const reasoningTheaterPath = resolveReasoningTheaterPath();
 
   app.use(express.static(distPath));
+  if (reasoningTheaterPath) {
+    app.use("/reasoning-theater", express.static(reasoningTheaterPath));
+  }
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.method !== "GET") {
       next();

@@ -1,3 +1,4 @@
+import * as fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -10,7 +11,15 @@ import { buildCodeLatticeSnapshot } from "../server/services/code-lattice/builde
 const execFileAsync = promisify(execFile);
 
 export type AtlasNodeKind = "file" | "symbol" | "concept" | "value" | "gate";
-export type AtlasEdgeKind = "imports" | "defines" | "mentions" | "tests" | "causal";
+export type AtlasEdgeKind =
+  | "imports"
+  | "defines"
+  | "mentions"
+  | "tests"
+  | "use"
+  | "doc-ref"
+  | "command-ref"
+  | "causal";
 
 export type AtlasNode = {
   id: string;
@@ -44,6 +53,29 @@ export type RepoAtlas = {
 
 export const DEFAULT_ATLAS_PATH = path.join(process.cwd(), "artifacts", "repo-atlas", "repo-atlas.v1.json");
 const DEFAULT_TREE_DAG_WALK_REPORT_PATH = path.join(process.cwd(), "docs", "warp-tree-dag-walk-report.json");
+const SCRIPT_DOC_REF_SOURCE_SYSTEM = "script-doc-ref";
+const SOURCE_PATH_PREFIXES = ["scripts/", "docs/"] as const;
+const PATH_REF_EXTENSIONS = [
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".py",
+  ".json",
+  ".md",
+  ".mdx",
+] as const;
+const IMPORT_REF_REGEX =
+  /(?:import\s+[^'"\n]*from\s*|import\s*|require\(\s*|from\s+|export\s+[^'"\n]*from\s*)(['"])([^'"\n]+)\1/gm;
+const COMMAND_TARGET_REGEX = /(?:^|\s)(?:tsx|node|python|bash)\s+([./A-Za-z0-9_\-\\/]+(?:\.[A-Za-z0-9]+)?)/gim;
+const NPM_RUN_REGEX = /npm\s+run\s+([A-Za-z0-9:_-]+)/gim;
+const MARKDOWN_LINK_REGEX = /\[[^\]]+\]\(([^)]+)\)/gm;
+const GENERIC_PATH_REF_REGEX =
+  /(?:^|[\s(])((?:\.{1,2}\/|\/)?(?:docs|scripts|server|client|modules|configs|shared)\/[A-Za-z0-9._\/-]+\.[A-Za-z0-9]+)(?:[#?)\s]|$)/gm;
+
+let packageScriptCommandMapCache: Map<string, string[]> | null = null;
 
 type TreeDagWalkVisitedNode = {
   id?: string;
@@ -136,10 +168,236 @@ const addEdge = (edges: Map<string, AtlasEdge>, edge: AtlasEdge) => {
 };
 
 const normalizeEdgeKind = (kind: string): AtlasEdgeKind => {
-  if (kind === "imports" || kind === "defines" || kind === "mentions" || kind === "tests") {
+  if (
+    kind === "imports" ||
+    kind === "defines" ||
+    kind === "mentions" ||
+    kind === "tests" ||
+    kind === "use" ||
+    kind === "doc-ref" ||
+    kind === "command-ref"
+  ) {
     return kind;
   }
   return "causal";
+};
+
+const normalizeRepoPath = (value: string): string =>
+  value
+    .replace(/\\/g, "/")
+    .replace(/^\.\//, "")
+    .replace(/^\/+/, "")
+    .replace(/\/+/g, "/")
+    .trim();
+
+const isScriptOrDocSourcePath = (value: string): boolean => {
+  const normalized = normalizeRepoPath(value).toLowerCase();
+  return SOURCE_PATH_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+};
+
+const sanitizeReferenceValue = (raw: string): string => {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return "";
+  if (trimmed.startsWith("mailto:")) return "";
+  if (trimmed.startsWith("<")) return "";
+  const withoutAnchor = trimmed.split("#")[0] ?? "";
+  const withoutQuery = withoutAnchor.split("?")[0] ?? "";
+  return withoutQuery.trim();
+};
+
+const hasKnownExtension = (candidate: string): boolean => path.extname(candidate).length > 0;
+
+const addExpandedPathCandidates = (candidate: string, out: Set<string>) => {
+  const normalized = normalizeRepoPath(candidate);
+  if (!normalized) return;
+  out.add(normalized);
+  if (hasKnownExtension(normalized)) return;
+  for (const ext of PATH_REF_EXTENSIONS) {
+    out.add(`${normalized}${ext}`);
+    out.add(`${normalized}/index${ext}`);
+  }
+};
+
+const buildReferenceCandidates = (reference: string, sourcePath: string): string[] => {
+  const cleaned = sanitizeReferenceValue(reference);
+  if (!cleaned) return [];
+  const normalizedRef = normalizeRepoPath(cleaned);
+  const candidates = new Set<string>();
+  if (cleaned.startsWith("./") || cleaned.startsWith("../")) {
+    const joined = path.posix.normalize(path.posix.join(path.posix.dirname(sourcePath), cleaned));
+    addExpandedPathCandidates(joined, candidates);
+  }
+  if (!cleaned.startsWith(".")) {
+    addExpandedPathCandidates(normalizedRef, candidates);
+  }
+  if (cleaned.startsWith("/")) {
+    addExpandedPathCandidates(normalizedRef.replace(/^\/+/, ""), candidates);
+  }
+  return Array.from(candidates);
+};
+
+const readPackageScriptCommandMap = (): Map<string, string[]> => {
+  if (packageScriptCommandMapCache) return packageScriptCommandMapCache;
+  const out = new Map<string, string[]>();
+  try {
+    const packagePath = path.resolve(process.cwd(), "package.json");
+    const raw = fsSync.readFileSync(packagePath, "utf8");
+    const parsed = JSON.parse(raw) as { scripts?: Record<string, string> };
+    for (const [name, command] of Object.entries(parsed.scripts ?? {})) {
+      if (!name || typeof command !== "string") continue;
+      const refs = new Set<string>();
+      COMMAND_TARGET_REGEX.lastIndex = 0;
+      for (const match of command.matchAll(COMMAND_TARGET_REGEX)) {
+        const value = sanitizeReferenceValue(match[1] ?? "");
+        if (!value) continue;
+        if (value.includes("scripts/")) {
+          refs.add(normalizeRepoPath(value));
+        }
+      }
+      out.set(name.trim(), Array.from(refs));
+    }
+  } catch {
+    // Keep atlas build deterministic without package script mapping.
+  }
+  packageScriptCommandMapCache = out;
+  return out;
+};
+
+const resolveAtlasReferencePath = (
+  reference: string,
+  sourcePath: string,
+  knownByNormalizedPath: Map<string, string>,
+  knownByBaseName: Map<string, string[]>,
+): string | null => {
+  const candidates = buildReferenceCandidates(reference, sourcePath);
+  for (const candidate of candidates) {
+    const hit = knownByNormalizedPath.get(candidate.toLowerCase());
+    if (hit) return hit;
+  }
+  const cleaned = sanitizeReferenceValue(reference);
+  if (!cleaned) return null;
+  const baseName = path.posix.basename(cleaned).toLowerCase();
+  if (!baseName) return null;
+  const baseMatches = knownByBaseName.get(baseName) ?? [];
+  if (baseMatches.length === 1) return baseMatches[0];
+  return null;
+};
+
+const collectScriptDocReferenceEdges = (sources: AtlasSources): AtlasEdge[] => {
+  const knownPaths = new Set<string>();
+  for (const node of sources.repoGraph.nodes) {
+    if (typeof node.path === "string" && node.path.trim()) {
+      knownPaths.add(normalizeRepoPath(node.path));
+    }
+  }
+  for (const entry of sources.repoIndex) {
+    if (entry.source?.path) {
+      knownPaths.add(normalizeRepoPath(entry.source.path));
+    }
+  }
+  for (const node of sources.codeLattice.nodes) {
+    if (node.filePath) {
+      knownPaths.add(normalizeRepoPath(node.filePath));
+    }
+  }
+
+  const knownByNormalizedPath = new Map<string, string>();
+  const knownByBaseName = new Map<string, string[]>();
+  for (const filePath of knownPaths) {
+    const normalized = normalizeRepoPath(filePath);
+    if (!normalized) continue;
+    knownByNormalizedPath.set(normalized.toLowerCase(), normalized);
+    const baseName = path.posix.basename(normalized).toLowerCase();
+    if (!baseName) continue;
+    const list = knownByBaseName.get(baseName) ?? [];
+    list.push(normalized);
+    knownByBaseName.set(baseName, list);
+  }
+
+  const edges = new Map<string, AtlasEdge>();
+  const scriptMap = readPackageScriptCommandMap();
+  const sourcePaths = Array.from(knownPaths)
+    .filter((entry) => isScriptOrDocSourcePath(entry))
+    .sort((a, b) => a.localeCompare(b));
+
+  for (const sourcePath of sourcePaths) {
+    const absolutePath = path.resolve(process.cwd(), sourcePath);
+    if (!fsSync.existsSync(absolutePath)) continue;
+    let contents = "";
+    try {
+      contents = fsSync.readFileSync(absolutePath, "utf8");
+    } catch {
+      continue;
+    }
+    if (!contents.trim()) continue;
+
+    const addDeterministicEdge = (targetPath: string, kind: AtlasEdgeKind, reference: string) => {
+      if (!targetPath || targetPath === sourcePath) return;
+      addEdge(edges, {
+        source: `file:${sourcePath}`,
+        target: `file:${targetPath}`,
+        kind,
+        sourceSystem: SCRIPT_DOC_REF_SOURCE_SYSTEM,
+        meta: {
+          reference: reference.slice(0, 200),
+          sourceKind: sourcePath.startsWith("docs/") ? "docs" : "scripts",
+        },
+      });
+    };
+
+    IMPORT_REF_REGEX.lastIndex = 0;
+    for (const match of contents.matchAll(IMPORT_REF_REGEX)) {
+      const reference = sanitizeReferenceValue(match[2] ?? "");
+      if (!reference) continue;
+      const targetPath = resolveAtlasReferencePath(reference, sourcePath, knownByNormalizedPath, knownByBaseName);
+      if (!targetPath) continue;
+      addDeterministicEdge(targetPath, "imports", reference);
+    }
+
+    GENERIC_PATH_REF_REGEX.lastIndex = 0;
+    for (const match of contents.matchAll(GENERIC_PATH_REF_REGEX)) {
+      const reference = sanitizeReferenceValue(match[1] ?? "");
+      if (!reference) continue;
+      const targetPath = resolveAtlasReferencePath(reference, sourcePath, knownByNormalizedPath, knownByBaseName);
+      if (!targetPath) continue;
+      addDeterministicEdge(targetPath, "use", reference);
+    }
+
+    if (sourcePath.startsWith("docs/")) {
+      MARKDOWN_LINK_REGEX.lastIndex = 0;
+      for (const match of contents.matchAll(MARKDOWN_LINK_REGEX)) {
+        const reference = sanitizeReferenceValue(match[1] ?? "");
+        if (!reference) continue;
+        const targetPath = resolveAtlasReferencePath(reference, sourcePath, knownByNormalizedPath, knownByBaseName);
+        if (!targetPath) continue;
+        const kind: AtlasEdgeKind = /\.(md|mdx)$/i.test(targetPath) ? "doc-ref" : "use";
+        addDeterministicEdge(targetPath, kind, reference);
+      }
+    }
+
+    COMMAND_TARGET_REGEX.lastIndex = 0;
+    for (const match of contents.matchAll(COMMAND_TARGET_REGEX)) {
+      const reference = sanitizeReferenceValue(match[1] ?? "");
+      if (!reference) continue;
+      const targetPath = resolveAtlasReferencePath(reference, sourcePath, knownByNormalizedPath, knownByBaseName);
+      if (!targetPath) continue;
+      addDeterministicEdge(targetPath, "command-ref", reference);
+    }
+
+    NPM_RUN_REGEX.lastIndex = 0;
+    for (const match of contents.matchAll(NPM_RUN_REGEX)) {
+      const scriptName = (match[1] ?? "").trim();
+      if (!scriptName) continue;
+      for (const reference of scriptMap.get(scriptName) ?? []) {
+        const targetPath = resolveAtlasReferencePath(reference, sourcePath, knownByNormalizedPath, knownByBaseName);
+        if (!targetPath) continue;
+        addDeterministicEdge(targetPath, "command-ref", `npm run ${scriptName}`);
+      }
+    }
+  }
+
+  return stableSort([...edges.values()], (edge) => `${edge.kind}|${edge.source}|${edge.target}|${edge.sourceSystem}`);
 };
 
 const readStageHints = (meta: unknown): string[] => {
@@ -342,6 +600,31 @@ export const buildRepoAtlasFromSources = (sources: AtlasSources): RepoAtlas => {
       sourceSystem: "code-lattice",
       meta: edge.label ? { label: edge.label } : undefined,
     });
+  }
+
+  const scriptDocEdges = collectScriptDocReferenceEdges(sources);
+  for (const edge of scriptDocEdges) {
+    const sourcePath = edge.source.replace(/^file:/, "");
+    const targetPath = edge.target.replace(/^file:/, "");
+    if (sourcePath) {
+      addNode(nodes, {
+        id: edge.source,
+        kind: "file",
+        label: path.basename(sourcePath),
+        path: sourcePath,
+        source: SCRIPT_DOC_REF_SOURCE_SYSTEM,
+      });
+    }
+    if (targetPath) {
+      addNode(nodes, {
+        id: edge.target,
+        kind: "file",
+        label: path.basename(targetPath),
+        path: targetPath,
+        source: SCRIPT_DOC_REF_SOURCE_SYSTEM,
+      });
+    }
+    addEdge(edges, edge);
   }
 
   addTreeDagWalkGraph(nodes, edges, sources.treeDagWalk);

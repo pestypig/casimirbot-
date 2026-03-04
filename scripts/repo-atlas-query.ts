@@ -143,13 +143,16 @@ export const resolveIdentifier = (atlas: RepoAtlas, identifier: string) => {
   return ranked[0]?.node;
 };
 
-const buildAdjacency = (atlas: RepoAtlas, direction: Direction): Map<string, string[]> => {
-  const map = new Map<string, string[]>();
+const buildAdjacency = (
+  atlas: RepoAtlas,
+  direction: Direction,
+): Map<string, Array<{ to: string; kind: string; sourceSystem: string }>> => {
+  const map = new Map<string, Array<{ to: string; kind: string; sourceSystem: string }>>();
   for (const edge of atlas.edges) {
     const from = direction === "downstream" ? edge.source : edge.target;
     const to = direction === "downstream" ? edge.target : edge.source;
     const list = map.get(from) ?? [];
-    list.push(to);
+    list.push({ to, kind: edge.kind, sourceSystem: edge.sourceSystem });
     map.set(from, list);
   }
   return map;
@@ -165,7 +168,8 @@ const bfsPaths = (atlas: RepoAtlas, startId: string, direction: Direction, maxDe
     const item = queue.shift();
     if (!item) break;
     if (item.depth >= maxDepth) continue;
-    for (const nextId of adjacency.get(item.id) ?? []) {
+    for (const step of adjacency.get(item.id) ?? []) {
+      const nextId = step.to;
       const nextPath = [...item.path, nextId];
       paths.push(nextPath);
       if (!visited.has(nextId)) {
@@ -178,18 +182,88 @@ const bfsPaths = (atlas: RepoAtlas, startId: string, direction: Direction, maxDe
   return paths.sort((a, b) => a.join("|").localeCompare(b.join("|")));
 };
 
+const buildDirectedEdgeLookup = (
+  atlas: RepoAtlas,
+  direction: Direction,
+): Map<string, Array<{ kind: string; sourceSystem: string }>> => {
+  const lookup = new Map<string, Array<{ kind: string; sourceSystem: string }>>();
+  for (const edge of atlas.edges) {
+    const from = direction === "downstream" ? edge.source : edge.target;
+    const to = direction === "downstream" ? edge.target : edge.source;
+    const key = `${from}|${to}`;
+    const list = lookup.get(key) ?? [];
+    list.push({ kind: edge.kind, sourceSystem: edge.sourceSystem });
+    lookup.set(key, list);
+  }
+  return lookup;
+};
+
+const summarizePathDiagnostics = (atlas: RepoAtlas, paths: string[][], direction: Direction) => {
+  const edgeLookup = buildDirectedEdgeLookup(atlas, direction);
+  const edgeTypeCounts: Record<string, number> = {};
+  const sourceSystemCounts: Record<string, number> = {};
+  const pathHopDiagnostics = paths.slice(0, 16).map((pathIds) => {
+    const hops: Array<{ from: string; to: string; kind: string; sourceSystem: string }> = [];
+    for (let i = 0; i + 1 < pathIds.length; i += 1) {
+      const from = pathIds[i];
+      const to = pathIds[i + 1];
+      const key = `${from}|${to}`;
+      const metadata = edgeLookup.get(key)?.[0] ?? { kind: "unknown", sourceSystem: "unknown" };
+      edgeTypeCounts[metadata.kind] = (edgeTypeCounts[metadata.kind] ?? 0) + 1;
+      sourceSystemCounts[metadata.sourceSystem] = (sourceSystemCounts[metadata.sourceSystem] ?? 0) + 1;
+      hops.push({
+        from,
+        to,
+        kind: metadata.kind,
+        sourceSystem: metadata.sourceSystem,
+      });
+    }
+    return {
+      nodes: pathIds,
+      hop_count: Math.max(0, pathIds.length - 1),
+      hops: hops.slice(0, 12),
+    };
+  });
+  return {
+    edge_type_counts: edgeTypeCounts,
+    source_system_counts: sourceSystemCounts,
+    path_hop_diagnostics: pathHopDiagnostics,
+  };
+};
+
 export const whyIdentifier = (atlas: RepoAtlas, identifier: string) => {
   const node = resolveIdentifier(atlas, identifier);
   if (!node) return null;
   const producers = bfsPaths(atlas, node.id, "upstream", 3);
   const consumers = bfsPaths(atlas, node.id, "downstream", 3);
-  return { node, producers, consumers };
+  const producerDiagnostics = summarizePathDiagnostics(atlas, producers, "upstream");
+  const consumerDiagnostics = summarizePathDiagnostics(atlas, consumers, "downstream");
+  return {
+    node,
+    producers,
+    consumers,
+    producer_edge_type_counts: producerDiagnostics.edge_type_counts,
+    producer_source_system_counts: producerDiagnostics.source_system_counts,
+    producer_path_hop_diagnostics: producerDiagnostics.path_hop_diagnostics,
+    consumer_edge_type_counts: consumerDiagnostics.edge_type_counts,
+    consumer_source_system_counts: consumerDiagnostics.source_system_counts,
+    consumer_path_hop_diagnostics: consumerDiagnostics.path_hop_diagnostics,
+  };
 };
 
 export const traceIdentifier = (atlas: RepoAtlas, identifier: string, direction: Direction) => {
   const node = resolveIdentifier(atlas, identifier);
   if (!node) return null;
-  return { node, direction, paths: bfsPaths(atlas, node.id, direction, 6) };
+  const paths = bfsPaths(atlas, node.id, direction, 6);
+  const diagnostics = summarizePathDiagnostics(atlas, paths, direction);
+  return {
+    node,
+    direction,
+    paths,
+    edge_type_counts: diagnostics.edge_type_counts,
+    source_system_counts: diagnostics.source_system_counts,
+    path_hop_diagnostics: diagnostics.path_hop_diagnostics,
+  };
 };
 
 const pickFieldValue = (record: Record<string, unknown>, field: DivergenceField): unknown => {
@@ -430,7 +504,8 @@ async function main() {
       return;
     }
     const atlas = await loadAtlas();
-    const direction: Direction = rest.includes("--upstream") ? "upstream" : "downstream";
+    const traceFlags = [arg2, ...rest].filter((entry): entry is string => Boolean(entry));
+    const direction: Direction = traceFlags.includes("--upstream") ? "upstream" : "downstream";
     const result = traceIdentifier(atlas, arg1, direction);
     if (!result) {
       console.error(`Identifier not found: ${arg1}`);

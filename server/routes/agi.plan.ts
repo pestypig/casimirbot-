@@ -5689,6 +5689,11 @@ const HELIX_ASK_ATLAS_GRAPH_EXPANSION_LIMIT = clampNumber(
   4,
   64,
 );
+const HELIX_ASK_ATLAS_GRAPH_RUNTIME_LINK_BOOST = clampNumber(
+  Number(process.env.HELIX_ASK_ATLAS_GRAPH_RUNTIME_LINK_BOOST ?? 2),
+  0,
+  8,
+);
 let helixAskAtlasCorpusFilesCache: string[] | null = null;
 
 function getHelixAskAtlasCorpusFiles(): string[] {
@@ -6210,6 +6215,11 @@ type AskCandidate = {
   preview: string;
   score: number;
   rrfScore: number;
+  meta?: {
+    atlasSource?: "corpus" | "graph";
+    atlasGraphRuntimeLink?: boolean;
+    atlasGraphEdgeTypes?: string[];
+  };
 };
 
 type AskCandidateChannel = "lexical" | "symbol" | "fuzzy" | "path" | "git_tracked" | "atlas";
@@ -8236,6 +8246,71 @@ async function collectAskCandidatesMultiChannel(
   return { lists, queryHit };
 }
 
+const HELIX_ASK_ATLAS_RUNTIME_QUERY_TOKENS = new Set([
+  "runtime",
+  "route",
+  "router",
+  "service",
+  "server",
+  "module",
+  "modules",
+  "api",
+  "adapter",
+  "pipeline",
+  "retrieve",
+  "retrieval",
+  "ablation",
+  "atlas",
+  "helix",
+  "ask",
+  "evidence",
+  "script",
+  "scripts",
+  "doc",
+  "docs",
+]);
+
+function isAtlasScriptOrDocPath(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, "/").toLowerCase();
+  return normalized.startsWith("scripts/") || normalized.startsWith("docs/");
+}
+
+function parseAtlasGraphEdgeTypes(snippet: string): string[] {
+  const normalized = snippet.toLowerCase();
+  const edgeTypes = ["imports", "defines", "calls", "tests", "mentions", "use", "doc-ref", "command-ref"];
+  const hits = new Set<string>();
+  for (const edgeType of edgeTypes) {
+    if (normalized.includes(`${edgeType} `) || normalized.includes(`| ${edgeType} `)) {
+      hits.add(edgeType);
+    }
+  }
+  return Array.from(hits).sort((a, b) => a.localeCompare(b));
+}
+
+function hasAtlasGraphRuntimeLink(args: {
+  filePath: string;
+  queryTokens: Set<string>;
+  symbolName: string;
+  snippet: string;
+  edgeTypes: string[];
+}): boolean {
+  if (!isAtlasScriptOrDocPath(args.filePath)) return false;
+  const normalizedSymbol = args.symbolName.toLowerCase();
+  const queryHasRuntimeCue = Array.from(args.queryTokens).some((token) =>
+    HELIX_ASK_ATLAS_RUNTIME_QUERY_TOKENS.has(token),
+  );
+  const symbolOverlap = normalizedSymbol
+    ? Array.from(args.queryTokens).some((token) => token.length >= 3 && normalizedSymbol.includes(token))
+    : false;
+  const runtimeSnippet = /(server\/|modules\/|client\/src\/|shared\/|routes?\/|services?\/|adapter|pipeline|helix-ask)/i.test(
+    args.snippet,
+  );
+  const edgeTypeRuntime = args.edgeTypes.some((edgeType) =>
+    edgeType === "imports" || edgeType === "defines" || edgeType === "calls" || edgeType === "use",
+  );
+  return symbolOverlap || (queryHasRuntimeCue && runtimeSnippet) || (queryHasRuntimeCue && edgeTypeRuntime);
+}
+
 async function collectAtlasCandidatesForQuery(
   query: string,
   question: string,
@@ -8274,6 +8349,7 @@ async function collectAtlasCandidatesForQuery(
       preview: `Atlas lane candidate: ${filePath}`,
       score,
       rrfScore: 0,
+      meta: { atlasSource: "corpus" },
     });
   }
 
@@ -8299,8 +8375,20 @@ async function collectAtlasCandidatesForQuery(
         if (atlasMembershipBoost <= 0 && tokenHits <= 0) continue;
         const graphScore = Number.isFinite(hit.score) ? hit.score : 0;
         if (graphScore <= 0) continue;
+        const symbolName = String((hit as { symbol_name?: unknown }).symbol_name ?? "").trim();
+        const snippet = String((hit as { snippet?: unknown }).snippet ?? "");
+        const edgeTypes = parseAtlasGraphEdgeTypes(snippet);
+        const runtimeLink = hasAtlasGraphRuntimeLink({
+          filePath,
+          queryTokens,
+          symbolName,
+          snippet,
+          edgeTypes,
+        });
+        const runtimeBoost = runtimeLink ? HELIX_ASK_ATLAS_GRAPH_RUNTIME_LINK_BOOST : 0;
+        const edgeTypeBoost = Math.min(1.5, edgeTypes.length * 0.3);
         const score = applyAskNodeBoosts(
-          4 + graphScore * 4 + tokenHits + atlasMembershipBoost,
+          4 + graphScore * 4 + tokenHits + atlasMembershipBoost + runtimeBoost + edgeTypeBoost,
           filePath,
           question,
           options?.topicProfile,
@@ -8310,6 +8398,11 @@ async function collectAtlasCandidatesForQuery(
           preview: `Atlas graph candidate: ${filePath}`,
           score,
           rrfScore: 0,
+          meta: {
+            atlasSource: "graph",
+            atlasGraphRuntimeLink: runtimeLink,
+            atlasGraphEdgeTypes: edgeTypes,
+          },
         });
       }
     } catch {
@@ -8413,6 +8506,7 @@ function mergeCandidatesWithWeightedRrf(
       if (candidate.score > existing.score) {
         existing.score = candidate.score;
         existing.preview = candidate.preview;
+        existing.meta = candidate.meta;
       }
       existing.rrfScore += bump;
     });
@@ -8646,6 +8740,27 @@ function injectMustIncludeCandidates(
   return { selected: trimmed, mustIncludeOk };
 }
 
+function summarizeAtlasGraphSelection(selected: AskCandidate[]): {
+  atlasGraphSelectedCount: number;
+  atlasGraphRuntimeLinkCount: number;
+  atlasGraphEdgeTypeCounts: Record<string, number>;
+} {
+  const graphCandidates = selected.filter((entry) => entry.meta?.atlasSource === "graph");
+  const edgeTypeCounts: Record<string, number> = {};
+  let runtimeLinkCount = 0;
+  for (const entry of graphCandidates) {
+    if (entry.meta?.atlasGraphRuntimeLink) runtimeLinkCount += 1;
+    for (const edgeType of entry.meta?.atlasGraphEdgeTypes ?? []) {
+      edgeTypeCounts[edgeType] = (edgeTypeCounts[edgeType] ?? 0) + 1;
+    }
+  }
+  return {
+    atlasGraphSelectedCount: graphCandidates.length,
+    atlasGraphRuntimeLinkCount: runtimeLinkCount,
+    atlasGraphEdgeTypeCounts: edgeTypeCounts,
+  };
+}
+
 async function buildAskContextFromQueries(
   question: string,
   queries: string[],
@@ -8664,6 +8779,9 @@ async function buildAskContextFromQueries(
   channelTopScores?: AskCandidateChannelStats;
   channelWeights?: AskCandidateChannelStats;
   docHeaderInjected?: number;
+  atlasGraphSelectedCount?: number;
+  atlasGraphRuntimeLinkCount?: number;
+  atlasGraphEdgeTypeCounts?: Record<string, number>;
 }> {
   const snapshot = await loadCodeLattice();
   if (!snapshot) return { context: "", files: [] };
@@ -8693,6 +8811,9 @@ async function buildAskContextFromQueries(
   let channelHits = initAskChannelStats();
   let channelTopScores = initAskChannelStats();
   let channelWeights = initAskChannelStats();
+  let atlasGraphSelectedCount = 0;
+  let atlasGraphRuntimeLinkCount = 0;
+  let atlasGraphEdgeTypeCounts: Record<string, number> = {};
 
   for (let tierIndex = 0; tierIndex < allowlistTiers.length; tierIndex += 1) {
     const allowlist = allowlistTiers[tierIndex] ?? [];
@@ -8762,6 +8883,10 @@ async function buildAskContextFromQueries(
       }
     }
     selected = tierFinal;
+    const graphSummary = summarizeAtlasGraphSelection(tierFinal);
+    atlasGraphSelectedCount = graphSummary.atlasGraphSelectedCount;
+    atlasGraphRuntimeLinkCount = graphSummary.atlasGraphRuntimeLinkCount;
+    atlasGraphEdgeTypeCounts = graphSummary.atlasGraphEdgeTypeCounts;
     channelWeights = channelWeightsForTier;
     topicTier = tierIndex + 1;
     topicMustIncludeOk = mustIncludeOk;
@@ -8782,6 +8907,9 @@ async function buildAskContextFromQueries(
     channelHits,
     channelTopScores,
     channelWeights,
+    atlasGraphSelectedCount,
+    atlasGraphRuntimeLinkCount,
+    atlasGraphEdgeTypeCounts,
   });
 }
 
@@ -8795,6 +8923,9 @@ function buildAskContextFromCandidates(args: {
   channelHits?: AskCandidateChannelStats;
   channelTopScores?: AskCandidateChannelStats;
   channelWeights?: AskCandidateChannelStats;
+  atlasGraphSelectedCount?: number;
+  atlasGraphRuntimeLinkCount?: number;
+  atlasGraphEdgeTypeCounts?: Record<string, number>;
 }): {
   context: string;
   files: string[];
@@ -8807,6 +8938,9 @@ function buildAskContextFromCandidates(args: {
   channelTopScores?: AskCandidateChannelStats;
   channelWeights?: AskCandidateChannelStats;
   docHeaderInjected?: number;
+  atlasGraphSelectedCount?: number;
+  atlasGraphRuntimeLinkCount?: number;
+  atlasGraphEdgeTypeCounts?: Record<string, number>;
 } {
   return finalizeAskContext(args);
 }
@@ -9418,6 +9552,9 @@ function finalizeAskContext({
   channelHits,
   channelTopScores,
   channelWeights,
+  atlasGraphSelectedCount,
+  atlasGraphRuntimeLinkCount,
+  atlasGraphEdgeTypeCounts,
 }: {
   selected: AskCandidate[];
   topicTier?: number;
@@ -9428,6 +9565,9 @@ function finalizeAskContext({
   channelHits?: AskCandidateChannelStats;
   channelTopScores?: AskCandidateChannelStats;
   channelWeights?: AskCandidateChannelStats;
+  atlasGraphSelectedCount?: number;
+  atlasGraphRuntimeLinkCount?: number;
+  atlasGraphEdgeTypeCounts?: Record<string, number>;
 }): {
   context: string;
   files: string[];
@@ -9440,6 +9580,9 @@ function finalizeAskContext({
   channelTopScores?: AskCandidateChannelStats;
   channelWeights?: AskCandidateChannelStats;
   docHeaderInjected?: number;
+  atlasGraphSelectedCount?: number;
+  atlasGraphRuntimeLinkCount?: number;
+  atlasGraphEdgeTypeCounts?: Record<string, number>;
 } {
   const lines: string[] = [];
   const files: string[] = [];
@@ -9470,6 +9613,9 @@ function finalizeAskContext({
     channelTopScores,
     channelWeights,
     docHeaderInjected,
+    atlasGraphSelectedCount,
+    atlasGraphRuntimeLinkCount,
+    atlasGraphEdgeTypeCounts,
   };
 }
 
@@ -19303,6 +19449,9 @@ const executeHelixAsk = async ({
       retrieval_query_hit_count?: number;
       retrieval_top_score?: number;
       retrieval_score_gap?: number;
+      retrieval_atlas_graph_selected_count?: number;
+      retrieval_atlas_graph_runtime_link_count?: number;
+      retrieval_atlas_graph_edge_type_counts?: Record<string, number>;
       retrieval_channel_hits?: AskCandidateChannelStats;
       retrieval_channel_top_scores?: AskCandidateChannelStats;
       retrieval_channel_weights?: AskCandidateChannelStats;
@@ -22430,6 +22579,9 @@ const executeHelixAsk = async ({
           channelTopScores?: AskCandidateChannelStats;
           channelWeights?: AskCandidateChannelStats;
           docHeaderInjected?: number;
+          atlasGraphSelectedCount?: number;
+          atlasGraphRuntimeLinkCount?: number;
+          atlasGraphEdgeTypeCounts?: Record<string, number>;
         }
       | null = null;
     let preflightEvidence: EvidenceEligibility | null = null;
@@ -23716,6 +23868,9 @@ const executeHelixAsk = async ({
           channelTopScores?: AskCandidateChannelStats;
           channelWeights?: AskCandidateChannelStats;
           docHeaderInjected?: number;
+          atlasGraphSelectedCount?: number;
+          atlasGraphRuntimeLinkCount?: number;
+          atlasGraphEdgeTypeCounts?: Record<string, number>;
         } = preflightMeta
           ? {
               files: contextFiles.slice(),
@@ -23728,6 +23883,9 @@ const executeHelixAsk = async ({
               channelTopScores: preflightMeta.channelTopScores ?? initAskChannelStats(),
               channelWeights: preflightMeta.channelWeights,
               docHeaderInjected: preflightMeta.docHeaderInjected,
+              atlasGraphSelectedCount: preflightMeta.atlasGraphSelectedCount,
+              atlasGraphRuntimeLinkCount: preflightMeta.atlasGraphRuntimeLinkCount,
+              atlasGraphEdgeTypeCounts: preflightMeta.atlasGraphEdgeTypeCounts,
             }
           : {
               files: contextFiles.slice(),
@@ -23773,6 +23931,9 @@ const executeHelixAsk = async ({
                 channelTopScores?: AskCandidateChannelStats;
                 channelWeights?: AskCandidateChannelStats;
                 docHeaderInjected?: number;
+                atlasGraphSelectedCount?: number;
+                atlasGraphRuntimeLinkCount?: number;
+                atlasGraphEdgeTypeCounts?: Record<string, number>;
               }
             | undefined;
           let docsFirstOk = false;
@@ -24688,6 +24849,9 @@ const executeHelixAsk = async ({
           debugPayload.retrieval_query_hit_count = queryHitCount;
           debugPayload.retrieval_top_score = topScore;
           debugPayload.retrieval_score_gap = scoreGap;
+          debugPayload.retrieval_atlas_graph_selected_count = contextMeta.atlasGraphSelectedCount ?? 0;
+          debugPayload.retrieval_atlas_graph_runtime_link_count = contextMeta.atlasGraphRuntimeLinkCount ?? 0;
+          debugPayload.retrieval_atlas_graph_edge_type_counts = contextMeta.atlasGraphEdgeTypeCounts ?? {};
           debugPayload.retrieval_channel_hits = channelHits;
           debugPayload.retrieval_channel_top_scores = channelTopScores;
           debugPayload.retrieval_channel_weights = contextMeta.channelWeights;
@@ -25066,6 +25230,9 @@ const executeHelixAsk = async ({
             debugPayload.retrieval_query_hit_count = attemptQueryHits;
             debugPayload.retrieval_top_score = attemptTopScore;
             debugPayload.retrieval_score_gap = attemptScoreGap;
+            debugPayload.retrieval_atlas_graph_selected_count = result.atlasGraphSelectedCount ?? 0;
+            debugPayload.retrieval_atlas_graph_runtime_link_count = result.atlasGraphRuntimeLinkCount ?? 0;
+            debugPayload.retrieval_atlas_graph_edge_type_counts = result.atlasGraphEdgeTypeCounts ?? {};
             debugPayload.retrieval_channel_hits = attemptChannelHits;
             debugPayload.retrieval_channel_top_scores = attemptChannelTopScores;
             debugPayload.retrieval_channel_weights = result.channelWeights;

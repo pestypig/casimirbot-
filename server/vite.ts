@@ -29,6 +29,11 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+function resolveReasoningTheaterPath(): string | null {
+  const candidate = path.resolve(process.cwd(), "public", "reasoning-theater");
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
 export async function setupVite(app: Express, server: Server) {
   const { createServer: createViteServer, createLogger } = await import("vite");
   const { default: viteConfig } = await import("../vite.config");
@@ -79,6 +84,10 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.middlewares);
+  const reasoningTheaterPath = resolveReasoningTheaterPath();
+  if (reasoningTheaterPath) {
+    app.use("/reasoning-theater", express.static(reasoningTheaterPath));
+  }
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
 
@@ -133,8 +142,12 @@ function resolveDistPath(): string {
 
 export function serveStatic(app: Express) {
   const distPath = resolveDistPath();
+  const reasoningTheaterPath = resolveReasoningTheaterPath();
 
   app.use(express.static(distPath));
+  if (reasoningTheaterPath) {
+    app.use("/reasoning-theater", express.static(reasoningTheaterPath));
+  }
   app.use((req, res, next) => {
     if (req.method !== "GET") {
       next();
