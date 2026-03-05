@@ -1,9 +1,9 @@
 # Helix Ask Retrieval Attribution Go/No-Go (2026-03-03)
 
-Run: retrieval-ablation-1772650877554
+Run: retrieval-ablation-1772730019929
 
 retrieval_lift_proven=yes
-dominant_channel=git
+dominant_channel=atlas
 fault_owner=retrieval
 
 Strict retrieval-lift claim gate:
@@ -19,9 +19,9 @@ Absolute quality floor:
 - consequential_file_retention_rate >= 0.2
 
 Observed baseline quality:
-- unmatched_expected_file_rate = 0.000000
-- gold_file_recall_at_10 = 1.000000
-- consequential_file_retention_rate = 1.000000
+- unmatched_expected_file_rate = 0.016667
+- gold_file_recall_at_10 = 0.983333
+- consequential_file_retention_rate = 0.983333
 
 Corpus fidelity gate:
 - prompt_template_collision_rate <= 0.6

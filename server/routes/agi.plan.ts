@@ -21022,10 +21022,15 @@ const executeHelixAsk = async ({
     }
     const hasFilePathHints = HELIX_ASK_FILE_HINT.test(baseQuestion);
     const endpointHints = extractEndpointHints(baseQuestion);
+    const explicitCodeSymbolCue =
+      /\b[a-z][a-z0-9_]*[A-Z][A-Za-z0-9_]*\b/.test(baseQuestion) ||
+      /`[A-Za-z_][A-Za-z0-9_]*`/.test(baseQuestion) ||
+      /\b[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)/.test(baseQuestion);
     const explicitRepoApiCue =
       endpointHints.length > 0 ||
       /\bllm\.[a-z0-9_.-]+\b/i.test(baseQuestion) ||
-      /\b(?:server|client|shared|docs|tests?)\/[a-z0-9_./-]+\b/i.test(baseQuestion);
+      /\b(?:server|client|shared|docs|tests?)\/[a-z0-9_./-]+\b/i.test(baseQuestion) ||
+      explicitCodeSymbolCue;
     const explicitRepoExpectation =
       hasFilePathHints ||
       HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
@@ -21567,6 +21572,21 @@ const executeHelixAsk = async ({
     });
     const compositeRequest = shouldHelixAskCompositeSynthesis(baseQuestion, topicTags);
     const originalIntentProfile = intentMatch.profile;
+    const relationIntentByProfile = originalIntentProfile.id === "hybrid.warp_ethos_relation";
+    const relationIntentStrong = isWarpEthosRelationQuestion(baseQuestion);
+    const relationIntentByHeuristic =
+      relationIntentStrong ||
+      (!explicitRepoExpectation && HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion));
+    const explicitCompositeDirective =
+      /\b(synthesi[sz]e|fit together|unified synthesis|cross-domain synthesis|system synthesis)\b/i.test(
+        baseQuestion,
+      );
+    const relationIntentCandidate = relationIntentByProfile || relationIntentByHeuristic;
+    const relationIntentLocked =
+      !explicitCompositeDirective &&
+      (relationIntentByProfile ||
+        relationIntentStrong ||
+        (relationIntentByHeuristic && !compositeRequest.enabled));
     let intentProfile = intentMatch.profile;
     let intentReasonBase = intentMatch.reason;
     const frontierTheoryLensRequestedDirect = HELIX_ASK_FRONTIER_LENS_RE.test(baseQuestion);
@@ -21618,7 +21638,7 @@ const executeHelixAsk = async ({
         compositeRequiredFiles = collectCompositeMustIncludeFiles(compositeRequest.topics);
       }
     }
-    if (warpEthosRelationQuery && !compositeRequest.enabled) {
+    if (relationIntentLocked) {
       const relationProfile = getHelixAskIntentProfileById("hybrid.warp_ethos_relation");
       if (relationProfile) {
         intentProfile = relationProfile;
@@ -21952,11 +21972,16 @@ const executeHelixAsk = async ({
       });
     }
     const isRelationIntentRequested = (): boolean => {
-      if (isWarpEthosRelationQuestion(baseQuestion)) return true;
+      if (relationIntentLocked) return true;
       if (intentProfile.id === "hybrid.warp_ethos_relation") return true;
       // Generic relation verbs like "map/connect" should not force relation mode
       // for explicit repo/file-path questions.
-      if (!explicitRepoExpectation && HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion)) return true;
+      if (
+        !explicitRepoExpectation &&
+        !compositeRequest.enabled &&
+        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion)
+      )
+        return true;
       return false;
     };
     if (isIdeologyReferenceIntent && isIdeologyConversationalMode) {
@@ -26169,7 +26194,7 @@ const executeHelixAsk = async ({
             arbiterMode === "clarify" &&
             intentProfile.domain === "general";
           const relationFallbackProfile =
-            warpEthosRelationQuery && !compositeRequest.enabled
+            isRelationIntentRequested()
               ? getHelixAskIntentProfileById("hybrid.warp_ethos_relation")
               : null;
           const compositeFallbackProfile = compositeRequest.enabled
@@ -31995,6 +32020,10 @@ const executeHelixAsk = async ({
       if (suppressGeneralCitations) {
         cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
         answerPath.push("citationScrub:general_sources_suppressed");
+        if (!hasSourcesLine(cleaned)) {
+          cleaned = `${cleaned}\n\nSources: open-world best-effort (no repo citations required).`.trim();
+          answerPath.push("citationScrub:open_world_sources_marker");
+        }
       }
       const frontierContractIntent =
         intentProfile.id === "falsifiable.frontier_consciousness_theory_lens";
@@ -32070,6 +32099,18 @@ const executeHelixAsk = async ({
           ok: false,
           reason: "warp_delegation_required",
         } as HelixAskMathSolveResult);
+        if (!hasSourcesLine(cleaned)) {
+          const warpGuardSources = normalizeCitations([
+            ...allowedSourcePaths,
+            ...finalCanonicalEvidence.contextFiles,
+            ...finalCanonicalEvidence.citationTokens,
+            ...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES,
+          ]);
+          if (warpGuardSources.length > 0) {
+            cleaned = `${cleaned}\n\nSources: ${warpGuardSources.slice(0, 8).join(", ")}`.trim();
+            answerPath.push("forcedAnswer:math_solver_warp_guard_sources");
+          }
+        }
         answerPath.push("forcedAnswer:math_solver_warp_guard_preserve");
       }
       const securityOpenWorldBypassEligible =
