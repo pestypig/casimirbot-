@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "mode": "shadow_non_blocking",
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "recovery_goal": "qei_recovery",
+  "success_bar": "at_least_one_compatible",
+  "baseline_reference": {
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-05.json",
+    "keys": [
+      "marginRatioRaw",
+      "marginRatioRawComputed",
+      "applicabilityStatus",
+      "congruentSolvePass",
+      "congruentSolveFailReasons",
+      "sampler",
+      "fieldType",
+      "tauSelected_s"
+    ]
+  },
+  "notes": [
+    "Primary/standard QEI evidence only.",
+    "Non-blocking exploratory recovery lane.",
+    "No canonical override or promotion implied."
+  ],
+  "scenarios": [
+    {
+      "id": "qei_recovery_lorentzian_tau_0p005ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: lorentzian sampler, tau_s_ms=0.005, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.005 } }
+    },
+    {
+      "id": "qei_recovery_lorentzian_tau_0p01ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: lorentzian sampler, tau_s_ms=0.01, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.01 } }
+    },
+    {
+      "id": "qei_recovery_lorentzian_tau_0p02ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: lorentzian sampler, tau_s_ms=0.02, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.02 } }
+    },
+    {
+      "id": "qei_recovery_lorentzian_tau_0p05ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: lorentzian sampler, tau_s_ms=0.05, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.05 } }
+    },
+    {
+      "id": "qei_recovery_lorentzian_tau_0p1ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: lorentzian sampler, tau_s_ms=0.1, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.1 } }
+    },
+    {
+      "id": "qei_recovery_lorentzian_tau_0p2ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: lorentzian sampler, tau_s_ms=0.2, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.2 } }
+    },
+    {
+      "id": "qei_recovery_gaussian_tau_0p005ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: gaussian sampler, tau_s_ms=0.005, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "gaussian", "fieldType": "scalar", "tau_s_ms": 0.005 } }
+    },
+    {
+      "id": "qei_recovery_gaussian_tau_0p01ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: gaussian sampler, tau_s_ms=0.01, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "gaussian", "fieldType": "scalar", "tau_s_ms": 0.01 } }
+    },
+    {
+      "id": "qei_recovery_gaussian_tau_0p02ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: gaussian sampler, tau_s_ms=0.02, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "gaussian", "fieldType": "scalar", "tau_s_ms": 0.02 } }
+    },
+    {
+      "id": "qei_recovery_gaussian_tau_0p05ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: gaussian sampler, tau_s_ms=0.05, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "gaussian", "fieldType": "scalar", "tau_s_ms": 0.05 } }
+    },
+    {
+      "id": "qei_recovery_gaussian_tau_0p1ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: gaussian sampler, tau_s_ms=0.1, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "gaussian", "fieldType": "scalar", "tau_s_ms": 0.1 } }
+    },
+    {
+      "id": "qei_recovery_gaussian_tau_0p2ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: gaussian sampler, tau_s_ms=0.2, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "gaussian", "fieldType": "scalar", "tau_s_ms": 0.2 } }
+    },
+    {
+      "id": "qei_recovery_compact_tau_0p005ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: compact sampler, tau_s_ms=0.005, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "compact", "fieldType": "scalar", "tau_s_ms": 0.005 } }
+    },
+    {
+      "id": "qei_recovery_compact_tau_0p01ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: compact sampler, tau_s_ms=0.01, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "compact", "fieldType": "scalar", "tau_s_ms": 0.01 } }
+    },
+    {
+      "id": "qei_recovery_compact_tau_0p02ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: compact sampler, tau_s_ms=0.02, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "compact", "fieldType": "scalar", "tau_s_ms": 0.02 } }
+    },
+    {
+      "id": "qei_recovery_compact_tau_0p05ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: compact sampler, tau_s_ms=0.05, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "compact", "fieldType": "scalar", "tau_s_ms": 0.05 } }
+    },
+    {
+      "id": "qei_recovery_compact_tau_0p1ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: compact sampler, tau_s_ms=0.1, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "compact", "fieldType": "scalar", "tau_s_ms": 0.1 } }
+    },
+    {
+      "id": "qei_recovery_compact_tau_0p2ms",
+      "lane": "qei_worldline",
+      "description": "QEI recovery sweep: compact sampler, tau_s_ms=0.2, scalar field.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "compact", "fieldType": "scalar", "tau_s_ms": 0.2 } }
+    }
+  ]
+}

@@ -1,0 +1,855 @@
+{
+  "version": 1,
+  "mode": "shadow_non_blocking",
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "recovery_goal": "casimir_sign_control_recovery",
+  "success_bar": "map_only",
+  "baseline_reference": {
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-05.json",
+    "keys": [
+      "marginRatioRaw",
+      "marginRatioRawComputed",
+      "applicabilityStatus",
+      "congruentSolvePass",
+      "congruentSolveFailReasons",
+      "sampler",
+      "fieldType",
+      "tauSelected_s"
+    ]
+  },
+  "notes": [
+    "Primary/standard Casimir sign-control evidence only.",
+    "Non-blocking compatibility envelope mapping lane.",
+    "No canonical override or promotion implied.",
+    "Branch-wise congruence is uncertainty-aware via u_gap_nm and u_window_nm."
+  ],
+  "pass": "pass_2_typed_context",
+  "dimensions": {
+    "gap_nm": [
+      10,
+      51.5,
+      90,
+      100,
+      140,
+      220
+    ],
+    "branch_tag": [
+      "attractive",
+      "transition",
+      "repulsive"
+    ],
+    "fieldType": "scalar"
+  },
+  "scenarios": [
+    {
+      "id": "cs_primary_typed_attractive_gap_10nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=attractive, gap_nm=10.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 10
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "attractive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_attractive_gap_51p5nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=attractive, gap_nm=51.5.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 51.5
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "attractive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_attractive_gap_90nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=attractive, gap_nm=90.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 90
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "attractive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_attractive_gap_100nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=attractive, gap_nm=100.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 100
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "attractive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_attractive_gap_140nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=attractive, gap_nm=140.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 140
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "attractive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_attractive_gap_220nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=attractive, gap_nm=220.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 220
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "attractive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_transition_gap_10nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=transition, gap_nm=10.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 10
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "transition",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_transition_gap_51p5nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=transition, gap_nm=51.5.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 51.5
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "transition",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_transition_gap_90nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=transition, gap_nm=90.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 90
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "transition",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_transition_gap_100nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=transition, gap_nm=100.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 100
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "transition",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_transition_gap_140nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=transition, gap_nm=140.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 140
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "transition",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_transition_gap_220nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=transition, gap_nm=220.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 220
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "transition",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_repulsive_gap_10nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=repulsive, gap_nm=10.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 10
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "repulsive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_repulsive_gap_51p5nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=repulsive, gap_nm=51.5.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 51.5
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "repulsive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_repulsive_gap_90nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=repulsive, gap_nm=90.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 90
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "repulsive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_repulsive_gap_100nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=repulsive, gap_nm=100.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 100
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "repulsive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_repulsive_gap_140nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=repulsive, gap_nm=140.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 140
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "repulsive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_primary_typed_repulsive_gap_220nm",
+      "lane": "casimir_sign_control",
+      "description": "Pass-2 typed Casimir sign envelope: branch=repulsive, gap_nm=220.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005",
+        "EXP-CS-006",
+        "EXP-CS-007",
+        "EXP-CS-011"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 220
+        },
+        "qi": {
+          "fieldType": "scalar"
+        }
+      },
+      "experimentalContext": {
+        "casimirSign": {
+          "branchHypothesis": "repulsive",
+          "materialPair": "gold_gold",
+          "interveningMedium": "ethanol",
+          "sourceRefs": [
+            "EXP-CS-001",
+            "EXP-CS-002",
+            "EXP-CS-005",
+            "EXP-CS-006",
+            "EXP-CS-007",
+            "EXP-CS-011"
+          ],
+          "uncertainty": {
+            "u_gap_nm": 5,
+            "u_window_nm": 5,
+            "method": "conservative_fallback_no_nm_uncertainty",
+            "sourceRefs": [
+              "EXP-CS-001",
+              "EXP-CS-002"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

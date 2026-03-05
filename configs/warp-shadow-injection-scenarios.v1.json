@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "mode": "shadow_non_blocking",
+  "notes": [
+    "Scenarios are research-derived injections for congruence exploration only.",
+    "These scenarios do not override canonical full-solve policy or gate decisions."
+  ],
+  "scenarios": [
+    {
+      "id": "lab_coupon_gap_96nm",
+      "lane": "nanogap",
+      "description": "Lab-coupon geometry lane based on guarded tile gap target.",
+      "registryRefs": [
+        "EXP-NG-001",
+        "EXP-NG-002"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      }
+    },
+    {
+      "id": "casimir_sign_window_100nm",
+      "lane": "casimir_sign_control",
+      "description": "Sign-transition exploration lane near the upper nanogap regime.",
+      "registryRefs": [
+        "EXP-CS-015",
+        "EXP-CS-020"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 100
+        }
+      }
+    },
+    {
+      "id": "q_spoiling_moderate",
+      "lane": "q_spoiling",
+      "description": "Moderate cavity quality degradation lane for spoil-factor sensitivity.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-003",
+        "EXP-Q-009"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 100000,
+          "qSpoilingFactor": 1
+        }
+      }
+    },
+    {
+      "id": "q_spoiling_severe_tls",
+      "lane": "q_spoiling",
+      "description": "Severe low-field/TLS-like spoil lane with reduced Q and high spoil attenuation.",
+      "registryRefs": [
+        "EXP-Q-013",
+        "EXP-Q-014",
+        "EXP-Q-015"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000,
+          "qSpoilingFactor": 0.05
+        }
+      }
+    },
+    {
+      "id": "white_rabbit_tight_clocking",
+      "lane": "timing",
+      "description": "Tight-clocking lane inspired by ps-class synchronization studies.",
+      "registryRefs": [
+        "EXP-T-010",
+        "EXP-T-011",
+        "EXP-T-013"
+      ],
+      "overrides": {
+        "params": {
+          "clocking": {
+            "tauLC_ms": 3.34,
+            "tauPulse_ms": 0.00001,
+            "metricDerived": true,
+            "metricDerivedSource": "shadow_injection_wr",
+            "metricDerivedReason": "ps_class_timing_profile"
+          }
+        }
+      }
+    },
+    {
+      "id": "qei_gaussian_tau20us",
+      "lane": "qei_worldline",
+      "description": "Gaussian sampler lane using 20 us averaging-window configuration.",
+      "registryRefs": [
+        "EXP-QEI-003",
+        "EXP-QEI-013",
+        "EXP-QEI-014"
+      ],
+      "overrides": {
+        "qi": {
+          "sampler": "gaussian",
+          "fieldType": "scalar",
+          "tau_s_ms": 0.02
+        }
+      }
+    },
+    {
+      "id": "qei_compact_tau5us",
+      "lane": "qei_worldline",
+      "description": "Compact smooth-sampler lane for short-window scaling checks.",
+      "registryRefs": [
+        "EXP-QEI-004",
+        "EXP-QEI-016",
+        "EXP-QEI-017"
+      ],
+      "overrides": {
+        "qi": {
+          "sampler": "compact",
+          "fieldType": "scalar",
+          "tau_s_ms": 0.005
+        }
+      }
+    }
+  ]
+}

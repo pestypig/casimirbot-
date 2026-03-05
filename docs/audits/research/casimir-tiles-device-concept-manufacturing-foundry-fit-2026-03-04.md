@@ -11,6 +11,18 @@ This document is a research annex. Authoritative manufacturing definitions and a
 
 Use this annex for context and source mapping, but use `docs/specs/*` as the governance contract for implementation and foundry handoff.
 
+Sign-control integration note:
+- Sign-switch/repulsive Casimir pathways are now captured as measurable contract items in:
+  - `docs/specs/casimir-tile-spec-v1.md` (`g_transition_nm`, `P_rep_min`, `C_congruence`)
+  - `docs/specs/casimir-tile-manufacturing-delta-v1.md` (`CT-MD-007..009`)
+  - `docs/specs/casimir-tile-test-vehicle-plan-v1.md` (cross-source congruence gate)
+  - `docs/specs/casimir-tile-q-spoiling-test-protocol-v1.md` (`Q_L`, `Q_0`, coupling correction, `F_Q_spoil`)
+  - `docs/specs/casimir-tile-timing-precision-test-protocol-v1.md` (`sigma_t_ps`, `TIE_pp_ps`, `PDV_pp_ps`, profile preconditions)
+  - `docs/specs/casimir-tile-nanogap-uncertainty-test-protocol-v1.md` (`u_g_mean_nm`, `u_g_sigma_nm`, BTR/fiducial controls, traceability)
+  - `docs/specs/casimir-tile-nanogap-uncertainty-budget-template-v1.md` (ready-to-fill budget + Monte Carlo slots + `C_congruence` contribution slot)
+  - `docs/specs/casimir-tile-sem-ellipsometry-cross-validation-protocol-v1.md` (`d_sem_corr_nm`, `d_ellip_nm`, `delta_se_nm`, `U_fused_nm`, profile gates)
+  - `docs/specs/casimir-tile-spec-bookkeeping-v1.md` (spec lifecycle bookkeeping)
+
 ## What the codebase means by a Casimir tile
 
 In the CasimirBot/Helix codebase, "Casimir tiles" are first defined as sectorized lattice elements used for grid visualization and telemetry - units in the dashboard/ledger that track per-tile quantities such as pressure and pipeline state fields.
@@ -130,10 +142,17 @@ Final fit summary:
 
 ### Repo sources
 
+- `docs/audits/research/warp-primary-standards-citation-pack-2026-03-04.md`
 - `docs/specs/casimir-tile-spec-v1.md`
 - `docs/specs/casimir-tile-manufacturing-delta-v1.md`
 - `docs/specs/casimir-tile-test-vehicle-plan-v1.md`
 - `docs/specs/casimir-tile-rfq-pack-v1.md`
+- `docs/specs/casimir-tile-q-spoiling-test-protocol-v1.md`
+- `docs/specs/casimir-tile-timing-precision-test-protocol-v1.md`
+- `docs/specs/casimir-tile-nanogap-uncertainty-test-protocol-v1.md`
+- `docs/specs/casimir-tile-nanogap-uncertainty-budget-template-v1.md`
+- `docs/specs/casimir-tile-sem-ellipsometry-cross-validation-protocol-v1.md`
+- `docs/specs/casimir-tile-spec-bookkeeping-v1.md`
 - `docs/knowledge/casimir-tiles.md`
 - `docs/guarded-casimir-tile-code-mapped.md`
 - `docs/casimir-tile-mechanism.md`

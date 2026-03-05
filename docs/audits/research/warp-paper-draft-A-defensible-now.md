@@ -99,12 +99,32 @@ UNKNOWN handling rule:
 | Uncertainty falsifier | uncertainty audit blocked or decision band unresolved | Any robust-pass claim |
 | Reproducibility falsifier | snapshot blocked, provenance mismatch, or trace integrity failure | Any reproducibility claim |
 
+## Casimir Sign-Control Compatibility Envelope (Non-Blocking)
+This lane is explicitly `reference_only` and does not alter canonical campaign decisions.
+
+Primary/standard pass-1 (`configs/warp-shadow-injection-scenarios.cs-primary-recovery.v1.json`) and pass-2 typed (`configs/warp-shadow-injection-scenarios.cs-primary-typed.v1.json`) sweeps were executed with deterministic replay:
+- pass-1 run summary: `scenarioCount=18`, `compatible=18`, `partial=0`, `incompatible=0`, `error=0`
+- pass-2 run summary: `scenarioCount=18`, `compatible=18`, `partial=0`, `incompatible=0`, `error=0`
+- frozen reportable prereg profile (`configs/warp-shadow-injection-scenarios.cs-primary-reportable.v1.json`) replays with identical summary and locked refs/grid assumptions.
+- `success_bar=map_only` contract is satisfied with `winnerScenarioId=null` and explicit failure-envelope payloads.
+
+Lane-specific evidence congruence check (`artifacts/research/full-solve/cs-compat-check-2026-03-05.json`) reports:
+- `congruent=6`
+- `incongruent=9`
+- `unknown=3`
+- dominant reasons: `gap_outside_primary_window=5`, `gap_outside_transition_band=4`, `edge_uncertainty_overlap=3`
+
+Interpretation rule:
+- compatibility to the existing full-solve lane and evidence congruence are tracked separately;
+- no promotion/canonical override is implied by this envelope mapping alone.
+
 ## What This Research Improves Now
 1. Adds standards-oriented governance language without changing reduced-order gate semantics.
 2. Provides explicit source-quality hierarchy (primary/standard first) for manuscript claims.
 3. Improves reproducibility framing by adding deterministic staleness/conflict reporting expectations.
-4. Strengthens closure planning by mapping unresolved items to falsifier-driven upgrade steps.
-5. Adds a manufacturing-spec package (`docs/specs/*`) that converts tile novelty claims into measurable requirements, acceptance gates, and falsifiers.
+4. Adds per-lane envelope mapping for `casimir_sign_control` with deterministic two-pass sweep artifacts and congruence reason codes.
+5. Strengthens closure planning by mapping unresolved items to falsifier-driven upgrade steps.
+6. Adds a manufacturing-spec package (`docs/specs/*`) that converts tile novelty claims into measurable requirements, acceptance gates, and falsifiers.
 
 ## What Remains Unresolved
 Semantic blockers:

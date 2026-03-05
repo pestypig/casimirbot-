@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "mode": "shadow_non_blocking",
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "recovery_goal": "qei_lorentzian_forensic",
+  "success_bar": "map_only",
+  "baseline_reference": {
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-05.json",
+    "keys": [
+      "marginRatioRaw",
+      "marginRatioRawComputed",
+      "applicabilityStatus",
+      "congruentSolvePass",
+      "congruentSolveFailReasons",
+      "sampler",
+      "fieldType",
+      "tauSelected_s"
+    ]
+  },
+  "notes": [
+    "Lorentzian-only forensic sweep to isolate persistent incompatibility reasons.",
+    "Non-blocking exploratory lane; no canonical override."
+  ],
+  "scenarios": [
+    {
+      "id": "qei_lorentzian_forensic_tau_0p001ms",
+      "lane": "qei_worldline",
+      "description": "Lorentzian forensic sweep tau=0.001 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.001 } }
+    },
+    {
+      "id": "qei_lorentzian_forensic_tau_0p0025ms",
+      "lane": "qei_worldline",
+      "description": "Lorentzian forensic sweep tau=0.0025 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.0025 } }
+    },
+    {
+      "id": "qei_lorentzian_forensic_tau_0p005ms",
+      "lane": "qei_worldline",
+      "description": "Lorentzian forensic sweep tau=0.005 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.005 } }
+    },
+    {
+      "id": "qei_lorentzian_forensic_tau_0p01ms",
+      "lane": "qei_worldline",
+      "description": "Lorentzian forensic sweep tau=0.01 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.01 } }
+    },
+    {
+      "id": "qei_lorentzian_forensic_tau_0p02ms",
+      "lane": "qei_worldline",
+      "description": "Lorentzian forensic sweep tau=0.02 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.02 } }
+    },
+    {
+      "id": "qei_lorentzian_forensic_tau_0p05ms",
+      "lane": "qei_worldline",
+      "description": "Lorentzian forensic sweep tau=0.05 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.05 } }
+    },
+    {
+      "id": "qei_lorentzian_forensic_tau_0p1ms",
+      "lane": "qei_worldline",
+      "description": "Lorentzian forensic sweep tau=0.1 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.1 } }
+    },
+    {
+      "id": "qei_lorentzian_forensic_tau_0p2ms",
+      "lane": "qei_worldline",
+      "description": "Lorentzian forensic sweep tau=0.2 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.2 } }
+    },
+    {
+      "id": "qei_lorentzian_forensic_tau_0p5ms",
+      "lane": "qei_worldline",
+      "description": "Lorentzian forensic sweep tau=0.5 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 0.5 } }
+    },
+    {
+      "id": "qei_lorentzian_forensic_tau_1p0ms",
+      "lane": "qei_worldline",
+      "description": "Lorentzian forensic sweep tau=1.0 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "lorentzian", "fieldType": "scalar", "tau_s_ms": 1.0 } }
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "mode": "shadow_non_blocking",
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "recovery_goal": "qei_boundary_refinement",
+  "success_bar": "at_least_one_compatible",
+  "baseline_reference": {
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-05.json",
+    "keys": [
+      "marginRatioRaw",
+      "marginRatioRawComputed",
+      "applicabilityStatus",
+      "congruentSolvePass",
+      "congruentSolveFailReasons",
+      "sampler",
+      "fieldType",
+      "tauSelected_s"
+    ]
+  },
+  "notes": [
+    "Boundary refinement around observed compatibility cut lines.",
+    "Non-blocking exploratory lane; no canonical override."
+  ],
+  "scenarios": [
+    {
+      "id": "qei_boundary_gaussian_tau_0p02ms",
+      "lane": "qei_worldline",
+      "description": "Boundary sweep: gaussian tau=0.02 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "gaussian", "fieldType": "scalar", "tau_s_ms": 0.02 } }
+    },
+    {
+      "id": "qei_boundary_gaussian_tau_0p025ms",
+      "lane": "qei_worldline",
+      "description": "Boundary sweep: gaussian tau=0.025 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "gaussian", "fieldType": "scalar", "tau_s_ms": 0.025 } }
+    },
+    {
+      "id": "qei_boundary_gaussian_tau_0p03ms",
+      "lane": "qei_worldline",
+      "description": "Boundary sweep: gaussian tau=0.03 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "gaussian", "fieldType": "scalar", "tau_s_ms": 0.03 } }
+    },
+    {
+      "id": "qei_boundary_gaussian_tau_0p04ms",
+      "lane": "qei_worldline",
+      "description": "Boundary sweep: gaussian tau=0.04 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "gaussian", "fieldType": "scalar", "tau_s_ms": 0.04 } }
+    },
+    {
+      "id": "qei_boundary_gaussian_tau_0p05ms",
+      "lane": "qei_worldline",
+      "description": "Boundary sweep: gaussian tau=0.05 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "gaussian", "fieldType": "scalar", "tau_s_ms": 0.05 } }
+    },
+    {
+      "id": "qei_boundary_compact_tau_0p1ms",
+      "lane": "qei_worldline",
+      "description": "Boundary sweep: compact tau=0.1 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "compact", "fieldType": "scalar", "tau_s_ms": 0.1 } }
+    },
+    {
+      "id": "qei_boundary_compact_tau_0p125ms",
+      "lane": "qei_worldline",
+      "description": "Boundary sweep: compact tau=0.125 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "compact", "fieldType": "scalar", "tau_s_ms": 0.125 } }
+    },
+    {
+      "id": "qei_boundary_compact_tau_0p15ms",
+      "lane": "qei_worldline",
+      "description": "Boundary sweep: compact tau=0.15 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "compact", "fieldType": "scalar", "tau_s_ms": 0.15 } }
+    },
+    {
+      "id": "qei_boundary_compact_tau_0p175ms",
+      "lane": "qei_worldline",
+      "description": "Boundary sweep: compact tau=0.175 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "compact", "fieldType": "scalar", "tau_s_ms": 0.175 } }
+    },
+    {
+      "id": "qei_boundary_compact_tau_0p2ms",
+      "lane": "qei_worldline",
+      "description": "Boundary sweep: compact tau=0.2 ms.",
+      "registryRefs": ["EXP-QEI-003", "EXP-QEI-013", "EXP-QEI-005", "EXP-QEI-018"],
+      "overrides": { "qi": { "sampler": "compact", "fieldType": "scalar", "tau_s_ms": 0.2 } }
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "laneFromEntryPrefix": {
+    "EXP-T-": "timing",
+    "EXP-NG-": "nanogap",
+    "EXP-Q-": "q_spoiling",
+    "EXP-CS-": "casimir_sign_control",
+    "EXP-SE-": "sem_ellipsometry",
+    "EXP-QEI-": "qei_worldline",
+    "EXP-PROV-": "provenance_attestation"
+  },
+  "runnableLanes": [
+    "timing",
+    "nanogap",
+    "q_spoiling",
+    "casimir_sign_control",
+    "qei_worldline"
+  ],
+  "strictLaneRequirements": {
+    "qei_worldline": {
+      "flag": "strict_qei",
+      "requiredSignals": [
+        {
+          "id": "sampler_normalization",
+          "anchors": ["EXP-QEI-003", "EXP-QEI-013"],
+          "anyPatterns": ["samplingkernelnormalization", "normalize_ok", "unit_integral", "integral"]
+        },
+        {
+          "id": "tau",
+          "anchors": ["EXP-QEI-018"],
+          "anyPatterns": ["\\btau\\b", "tau_s", "tau0", "t_0", "sampling time", "averaging time"]
+        },
+        {
+          "id": "worldline_applicability",
+          "anchors": ["EXP-QEI-005"],
+          "anyPatterns": [
+            "qei_worldline_applicability",
+            "short_sampling_required",
+            "stationary_worldline_qei",
+            "timelike"
+          ]
+        }
+      ]
+    },
+    "casimir_sign_control": {
+      "flag": "strict_casimir_sign",
+      "requiredSourceClasses": ["primary", "standard"],
+      "requiredSignals": [
+        {
+          "id": "sign_observation_or_branch_anchor",
+          "anchors": ["EXP-CS-011", "EXP-CS-003", "EXP-CS-010"],
+          "anyPatterns": ["sign_change_observed", "sign_change_predicted", "repulsive-branch", "casimir_sign_gate"]
+        },
+        {
+          "id": "gap_window_anchor_nm",
+          "anchors": ["EXP-CS-001", "EXP-CS-002"],
+          "anyPatterns": ["casimir_sign_window_nm", "distance band", "separation", "nm"]
+        },
+        {
+          "id": "materials_medium_anchor",
+          "anchors": ["EXP-CS-005", "EXP-CS-006", "EXP-CS-007"],
+          "anyPatterns": [
+            "gold-coated",
+            "silica",
+            "bromobenzene",
+            "ethanol",
+            "coating",
+            "dielectric reduction factor"
+          ]
+        },
+        {
+          "id": "uncertainty_fields_anchor",
+          "anchors": ["EXP-CS-005"],
+          "anyPatterns": ["\\+/-", "uncertainty", "error", "sigma", "std"]
+        }
+      ]
+    }
+  },
+  "laneTemplates": {
+    "timing": {
+      "params": {
+        "clocking": {
+          "tauLC_ms": 3.34,
+          "tauPulse_ms": 0.00001,
+          "metricDerived": true,
+          "metricDerivedSource": "shadow_builder_timing",
+          "metricDerivedReason": "auto_selected_timing_profile"
+        }
+      }
+    },
+    "nanogap": {
+      "params": {
+        "gap_nm": 96
+      }
+    },
+    "q_spoiling": {
+      "params": {
+        "qCavity": 100000,
+        "qSpoilingFactor": 1
+      }
+    },
+    "casimir_sign_control": {
+      "params": {
+        "gap_nm": 100
+      }
+    },
+    "qei_worldline": {
+      "qi": {
+        "sampler": "gaussian",
+        "fieldType": "scalar",
+        "tau_s_ms": 0.02
+      }
+    }
+  }
+}

@@ -6,7 +6,7 @@
 Generate a literature-backed scientific manuscript package from the current repo state while preserving strict claim-tier governance and fail-closed evidence handling.
 
 ## Commit Pin
-- `83ad2276e89f6766b863d0b10ab7a09d569585da`
+- `e240431948598a964a9042ed929a076f609b90d6`
 
 ## Repository Accessibility Rule (important)
 Use only files that are committed and readable at the commit pin.
@@ -71,7 +71,7 @@ Citation admissibility checks:
 - Recommendations supported only by `preprint` must be tagged exploratory.
 - Recommendations supported only by `secondary` are non-compliant.
 
-## Required Local Inputs (must be read first, commit-tracked)
+## Required Local Inputs (core adjudication, commit-tracked)
 - `docs/audits/research/warp-paper-authoring-contract-2026-03-02.md`
 - `docs/audits/research/warp-evidence-pack-2026-03-02.json`
 - `docs/audits/research/warp-evidence-snapshot-2026-03-02.md`
@@ -83,10 +83,24 @@ Citation admissibility checks:
 - `docs/audits/research/warp-g4-curvature-applicability-audit-2026-03-02.md`
 - `docs/audits/research/warp-g4-uncertainty-audit-2026-03-02.md`
 - `docs/audits/research/warp-g4-literature-parity-replay-2026-03-02.md`
+
+## Experimental Data Staging Inputs (reference-only, non-blocking)
+- `docs/audits/research/warp-qei-worldline-primer-2026-03-04.md`
+- `docs/audits/research/warp-primary-standards-citation-pack-2026-03-04.md`
 - `docs/specs/casimir-tile-spec-v1.md`
 - `docs/specs/casimir-tile-manufacturing-delta-v1.md`
 - `docs/specs/casimir-tile-test-vehicle-plan-v1.md`
 - `docs/specs/casimir-tile-rfq-pack-v1.md`
+- `docs/specs/casimir-tile-q-spoiling-test-protocol-v1.md`
+- `docs/specs/casimir-tile-timing-precision-test-protocol-v1.md`
+- `docs/specs/casimir-tile-nanogap-uncertainty-test-protocol-v1.md`
+- `docs/specs/casimir-tile-nanogap-uncertainty-budget-template-v1.md`
+- `docs/specs/casimir-tile-spec-bookkeeping-v1.md`
+- `docs/specs/casimir-tile-experimental-data-staging-ledger-v1.md`
+- `docs/specs/casimir-tile-promotion-preregistration-v1.md`
+
+Staging rule:
+- Missing staging inputs must be reported as `experimental_missing`, but must not trigger fail-closed for canonical warp adjudication outputs.
 
 ## Optional Local Overlays (use when present)
 - `artifacts/research/full-solve/warp-evidence-snapshot-2026-03-02.json`
@@ -108,6 +122,7 @@ Citation admissibility checks:
    - curved-spacetime renormalization semantics (Wald/Birrell-Davies lineage)
    - VVUQ/uncertainty standards (NASA/ASME/GUM lineage)
 5. For manufacturing claims, anchor to the `docs/specs/*` package first, then external standards.
+6. For FordRomanQI/QEI parity claims, report sampler admissibility evidence (`normalize_ok`, `smoothness_ok`, `scaling_ok`) and fail closed when any check is missing.
 
 ## Output Requirements
 Generate two outputs.
@@ -135,6 +150,7 @@ Generate two outputs.
   - minimal experimental/validation program
   - explicit blockers and how to clear them
   - VVUQ/standards alignment matrix mapped to H-N
+  - measurement-congruence and fail-safe synthesis block for any sign-control Casimir claims
 
 ## Required Output Blocks (contract)
 The response must include all blocks below in this order:
@@ -143,6 +159,7 @@ The response must include all blocks below in this order:
 3. Concrete evidence upgrades
 4. Source-to-claim matrix
 5. Staleness/conflict audit
+6. Measurement congruence and fail-safe synthesis (required when sign-control claims are present)
 
 ## Output Schema Additions (required)
 Include explicit fields:
@@ -171,10 +188,16 @@ Deep-research output must:
    - no interactive or scrolling graph dependency.
 
 ## Fail-Closed Rules
-If any required commit-tracked local file is missing/unreadable:
+If any required core-adjudication commit-tracked local file is missing/unreadable:
 - return:
   - `blocked=true`
   - `commit_pin=<hash>`
   - list of missing paths
   - `stop_reason=Fail-closed`
 - do not draft A/B content.
+
+If only experimental staging inputs are missing/unreadable:
+- return:
+  - `experimental_missing=true`
+  - list of missing staging paths
+- continue with A/B using core-adjudication inputs and mark staging-dependent claims as `UNKNOWN`.

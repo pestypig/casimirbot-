@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "mode": "shadow_non_blocking",
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "generatedBy": "warp-shadow-scenario-builder",
+  "generatedAt": "2026-03-05T04:13:02.546Z",
+  "selection": {
+    "registryPath": "docs\\specs\\casimir-tile-experimental-parameter-registry-2026-03-04.md",
+    "rulebookPath": "configs\\warp-shadow-scenario-builder-rulebook.v1.json",
+    "laneFilter": [
+      "qei_worldline",
+      "q_spoiling",
+      "timing",
+      "nanogap",
+      "casimir_sign_control"
+    ],
+    "statusFilter": [
+      "extracted"
+    ],
+    "sourceClassFilter": [],
+    "entryFilter": [],
+    "maxPerLane": 3,
+    "strictQei": true
+  },
+  "summary": {
+    "registryRowsParsed": 130,
+    "registryRowsEligible": 130,
+    "registryRowsSelected": 104,
+    "scenariosBuilt": 5,
+    "strictQeiSkips": 0
+  },
+  "strictQeiSkips": [],
+  "scenarios": [
+    {
+      "id": "auto_casimir_sign_control_2026_03_05",
+      "lane": "casimir_sign_control",
+      "description": "Auto-built from 3 registry rows in lane casimir_sign_control.",
+      "registryRefs": [
+        "EXP-CS-001",
+        "EXP-CS-002",
+        "EXP-CS-005"
+      ],
+      "sourceSelection": {
+        "statuses": [
+          "extracted"
+        ],
+        "sourceClasses": [],
+        "maxPerLane": 3
+      },
+      "overrides": {
+        "params": {
+          "gap_nm": 100
+        }
+      }
+    },
+    {
+      "id": "auto_nanogap_2026_03_05",
+      "lane": "nanogap",
+      "description": "Auto-built from 3 registry rows in lane nanogap.",
+      "registryRefs": [
+        "EXP-NG-001",
+        "EXP-NG-002",
+        "EXP-NG-003"
+      ],
+      "sourceSelection": {
+        "statuses": [
+          "extracted"
+        ],
+        "sourceClasses": [],
+        "maxPerLane": 3
+      },
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      }
+    },
+    {
+      "id": "auto_q_spoiling_2026_03_05",
+      "lane": "q_spoiling",
+      "description": "Auto-built from 3 registry rows in lane q_spoiling.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003"
+      ],
+      "sourceSelection": {
+        "statuses": [
+          "extracted"
+        ],
+        "sourceClasses": [],
+        "maxPerLane": 3
+      },
+      "overrides": {
+        "params": {
+          "qCavity": 18000000000,
+          "qSpoilingFactor": 1
+        }
+      }
+    },
+    {
+      "id": "auto_qei_worldline_2026_03_05",
+      "lane": "qei_worldline",
+      "description": "Auto-built from 3 registry rows in lane qei_worldline.",
+      "registryRefs": [
+        "EXP-QEI-003",
+        "EXP-QEI-018",
+        "EXP-QEI-005"
+      ],
+      "sourceSelection": {
+        "statuses": [
+          "extracted"
+        ],
+        "sourceClasses": [],
+        "maxPerLane": 3
+      },
+      "overrides": {
+        "qi": {
+          "sampler": "lorentzian",
+          "fieldType": "scalar",
+          "tau_s_ms": 0.02
+        }
+      }
+    },
+    {
+      "id": "auto_timing_2026_03_05",
+      "lane": "timing",
+      "description": "Auto-built from 3 registry rows in lane timing.",
+      "registryRefs": [
+        "EXP-T-001",
+        "EXP-T-002",
+        "EXP-T-003"
+      ],
+      "sourceSelection": {
+        "statuses": [
+          "extracted"
+        ],
+        "sourceClasses": [],
+        "maxPerLane": 3
+      },
+      "overrides": {
+        "params": {
+          "clocking": {
+            "tauLC_ms": 3.34,
+            "tauPulse_ms": 0.00001,
+            "metricDerived": true,
+            "metricDerivedSource": "shadow_builder_timing",
+            "metricDerivedReason": "auto_selected_timing_profile"
+          }
+        }
+      }
+    }
+  ]
+}
