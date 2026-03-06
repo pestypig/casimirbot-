@@ -2147,8 +2147,11 @@ export function HelixAskPill({
 
   useEffect(() => {
     if (!contextCapsuleDetectedId) {
+      if (contextCapsuleAppliedId) {
+        // Keep an explicitly applied capsule visible while the user types.
+        return;
+      }
       setContextCapsulePreview(null);
-      setContextCapsuleAppliedId(null);
       return;
     }
     const sequence = ++contextCapsuleLookupSeqRef.current;
@@ -2184,7 +2187,7 @@ export function HelixAskPill({
     return () => {
       controller.abort();
     };
-  }, [contextCapsuleDetectedId, getHelixAskSessionId]);
+  }, [contextCapsuleDetectedId, contextCapsuleAppliedId, getHelixAskSessionId]);
 
   useEffect(() => {
     broadcastLumaMood(askMood);
