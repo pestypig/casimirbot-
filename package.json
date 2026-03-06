@@ -193,6 +193,7 @@
     "warp:shadow:ti-compat-check": "tsx scripts/warp-shadow-timing-compat-check.ts",
     "warp:shadow:ti-repeat-determinism": "tsx scripts/warp-shadow-timing-repeat-determinism.ts",
     "warp:shadow:se-compat-check": "tsx scripts/warp-shadow-sem-ellips-compat-check.ts",
+    "warp:shadow:se-paired-evidence:validate": "tsx scripts/warp-shadow-sem-ellips-paired-evidence-validate.ts",
     "warp:shadow:se-repeat-determinism": "tsx scripts/warp-shadow-sem-ellips-repeat-determinism.ts",
     "warp:shadow:inject:qei-recovery": "tsx scripts/warp-shadow-injection-runner.ts --scenarios configs/warp-shadow-injection-scenarios.qei-recovery.v1.json",
     "warp:shadow:qei-recovery:check": "tsx scripts/warp-shadow-qei-recovery-check.ts",

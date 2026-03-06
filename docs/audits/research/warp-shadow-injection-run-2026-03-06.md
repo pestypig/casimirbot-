@@ -5,16 +5,16 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 ## Summary
 - mode: shadow_non_blocking
 - non_blocking: true
-- scenario_count: 12
-- compatible: 12
+- scenario_count: 2
+- compatible: 2
 - partial: 0
 - incompatible: 0
 - error: 0
-- scenario_pack: `configs/warp-shadow-injection-scenarios.ti-primary-reportable.v1.json`
-- commit_pin: `f6d6146d26885aae34ebd8785950df07d6af9731`
+- scenario_pack: `configs/warp-shadow-injection-scenarios.se-primary-reportable-reference.v1.json`
+- commit_pin: `0c7afa8f5c942c36888b2aa8cc6f9155146d687c`
 
 ## Recovery Contract
-- recovery_goal: timing_compatibility_recovery
+- recovery_goal: sem_ellipsometry_compatibility_recovery
 - success_bar: map_only
 - winnerScenarioId: null
 - success_achieved: true
@@ -32,18 +32,8 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 ## Scenario Results
 | scenario_id | lane | experimental_context | classification | congruentSolvePass | marginRatioRaw | deltaMarginRatioRaw | fail_or_error |
 |---|---|---|---|---|---:|---:|---|
-| ti_primary_typed_wr_short_ps_sigma_6ps | timing | WR-SHORT-PS;sigma=6;ts=hardware | compatible | true | 0.2739798236667395 | -0.7260201763332605 | none |
-| ti_primary_typed_wr_short_ps_sigma_12ps | timing | WR-SHORT-PS;sigma=12;ts=hardware | compatible | true | 0.22652103813228594 | -0.773478961867714 | none |
-| ti_primary_typed_wr_short_ps_sigma_50ps | timing | WR-SHORT-PS;sigma=50;ts=hardware | compatible | true | 0.20825309986725563 | -0.7917469001327444 | none |
-| ti_primary_typed_wr_short_ps_sigma_100ps | timing | WR-SHORT-PS;sigma=100;ts=hardware | compatible | true | 0.20508832087663792 | -0.7949116791233621 | none |
-| ti_primary_typed_wr_short_ps_sigma_120ps | timing | WR-SHORT-PS;sigma=120;ts=hardware | compatible | true | 0.20666485523008782 | -0.7933351447699122 | none |
-| ti_primary_typed_wr_short_ps_sigma_300ps | timing | WR-SHORT-PS;sigma=300;ts=hardware | compatible | true | 0.21308893587673397 | -0.7869110641232661 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_6ps | timing | WR-LONGHAUL-EXP;sigma=6;ts=hardware | compatible | true | 0.20508832087663792 | -0.7949116791233621 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_12ps | timing | WR-LONGHAUL-EXP;sigma=12;ts=hardware | compatible | true | 0.2035234136253071 | -0.7964765863746929 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_50ps | timing | WR-LONGHAUL-EXP;sigma=50;ts=hardware | compatible | true | 0.2035234136253071 | -0.7964765863746929 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_100ps | timing | WR-LONGHAUL-EXP;sigma=100;ts=hardware | compatible | true | 0.20042815053284566 | -0.7995718494671543 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_120ps | timing | WR-LONGHAUL-EXP;sigma=120;ts=hardware | compatible | true | 0.20042815053284566 | -0.7995718494671543 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_300ps | timing | WR-LONGHAUL-EXP;sigma=300;ts=hardware | compatible | true | 0.20042815053284566 | -0.7995718494671543 | none |
+| se_primary_typed_se_std_2_delta_1_u_1 | sem_ellipsometry | SE-STD-2;delta=1;U=1 | compatible | true | 0.24446485107201202 | -0.755535148927988 | none |
+| se_primary_typed_se_adv_1_delta_0p5_u_0p5 | sem_ellipsometry | SE-ADV-1;delta=0.5;U=0.5 | compatible | true | 0.22308827469892908 | -0.7769117253010709 | none |
 
 ## Failure Envelope
 

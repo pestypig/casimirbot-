@@ -46,6 +46,23 @@ const finiteOrUndefined = (value: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+const resolveCommitHash = (): string => {
+  const envHash = (
+    process.env.GIT_SHA ??
+    process.env.COMMIT_SHA ??
+    process.env.GITHUB_SHA ??
+    process.env.REPLIT_GIT_COMMIT
+  )?.trim();
+  if (envHash) {
+    return envHash;
+  }
+  try {
+    return execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return 'unknown';
+  }
+};
+
 const readArgValue = (name: string, argv = process.argv.slice(2)): string | undefined => {
   const index = argv.findIndex((value) => value === name || value.startsWith(`${name}=`));
   if (index < 0) return undefined;
@@ -173,9 +190,7 @@ export const runWarpFullSolveCalculator = async (
 ) => {
   const outPath = options.outPath ?? DEFAULT_OUT_PATH;
   const payload = loadInputPayload(options.inputPath, options.inputPayload);
-  const getCommitHash =
-    options.getCommitHash ??
-    (() => execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
+  const getCommitHash = options.getCommitHash ?? resolveCommitHash;
 
   let state = initializePipelineState();
   state = await updateParameters(state, buildPromotedBaseParams(), { includeReadinessSignals: true });
@@ -256,7 +271,17 @@ export const runWarpFullSolveCalculator = async (
   };
 };
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+const isDirectScriptExecution = () => {
+  const entryArg = process.argv[1];
+  if (!entryArg) return false;
+  const entryAbs = path.resolve(entryArg);
+  const directUrl = pathToFileURL(entryAbs).href;
+  if (import.meta.url !== directUrl) return false;
+  const entryBase = path.basename(entryAbs).toLowerCase();
+  return entryBase.includes('warp-full-solve-calculator');
+};
+
+if (isDirectScriptExecution()) {
   const inputPath = readArgValue('--input');
   const outPath = readArgValue('--out') ?? DEFAULT_OUT_PATH;
   const injectCurvatureSignals = !hasArg('--no-inject-curvature-signals');

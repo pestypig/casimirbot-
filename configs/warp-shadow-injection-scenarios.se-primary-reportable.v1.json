@@ -73,14 +73,14 @@
         "semEllips": {
           "profileId": "SE-STD-2",
           "d_sem_corr_nm": 101,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 1,
           "d_fused_nm": 100.5,
           "u_fused_nm": 0.5,
           "U_fused_nm": 1,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -93,7 +93,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -134,14 +134,14 @@
         "semEllips": {
           "profileId": "SE-STD-2",
           "d_sem_corr_nm": 101,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 1,
           "d_fused_nm": 100.5,
           "u_fused_nm": 1,
           "U_fused_nm": 2,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -154,7 +154,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -195,14 +195,14 @@
         "semEllips": {
           "profileId": "SE-STD-2",
           "d_sem_corr_nm": 101,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 1,
           "d_fused_nm": 100.5,
           "u_fused_nm": 1.2,
           "U_fused_nm": 2.4,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -215,7 +215,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -256,14 +256,14 @@
         "semEllips": {
           "profileId": "SE-STD-2",
           "d_sem_corr_nm": 98,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": -2,
           "d_fused_nm": 99,
           "u_fused_nm": 0.5,
           "U_fused_nm": 1,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -276,7 +276,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -317,14 +317,14 @@
         "semEllips": {
           "profileId": "SE-STD-2",
           "d_sem_corr_nm": 98,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": -2,
           "d_fused_nm": 99,
           "u_fused_nm": 1,
           "U_fused_nm": 2,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -337,7 +337,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -378,14 +378,14 @@
         "semEllips": {
           "profileId": "SE-STD-2",
           "d_sem_corr_nm": 98,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": -2,
           "d_fused_nm": 99,
           "u_fused_nm": 1.2,
           "U_fused_nm": 2.4,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -398,7 +398,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -439,14 +439,14 @@
         "semEllips": {
           "profileId": "SE-STD-2",
           "d_sem_corr_nm": 102.4,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 2.4,
           "d_fused_nm": 101.2,
           "u_fused_nm": 0.5,
           "U_fused_nm": 1,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -459,7 +459,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -500,14 +500,14 @@
         "semEllips": {
           "profileId": "SE-STD-2",
           "d_sem_corr_nm": 102.4,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 2.4,
           "d_fused_nm": 101.2,
           "u_fused_nm": 1,
           "U_fused_nm": 2,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -520,7 +520,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -561,14 +561,14 @@
         "semEllips": {
           "profileId": "SE-STD-2",
           "d_sem_corr_nm": 102.4,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 2.4,
           "d_fused_nm": 101.2,
           "u_fused_nm": 1.2,
           "U_fused_nm": 2.4,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -581,7 +581,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -622,14 +622,14 @@
         "semEllips": {
           "profileId": "SE-ADV-1",
           "d_sem_corr_nm": 100.5,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 0.5,
           "d_fused_nm": 100.25,
           "u_fused_nm": 0.25,
           "U_fused_nm": 0.5,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -642,7 +642,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -683,14 +683,14 @@
         "semEllips": {
           "profileId": "SE-ADV-1",
           "d_sem_corr_nm": 100.5,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 0.5,
           "d_fused_nm": 100.25,
           "u_fused_nm": 0.5,
           "U_fused_nm": 1,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -703,7 +703,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -744,14 +744,14 @@
         "semEllips": {
           "profileId": "SE-ADV-1",
           "d_sem_corr_nm": 100.5,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 0.5,
           "d_fused_nm": 100.25,
           "u_fused_nm": 0.6,
           "U_fused_nm": 1.2,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -764,7 +764,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -805,14 +805,14 @@
         "semEllips": {
           "profileId": "SE-ADV-1",
           "d_sem_corr_nm": 99,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": -1,
           "d_fused_nm": 99.5,
           "u_fused_nm": 0.25,
           "U_fused_nm": 0.5,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -825,7 +825,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -866,14 +866,14 @@
         "semEllips": {
           "profileId": "SE-ADV-1",
           "d_sem_corr_nm": 99,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": -1,
           "d_fused_nm": 99.5,
           "u_fused_nm": 0.5,
           "U_fused_nm": 1,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -886,7 +886,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -927,14 +927,14 @@
         "semEllips": {
           "profileId": "SE-ADV-1",
           "d_sem_corr_nm": 99,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": -1,
           "d_fused_nm": 99.5,
           "u_fused_nm": 0.6,
           "U_fused_nm": 1.2,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -947,7 +947,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -988,14 +988,14 @@
         "semEllips": {
           "profileId": "SE-ADV-1",
           "d_sem_corr_nm": 101.2,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 1.2,
           "d_fused_nm": 100.6,
           "u_fused_nm": 0.25,
           "U_fused_nm": 0.5,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -1008,7 +1008,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -1049,14 +1049,14 @@
         "semEllips": {
           "profileId": "SE-ADV-1",
           "d_sem_corr_nm": 101.2,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 1.2,
           "d_fused_nm": 100.6,
           "u_fused_nm": 0.5,
           "U_fused_nm": 1,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -1069,7 +1069,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",
@@ -1110,14 +1110,14 @@
         "semEllips": {
           "profileId": "SE-ADV-1",
           "d_sem_corr_nm": 101.2,
-          "u_sem_nm": 0,
+          "u_sem_nm": 100,
           "d_ellip_nm": 100,
-          "u_ellip_nm": 0,
+          "u_ellip_nm": 0.5,
           "delta_se_nm": 1.2,
           "d_fused_nm": 100.6,
           "u_fused_nm": 0.6,
           "U_fused_nm": 1.2,
-          "paired_run_id": null,
+          "paired_run_id": "unpaired_anchor_only_2026-03-06",
           "rho_sem_ellip": 0,
           "covariance_sem_ellip_nm2": 0,
           "sourceRefs": [
@@ -1130,7 +1130,7 @@
             "EXP-SE-004"
           ],
           "uncertainty": {
-            "method": "paired_dual_instrument_covariance_numeric",
+            "method": "strict_anchor_partial_no_paired_covariance",
             "reportableReady": false,
             "blockedReasons": [
               "missing_paired_dual_instrument_run",

@@ -1,10 +1,10 @@
-# SEM+Ellipsometry Compatibility Check (2026-03-06T18:54:22.902Z)
+# SEM+Ellipsometry Compatibility Check (2026-03-06T19:25:11.936Z)
 
 This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.
 
 ## Inputs
 - scenario_pack: `configs/warp-shadow-injection-scenarios.se-primary-reportable.v1.json`
-- run_artifact: `artifacts/research/full-solve/shadow-injection-run-se-primary-reportable-2026-03-06.json`
+- run_artifact: `artifacts/research/full-solve/shadow-injection-run-2026-03-06.json`
 - registry: `docs\specs\casimir-tile-experimental-parameter-registry-2026-03-04.md`
 
 ## Summary
