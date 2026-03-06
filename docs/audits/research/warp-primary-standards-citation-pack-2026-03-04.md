@@ -48,6 +48,8 @@ Commit-tracked, source-admissible citation pack for manuscript generation and cl
 | SRC-032 | Long-haul unrepeated WR synchronization over 300 km | M | arXiv:2511.23254 | https://arxiv.org/abs/2511.23254 | 2025-11 | preprint | low | exploratory |
 | SRC-033 | User-supplied White Rabbit Wikipedia overview | M | Wikipedia: White Rabbit Project | https://en.wikipedia.org/wiki/White_Rabbit_Project | rolling | secondary | low | non-admissible |
 | SRC-034 | User-supplied vendor overview of IEEE 1588/WR | M | white-rabbit.tech overview page | https://www.white-rabbit.tech/ieee1588-standard/ | rolling | secondary | low | supporting |
+| SRC-067 | White Rabbit conference baseline with multi-switch skew/jitter measurements | M | Serrano et al., ICALEPCS2009 TUC004 | https://accelconf.web.cern.ch/icalepcs2009/papers/tuc004.pdf | 2009 | primary | medium | normative |
+| SRC-068 | White Rabbit clock-characteristics paper with DDMTD/SoftPLL precision metrics | M | Rizzi et al., ISPCS 2016 | https://doi.org/10.1109/ISPCS.2016.7579446 | 2016 | primary | medium | normative |
 | SRC-035 | CD-AFM standards comparison and uncertainty discussion (NIST publication) | M,N | NIST CD-AFM uncertainty publication | https://www.nist.gov/publications/comparison-and-uncertainties-standards-cd-afm-microscope-tip-width-calibration | 2004 | standard | high | normative |
 | SRC-036 | Blind tip reconstruction methodology foundation (Villarrubia) | M | Villarrubia, J. Res. NIST 102(4):425-454 | https://doi.org/10.6028/jres.102.030 | 1997 | primary | high | normative |
 | SRC-037 | End-to-end differentiable BTR under noisy AFM conditions | M | PMC9813222 | https://pmc.ncbi.nlm.nih.gov/articles/PMC9813222/ | 2023 | primary | medium | normative |
@@ -79,6 +81,7 @@ Commit-tracked, source-admissible citation pack for manuscript generation and cl
 | SRC-063 | Full-text off-stoichiometry sign-transition extraction anchor (published-lane companion) | M | Pal et al., arXiv:2406.08058 | https://arxiv.org/abs/2406.08058 | 2024-06 (v1), 2025 (published lane) | preprint | medium | supporting |
 | SRC-064 | Optimal 2D QI bound and explicit smearing normalization convention | L | Flanagan, Phys. Rev. D 56, 4922 | https://arxiv.org/abs/gr-qc/9706006 | 1997-06 (v1), 1997-10 (journal) | primary | high | normative |
 | SRC-065 | Gauss-Kronrod adaptive quadrature implementation contract for normalization checks | L,N | QUADPACK (`dqag` and `dqk15..dqk61`) | https://www.netlib.org/quadpack/ | historical package; active archive | standard | medium | normative |
+| SRC-066 | Q-spoiling lane policy fallback note (deprecated as primary uncertainty anchor) | M,N | Repo spec (`casimir-tile-q-spoiling-compatibility-contract-v1.md`) | docs/specs/casimir-tile-q-spoiling-compatibility-contract-v1.md | 2026-03-06 | standard | medium | supporting |
 
 ## Staleness and Conflict Notes
 - `conflict`: false (no direct contradiction identified against canonical precedence artifacts during this citation curation pass).
@@ -94,6 +97,7 @@ Commit-tracked, source-admissible citation pack for manuscript generation and cl
 - `SRC-024` and `SRC-028` are conference/supporting context; use only with primary anchors for normative claims.
 - `SRC-025`, `SRC-026`, and `SRC-027` are non-admissible for normative claims and should only be used as intake leads.
 - `SRC-029`, `SRC-030`, and `SRC-031` are preferred anchors for timing-acceptance normative claims.
+- `SRC-067` and `SRC-068` are admissible primary timing anchors for WR topology/jitter architecture and clock-subsystem precision metrics.
 - `SRC-032` is exploratory long-haul evidence until matched topology replication exists.
 - `SRC-033` is non-admissible for normative claims and should be treated as intake context only.
 - `SRC-034` is supporting context and cannot be sole basis for a hard recommendation.
@@ -117,6 +121,7 @@ Commit-tracked, source-admissible citation pack for manuscript generation and cl
 - `SRC-063` is admissible as equation-level extraction support for off-stoichiometry Casimir sign-transition modeling, but published DOI sources remain canonical for normative statements.
 - `SRC-064` is a preferred primary anchor for smearing-function normalization and optimal 2D QI convention checks (`rho` normalization and weighting semantics).
 - `SRC-065` is admissible as the numerical-integration implementation anchor (Gauss-Kronrod adaptive error control); pair with QEI theorem sources for normative gate-policy statements.
+- `SRC-066` remains a fallback-policy note only; mechanism-specific measurement-led uncertainty anchors (`EXP-Q-020..EXP-Q-022`) supersede it for q-spoiling congruence mapping.
 
 ## Intake Notes (2026-03-04 Source Drop)
 - The new drop strengthens SEM calibration/governance coverage.

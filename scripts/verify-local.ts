@@ -6,7 +6,7 @@ type SpawnResult = {
   code: number;
 };
 
-const baseUrl = process.env.VERIFY_BASE_URL ?? "http://localhost:5173";
+const baseUrl = process.env.VERIFY_BASE_URL ?? "http://localhost:5050";
 const packsUrl = new URL("/api/agi/constraint-packs", baseUrl).toString();
 const adapterUrl = new URL("/api/agi/adapter/run", baseUrl).toString();
 const traceOut = process.env.VERIFY_TRACE_OUT ?? "tmp/training-trace.jsonl";
@@ -128,7 +128,7 @@ const runVerification = async (): Promise<number> => {
   try {
     const alreadyUp = await waitForServer(2000);
     if (!alreadyUp) {
-      serverProcess = spawnNpm(["run", "dev:agi:5173"]);
+      serverProcess = spawnNpm(["run", "dev:agi:5050"]);
       startedServer = true;
       const ready = await waitForServer();
       if (!ready) {

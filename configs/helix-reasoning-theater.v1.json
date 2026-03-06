@@ -480,5 +480,88 @@
         }
       }
     }
+  },
+  "retrieval_zone_layer": {
+    "enabled": true,
+    "node_count_dense": 120,
+    "pulse_ms": 1200,
+    "hold_ms": 260,
+    "open_world_label": "open-world",
+    "zones": {
+      "mapped_connected": {
+        "base_color": "#0F766E",
+        "active_color": "#22D3EE",
+        "edge_opacity": 0.44
+      },
+      "owned_frontier": {
+        "base_color": "#475569",
+        "active_color": "#F59E0B",
+        "edge_opacity": 0.38
+      },
+      "uncharted": {
+        "base_color": "#1F2937",
+        "active_color": "#FB7185",
+        "edge_opacity": 0.32
+      }
+    },
+    "motion": {
+      "enabled": true,
+      "sweep_band_width_pct": 14,
+      "sweep_falloff_pct": 10,
+      "node_frontier_boost": 0.52,
+      "node_zone_boost": 0.48,
+      "edge_frontier_boost": 0.34,
+      "edge_zone_boost": 0.22,
+      "breath_hz_base": 0.45,
+      "breath_hz_gain": 1.1,
+      "dash_px": 1.6,
+      "dash_gap_px": 2.8,
+      "sweep_opacity_min": 0.08,
+      "sweep_opacity_max": 0.42
+    },
+    "presentation": {
+      "mode": "convergence_strip_v1",
+      "symbolic_model": "constellation_weave",
+      "literality": "exact_plus_aura",
+      "zone_presence": "ambient_only",
+      "map_text": "none",
+      "constellation_node_budget": 96,
+      "aura_hop_limit": 1,
+      "aura_opacity_max": 0.22,
+      "thread_count_per_edge": 2,
+      "trace_scope": "primary_only",
+      "camera_mode": "fixed",
+      "path_mode": "full_path_with_event_flow",
+      "progress_encoding": "leaf_beacon_route_flux",
+      "no_exact_fallback": "tree_pulse_only",
+      "show_root_leaf_markers": true,
+      "caption_mode": "one_line",
+      "causality_encoding": "map_only",
+      "provenance_mode": "strict_exact_only",
+      "labels": "none",
+      "show_open_world_text_chip": true,
+      "core_reaction_ms": 480,
+      "event_pulse_ms": 720,
+      "event_hold_ms": 180,
+      "path_fade_ms": 900,
+      "max_exact_paths_per_event": 12,
+      "show_phase_tick": true,
+      "show_caption": true,
+      "show_reply_snapshot": true,
+      "collapse_pulse_ms": 520,
+      "lane_hold_ms": 220,
+      "unknown_policy": "explicit"
+    },
+    "graph_focus": {
+      "enabled": true,
+      "max_visible_nodes": 120,
+      "max_visible_edges": 280,
+      "hop_limit": 3,
+      "neighbor_cap_per_node": 8,
+      "camera_padding_pct": 0.12,
+      "camera_lerp": 0.22,
+      "indicator_ms": 520,
+      "objective_reaction_ms": 480
+    }
   }
 }

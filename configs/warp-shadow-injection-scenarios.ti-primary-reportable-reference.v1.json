@@ -1,0 +1,231 @@
+{
+  "version": 1,
+  "mode": "shadow_non_blocking",
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "recovery_goal": "timing_compatibility_recovery",
+  "success_bar": "map_only",
+  "baseline_reference": {
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-06.json",
+    "keys": [
+      "marginRatioRaw",
+      "marginRatioRawComputed",
+      "applicabilityStatus",
+      "congruentSolvePass",
+      "congruentSolveFailReasons",
+      "sampler",
+      "fieldType",
+      "tauSelected_s"
+    ]
+  },
+  "notes": [
+    "Primary/standard timing evidence only.",
+    "Non-blocking compatibility envelope mapping lane.",
+    "No canonical override or promotion implied.",
+    "Sweep dimensions are sigma_t_ps x profile_id."
+  ],
+  "profileThresholds": {
+    "WR-SHORT-PS": {
+      "sigma_t_ps_max": 100
+    },
+    "WR-LONGHAUL-EXP": {
+      "sigma_t_ps_max": null
+    }
+  },
+  "pass": "pass_2_typed_context",
+  "dimensions": {
+    "sigma_t_ps": [
+      6,
+      12,
+      50,
+      100,
+      120,
+      300
+    ],
+    "profile_id": [
+      "WR-SHORT-PS",
+      "WR-LONGHAUL-EXP"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "ti_primary_typed_wr_short_ps_sigma_1e2ps",
+      "lane": "timing",
+      "description": "Pass-2 typed timing envelope: profile=WR-SHORT-PS, sigma_t_ps=100.",
+      "registryRefs": [
+        "EXP-T-001",
+        "EXP-T-003",
+        "EXP-T-002",
+        "EXP-T-004",
+        "EXP-T-019",
+        "EXP-T-020"
+      ],
+      "overrides": {
+        "params": {
+          "clocking": {
+            "tauLC_ms": 3.34,
+            "tauPulse_ms": 0.00001,
+            "metricDerived": true,
+            "metricDerivedSource": "shadow_builder_timing",
+            "metricDerivedReason": "timing_profile_sigma_sweep"
+          }
+        }
+      },
+      "experimentalContext": {
+        "timing": {
+          "profileId": "WR-SHORT-PS",
+          "sigma_t_ps": 100,
+          "tie_pp_ps": 1000,
+          "pdv_pp_ps": null,
+          "timestamping_mode": "hardware",
+          "synce_enabled": true,
+          "clock_mode": "transparent",
+          "topology_class": "wr_short_fiber",
+          "sourceRefs": [
+            "EXP-T-001",
+            "EXP-T-003",
+            "EXP-T-002",
+            "EXP-T-004",
+            "EXP-T-019",
+            "EXP-T-020"
+          ],
+          "uncertainty": {
+            "u_sigma_t_ps": 6,
+            "u_tie_pp_ps": null,
+            "u_pdv_pp_ps": null,
+            "method": "registry_numeric_uncertainty_anchor",
+            "reportableReady": true,
+            "blockedReasons": []
+          }
+        }
+      }
+    },
+    {
+      "id": "ti_primary_typed_wr_short_ps_sigma_1e2ps",
+      "lane": "timing",
+      "description": "Pass-2 typed timing envelope: profile=WR-SHORT-PS, sigma_t_ps=120.",
+      "registryRefs": [
+        "EXP-T-001",
+        "EXP-T-003",
+        "EXP-T-002",
+        "EXP-T-004",
+        "EXP-T-019",
+        "EXP-T-020"
+      ],
+      "overrides": {
+        "params": {
+          "clocking": {
+            "tauLC_ms": 3.34,
+            "tauPulse_ms": 0.00001,
+            "metricDerived": true,
+            "metricDerivedSource": "shadow_builder_timing",
+            "metricDerivedReason": "timing_profile_sigma_sweep"
+          }
+        }
+      },
+      "experimentalContext": {
+        "timing": {
+          "profileId": "WR-SHORT-PS",
+          "sigma_t_ps": 120,
+          "tie_pp_ps": 1000,
+          "pdv_pp_ps": null,
+          "timestamping_mode": "hardware",
+          "synce_enabled": true,
+          "clock_mode": "transparent",
+          "topology_class": "wr_short_fiber",
+          "sourceRefs": [
+            "EXP-T-001",
+            "EXP-T-003",
+            "EXP-T-002",
+            "EXP-T-004",
+            "EXP-T-019",
+            "EXP-T-020"
+          ],
+          "uncertainty": {
+            "u_sigma_t_ps": 6,
+            "u_tie_pp_ps": null,
+            "u_pdv_pp_ps": null,
+            "method": "registry_numeric_uncertainty_anchor",
+            "reportableReady": true,
+            "blockedReasons": []
+          }
+        }
+      }
+    },
+    {
+      "id": "ti_primary_typed_wr_longhaul_exp_sigma_6e0ps",
+      "lane": "timing",
+      "description": "Pass-2 typed timing envelope: profile=WR-LONGHAUL-EXP, sigma_t_ps=6.",
+      "registryRefs": [
+        "EXP-T-001",
+        "EXP-T-003",
+        "EXP-T-002",
+        "EXP-T-004",
+        "EXP-T-019",
+        "EXP-T-020"
+      ],
+      "overrides": {
+        "params": {
+          "clocking": {
+            "tauLC_ms": 3.34,
+            "tauPulse_ms": 0.00001,
+            "metricDerived": true,
+            "metricDerivedSource": "shadow_builder_timing",
+            "metricDerivedReason": "timing_profile_sigma_sweep"
+          }
+        }
+      },
+      "experimentalContext": {
+        "timing": {
+          "profileId": "WR-LONGHAUL-EXP",
+          "sigma_t_ps": 6,
+          "tie_pp_ps": 1000,
+          "pdv_pp_ps": null,
+          "timestamping_mode": "hardware",
+          "synce_enabled": false,
+          "clock_mode": "transparent",
+          "topology_class": "wr_longhaul_unrepeated",
+          "sourceRefs": [
+            "EXP-T-001",
+            "EXP-T-003",
+            "EXP-T-002",
+            "EXP-T-004",
+            "EXP-T-019",
+            "EXP-T-020"
+          ],
+          "uncertainty": {
+            "u_sigma_t_ps": 6,
+            "u_tie_pp_ps": null,
+            "u_pdv_pp_ps": null,
+            "method": "registry_numeric_uncertainty_anchor",
+            "reportableReady": true,
+            "blockedReasons": []
+          }
+        }
+      }
+    }
+  ],
+  "profile": "ti_primary_reportable_reference_v1",
+  "reportableReferenceProfile": {
+    "profileId": "ti-primary-reportable-reference-v1",
+    "lockedOn": "2026-03-06",
+    "lane": "timing",
+    "sourceClassAllowlist": [
+      "primary",
+      "standard"
+    ],
+    "scenarioIds": [
+      "ti_primary_typed_wr_short_ps_sigma_1e2ps",
+      "ti_primary_typed_wr_longhaul_exp_sigma_6e0ps"
+    ],
+    "sourceRefs": [
+      "EXP-T-001",
+      "EXP-T-003",
+      "EXP-T-002",
+      "EXP-T-004",
+      "EXP-T-019",
+      "EXP-T-020"
+    ],
+    "reportableReady": true,
+    "blockedReasons": []
+  }
+}

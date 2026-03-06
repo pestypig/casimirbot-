@@ -1,0 +1,655 @@
+{
+  "version": 1,
+  "mode": "shadow_non_blocking",
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "recovery_goal": "nanogap_compatibility_recovery",
+  "success_bar": "map_only",
+  "baseline_reference": {
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-06.json",
+    "keys": [
+      "marginRatioRaw",
+      "marginRatioRawComputed",
+      "applicabilityStatus",
+      "congruentSolvePass",
+      "congruentSolveFailReasons",
+      "sampler",
+      "fieldType",
+      "tauSelected_s"
+    ]
+  },
+  "notes": [
+    "Primary/standard nanogap evidence only.",
+    "Non-blocking compatibility envelope mapping lane.",
+    "No canonical override or promotion implied.",
+    "Profile thresholds follow NG-STD-10 and NG-ADV-5 protocol bounds."
+  ],
+  "profileThresholds": {
+    "NG-STD-10": {
+      "u_g_mean_nm_max": 2,
+      "u_g_sigma_nm_max": 2
+    },
+    "NG-ADV-5": {
+      "u_g_mean_nm_max": 1,
+      "u_g_sigma_nm_max": 1
+    }
+  },
+  "pass": "pass_2_typed_context",
+  "dimensions": {
+    "gap_nm": [
+      5,
+      10,
+      18,
+      96,
+      100
+    ],
+    "profile_id": [
+      "NG-STD-10",
+      "NG-ADV-5"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "ng_primary_typed_ng_std_10_gap_5e0nm",
+      "lane": "nanogap",
+      "description": "Pass-2 typed nanogap envelope: profile=NG-STD-10, gap_nm=5.",
+      "registryRefs": [
+        "EXP-NG-002",
+        "EXP-NG-011",
+        "EXP-NG-012",
+        "EXP-NG-019",
+        "EXP-NG-020",
+        "EXP-NG-001",
+        "EXP-NG-003",
+        "EXP-NG-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 5
+        }
+      },
+      "experimentalContext": {
+        "nanogap": {
+          "profileId": "NG-STD-10",
+          "u_g_mean_nm": 1,
+          "u_g_sigma_nm": 1.2,
+          "tip_method": "btr",
+          "fiducial_present": true,
+          "sourceRefs": [
+            "EXP-NG-002",
+            "EXP-NG-011",
+            "EXP-NG-012",
+            "EXP-NG-019",
+            "EXP-NG-020",
+            "EXP-NG-001",
+            "EXP-NG-003",
+            "EXP-NG-004"
+          ],
+          "uncertainty": {
+            "method": "registry_anchor_derived",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-NG-002",
+              "EXP-NG-011",
+              "EXP-NG-012",
+              "EXP-NG-019",
+              "EXP-NG-020",
+              "EXP-NG-001",
+              "EXP-NG-003",
+              "EXP-NG-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ng_primary_typed_ng_std_10_gap_1e1nm",
+      "lane": "nanogap",
+      "description": "Pass-2 typed nanogap envelope: profile=NG-STD-10, gap_nm=10.",
+      "registryRefs": [
+        "EXP-NG-002",
+        "EXP-NG-011",
+        "EXP-NG-012",
+        "EXP-NG-019",
+        "EXP-NG-020",
+        "EXP-NG-001",
+        "EXP-NG-003",
+        "EXP-NG-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 10
+        }
+      },
+      "experimentalContext": {
+        "nanogap": {
+          "profileId": "NG-STD-10",
+          "u_g_mean_nm": 1,
+          "u_g_sigma_nm": 1.2,
+          "tip_method": "btr",
+          "fiducial_present": true,
+          "sourceRefs": [
+            "EXP-NG-002",
+            "EXP-NG-011",
+            "EXP-NG-012",
+            "EXP-NG-019",
+            "EXP-NG-020",
+            "EXP-NG-001",
+            "EXP-NG-003",
+            "EXP-NG-004"
+          ],
+          "uncertainty": {
+            "method": "registry_anchor_derived",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-NG-002",
+              "EXP-NG-011",
+              "EXP-NG-012",
+              "EXP-NG-019",
+              "EXP-NG-020",
+              "EXP-NG-001",
+              "EXP-NG-003",
+              "EXP-NG-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ng_primary_typed_ng_std_10_gap_2e1nm",
+      "lane": "nanogap",
+      "description": "Pass-2 typed nanogap envelope: profile=NG-STD-10, gap_nm=18.",
+      "registryRefs": [
+        "EXP-NG-002",
+        "EXP-NG-011",
+        "EXP-NG-012",
+        "EXP-NG-019",
+        "EXP-NG-020",
+        "EXP-NG-001",
+        "EXP-NG-003",
+        "EXP-NG-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 18
+        }
+      },
+      "experimentalContext": {
+        "nanogap": {
+          "profileId": "NG-STD-10",
+          "u_g_mean_nm": 1,
+          "u_g_sigma_nm": 1.2,
+          "tip_method": "btr",
+          "fiducial_present": true,
+          "sourceRefs": [
+            "EXP-NG-002",
+            "EXP-NG-011",
+            "EXP-NG-012",
+            "EXP-NG-019",
+            "EXP-NG-020",
+            "EXP-NG-001",
+            "EXP-NG-003",
+            "EXP-NG-004"
+          ],
+          "uncertainty": {
+            "method": "registry_anchor_derived",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-NG-002",
+              "EXP-NG-011",
+              "EXP-NG-012",
+              "EXP-NG-019",
+              "EXP-NG-020",
+              "EXP-NG-001",
+              "EXP-NG-003",
+              "EXP-NG-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ng_primary_typed_ng_std_10_gap_1e2nm",
+      "lane": "nanogap",
+      "description": "Pass-2 typed nanogap envelope: profile=NG-STD-10, gap_nm=96.",
+      "registryRefs": [
+        "EXP-NG-002",
+        "EXP-NG-011",
+        "EXP-NG-012",
+        "EXP-NG-019",
+        "EXP-NG-020",
+        "EXP-NG-001",
+        "EXP-NG-003",
+        "EXP-NG-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "nanogap": {
+          "profileId": "NG-STD-10",
+          "u_g_mean_nm": 1,
+          "u_g_sigma_nm": 1.2,
+          "tip_method": "btr",
+          "fiducial_present": true,
+          "sourceRefs": [
+            "EXP-NG-002",
+            "EXP-NG-011",
+            "EXP-NG-012",
+            "EXP-NG-019",
+            "EXP-NG-020",
+            "EXP-NG-001",
+            "EXP-NG-003",
+            "EXP-NG-004"
+          ],
+          "uncertainty": {
+            "method": "registry_anchor_derived",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-NG-002",
+              "EXP-NG-011",
+              "EXP-NG-012",
+              "EXP-NG-019",
+              "EXP-NG-020",
+              "EXP-NG-001",
+              "EXP-NG-003",
+              "EXP-NG-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ng_primary_typed_ng_std_10_gap_1e2nm",
+      "lane": "nanogap",
+      "description": "Pass-2 typed nanogap envelope: profile=NG-STD-10, gap_nm=100.",
+      "registryRefs": [
+        "EXP-NG-002",
+        "EXP-NG-011",
+        "EXP-NG-012",
+        "EXP-NG-019",
+        "EXP-NG-020",
+        "EXP-NG-001",
+        "EXP-NG-003",
+        "EXP-NG-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 100
+        }
+      },
+      "experimentalContext": {
+        "nanogap": {
+          "profileId": "NG-STD-10",
+          "u_g_mean_nm": 1,
+          "u_g_sigma_nm": 1.2,
+          "tip_method": "btr",
+          "fiducial_present": true,
+          "sourceRefs": [
+            "EXP-NG-002",
+            "EXP-NG-011",
+            "EXP-NG-012",
+            "EXP-NG-019",
+            "EXP-NG-020",
+            "EXP-NG-001",
+            "EXP-NG-003",
+            "EXP-NG-004"
+          ],
+          "uncertainty": {
+            "method": "registry_anchor_derived",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-NG-002",
+              "EXP-NG-011",
+              "EXP-NG-012",
+              "EXP-NG-019",
+              "EXP-NG-020",
+              "EXP-NG-001",
+              "EXP-NG-003",
+              "EXP-NG-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ng_primary_typed_ng_adv_5_gap_5e0nm",
+      "lane": "nanogap",
+      "description": "Pass-2 typed nanogap envelope: profile=NG-ADV-5, gap_nm=5.",
+      "registryRefs": [
+        "EXP-NG-002",
+        "EXP-NG-011",
+        "EXP-NG-012",
+        "EXP-NG-019",
+        "EXP-NG-020",
+        "EXP-NG-001",
+        "EXP-NG-003",
+        "EXP-NG-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 5
+        }
+      },
+      "experimentalContext": {
+        "nanogap": {
+          "profileId": "NG-ADV-5",
+          "u_g_mean_nm": 1,
+          "u_g_sigma_nm": 1.2,
+          "tip_method": "btr",
+          "fiducial_present": true,
+          "sourceRefs": [
+            "EXP-NG-002",
+            "EXP-NG-011",
+            "EXP-NG-012",
+            "EXP-NG-019",
+            "EXP-NG-020",
+            "EXP-NG-001",
+            "EXP-NG-003",
+            "EXP-NG-004"
+          ],
+          "uncertainty": {
+            "method": "registry_anchor_derived",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-NG-002",
+              "EXP-NG-011",
+              "EXP-NG-012",
+              "EXP-NG-019",
+              "EXP-NG-020",
+              "EXP-NG-001",
+              "EXP-NG-003",
+              "EXP-NG-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ng_primary_typed_ng_adv_5_gap_1e1nm",
+      "lane": "nanogap",
+      "description": "Pass-2 typed nanogap envelope: profile=NG-ADV-5, gap_nm=10.",
+      "registryRefs": [
+        "EXP-NG-002",
+        "EXP-NG-011",
+        "EXP-NG-012",
+        "EXP-NG-019",
+        "EXP-NG-020",
+        "EXP-NG-001",
+        "EXP-NG-003",
+        "EXP-NG-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 10
+        }
+      },
+      "experimentalContext": {
+        "nanogap": {
+          "profileId": "NG-ADV-5",
+          "u_g_mean_nm": 1,
+          "u_g_sigma_nm": 1.2,
+          "tip_method": "btr",
+          "fiducial_present": true,
+          "sourceRefs": [
+            "EXP-NG-002",
+            "EXP-NG-011",
+            "EXP-NG-012",
+            "EXP-NG-019",
+            "EXP-NG-020",
+            "EXP-NG-001",
+            "EXP-NG-003",
+            "EXP-NG-004"
+          ],
+          "uncertainty": {
+            "method": "registry_anchor_derived",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-NG-002",
+              "EXP-NG-011",
+              "EXP-NG-012",
+              "EXP-NG-019",
+              "EXP-NG-020",
+              "EXP-NG-001",
+              "EXP-NG-003",
+              "EXP-NG-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ng_primary_typed_ng_adv_5_gap_2e1nm",
+      "lane": "nanogap",
+      "description": "Pass-2 typed nanogap envelope: profile=NG-ADV-5, gap_nm=18.",
+      "registryRefs": [
+        "EXP-NG-002",
+        "EXP-NG-011",
+        "EXP-NG-012",
+        "EXP-NG-019",
+        "EXP-NG-020",
+        "EXP-NG-001",
+        "EXP-NG-003",
+        "EXP-NG-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 18
+        }
+      },
+      "experimentalContext": {
+        "nanogap": {
+          "profileId": "NG-ADV-5",
+          "u_g_mean_nm": 1,
+          "u_g_sigma_nm": 1.2,
+          "tip_method": "btr",
+          "fiducial_present": true,
+          "sourceRefs": [
+            "EXP-NG-002",
+            "EXP-NG-011",
+            "EXP-NG-012",
+            "EXP-NG-019",
+            "EXP-NG-020",
+            "EXP-NG-001",
+            "EXP-NG-003",
+            "EXP-NG-004"
+          ],
+          "uncertainty": {
+            "method": "registry_anchor_derived",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-NG-002",
+              "EXP-NG-011",
+              "EXP-NG-012",
+              "EXP-NG-019",
+              "EXP-NG-020",
+              "EXP-NG-001",
+              "EXP-NG-003",
+              "EXP-NG-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ng_primary_typed_ng_adv_5_gap_1e2nm",
+      "lane": "nanogap",
+      "description": "Pass-2 typed nanogap envelope: profile=NG-ADV-5, gap_nm=96.",
+      "registryRefs": [
+        "EXP-NG-002",
+        "EXP-NG-011",
+        "EXP-NG-012",
+        "EXP-NG-019",
+        "EXP-NG-020",
+        "EXP-NG-001",
+        "EXP-NG-003",
+        "EXP-NG-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "nanogap": {
+          "profileId": "NG-ADV-5",
+          "u_g_mean_nm": 1,
+          "u_g_sigma_nm": 1.2,
+          "tip_method": "btr",
+          "fiducial_present": true,
+          "sourceRefs": [
+            "EXP-NG-002",
+            "EXP-NG-011",
+            "EXP-NG-012",
+            "EXP-NG-019",
+            "EXP-NG-020",
+            "EXP-NG-001",
+            "EXP-NG-003",
+            "EXP-NG-004"
+          ],
+          "uncertainty": {
+            "method": "registry_anchor_derived",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-NG-002",
+              "EXP-NG-011",
+              "EXP-NG-012",
+              "EXP-NG-019",
+              "EXP-NG-020",
+              "EXP-NG-001",
+              "EXP-NG-003",
+              "EXP-NG-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ng_primary_typed_ng_adv_5_gap_1e2nm",
+      "lane": "nanogap",
+      "description": "Pass-2 typed nanogap envelope: profile=NG-ADV-5, gap_nm=100.",
+      "registryRefs": [
+        "EXP-NG-002",
+        "EXP-NG-011",
+        "EXP-NG-012",
+        "EXP-NG-019",
+        "EXP-NG-020",
+        "EXP-NG-001",
+        "EXP-NG-003",
+        "EXP-NG-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 100
+        }
+      },
+      "experimentalContext": {
+        "nanogap": {
+          "profileId": "NG-ADV-5",
+          "u_g_mean_nm": 1,
+          "u_g_sigma_nm": 1.2,
+          "tip_method": "btr",
+          "fiducial_present": true,
+          "sourceRefs": [
+            "EXP-NG-002",
+            "EXP-NG-011",
+            "EXP-NG-012",
+            "EXP-NG-019",
+            "EXP-NG-020",
+            "EXP-NG-001",
+            "EXP-NG-003",
+            "EXP-NG-004"
+          ],
+          "uncertainty": {
+            "method": "registry_anchor_derived",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-NG-002",
+              "EXP-NG-011",
+              "EXP-NG-012",
+              "EXP-NG-019",
+              "EXP-NG-020",
+              "EXP-NG-001",
+              "EXP-NG-003",
+              "EXP-NG-004"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "profile": "ng_primary_reportable_v1",
+  "preRegistrationProfile": {
+    "profileId": "ng-primary-reportable-v1",
+    "lockedOn": "2026-03-06",
+    "lane": "nanogap",
+    "sourceClassAllowlist": [
+      "primary",
+      "standard"
+    ],
+    "lockedRegistryRefs": [
+      "EXP-NG-002",
+      "EXP-NG-011",
+      "EXP-NG-012",
+      "EXP-NG-019",
+      "EXP-NG-020",
+      "EXP-NG-001",
+      "EXP-NG-003",
+      "EXP-NG-004"
+    ],
+    "lockedGapGridNm": [
+      5,
+      10,
+      18,
+      96,
+      100
+    ],
+    "lockedProfileIds": [
+      "NG-STD-10",
+      "NG-ADV-5"
+    ],
+    "profileThresholds": {
+      "NG-STD-10": {
+        "u_g_mean_nm_max": 2,
+        "u_g_sigma_nm_max": 2
+      },
+      "NG-ADV-5": {
+        "u_g_mean_nm_max": 1,
+        "u_g_sigma_nm_max": 1
+      }
+    },
+    "uncertainty": {
+      "u_g_mean_nm": 1,
+      "u_g_sigma_nm": 1.2,
+      "method": "registry_anchor_derived",
+      "sourceRefs": [
+        "EXP-NG-002",
+        "EXP-NG-011",
+        "EXP-NG-012",
+        "EXP-NG-019",
+        "EXP-NG-020",
+        "EXP-NG-001",
+        "EXP-NG-003",
+        "EXP-NG-004"
+      ]
+    },
+    "reportableReady": true,
+    "blockedReasons": [],
+    "stableCitationTargetProfileId": "ng-primary-reportable-reference-v1",
+    "stableCitationTargetScenarioIds": [
+      "ng_primary_typed_ng_std_10_gap_1e2nm",
+      "ng_primary_typed_ng_adv_5_gap_1e2nm"
+    ]
+  }
+}

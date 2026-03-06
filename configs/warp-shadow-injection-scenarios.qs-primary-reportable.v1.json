@@ -1,0 +1,3635 @@
+{
+  "version": 1,
+  "mode": "shadow_non_blocking",
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "recovery_goal": "q_spoiling_recovery",
+  "success_bar": "map_only",
+  "baseline_reference": {
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-06.json",
+    "keys": [
+      "marginRatioRaw",
+      "marginRatioRawComputed",
+      "applicabilityStatus",
+      "congruentSolvePass",
+      "congruentSolveFailReasons",
+      "sampler",
+      "fieldType",
+      "tauSelected_s"
+    ]
+  },
+  "notes": [
+    "Q-spoiling mechanism lanes are split into hydride/Q-disease, trapped-flux, and TLS/oxide.",
+    "Mechanism uncertainty anchors are measurement-led (`EXP-Q-020..EXP-Q-022`) and replace the prior policy-only uncertainty anchor.",
+    "Non-blocking compatibility envelope mapping lane; canonical campaign remains unchanged.",
+    "Reportable profile readiness: all mechanism uncertainty anchors satisfy source-policy constraints."
+  ],
+  "pass": "pass_2_typed_context",
+  "dimensions": {
+    "mechanism_lane": [
+      "hydride_q_disease",
+      "trapped_flux",
+      "tls_oxide"
+    ],
+    "q0": [
+      10000000000,
+      20000000000,
+      30000000000
+    ],
+    "f_q_spoil": [
+      1,
+      3,
+      10,
+      20,
+      40,
+      80
+    ],
+    "fieldType": "em"
+  },
+  "thresholdsByMechanism": {
+    "hydride_q_disease": {
+      "mechanismLane": "hydride_q_disease",
+      "q0_clean_floor": 20000000000,
+      "q0_spoiled_ceiling": 1000000000,
+      "f_q_spoil_floor": 20,
+      "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+      "sourceRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002"
+      ]
+    },
+    "trapped_flux": {
+      "mechanismLane": "trapped_flux",
+      "q0_clean_floor": 18000000000,
+      "q0_spoiled_ceiling": 4153846153.846154,
+      "f_q_spoil_floor": 4.333333333333333,
+      "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+      "sourceRefs": [
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005"
+      ]
+    },
+    "tls_oxide": {
+      "mechanismLane": "tls_oxide",
+      "q0_clean_floor": 20000000000,
+      "q0_spoiled_ceiling": 1538461538.4615386,
+      "f_q_spoil_floor": 13,
+      "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+      "sourceRefs": [
+        "EXP-Q-001",
+        "EXP-Q-014",
+        "EXP-Q-015"
+      ]
+    }
+  },
+  "scenarios": [
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_1e10_f_1e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=10000000000, f_q_spoil=1.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 1
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 1,
+          "q0Spoiled": 10000000000,
+          "q_spoil_ratio": 1,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_1e10_f_3e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=10000000000, f_q_spoil=3.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 3
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 3,
+          "q0Spoiled": 3333330000,
+          "q_spoil_ratio": 3,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_1e10_f_1e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=10000000000, f_q_spoil=10.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 10
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 10,
+          "q0Spoiled": 1000000000,
+          "q_spoil_ratio": 10,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_1e10_f_2e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=10000000000, f_q_spoil=20.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 20
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 20,
+          "q0Spoiled": 500000000,
+          "q_spoil_ratio": 20,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_1e10_f_4e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=10000000000, f_q_spoil=40.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 40
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 40,
+          "q0Spoiled": 250000000,
+          "q_spoil_ratio": 40,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_1e10_f_8e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=10000000000, f_q_spoil=80.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 80
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 80,
+          "q0Spoiled": 125000000,
+          "q_spoil_ratio": 80,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_2e10_f_1e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=20000000000, f_q_spoil=1.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 1
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 1,
+          "q0Spoiled": 20000000000,
+          "q_spoil_ratio": 1,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_2e10_f_3e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=20000000000, f_q_spoil=3.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 3
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 3,
+          "q0Spoiled": 6666670000,
+          "q_spoil_ratio": 3,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_2e10_f_1e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=20000000000, f_q_spoil=10.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 10
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 10,
+          "q0Spoiled": 2000000000,
+          "q_spoil_ratio": 10,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_2e10_f_2e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=20000000000, f_q_spoil=20.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 20
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 20,
+          "q0Spoiled": 1000000000,
+          "q_spoil_ratio": 20,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_2e10_f_4e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=20000000000, f_q_spoil=40.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 40
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 40,
+          "q0Spoiled": 500000000,
+          "q_spoil_ratio": 40,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_2e10_f_8e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=20000000000, f_q_spoil=80.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 80
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 80,
+          "q0Spoiled": 250000000,
+          "q_spoil_ratio": 80,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_3e10_f_1e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=30000000000, f_q_spoil=1.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 1
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 1,
+          "q0Spoiled": 30000000000,
+          "q_spoil_ratio": 1,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_3e10_f_3e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=30000000000, f_q_spoil=3.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 3
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 3,
+          "q0Spoiled": 10000000000,
+          "q_spoil_ratio": 3,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_3e10_f_1e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=30000000000, f_q_spoil=10.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 10
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 10,
+          "q0Spoiled": 3000000000,
+          "q_spoil_ratio": 10,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_3e10_f_2e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=30000000000, f_q_spoil=20.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 20
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 20,
+          "q0Spoiled": 1500000000,
+          "q_spoil_ratio": 20,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_3e10_f_4e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=30000000000, f_q_spoil=40.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 40
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 40,
+          "q0Spoiled": 750000000,
+          "q_spoil_ratio": 40,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_hydride_q_disease_q0_3e10_f_8e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=hydride_q_disease, q0=30000000000, f_q_spoil=80.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 80
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "hydride_q_disease",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 80,
+          "q0Spoiled": 375000000,
+          "q_spoil_ratio": 80,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.053,
+            "u_f_rel": 0.053,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-020"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "hydride_q_disease",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1000000000,
+            "f_q_spoil_floor": 20,
+            "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-002"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_1e10_f_1e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=10000000000, f_q_spoil=1.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 1
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 1,
+          "q0Spoiled": 10000000000,
+          "q_spoil_ratio": 1,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_1e10_f_3e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=10000000000, f_q_spoil=3.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 3
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 3,
+          "q0Spoiled": 3333330000,
+          "q_spoil_ratio": 3,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_1e10_f_1e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=10000000000, f_q_spoil=10.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 10
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 10,
+          "q0Spoiled": 1000000000,
+          "q_spoil_ratio": 10,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_1e10_f_2e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=10000000000, f_q_spoil=20.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 20
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 20,
+          "q0Spoiled": 500000000,
+          "q_spoil_ratio": 20,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_1e10_f_4e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=10000000000, f_q_spoil=40.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 40
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 40,
+          "q0Spoiled": 250000000,
+          "q_spoil_ratio": 40,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_1e10_f_8e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=10000000000, f_q_spoil=80.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 80
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 80,
+          "q0Spoiled": 125000000,
+          "q_spoil_ratio": 80,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_2e10_f_1e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=20000000000, f_q_spoil=1.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 1
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 1,
+          "q0Spoiled": 20000000000,
+          "q_spoil_ratio": 1,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_2e10_f_3e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=20000000000, f_q_spoil=3.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 3
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 3,
+          "q0Spoiled": 6666670000,
+          "q_spoil_ratio": 3,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_2e10_f_1e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=20000000000, f_q_spoil=10.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 10
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 10,
+          "q0Spoiled": 2000000000,
+          "q_spoil_ratio": 10,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_2e10_f_2e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=20000000000, f_q_spoil=20.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 20
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 20,
+          "q0Spoiled": 1000000000,
+          "q_spoil_ratio": 20,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_2e10_f_4e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=20000000000, f_q_spoil=40.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 40
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 40,
+          "q0Spoiled": 500000000,
+          "q_spoil_ratio": 40,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_2e10_f_8e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=20000000000, f_q_spoil=80.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 80
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 80,
+          "q0Spoiled": 250000000,
+          "q_spoil_ratio": 80,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_3e10_f_1e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=30000000000, f_q_spoil=1.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 1
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 1,
+          "q0Spoiled": 30000000000,
+          "q_spoil_ratio": 1,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_3e10_f_3e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=30000000000, f_q_spoil=3.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 3
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 3,
+          "q0Spoiled": 10000000000,
+          "q_spoil_ratio": 3,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_3e10_f_1e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=30000000000, f_q_spoil=10.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 10
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 10,
+          "q0Spoiled": 3000000000,
+          "q_spoil_ratio": 10,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_3e10_f_2e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=30000000000, f_q_spoil=20.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 20
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 20,
+          "q0Spoiled": 1500000000,
+          "q_spoil_ratio": 20,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_3e10_f_4e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=30000000000, f_q_spoil=40.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 40
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 40,
+          "q0Spoiled": 750000000,
+          "q_spoil_ratio": 40,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_trapped_flux_q0_3e10_f_8e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=trapped_flux, q0=30000000000, f_q_spoil=80.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 80
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "trapped_flux",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 80,
+          "q0Spoiled": 375000000,
+          "q_spoil_ratio": 80,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-003",
+            "EXP-Q-004",
+            "EXP-Q-005",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.625,
+            "u_f_rel": 0.625,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-021"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "trapped_flux",
+            "q0_clean_floor": 18000000000,
+            "q0_spoiled_ceiling": 4153846153.846154,
+            "f_q_spoil_floor": 4.333333333333333,
+            "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+            "sourceRefs": [
+              "EXP-Q-003",
+              "EXP-Q-004",
+              "EXP-Q-005"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_1e10_f_1e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=10000000000, f_q_spoil=1.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 1
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 1,
+          "q0Spoiled": 10000000000,
+          "q_spoil_ratio": 1,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_1e10_f_3e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=10000000000, f_q_spoil=3.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 3
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 3,
+          "q0Spoiled": 3333330000,
+          "q_spoil_ratio": 3,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_1e10_f_1e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=10000000000, f_q_spoil=10.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 10
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 10,
+          "q0Spoiled": 1000000000,
+          "q_spoil_ratio": 10,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_1e10_f_2e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=10000000000, f_q_spoil=20.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 20
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 20,
+          "q0Spoiled": 500000000,
+          "q_spoil_ratio": 20,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_1e10_f_4e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=10000000000, f_q_spoil=40.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 40
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 40,
+          "q0Spoiled": 250000000,
+          "q_spoil_ratio": 40,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_1e10_f_8e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=10000000000, f_q_spoil=80.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 10000000000,
+          "qSpoilingFactor": 80
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 10000000000,
+          "f_q_spoil": 80,
+          "q0Spoiled": 125000000,
+          "q_spoil_ratio": 80,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_2e10_f_1e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=20000000000, f_q_spoil=1.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 1
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 1,
+          "q0Spoiled": 20000000000,
+          "q_spoil_ratio": 1,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_2e10_f_3e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=20000000000, f_q_spoil=3.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 3
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 3,
+          "q0Spoiled": 6666670000,
+          "q_spoil_ratio": 3,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_2e10_f_1e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=20000000000, f_q_spoil=10.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 10
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 10,
+          "q0Spoiled": 2000000000,
+          "q_spoil_ratio": 10,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_2e10_f_2e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=20000000000, f_q_spoil=20.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 20
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 20,
+          "q0Spoiled": 1000000000,
+          "q_spoil_ratio": 20,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_2e10_f_4e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=20000000000, f_q_spoil=40.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 40
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 40,
+          "q0Spoiled": 500000000,
+          "q_spoil_ratio": 40,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_2e10_f_8e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=20000000000, f_q_spoil=80.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 20000000000,
+          "qSpoilingFactor": 80
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 20000000000,
+          "f_q_spoil": 80,
+          "q0Spoiled": 250000000,
+          "q_spoil_ratio": 80,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_3e10_f_1e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=30000000000, f_q_spoil=1.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 1
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 1,
+          "q0Spoiled": 30000000000,
+          "q_spoil_ratio": 1,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_3e10_f_3e0",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=30000000000, f_q_spoil=3.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 3
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 3,
+          "q0Spoiled": 10000000000,
+          "q_spoil_ratio": 3,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_3e10_f_1e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=30000000000, f_q_spoil=10.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 10
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 10,
+          "q0Spoiled": 3000000000,
+          "q_spoil_ratio": 10,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_3e10_f_2e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=30000000000, f_q_spoil=20.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 20
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 20,
+          "q0Spoiled": 1500000000,
+          "q_spoil_ratio": 20,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_3e10_f_4e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=30000000000, f_q_spoil=40.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 40
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 40,
+          "q0Spoiled": 750000000,
+          "q_spoil_ratio": 40,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "qs_primary_typed_tls_oxide_q0_3e10_f_8e1",
+      "lane": "q_spoiling",
+      "description": "Pass-2 typed q-spoiling envelope: mechanism=tls_oxide, q0=30000000000, f_q_spoil=80.",
+      "registryRefs": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "overrides": {
+        "params": {
+          "qCavity": 30000000000,
+          "qSpoilingFactor": 80
+        },
+        "qi": {
+          "fieldType": "em"
+        }
+      },
+      "experimentalContext": {
+        "qSpoiling": {
+          "mechanismLane": "tls_oxide",
+          "q0Baseline": 30000000000,
+          "f_q_spoil": 80,
+          "q0Spoiled": 375000000,
+          "q_spoil_ratio": 80,
+          "q_spoil_ratio_anchor": "derived_q0_baseline_over_q0_spoiled",
+          "sourceRefs": [
+            "EXP-Q-001",
+            "EXP-Q-002",
+            "EXP-Q-014",
+            "EXP-Q-015",
+            "EXP-Q-020",
+            "EXP-Q-021",
+            "EXP-Q-022"
+          ],
+          "uncertainty": {
+            "u_q0_rel": 0.8,
+            "u_f_rel": 0.8,
+            "method": "measured_spread_registry_anchor",
+            "reportableReady": true,
+            "blockedReasons": [],
+            "sourceRefs": [
+              "EXP-Q-022"
+            ]
+          },
+          "thresholds": {
+            "mechanismLane": "tls_oxide",
+            "q0_clean_floor": 20000000000,
+            "q0_spoiled_ceiling": 1538461538.4615386,
+            "f_q_spoil_floor": 13,
+            "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+            "sourceRefs": [
+              "EXP-Q-001",
+              "EXP-Q-014",
+              "EXP-Q-015"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "profile": "qs_primary_reportable_v1",
+  "preRegistrationProfile": {
+    "profileId": "qs-primary-reportable-v1",
+    "lockedOn": "2026-03-06",
+    "lane": "q_spoiling",
+    "sourceClassAllowlist": [
+      "primary",
+      "standard"
+    ],
+    "lockedMechanismLanes": [
+      "hydride_q_disease",
+      "trapped_flux",
+      "tls_oxide"
+    ],
+    "lockedRegistryRefsByMechanism": {
+      "hydride_q_disease": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "trapped_flux": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-003",
+        "EXP-Q-004",
+        "EXP-Q-005",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ],
+      "tls_oxide": [
+        "EXP-Q-001",
+        "EXP-Q-002",
+        "EXP-Q-014",
+        "EXP-Q-015",
+        "EXP-Q-020",
+        "EXP-Q-021",
+        "EXP-Q-022"
+      ]
+    },
+    "lockedQ0Grid": [
+      10000000000,
+      20000000000,
+      30000000000
+    ],
+    "lockedFQSpoolGrid": [
+      1,
+      3,
+      10,
+      20,
+      40,
+      80
+    ],
+    "lockedFieldType": "em",
+    "thresholdsByMechanism": {
+      "hydride_q_disease": {
+        "mechanismLane": "hydride_q_disease",
+        "q0_clean_floor": 20000000000,
+        "q0_spoiled_ceiling": 1000000000,
+        "f_q_spoil_floor": 20,
+        "thresholdDerivation": "EXP-Q-001 / EXP-Q-002 measured hydride pair",
+        "sourceRefs": [
+          "EXP-Q-001",
+          "EXP-Q-002"
+        ]
+      },
+      "trapped_flux": {
+        "mechanismLane": "trapped_flux",
+        "q0_clean_floor": 18000000000,
+        "q0_spoiled_ceiling": 4153846153.846154,
+        "f_q_spoil_floor": 4.333333333333333,
+        "thresholdDerivation": "EXP-Q-003 baseline with flux-sensitivity spread ratio EXP-Q-005 / EXP-Q-004",
+        "sourceRefs": [
+          "EXP-Q-003",
+          "EXP-Q-004",
+          "EXP-Q-005"
+        ]
+      },
+      "tls_oxide": {
+        "mechanismLane": "tls_oxide",
+        "q0_clean_floor": 20000000000,
+        "q0_spoiled_ceiling": 1538461538.4615386,
+        "f_q_spoil_floor": 13,
+        "thresholdDerivation": "TLS fit-range spread from EXP-Q-014/EXP-Q-015",
+        "sourceRefs": [
+          "EXP-Q-001",
+          "EXP-Q-014",
+          "EXP-Q-015"
+        ]
+      }
+    },
+    "uncertaintyByMechanism": {
+      "hydride_q_disease": {
+        "mechanismLane": "hydride_q_disease",
+        "uRel": 0.053,
+        "sourceRefs": [
+          "EXP-Q-020"
+        ],
+        "method": "measured_spread_registry_anchor",
+        "reportableReady": true,
+        "blockedReasons": []
+      },
+      "trapped_flux": {
+        "mechanismLane": "trapped_flux",
+        "uRel": 0.625,
+        "sourceRefs": [
+          "EXP-Q-021"
+        ],
+        "method": "measured_spread_registry_anchor",
+        "reportableReady": true,
+        "blockedReasons": []
+      },
+      "tls_oxide": {
+        "mechanismLane": "tls_oxide",
+        "uRel": 0.8,
+        "sourceRefs": [
+          "EXP-Q-022"
+        ],
+        "method": "measured_spread_registry_anchor",
+        "reportableReady": true,
+        "blockedReasons": []
+      }
+    },
+    "reportableReady": true,
+    "blockedReasons": [],
+    "stableCitationTargetProfileId": "qs-primary-reportable-reference-v1",
+    "stableCitationTargetScenarioIds": [
+      "qs_primary_typed_hydride_q_disease_q0_2e10_f_2e1",
+      "qs_primary_typed_trapped_flux_q0_2e10_f_1e1",
+      "qs_primary_typed_tls_oxide_q0_2e10_f_2e1"
+    ]
+  },
+  "reportableReferenceProfile": {
+    "profileId": "qs-primary-reportable-reference-v1",
+    "stableCitationTarget": true,
+    "referenceScenarioIds": [
+      "qs_primary_typed_hydride_q_disease_q0_2e10_f_2e1",
+      "qs_primary_typed_trapped_flux_q0_2e10_f_1e1",
+      "qs_primary_typed_tls_oxide_q0_2e10_f_2e1"
+    ],
+    "referenceScenarioCount": 3,
+    "citationPackPath": "configs\\warp-shadow-injection-scenarios.qs-primary-reportable-reference.v1.json",
+    "note": "Use this fixed scenario-id set as manuscript-stable citation target across reruns."
+  }
+}

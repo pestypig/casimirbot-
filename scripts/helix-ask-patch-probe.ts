@@ -94,7 +94,7 @@ type ProbeSummary = {
 const BASE_URL =
   process.env.HELIX_ASK_BASE_URL ??
   process.env.EVAL_BASE_URL ??
-  "http://localhost:5173";
+  "http://localhost:5050";
 const ASK_URL = new URL("/api/agi/ask", BASE_URL).toString();
 const REQUEST_TIMEOUT_MS = Math.max(
   1000,

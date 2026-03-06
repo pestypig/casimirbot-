@@ -379,6 +379,121 @@ export type ToolLogEvent = {
 };
 
 let reasoningTheaterConfigPromise: Promise<ReasoningTheaterConfigResponse> | null = null;
+let reasoningTheaterTopologyPromise: Promise<ReasoningTheaterTopologyResponse> | null = null;
+let reasoningTheaterAtlasGraphPromise: Promise<ReasoningTheaterAtlasGraphResponse> | null = null;
+const reasoningTheaterCongruenceGraphPromiseByKey = new Map<
+  string,
+  Promise<ReasoningTheaterCongruenceGraphResponse>
+>();
+
+export type ReasoningTheaterTopologyResponse = {
+  version: string;
+  generated_at: string;
+  baseline: {
+    owned_total: number;
+    connected_owned: number;
+    owned_not_connected: number;
+    convergence_ratio: number;
+  };
+  sources: {
+    owned_source: "git_tracked" | "code_lattice_fallback";
+    connected_source: "atlas_corpus";
+    atlas_unique_files: number;
+    atlas_existing_files: number;
+    degraded: boolean;
+  };
+  display: {
+    node_density_mode: "dense";
+    total_nodes: number;
+    connected_nodes: number;
+    frontier_nodes: number;
+    uncharted_nodes: number;
+    seed: number;
+  };
+};
+
+export type ReasoningTheaterAtlasGraphResponse = {
+  version: string;
+  generated_at: string;
+  seed: number;
+  baseline: {
+    owned_total: number;
+    connected_owned: number;
+    owned_not_connected: number;
+    convergence_ratio: number;
+  };
+  stats: {
+    nodes_total: number;
+    edges_total: number;
+    mapped_connected_nodes: number;
+    owned_frontier_nodes: number;
+    uncharted_nodes: number;
+    degraded: boolean;
+  };
+  nodes: Array<{
+    id: string;
+    path: string;
+    zone: "mapped_connected" | "owned_frontier";
+    x: number;
+    y: number;
+    degree: number;
+  }>;
+  edges: Array<{
+    id: string;
+    from: string;
+    to: string;
+    weight: number;
+  }>;
+};
+
+export type ReasoningTheaterCongruenceGraphResponse = {
+  version: string;
+  generated_at: string;
+  seed: number;
+  baseline: {
+    owned_total: number;
+    connected_owned: number;
+    owned_not_connected: number;
+    convergence_ratio: number;
+  };
+  stats: {
+    trees_total: number;
+    nodes_total: number;
+    edges_total: number;
+    mapped_connected_nodes: number;
+    owned_frontier_nodes: number;
+    uncharted_nodes: number;
+    degraded: boolean;
+  };
+  trees: Array<{
+    id: string;
+    label: string;
+    root_id: string | null;
+    node_count: number;
+  }>;
+  nodes: Array<{
+    id: string;
+    tree_id: string;
+    node_id: string;
+    title: string;
+    zone: "mapped_connected" | "owned_frontier";
+    atlas_linked: boolean;
+    x: number;
+    y: number;
+    degree: number;
+    depth: number;
+  }>;
+  edges: Array<{
+    id: string;
+    tree_id: string;
+    from: string;
+    to: string;
+    rel: string;
+    edge_type: string;
+    requires_cl: string | null;
+    weight: number;
+  }>;
+};
 
 export type PersonaSummary = {
   id: string;
@@ -1231,6 +1346,104 @@ export async function getReasoningTheaterConfig(
     }
   })();
   return reasoningTheaterConfigPromise;
+}
+
+export async function getReasoningTheaterTopology(
+  options?: { forceRefresh?: boolean },
+): Promise<ReasoningTheaterTopologyResponse> {
+  if (!options?.forceRefresh && reasoningTheaterTopologyPromise) {
+    return reasoningTheaterTopologyPromise;
+  }
+  reasoningTheaterTopologyPromise = (async () => {
+    const response = await fetch("/api/helix/reasoning-theater/topology", {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error(`reasoning-theater-topology-http-${response.status}`);
+    }
+    const payload = (await response.json()) as ReasoningTheaterTopologyResponse;
+    return payload;
+  })().catch((error) => {
+    reasoningTheaterTopologyPromise = null;
+    throw error;
+  });
+  return reasoningTheaterTopologyPromise;
+}
+
+export async function getReasoningTheaterAtlasGraph(
+  options?: { forceRefresh?: boolean },
+): Promise<ReasoningTheaterAtlasGraphResponse> {
+  if (!options?.forceRefresh && reasoningTheaterAtlasGraphPromise) {
+    return reasoningTheaterAtlasGraphPromise;
+  }
+  reasoningTheaterAtlasGraphPromise = (async () => {
+    const response = await fetch("/api/helix/reasoning-theater/atlas-graph", {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error(`reasoning-theater-atlas-graph-http-${response.status}`);
+    }
+    return (await response.json()) as ReasoningTheaterAtlasGraphResponse;
+  })().catch((error) => {
+    reasoningTheaterAtlasGraphPromise = null;
+    throw error;
+  });
+  return reasoningTheaterAtlasGraphPromise;
+}
+
+export async function getReasoningTheaterCongruenceGraph(options?: {
+  forceRefresh?: boolean;
+  treeIds?: string[];
+  primaryTreeId?: string | null;
+}): Promise<ReasoningTheaterCongruenceGraphResponse> {
+  const treeIds = Array.isArray(options?.treeIds)
+    ? Array.from(
+        new Set(
+          options.treeIds
+            .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+            .filter(Boolean)
+            .map((entry) => entry.toLowerCase()),
+        ),
+      )
+    : [];
+  const primaryTreeId =
+    typeof options?.primaryTreeId === "string" && options.primaryTreeId.trim().length > 0
+      ? options.primaryTreeId.trim().toLowerCase()
+      : "";
+  const cacheKey = `${treeIds.join(",")}|${primaryTreeId}`;
+  if (!options?.forceRefresh) {
+    const cached = reasoningTheaterCongruenceGraphPromiseByKey.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+  const promise = (async () => {
+    const search = new URLSearchParams();
+    if (treeIds.length > 0) {
+      search.set("treeIds", treeIds.join(","));
+    }
+    if (primaryTreeId) {
+      search.set("primaryTreeId", primaryTreeId);
+    }
+    const query = search.toString();
+    const response = await fetch(
+      query
+        ? `/api/helix/reasoning-theater/congruence-graph?${query}`
+        : "/api/helix/reasoning-theater/congruence-graph",
+      {
+        headers: { Accept: "application/json" },
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`reasoning-theater-congruence-graph-http-${response.status}`);
+    }
+    return (await response.json()) as ReasoningTheaterCongruenceGraphResponse;
+  })().catch((error) => {
+    reasoningTheaterCongruenceGraphPromiseByKey.delete(cacheKey);
+    throw error;
+  });
+  reasoningTheaterCongruenceGraphPromiseByKey.set(cacheKey, promise);
+  return promise;
 }
 
 export async function syncKnowledgeProjects(

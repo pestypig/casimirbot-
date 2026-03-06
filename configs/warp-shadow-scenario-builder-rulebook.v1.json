@@ -18,6 +18,74 @@
     "qei_worldline"
   ],
   "strictLaneRequirements": {
+    "timing": {
+      "flag": "strict_timing",
+      "requiredSourceClasses": ["primary", "standard"],
+      "requiredSignals": [
+        {
+          "id": "timing_topology_anchor",
+          "anchors": ["EXP-T-001"],
+          "anyPatterns": ["chain length", "daisy chain", "fiber", "switch", "km"]
+        },
+        {
+          "id": "timing_precision_anchor",
+          "anchors": ["EXP-T-003"],
+          "anyPatterns": ["offset standard deviation", "jitter", "sigma_t", "ps"]
+        },
+        {
+          "id": "timing_accuracy_anchor",
+          "anchors": ["EXP-T-002", "EXP-T-004"],
+          "anyPatterns": ["sync target accuracy", "accumulated skew", "< 1", "ns"]
+        }
+      ]
+    },
+    "nanogap": {
+      "flag": "strict_nanogap",
+      "requiredSourceClasses": ["primary", "standard"],
+      "requiredSignals": [
+        {
+          "id": "nanogap_calibration_anchor",
+          "anchors": ["EXP-NG-002"],
+          "anyPatterns": ["calibration uncertainty", "sccdrm", "tip-width calibration", "traceability"]
+        },
+        {
+          "id": "tip_state_anchor",
+          "anchors": ["EXP-NG-019", "EXP-NG-020"],
+          "anyPatterns": ["blind-tip reconstruction", "btr", "tip reconstruction", "certainty map"]
+        },
+        {
+          "id": "fiducial_anchor",
+          "anchors": ["EXP-NG-011", "EXP-NG-012"],
+          "anyPatterns": ["fiducial", "dna origami", "stable tip estimate"]
+        },
+        {
+          "id": "uncertainty_anchor",
+          "anchors": ["EXP-NG-002"],
+          "anyPatterns": ["u_g_mean_nm", "u_g_sigma_nm", "std dev", "\\+/-", "uncertainty"]
+        }
+      ]
+    },
+    "q_spoiling": {
+      "flag": "strict_q_spoiling",
+      "requiredSourceClasses": ["primary", "standard"],
+      "requiredSignals": [
+        {
+          "id": "q0_baseline_anchor",
+          "anchors": ["EXP-Q-001"],
+          "anyPatterns": ["q0_baseline", "quality factor", "baseline", "post-treatment"]
+        },
+        {
+          "id": "q_spoil_anchor",
+          "anchors": ["EXP-Q-002"],
+          "anyPatterns": ["q_spoil_factor", "q disease", "spoil", "degraded"]
+        },
+        {
+          "id": "q_spoil_ratio_anchor",
+          "anchors": ["EXP-Q-001", "EXP-Q-002"],
+          "anyPatterns": ["q_spoil_factor", "q0_clean / q0_spoiled", "ratio"]
+        }
+      ]
+    },
     "qei_worldline": {
       "flag": "strict_qei",
       "requiredSignals": [

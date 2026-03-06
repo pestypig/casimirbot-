@@ -118,11 +118,68 @@ Interpretation rule:
 - compatibility to the existing full-solve lane and evidence congruence are tracked separately;
 - no promotion/canonical override is implied by this envelope mapping alone.
 
+## Q-Spoiling Compatibility Envelope (Non-Blocking)
+This lane is explicitly `reference_only` and does not alter canonical campaign decisions.
+
+Mechanism-split pass-1 (`configs/warp-shadow-injection-scenarios.qs-primary-recovery.v1.json`), pass-2 typed (`configs/warp-shadow-injection-scenarios.qs-primary-typed.v1.json`), frozen reportable (`configs/warp-shadow-injection-scenarios.qs-primary-reportable.v1.json`), and fixed reportable-reference (`configs/warp-shadow-injection-scenarios.qs-primary-reportable-reference.v1.json`) sweeps are executed with deterministic replay:
+- scenario grid is now `mechanism_lane x Q0 x F_Q_spoil` (`hydride_q_disease`, `trapped_flux`, `tls_oxide`)
+- reportable-reference profile locks a single stable scenario-id set for manuscript citations across reruns
+- `success_bar=map_only` is satisfied with `winnerScenarioId=null` and explicit empty failure-envelope payloads.
+
+Lane-specific evidence congruence checks now emit mechanism-qualified reason codes (for example `q0_spoiled_above_ceiling:hydride_q_disease`) and per-mechanism summary counts.
+
+Frozen reportable profile status is explicitly recorded per mechanism uncertainty anchor set (`EXP-Q-020..EXP-Q-022`) with `reportableReady=true` and `blockedReasons=[]` in the prereg profile.
+
+Repeat-run determinism (`artifacts/research/full-solve/qs-repeat-determinism-2026-03-06.json`) covers pass-1, pass-2, reportable, reportable-reference, and congruence-check summaries.
+
+## Nanogap Compatibility Envelope (Non-Blocking)
+This lane is explicitly `reference_only` and does not alter canonical campaign decisions.
+
+Strict primary/standard pass-1 (`configs/warp-shadow-injection-scenarios.ng-primary-recovery.v1.json`), pass-2 typed (`configs/warp-shadow-injection-scenarios.ng-primary-typed.v1.json`), frozen reportable (`configs/warp-shadow-injection-scenarios.ng-primary-reportable.v1.json`), and fixed reportable-reference (`configs/warp-shadow-injection-scenarios.ng-primary-reportable-reference.v1.json`) sweeps were executed with deterministic replay:
+- pass-1 run summary: `scenarioCount=10`, `compatible=10`, `partial=0`, `incompatible=0`, `error=0`
+- pass-2 run summary: `scenarioCount=10`, `compatible=10`, `partial=0`, `incompatible=0`, `error=0`
+- reportable run summary: `scenarioCount=10`, `compatible=10`, `partial=0`, `incompatible=0`, `error=0`
+- reportable-reference run summary: `scenarioCount=4`, `compatible=4`, `partial=0`, `incompatible=0`, `error=0`
+- frozen reportable prereg profile currently records `reportableReady=true`, `blockedReasons=[]`, and stable citation target scenario IDs.
+
+Lane-specific evidence congruence checks:
+- typed check (`artifacts/research/full-solve/ng-compat-check-2026-03-06.json`): `congruent=5`, `incongruent=5`, `unknown=0`
+- reportable check (`artifacts/research/full-solve/ng-compat-check-reportable-2026-03-06.json`): `congruent=5`, `incongruent=5`, `unknown=0`
+- dominant deterministic reason code: `u_g_sigma_exceeds_profile:NG-ADV-5`
+
+Repeat-run determinism (`artifacts/research/full-solve/ng-repeat-determinism-2026-03-06.json`) reports `status=PASS` across pass-1/pass-2/reportable/reportable-reference runs and checker summaries.
+
+Interpretation rule:
+- compatibility to the existing full-solve lane and evidence congruence are tracked separately;
+- no promotion/canonical override is implied by this envelope mapping alone.
+
+## Timing Compatibility Envelope (Non-Blocking)
+This lane is explicitly `reference_only` and does not alter canonical campaign decisions.
+
+Strict primary/standard pass-1 (`configs/warp-shadow-injection-scenarios.ti-primary-recovery.v1.json`), pass-2 typed (`configs/warp-shadow-injection-scenarios.ti-primary-typed.v1.json`), frozen reportable (`configs/warp-shadow-injection-scenarios.ti-primary-reportable.v1.json`), and fixed reportable-reference (`configs/warp-shadow-injection-scenarios.ti-primary-reportable-reference.v1.json`) sweeps were executed with deterministic replay:
+- pass-1 run summary: `scenarioCount=12`, `compatible=12`, `partial=0`, `incompatible=0`, `error=0`
+- pass-2 run summary: `scenarioCount=12`, `compatible=12`, `partial=0`, `incompatible=0`, `error=0`
+- reportable run summary: `scenarioCount=12`, `compatible=12`, `partial=0`, `incompatible=0`, `error=0`
+- reportable-reference run summary: `scenarioCount=3`, `compatible=3`, `partial=0`, `incompatible=0`, `error=0`
+- frozen reportable prereg profile records `reportableReady=false`, `blockedReasons=[missing_numeric_uncertainty_anchor]`, and stable citation target scenario IDs.
+
+Lane-specific evidence congruence checks:
+- typed check (`artifacts/research/full-solve/ti-compat-check-2026-03-06.json`): `congruent=0`, `incongruent=0`, `unknown=12`
+- reportable check (`artifacts/research/full-solve/ti-compat-check-reportable-2026-03-06.json`): `congruent=0`, `incongruent=0`, `unknown=12`
+- dominant deterministic reason code: `missing_numeric_uncertainty_anchor`
+
+Repeat-run determinism (`artifacts/research/full-solve/ti-repeat-determinism-2026-03-06.json`) reports `status=PASS` across pass-1/pass-2/reportable/reportable-reference runs and typed/reportable checker summaries.
+
+Interpretation rule:
+- compatibility to the existing full-solve lane and evidence congruence are tracked separately;
+- strict timing scope currently remains non-promotable until numeric uncertainty anchors are present in admissible source classes.
+- no promotion/canonical override is implied by this envelope mapping alone.
+
 ## What This Research Improves Now
 1. Adds standards-oriented governance language without changing reduced-order gate semantics.
 2. Provides explicit source-quality hierarchy (primary/standard first) for manuscript claims.
 3. Improves reproducibility framing by adding deterministic staleness/conflict reporting expectations.
-4. Adds per-lane envelope mapping for `casimir_sign_control` with deterministic two-pass sweep artifacts and congruence reason codes.
+4. Adds per-lane envelope mapping for `casimir_sign_control`, `q_spoiling`, `nanogap`, and `timing` with deterministic two-pass sweep artifacts and congruence reason codes.
 5. Strengthens closure planning by mapping unresolved items to falsifier-driven upgrade steps.
 6. Adds a manufacturing-spec package (`docs/specs/*`) that converts tile novelty claims into measurable requirements, acceptance gates, and falsifiers.
 

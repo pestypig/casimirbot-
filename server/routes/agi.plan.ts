@@ -6255,6 +6255,7 @@ type AskCandidate = {
   score: number;
   rrfScore: number;
   meta?: {
+    primaryChannel?: AskCandidateChannel;
     atlasSource?: "corpus" | "graph";
     atlasGraphRuntimeLink?: boolean;
     atlasGraphEdgeTypes?: string[];
@@ -6265,6 +6266,14 @@ type AskCandidateChannel = "lexical" | "symbol" | "fuzzy" | "path" | "git_tracke
 type AskCandidateChannelStats = Record<AskCandidateChannel, number>;
 type AskCandidateChannelList = { channel: AskCandidateChannel; candidates: AskCandidate[] };
 type EvidenceEligibility = ReturnType<typeof evaluateEvidenceEligibility>;
+type ReasoningTheaterFootprintZone = "mapped_connected" | "owned_frontier" | "uncharted";
+type RetrievalFootprintMeta = {
+  exact_paths: string[];
+  path_count: number;
+  zone_hint: ReasoningTheaterFootprintZone;
+  has_exact_provenance: boolean;
+  primary_path?: string;
+};
 
 type AmbiguityCluster = {
   key: string;
@@ -6334,6 +6343,7 @@ const HELIX_ASK_RRF_CHANNEL_WEIGHTS: AskCandidateChannelStats = {
   git_tracked: HELIX_ASK_RRF_WEIGHT_GIT_TRACKED,
   atlas: HELIX_ASK_RRF_WEIGHT_ATLAS,
 };
+const REASONING_THEATER_MAX_EXACT_PATHS_PER_EVENT = 12;
 
 type HelixAskPlanDirectives = {
   preferredSurfaces: string[];
@@ -8646,8 +8656,12 @@ function mergeCandidatesWithWeightedRrf(
       const existing = merged.get(candidate.filePath);
       const bump = weight / (rrfK + index + 1);
       if (!existing) {
+        const nextMeta = candidate.meta
+          ? { ...candidate.meta, primaryChannel: candidate.meta.primaryChannel ?? channel }
+          : { primaryChannel: channel };
         merged.set(candidate.filePath, {
           ...candidate,
+          meta: nextMeta,
           rrfScore: bump,
         });
         return;
@@ -8655,7 +8669,16 @@ function mergeCandidatesWithWeightedRrf(
       if (candidate.score > existing.score) {
         existing.score = candidate.score;
         existing.preview = candidate.preview;
-        existing.meta = candidate.meta;
+        const nextMeta = candidate.meta ? { ...candidate.meta } : {};
+        existing.meta = {
+          ...nextMeta,
+          primaryChannel: channel,
+        };
+      }
+      if (!existing.meta) {
+        existing.meta = { primaryChannel: channel };
+      } else if (!existing.meta.primaryChannel) {
+        existing.meta.primaryChannel = channel;
       }
       existing.rrfScore += bump;
     });
@@ -8910,6 +8933,79 @@ function summarizeAtlasGraphSelection(selected: AskCandidate[]): {
   };
 }
 
+function buildRetrievalFootprintMetaFromSelected(
+  selected: AskCandidate[],
+  maxExactPaths = REASONING_THEATER_MAX_EXACT_PATHS_PER_EVENT,
+): RetrievalFootprintMeta {
+  const seen = new Set<string>();
+  const exactPaths: string[] = [];
+  for (const entry of selected) {
+    const normalized = normalizeAtlasRepoPath(entry.filePath);
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    exactPaths.push(normalized);
+  }
+  const zone_hint: ReasoningTheaterFootprintZone = selected.some(
+    (entry) => entry.meta?.primaryChannel === "atlas" || entry.meta?.atlasSource,
+  )
+    ? "mapped_connected"
+    : exactPaths.length > 0
+      ? "owned_frontier"
+      : "mapped_connected";
+  return {
+    exact_paths: exactPaths.slice(0, Math.max(1, Math.floor(maxExactPaths))),
+    path_count: exactPaths.length,
+    zone_hint,
+    has_exact_provenance: exactPaths.length > 0,
+    primary_path: exactPaths[0],
+  };
+}
+
+function buildOpenWorldFootprintMeta(): RetrievalFootprintMeta {
+  return {
+    exact_paths: [],
+    path_count: 0,
+    zone_hint: "uncharted",
+    has_exact_provenance: false,
+    primary_path: undefined,
+  };
+}
+
+function resolveRetrievalFootprintEventMeta(args: {
+  openWorldBypassMode: "off" | "active";
+  channelHits?: AskCandidateChannelStats | null;
+  footprintExactPaths?: string[];
+  footprintPathCount?: number;
+  footprintZoneHint?: ReasoningTheaterFootprintZone;
+  hasExactProvenance?: boolean;
+}): RetrievalFootprintMeta {
+  if (args.openWorldBypassMode === "active") {
+    return buildOpenWorldFootprintMeta();
+  }
+  const exactPaths = Array.isArray(args.footprintExactPaths)
+    ? args.footprintExactPaths
+        .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+        .slice(0, REASONING_THEATER_MAX_EXACT_PATHS_PER_EVENT)
+    : [];
+  const pathCountRaw = Number(args.footprintPathCount ?? exactPaths.length);
+  const pathCount = Number.isFinite(pathCountRaw) ? Math.max(0, Math.floor(pathCountRaw)) : exactPaths.length;
+  const atlasHits = args.channelHits?.atlas ?? 0;
+  const zoneHint =
+    args.footprintZoneHint ??
+    (atlasHits > 0 ? "mapped_connected" : pathCount > 0 ? "owned_frontier" : "mapped_connected");
+  const hasExact =
+    typeof args.hasExactProvenance === "boolean" ? args.hasExactProvenance : pathCount > 0;
+  return {
+    exact_paths: exactPaths,
+    path_count: pathCount,
+    zone_hint: zoneHint,
+    has_exact_provenance: hasExact,
+    primary_path: exactPaths[0],
+  };
+}
+
 async function buildAskContextFromQueries(
   question: string,
   queries: string[],
@@ -8931,6 +9027,10 @@ async function buildAskContextFromQueries(
   atlasGraphSelectedCount?: number;
   atlasGraphRuntimeLinkCount?: number;
   atlasGraphEdgeTypeCounts?: Record<string, number>;
+  footprintExactPaths?: string[];
+  footprintPathCount?: number;
+  footprintZoneHint?: ReasoningTheaterFootprintZone;
+  hasExactProvenance?: boolean;
 }> {
   const snapshot = await loadCodeLattice();
   if (!snapshot) return { context: "", files: [] };
@@ -9075,6 +9175,10 @@ function buildAskContextFromCandidates(args: {
   atlasGraphSelectedCount?: number;
   atlasGraphRuntimeLinkCount?: number;
   atlasGraphEdgeTypeCounts?: Record<string, number>;
+  footprintExactPaths?: string[];
+  footprintPathCount?: number;
+  footprintZoneHint?: ReasoningTheaterFootprintZone;
+  hasExactProvenance?: boolean;
 }): {
   context: string;
   files: string[];
@@ -9090,6 +9194,10 @@ function buildAskContextFromCandidates(args: {
   atlasGraphSelectedCount?: number;
   atlasGraphRuntimeLinkCount?: number;
   atlasGraphEdgeTypeCounts?: Record<string, number>;
+  footprintExactPaths?: string[];
+  footprintPathCount?: number;
+  footprintZoneHint?: ReasoningTheaterFootprintZone;
+  hasExactProvenance?: boolean;
 } {
   return finalizeAskContext(args);
 }
@@ -9732,6 +9840,10 @@ function finalizeAskContext({
   atlasGraphSelectedCount?: number;
   atlasGraphRuntimeLinkCount?: number;
   atlasGraphEdgeTypeCounts?: Record<string, number>;
+  footprintExactPaths?: string[];
+  footprintPathCount?: number;
+  footprintZoneHint?: ReasoningTheaterFootprintZone;
+  hasExactProvenance?: boolean;
 } {
   const lines: string[] = [];
   const files: string[] = [];
@@ -9750,6 +9862,7 @@ function finalizeAskContext({
     lines.push(`${normalizedPath}\n${preview}`);
     files.push(normalizedPath);
   }
+  const footprint = buildRetrievalFootprintMetaFromSelected(selected);
   return {
     context: lines.join("\n\n"),
     files,
@@ -9765,6 +9878,10 @@ function finalizeAskContext({
     atlasGraphSelectedCount,
     atlasGraphRuntimeLinkCount,
     atlasGraphEdgeTypeCounts,
+    footprintExactPaths: footprint.exact_paths,
+    footprintPathCount: footprint.path_count,
+    footprintZoneHint: footprint.zone_hint,
+    hasExactProvenance: footprint.has_exact_provenance,
   };
 }
 
@@ -18760,7 +18877,31 @@ const executeHelixAsk = async ({
         );
       } catch (error) {
         adapterErrorMessage = error instanceof Error ? error.message : String(error);
-        logEvent("Verify proof", "adapter_error", adapterErrorMessage, undefined, false);
+        logEvent(
+          "Verify proof",
+          "adapter_error",
+          adapterErrorMessage,
+          undefined,
+          false,
+          {
+            verification: {
+              proof_verdict: "FAIL",
+              certificate_hash: null,
+              certificate_integrity_ok: null,
+            },
+            epistemic: {
+              arbiter_mode: askMode === "verify" ? "repo_grounded" : "general",
+              claim_tier: "diagnostic",
+              provenance_class: "inferred",
+              certifying: false,
+              fail_reason: "adapter_error",
+            },
+            intent: {
+              intent_domain: askMode === "verify" ? "verification" : "action",
+              intent_id: `ask_mode:${askMode}`,
+            },
+          },
+        );
       }
       const halobankConsistency =
         toolName === haloBankTimeComputeSpec.name
@@ -18818,6 +18959,46 @@ const executeHelixAsk = async ({
           ...askRequiredEvidence.map((entry) => ({ type: "required", ref: entry })),
         ],
       };
+      const proofCertificateRecord =
+        proof.certificate && typeof proof.certificate === "object"
+          ? (proof.certificate as Record<string, unknown>)
+          : null;
+      const proofCertificateHash =
+        typeof proofCertificateRecord?.certificateHash === "string"
+          ? proofCertificateRecord.certificateHash
+          : null;
+      const proofCertificateIntegrityOk =
+        typeof proofCertificateRecord?.integrityOk === "boolean"
+          ? proofCertificateRecord.integrityOk
+          : null;
+      const proofVerificationMeta = {
+        proof_verdict: proof.verdict,
+        certificate_hash: proofCertificateHash,
+        certificate_integrity_ok: proofCertificateIntegrityOk,
+      };
+      const proofEpistemicMeta = {
+        arbiter_mode: askMode === "verify" ? "repo_grounded" : "general",
+        claim_tier: "diagnostic",
+        provenance_class: "inferred",
+        certifying: false,
+        fail_reason: degradeReason ?? halobankConsistency?.firstFailId ?? undefined,
+      };
+      logEvent(
+        "Verify proof",
+        "commit",
+        `verdict=${proof.verdict} | integrity=${proofCertificateIntegrityOk === null ? "n/a" : proofCertificateIntegrityOk ? "ok" : "failed"}`,
+        undefined,
+        proof.verdict === "PASS" && proofCertificateIntegrityOk !== false,
+        {
+          convergence_commit: "proof_commit",
+          verification: proofVerificationMeta,
+          epistemic: proofEpistemicMeta,
+          intent: {
+            intent_domain: askMode === "verify" ? "verification" : "action",
+            intent_id: `ask_mode:${askMode}`,
+          },
+        },
+      );
       if (askMode === "verify") {
         if (degradeReason || consistencyGateFailed) {
           responder.send(200, {
@@ -22577,7 +22758,16 @@ const executeHelixAsk = async ({
         ]
           .filter(Boolean)
           .join(" | ");
-        logEvent("Graph pack", "resolved", graphDetail);
+        const graphPackEventMeta = {
+          graphPackTreeIds: graphPack.treeIds,
+          graphPackPrimaryTreeId: graphPack.primaryTreeId ?? null,
+          graphPackFrameworks: graphPack.frameworks.map((framework) => ({
+            treeId: framework.treeId,
+            pathMode: framework.pathMode ?? null,
+            nodeIds: (framework.path ?? []).map((node) => node.id),
+          })),
+        } satisfies Record<string, unknown>;
+        logEvent("Graph pack", "resolved", graphDetail, undefined, true, graphPackEventMeta);
         if (debugPayload) {
           const frameworkTrees = graphPack.frameworks.map((framework) => ({
             tree: framework.treeId,
@@ -22740,10 +22930,10 @@ const executeHelixAsk = async ({
     if (debugPayload) {
       debugPayload.verification_anchor_required = verificationAnchorRequired;
     }
-    let preflightContext:
-      | {
-          context: string;
-          files: string[];
+        let preflightContext:
+          | {
+              context: string;
+              files: string[];
           topicTier?: number;
           topicMustIncludeOk?: boolean;
           queryHitCount?: number;
@@ -22752,12 +22942,16 @@ const executeHelixAsk = async ({
           channelHits?: AskCandidateChannelStats;
           channelTopScores?: AskCandidateChannelStats;
           channelWeights?: AskCandidateChannelStats;
-          docHeaderInjected?: number;
-          atlasGraphSelectedCount?: number;
-          atlasGraphRuntimeLinkCount?: number;
-          atlasGraphEdgeTypeCounts?: Record<string, number>;
-        }
-      | null = null;
+              docHeaderInjected?: number;
+              atlasGraphSelectedCount?: number;
+              atlasGraphRuntimeLinkCount?: number;
+              atlasGraphEdgeTypeCounts?: Record<string, number>;
+              footprintExactPaths?: string[];
+              footprintPathCount?: number;
+              footprintZoneHint?: ReasoningTheaterFootprintZone;
+              hasExactProvenance?: boolean;
+            }
+          | null = null;
     let preflightEvidence: EvidenceEligibility | null = null;
     let preflightQueries: string[] = [];
     let preflightDocShare = 0;
@@ -23368,7 +23562,115 @@ const executeHelixAsk = async ({
     let failClosedReason: string | null = null;
     let alignmentGateDecision: "PASS" | "BORDERLINE" | "FAIL" = "PASS";
     let openWorldBypassMode: "off" | "active" = "off";
+    let openWorldBypassEventEmitted = false;
+    const buildConvergenceIntentMeta = (): Record<string, unknown> => {
+      const intentId =
+        typeof intentProfile?.id === "string" && intentProfile.id.trim().length > 0
+          ? intentProfile.id.trim()
+          : "unknown";
+      const domain =
+        typeof intentDomain === "string" && intentDomain.trim().length > 0
+          ? intentDomain.trim()
+          : "unknown";
+      const anchors =
+        domain === "ideology" || domain === "governance" || intentId.includes("ideology")
+          ? ["truth-convergence-pathways"]
+          : [];
+      return {
+        intent_domain: domain,
+        intent_id: intentId,
+        ideology_anchor_node_ids: anchors,
+      };
+    };
+    const buildConvergenceRetrievalMeta = (args: {
+      route: string;
+      channelHits?: AskCandidateChannelStats;
+      footprint: RetrievalFootprintMeta;
+      atlasExact?: boolean;
+    }): Record<string, unknown> => {
+      const channelHits = args.channelHits ?? {
+        lexical: 0,
+        symbol: 0,
+        fuzzy: 0,
+        path: 0,
+        git_tracked: 0,
+        atlas: 0,
+      };
+      return {
+        retrievalRoute: args.route,
+        zone_hint: args.footprint.zone_hint,
+        has_exact_provenance: args.footprint.has_exact_provenance,
+        exact_paths: args.footprint.exact_paths.slice(0, REASONING_THEATER_MAX_EXACT_PATHS_PER_EVENT),
+        path_count: args.footprint.path_count,
+        primary_path: args.footprint.primary_path,
+        atlasHits: channelHits.atlas ?? 0,
+        channelHits,
+        atlas_exact: args.atlasExact ?? Boolean((channelHits.atlas ?? 0) > 0),
+        openWorldBypassMode,
+      };
+    };
+    const buildConvergenceEpistemicMeta = (args?: {
+      arbiterMode?: string;
+      claimTier?: string;
+      provenanceClass?: string;
+      certifying?: boolean;
+      failReason?: string | null;
+    }): Record<string, unknown> => {
+      const claimTierRaw = args?.claimTier ?? "diagnostic";
+      const claimTier =
+        claimTierRaw === "reduced-order"
+          ? "reduced_order"
+          : claimTierRaw === "exploratory"
+            ? "exploratory"
+            : claimTierRaw === "certified"
+              ? "certified"
+              : "diagnostic";
+      const failReason =
+        typeof args?.failReason === "string" && args.failReason.trim().length > 0
+          ? args.failReason.trim()
+          : undefined;
+      return {
+        arbiter_mode: args?.arbiterMode,
+        claim_tier: claimTier,
+        provenance_class: args?.provenanceClass ?? "inferred",
+        certifying: args?.certifying ?? false,
+        fail_reason: failReason,
+      };
+    };
+    const buildConvergenceVerificationMeta = (args: {
+      verdict?: string | null;
+      certificateHash?: string | null;
+      certificateIntegrityOk?: boolean | null;
+    }): Record<string, unknown> => {
+      return {
+        proof_verdict: args.verdict ?? "UNKNOWN",
+        certificate_hash: args.certificateHash ?? null,
+        certificate_integrity_ok: args.certificateIntegrityOk ?? null,
+      };
+    };
     let runtimeBudgetRecommend: string | null = null;
+    const emitOpenWorldBypassEvent = () => {
+      if (openWorldBypassMode !== "active" || openWorldBypassEventEmitted) return;
+      openWorldBypassEventEmitted = true;
+      const footprint = buildOpenWorldFootprintMeta();
+      logEvent(
+        "Open-world mode",
+        "active",
+        "retrieval route switched to open-world best-effort",
+        undefined,
+        true,
+        {
+          openWorldBypassMode: "active",
+          retrievalRoute: "retrieval:open_world",
+          ...footprint,
+          retrieval: buildConvergenceRetrievalMeta({
+            route: "retrieval:open_world",
+            footprint,
+          }),
+          intent: buildConvergenceIntentMeta(),
+        },
+      );
+    };
     const arbiterAnswerArtifacts: {
       provenance_class: "measured" | "proxy" | "inferred";
       claim_tier: "diagnostic" | "reduced-order" | "certified";
@@ -24045,6 +24347,10 @@ const executeHelixAsk = async ({
           atlasGraphSelectedCount?: number;
           atlasGraphRuntimeLinkCount?: number;
           atlasGraphEdgeTypeCounts?: Record<string, number>;
+          footprintExactPaths?: string[];
+          footprintPathCount?: number;
+          footprintZoneHint?: ReasoningTheaterFootprintZone;
+          hasExactProvenance?: boolean;
         } = preflightMeta
           ? {
               files: contextFiles.slice(),
@@ -24060,6 +24366,10 @@ const executeHelixAsk = async ({
               atlasGraphSelectedCount: preflightMeta.atlasGraphSelectedCount,
               atlasGraphRuntimeLinkCount: preflightMeta.atlasGraphRuntimeLinkCount,
               atlasGraphEdgeTypeCounts: preflightMeta.atlasGraphEdgeTypeCounts,
+              footprintExactPaths: preflightMeta.footprintExactPaths,
+              footprintPathCount: preflightMeta.footprintPathCount,
+              footprintZoneHint: preflightMeta.footprintZoneHint,
+              hasExactProvenance: preflightMeta.hasExactProvenance,
             }
           : {
               files: contextFiles.slice(),
@@ -24108,6 +24418,10 @@ const executeHelixAsk = async ({
                 atlasGraphSelectedCount?: number;
                 atlasGraphRuntimeLinkCount?: number;
                 atlasGraphEdgeTypeCounts?: Record<string, number>;
+                footprintExactPaths?: string[];
+                footprintPathCount?: number;
+                footprintZoneHint?: ReasoningTheaterFootprintZone;
+                hasExactProvenance?: boolean;
               }
             | undefined;
           let docsFirstOk = false;
@@ -25026,6 +25340,14 @@ const executeHelixAsk = async ({
           debugPayload.retrieval_atlas_graph_selected_count = contextMeta.atlasGraphSelectedCount ?? 0;
           debugPayload.retrieval_atlas_graph_runtime_link_count = contextMeta.atlasGraphRuntimeLinkCount ?? 0;
           debugPayload.retrieval_atlas_graph_edge_type_counts = contextMeta.atlasGraphEdgeTypeCounts ?? {};
+          (debugPayload as Record<string, unknown>).retrieval_footprint_exact_paths =
+            (contextMeta.footprintExactPaths ?? []).slice(0, REASONING_THEATER_MAX_EXACT_PATHS_PER_EVENT);
+          (debugPayload as Record<string, unknown>).retrieval_footprint_path_count =
+            contextMeta.footprintPathCount ?? 0;
+          (debugPayload as Record<string, unknown>).retrieval_footprint_zone_hint =
+            contextMeta.footprintZoneHint ?? "mapped_connected";
+          (debugPayload as Record<string, unknown>).retrieval_has_exact_provenance =
+            contextMeta.hasExactProvenance ?? false;
           debugPayload.retrieval_channel_hits = channelHits;
           debugPayload.retrieval_channel_top_scores = channelTopScores;
           debugPayload.retrieval_channel_weights = contextMeta.channelWeights;
@@ -25141,6 +25463,14 @@ const executeHelixAsk = async ({
             `verifyAnchors=${verificationAnchorRequired ? (verificationAnchorOk ? "ok" : "missing") : "n/a"}`,
           ].join(" | "),
         );
+        const retrievalFootprintMeta = resolveRetrievalFootprintEventMeta({
+          openWorldBypassMode,
+          channelHits,
+          footprintExactPaths: contextMeta.footprintExactPaths,
+          footprintPathCount: contextMeta.footprintPathCount,
+          footprintZoneHint: contextMeta.footprintZoneHint,
+          hasExactProvenance: contextMeta.hasExactProvenance,
+        });
         logEvent(
           "Retrieval confidence",
           retrievalConfidence >= 0.6 ? "high" : retrievalConfidence >= 0.35 ? "med" : "low",
@@ -25150,6 +25480,21 @@ const executeHelixAsk = async ({
             `files=${contextFilesSnapshot.length}`,
             `queries=${queryHitCount}`,
           ].join(" | "),
+          undefined,
+          true,
+          {
+            retrievalConfidence: Number(retrievalConfidence.toFixed(3)),
+            docShare: Number(docShare.toFixed(3)),
+            contextFileCount: contextFilesSnapshot.length,
+            queryHitCount,
+            retrieval: buildConvergenceRetrievalMeta({
+              route: openWorldBypassMode === "active" ? "retrieval:open_world" : "retrieval:repo",
+              channelHits,
+              footprint: retrievalFootprintMeta,
+              atlasExact: (channelHits.atlas ?? 0) > 0,
+            }),
+            intent: buildConvergenceIntentMeta(),
+          },
         );
         logEvent(
           "Retrieval channels",
@@ -25158,6 +25503,22 @@ const executeHelixAsk = async ({
             `hits=${formatAskChannelHits(channelHits)}`,
             `tops=${formatAskChannelTopScores(channelTopScores)}`,
           ].join(" | "),
+          undefined,
+          true,
+          {
+            channelHits,
+            channelTopScores,
+            atlasHits: channelHits.atlas ?? 0,
+            retrievalRoute: "retrieval:repo",
+            ...retrievalFootprintMeta,
+            retrieval: buildConvergenceRetrievalMeta({
+              route: openWorldBypassMode === "active" ? "retrieval:open_world" : "retrieval:repo",
+              channelHits,
+              footprint: retrievalFootprintMeta,
+              atlasExact: (channelHits.atlas ?? 0) > 0,
+            }),
+            intent: buildConvergenceIntentMeta(),
+          },
         );
         if (atlasRequirementRequired) {
           logEvent(
@@ -25166,6 +25527,19 @@ const executeHelixAsk = async ({
             `required=1 | hits=${channelHits.atlas ?? 0} | reason=${atlasRequirementReason ?? "none"}`,
             undefined,
             !atlasRequirementFailed,
+            {
+              required: true,
+              failed: atlasRequirementFailed,
+              hits: channelHits.atlas ?? 0,
+              reason: atlasRequirementReason ?? "none",
+              retrieval: buildConvergenceRetrievalMeta({
+                route: openWorldBypassMode === "active" ? "retrieval:open_world" : "retrieval:repo",
+                channelHits,
+                footprint: retrievalFootprintMeta,
+                atlasExact: (channelHits.atlas ?? 0) > 0,
+              }),
+              intent: buildConvergenceIntentMeta(),
+            },
           );
         }
         recordControllerStep({
@@ -25407,6 +25781,14 @@ const executeHelixAsk = async ({
             debugPayload.retrieval_atlas_graph_selected_count = result.atlasGraphSelectedCount ?? 0;
             debugPayload.retrieval_atlas_graph_runtime_link_count = result.atlasGraphRuntimeLinkCount ?? 0;
             debugPayload.retrieval_atlas_graph_edge_type_counts = result.atlasGraphEdgeTypeCounts ?? {};
+            (debugPayload as Record<string, unknown>).retrieval_footprint_exact_paths =
+              (result.footprintExactPaths ?? []).slice(0, REASONING_THEATER_MAX_EXACT_PATHS_PER_EVENT);
+            (debugPayload as Record<string, unknown>).retrieval_footprint_path_count =
+              result.footprintPathCount ?? 0;
+            (debugPayload as Record<string, unknown>).retrieval_footprint_zone_hint =
+              result.footprintZoneHint ?? "mapped_connected";
+            (debugPayload as Record<string, unknown>).retrieval_has_exact_provenance =
+              result.hasExactProvenance ?? false;
             debugPayload.retrieval_channel_hits = attemptChannelHits;
             debugPayload.retrieval_channel_top_scores = attemptChannelTopScores;
             debugPayload.retrieval_channel_weights = result.channelWeights;
@@ -25454,6 +25836,14 @@ const executeHelixAsk = async ({
             ].join(" | "),
             startedAt,
           );
+          const attemptFootprintMeta = resolveRetrievalFootprintEventMeta({
+            openWorldBypassMode,
+            channelHits: attemptChannelHits,
+            footprintExactPaths: result.footprintExactPaths,
+            footprintPathCount: result.footprintPathCount,
+            footprintZoneHint: result.footprintZoneHint,
+            hasExactProvenance: result.hasExactProvenance,
+          });
           logEvent(
             "Retrieval confidence",
             retrievalConfidence >= 0.6 ? "high" : retrievalConfidence >= 0.35 ? "med" : "low",
@@ -25464,6 +25854,20 @@ const executeHelixAsk = async ({
               `queries=${attemptQueryHits}`,
             ].join(" | "),
             startedAt,
+            true,
+            {
+              retrievalConfidence: Number(retrievalConfidence.toFixed(3)),
+              docShare: Number(attemptDocShare.toFixed(3)),
+              contextFileCount: attemptFiles.length,
+              queryHitCount: attemptQueryHits,
+              retrieval: buildConvergenceRetrievalMeta({
+                route: openWorldBypassMode === "active" ? "retrieval:open_world" : "retrieval:repo",
+                channelHits: attemptChannelHits,
+                footprint: attemptFootprintMeta,
+                atlasExact: (attemptChannelHits.atlas ?? 0) > 0,
+              }),
+              intent: buildConvergenceIntentMeta(),
+            },
           );
           if (requiredSlots.length > 0) {
             logEvent(
@@ -25486,6 +25890,21 @@ const executeHelixAsk = async ({
               `tops=${formatAskChannelTopScores(attemptChannelTopScores)}`,
             ].join(" | "),
             startedAt,
+            true,
+            {
+              channelHits: attemptChannelHits,
+              channelTopScores: attemptChannelTopScores,
+              atlasHits: attemptChannelHits.atlas ?? 0,
+              retrievalRoute: "retrieval:repo",
+              ...attemptFootprintMeta,
+              retrieval: buildConvergenceRetrievalMeta({
+                route: openWorldBypassMode === "active" ? "retrieval:open_world" : "retrieval:repo",
+                channelHits: attemptChannelHits,
+                footprint: attemptFootprintMeta,
+                atlasExact: (attemptChannelHits.atlas ?? 0) > 0,
+              }),
+              intent: buildConvergenceIntentMeta(),
+            },
           );
           if (attemptAtlasRequirementRequired) {
             logEvent(
@@ -25494,6 +25913,19 @@ const executeHelixAsk = async ({
               `required=1 | hits=${attemptChannelHits.atlas ?? 0} | reason=${atlasRequirementReason ?? "none"}`,
               startedAt,
               !attemptAtlasRequirementFailed,
+              {
+                required: true,
+                failed: attemptAtlasRequirementFailed,
+                hits: attemptChannelHits.atlas ?? 0,
+                reason: atlasRequirementReason ?? "none",
+                retrieval: buildConvergenceRetrievalMeta({
+                  route: openWorldBypassMode === "active" ? "retrieval:open_world" : "retrieval:repo",
+                  channelHits: attemptChannelHits,
+                  footprint: attemptFootprintMeta,
+                  atlasExact: (attemptChannelHits.atlas ?? 0) > 0,
+                }),
+                intent: buildConvergenceIntentMeta(),
+              },
             );
           }
           const afterMissingSlots =
@@ -25983,6 +26415,7 @@ const executeHelixAsk = async ({
         if (openWorldBypassPolicy.action === "bypass_with_uncertainty") {
           openWorldBypassMode = "active";
           answerPath.push("openWorldBypass:alignment_fail");
+          emitOpenWorldBypassEvent();
         }
         if (
           isSecurityRiskPrompt(baseQuestion) &&
@@ -25991,6 +26424,7 @@ const executeHelixAsk = async ({
         ) {
           openWorldBypassMode = "active";
           answerPath.push("openWorldBypass:security_guardrail");
+          emitOpenWorldBypassEvent();
         }
         if (debugPayload) {
           debugPayload.alignment_gate_decision = alignmentGate.decision;
@@ -26134,6 +26568,13 @@ const executeHelixAsk = async ({
         arbiterAnswerArtifacts.claim_tier = arbiterDecision.claim_tier;
         arbiterAnswerArtifacts.certifying = arbiterDecision.certifying;
         arbiterAnswerArtifacts.fail_reason = arbiterDecision.fail_reason;
+        const arbiterEpistemicMeta = buildConvergenceEpistemicMeta({
+          arbiterMode,
+          claimTier: arbiterDecision.claim_tier,
+          provenanceClass: arbiterDecision.provenance_class,
+          certifying: arbiterDecision.certifying,
+          failReason: strictReadyFailReason ?? arbiterDecision.fail_reason ?? null,
+        });
         logEvent(
           "Arbiter",
           arbiterMode,
@@ -26150,6 +26591,24 @@ const executeHelixAsk = async ({
           ]
             .filter(Boolean)
             .join(" | "),
+          undefined,
+          true,
+          {
+            epistemic: arbiterEpistemicMeta,
+            intent: buildConvergenceIntentMeta(),
+          },
+        );
+        logEvent(
+          "Arbiter commit",
+          arbiterMode,
+          `mode=${arbiterMode} | reason=${arbiterReason}`,
+          undefined,
+          true,
+          {
+            convergence_commit: "arbiter_commit",
+            epistemic: arbiterEpistemicMeta,
+            intent: buildConvergenceIntentMeta(),
+          },
         );
         if (debugPayload) {
           debugPayload.arbiter_mode = arbiterMode;
@@ -26416,7 +26875,16 @@ const executeHelixAsk = async ({
           ]
             .filter(Boolean)
             .join(" | ");
-          logEvent("Tree walk", "ready", treeWalkDetail);
+          const treeWalkTrace = (graphPack?.frameworks ?? []).map((framework) => ({
+            treeId: framework.treeId,
+            nodeIds: (framework.path ?? []).map((node) => node.id),
+          }));
+          logEvent("Tree walk", "ready", treeWalkDetail, undefined, true, {
+            treeWalkMode,
+            treeWalkTrace,
+            treeWalkPrimaryTreeId: graphPack?.primaryTreeId ?? null,
+            treeWalkStepCount: treeWalkMetrics.stepCount ?? 0,
+          });
           if (debugPayload) {
             debugPayload.tree_walk = treeWalkMetrics;
             debugPayload.tree_walk_lines = treeWalkBlock
@@ -28290,6 +28758,63 @@ const executeHelixAsk = async ({
             .map((entry) => `${entry.stage}:${entry.reason}`);
         }
         applyArbiterAnswerArtifacts(result);
+        const resultProofRecord =
+          result.proof && typeof result.proof === "object"
+            ? (result.proof as {
+                verdict?: string;
+                certificate?: { certificateHash?: string | null; integrityOk?: boolean | null } | null;
+              })
+            : null;
+        const resultVerificationMeta = buildConvergenceVerificationMeta({
+          verdict: resultProofRecord?.verdict ?? null,
+          certificateHash: resultProofRecord?.certificate?.certificateHash ?? null,
+          certificateIntegrityOk: resultProofRecord?.certificate?.integrityOk ?? null,
+        });
+        if (resultProofRecord?.verdict) {
+          logEvent(
+            "Verify proof",
+            "commit",
+            `verdict=${resultProofRecord.verdict}`,
+            undefined,
+            resultProofRecord.verdict === "PASS" && resultProofRecord.certificate?.integrityOk !== false,
+            {
+              convergence_commit: "proof_commit",
+              verification: resultVerificationMeta,
+              epistemic: buildConvergenceEpistemicMeta({
+                arbiterMode:
+                  typeof debugPayload?.arbiter_mode === "string"
+                    ? debugPayload.arbiter_mode
+                    : undefined,
+                claimTier: arbiterAnswerArtifacts.claim_tier,
+                provenanceClass: arbiterAnswerArtifacts.provenance_class,
+                certifying: arbiterAnswerArtifacts.certifying,
+                failReason: strictReadyFailReason ?? arbiterAnswerArtifacts.fail_reason ?? null,
+              }),
+              intent: buildConvergenceIntentMeta(),
+            },
+          );
+        }
+        logEvent(
+          "Finalization",
+          "done",
+          "response_ready",
+          undefined,
+          true,
+          {
+            epistemic: buildConvergenceEpistemicMeta({
+              arbiterMode:
+                typeof debugPayload?.arbiter_mode === "string"
+                  ? debugPayload.arbiter_mode
+                  : undefined,
+              claimTier: arbiterAnswerArtifacts.claim_tier,
+              provenanceClass: arbiterAnswerArtifacts.provenance_class,
+              certifying: arbiterAnswerArtifacts.certifying,
+              failReason: strictReadyFailReason ?? arbiterAnswerArtifacts.fail_reason ?? null,
+            }),
+            verification: resultVerificationMeta,
+            intent: buildConvergenceIntentMeta(),
+          },
+        );
         const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
         responder.send(200, responsePayload);
         return;
@@ -28380,6 +28905,31 @@ const executeHelixAsk = async ({
             .map((entry) => `${entry.stage}:${entry.reason}`);
         }
         applyArbiterAnswerArtifacts(fastResult);
+        logEvent(
+          "Finalization",
+          "done",
+          "response_ready",
+          undefined,
+          true,
+          {
+            epistemic: buildConvergenceEpistemicMeta({
+              arbiterMode:
+                typeof debugPayload?.arbiter_mode === "string"
+                  ? debugPayload.arbiter_mode
+                  : undefined,
+              claimTier: arbiterAnswerArtifacts.claim_tier,
+              provenanceClass: arbiterAnswerArtifacts.provenance_class,
+              certifying: arbiterAnswerArtifacts.certifying,
+              failReason: strictReadyFailReason ?? arbiterAnswerArtifacts.fail_reason ?? null,
+            }),
+            verification: buildConvergenceVerificationMeta({
+              verdict: null,
+              certificateHash: null,
+              certificateIntegrityOk: null,
+            }),
+            intent: buildConvergenceIntentMeta(),
+          },
+        );
         const responsePayload = debugPayload ? { ...fastResult, debug: debugPayload } : fastResult;
         responder.send(200, responsePayload);
         return;
@@ -32122,6 +32672,7 @@ const executeHelixAsk = async ({
       if (securityOpenWorldBypassEligible && openWorldBypassMode !== "active") {
         openWorldBypassMode = "active";
         answerPath.push("openWorldBypass:security_guardrail");
+        emitOpenWorldBypassEvent();
         if (debugPayload) {
           debugPayload.open_world_bypass_mode = openWorldBypassMode;
         }
@@ -32241,6 +32792,63 @@ const executeHelixAsk = async ({
       result.fail_class = "input_contract";
     }
     applyArbiterAnswerArtifacts(result);
+    const finalProofRecord =
+      result.proof && typeof result.proof === "object"
+        ? (result.proof as {
+            verdict?: string;
+            certificate?: { certificateHash?: string | null; integrityOk?: boolean | null } | null;
+          })
+        : null;
+    const finalVerificationMeta = buildConvergenceVerificationMeta({
+      verdict: finalProofRecord?.verdict ?? null,
+      certificateHash: finalProofRecord?.certificate?.certificateHash ?? null,
+      certificateIntegrityOk: finalProofRecord?.certificate?.integrityOk ?? null,
+    });
+    if (finalProofRecord?.verdict) {
+      logEvent(
+        "Verify proof",
+        "commit",
+        `verdict=${finalProofRecord.verdict}`,
+        undefined,
+        finalProofRecord.verdict === "PASS" && finalProofRecord.certificate?.integrityOk !== false,
+        {
+          convergence_commit: "proof_commit",
+          verification: finalVerificationMeta,
+          epistemic: buildConvergenceEpistemicMeta({
+            arbiterMode:
+              typeof debugPayload?.arbiter_mode === "string"
+                ? debugPayload.arbiter_mode
+                : undefined,
+            claimTier: arbiterAnswerArtifacts.claim_tier,
+            provenanceClass: arbiterAnswerArtifacts.provenance_class,
+            certifying: arbiterAnswerArtifacts.certifying,
+            failReason: strictReadyFailReason ?? arbiterAnswerArtifacts.fail_reason ?? null,
+          }),
+          intent: buildConvergenceIntentMeta(),
+        },
+      );
+    }
+    logEvent(
+      "Finalization",
+      "done",
+      "response_ready",
+      undefined,
+      true,
+      {
+        epistemic: buildConvergenceEpistemicMeta({
+          arbiterMode:
+            typeof debugPayload?.arbiter_mode === "string"
+              ? debugPayload.arbiter_mode
+              : undefined,
+          claimTier: arbiterAnswerArtifacts.claim_tier,
+          provenanceClass: arbiterAnswerArtifacts.provenance_class,
+          certifying: arbiterAnswerArtifacts.certifying,
+          failReason: strictReadyFailReason ?? arbiterAnswerArtifacts.fail_reason ?? null,
+        }),
+        verification: finalVerificationMeta,
+        intent: buildConvergenceIntentMeta(),
+      },
+    );
     if (debugPayload && captureLiveHistory) {
       const traceEvents = liveEventHistory.slice();
       debugPayload.live_events = traceEvents;

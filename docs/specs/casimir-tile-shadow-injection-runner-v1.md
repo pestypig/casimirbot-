@@ -23,10 +23,25 @@ This runner is not for:
 - Casimir sign recovery pack (input): `configs/warp-shadow-injection-scenarios.cs-primary-recovery.v1.json`
 - Casimir sign typed pack (input): `configs/warp-shadow-injection-scenarios.cs-primary-typed.v1.json`
 - Casimir sign reportable prereg pack (input): `configs/warp-shadow-injection-scenarios.cs-primary-reportable.v1.json`
+- Q-spoiling recovery pack (input): `configs/warp-shadow-injection-scenarios.qs-primary-recovery.v1.json`
+- Q-spoiling typed pack (input): `configs/warp-shadow-injection-scenarios.qs-primary-typed.v1.json`
+- Q-spoiling reportable prereg pack (input): `configs/warp-shadow-injection-scenarios.qs-primary-reportable.v1.json`
+- Q-spoiling reportable reference profile pack (input): `configs/warp-shadow-injection-scenarios.qs-primary-reportable-reference.v1.json`
+- Nanogap recovery pack (input): `configs/warp-shadow-injection-scenarios.ng-primary-recovery.v1.json`
+- Nanogap typed pack (input): `configs/warp-shadow-injection-scenarios.ng-primary-typed.v1.json`
+- Nanogap reportable prereg pack (input): `configs/warp-shadow-injection-scenarios.ng-primary-reportable.v1.json`
+- Nanogap reportable reference profile pack (input): `configs/warp-shadow-injection-scenarios.ng-primary-reportable-reference.v1.json`
+- Timing recovery pack (input): `configs/warp-shadow-injection-scenarios.ti-primary-recovery.v1.json`
+- Timing typed pack (input): `configs/warp-shadow-injection-scenarios.ti-primary-typed.v1.json`
+- Timing reportable prereg pack (input): `configs/warp-shadow-injection-scenarios.ti-primary-reportable.v1.json`
+- Timing reportable reference profile pack (input): `configs/warp-shadow-injection-scenarios.ti-primary-reportable-reference.v1.json`
 - QEI operating envelope (input): `configs/warp-shadow-qei-operating-envelope.v1.json`
 - Runner (execution): `scripts/warp-shadow-injection-runner.ts`
 - Recovery checker (execution): `scripts/warp-shadow-qei-recovery-check.ts`
 - Casimir sign checker (execution): `scripts/warp-shadow-casimir-sign-compat-check.ts`
+- Q-spoiling checker (execution): `scripts/warp-shadow-q-spoiling-compat-check.ts`
+- Nanogap checker (execution): `scripts/warp-shadow-nanogap-compat-check.ts`
+- Timing checker (execution): `scripts/warp-shadow-timing-compat-check.ts`
 - JSON output (default): `artifacts/research/full-solve/shadow-injection-run-YYYY-MM-DD.json`
 - Markdown output (default): `docs/audits/research/warp-shadow-injection-run-YYYY-MM-DD.md`
 
@@ -65,6 +80,81 @@ Casimir sign reportable prereg run:
 npm run warp:shadow:inject:cs-primary-reportable -- --out artifacts/research/full-solve/shadow-injection-run-cs-primary-reportable-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-cs-primary-reportable-YYYY-MM-DD.md
 ```
 
+Q-spoiling compatibility pass-1:
+```bash
+npm run warp:shadow:inject:qs-primary-recovery -- --out artifacts/research/full-solve/shadow-injection-run-qs-primary-recovery-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-qs-primary-recovery-YYYY-MM-DD.md
+```
+
+Q-spoiling compatibility pass-2 (typed context):
+```bash
+npm run warp:shadow:inject:qs-primary-typed -- --out artifacts/research/full-solve/shadow-injection-run-qs-primary-typed-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-qs-primary-typed-YYYY-MM-DD.md
+```
+
+Q-spoiling reportable prereg run:
+```bash
+npm run warp:shadow:inject:qs-primary-reportable -- --out artifacts/research/full-solve/shadow-injection-run-qs-primary-reportable-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-qs-primary-reportable-YYYY-MM-DD.md
+```
+
+Q-spoiling reportable reference profile run:
+```bash
+npm run warp:shadow:inject:qs-primary-reportable-reference -- --out artifacts/research/full-solve/shadow-injection-run-qs-primary-reportable-reference-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-qs-primary-reportable-reference-YYYY-MM-DD.md
+```
+
+Nanogap compatibility pass-1:
+```bash
+npm run warp:shadow:inject:ng-primary-recovery -- --out artifacts/research/full-solve/shadow-injection-run-ng-primary-recovery-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-ng-primary-recovery-YYYY-MM-DD.md
+```
+
+Nanogap compatibility pass-2 (typed context):
+```bash
+npm run warp:shadow:inject:ng-primary-typed -- --out artifacts/research/full-solve/shadow-injection-run-ng-primary-typed-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-ng-primary-typed-YYYY-MM-DD.md
+```
+
+Nanogap reportable prereg run:
+```bash
+npm run warp:shadow:inject:ng-primary-reportable -- --out artifacts/research/full-solve/shadow-injection-run-ng-primary-reportable-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-ng-primary-reportable-YYYY-MM-DD.md
+```
+
+Nanogap reportable reference profile run:
+```bash
+npm run warp:shadow:inject:ng-primary-reportable-reference -- --out artifacts/research/full-solve/shadow-injection-run-ng-primary-reportable-reference-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-ng-primary-reportable-reference-YYYY-MM-DD.md
+```
+
+Timing compatibility pass-1:
+```bash
+npm run warp:shadow:inject:ti-primary-recovery -- --out artifacts/research/full-solve/shadow-injection-run-ti-primary-recovery-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-ti-primary-recovery-YYYY-MM-DD.md
+```
+
+Timing compatibility pass-2 (typed context):
+```bash
+npm run warp:shadow:inject:ti-primary-typed -- --out artifacts/research/full-solve/shadow-injection-run-ti-primary-typed-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-ti-primary-typed-YYYY-MM-DD.md
+```
+
+Timing reportable prereg run:
+```bash
+npm run warp:shadow:inject:ti-primary-reportable -- --out artifacts/research/full-solve/shadow-injection-run-ti-primary-reportable-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-ti-primary-reportable-YYYY-MM-DD.md
+```
+
+Timing reportable reference profile run:
+```bash
+npm run warp:shadow:inject:ti-primary-reportable-reference -- --out artifacts/research/full-solve/shadow-injection-run-ti-primary-reportable-reference-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-ti-primary-reportable-reference-YYYY-MM-DD.md
+```
+
+Q-spoiling evidence congruence check:
+```bash
+npm run warp:shadow:qs-compat-check -- --scenarios configs/warp-shadow-injection-scenarios.qs-primary-typed.v1.json --run artifacts/research/full-solve/shadow-injection-run-qs-primary-typed-YYYY-MM-DD.json --out artifacts/research/full-solve/qs-compat-check-YYYY-MM-DD.json --out-md docs/audits/research/warp-qs-compat-check-YYYY-MM-DD.md
+```
+
+Nanogap evidence congruence check:
+```bash
+npm run warp:shadow:ng-compat-check -- --scenarios configs/warp-shadow-injection-scenarios.ng-primary-typed.v1.json --run artifacts/research/full-solve/shadow-injection-run-ng-primary-typed-YYYY-MM-DD.json --out artifacts/research/full-solve/ng-compat-check-YYYY-MM-DD.json --out-md docs/audits/research/warp-ng-compat-check-YYYY-MM-DD.md
+```
+
+Timing evidence congruence check:
+```bash
+npm run warp:shadow:ti-compat-check -- --scenarios configs/warp-shadow-injection-scenarios.ti-primary-typed.v1.json --run artifacts/research/full-solve/shadow-injection-run-ti-primary-typed-YYYY-MM-DD.json --out artifacts/research/full-solve/ti-compat-check-YYYY-MM-DD.json --out-md docs/audits/research/warp-ti-compat-check-YYYY-MM-DD.md
+```
+
 Casimir sign evidence congruence check:
 ```bash
 npm run warp:shadow:cs-compat-check -- --scenarios configs/warp-shadow-injection-scenarios.cs-primary-typed.v1.json --run artifacts/research/full-solve/shadow-injection-run-cs-primary-typed-YYYY-MM-DD.json --out artifacts/research/full-solve/cs-compat-check-YYYY-MM-DD.json --out-md docs/audits/research/warp-cs-compat-check-YYYY-MM-DD.md
@@ -96,6 +186,49 @@ Each scenario uses:
   - `uncertainty.u_gap_nm`
   - `uncertainty.u_window_nm`
   - `uncertainty.method`
+- optional `experimentalContext.qSpoiling`:
+  - `mechanismLane`
+  - `q0Baseline`
+  - `f_q_spoil`
+  - `q0Spoiled`
+  - `q_spoil_ratio`
+  - `q_spoil_ratio_anchor`
+  - `sourceRefs[]`
+  - `uncertainty.u_q0_rel`
+  - `uncertainty.u_f_rel`
+  - `uncertainty.method`
+  - `uncertainty.reportableReady`
+  - `uncertainty.blockedReasons[]`
+  - optional `thresholds.q0_clean_floor`
+  - optional `thresholds.q0_spoiled_ceiling`
+  - optional `thresholds.f_q_spoil_floor`
+- optional `experimentalContext.nanogap`:
+  - `profileId`
+  - `u_g_mean_nm`
+  - `u_g_sigma_nm`
+  - `tip_method`
+  - `fiducial_present`
+  - `sourceRefs[]`
+  - `uncertainty.method`
+  - `uncertainty.reportableReady`
+  - `uncertainty.blockedReasons[]`
+- optional `experimentalContext.timing`:
+  - `profileId`
+  - `sigma_t_ps`
+  - `tie_pp_ps` (nullable)
+  - `pdv_pp_ps` (nullable)
+  - `timestamping_mode`
+  - `synce_enabled`
+  - `clock_mode`
+  - `topology_class`
+  - `sourceRefs[]`
+  - `uncertainty.u_sigma_t_ps`
+  - `uncertainty.u_tie_pp_ps`
+  - `uncertainty.u_pdv_pp_ps`
+  - `uncertainty.method`
+  - `uncertainty.reportableReady`
+  - `uncertainty.blockedReasons[]`
+- optional pack-level `profileThresholds` for profile-aware nanogap congruence checks.
 
 Optional pack-level fields:
 - `recovery_goal`

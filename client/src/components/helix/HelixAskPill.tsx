@@ -44,7 +44,6 @@ import {
   getDefaultReasoningTheaterConfig,
   type ReasoningTheaterConfigResponse,
   type ReasoningTheaterFrontierAction,
-  type ReasoningTheaterFrontierActionsConfig,
 } from "@/lib/helix/reasoning-theater-config";
 import {
   advanceReasoningTheaterFrontierTracker,
@@ -54,6 +53,13 @@ import {
   resolveReasoningTheaterFrontierParticleProfile,
   type ReasoningTheaterFrontierTrackerState,
 } from "@/lib/helix/reasoning-theater-frontier";
+import {
+  deriveConvergenceStripState,
+  getConvergencePhaseOrder,
+  type ConvergenceCollapseEvent,
+  type ConvergenceDebug,
+  type ConvergenceStripState,
+} from "@/lib/helix/reasoning-theater-convergence";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 
@@ -89,9 +95,9 @@ export function buildSpeakText(source: string, maxChars = SPEAK_TEXT_MAX_CHARS):
   const bounded = boundaryIndex > 0 ? capped.slice(0, boundaryIndex + 1).trimEnd() : capped;
   const fallback = bounded || capped;
   if (!fallback) return "";
-  if (fallback.length < maxChars) return `${fallback}…`;
-  if (maxChars === 1) return "…";
-  return `${fallback.slice(0, maxChars - 1).trimEnd()}…`;
+  if (fallback.length < maxChars) return `${fallback}...`;
+  if (maxChars === 1) return ".";
+  return `${fallback.slice(0, maxChars - 1).trimEnd()}...`;
 }
 
 export function isActivePlayback(audio: HTMLAudioElement | null, active: HTMLAudioElement): boolean {
@@ -113,6 +119,7 @@ type HelixAskReply = {
   promptIngested?: boolean;
   envelope?: HelixAskResponseEnvelope;
   liveEvents?: AskLiveEventEntry[];
+  convergenceSnapshot?: ConvergenceStripState;
   debug?: {
     two_pass?: boolean;
     micro_pass?: boolean;
@@ -137,6 +144,11 @@ type HelixAskReply = {
     intent_secondary_tier?: string;
     intent_strategy?: string;
     intent_reason?: string;
+    claim_tier?: "exploratory" | "diagnostic" | "reduced_order" | "reduced-order" | "certified";
+    provenance_class?: "measured" | "proxy" | "inferred" | "simulation";
+    certifying?: boolean;
+    fail_reason?: string;
+    helix_ask_fail_reason?: string | null;
     arbiter_mode?: "repo_grounded" | "hybrid" | "general" | "clarify";
     arbiter_reason?: string;
     arbiter_strictness?: "low" | "med" | "high";
@@ -313,6 +325,7 @@ type HelixAskReply = {
       ok?: boolean;
       durationMs?: number;
       text?: string;
+      meta?: Record<string, unknown>;
     }>;
     format?: "steps" | "compare" | "brief";
     stage_tags?: boolean;
@@ -328,6 +341,7 @@ type AskLiveEventEntry = {
   tsMs?: number;
   seq?: number;
   durationMs?: number;
+  meta?: Record<string, unknown>;
 };
 
 type HelixAskPillProps = {
@@ -396,6 +410,59 @@ function safeJsonStringify(value: unknown, fallback = "Unable to render debug pa
   } catch {
     return fallback;
   }
+}
+
+function convergenceSourceTone(source: ConvergenceStripState["source"]): string {
+  if (source === "atlas_exact") return "border-cyan-300/45 bg-cyan-400/12 text-cyan-100";
+  if (source === "repo_exact") return "border-sky-300/45 bg-sky-400/12 text-sky-100";
+  if (source === "open_world") return "border-rose-300/45 bg-rose-400/12 text-rose-100";
+  return "border-slate-300/25 bg-slate-400/10 text-slate-200";
+}
+
+function convergenceProofTone(proof: ConvergenceStripState["proof"]): string {
+  if (proof === "confirmed") return "border-emerald-300/45 bg-emerald-400/12 text-emerald-100";
+  if (proof === "reasoned") return "border-teal-300/45 bg-teal-400/12 text-teal-100";
+  if (proof === "hypothesis") return "border-amber-300/45 bg-amber-400/12 text-amber-100";
+  if (proof === "fail_closed") return "border-rose-300/55 bg-rose-500/16 text-rose-100";
+  return "border-slate-300/25 bg-slate-400/10 text-slate-200";
+}
+
+function convergenceMaturityTone(maturity: ConvergenceStripState["maturity"]): string {
+  if (maturity === "certified") return "border-emerald-300/45 bg-emerald-400/12 text-emerald-100";
+  if (maturity === "diagnostic") return "border-cyan-300/45 bg-cyan-400/12 text-cyan-100";
+  if (maturity === "reduced_order") return "border-violet-300/45 bg-violet-400/12 text-violet-100";
+  return "border-amber-300/45 bg-amber-400/12 text-amber-100";
+}
+
+function buildConvergenceDebugSnapshot(
+  debug: HelixAskReply["debug"] | undefined,
+): ConvergenceDebug | undefined {
+  if (!debug) return undefined;
+  return {
+    intent_domain: debug.intent_domain,
+    intent_id: debug.intent_id,
+    arbiter_mode: debug.arbiter_mode,
+    claim_tier: typeof debug.claim_tier === "string" ? debug.claim_tier : undefined,
+    math_solver_maturity: debug.math_solver_maturity,
+    helix_ask_fail_reason:
+      typeof debug.helix_ask_fail_reason === "string" ? debug.helix_ask_fail_reason : undefined,
+  };
+}
+
+function hasConvergenceStateChanged(
+  previous: ConvergenceStripState | null,
+  next: ConvergenceStripState,
+): boolean {
+  if (!previous) return true;
+  return (
+    previous.source !== next.source ||
+    previous.proof !== next.proof ||
+    previous.maturity !== next.maturity ||
+    previous.phase !== next.phase ||
+    previous.openWorldActive !== next.openWorldActive ||
+    previous.caption !== next.caption ||
+    previous.deltaPct !== next.deltaPct
+  );
 }
 
 type HelixAskErrorBoundaryState = { hasError: boolean; error?: Error };
@@ -871,6 +938,40 @@ const REASONING_THEATER_FRONTIER_ACTION_LABEL: Record<ReasoningTheaterFrontierAc
   small_loss: "Small loss",
   large_loss: "Large loss",
   hard_drop: "Hard drop",
+};
+const CONVERGENCE_SOURCE_LABEL: Record<ConvergenceStripState["source"], string> = {
+  atlas_exact: "atlas exact",
+  repo_exact: "repo exact",
+  open_world: "open-world",
+  unknown: "unknown",
+};
+const CONVERGENCE_PROOF_LABEL: Record<ConvergenceStripState["proof"], string> = {
+  confirmed: "confirmed",
+  reasoned: "reasoned",
+  hypothesis: "hypothesis",
+  unknown: "unknown",
+  fail_closed: "fail-closed",
+};
+const CONVERGENCE_MATURITY_LABEL: Record<ConvergenceStripState["maturity"], string> = {
+  exploratory: "exploratory",
+  reduced_order: "reduced-order",
+  diagnostic: "diagnostic",
+  certified: "certified",
+};
+const CONVERGENCE_PHASE_ORDER = getConvergencePhaseOrder();
+const CONVERGENCE_PHASE_LABEL: Record<ConvergenceStripState["phase"], string> = {
+  observe: "observe",
+  plan: "plan",
+  retrieve: "retrieve",
+  gate: "gate",
+  synthesize: "synthesize",
+  verify: "verify",
+  execute: "execute",
+  debrief: "debrief",
+};
+const CONVERGENCE_COLLAPSE_LABEL: Record<ConvergenceCollapseEvent, string> = {
+  arbiter_commit: "arbiter commit",
+  proof_commit: "proof commit",
 };
 const REASONING_THEATER_FRONTIER_CURSOR_PULSE_MS = 420;
 const REASONING_THEATER_FRONTIER_PARTICLE_COUNT = 8;
@@ -1551,8 +1652,8 @@ function cleanPromptLine(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
   const stripped = trimmed
-    .replace(/^[\"'`.\-–—,;]+/g, "")
-    .replace(/[\"'`.\-–—,;]+$/g, "")
+    .replace(/^[\"'`.\-,;]+/g, "")
+    .replace(/[\"'`.\-,;]+$/g, "")
     .trim();
   return stripped;
 }
@@ -1900,6 +2001,13 @@ export function HelixAskPill({
     action: "steady",
     deltaPct: 0,
   });
+  const reasoningTheaterFrontierDebugRef = useRef<{
+    action: ReasoningTheaterFrontierAction;
+    deltaPct: number;
+  }>({
+    action: "steady",
+    deltaPct: 0,
+  });
   const reasoningTheaterFrontierTrackerRef = useRef<ReasoningTheaterFrontierTrackerState>(
     createReasoningTheaterFrontierTrackerState("steady"),
   );
@@ -1910,6 +2018,16 @@ export function HelixAskPill({
   const reasoningTheaterFrontierBurstRef = useRef<HTMLDivElement | null>(null);
   const reasoningTheaterFrontierPulseUntilMsRef = useRef(0);
   const reasoningTheaterFrontierDebugUpdateAtRef = useRef(0);
+  const convergenceStripHoldTimerRef = useRef<number | null>(null);
+  const convergenceStripCollapseTimerRef = useRef<number | null>(null);
+  const convergenceStripLastCommitTokenRef = useRef<string | null>(null);
+  const convergenceStripLastAppliedAtRef = useRef(0);
+  const [convergenceStripDisplayState, setConvergenceStripDisplayState] =
+    useState<ConvergenceStripState | null>(null);
+  const [convergenceStripCollapseState, setConvergenceStripCollapseState] = useState<{
+    token: string;
+    event: ConvergenceCollapseEvent;
+  } | null>(null);
 
   const getHelixAskSessionId = useCallback(() => {
     if (helixAskSessionRef.current) return helixAskSessionRef.current;
@@ -1952,6 +2070,17 @@ export function HelixAskPill({
       });
     return () => {
       active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (convergenceStripHoldTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(convergenceStripHoldTimerRef.current);
+      }
+      if (convergenceStripCollapseTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(convergenceStripCollapseTimerRef.current);
+      }
     };
   }, []);
 
@@ -2151,6 +2280,92 @@ export function HelixAskPill({
   const reasoningTheaterMeterTarget = reasoningTheater
     ? clampNumber(Math.round(((reasoningTheater.battleIndex + 1) / 2) * 100), 0, 100)
     : 50;
+  const convergenceStripRawState = useMemo(
+    () =>
+      deriveConvergenceStripState({
+        events: askLiveEvents,
+        frontierAction: reasoningTheaterFrontierDebug.action,
+        frontierDeltaPct: reasoningTheaterFrontierDebug.deltaPct,
+        fallbackPhase: reasoningTheater?.phase ?? "observe",
+      }),
+    [
+      askLiveEvents,
+      reasoningTheater?.phase,
+      reasoningTheaterFrontierDebug.action,
+      reasoningTheaterFrontierDebug.deltaPct,
+    ],
+  );
+
+  useEffect(() => {
+    if (!askBusy) {
+      if (convergenceStripHoldTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(convergenceStripHoldTimerRef.current);
+      }
+      convergenceStripHoldTimerRef.current = null;
+      convergenceStripLastAppliedAtRef.current = 0;
+      setConvergenceStripDisplayState(null);
+      return;
+    }
+    const next = convergenceStripRawState;
+    setConvergenceStripDisplayState((previous) => {
+      if (!hasConvergenceStateChanged(previous, next)) {
+        return previous ?? next;
+      }
+      const nowMs = Date.now();
+      const holdMs = Math.max(0, reasoningTheaterConfig.retrieval_zone_layer.presentation.lane_hold_ms);
+      const elapsed = nowMs - convergenceStripLastAppliedAtRef.current;
+      const remaining = Math.max(0, holdMs - elapsed);
+      if (remaining <= 0 || previous === null || typeof window === "undefined") {
+        convergenceStripLastAppliedAtRef.current = nowMs;
+        if (convergenceStripHoldTimerRef.current !== null && typeof window !== "undefined") {
+          window.clearTimeout(convergenceStripHoldTimerRef.current);
+          convergenceStripHoldTimerRef.current = null;
+        }
+        return next;
+      }
+      if (convergenceStripHoldTimerRef.current !== null) {
+        window.clearTimeout(convergenceStripHoldTimerRef.current);
+      }
+      convergenceStripHoldTimerRef.current = window.setTimeout(() => {
+        convergenceStripLastAppliedAtRef.current = Date.now();
+        setConvergenceStripDisplayState((current) => (hasConvergenceStateChanged(current, next) ? next : current));
+      }, remaining);
+      return previous;
+    });
+  }, [askBusy, convergenceStripRawState, reasoningTheaterConfig.retrieval_zone_layer.presentation.lane_hold_ms]);
+
+  useEffect(() => {
+    if (!askBusy) {
+      if (convergenceStripCollapseTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(convergenceStripCollapseTimerRef.current);
+      }
+      convergenceStripCollapseTimerRef.current = null;
+      convergenceStripLastCommitTokenRef.current = null;
+      setConvergenceStripCollapseState(null);
+      return;
+    }
+    const token = convergenceStripRawState.collapseToken;
+    const event = convergenceStripRawState.collapseEvent;
+    if (!token || !event) return;
+    if (token === convergenceStripLastCommitTokenRef.current) return;
+    convergenceStripLastCommitTokenRef.current = token;
+    setConvergenceStripCollapseState({ token, event });
+    if (convergenceStripCollapseTimerRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(convergenceStripCollapseTimerRef.current);
+    }
+    if (typeof window !== "undefined") {
+      convergenceStripCollapseTimerRef.current = window.setTimeout(() => {
+        setConvergenceStripCollapseState((current) => (current?.token === token ? null : current));
+      }, Math.max(120, reasoningTheaterConfig.retrieval_zone_layer.presentation.collapse_pulse_ms));
+    }
+  }, [
+    askBusy,
+    convergenceStripRawState.collapseEvent,
+    convergenceStripRawState.collapseToken,
+    reasoningTheaterConfig.retrieval_zone_layer.presentation.collapse_pulse_ms,
+  ]);
+
+  const convergenceStripState = convergenceStripDisplayState ?? convergenceStripRawState;
 
   const stopReasoningTheaterClock = useCallback(() => {
     if (reasoningTheaterClockRafRef.current !== null && typeof window !== "undefined") {
@@ -2245,127 +2460,137 @@ export function HelixAskPill({
         pattern.style.opacity = intensity.toFixed(2);
       }
 
-      if (!REASONING_THEATER_FRONTIER_ACTIONS_ENABLED) return;
-      const trackerResult = advanceReasoningTheaterFrontierTracker(
-        reasoningTheaterFrontierTrackerRef.current,
-        {
-          nowMs: elapsedMs,
-          meterPct: clampedMeter,
-          stance: reasoningTheaterStanceRef.current,
-          suppressionReason: reasoningTheaterSuppressionReasonRef.current,
-          config: reasoningTheaterConfig.frontier_actions,
-        },
+      let committedAction = reasoningTheaterFrontierTrackerRef.current.committedAction;
+      let profile = resolveReasoningTheaterFrontierParticleProfile(
+        committedAction,
+        reasoningTheaterConfig.frontier_actions,
       );
-      reasoningTheaterFrontierTrackerRef.current = trackerResult.state;
-      const committedAction = trackerResult.state.committedAction;
-      if (trackerResult.actionChanged) {
-        reasoningTheaterFrontierPulseUntilMsRef.current =
-          elapsedMs + REASONING_THEATER_FRONTIER_CURSOR_PULSE_MS;
-      }
-      const windowDeltaPct = trackerResult.state.lastWindowDeltaPct;
-      const deltaRounded = Math.round(windowDeltaPct * 10) / 10;
-      const canPublishDebug =
-        trackerResult.actionChanged ||
-        elapsedMs - reasoningTheaterFrontierDebugUpdateAtRef.current >= 250;
-      if (canPublishDebug) {
-        reasoningTheaterFrontierDebugUpdateAtRef.current = elapsedMs;
-        setReasoningTheaterFrontierDebug((prev) =>
-          prev.action === committedAction && Math.abs(prev.deltaPct - deltaRounded) < 0.25
-            ? prev
-            : {
-                action: committedAction,
-                deltaPct: deltaRounded,
-              },
+      if (REASONING_THEATER_FRONTIER_ACTIONS_ENABLED) {
+        const trackerResult = advanceReasoningTheaterFrontierTracker(
+          reasoningTheaterFrontierTrackerRef.current,
+          {
+            nowMs: elapsedMs,
+            meterPct: clampedMeter,
+            stance: reasoningTheaterStanceRef.current,
+            suppressionReason: reasoningTheaterSuppressionReasonRef.current,
+            config: reasoningTheaterConfig.frontier_actions,
+          },
         );
-      }
+        reasoningTheaterFrontierTrackerRef.current = trackerResult.state;
+        committedAction = trackerResult.state.committedAction;
+        if (trackerResult.actionChanged) {
+          reasoningTheaterFrontierPulseUntilMsRef.current =
+            elapsedMs + REASONING_THEATER_FRONTIER_CURSOR_PULSE_MS;
+        }
+        const windowDeltaPct = trackerResult.state.lastWindowDeltaPct;
+        const deltaRounded = Math.round(windowDeltaPct * 10) / 10;
+        const canPublishDebug =
+          trackerResult.actionChanged ||
+          elapsedMs - reasoningTheaterFrontierDebugUpdateAtRef.current >= 250;
+        if (canPublishDebug) {
+          reasoningTheaterFrontierDebugUpdateAtRef.current = elapsedMs;
+          const nextDebug = {
+            action: committedAction,
+            deltaPct: deltaRounded,
+          };
+          reasoningTheaterFrontierDebugRef.current = nextDebug;
+          setReasoningTheaterFrontierDebug((prev) =>
+            prev.action === committedAction && Math.abs(prev.deltaPct - deltaRounded) < 0.25
+              ? prev
+              : nextDebug,
+          );
+        }
 
-      const iconPath = resolveReasoningTheaterFrontierIconPath(
-        committedAction,
-        reasoningTheaterConfig.frontier_actions,
-      );
-      const profile = resolveReasoningTheaterFrontierParticleProfile(
-        committedAction,
-        reasoningTheaterConfig.frontier_actions,
-      );
-      const iconBroken = reasoningTheaterFrontierIconBrokenByPath[iconPath] === true;
-      const cursor = reasoningTheaterFrontierCursorRef.current;
-      if (cursor) {
-        const pulseActive = elapsedMs <= reasoningTheaterFrontierPulseUntilMsRef.current;
-        const pulseScale = pulseActive ? 1.18 : 1;
-        cursor.style.left = `${clampedMeter.toFixed(2)}%`;
-        cursor.style.opacity = "1";
-        cursor.style.transform = `translate3d(-50%,-50%,0) scale(${pulseScale.toFixed(2)})`;
-      }
+        const iconPath = resolveReasoningTheaterFrontierIconPath(
+          committedAction,
+          reasoningTheaterConfig.frontier_actions,
+        );
+        profile = resolveReasoningTheaterFrontierParticleProfile(
+          committedAction,
+          reasoningTheaterConfig.frontier_actions,
+        );
+        const iconBroken = reasoningTheaterFrontierIconBrokenByPath[iconPath] === true;
+        const cursor = reasoningTheaterFrontierCursorRef.current;
+        if (cursor) {
+          const pulseActive = elapsedMs <= reasoningTheaterFrontierPulseUntilMsRef.current;
+          const pulseScale = pulseActive ? 1.18 : 1;
+          cursor.style.left = `${clampedMeter.toFixed(2)}%`;
+          cursor.style.opacity = "1";
+          cursor.style.transform = `translate3d(-50%,-50%,0) scale(${pulseScale.toFixed(2)})`;
+        }
 
-      const icon = reasoningTheaterFrontierIconRef.current;
-      if (icon) {
-        if (!iconBroken) {
-          if (icon.getAttribute("src") !== iconPath) {
-            icon.setAttribute("src", iconPath);
+        const icon = reasoningTheaterFrontierIconRef.current;
+        if (icon) {
+          if (!iconBroken) {
+            if (icon.getAttribute("src") !== iconPath) {
+              icon.setAttribute("src", iconPath);
+            }
+            icon.style.display = "block";
+          } else {
+            icon.style.display = "none";
           }
-          icon.style.display = "block";
-        } else {
-          icon.style.display = "none";
         }
-      }
-      const fallback = reasoningTheaterFrontierTextRef.current;
-      if (fallback) {
-        fallback.textContent = REASONING_THEATER_FRONTIER_ACTION_LABEL[committedAction];
-        fallback.style.display = iconBroken ? "inline-flex" : "none";
-        fallback.style.color = profile.color;
-      }
-
-      const densityRatio = clamp01(profile.emit_rate_hz / 30);
-      const activeParticleCount = Math.max(
-        1,
-        Math.round(densityRatio * reasoningTheaterFrontierParticleRefs.current.length),
-      );
-      for (let i = 0; i < reasoningTheaterFrontierParticleRefs.current.length; i += 1) {
-        const node = reasoningTheaterFrontierParticles[i];
-        const element = reasoningTheaterFrontierParticleRefs.current[i];
-        if (!node || !element) continue;
-        if (i >= activeParticleCount) {
-          element.style.opacity = "0";
-          continue;
+        const fallback = reasoningTheaterFrontierTextRef.current;
+        if (fallback) {
+          fallback.textContent = REASONING_THEATER_FRONTIER_ACTION_LABEL[committedAction];
+          fallback.style.display = iconBroken ? "inline-flex" : "none";
+          fallback.style.color = profile.color;
         }
-        const cycleMs = clampNumber(
-          980 - profile.speed_max_px_s * 2.8 + i * 40,
-          260,
-          1200,
-        );
-        const progress = ((elapsedMs + node.phaseOffsetMs) % cycleMs) / cycleMs;
-        const angleDrift = Math.sin((elapsedMs + node.phaseOffsetMs) * 0.003 + i) * profile.spread_deg;
-        const angleDeg =
-          profile.base_direction_deg + angleDrift * (0.45 + profile.turbulence * 0.75);
-        const angleRad = (angleDeg * Math.PI) / 180;
-        const speed =
-          profile.speed_min_px_s +
-          (profile.speed_max_px_s - profile.speed_min_px_s) *
-            (0.24 + ((i + 1) / (activeParticleCount + 1)) * 0.76);
-        const travelPx = speed * 0.22;
-        const jitter = Math.sin((elapsedMs + node.phaseOffsetMs) * 0.014 + i) * profile.turbulence * 5;
-        const x = Math.cos(angleRad) * travelPx * progress;
-        const y = Math.sin(angleRad) * travelPx * progress + jitter;
-        const alpha = (1 - progress) * (0.42 + densityRatio * 0.5);
-        const size = node.baseRadiusPx + profile.turbulence * 1.6;
-        element.style.width = `${size.toFixed(2)}px`;
-        element.style.height = `${size.toFixed(2)}px`;
-        element.style.backgroundColor = profile.color;
-        element.style.opacity = alpha.toFixed(2);
-        element.style.transform = `translate3d(${x.toFixed(2)}px,${y.toFixed(2)}px,0)`;
-      }
 
-      const burst = reasoningTheaterFrontierBurstRef.current;
-      if (burst) {
-        const pulseWindowMs = Math.max(1, REASONING_THEATER_FRONTIER_CURSOR_PULSE_MS);
-        const pulseProgress = clamp01(
-          (reasoningTheaterFrontierPulseUntilMsRef.current - elapsedMs) / pulseWindowMs,
+        const densityRatio = clamp01(profile.emit_rate_hz / 30);
+        const activeParticleCount = Math.max(
+          1,
+          Math.round(densityRatio * reasoningTheaterFrontierParticleRefs.current.length),
         );
-        const shouldShow = profile.transition_burst && pulseProgress > 0;
-        burst.style.opacity = shouldShow ? (pulseProgress * 0.7).toFixed(2) : "0";
-        burst.style.borderColor = profile.color;
-        const ringScale = 0.7 + (1 - pulseProgress) * (profile.shock_ring ? 1.45 : 0.9);
-        burst.style.transform = `translate3d(-50%,-50%,0) scale(${ringScale.toFixed(2)})`;
+        for (let i = 0; i < reasoningTheaterFrontierParticleRefs.current.length; i += 1) {
+          const node = reasoningTheaterFrontierParticles[i];
+          const element = reasoningTheaterFrontierParticleRefs.current[i];
+          if (!node || !element) continue;
+          if (i >= activeParticleCount) {
+            element.style.opacity = "0";
+            continue;
+          }
+          const cycleMs = clampNumber(
+            980 - profile.speed_max_px_s * 2.8 + i * 40,
+            260,
+            1200,
+          );
+          const progress = ((elapsedMs + node.phaseOffsetMs) % cycleMs) / cycleMs;
+          const angleDrift =
+            Math.sin((elapsedMs + node.phaseOffsetMs) * 0.003 + i) * profile.spread_deg;
+          const angleDeg =
+            profile.base_direction_deg + angleDrift * (0.45 + profile.turbulence * 0.75);
+          const angleRad = (angleDeg * Math.PI) / 180;
+          const speed =
+            profile.speed_min_px_s +
+            (profile.speed_max_px_s - profile.speed_min_px_s) *
+              (0.24 + ((i + 1) / (activeParticleCount + 1)) * 0.76);
+          const travelPx = speed * 0.22;
+          const jitter =
+            Math.sin((elapsedMs + node.phaseOffsetMs) * 0.014 + i) * profile.turbulence * 5;
+          const x = Math.cos(angleRad) * travelPx * progress;
+          const y = Math.sin(angleRad) * travelPx * progress + jitter;
+          const alpha = (1 - progress) * (0.42 + densityRatio * 0.5);
+          const size = node.baseRadiusPx + profile.turbulence * 1.6;
+          element.style.width = `${size.toFixed(2)}px`;
+          element.style.height = `${size.toFixed(2)}px`;
+          element.style.backgroundColor = profile.color;
+          element.style.opacity = alpha.toFixed(2);
+          element.style.transform = `translate3d(${x.toFixed(2)}px,${y.toFixed(2)}px,0)`;
+        }
+
+        const burst = reasoningTheaterFrontierBurstRef.current;
+        if (burst) {
+          const pulseWindowMs = Math.max(1, REASONING_THEATER_FRONTIER_CURSOR_PULSE_MS);
+          const pulseProgress = clamp01(
+            (reasoningTheaterFrontierPulseUntilMsRef.current - elapsedMs) / pulseWindowMs,
+          );
+          const shouldShow = profile.transition_burst && pulseProgress > 0;
+          burst.style.opacity = shouldShow ? (pulseProgress * 0.7).toFixed(2) : "0";
+          burst.style.borderColor = profile.color;
+          const ringScale = 0.7 + (1 - pulseProgress) * (profile.shock_ring ? 1.45 : 0.9);
+          burst.style.transform = `translate3d(-50%,-50%,0) scale(${ringScale.toFixed(2)})`;
+        }
       }
     },
     [
@@ -2385,9 +2610,14 @@ export function HelixAskPill({
       reasoningTheaterMeterDisplayRef.current = 50;
       reasoningTheaterClockElapsedMsRef.current = 0;
       reasoningTheaterFrontierTrackerRef.current = createReasoningTheaterFrontierTrackerState("steady");
-      setReasoningTheaterFrontierDebug({ action: "steady", deltaPct: 0 });
+      const steadyDebug = { action: "steady" as const, deltaPct: 0 };
+      reasoningTheaterFrontierDebugRef.current = steadyDebug;
+      setReasoningTheaterFrontierDebug(steadyDebug);
       setReasoningTheaterFrontierIconBrokenByPath({});
       reasoningTheaterFrontierDebugUpdateAtRef.current = 0;
+      setConvergenceStripDisplayState(null);
+      setConvergenceStripCollapseState(null);
+      convergenceStripLastCommitTokenRef.current = null;
       if (!askBusy) {
         resetReasoningTheaterEventClock();
       }
@@ -2549,6 +2779,21 @@ export function HelixAskPill({
   );
   const reasoningTheaterFrontierIconBroken =
     reasoningTheaterFrontierIconBrokenByPath[reasoningTheaterFrontierIconPath] === true;
+  const convergenceStripPresentation = reasoningTheaterConfig.retrieval_zone_layer.presentation;
+  const convergenceStripActiveMode = convergenceStripPresentation.mode === "convergence_strip_v1";
+  const convergenceStripShowPhaseTick =
+    convergenceStripActiveMode && convergenceStripPresentation.show_phase_tick;
+  const convergenceStripShowCaption =
+    convergenceStripActiveMode && convergenceStripPresentation.show_caption;
+  const convergenceStripShowReplySnapshot = convergenceStripPresentation.show_reply_snapshot;
+  const convergenceIdeologyCue =
+    convergenceStripActiveMode &&
+    convergenceStripState.ideologyAnchorNodeIds.length > 0 &&
+    (convergenceStripState.source !== "unknown" || convergenceStripState.proof !== "unknown");
+  const convergenceCollapseVisible =
+    convergenceStripActiveMode &&
+    convergenceStripCollapseState !== null &&
+    convergenceStripCollapseState.token === convergenceStripState.collapseToken;
 
   useEffect(() => {
     if (!askBusy) return;
@@ -2989,6 +3234,10 @@ export function HelixAskPill({
       setAskLiveEvents((prev) => {
         const id = event.id ?? String(event.seq ?? Date.now());
         if (prev.some((entry) => entry.id === id)) return prev;
+        const meta =
+          event.meta && typeof event.meta === "object" && !Array.isArray(event.meta)
+            ? (event.meta as Record<string, unknown>)
+            : undefined;
         const next = [
           ...prev,
           {
@@ -3005,6 +3254,7 @@ export function HelixAskPill({
               typeof event.durationMs === "number" && Number.isFinite(event.durationMs)
                 ? event.durationMs
                 : undefined,
+            meta,
           },
         ];
         const clipped = next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
@@ -3049,6 +3299,33 @@ export function HelixAskPill({
     return statusTrimmed || null;
   }, [askBusy, askLiveDraft, askLiveEvents, askStatus]);
 
+  const buildConvergenceSnapshot = useCallback(
+    (args: {
+      events: AskLiveEventEntry[];
+      proof?: HelixAskReply["proof"];
+      debug?: HelixAskReply["debug"];
+      fallbackPhase?: ReasoningTheaterPhase;
+    }): ConvergenceStripState => {
+      return deriveConvergenceStripState({
+        events: args.events,
+        frontierAction: reasoningTheaterFrontierDebugRef.current.action,
+        frontierDeltaPct: reasoningTheaterFrontierDebugRef.current.deltaPct,
+        proof: args.proof
+          ? {
+              verdict: args.proof.verdict,
+              certificate: {
+                certificateHash: args.proof.certificate?.certificateHash ?? null,
+                integrityOk: args.proof.certificate?.integrityOk ?? null,
+              },
+            }
+          : undefined,
+        debug: buildConvergenceDebugSnapshot(args.debug),
+        fallbackPhase: args.fallbackPhase ?? reasoningTheater?.phase ?? "observe",
+      });
+    },
+    [reasoningTheater?.phase],
+  );
+
   const parseQueuedQuestions = useCallback((value: string): string[] => {
     if (!value) return [];
     return value
@@ -3075,9 +3352,38 @@ export function HelixAskPill({
         ts: entry.ts,
         tsMs: parseTimestampMs(entry.ts) ?? undefined,
         durationMs: entry.durationMs,
+        meta:
+          entry.meta && typeof entry.meta === "object" && !Array.isArray(entry.meta)
+            ? entry.meta
+            : undefined,
       };
     });
   }, []);
+
+  const resolveReplyConvergenceSnapshot = useCallback(
+    (reply: HelixAskReply, events: AskLiveEventEntry[]): ConvergenceStripState => {
+      if (reply.convergenceSnapshot) {
+        return reply.convergenceSnapshot;
+      }
+      return deriveConvergenceStripState({
+        events,
+        frontierAction: "steady",
+        frontierDeltaPct: 0,
+        proof: reply.proof
+          ? {
+              verdict: reply.proof.verdict,
+              certificate: {
+                certificateHash: reply.proof.certificate?.certificateHash ?? null,
+                integrityOk: reply.proof.certificate?.integrityOk ?? null,
+              },
+            }
+          : undefined,
+        debug: buildConvergenceDebugSnapshot(reply.debug),
+        fallbackPhase: "debrief",
+      });
+    },
+    [],
+  );
 
 
   const extractObjectiveSignals = useCallback((events: AskLiveEventEntry[]) => {
@@ -3173,6 +3479,11 @@ export function HelixAskPill({
           requestMoodHint(responseText, { force: true });
           const replyId = crypto.randomUUID();
           const liveEventsSnapshot = [...askLiveEventsRef.current];
+          const convergenceSnapshot = buildConvergenceSnapshot({
+            events: liveEventsSnapshot,
+            proof: responseProof,
+            debug: responseDebug,
+          });
           setAskReplies((prev) =>
             [
               {
@@ -3186,6 +3497,7 @@ export function HelixAskPill({
                 proof: responseProof,
                 sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
                 liveEvents: liveEventsSnapshot,
+                convergenceSnapshot,
               },
               ...prev,
             ].slice(0, 3),
@@ -3213,6 +3525,7 @@ export function HelixAskPill({
     },
     [
       addMessage,
+      buildConvergenceSnapshot,
       cancelMoodHint,
       clearLiveDraftFlush,
       clearMoodTimer,
@@ -3324,6 +3637,11 @@ export function HelixAskPill({
           requestMoodHint(responseText, { force: true });
           const replyId = crypto.randomUUID();
           const liveEventsSnapshot = [...askLiveEventsRef.current];
+          const convergenceSnapshot = buildConvergenceSnapshot({
+            events: liveEventsSnapshot,
+            proof: responseProof,
+            debug: responseDebug,
+          });
           setAskReplies((prev) =>
             [
               {
@@ -3337,6 +3655,7 @@ export function HelixAskPill({
                 proof: responseProof,
                 sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
                 liveEvents: liveEventsSnapshot,
+                convergenceSnapshot,
               },
               ...prev,
             ].slice(0, 3),
@@ -3365,6 +3684,7 @@ export function HelixAskPill({
     [
       addMessage,
       askBusy,
+      buildConvergenceSnapshot,
       cancelMoodHint,
       clearLiveDraftFlush,
       clearMoodTimer,
@@ -3778,6 +4098,79 @@ export function HelixAskPill({
                       <p className="mt-1 text-[11px] text-slate-200/90">
                         {reasoningTheater.symbolicLine}
                       </p>
+                      {convergenceStripActiveMode ? (
+                        <div className="relative mt-2 overflow-hidden rounded-lg border border-white/15 bg-black/35 px-2 py-2">
+                          {convergenceCollapseVisible ? (
+                            <div className="pointer-events-none absolute inset-0">
+                              <span
+                                key={convergenceStripCollapseState?.token}
+                                className="absolute inset-0 rounded-lg border border-cyan-200/60"
+                                style={{
+                                  animationName: "ping",
+                                  animationDuration: `${Math.max(120, convergenceStripPresentation.collapse_pulse_ms)}ms`,
+                                  animationTimingFunction: "cubic-bezier(0,0,0.2,1)",
+                                  animationIterationCount: 1,
+                                }}
+                              />
+                            </div>
+                          ) : null}
+                          <div className="relative flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceSourceTone(convergenceStripState.source)}`}
+                            >
+                              {CONVERGENCE_SOURCE_LABEL[convergenceStripState.source]}
+                            </span>
+                            <span
+                              className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceProofTone(convergenceStripState.proof)}`}
+                            >
+                              {CONVERGENCE_PROOF_LABEL[convergenceStripState.proof]}
+                            </span>
+                            <span
+                              className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceMaturityTone(convergenceStripState.maturity)}`}
+                            >
+                              {CONVERGENCE_MATURITY_LABEL[convergenceStripState.maturity]}
+                            </span>
+                            {convergenceIdeologyCue ? (
+                              <span className="inline-flex items-center rounded border border-violet-300/35 bg-violet-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] text-violet-100">
+                                ideology cue
+                              </span>
+                            ) : null}
+                            {convergenceCollapseVisible ? (
+                              <span className="inline-flex items-center rounded border border-cyan-300/45 bg-cyan-400/12 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] text-cyan-100">
+                                {convergenceStripCollapseState
+                                  ? CONVERGENCE_COLLAPSE_LABEL[convergenceStripCollapseState.event]
+                                  : ""}
+                              </span>
+                            ) : null}
+                          </div>
+                          {convergenceStripShowPhaseTick ? (
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                              {CONVERGENCE_PHASE_ORDER.map((phase, index) => {
+                                const active = phase === convergenceStripState.phase;
+                                return (
+                                  <div key={phase} className="flex items-center gap-1">
+                                    <span
+                                      className={`h-1.5 w-1.5 rounded-full ${
+                                        active ? "bg-cyan-200 shadow-[0_0_8px_rgba(34,211,238,0.8)]" : "bg-slate-500/70"
+                                      }`}
+                                      title={CONVERGENCE_PHASE_LABEL[phase]}
+                                    />
+                                    {index < CONVERGENCE_PHASE_ORDER.length - 1 ? (
+                                      <span className="h-px w-2 bg-slate-500/50" />
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                              <span className="ml-1 text-[9px] uppercase tracking-[0.14em] text-slate-300/90">
+                                {CONVERGENCE_PHASE_LABEL[convergenceStripState.phase]}
+                              </span>
+                            </div>
+                          ) : null}
+                          {convergenceStripShowCaption ? (
+                            <p className="mt-1 text-[10px] text-slate-200/90">{convergenceStripState.caption}</p>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {reasoningTheaterMedalQueue.length > 0 ? (
                         <div className="pointer-events-none mt-1 space-y-1 text-cyan-100/95">
                           <div className="flex items-end gap-1.5">
@@ -3983,6 +4376,7 @@ export function HelixAskPill({
           <div className="mt-4 max-h-[52vh] space-y-3 overflow-y-auto pr-2">
           {askReplies.map((reply) => {
             const replyEvents = resolveReplyEvents(reply);
+            const replyConvergence = resolveReplyConvergenceSnapshot(reply, replyEvents);
             const expanded = Boolean(askExpandedByReply[reply.id]);
             return (
               <div
@@ -4007,15 +4401,43 @@ export function HelixAskPill({
                     <div className="mt-2 rounded-lg border border-indigo-400/20 bg-indigo-950/20 px-3 py-2 text-xs text-indigo-100">
                       <p className="text-[10px] uppercase tracking-[0.2em] text-indigo-300">Objective-first situational view</p>
                       {objectiveSignals.objective ? <p className="mt-1">Objective: {objectiveSignals.objective}</p> : null}
-                      {objectiveSignals.gaps.length > 0 ? <p className="mt-1">Top unresolved gaps: {objectiveSignals.gaps.join(" · ")}</p> : null}
+                      {objectiveSignals.gaps.length > 0 ? <p className="mt-1">Top unresolved gaps: {objectiveSignals.gaps.join(" | ")}</p> : null}
                       <p className="mt-1">Suppression inspector: {objectiveSignals.suppression ?? "not suppressed"}</p>
                     </div>
                   );
                 })()}
+                {convergenceStripShowReplySnapshot ? (
+                  <div className="mt-2 rounded-lg border border-white/12 bg-black/25 px-3 py-2 text-xs">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Convergence snapshot</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceSourceTone(replyConvergence.source)}`}
+                      >
+                        {CONVERGENCE_SOURCE_LABEL[replyConvergence.source]}
+                      </span>
+                      <span
+                        className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceProofTone(replyConvergence.proof)}`}
+                      >
+                        {CONVERGENCE_PROOF_LABEL[replyConvergence.proof]}
+                      </span>
+                      <span
+                        className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceMaturityTone(replyConvergence.maturity)}`}
+                      >
+                        {CONVERGENCE_MATURITY_LABEL[replyConvergence.maturity]}
+                      </span>
+                      <span className="inline-flex items-center rounded border border-slate-300/25 bg-slate-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] text-slate-200">
+                        {CONVERGENCE_PHASE_LABEL[replyConvergence.phase]}
+                      </span>
+                    </div>
+                    {convergenceStripShowCaption ? (
+                      <p className="mt-1 text-[10px] text-slate-300">{replyConvergence.caption}</p>
+                    ) : null}
+                  </div>
+                ) : null}
                 {reply.proof ? (
                   <div className="mt-2 rounded-lg border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100">
                     <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-300">Proof</p>
-                    <p className="mt-1">Mode: {reply.mode ?? "read"} · Verdict: {reply.proof.verdict ?? "n/a"}</p>
+                    <p className="mt-1">Mode: {reply.mode ?? "read"} | Verdict: {reply.proof.verdict ?? "n/a"}</p>
                     {reply.proof.certificate?.certificateHash ? (
                       <p className="mt-1">Certificate: {reply.proof.certificate.certificateHash}</p>
                     ) : null}
@@ -4049,7 +4471,7 @@ export function HelixAskPill({
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
                 <span>
                   Saved in Helix Console
-                  {reply.promptIngested ? " · Prompt ingested" : ""}
+                  {reply.promptIngested ? " | Prompt ingested" : ""}
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -4089,3 +4511,5 @@ export function HelixAskPill({
     </HelixAskErrorBoundary>
   );
 }
+
+

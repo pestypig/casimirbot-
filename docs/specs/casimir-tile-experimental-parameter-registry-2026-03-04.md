@@ -48,7 +48,7 @@ Per-paper equation trace:
 |---|---|---|---:|---|---|---|---|---|---|---|---|
 | EXP-T-001 | SRC-031 | WR demo chain length | 15 | km | UNKNOWN | Four-switch daisy chain, 5 km fiber each | NIM A 2013, Measurements section, Fig. 5/6 | full_text | primary | `sigma_t_ps`,`TIE_pp_ps`,`PDV_pp_ps` | extracted |
 | EXP-T-002 | SRC-031 | WR accumulated skew | < 1 | ns | UNKNOWN | Same setup as EXP-T-001 | NIM A 2013, Measurements section | full_text | primary | `sigma_t_ps`,`TIE_pp_ps` | extracted |
-| EXP-T-003 | SRC-031 | WR offset standard deviation | ~6 | ps | UNKNOWN | Histogram of master-slave offsets | NIM A 2013, Measurements section, Fig. 6 | full_text | primary | `sigma_t_ps` | extracted |
+| EXP-T-003 | SRC-031 | WR offset standard deviation | ~6 | ps | ~6 ps (reported 1sigma spread; strict-lane uncertainty proxy) | Histogram of master-slave offsets | NIM A 2013, Measurements section, Fig. 6 | full_text | primary | `sigma_t_ps` | extracted |
 | EXP-T-004 | SRC-031 | WR node sync target accuracy | < 1 | ns | UNKNOWN | Intro/design goal statement | NIM A 2013, Introduction | full_text | primary | timing acceptance profile | extracted |
 | EXP-T-005 | SRC-032 | Unrepeated WR span length | 300 | km | UNKNOWN | Single-span fiber link | arXiv:2511.23254, p.1 abstract | full_text | preprint | long-haul exploratory lane | extracted |
 | EXP-T-006 | SRC-032 | One-way link loss | 51.34 | dB | UNKNOWN | 300 km link configuration | arXiv:2511.23254, p.1 abstract and Fig. 1 caption | full_text | preprint | long-haul exploratory lane | extracted |
@@ -64,6 +64,16 @@ Per-paper equation trace:
 | EXP-T-016 | SRC-032 | Allan time deviation definition | `sigma_x^2(tau)=1/(6m^2(N-3m+1))*sum_{j=1}^{N-3m+1}[sum_{i=j}^{j+m-1}(x_{i+2m}-2x_{i+m}+x_i)]^2` | symbolic | UNKNOWN | `tau=m*tau0`; `x_i` is phase-error time series | arXiv:2511.23254, Eq. (1), p.4 | full_text | preprint | `sigma_t_ps` | extracted |
 | EXP-T-017 | SRC-032 | Maximum time interval error definition | `MTIE(tau)=max_{1<=k<=N-n}(max_{k<=i<=k+n}(x_i)-min_{k<=i<=k+n}(x_i))` | symbolic | UNKNOWN | `tau=n*tau0`; `x_i` in time units | arXiv:2511.23254, Eq. (2), p.5 | full_text | preprint | `TIE_pp_ps` | extracted |
 | EXP-T-018 | SRC-032 | 300 km MTIE acceptance anchor | <100 | ps | UNKNOWN | Longest no-dropout interval; holds through averaging times <=100 s | arXiv:2511.23254, p.5 results | full_text | preprint | `TIE_pp_ps` acceptance profile | extracted |
+| EXP-T-019 | SRC-067 | WR design scalability target | 1000 | nodes | UNKNOWN | Deterministic transfer and synchronization scope target for WR network design | ICALEPCS2009 TUC004, abstract/intro | full_text | primary | timing topology class | extracted |
+| EXP-T-020 | SRC-067 | WR automatic compensation path scale | ~10 | km | UNKNOWN | Auto-compensated optical-fiber paths of order 10 km in design statement | ICALEPCS2009 TUC004, intro | full_text | primary | timing topology class | extracted |
+| EXP-T-021 | SRC-067 | WR single-link skew bound | <1 | ns | UNKNOWN | Per-link skew statement in multi-switch validation setup | ICALEPCS2009 TUC004, results section | full_text | primary | `TIE_pp_ps` | extracted |
+| EXP-T-022 | SRC-067 | WR last-slave skew bound in multi-switch chain | <200 | ps | UNKNOWN | Three-switch setup; reported last-slave skew versus master | ICALEPCS2009 TUC004, results section | full_text | primary | `sigma_t_ps`,`TIE_pp_ps` | extracted |
+| EXP-T-023 | SRC-067 | WR accumulated skew across chain | <0.5 | ns | UNKNOWN | Three-switch daisy chain timing accumulation | ICALEPCS2009 TUC004, results section | full_text | primary | `TIE_pp_ps` acceptance profile | extracted |
+| EXP-T-024 | SRC-068 | WR clock subsystem timing precision target | <50 | ps | UNKNOWN | Stated subsystem objective for timing precision | ISPCS 2016 (clock characteristics), abstract | full_text | primary | `sigma_t_ps` acceptance profile | extracted |
+| EXP-T-025 | SRC-068 | WR DDMTD phase-tagging resolution | 0.977 | ps | UNKNOWN | PLL+DDMTD phase-tagging implementation detail | ISPCS 2016 (clock characteristics), timing architecture section | full_text | primary | timestamping precision lane | extracted |
+| EXP-T-026 | SRC-068 | WR SoftPLL update bandwidth | 30 | Hz | UNKNOWN | SoftPLL update path in timing architecture | ISPCS 2016 (clock characteristics), timing architecture section | full_text | primary | clock-mode conditions | extracted |
+| EXP-T-027 | SRC-068 | WR max measured frequency offset in G.8262 setup | 4.256 | ppm | UNKNOWN | 24 h run under G.8262 setup | ISPCS 2016 (clock characteristics), G.8262 experiment section | full_text | primary | frequency stability lane | extracted |
+| EXP-T-028 | SRC-068 | WR frequency-offset bound over 1000 s windows | <20 | ppb | UNKNOWN | Same run as EXP-T-027; all windows below bound | ISPCS 2016 (clock characteristics), G.8262 experiment section | full_text | primary | frequency stability lane | extracted |
 
 ## Nanogap Extraction
 
@@ -145,6 +155,9 @@ Per-paper equation trace:
 | EXP-Q-017 | SRC-062 | Electric-field filling factor (100 nm oxide) | ~6e-8 | dimensionless | UNKNOWN | TM010 simulation with epsilon~33 | arXiv:1705.05982, Eq. (4) discussion | full_text | preprint | oxide-participation lane | extracted |
 | EXP-Q-018 | SRC-062 | Inferred TLS loss tangent from saturated-Q estimate | ~1e-2 | dimensionless | UNKNOWN | Uses Q~3e10 and F*delta_TLS~1/Q relation | arXiv:1705.05982, Eq. (3) fit discussion | full_text | preprint | `q_spoil_tls_delta` | extracted |
 | EXP-Q-019 | SRC-062 | Nitrogen pressure used in condensed-gas low-field test | 1e-4 | Torr | UNKNOWN | Cooldown in nitrogen; no observable LFQS change | arXiv:1705.05982, experiment notes | full_text | preprint | contamination-control lane | extracted |
+| EXP-Q-020 | SRC-023 | Hydride/Q-disease spoil-factor relative uncertainty (measured-ratio spread) | 0.053 | relative | k=1 (half-range/mean over measured ratio pair {20,18}) | Derived from measured spoil-factor ratios `EXP-Q-001/EXP-Q-002=20` and corroborating SRF run `EXP-Q-003/EXP-Q-002=18` | Supercond. Sci. Technol. 26(10) 102001 + corroborating SRF proceedings lane | full_text | primary | `u_q0_rel:hydride`,`u_f_rel:hydride` | extracted |
+| EXP-Q-021 | SRC-022 | Trapped-flux lane relative uncertainty anchor (measured sensitivity spread) | 0.625 | relative | k=1 (half-range/mean over 0.9 to 3.9 nOhm/mG) | Derived from trapped-flux sensitivity spread in the trapped-flux mechanism lane | Phys. Rev. ST Accel. Beams 17, 012001 trapped-flux sensitivity lane | full_text | primary | `u_q0_rel:trapped_flux`,`u_f_rel:trapped_flux` | extracted |
+| EXP-Q-022 | SRC-021 | TLS/oxide lane relative uncertainty anchor (measured fit-range spread) | 0.857 | relative | k=1 (half-range/mean over Ec range 0.02 to 0.26 MV/m) | Derived from low-field TLS fit spread (`EXP-Q-014`) with journal-companion SRF low-field Q-slope semantics | Phys. Rev. Lett. 119, 264801 + companion full-text fit lane | full_text | primary | `u_q0_rel:tls_oxide`,`u_f_rel:tls_oxide` | extracted |
 
 ## Casimir Sign-Control Extraction
 
@@ -211,10 +224,10 @@ Per-paper equation trace:
 
 | lane | sources attempted | extracted rows | partial rows | blocked rows |
 |---|---:|---:|---:|---:|
-| timing | 5 | 16 | 2 | 0 |
+| timing | 7 | 26 | 2 | 0 |
 | nanogap | 6 | 32 | 0 | 0 |
 | sem_ellipsometry | 5 | 14 | 1 | 0 |
-| q_spoiling | 5 | 17 | 2 | 0 |
+| q_spoiling | 6 | 20 | 2 | 0 |
 | casimir_sign_control | 4 | 21 | 2 | 0 |
 | worldline_qei | 9 | 18 | 0 | 0 |
 | provenance_attestation | 3 | 5 | 0 | 0 |
@@ -229,6 +242,7 @@ Per-paper equation trace:
 7. Provenance/attestation extraction is source-complete at schema level, but CI-integrated verification artifacts are still pending for promotion use.
 8. `SRC-062` and `SRC-063` are preprint extraction lanes; journal-linked primary counterparts remain canonical for normative claim phrasing.
 9. `SRC-065` is a numerical-methods implementation anchor and must be paired with theorem-level QEI sources when defining hard gate policy semantics.
+10. `EXP-Q-020..EXP-Q-022` replace the prior policy-only uncertainty anchor with mechanism-specific measured-spread anchors and are tagged as reportable uncertainty anchors for the q-spoiling lane.
 
 ## Traceability
 - `registry_id`: `casimir-tile-experimental-parameter-registry-2026-03-04`

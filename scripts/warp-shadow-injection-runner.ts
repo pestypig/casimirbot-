@@ -33,8 +33,62 @@ type CasimirSignContext = {
   sourceRefs?: string[];
 };
 
+type QSpoilingContext = {
+  mechanismLane?: string;
+  q0Baseline?: number;
+  f_q_spoil?: number;
+  q0Spoiled?: number;
+  sourceRefs?: string[];
+  uncertainty?: {
+    u_q0_rel?: number;
+    u_f_rel?: number;
+    method?: string;
+    reportableReady?: boolean;
+    blockedReasons?: string[];
+    sourceRefs?: string[];
+  };
+};
+
+type NanogapContext = {
+  profileId?: string;
+  u_g_mean_nm?: number;
+  u_g_sigma_nm?: number;
+  tip_method?: string;
+  fiducial_present?: boolean;
+  sourceRefs?: string[];
+  uncertainty?: {
+    method?: string;
+    reportableReady?: boolean;
+    blockedReasons?: string[];
+    sourceRefs?: string[];
+  };
+};
+
+type TimingContext = {
+  profileId?: string;
+  sigma_t_ps?: number;
+  tie_pp_ps?: number | null;
+  pdv_pp_ps?: number | null;
+  timestamping_mode?: string;
+  synce_enabled?: boolean;
+  clock_mode?: string;
+  topology_class?: string;
+  sourceRefs?: string[];
+  uncertainty?: {
+    u_sigma_t_ps?: number | null;
+    u_tie_pp_ps?: number | null;
+    u_pdv_pp_ps?: number | null;
+    method?: string;
+    reportableReady?: boolean;
+    blockedReasons?: string[];
+  };
+};
+
 type ExperimentalContext = {
   casimirSign?: CasimirSignContext;
+  qSpoiling?: QSpoilingContext;
+  nanogap?: NanogapContext;
+  timing?: TimingContext;
 };
 
 type ShadowScenario = {
@@ -350,9 +404,18 @@ const renderMarkdown = (payload: any): string => {
       const margin = row.guard?.marginRatioRaw ?? 'n/a';
       const delta = row.deltaFromBaseline?.marginRatioRaw ?? 'n/a';
       const csContext = row.experimentalContext?.casimirSign;
+      const qsContext = row.experimentalContext?.qSpoiling;
+      const ngContext = row.experimentalContext?.nanogap;
+      const tiContext = row.experimentalContext?.timing;
       const contextSummary = csContext
         ? `${csContext.branchHypothesis ?? 'n/a'};${csContext.materialPair ?? 'n/a'};${csContext.interveningMedium ?? 'n/a'}`
-        : 'n/a';
+        : qsContext
+          ? `${qsContext.mechanismLane ?? 'n/a'};Q0=${qsContext.q0Baseline ?? 'n/a'};F=${qsContext.f_q_spoil ?? 'n/a'}`
+          : ngContext
+            ? `${ngContext.profileId ?? 'n/a'};u_mean=${ngContext.u_g_mean_nm ?? 'n/a'};u_sigma=${ngContext.u_g_sigma_nm ?? 'n/a'}`
+            : tiContext
+              ? `${tiContext.profileId ?? 'n/a'};sigma=${tiContext.sigma_t_ps ?? 'n/a'};ts=${tiContext.timestamping_mode ?? 'n/a'}`
+            : 'n/a';
       const failReasons =
         row.guard?.congruentSolveFailReasons && row.guard.congruentSolveFailReasons.length > 0
           ? row.guard.congruentSolveFailReasons.join(', ')

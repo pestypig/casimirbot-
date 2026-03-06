@@ -105,7 +105,7 @@ type GitProvenance = {
   hasMainBranch: boolean;
 };
 
-const BASE_URL = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5173";
+const BASE_URL = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5050";
 const OUT_DIR = process.env.HELIX_ASK_VERSATILITY_OUT ?? "artifacts/experiments/helix-ask-versatility";
 const REPORT_PATH = process.env.HELIX_ASK_VERSATILITY_REPORT ?? "reports/helix-ask-versatility-report.md";
 const PROMPT_ORDER_MODE = process.env.HELIX_ASK_VERSATILITY_PROMPT_ORDER_MODE ?? "sequential";
@@ -123,8 +123,9 @@ const TEMPS = (process.env.HELIX_ASK_VERSATILITY_TEMPS ?? "0.2")
   .filter((entry) => Number.isFinite(entry));
 const START_SERVER = (process.env.HELIX_ASK_VERSATILITY_START_SERVER ?? "0") === "1";
 const SERVER_COMMAND = process.env.HELIX_ASK_VERSATILITY_SERVER_CMD ?? "npm";
+const DEFAULT_SERVER_ARGS = ["run", "dev:agi:5050"];
 const SERVER_ARGS =
-  process.env.HELIX_ASK_VERSATILITY_SERVER_ARGS?.split(/\s+/).filter(Boolean) ?? ["run", "dev:agi:5173"];
+  process.env.HELIX_ASK_VERSATILITY_SERVER_ARGS?.split(/\s+/).filter(Boolean) ?? DEFAULT_SERVER_ARGS;
 const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_ASK_VERSATILITY_TIMEOUT_MS ?? 15000);
 const PRECHECK_TIMEOUT_MS = Math.max(
   1000,

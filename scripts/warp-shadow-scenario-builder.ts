@@ -42,7 +42,7 @@ type StrictSignalRequirement = {
 };
 
 type StrictLaneRequirement = {
-  flag: 'strict_qei' | 'strict_casimir_sign';
+  flag: 'strict_qei' | 'strict_casimir_sign' | 'strict_q_spoiling' | 'strict_nanogap' | 'strict_timing';
   requiredSourceClasses?: string[];
   requiredSignals: StrictSignalRequirement[];
 };
@@ -71,6 +71,35 @@ type CasimirSignContext = {
 
 type ExperimentalContext = {
   casimirSign?: CasimirSignContext;
+  nanogap?: {
+    profileId?: 'NG-STD-10' | 'NG-ADV-5';
+    u_g_mean_nm?: number;
+    u_g_sigma_nm?: number;
+    tip_method?: 'btr' | 'direct_ref';
+    fiducial_present?: boolean;
+    sourceRefs?: string[];
+    uncertainty?: {
+      method?: string;
+      reportableReady?: boolean;
+      blockedReasons?: string[];
+      sourceRefs?: string[];
+    };
+  };
+  qSpoiling?: {
+    mechanismLane?: string;
+    q0Baseline?: number;
+    f_q_spoil?: number;
+    q0Spoiled?: number;
+    sourceRefs?: string[];
+    uncertainty?: {
+      u_q0_rel?: number;
+      u_f_rel?: number;
+      method?: string;
+      reportableReady?: boolean;
+      blockedReasons?: string[];
+      sourceRefs?: string[];
+    };
+  };
 };
 
 type BuiltScenario = {
@@ -129,6 +158,11 @@ const parseNumberCandidates = (raw: string): number[] => {
     .filter((value) => Number.isFinite(value));
 };
 
+const parsePositiveNumberFromValue = (raw: string): number | null => {
+  const candidates = parseNumberCandidates(raw).filter((value) => value > 0);
+  return candidates.length > 0 ? candidates[0] : null;
+};
+
 const deepClone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
 const isUnknownValue = (value: unknown): boolean => {
@@ -184,7 +218,7 @@ const buildRowText = (row: RegistryRow): string =>
   `${row.entry_id} ${row.parameter} ${row.value} ${row.unit} ${row.uncertainty} ${row.conditions} ${row.paper_ref} ${row.maps_to_spec}`.toLowerCase();
 
 const rowMatchesStrictSignal = (row: RegistryRow, signal: StrictSignalRequirement): boolean => {
-  if (signal.id === 'uncertainty_fields_anchor') {
+  if (signal.id === 'uncertainty_fields_anchor' || signal.id === 'uncertainty_anchor') {
     return !isUnknownValue(row.uncertainty);
   }
   const entryId = String(row.entry_id).trim().toUpperCase();
@@ -306,6 +340,22 @@ const selectStrictQeiRows = (rows: RegistryRow[], maxPerLane: number): { selecte
   };
 };
 
+const canDeriveQSpoilRatio = (rows: RegistryRow[]): boolean => {
+  const textOf = (row: RegistryRow): string =>
+    `${row.parameter} ${row.maps_to_spec} ${row.conditions}`.toLowerCase();
+  const baselineRow =
+    rows.find((row) => row.entry_id.toUpperCase() === 'EXP-Q-001') ??
+    rows.find((row) => /q0_baseline|post-treatment|quality factor/.test(textOf(row)));
+  const spoiledRow =
+    rows.find((row) => row.entry_id.toUpperCase() === 'EXP-Q-002') ??
+    rows.find((row) => /q_spoil_factor|q disease|degraded|spoil/.test(textOf(row)));
+  const q0Baseline = baselineRow ? parsePositiveNumberFromValue(baselineRow.value) : null;
+  const q0Spoiled = spoiledRow ? parsePositiveNumberFromValue(spoiledRow.value) : null;
+  if (q0Baseline == null || q0Spoiled == null) return false;
+  const ratio = q0Baseline / q0Spoiled;
+  return Number.isFinite(ratio) && ratio > 1;
+};
+
 const applyLaneDerivedOverrides = (lane: string, rows: RegistryRow[], overrides: ScenarioOverrides) => {
   if (lane === 'nanogap') {
     const nmCandidates = rows
@@ -419,6 +469,128 @@ const deriveCasimirSignContext = (rows: RegistryRow[]): CasimirSignContext => {
   };
 };
 
+const deriveQSpoilingContext = (rows: RegistryRow[]): NonNullable<ExperimentalContext['qSpoiling']> => {
+  const textOf = (row: RegistryRow): string =>
+    `${row.parameter} ${row.maps_to_spec} ${row.conditions}`.toLowerCase();
+  const baselineRow =
+    rows.find((row) => row.entry_id.toUpperCase() === 'EXP-Q-001') ??
+    rows.find((row) => /q0_baseline|post-treatment|quality factor/.test(textOf(row)));
+  const spoiledRow =
+    rows.find((row) => row.entry_id.toUpperCase() === 'EXP-Q-002') ??
+    rows.find((row) => /q_spoil_factor|q disease|degraded|spoil/.test(textOf(row)));
+  const q0Baseline = baselineRow ? parsePositiveNumberFromValue(baselineRow.value) : null;
+  const q0Spoiled = spoiledRow ? parsePositiveNumberFromValue(spoiledRow.value) : null;
+  const fQSpool =
+    q0Baseline != null && q0Spoiled != null && q0Spoiled > 0 ? Number((q0Baseline / q0Spoiled).toFixed(6)) : null;
+
+  const rowHasRelativeUncertaintyAnchor = (row: RegistryRow): boolean => {
+    const text = `${row.parameter} ${row.maps_to_spec}`.toLowerCase();
+    return /u_q0_rel|u_f_rel|relative uncertainty/.test(text);
+  };
+
+  const parseRelativeUncertaintyCandidates = (row: RegistryRow): number[] => {
+    const fromUncertainty = isUnknownValue(row.uncertainty)
+      ? []
+      : parseNumberCandidates(row.uncertainty)
+          .filter((value) => value > 0)
+          .map((value) => {
+            if (value <= 1) return value;
+            const base = parsePositiveNumberFromValue(row.value);
+            if (base != null && base > 0) return value / base;
+            return Number.NaN;
+          })
+          .filter((value) => Number.isFinite(value) && value > 0);
+
+    if (fromUncertainty.length > 0) return fromUncertainty;
+    if (!rowHasRelativeUncertaintyAnchor(row)) return [];
+
+    return parseNumberCandidates(row.value)
+      .filter((value) => value > 0)
+      .map((value) => {
+        if (value <= 1) return value;
+        if (value <= 100) return value / 100;
+        return Number.NaN;
+      })
+      .filter((value) => Number.isFinite(value) && value > 0);
+  };
+
+  const uncertaintyCandidates = rows.flatMap(parseRelativeUncertaintyCandidates);
+  const numericReady = uncertaintyCandidates.length > 0;
+  const uRel = numericReady ? Math.min(0.5, Math.max(0.01, median(uncertaintyCandidates) ?? 0.3)) : 0.3;
+  const uncertaintyMethod = numericReady ? 'registry_numeric_anchor' : 'conservative_fallback_missing_numeric';
+  const mechanismLane = rows.some((row) => /hydride|q disease/i.test(textOf(row)))
+    ? 'hydride'
+    : rows.some((row) => /flux/i.test(textOf(row)))
+      ? 'flux'
+      : rows.some((row) => /tls|oxide/i.test(textOf(row)))
+        ? 'oxide_tls'
+        : 'mixed_reference';
+
+  return {
+    mechanismLane,
+    q0Baseline: q0Baseline ?? undefined,
+    f_q_spoil: fQSpool ?? undefined,
+    q0Spoiled: q0Spoiled ?? undefined,
+    sourceRefs: rows.map((row) => row.entry_id),
+    uncertainty: {
+      u_q0_rel: Number(uRel.toFixed(6)),
+      u_f_rel: Number(uRel.toFixed(6)),
+      method: uncertaintyMethod,
+      reportableReady: numericReady,
+      blockedReasons: numericReady ? [] : ['missing_numeric_uncertainty_anchor'],
+      sourceRefs: numericReady ? rows.map((row) => row.entry_id) : [],
+    },
+  };
+};
+
+const deriveNanogapContext = (rows: RegistryRow[]): NonNullable<ExperimentalContext['nanogap']> => {
+  const refs = rows.map((row) => row.entry_id.toUpperCase());
+  const byId = new Map(rows.map((row) => [row.entry_id.toUpperCase(), row]));
+  const parseRowValue = (entryId: string): number | null => parsePositiveNumberFromValue(byId.get(entryId)?.value ?? '');
+
+  const uCalibration = parseRowValue('EXP-NG-002');
+  const uNoise = parseRowValue('EXP-NG-006');
+  const uStress = parseRowValue('EXP-NG-007');
+
+  const uMean =
+    uCalibration != null
+      ? Math.max(uCalibration, uNoise ?? 0)
+      : uNoise != null
+        ? uNoise
+        : null;
+  const uSigma =
+    uCalibration != null
+      ? Math.max(uCalibration, uStress ?? uNoise ?? 0)
+      : uStress != null
+        ? uStress
+        : uNoise != null
+          ? uNoise
+          : null;
+
+  const reportableReady = uMean != null && uSigma != null;
+  const blockedReasons: string[] = [];
+  if (uMean == null) blockedReasons.push('missing_u_g_mean_anchor');
+  if (uSigma == null) blockedReasons.push('missing_u_g_sigma_anchor');
+
+  const profileId: 'NG-STD-10' | 'NG-ADV-5' =
+    (uMean ?? Number.POSITIVE_INFINITY) <= 1 && (uSigma ?? Number.POSITIVE_INFINITY) <= 1 ? 'NG-ADV-5' : 'NG-STD-10';
+
+  return {
+    profileId,
+    ...(uMean != null ? { u_g_mean_nm: Number(uMean.toFixed(6)) } : {}),
+    ...(uSigma != null ? { u_g_sigma_nm: Number(uSigma.toFixed(6)) } : {}),
+    tip_method: refs.includes('EXP-NG-019') || refs.includes('EXP-NG-020') ? 'btr' : 'direct_ref',
+    fiducial_present: refs.includes('EXP-NG-011') && refs.includes('EXP-NG-012'),
+    sourceRefs: rows.map((row) => row.entry_id),
+    uncertainty: {
+      method: reportableReady ? 'registry_anchor_derived' : 'conservative_fallback_missing_numeric',
+      reportableReady,
+      blockedReasons,
+      sourceRefs: rows.map((row) => row.entry_id),
+    },
+  };
+};
+
 const toScenario = (
   lane: string,
   selectedRows: RegistryRow[],
@@ -434,7 +606,13 @@ const toScenario = (
   };
   applyLaneDerivedOverrides(lane, selectedRows, overrides);
   const experimentalContext: ExperimentalContext | undefined =
-    lane === 'casimir_sign_control' ? { casimirSign: deriveCasimirSignContext(selectedRows) } : undefined;
+    lane === 'casimir_sign_control'
+      ? { casimirSign: deriveCasimirSignContext(selectedRows) }
+      : lane === 'nanogap'
+        ? { nanogap: deriveNanogapContext(selectedRows) }
+      : lane === 'q_spoiling'
+        ? { qSpoiling: deriveQSpoilingContext(selectedRows) }
+        : undefined;
 
   return {
     id: `auto_${lane}_${DATE_STAMP}`.replace(/[^a-z0-9_]+/gi, '_').toLowerCase(),
@@ -462,6 +640,9 @@ export const buildWarpShadowScenarios = (options: {
   maxPerLane?: number;
   strictQei?: boolean;
   strictCasimirSign?: boolean;
+  strictQSpoiling?: boolean;
+  strictNanogap?: boolean;
+  strictTiming?: boolean;
 }) => {
   const registryPath = options.registryPath ?? DEFAULT_REGISTRY_PATH;
   const rulebookPath = options.rulebookPath ?? DEFAULT_RULEBOOK_PATH;
@@ -473,6 +654,9 @@ export const buildWarpShadowScenarios = (options: {
   const entryFilter = new Set((options.entryFilter ?? []).map((value) => value.toUpperCase()));
   const strictQei = options.strictQei === true;
   const strictCasimirSign = options.strictCasimirSign === true;
+  const strictQSpoiling = options.strictQSpoiling === true;
+  const strictNanogap = options.strictNanogap === true;
+  const strictTiming = options.strictTiming === true;
 
   const rulebook = JSON.parse(fs.readFileSync(rulebookPath, 'utf8')) as Rulebook;
   const rows = parseRegistryRows(fs.readFileSync(registryPath, 'utf8'));
@@ -504,6 +688,9 @@ export const buildWarpShadowScenarios = (options: {
     if (!requirement) return false;
     if (requirement.flag === 'strict_qei') return strictQei && lane === 'qei_worldline';
     if (requirement.flag === 'strict_casimir_sign') return strictCasimirSign && lane === 'casimir_sign_control';
+    if (requirement.flag === 'strict_q_spoiling') return strictQSpoiling && lane === 'q_spoiling';
+    if (requirement.flag === 'strict_nanogap') return strictNanogap && lane === 'nanogap';
+    if (requirement.flag === 'strict_timing') return strictTiming && lane === 'timing';
     return false;
   };
 
@@ -519,7 +706,10 @@ export const buildWarpShadowScenarios = (options: {
           : { selectedRows: selectLaneRows(laneRows, maxPerLane), missingSignals: [] };
 
     const selectedRows = strictSelection.selectedRows;
-    const missingSignals = strictSelection.missingSignals;
+    const missingSignals = [...strictSelection.missingSignals];
+    if (strictEnabled && lane === 'q_spoiling' && !canDeriveQSpoilRatio(selectedRows)) {
+      if (!missingSignals.includes('q_spoil_ratio_anchor')) missingSignals.push('q_spoil_ratio_anchor');
+    }
 
     const sourceClassViolations =
       strictEnabled && strictRequirement?.requiredSourceClasses?.length
@@ -564,7 +754,7 @@ export const buildWarpShadowScenarios = (options: {
     boundaryStatement: rulebook.boundaryStatement,
     generatedBy: 'warp-shadow-scenario-builder',
     generatedAt: new Date().toISOString(),
-    selection: {
+      selection: {
       registryPath,
       rulebookPath,
       laneFilter: [...laneFilter.values()],
@@ -574,6 +764,9 @@ export const buildWarpShadowScenarios = (options: {
       maxPerLane,
       strictQei,
       strictCasimirSign,
+      strictQSpoiling,
+      strictNanogap,
+      strictTiming,
     },
     summary: {
       registryRowsParsed: rows.length,
@@ -582,9 +775,13 @@ export const buildWarpShadowScenarios = (options: {
       scenariosBuilt: scenarios.length,
       strictLaneSkips: strictSkips.length,
       strictQeiSkips: strictSkips.filter((row) => row.lane === 'qei_worldline').length,
+      strictQSpoilingSkips: strictSkips.filter((row) => row.lane === 'q_spoiling').length,
+      strictNanogapSkips: strictSkips.filter((row) => row.lane === 'nanogap').length,
+      strictTimingSkips: strictSkips.filter((row) => row.lane === 'timing').length,
     },
     strictLaneSkips: strictSkips,
     strictQeiSkips: strictSkips.filter((row) => row.lane === 'qei_worldline'),
+    strictTimingSkips: strictSkips.filter((row) => row.lane === 'timing'),
     scenarios,
   };
 
@@ -601,6 +798,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const maxPerLaneRaw = finiteOrNull(readArgValue('--max-per-lane'));
   const strictQei = parseBoolArg('--strict-qei');
   const strictCasimirSign = parseBoolArg('--strict-casimir-sign');
+  const strictQSpoiling = parseBoolArg('--strict-q-spoiling');
+  const strictNanogap = parseBoolArg('--strict-nanogap');
+  const strictTiming = parseBoolArg('--strict-timing');
   const result = buildWarpShadowScenarios({
     registryPath: readArgValue('--registry') ?? DEFAULT_REGISTRY_PATH,
     rulebookPath: readArgValue('--rulebook') ?? DEFAULT_RULEBOOK_PATH,
@@ -612,6 +812,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     maxPerLane: maxPerLaneRaw ?? undefined,
     strictQei,
     strictCasimirSign,
+    strictQSpoiling,
+    strictNanogap,
+    strictTiming,
   });
   console.log(JSON.stringify(result, null, 2));
 }
