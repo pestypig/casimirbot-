@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "lane": "sem_ellipsometry",
+  "profilePolicy": [
+    "SE-STD-2",
+    "SE-ADV-1"
+  ],
+  "pairedRunPresent": false,
+  "covarianceAnchorPresent": false,
+  "pairedRunId": "",
+  "sourceClass": "primary",
+  "sourceRefs": [
+    "EXP-SE-003",
+    "EXP-SE-009",
+    "EXP-SE-012",
+    "EXP-SE-013"
+  ],
+  "uncertainty": {
+    "method": "paired_dual_instrument_covariance_numeric",
+    "u_sem_nm": null,
+    "u_ellip_nm": null,
+    "rho_sem_ellip": null,
+    "covariance_sem_ellip_nm2": null,
+    "k": 2
+  },
+  "notes": [
+    "Set pairedRunPresent=true only when matched SEM+ellips sample IDs are commit-tracked.",
+    "Set covarianceAnchorPresent=true only when numeric rho or covariance term is present."
+  ]
+}

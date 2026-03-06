@@ -241,6 +241,13 @@ import {
   recordHelixAskSessionMemory,
   type HelixAskSessionMemory,
 } from "../services/helix-ask/session-memory";
+import {
+  buildContextCapsuleFromTrace,
+  buildSessionMemoryPatchFromCapsules,
+  resolveContextCapsuleIds,
+  saveContextCapsule,
+  summarizeContextCapsule,
+} from "../services/helix-ask/context-capsule";
 import { isFastModeRuntimeMissingSymbolError } from "../services/helix-ask/runtime-errors";
 import { stripRunawayAnswerArtifacts } from "../services/helix-ask/answer-artifacts";
 import {
@@ -14761,6 +14768,7 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
     stop: z.union([z.string().min(1), z.array(z.string().min(1))]).optional(),
     sessionId: z.string().min(1).max(128).optional(),
     traceId: z.string().min(1).max(128).optional(),
+    capsuleIds: z.array(z.string().min(1).max(24)).max(3).optional(),
     personaId: z.string().min(1).optional(),
     tuning: HelixAskTuningOverrides.optional(),
     mode: z.enum(["read", "observe", "act", "verify"]).optional(),
@@ -18383,6 +18391,7 @@ export const __testHelixAskReliabilityGuards = {
 type HelixAskExecutionArgs = {
   request: z.infer<typeof LocalAskRequest>;
   personaId: string;
+  tenantId?: string | null;
   responder: HelixAskResponder;
   streamChunk?: (chunk: string) => void;
   skipReportMode?: boolean;
@@ -18511,6 +18520,7 @@ const getHelixAskRuntimeP50Ms = (): number => {
 const executeHelixAsk = async ({
   request,
   personaId,
+  tenantId,
   responder,
   streamChunk,
   skipReportMode,
@@ -18520,6 +18530,14 @@ const executeHelixAsk = async ({
   const askRequestStartedAt = Date.now();
   const askSessionId = parsed.data.sessionId;
   const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
+  const requestedContextCapsuleIds = resolveContextCapsuleIds({
+    explicit: parsed.data.capsuleIds,
+    prompt: parsed.data.prompt,
+    question: parsed.data.question,
+  });
+  let contextCapsuleMemoryPatchSummary: ReturnType<
+    typeof buildSessionMemoryPatchFromCapsules
+  > | null = null;
   const dryRun = parsed.data.dryRun === true;
   const debugEnabled = parsed.data.debug === true;
   const forceLlmProbeRequested = parsed.data.forceLlmProbe === true;
@@ -18717,6 +18735,8 @@ const executeHelixAsk = async ({
   };
   const streamEmitter = createHelixAskStreamEmitter({ sessionId: askSessionId, traceId: askTraceId, onChunk: streamChunk });
   let debugPayloadForFallback: Record<string, unknown> | undefined;
+  let attachContextCapsuleToResult: (target: LocalAskResult, finalTextRaw?: string) => void =
+    () => {};
   try {
     logDebug("executeHelixAsk START", {
       traceId: askTraceId,
@@ -18725,6 +18745,40 @@ const executeHelixAsk = async ({
     let prompt = parsed.data.prompt?.trim();
     const question = parsed.data.question?.trim();
     let questionValue = question;
+    if (HELIX_ASK_SESSION_MEMORY && askSessionId && requestedContextCapsuleIds.length > 0) {
+      contextCapsuleMemoryPatchSummary = buildSessionMemoryPatchFromCapsules({
+        capsuleIds: requestedContextCapsuleIds,
+        tenantId: tenantId ?? null,
+        sessionId: askSessionId,
+      });
+      if (contextCapsuleMemoryPatchSummary.appliedCapsuleIds.length > 0) {
+        recordHelixAskSessionMemory({
+          sessionId: askSessionId,
+          pinnedFiles: contextCapsuleMemoryPatchSummary.pinnedFiles,
+          resolvedConcepts: contextCapsuleMemoryPatchSummary.resolvedConcepts,
+          recentTopics: contextCapsuleMemoryPatchSummary.recentTopics,
+          openSlots: contextCapsuleMemoryPatchSummary.openSlots,
+        });
+      }
+      logEvent(
+        "Context capsule",
+        contextCapsuleMemoryPatchSummary.appliedCapsuleIds.length > 0 ? "applied" : "skipped",
+        [
+          `requested=${contextCapsuleMemoryPatchSummary.requestedCapsuleIds.length}`,
+          `applied=${contextCapsuleMemoryPatchSummary.appliedCapsuleIds.length}`,
+          `inactive=${contextCapsuleMemoryPatchSummary.inactiveCapsuleIds.length}`,
+          `missing=${contextCapsuleMemoryPatchSummary.missingCapsuleIds.length}`,
+        ].join(" | "),
+        undefined,
+        contextCapsuleMemoryPatchSummary.appliedCapsuleIds.length > 0,
+        {
+          context_capsule_ids: contextCapsuleMemoryPatchSummary.requestedCapsuleIds,
+          context_capsule_applied: contextCapsuleMemoryPatchSummary.appliedCapsuleIds,
+          context_capsule_inactive: contextCapsuleMemoryPatchSummary.inactiveCapsuleIds,
+          context_capsule_missing: contextCapsuleMemoryPatchSummary.missingCapsuleIds,
+        },
+      );
+    }
     const askMode = parsed.data.mode ?? "read";
     const askAllowTools = parsed.data.allowTools ?? [];
     const askRequiredEvidence = parsed.data.requiredEvidence ?? [];
@@ -20066,6 +20120,62 @@ const executeHelixAsk = async ({
       debugPayload.llm_force_probe_requested = forceLlmProbeRequested;
       debugPayload.llm_force_probe_enabled = forceLlmProbe;
     }
+    attachContextCapsuleToResult = (
+      target: LocalAskResult,
+      finalTextRaw?: string,
+    ): void => {
+      const finalText = (coerceString(finalTextRaw ?? target.text ?? "") ?? "").trim();
+      if (!finalText) return;
+      try {
+        const proofRecord =
+          target.proof && typeof target.proof === "object"
+            ? (target.proof as {
+                verdict?: string;
+                certificate?: { certificateHash?: string | null; integrityOk?: boolean | null } | null;
+              })
+            : null;
+        const capsule = buildContextCapsuleFromTrace({
+          traceId: askTraceId,
+          runId: askTraceId,
+          question: (questionValue ?? question ?? prompt ?? "").trim(),
+          answer: finalText,
+          events: liveEventHistory,
+          proof: {
+            verdict: proofRecord?.verdict ?? null,
+            certificateHash: proofRecord?.certificate?.certificateHash ?? null,
+            certificateIntegrityOk: proofRecord?.certificate?.integrityOk ?? null,
+          },
+        });
+        const storedCapsule = saveContextCapsule({
+          capsule,
+          tenantId: tenantId ?? null,
+          sessionId: askSessionId ?? null,
+          traceId: askTraceId,
+        });
+        const summary = summarizeContextCapsule(storedCapsule);
+        (target as Record<string, unknown>).context_capsule = summary;
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).context_capsule = summary;
+          (debugPayload as Record<string, unknown>).context_capsule_id = summary.capsuleId;
+          if (contextCapsuleMemoryPatchSummary) {
+            (debugPayload as Record<string, unknown>).context_capsule_memory = {
+              requested: contextCapsuleMemoryPatchSummary.requestedCapsuleIds,
+              applied: contextCapsuleMemoryPatchSummary.appliedCapsuleIds,
+              inactive: contextCapsuleMemoryPatchSummary.inactiveCapsuleIds,
+              missing: contextCapsuleMemoryPatchSummary.missingCapsuleIds,
+            };
+          }
+        }
+      } catch (error) {
+        logEvent(
+          "Context capsule",
+          "error",
+          error instanceof Error ? error.message : String(error),
+          undefined,
+          false,
+        );
+      }
+    };
     const markLlmSkipDebug = (reason: string | null | undefined, detail?: string | null): void => {
       if (!debugPayload) return;
       if (debugPayload.llm_invoke_attempted) return;
@@ -20635,9 +20745,11 @@ const executeHelixAsk = async ({
         debugPayload.report_blocks_count = limitedBlocks.length;
       }
       if (dryRun) {
+        const dryReportPayload: LocalAskResult = { text: "", report_mode: true, dry_run: true };
+        attachContextCapsuleToResult(dryReportPayload, "");
         const responsePayload = debugPayload
-          ? { text: "", report_mode: true, debug: debugPayload, dry_run: true }
-          : { text: "", report_mode: true, dry_run: true };
+          ? { ...dryReportPayload, debug: debugPayload }
+          : dryReportPayload;
         responder.send(200, responsePayload);
         return;
       }
@@ -20858,7 +20970,7 @@ const executeHelixAsk = async ({
           );
         }
         let blockPayload: { status: number; payload: any } | null = null;
-          await executeHelixAsk({
+        await executeHelixAsk({
           request: {
             ...request,
             question: blockQuestion,
@@ -20871,6 +20983,7 @@ const executeHelixAsk = async ({
             coverageSlots: block.slotId ? [block.slotId] : undefined,
           },
           personaId,
+          tenantId,
           responder: {
             send: (status, payload) => {
               blockPayload = { status, payload };
@@ -21197,6 +21310,7 @@ const executeHelixAsk = async ({
         debugPayload.trace_events = combinedEvents;
         debugPayload.trace_summary = buildTraceSummary(combinedEvents);
       }
+      attachContextCapsuleToResult(reportPayload, reportText);
       responder.send(200, debugPayload ? { ...reportPayload, debug: debugPayload } : reportPayload);
       return;
       }
@@ -28426,6 +28540,7 @@ const executeHelixAsk = async ({
         const responsePayload = debugPayload
           ? { ...dryPayload, debug: debugPayload, dry_run: true }
           : { ...dryPayload, dry_run: true };
+        attachContextCapsuleToResult(responsePayload as LocalAskResult, dryOpenWorld);
         responder.send(200, responsePayload);
         return;
       }
@@ -28446,6 +28561,7 @@ const executeHelixAsk = async ({
         const responsePayload = debugPayload
           ? { ...dryPayload, debug: debugPayload, dry_run: true }
           : { ...dryPayload, dry_run: true };
+        attachContextCapsuleToResult(responsePayload as LocalAskResult, dryFrontier);
         responder.send(200, responsePayload);
         return;
       }
@@ -28464,6 +28580,7 @@ const executeHelixAsk = async ({
       const responsePayload = debugPayload
         ? { ...dryPayload, debug: debugPayload, dry_run: true }
         : { ...dryPayload, dry_run: true };
+      attachContextCapsuleToResult(responsePayload as LocalAskResult, "");
       responder.send(200, responsePayload);
       return;
     }
@@ -28816,6 +28933,7 @@ const executeHelixAsk = async ({
           },
         );
         const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
+        attachContextCapsuleToResult(responsePayload as LocalAskResult, forcedFinalText);
         responder.send(200, responsePayload);
         return;
       }
@@ -28931,6 +29049,7 @@ const executeHelixAsk = async ({
           },
         );
         const responsePayload = debugPayload ? { ...fastResult, debug: debugPayload } : fastResult;
+        attachContextCapsuleToResult(responsePayload as LocalAskResult, fastText);
         responder.send(200, responsePayload);
         return;
       }
@@ -32925,6 +33044,10 @@ const executeHelixAsk = async ({
       debugPayload.fallback_reason_taxonomy = fallbackTaxonomy;
     }
     const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
+    attachContextCapsuleToResult(
+      responsePayload as LocalAskResult,
+      coerceString(result.text ?? result.answer ?? ""),
+    );
     logDebug("responder.send(200) start", {
       hasDebug: Boolean(debugPayload),
       hasEnvelope: Boolean(result.envelope),
@@ -32969,7 +33092,7 @@ const executeHelixAsk = async ({
       const fallbackText = `${clarifyLine}\n\nSources: server/routes/agi.plan.ts`;
       streamEmitter.finalize(fallbackText);
       logProgress("Fallback", "fast_mode_runtime_missing_clarify", undefined, false);
-      responder.send(200, {
+      const runtimeFallbackPayload: LocalAskResult = {
         ok: true,
         text: fallbackText,
         answer: fallbackText,
@@ -32980,7 +33103,9 @@ const executeHelixAsk = async ({
           fallbackReason: "fast_mode_runtime_missing_clarify",
           finalText: fallbackText,
         }),
-      });
+      };
+      attachContextCapsuleToResult?.(runtimeFallbackPayload, fallbackText);
+      responder.send(200, runtimeFallbackPayload);
       return;
     }
     if (/runHelperWithinStageBudget is not defined/i.test(message)) {
@@ -32989,7 +33114,7 @@ const executeHelixAsk = async ({
       const fallbackText = `${clarifyLine}\n\nSources: server/routes/agi.plan.ts`;
       streamEmitter.finalize(fallbackText);
       logProgress("Fallback", "helper_runtime_missing_clarify", undefined, false);
-      responder.send(200, {
+      const runtimeFallbackPayload: LocalAskResult = {
         ok: true,
         text: fallbackText,
         answer: fallbackText,
@@ -33000,7 +33125,9 @@ const executeHelixAsk = async ({
           fallbackReason: "helper_runtime_missing_clarify",
           finalText: fallbackText,
         }),
-      });
+      };
+      attachContextCapsuleToResult?.(runtimeFallbackPayload, fallbackText);
+      responder.send(200, runtimeFallbackPayload);
       return;
     }
     const runtimeFallbackReason = /timeout|timed out|econnrefused|unavailable|llm|model/i.test(message)
@@ -33027,7 +33154,7 @@ const executeHelixAsk = async ({
     const fallbackText = nonReportGuard.text;
     streamEmitter.finalize(fallbackText);
     logProgress("Fallback", runtimeFallbackReason, undefined, false);
-    responder.send(200, {
+    const runtimeFallbackPayload: LocalAskResult = {
       ok: true,
       text: fallbackText,
       answer: fallbackText,
@@ -33040,7 +33167,9 @@ const executeHelixAsk = async ({
         reportModeMismatch: nonReportGuard.mismatch,
         reportScaffoldGuardTriggered: nonReportGuard.hadScaffold,
       }),
-    });
+    };
+    attachContextCapsuleToResult?.(runtimeFallbackPayload, fallbackText);
+    responder.send(200, runtimeFallbackPayload);
     return;
   } finally {
     recordHelixAskRuntimeSample(Date.now() - askRequestStartedAt);
@@ -33133,6 +33262,12 @@ planRouter.post("/ask", async (req, res) => {
     await executeHelixAsk({
       request: parsed.data,
       personaId,
+      tenantId:
+        req.tenantId ??
+        req.get("x-tenant-id") ??
+        req.get("x-customer-id") ??
+        req.get("x-org-id") ??
+        null,
       responder: { send: safeSend },
     });
   } catch (error) {
@@ -33183,6 +33318,7 @@ const runHelixAskJob = async (
   jobId: string,
   request: z.infer<typeof LocalAskRequest>,
   personaId: string,
+  tenantId?: string | null,
 ): Promise<void> => {
   if (!(await markHelixAskJobRunning(jobId))) return;
   if (isHelixAskCircuitOpen()) {
@@ -33231,6 +33367,7 @@ const runHelixAskJob = async (
     const executePromise = executeHelixAsk({
       request,
       personaId,
+      tenantId,
       responder,
       streamChunk: (chunk) => appendHelixAskJobPartial(jobId, chunk),
     });
@@ -33304,7 +33441,16 @@ planRouter.post("/ask/jobs", async (req, res) => {
     sessionId: request.sessionId ?? null,
     traceId: askTraceId,
   });
-  void runHelixAskJob(job.id, request, personaId);
+  void runHelixAskJob(
+    job.id,
+    request,
+    personaId,
+    req.tenantId ??
+      req.get("x-tenant-id") ??
+      req.get("x-customer-id") ??
+      req.get("x-org-id") ??
+      null,
+  );
 });
 
 planRouter.get("/ask/jobs/:jobId", async (req, res) => {

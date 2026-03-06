@@ -14,6 +14,7 @@ import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/
 import {
   askLocal,
   askMoodHint,
+  getContextCapsule,
   getReasoningTheaterConfig,
   getPendingHelixAskJob,
   resumeHelixAskJob,
@@ -60,6 +61,16 @@ import {
   type ConvergenceDebug,
   type ConvergenceStripState,
 } from "@/lib/helix/reasoning-theater-convergence";
+import {
+  createContextCapsuleAutomaton,
+  extractContextCapsuleIdsFromText,
+  injectContextCapsuleCommit,
+  renderContextCapsuleStampLines,
+  stepContextCapsuleAutomaton,
+  type ContextCapsuleAutomaton,
+  type ContextCapsuleConvergence,
+  type ContextCapsuleSummary,
+} from "@shared/helix-context-capsule";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 
@@ -107,6 +118,7 @@ export function isActivePlayback(audio: HTMLAudioElement | null, active: HTMLAud
 type HelixAskReply = {
   id: string;
   content: string;
+  contextCapsule?: ContextCapsuleSummary;
   mode?: "read" | "observe" | "act" | "verify";
   proof?: {
     verdict?: "PASS" | "FAIL";
@@ -342,6 +354,14 @@ type AskLiveEventEntry = {
   seq?: number;
   durationMs?: number;
   meta?: Record<string, unknown>;
+};
+
+type ContextCapsulePreview = {
+  id: string;
+  loading: boolean;
+  error?: string;
+  summary?: ContextCapsuleSummary;
+  convergence?: ContextCapsuleConvergence;
 };
 
 type HelixAskPillProps = {
@@ -979,6 +999,9 @@ const REASONING_THEATER_FRONTIER_ACTIONS_ENABLED = (() => {
   const raw = (import.meta as any)?.env?.VITE_HELIX_THEATER_FRONTIER_ACTIONS;
   return raw === undefined ? true : String(raw) !== "0";
 })();
+const CONTEXT_CAPSULE_GRID_WIDTH = 80;
+const CONTEXT_CAPSULE_GRID_HEIGHT = 16;
+const CONTEXT_CAPSULE_SIM_TICK_MS = 50;
 
 const REASONING_THEATER_SUPPRESSION_PATTERNS: Array<{
   reason: ReasoningTheaterSuppressionReason;
@@ -1010,6 +1033,66 @@ function parseTimestampMs(value: unknown): number | null {
     }
   }
   return null;
+}
+
+function stripContextCapsuleTokensFromText(value: string): string {
+  const ids = extractContextCapsuleIdsFromText(value);
+  if (ids.length === 0) return value.trim();
+  let next = value;
+  for (const id of ids) {
+    const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    next = next.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ");
+  }
+  return next.replace(/\s{2,}/g, " ").trim();
+}
+
+function resolveContextCapsulePalette(state: ConvergenceStripState): {
+  r: number;
+  g: number;
+  b: number;
+} {
+  if (state.proof === "fail_closed") return { r: 239, g: 68, b: 68 };
+  if (state.source === "open_world") return { r: 244, g: 114, b: 182 };
+  if (state.source === "atlas_exact") return { r: 34, g: 211, b: 238 };
+  if (state.source === "repo_exact") return { r: 56, g: 189, b: 248 };
+  return { r: 148, g: 163, b: 184 };
+}
+
+function buildContextCapsuleCopyText(summary: ContextCapsuleSummary): string {
+  const proofTag = summary.commit.proof_verdict ?? "UNKNOWN";
+  const sourceTag = summary.convergence.source;
+  const stampLines = renderContextCapsuleStampLines({
+    bits: summary.stamp.finalBits,
+    width: summary.stamp.gridW,
+    height: summary.stamp.gridH,
+    targetWidth: 10,
+    targetHeight: 3,
+  });
+  return [
+    ...stampLines,
+    `proof:${proofTag}  src:${sourceTag}`,
+  ].join("\n");
+}
+
+function buildContextCapsuleStampDataUri(
+  stamp: ContextCapsuleSummary["stamp"],
+  options?: { onColor?: string; offColor?: string },
+): string {
+  const width = Math.max(1, Math.floor(stamp.gridW));
+  const height = Math.max(1, Math.floor(stamp.gridH));
+  const bits = typeof stamp.finalBits === "string" ? stamp.finalBits : "";
+  const total = width * height;
+  const onColor = options?.onColor ?? "#D4F4FF";
+  const offColor = options?.offColor ?? "#071525";
+  const rects: string[] = [];
+  for (let i = 0; i < total; i += 1) {
+    if (bits[i] !== "1") continue;
+    const x = i % width;
+    const y = Math.floor(i / width);
+    rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${onColor}" />`);
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" shape-rendering="crispEdges"><rect width="${width}" height="${height}" fill="${offColor}" />${rects.join("")}</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 function hash32(value: string): number {
@@ -1914,6 +1997,10 @@ export function HelixAskPill({
   const askLiveDraftBufferRef = useRef("");
   const askLiveDraftFlushRef = useRef<number | null>(null);
   const [askQueue, setAskQueue] = useState<string[]>([]);
+  const [contextCapsulePreview, setContextCapsulePreview] = useState<ContextCapsulePreview | null>(null);
+  const [contextCapsuleDetectedId, setContextCapsuleDetectedId] = useState<string | null>(null);
+  const [contextCapsuleAppliedId, setContextCapsuleAppliedId] = useState<string | null>(null);
+  const contextCapsuleLookupSeqRef = useRef(0);
   const [askActiveQuestion, setAskActiveQuestion] = useState<string | null>(null);
   const [askMood, setAskMood] = useState<LumaMood>("question");
   const [askMoodBroken, setAskMoodBroken] = useState(false);
@@ -2028,6 +2115,12 @@ export function HelixAskPill({
     token: string;
     event: ConvergenceCollapseEvent;
   } | null>(null);
+  const convergenceStripStateRef = useRef<ConvergenceStripState | null>(null);
+  const contextCapsuleCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const contextCapsuleAutomatonRef = useRef<ContextCapsuleAutomaton | null>(null);
+  const contextCapsulePrevCellsRef = useRef<Uint8Array | null>(null);
+  const contextCapsuleLastStepMsRef = useRef(0);
+  const contextCapsuleLastCommitTokenRef = useRef<string | null>(null);
 
   const getHelixAskSessionId = useCallback(() => {
     if (helixAskSessionRef.current) return helixAskSessionRef.current;
@@ -2051,6 +2144,47 @@ export function HelixAskPill({
       window.removeEventListener("offline", update);
     };
   }, []);
+
+  useEffect(() => {
+    if (!contextCapsuleDetectedId) {
+      setContextCapsulePreview(null);
+      setContextCapsuleAppliedId(null);
+      return;
+    }
+    const sequence = ++contextCapsuleLookupSeqRef.current;
+    const controller = new AbortController();
+    setContextCapsulePreview({
+      id: contextCapsuleDetectedId,
+      loading: true,
+    });
+    void getContextCapsule(contextCapsuleDetectedId, {
+      sessionId: getHelixAskSessionId() ?? undefined,
+      signal: controller.signal,
+    })
+      .then((payload) => {
+        if (controller.signal.aborted || sequence !== contextCapsuleLookupSeqRef.current) return;
+        setContextCapsulePreview({
+          id: contextCapsuleDetectedId,
+          loading: false,
+          summary: payload.capsule,
+          convergence: payload.convergence,
+        });
+        setContextCapsuleAppliedId(contextCapsuleDetectedId);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted || sequence !== contextCapsuleLookupSeqRef.current) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setContextCapsulePreview({
+          id: contextCapsuleDetectedId,
+          loading: false,
+          error: message,
+        });
+        setContextCapsuleAppliedId(null);
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [contextCapsuleDetectedId, getHelixAskSessionId]);
 
   useEffect(() => {
     broadcastLumaMood(askMood);
@@ -2592,6 +2726,85 @@ export function HelixAskPill({
           burst.style.transform = `translate3d(-50%,-50%,0) scale(${ringScale.toFixed(2)})`;
         }
       }
+
+      const capsuleState = convergenceStripStateRef.current;
+      let capsuleAutomaton = contextCapsuleAutomatonRef.current;
+      const capsuleCanvas = contextCapsuleCanvasRef.current;
+      if (capsuleState && capsuleAutomaton && capsuleCanvas) {
+        const commitToken = capsuleState.collapseToken;
+        if (
+          commitToken &&
+          capsuleState.collapseEvent &&
+          commitToken !== contextCapsuleLastCommitTokenRef.current
+        ) {
+          contextCapsulePrevCellsRef.current = capsuleAutomaton.cells.slice();
+          capsuleAutomaton = injectContextCapsuleCommit(capsuleAutomaton, capsuleState.collapseEvent);
+          if (capsuleState.collapseEvent === "proof_commit") {
+            capsuleAutomaton = { ...capsuleAutomaton, frozen: true };
+          }
+          contextCapsuleAutomatonRef.current = capsuleAutomaton;
+          contextCapsuleLastCommitTokenRef.current = commitToken;
+        } else if (!commitToken) {
+          contextCapsuleLastCommitTokenRef.current = null;
+        }
+
+        const controls = {
+          source: capsuleState.source,
+          proof: capsuleState.proof,
+          maturity: capsuleState.maturity,
+        } satisfies {
+          source: ConvergenceStripState["source"];
+          proof: ConvergenceStripState["proof"];
+          maturity: ConvergenceStripState["maturity"];
+        };
+        let guard = 0;
+        while (
+          !capsuleAutomaton.frozen &&
+          elapsedMs - contextCapsuleLastStepMsRef.current >= CONTEXT_CAPSULE_SIM_TICK_MS &&
+          guard < 8
+        ) {
+          contextCapsulePrevCellsRef.current = capsuleAutomaton.cells.slice();
+          capsuleAutomaton = stepContextCapsuleAutomaton(capsuleAutomaton, controls);
+          contextCapsuleAutomatonRef.current = capsuleAutomaton;
+          contextCapsuleLastStepMsRef.current += CONTEXT_CAPSULE_SIM_TICK_MS;
+          guard += 1;
+        }
+        if (guard === 8 && elapsedMs - contextCapsuleLastStepMsRef.current >= CONTEXT_CAPSULE_SIM_TICK_MS) {
+          contextCapsuleLastStepMsRef.current = elapsedMs;
+        }
+
+        const interpolation = clamp01(
+          (elapsedMs - contextCapsuleLastStepMsRef.current) / CONTEXT_CAPSULE_SIM_TICK_MS,
+        );
+        const prevCells = contextCapsulePrevCellsRef.current ?? capsuleAutomaton.cells;
+        const palette = resolveContextCapsulePalette(capsuleState);
+        const ctx = capsuleCanvas.getContext("2d");
+        if (ctx) {
+          const width = capsuleAutomaton.width;
+          const height = capsuleAutomaton.height;
+          const proofBias =
+            capsuleState.proof === "confirmed"
+              ? 0.24
+              : capsuleState.proof === "reasoned"
+                ? 0.12
+                : capsuleState.proof === "fail_closed"
+                  ? -0.2
+                  : 0;
+          ctx.clearRect(0, 0, width, height);
+          for (let y = 0; y < height; y += 1) {
+            for (let x = 0; x < width; x += 1) {
+              const index = y * width + x;
+              const prev = prevCells[index] ?? 0;
+              const current = capsuleAutomaton.cells[index] ?? 0;
+              const mixed = prev + (current - prev) * interpolation;
+              if (mixed <= 0.01) continue;
+              const alpha = clampNumber(0.08 + mixed * 0.78 + proofBias, 0.04, 0.98);
+              ctx.fillStyle = `rgba(${palette.r},${palette.g},${palette.b},${alpha.toFixed(3)})`;
+              ctx.fillRect(x, y, 1, 1);
+            }
+          }
+        }
+      }
     },
     [
       reasoningTheaterConfig,
@@ -2618,6 +2831,15 @@ export function HelixAskPill({
       setConvergenceStripDisplayState(null);
       setConvergenceStripCollapseState(null);
       convergenceStripLastCommitTokenRef.current = null;
+      contextCapsuleAutomatonRef.current = null;
+      contextCapsulePrevCellsRef.current = null;
+      contextCapsuleLastStepMsRef.current = 0;
+      contextCapsuleLastCommitTokenRef.current = null;
+      const capsuleCanvas = contextCapsuleCanvasRef.current;
+      if (capsuleCanvas) {
+        const ctx = capsuleCanvas.getContext("2d");
+        ctx?.clearRect(0, 0, capsuleCanvas.width, capsuleCanvas.height);
+      }
       if (!askBusy) {
         resetReasoningTheaterEventClock();
       }
@@ -2629,9 +2851,28 @@ export function HelixAskPill({
     reasoningTheaterBattleIndexRef.current = reasoningTheater.battleIndex;
     reasoningTheaterStanceRef.current = reasoningTheater.stance;
     reasoningTheaterSuppressionReasonRef.current = reasoningTheater.suppressionReason;
+    if (!contextCapsuleAutomatonRef.current) {
+      const seed = hash32(
+        `${askLiveTraceId ?? askActiveQuestion ?? "helix"}:${convergenceStripState.source}:${contextId}`,
+      );
+      const automaton = createContextCapsuleAutomaton({
+        seed,
+        width: CONTEXT_CAPSULE_GRID_WIDTH,
+        height: CONTEXT_CAPSULE_GRID_HEIGHT,
+        source: convergenceStripState.source,
+      });
+      contextCapsuleAutomatonRef.current = automaton;
+      contextCapsulePrevCellsRef.current = automaton.cells.slice();
+      contextCapsuleLastStepMsRef.current = reasoningTheaterClockElapsedMsRef.current;
+      contextCapsuleLastCommitTokenRef.current = null;
+    }
   }, [
     applyReasoningTheaterMeterFrame,
     askBusy,
+    askActiveQuestion,
+    askLiveTraceId,
+    contextId,
+    convergenceStripState.source,
     resetReasoningTheaterEventClock,
     reasoningTheater,
     reasoningTheaterMeterTarget,
@@ -2794,6 +3035,10 @@ export function HelixAskPill({
     convergenceStripActiveMode &&
     convergenceStripCollapseState !== null &&
     convergenceStripCollapseState.token === convergenceStripState.collapseToken;
+
+  useEffect(() => {
+    convergenceStripStateRef.current = convergenceStripState;
+  }, [convergenceStripState]);
 
   useEffect(() => {
     if (!askBusy) return;
@@ -3068,6 +3313,19 @@ export function HelixAskPill({
     [buildCopyText],
   );
 
+  const handleCopyContextCapsule = useCallback(
+    async (reply: HelixAskReply) => {
+      if (!reply.contextCapsule || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(buildContextCapsuleCopyText(reply.contextCapsule));
+      } catch {
+        // ignore clipboard failures
+      }
+    },
+    [],
+  );
 
   const stopReadAloud = useCallback(() => {
     const currentAudio = playbackAudioRef.current;
@@ -3172,6 +3430,28 @@ export function HelixAskPill({
   useEffect(() => {
     resizeTextarea();
   }, [resizeTextarea]);
+
+  const handleUseContextCapsuleFromReply = useCallback(
+    (reply: HelixAskReply) => {
+      const capsule = reply.contextCapsule;
+      if (!capsule) return;
+      const capsuleToken = capsule.fingerprint.trim().toUpperCase();
+      if (!capsuleToken) return;
+
+      const input = askInputRef.current;
+      input?.focus();
+
+      setContextCapsuleDetectedId(capsuleToken);
+      setContextCapsuleAppliedId(capsuleToken);
+      setContextCapsulePreview({
+        id: capsuleToken,
+        loading: false,
+        summary: capsule,
+        convergence: capsule.convergence,
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!askBusy) {
@@ -3444,6 +3724,7 @@ export function HelixAskPill({
         let responseViewerLaunch: AtomicViewerLaunch | undefined;
         let responseMode: "read" | "observe" | "act" | "verify" | undefined;
         let responseProof: HelixAskReply["proof"];
+        let responseContextCapsule: ContextCapsuleSummary | undefined;
         try {
           const localResponse = await resumeHelixAskJob(pending.jobId, {
             signal: controller.signal,
@@ -3458,6 +3739,7 @@ export function HelixAskPill({
           responseViewerLaunch = localResponse.viewer_launch;
           responseMode = localResponse.mode;
           responseProof = localResponse.proof;
+          responseContextCapsule = localResponse.context_capsule;
         } catch (error) {
           const aborted =
             controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
@@ -3495,6 +3777,7 @@ export function HelixAskPill({
                 envelope: responseEnvelope,
                 mode: responseMode,
                 proof: responseProof,
+                contextCapsule: responseContextCapsule,
                 sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
                 liveEvents: liveEventsSnapshot,
                 convergenceSnapshot,
@@ -3548,7 +3831,7 @@ export function HelixAskPill({
   }, [askBusy, resumePendingAsk]);
 
   const runAsk = useCallback(
-    async (question: string) => {
+    async (question: string, capsuleIds?: string[]) => {
       const trimmed = question.trim();
       if (!trimmed) return;
       setAskBusy(true);
@@ -3569,6 +3852,8 @@ export function HelixAskPill({
         resizeTextarea();
       }
       askDraftRef.current = "";
+      setContextCapsuleDetectedId(null);
+      setContextCapsuleAppliedId(null);
       clearMoodTimer();
       cancelMoodHint();
       updateMoodFromText(trimmed);
@@ -3595,6 +3880,7 @@ export function HelixAskPill({
         let responseViewerLaunch: AtomicViewerLaunch | undefined;
         let responseMode: "read" | "observe" | "act" | "verify" | undefined;
         let responseProof: HelixAskReply["proof"];
+        let responseContextCapsule: ContextCapsuleSummary | undefined;
         setAskStatus("Generating answer...");
         try {
           const localResponse = await askLocal(undefined, {
@@ -3605,6 +3891,7 @@ export function HelixAskPill({
             debug: userSettings.showHelixAskDebug,
             signal: controller.signal,
             mode: askMode,
+            capsuleIds,
           });
           responseEnvelope = localResponse.envelope;
           const envelopeAnswer = responseEnvelope?.answer?.trim() ?? "";
@@ -3616,6 +3903,7 @@ export function HelixAskPill({
           responseViewerLaunch = localResponse.viewer_launch;
           responseMode = localResponse.mode;
           responseProof = localResponse.proof;
+          responseContextCapsule = localResponse.context_capsule;
         } catch (error) {
           const aborted =
             controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
@@ -3653,6 +3941,7 @@ export function HelixAskPill({
                 envelope: responseEnvelope,
                 mode: responseMode,
                 proof: responseProof,
+                contextCapsule: responseContextCapsule,
                 sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
                 liveEvents: liveEventsSnapshot,
                 convergenceSnapshot,
@@ -3713,13 +4002,55 @@ export function HelixAskPill({
     setAskStatus("Stopping...");
   }, []);
 
+  const handleApplyContextCapsuleChip = useCallback(() => {
+    if (!contextCapsulePreview?.summary) return;
+    setContextCapsuleAppliedId(contextCapsulePreview.summary.fingerprint);
+  }, [contextCapsulePreview]);
+
+  const handleRemoveContextCapsuleChip = useCallback(() => {
+    const capsuleId =
+      contextCapsulePreview?.summary?.fingerprint ??
+      contextCapsulePreview?.summary?.capsuleId ??
+      contextCapsulePreview?.id;
+    if (!capsuleId) {
+      setContextCapsuleDetectedId(null);
+      setContextCapsuleAppliedId(null);
+      setContextCapsulePreview(null);
+      return;
+    }
+    const input = askInputRef.current;
+    if (input) {
+      const escaped = capsuleId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const nextValue = input.value
+        .replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+      input.value = nextValue;
+      askDraftRef.current = nextValue;
+      resizeTextarea(input);
+    }
+    setContextCapsuleDetectedId(null);
+    setContextCapsuleAppliedId(null);
+    setContextCapsulePreview(null);
+  }, [contextCapsulePreview, resizeTextarea]);
+
   const handleAskSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const rawInput = askInputRef.current?.value ?? "";
       const entries = parseQueuedQuestions(rawInput);
       if (entries.length === 0) return;
-      const panelCommand = entries.length === 1 ? parseOpenPanelCommand(entries[0]) : null;
+      const inlineCapsuleIds = extractContextCapsuleIdsFromText(rawInput);
+      const selectedCapsuleIds =
+        contextCapsuleAppliedId !== null
+          ? [contextCapsuleAppliedId]
+          : inlineCapsuleIds.slice(0, 1);
+      const normalizedEntries = entries.map((entry) => {
+        const stripped = stripContextCapsuleTokensFromText(entry);
+        return stripped || entry.trim();
+      });
+      const panelCommand =
+        normalizedEntries.length === 1 ? parseOpenPanelCommand(normalizedEntries[0]) : null;
       if (panelCommand) {
         const panelDef = getPanelDef(panelCommand);
         if (askInputRef.current) {
@@ -3727,14 +4058,16 @@ export function HelixAskPill({
           resizeTextarea();
         }
         askDraftRef.current = "";
+        setContextCapsuleDetectedId(null);
+        setContextCapsuleAppliedId(null);
         clearMoodTimer();
         cancelMoodHint();
-        updateMoodFromText(entries[0]);
-        requestMoodHint(entries[0], { force: true });
+        updateMoodFromText(normalizedEntries[0] ?? entries[0] ?? "");
+        requestMoodHint(normalizedEntries[0] ?? entries[0] ?? "", { force: true });
         const sessionId = getHelixAskSessionId();
         if (sessionId) {
           setActive(sessionId);
-          addMessage(sessionId, { role: "user", content: entries[0] });
+          addMessage(sessionId, { role: "user", content: normalizedEntries[0] ?? entries[0] });
         }
         if (panelDef) {
           openPanelById(panelCommand);
@@ -3742,7 +4075,7 @@ export function HelixAskPill({
           const responseText = `Opened ${panelDef.title}.`;
           setAskReplies((prev) =>
             [
-              { id: replyId, content: responseText, question: entries[0] },
+              { id: replyId, content: responseText, question: normalizedEntries[0] ?? entries[0] },
               ...prev,
             ].slice(0, 3),
           );
@@ -3762,25 +4095,30 @@ export function HelixAskPill({
         resizeTextarea();
       }
       askDraftRef.current = "";
+      setContextCapsuleDetectedId(null);
+      setContextCapsuleAppliedId(null);
       if (askBusy) {
         setAskQueue((prev) => {
-          const combined = [...prev, ...entries];
+          const combined = [...prev, ...normalizedEntries];
           return combined.slice(0, HELIX_ASK_QUEUE_LIMIT);
         });
         return;
       }
-      const [first, ...rest] = entries;
+      const [firstRaw, ...restRaw] = normalizedEntries;
+      const first = firstRaw?.trim() || normalizedEntries[0] || entries[0];
+      const rest = restRaw.map((entry) => entry.trim()).filter(Boolean);
       if (rest.length > 0) {
         setAskQueue((prev) => {
           const combined = [...prev, ...rest];
           return combined.slice(0, HELIX_ASK_QUEUE_LIMIT);
         });
       }
-      void runAsk(first);
+      void runAsk(first, selectedCapsuleIds);
     },
     [
       addMessage,
       cancelMoodHint,
+      contextCapsuleAppliedId,
       clearMoodTimer,
       getHelixAskSessionId,
       openPanelById,
@@ -3939,6 +4277,8 @@ export function HelixAskPill({
               onInput={(event) => {
                 resizeTextarea(event.currentTarget);
                 askDraftRef.current = event.currentTarget.value;
+                const contextCapsuleIds = extractContextCapsuleIdsFromText(event.currentTarget.value);
+                setContextCapsuleDetectedId(contextCapsuleIds[0] ?? null);
                 if (askBusy) return;
                 clearMoodTimer();
                 askMoodTimerRef.current = window.setTimeout(() => {
@@ -3966,6 +4306,60 @@ export function HelixAskPill({
               {askBusy ? <Square className="h-4 w-4" /> : <Search className="h-4 w-4" />}
             </button>
           </div>
+            {contextCapsulePreview ? (
+              <div className="-mt-1 px-4 pb-2 text-[10px] text-slate-300">
+                <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-950/20 px-2 py-1">
+                  <span className="uppercase tracking-[0.18em] text-cyan-200/90">capsule</span>
+                  {contextCapsulePreview.summary ? (
+                    <img
+                      src={buildContextCapsuleStampDataUri(contextCapsulePreview.summary.stamp)}
+                      alt="Context capsule fingerprint"
+                      className="h-7 w-32 rounded border border-cyan-300/40 bg-cyan-950/30 object-fill"
+                      style={{ imageRendering: "pixelated" }}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className="rounded border border-cyan-300/40 bg-cyan-400/10 px-1.5 py-0.5 font-mono text-[10px] text-cyan-100">
+                      visual key detected
+                    </span>
+                  )}
+                  {contextCapsulePreview.loading ? (
+                    <span className="text-cyan-100/80">loading...</span>
+                  ) : contextCapsulePreview.error ? (
+                    <span className="text-rose-200/90">unavailable</span>
+                  ) : contextCapsulePreview.convergence ? (
+                    <span className="text-cyan-100/85">
+                      {CONVERGENCE_SOURCE_LABEL[contextCapsulePreview.convergence.source]} /{" "}
+                      {CONVERGENCE_PROOF_LABEL[contextCapsulePreview.convergence.proofPosture]} /{" "}
+                      {CONVERGENCE_MATURITY_LABEL[contextCapsulePreview.convergence.maturity]}
+                    </span>
+                  ) : null}
+                  {contextCapsuleAppliedId ? (
+                    <span className="rounded border border-emerald-300/45 bg-emerald-400/12 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-emerald-100">
+                      apply on send
+                    </span>
+                  ) : null}
+                  <div className="ml-auto flex items-center gap-1.5">
+                    {!contextCapsuleAppliedId && contextCapsulePreview.summary && !contextCapsulePreview.error ? (
+                      <button
+                        type="button"
+                        className="rounded border border-white/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-100 hover:bg-white/10"
+                        onClick={handleApplyContextCapsuleChip}
+                      >
+                        apply
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="rounded border border-white/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-100 hover:bg-white/10"
+                      onClick={handleRemoveContextCapsuleChip}
+                    >
+                      remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <div className="-mt-1 px-4 pb-2 text-[10px] text-slate-300">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="uppercase tracking-[0.2em] text-slate-500">Dot context</span>
@@ -4114,61 +4508,72 @@ export function HelixAskPill({
                               />
                             </div>
                           ) : null}
-                          <div className="relative flex flex-wrap items-center gap-1.5">
-                            <span
-                              className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceSourceTone(convergenceStripState.source)}`}
-                            >
-                              {CONVERGENCE_SOURCE_LABEL[convergenceStripState.source]}
-                            </span>
-                            <span
-                              className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceProofTone(convergenceStripState.proof)}`}
-                            >
-                              {CONVERGENCE_PROOF_LABEL[convergenceStripState.proof]}
-                            </span>
-                            <span
-                              className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceMaturityTone(convergenceStripState.maturity)}`}
-                            >
-                              {CONVERGENCE_MATURITY_LABEL[convergenceStripState.maturity]}
-                            </span>
-                            {convergenceIdeologyCue ? (
-                              <span className="inline-flex items-center rounded border border-violet-300/35 bg-violet-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] text-violet-100">
-                                ideology cue
+                          <div className="pointer-events-none absolute right-2 top-2">
+                            <canvas
+                              ref={contextCapsuleCanvasRef}
+                              width={CONTEXT_CAPSULE_GRID_WIDTH}
+                              height={CONTEXT_CAPSULE_GRID_HEIGHT}
+                              className="h-8 w-32 rounded border border-cyan-300/20 bg-black/30"
+                              aria-label="Context capsule texture"
+                            />
+                          </div>
+                          <div className="relative pr-36">
+                            <div className="relative flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceSourceTone(convergenceStripState.source)}`}
+                              >
+                                {CONVERGENCE_SOURCE_LABEL[convergenceStripState.source]}
                               </span>
+                              <span
+                                className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceProofTone(convergenceStripState.proof)}`}
+                              >
+                                {CONVERGENCE_PROOF_LABEL[convergenceStripState.proof]}
+                              </span>
+                              <span
+                                className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] ${convergenceMaturityTone(convergenceStripState.maturity)}`}
+                              >
+                                {CONVERGENCE_MATURITY_LABEL[convergenceStripState.maturity]}
+                              </span>
+                              {convergenceIdeologyCue ? (
+                                <span className="inline-flex items-center rounded border border-violet-300/35 bg-violet-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] text-violet-100">
+                                  ideology cue
+                                </span>
+                              ) : null}
+                              {convergenceCollapseVisible ? (
+                                <span className="inline-flex items-center rounded border border-cyan-300/45 bg-cyan-400/12 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] text-cyan-100">
+                                  {convergenceStripCollapseState
+                                    ? CONVERGENCE_COLLAPSE_LABEL[convergenceStripCollapseState.event]
+                                    : ""}
+                                </span>
+                              ) : null}
+                            </div>
+                            {convergenceStripShowPhaseTick ? (
+                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                {CONVERGENCE_PHASE_ORDER.map((phase, index) => {
+                                  const active = phase === convergenceStripState.phase;
+                                  return (
+                                    <div key={phase} className="flex items-center gap-1">
+                                      <span
+                                        className={`h-1.5 w-1.5 rounded-full ${
+                                          active ? "bg-cyan-200 shadow-[0_0_8px_rgba(34,211,238,0.8)]" : "bg-slate-500/70"
+                                        }`}
+                                        title={CONVERGENCE_PHASE_LABEL[phase]}
+                                      />
+                                      {index < CONVERGENCE_PHASE_ORDER.length - 1 ? (
+                                        <span className="h-px w-2 bg-slate-500/50" />
+                                      ) : null}
+                                    </div>
+                                  );
+                                })}
+                                <span className="ml-1 text-[9px] uppercase tracking-[0.14em] text-slate-300/90">
+                                  {CONVERGENCE_PHASE_LABEL[convergenceStripState.phase]}
+                                </span>
+                              </div>
                             ) : null}
-                            {convergenceCollapseVisible ? (
-                              <span className="inline-flex items-center rounded border border-cyan-300/45 bg-cyan-400/12 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] text-cyan-100">
-                                {convergenceStripCollapseState
-                                  ? CONVERGENCE_COLLAPSE_LABEL[convergenceStripCollapseState.event]
-                                  : ""}
-                              </span>
+                            {convergenceStripShowCaption ? (
+                              <p className="mt-1 text-[10px] text-slate-200/90">{convergenceStripState.caption}</p>
                             ) : null}
                           </div>
-                          {convergenceStripShowPhaseTick ? (
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                              {CONVERGENCE_PHASE_ORDER.map((phase, index) => {
-                                const active = phase === convergenceStripState.phase;
-                                return (
-                                  <div key={phase} className="flex items-center gap-1">
-                                    <span
-                                      className={`h-1.5 w-1.5 rounded-full ${
-                                        active ? "bg-cyan-200 shadow-[0_0_8px_rgba(34,211,238,0.8)]" : "bg-slate-500/70"
-                                      }`}
-                                      title={CONVERGENCE_PHASE_LABEL[phase]}
-                                    />
-                                    {index < CONVERGENCE_PHASE_ORDER.length - 1 ? (
-                                      <span className="h-px w-2 bg-slate-500/50" />
-                                    ) : null}
-                                  </div>
-                                );
-                              })}
-                              <span className="ml-1 text-[9px] uppercase tracking-[0.14em] text-slate-300/90">
-                                {CONVERGENCE_PHASE_LABEL[convergenceStripState.phase]}
-                              </span>
-                            </div>
-                          ) : null}
-                          {convergenceStripShowCaption ? (
-                            <p className="mt-1 text-[10px] text-slate-200/90">{convergenceStripState.caption}</p>
-                          ) : null}
                         </div>
                       ) : null}
                       {reasoningTheaterMedalQueue.length > 0 ? (
@@ -4388,6 +4793,30 @@ export function HelixAskPill({
                     aria-hidden
                   />
                   <div className="relative">
+                {reply.contextCapsule ? (
+                  <button
+                    type="button"
+                    onClick={() => handleUseContextCapsuleFromReply(reply)}
+                    className="mb-2 w-full rounded-lg border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-left text-xs text-cyan-100 transition hover:border-cyan-300/45 hover:bg-cyan-900/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+                    aria-label={`Use context capsule ${reply.contextCapsule.fingerprint}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-300">Context capsule</p>
+                        <img
+                          src={buildContextCapsuleStampDataUri(reply.contextCapsule.stamp)}
+                          alt="Context capsule fingerprint"
+                          className="mt-1 h-10 w-44 rounded border border-cyan-300/40 bg-cyan-950/30 object-fill"
+                          style={{ imageRendering: "pixelated" }}
+                          loading="lazy"
+                        />
+                      </div>
+                      <span className="shrink-0 rounded border border-cyan-300/35 bg-cyan-400/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-cyan-100">
+                        use
+                      </span>
+                    </div>
+                  </button>
+                ) : null}
                 {reply.question ? (
                   <p className="mb-2 text-xs text-slate-300">
                     <span className="text-slate-400">Question:</span> {reply.question}
@@ -4482,6 +4911,16 @@ export function HelixAskPill({
                   >
                     Copy
                   </button>
+                  {reply.contextCapsule ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyContextCapsule(reply)}
+                      className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-cyan-100 transition hover:bg-cyan-400/20"
+                      aria-label="Copy context capsule"
+                    >
+                      Copy Capsule
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => void handleReadAloud(reply)}

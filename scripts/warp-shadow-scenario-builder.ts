@@ -42,7 +42,13 @@ type StrictSignalRequirement = {
 };
 
 type StrictLaneRequirement = {
-  flag: 'strict_qei' | 'strict_casimir_sign' | 'strict_q_spoiling' | 'strict_nanogap' | 'strict_timing';
+  flag:
+    | 'strict_qei'
+    | 'strict_casimir_sign'
+    | 'strict_q_spoiling'
+    | 'strict_nanogap'
+    | 'strict_timing'
+    | 'strict_sem_ellips';
   requiredSourceClasses?: string[];
   requiredSignals: StrictSignalRequirement[];
 };
@@ -94,6 +100,24 @@ type ExperimentalContext = {
     uncertainty?: {
       u_q0_rel?: number;
       u_f_rel?: number;
+      method?: string;
+      reportableReady?: boolean;
+      blockedReasons?: string[];
+      sourceRefs?: string[];
+    };
+  };
+  semEllips?: {
+    profileId?: 'SE-STD-2' | 'SE-ADV-1';
+    d_sem_corr_nm?: number;
+    u_sem_nm?: number;
+    d_ellip_nm?: number;
+    u_ellip_nm?: number;
+    delta_se_nm?: number;
+    d_fused_nm?: number;
+    u_fused_nm?: number;
+    U_fused_nm?: number;
+    sourceRefs?: string[];
+    uncertainty?: {
       method?: string;
       reportableReady?: boolean;
       blockedReasons?: string[];
@@ -643,6 +667,7 @@ export const buildWarpShadowScenarios = (options: {
   strictQSpoiling?: boolean;
   strictNanogap?: boolean;
   strictTiming?: boolean;
+  strictSemEllips?: boolean;
 }) => {
   const registryPath = options.registryPath ?? DEFAULT_REGISTRY_PATH;
   const rulebookPath = options.rulebookPath ?? DEFAULT_RULEBOOK_PATH;
@@ -657,6 +682,7 @@ export const buildWarpShadowScenarios = (options: {
   const strictQSpoiling = options.strictQSpoiling === true;
   const strictNanogap = options.strictNanogap === true;
   const strictTiming = options.strictTiming === true;
+  const strictSemEllips = options.strictSemEllips === true;
 
   const rulebook = JSON.parse(fs.readFileSync(rulebookPath, 'utf8')) as Rulebook;
   const rows = parseRegistryRows(fs.readFileSync(registryPath, 'utf8'));
@@ -691,6 +717,7 @@ export const buildWarpShadowScenarios = (options: {
     if (requirement.flag === 'strict_q_spoiling') return strictQSpoiling && lane === 'q_spoiling';
     if (requirement.flag === 'strict_nanogap') return strictNanogap && lane === 'nanogap';
     if (requirement.flag === 'strict_timing') return strictTiming && lane === 'timing';
+    if (requirement.flag === 'strict_sem_ellips') return strictSemEllips && lane === 'sem_ellipsometry';
     return false;
   };
 
@@ -767,6 +794,7 @@ export const buildWarpShadowScenarios = (options: {
       strictQSpoiling,
       strictNanogap,
       strictTiming,
+      strictSemEllips,
     },
     summary: {
       registryRowsParsed: rows.length,
@@ -778,10 +806,12 @@ export const buildWarpShadowScenarios = (options: {
       strictQSpoilingSkips: strictSkips.filter((row) => row.lane === 'q_spoiling').length,
       strictNanogapSkips: strictSkips.filter((row) => row.lane === 'nanogap').length,
       strictTimingSkips: strictSkips.filter((row) => row.lane === 'timing').length,
+      strictSemEllipsSkips: strictSkips.filter((row) => row.lane === 'sem_ellipsometry').length,
     },
     strictLaneSkips: strictSkips,
     strictQeiSkips: strictSkips.filter((row) => row.lane === 'qei_worldline'),
     strictTimingSkips: strictSkips.filter((row) => row.lane === 'timing'),
+    strictSemEllipsSkips: strictSkips.filter((row) => row.lane === 'sem_ellipsometry'),
     scenarios,
   };
 
@@ -801,6 +831,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const strictQSpoiling = parseBoolArg('--strict-q-spoiling');
   const strictNanogap = parseBoolArg('--strict-nanogap');
   const strictTiming = parseBoolArg('--strict-timing');
+  const strictSemEllips = parseBoolArg('--strict-sem-ellips');
   const result = buildWarpShadowScenarios({
     registryPath: readArgValue('--registry') ?? DEFAULT_REGISTRY_PATH,
     rulebookPath: readArgValue('--rulebook') ?? DEFAULT_RULEBOOK_PATH,
@@ -815,6 +846,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     strictQSpoiling,
     strictNanogap,
     strictTiming,
+    strictSemEllips,
   });
   console.log(JSON.stringify(result, null, 2));
 }

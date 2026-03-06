@@ -35,6 +35,10 @@ This runner is not for:
 - Timing typed pack (input): `configs/warp-shadow-injection-scenarios.ti-primary-typed.v1.json`
 - Timing reportable prereg pack (input): `configs/warp-shadow-injection-scenarios.ti-primary-reportable.v1.json`
 - Timing reportable reference profile pack (input): `configs/warp-shadow-injection-scenarios.ti-primary-reportable-reference.v1.json`
+- SEM+ellipsometry recovery pack (input): `configs/warp-shadow-injection-scenarios.se-primary-recovery.v1.json`
+- SEM+ellipsometry typed pack (input): `configs/warp-shadow-injection-scenarios.se-primary-typed.v1.json`
+- SEM+ellipsometry reportable prereg pack (input): `configs/warp-shadow-injection-scenarios.se-primary-reportable.v1.json`
+- SEM+ellipsometry reportable reference profile pack (input): `configs/warp-shadow-injection-scenarios.se-primary-reportable-reference.v1.json`
 - QEI operating envelope (input): `configs/warp-shadow-qei-operating-envelope.v1.json`
 - Runner (execution): `scripts/warp-shadow-injection-runner.ts`
 - Recovery checker (execution): `scripts/warp-shadow-qei-recovery-check.ts`
@@ -42,6 +46,7 @@ This runner is not for:
 - Q-spoiling checker (execution): `scripts/warp-shadow-q-spoiling-compat-check.ts`
 - Nanogap checker (execution): `scripts/warp-shadow-nanogap-compat-check.ts`
 - Timing checker (execution): `scripts/warp-shadow-timing-compat-check.ts`
+- SEM+ellipsometry checker (execution): `scripts/warp-shadow-sem-ellips-compat-check.ts`
 - JSON output (default): `artifacts/research/full-solve/shadow-injection-run-YYYY-MM-DD.json`
 - Markdown output (default): `docs/audits/research/warp-shadow-injection-run-YYYY-MM-DD.md`
 
@@ -140,6 +145,26 @@ Timing reportable reference profile run:
 npm run warp:shadow:inject:ti-primary-reportable-reference -- --out artifacts/research/full-solve/shadow-injection-run-ti-primary-reportable-reference-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-ti-primary-reportable-reference-YYYY-MM-DD.md
 ```
 
+SEM+ellipsometry compatibility pass-1:
+```bash
+npm run warp:shadow:inject:se-primary-recovery -- --out artifacts/research/full-solve/shadow-injection-run-se-primary-recovery-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-se-primary-recovery-YYYY-MM-DD.md
+```
+
+SEM+ellipsometry compatibility pass-2 (typed context):
+```bash
+npm run warp:shadow:inject:se-primary-typed -- --out artifacts/research/full-solve/shadow-injection-run-se-primary-typed-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-se-primary-typed-YYYY-MM-DD.md
+```
+
+SEM+ellipsometry reportable prereg run:
+```bash
+npm run warp:shadow:inject:se-primary-reportable -- --out artifacts/research/full-solve/shadow-injection-run-se-primary-reportable-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-se-primary-reportable-YYYY-MM-DD.md
+```
+
+SEM+ellipsometry reportable reference profile run:
+```bash
+npm run warp:shadow:inject:se-primary-reportable-reference -- --out artifacts/research/full-solve/shadow-injection-run-se-primary-reportable-reference-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-se-primary-reportable-reference-YYYY-MM-DD.md
+```
+
 Q-spoiling evidence congruence check:
 ```bash
 npm run warp:shadow:qs-compat-check -- --scenarios configs/warp-shadow-injection-scenarios.qs-primary-typed.v1.json --run artifacts/research/full-solve/shadow-injection-run-qs-primary-typed-YYYY-MM-DD.json --out artifacts/research/full-solve/qs-compat-check-YYYY-MM-DD.json --out-md docs/audits/research/warp-qs-compat-check-YYYY-MM-DD.md
@@ -153,6 +178,11 @@ npm run warp:shadow:ng-compat-check -- --scenarios configs/warp-shadow-injection
 Timing evidence congruence check:
 ```bash
 npm run warp:shadow:ti-compat-check -- --scenarios configs/warp-shadow-injection-scenarios.ti-primary-typed.v1.json --run artifacts/research/full-solve/shadow-injection-run-ti-primary-typed-YYYY-MM-DD.json --out artifacts/research/full-solve/ti-compat-check-YYYY-MM-DD.json --out-md docs/audits/research/warp-ti-compat-check-YYYY-MM-DD.md
+```
+
+SEM+ellipsometry evidence congruence check:
+```bash
+npm run warp:shadow:se-compat-check -- --scenarios configs/warp-shadow-injection-scenarios.se-primary-typed.v1.json --run artifacts/research/full-solve/shadow-injection-run-se-primary-typed-YYYY-MM-DD.json --out artifacts/research/full-solve/se-compat-check-YYYY-MM-DD.json --out-md docs/audits/research/warp-se-compat-check-YYYY-MM-DD.md
 ```
 
 Casimir sign evidence congruence check:
@@ -228,7 +258,25 @@ Each scenario uses:
   - `uncertainty.method`
   - `uncertainty.reportableReady`
   - `uncertainty.blockedReasons[]`
+- optional `experimentalContext.semEllips`:
+  - `profileId`
+  - `d_sem_corr_nm`
+  - `u_sem_nm`
+  - `d_ellip_nm`
+  - `u_ellip_nm`
+  - `delta_se_nm`
+  - `d_fused_nm`
+  - `u_fused_nm`
+  - `U_fused_nm`
+  - `paired_run_id` (nullable)
+  - `rho_sem_ellip` (nullable)
+  - `covariance_sem_ellip_nm2` (nullable)
+  - `sourceRefs[]`
+  - `uncertainty.method`
+  - `uncertainty.reportableReady`
+  - `uncertainty.blockedReasons[]`
 - optional pack-level `profileThresholds` for profile-aware nanogap congruence checks.
+- optional pack-level `profileThresholds.semEllips` for profile-aware SEM+ellipsometry congruence checks.
 
 Optional pack-level fields:
 - `recovery_goal`

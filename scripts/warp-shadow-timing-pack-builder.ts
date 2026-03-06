@@ -21,6 +21,11 @@ const BOUNDARY_STATEMENT =
 
 const PROFILE_IDS = ['WR-SHORT-PS', 'WR-LONGHAUL-EXP'] as const;
 type ProfileId = (typeof PROFILE_IDS)[number];
+type TimingProfileThresholds = {
+  sigma_t_ps_max: number | null;
+  tie_pp_ps_max: number | null;
+  pdv_pp_ps_max: number | null;
+};
 
 type RegistryRow = {
   entry_id: string;
@@ -81,17 +86,20 @@ const parseRegistryRows = (markdown: string): RegistryRow[] => {
   return rows;
 };
 
-const toIdToken = (value: number): string =>
-  Number(value).toExponential(0).replace('+', '').replace('-', 'm').replace('.', 'p');
+const toIdToken = (value: number): string => {
+  const normalized = Number(value.toFixed(6));
+  const token = Number.isInteger(normalized) ? String(normalized) : String(normalized).replace('.', 'p');
+  return token.replace('-', 'm');
+};
 
-const sigmaBoundByProfile: Record<ProfileId, { sigma_t_ps_max: number | null }> = {
-  'WR-SHORT-PS': { sigma_t_ps_max: 100 },
-  'WR-LONGHAUL-EXP': { sigma_t_ps_max: null },
+const sigmaBoundByProfile: Record<ProfileId, number | null> = {
+  'WR-SHORT-PS': 100,
+  'WR-LONGHAUL-EXP': null,
 };
 
 const deriveSigmaGrid = (rowsById: Map<string, RegistryRow>): number[] => {
   const sigmaAnchor = parsePositiveValue(rowsById.get('EXP-T-003')?.value ?? '') ?? 6;
-  const shortBound = sigmaBoundByProfile['WR-SHORT-PS'].sigma_t_ps_max ?? 100;
+  const shortBound = sigmaBoundByProfile['WR-SHORT-PS'] ?? 100;
   const grid = uniqueSorted([
     sigmaAnchor,
     Math.max(1, Math.round(sigmaAnchor * 2)),
@@ -103,14 +111,97 @@ const deriveSigmaGrid = (rowsById: Map<string, RegistryRow>): number[] => {
   return grid;
 };
 
-const deriveTieAnchorPs = (rowsById: Map<string, RegistryRow>): number | null => {
-  const nsFromSkew = parsePositiveValue(rowsById.get('EXP-T-002')?.value ?? '');
-  const nsFromTarget = parsePositiveValue(rowsById.get('EXP-T-004')?.value ?? '');
-  const ns = nsFromSkew ?? nsFromTarget;
-  return ns != null ? Number((ns * 1000).toFixed(6)) : null;
+const parseValuePs = (row: RegistryRow | undefined): number | null => {
+  if (!row) return null;
+  const value = parsePositiveValue(row.value);
+  if (value == null) return null;
+  const unit = String(row.unit).toLowerCase();
+  if (unit.includes('ps')) return Number(value.toFixed(6));
+  if (unit.includes('ns')) return Number((value * 1000).toFixed(6));
+  return Number(value.toFixed(6));
 };
 
-const deriveUncertainty = (rows: RegistryRow[], refs: string[]) => {
+const parseUnitBearingPsValue = (raw: string): number | null => {
+  const unitMatches = [...String(raw).matchAll(/(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\s*(ps|ns)\b/gi)];
+  for (const match of unitMatches) {
+    const value = Number(match[1]);
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const unit = String(match[2]).toLowerCase();
+    if (unit === 'ns') return Number((value * 1000).toFixed(6));
+    return Number(value.toFixed(6));
+  }
+  return null;
+};
+
+const parseUncertaintyPs = (row: RegistryRow | undefined, options?: { preferValueField?: boolean }): number | null => {
+  if (!row) return null;
+  if (options?.preferValueField) {
+    const valuePs = parseValuePs(row);
+    if (valuePs != null) return valuePs;
+  }
+
+  const uncertainty = String(row.uncertainty);
+  const normalized = uncertainty.trim().toLowerCase();
+  if (!normalized || ['unknown', 'n/a', 'na', 'none', 'null'].includes(normalized)) return null;
+
+  const unitBearing = parseUnitBearingPsValue(uncertainty);
+  if (unitBearing != null) return unitBearing;
+
+  // Avoid mis-parsing coverage factors such as "k=1" as uncertainty magnitudes.
+  if (/\bk\s*=/.test(normalized)) return null;
+
+  const magnitude = parsePositiveValue(uncertainty);
+  if (magnitude == null) return null;
+  const unit = String(row.unit).toLowerCase();
+  if (unit.includes('ns')) return Number((magnitude * 1000).toFixed(6));
+  return Number(magnitude.toFixed(6));
+};
+
+const deriveTieThresholdByProfile = (rowsById: Map<string, RegistryRow>): Record<ProfileId, number> => {
+  const shortThresholdPs =
+    parseValuePs(rowsById.get('EXP-T-022')) ??
+    parseValuePs(rowsById.get('EXP-T-021')) ??
+    parseValuePs(rowsById.get('EXP-T-002')) ??
+    parseValuePs(rowsById.get('EXP-T-004')) ??
+    200;
+  const longhaulThresholdPs =
+    parseValuePs(rowsById.get('EXP-T-023')) ??
+    parseValuePs(rowsById.get('EXP-T-021')) ??
+    shortThresholdPs ??
+    500;
+  return {
+    'WR-SHORT-PS': Number(shortThresholdPs.toFixed(6)),
+    'WR-LONGHAUL-EXP': Number(longhaulThresholdPs.toFixed(6)),
+  };
+};
+
+const deriveTiePointByProfile = (tieThresholdByProfile: Record<ProfileId, number>): Record<ProfileId, number> => {
+  // Treat literature inequality anchors as ceilings and place sweep points conservatively below each ceiling.
+  const toPoint = (limit: number): number => Number((limit * 0.75).toFixed(6));
+  return {
+    'WR-SHORT-PS': toPoint(tieThresholdByProfile['WR-SHORT-PS']),
+    'WR-LONGHAUL-EXP': toPoint(tieThresholdByProfile['WR-LONGHAUL-EXP']),
+  };
+};
+
+const deriveProfileThresholds = (
+  tieThresholdByProfile: Record<ProfileId, number>,
+): Record<ProfileId, TimingProfileThresholds> => {
+  return {
+    'WR-SHORT-PS': {
+      sigma_t_ps_max: sigmaBoundByProfile['WR-SHORT-PS'],
+      tie_pp_ps_max: tieThresholdByProfile['WR-SHORT-PS'],
+      pdv_pp_ps_max: null,
+    },
+    'WR-LONGHAUL-EXP': {
+      sigma_t_ps_max: sigmaBoundByProfile['WR-LONGHAUL-EXP'],
+      tie_pp_ps_max: tieThresholdByProfile['WR-LONGHAUL-EXP'],
+      pdv_pp_ps_max: null,
+    },
+  };
+};
+
+const deriveUncertainty = (rows: RegistryRow[], rowsById: Map<string, RegistryRow>, refs: string[]) => {
   const strictRows = rows.filter(
     (row) =>
       refs.includes(row.entry_id.toUpperCase()) &&
@@ -122,13 +213,36 @@ const deriveUncertainty = (rows: RegistryRow[], refs: string[]) => {
     return normalized.length > 0 && !['unknown', 'n/a', 'na', 'none', 'null'].includes(normalized);
   });
 
-  const reportableReady = numericUncertaintyRows.length > 0;
-  const blockedReasons = reportableReady ? [] : ['missing_numeric_uncertainty_anchor'];
+  const namedSigma = parseUncertaintyPs(rowsById.get('EXP-T-030'), { preferValueField: true });
+  const namedTie = parseUncertaintyPs(rowsById.get('EXP-T-031'), { preferValueField: true });
+  const fallbackUncertainties = numericUncertaintyRows
+    .map((row) => parseUncertaintyPs(row))
+    .filter((value): value is number => value != null);
+  const fallbackSigma = fallbackUncertainties[0] ?? null;
+  const fallbackTie = fallbackUncertainties[1] ?? fallbackUncertainties[0] ?? null;
+
+  const uSigmaPs = namedSigma ?? fallbackSigma;
+  const uTiePs = namedTie ?? uSigmaPs ?? fallbackTie;
+  const blockedReasons: string[] = [];
+  if (uSigmaPs == null) blockedReasons.push('missing_u_sigma_t_ps_anchor');
+  if (uTiePs == null) blockedReasons.push('missing_u_tie_pp_ps_anchor');
+
+  const reportableReady = blockedReasons.length === 0;
+  if (!reportableReady) blockedReasons.push('missing_numeric_uncertainty_anchor');
+
+  const method =
+    namedSigma != null || namedTie != null
+      ? 'registry_named_uncertainty_anchor'
+      : reportableReady
+        ? 'registry_numeric_uncertainty_anchor'
+        : 'conservative_fallback_missing_numeric';
+
   return {
     reportableReady,
     blockedReasons,
-    method: reportableReady ? 'registry_numeric_uncertainty_anchor' : 'conservative_fallback_missing_numeric',
-    uSigmaPs: reportableReady ? parsePositiveValue(numericUncertaintyRows[0]?.uncertainty ?? '') : null,
+    method,
+    uSigmaPs,
+    uTiePs,
   };
 };
 
@@ -156,16 +270,19 @@ export const buildTimingScenarioPacks = (options: {
     for (const ref of scenario.registryRefs ?? []) baseRefs.add(String(ref).trim().toUpperCase());
   }
 
-  const orderedRequiredRefs = ['EXP-T-001', 'EXP-T-003', 'EXP-T-002', 'EXP-T-004'];
-  for (const required of orderedRequiredRefs) baseRefs.add(required);
+  const orderedRequiredRefs = ['EXP-T-001', 'EXP-T-003', 'EXP-T-002', 'EXP-T-004', 'EXP-T-029'];
+  const orderedUncertaintyRefs = ['EXP-T-030', 'EXP-T-031'].filter((entryId) => rowsById.has(entryId));
+  for (const required of [...orderedRequiredRefs, ...orderedUncertaintyRefs]) baseRefs.add(required);
   const extraRefs = [...baseRefs]
-    .filter((ref) => !orderedRequiredRefs.includes(ref))
+    .filter((ref) => !orderedRequiredRefs.includes(ref) && !orderedUncertaintyRefs.includes(ref))
     .sort((a, b) => a.localeCompare(b));
-  const registryRefs = [...orderedRequiredRefs, ...extraRefs];
+  const registryRefs = [...orderedRequiredRefs, ...orderedUncertaintyRefs, ...extraRefs];
 
   const sigmaGrid = deriveSigmaGrid(rowsById);
-  const tieAnchorPs = deriveTieAnchorPs(rowsById);
-  const uncertainty = deriveUncertainty(registryRows, registryRefs);
+  const tieThresholdByProfile = deriveTieThresholdByProfile(rowsById);
+  const tiePointByProfile = deriveTiePointByProfile(tieThresholdByProfile);
+  const profileThresholds = deriveProfileThresholds(tieThresholdByProfile);
+  const uncertainty = deriveUncertainty(registryRows, rowsById, registryRefs);
 
   const baseEnvelopePack = {
     version: 1,
@@ -192,7 +309,7 @@ export const buildTimingScenarioPacks = (options: {
       'No canonical override or promotion implied.',
       'Sweep dimensions are sigma_t_ps x profile_id.',
     ],
-    profileThresholds: sigmaBoundByProfile,
+    profileThresholds,
   };
 
   const pass1Scenarios = PROFILE_IDS.flatMap((profileId) =>
@@ -236,7 +353,7 @@ export const buildTimingScenarioPacks = (options: {
         timing: {
           profileId,
           sigma_t_ps: sigmaPs,
-          tie_pp_ps: tieAnchorPs,
+          tie_pp_ps: tiePointByProfile[profileId],
           pdv_pp_ps: null,
           timestamping_mode: 'hardware',
           synce_enabled: profileId === 'WR-SHORT-PS',
@@ -245,7 +362,7 @@ export const buildTimingScenarioPacks = (options: {
           sourceRefs: registryRefs,
           uncertainty: {
             u_sigma_t_ps: uncertainty.uSigmaPs,
-            u_tie_pp_ps: null,
+            u_tie_pp_ps: uncertainty.uTiePs,
             u_pdv_pp_ps: null,
             method: uncertainty.method,
             reportableReady: uncertainty.reportableReady,
@@ -257,7 +374,10 @@ export const buildTimingScenarioPacks = (options: {
   );
 
   const pickReferenceId = (profileId: ProfileId): string => {
-    const targetSigma = profileId === 'WR-SHORT-PS' ? 100 : 6;
+    const targetSigma =
+      profileId === 'WR-SHORT-PS'
+        ? Math.max(1, Math.floor(((profileThresholds['WR-SHORT-PS'].sigma_t_ps_max ?? 100) - (uncertainty.uSigmaPs ?? 0)) / 2))
+        : sigmaGrid[0] ?? 6;
     const profileScenarios = pass2Scenarios.filter(
       (scenario) => scenario.experimentalContext.timing.profileId === profileId,
     );
@@ -306,10 +426,10 @@ export const buildTimingScenarioPacks = (options: {
       lockedRegistryRefs: registryRefs,
       lockedSigmaGridPs: sigmaGrid,
       lockedProfileIds: [...PROFILE_IDS],
-      profileThresholds: sigmaBoundByProfile,
+      profileThresholds,
       uncertainty: {
         u_sigma_t_ps: uncertainty.uSigmaPs,
-        u_tie_pp_ps: null,
+        u_tie_pp_ps: uncertainty.uTiePs,
         u_pdv_pp_ps: null,
         method: uncertainty.method,
         sourceRefs: registryRefs,
@@ -329,6 +449,7 @@ export const buildTimingScenarioPacks = (options: {
       lockedOn: DATE_STAMP,
       lane: 'timing',
       sourceClassAllowlist: ['primary', 'standard'],
+      selectionPolicy: 'interior_congruent_target',
       scenarioIds: stableCitationTargetScenarioIds,
       sourceRefs: registryRefs,
       reportableReady: uncertainty.reportableReady,
@@ -373,4 +494,3 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   });
   console.log(JSON.stringify(result, null, 2));
 }
-

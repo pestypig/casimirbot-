@@ -25,10 +25,14 @@
   ],
   "profileThresholds": {
     "WR-SHORT-PS": {
-      "sigma_t_ps_max": 100
+      "sigma_t_ps_max": 100,
+      "tie_pp_ps_max": 200,
+      "pdv_pp_ps_max": null
     },
     "WR-LONGHAUL-EXP": {
-      "sigma_t_ps_max": null
+      "sigma_t_ps_max": null,
+      "tie_pp_ps_max": 500,
+      "pdv_pp_ps_max": null
     }
   },
   "pass": "pass_2_typed_context",
@@ -48,7 +52,7 @@
   },
   "scenarios": [
     {
-      "id": "ti_primary_typed_wr_short_ps_sigma_6e0ps",
+      "id": "ti_primary_typed_wr_short_ps_sigma_6ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-SHORT-PS, sigma_t_ps=6.",
       "registryRefs": [
@@ -56,8 +60,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -74,7 +80,7 @@
         "timing": {
           "profileId": "WR-SHORT-PS",
           "sigma_t_ps": 6,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 150,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": true,
@@ -85,14 +91,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }
@@ -100,7 +108,7 @@
       }
     },
     {
-      "id": "ti_primary_typed_wr_short_ps_sigma_1e1ps",
+      "id": "ti_primary_typed_wr_short_ps_sigma_12ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-SHORT-PS, sigma_t_ps=12.",
       "registryRefs": [
@@ -108,8 +116,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -126,7 +136,7 @@
         "timing": {
           "profileId": "WR-SHORT-PS",
           "sigma_t_ps": 12,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 150,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": true,
@@ -137,14 +147,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }
@@ -152,7 +164,7 @@
       }
     },
     {
-      "id": "ti_primary_typed_wr_short_ps_sigma_5e1ps",
+      "id": "ti_primary_typed_wr_short_ps_sigma_50ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-SHORT-PS, sigma_t_ps=50.",
       "registryRefs": [
@@ -160,8 +172,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -178,7 +192,7 @@
         "timing": {
           "profileId": "WR-SHORT-PS",
           "sigma_t_ps": 50,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 150,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": true,
@@ -189,14 +203,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }
@@ -204,7 +220,7 @@
       }
     },
     {
-      "id": "ti_primary_typed_wr_short_ps_sigma_1e2ps",
+      "id": "ti_primary_typed_wr_short_ps_sigma_100ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-SHORT-PS, sigma_t_ps=100.",
       "registryRefs": [
@@ -212,8 +228,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -230,7 +248,7 @@
         "timing": {
           "profileId": "WR-SHORT-PS",
           "sigma_t_ps": 100,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 150,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": true,
@@ -241,14 +259,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }
@@ -256,7 +276,7 @@
       }
     },
     {
-      "id": "ti_primary_typed_wr_short_ps_sigma_1e2ps",
+      "id": "ti_primary_typed_wr_short_ps_sigma_120ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-SHORT-PS, sigma_t_ps=120.",
       "registryRefs": [
@@ -264,8 +284,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -282,7 +304,7 @@
         "timing": {
           "profileId": "WR-SHORT-PS",
           "sigma_t_ps": 120,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 150,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": true,
@@ -293,14 +315,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }
@@ -308,7 +332,7 @@
       }
     },
     {
-      "id": "ti_primary_typed_wr_short_ps_sigma_3e2ps",
+      "id": "ti_primary_typed_wr_short_ps_sigma_300ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-SHORT-PS, sigma_t_ps=300.",
       "registryRefs": [
@@ -316,8 +340,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -334,7 +360,7 @@
         "timing": {
           "profileId": "WR-SHORT-PS",
           "sigma_t_ps": 300,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 150,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": true,
@@ -345,14 +371,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }
@@ -360,7 +388,7 @@
       }
     },
     {
-      "id": "ti_primary_typed_wr_longhaul_exp_sigma_6e0ps",
+      "id": "ti_primary_typed_wr_longhaul_exp_sigma_6ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-LONGHAUL-EXP, sigma_t_ps=6.",
       "registryRefs": [
@@ -368,8 +396,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -386,7 +416,7 @@
         "timing": {
           "profileId": "WR-LONGHAUL-EXP",
           "sigma_t_ps": 6,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 375,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": false,
@@ -397,14 +427,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }
@@ -412,7 +444,7 @@
       }
     },
     {
-      "id": "ti_primary_typed_wr_longhaul_exp_sigma_1e1ps",
+      "id": "ti_primary_typed_wr_longhaul_exp_sigma_12ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-LONGHAUL-EXP, sigma_t_ps=12.",
       "registryRefs": [
@@ -420,8 +452,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -438,7 +472,7 @@
         "timing": {
           "profileId": "WR-LONGHAUL-EXP",
           "sigma_t_ps": 12,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 375,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": false,
@@ -449,14 +483,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }
@@ -464,7 +500,7 @@
       }
     },
     {
-      "id": "ti_primary_typed_wr_longhaul_exp_sigma_5e1ps",
+      "id": "ti_primary_typed_wr_longhaul_exp_sigma_50ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-LONGHAUL-EXP, sigma_t_ps=50.",
       "registryRefs": [
@@ -472,8 +508,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -490,7 +528,7 @@
         "timing": {
           "profileId": "WR-LONGHAUL-EXP",
           "sigma_t_ps": 50,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 375,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": false,
@@ -501,14 +539,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }
@@ -516,7 +556,7 @@
       }
     },
     {
-      "id": "ti_primary_typed_wr_longhaul_exp_sigma_1e2ps",
+      "id": "ti_primary_typed_wr_longhaul_exp_sigma_100ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-LONGHAUL-EXP, sigma_t_ps=100.",
       "registryRefs": [
@@ -524,8 +564,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -542,7 +584,7 @@
         "timing": {
           "profileId": "WR-LONGHAUL-EXP",
           "sigma_t_ps": 100,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 375,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": false,
@@ -553,14 +595,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }
@@ -568,7 +612,7 @@
       }
     },
     {
-      "id": "ti_primary_typed_wr_longhaul_exp_sigma_1e2ps",
+      "id": "ti_primary_typed_wr_longhaul_exp_sigma_120ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-LONGHAUL-EXP, sigma_t_ps=120.",
       "registryRefs": [
@@ -576,8 +620,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -594,7 +640,7 @@
         "timing": {
           "profileId": "WR-LONGHAUL-EXP",
           "sigma_t_ps": 120,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 375,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": false,
@@ -605,14 +651,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }
@@ -620,7 +668,7 @@
       }
     },
     {
-      "id": "ti_primary_typed_wr_longhaul_exp_sigma_3e2ps",
+      "id": "ti_primary_typed_wr_longhaul_exp_sigma_300ps",
       "lane": "timing",
       "description": "Pass-2 typed timing envelope: profile=WR-LONGHAUL-EXP, sigma_t_ps=300.",
       "registryRefs": [
@@ -628,8 +676,10 @@
         "EXP-T-003",
         "EXP-T-002",
         "EXP-T-004",
-        "EXP-T-019",
-        "EXP-T-020"
+        "EXP-T-029",
+        "EXP-T-030",
+        "EXP-T-031",
+        "EXP-T-019"
       ],
       "overrides": {
         "params": {
@@ -646,7 +696,7 @@
         "timing": {
           "profileId": "WR-LONGHAUL-EXP",
           "sigma_t_ps": 300,
-          "tie_pp_ps": 1000,
+          "tie_pp_ps": 375,
           "pdv_pp_ps": null,
           "timestamping_mode": "hardware",
           "synce_enabled": false,
@@ -657,14 +707,16 @@
             "EXP-T-003",
             "EXP-T-002",
             "EXP-T-004",
-            "EXP-T-019",
-            "EXP-T-020"
+            "EXP-T-029",
+            "EXP-T-030",
+            "EXP-T-031",
+            "EXP-T-019"
           ],
           "uncertainty": {
             "u_sigma_t_ps": 6,
-            "u_tie_pp_ps": null,
+            "u_tie_pp_ps": 12,
             "u_pdv_pp_ps": null,
-            "method": "registry_numeric_uncertainty_anchor",
+            "method": "registry_named_uncertainty_anchor",
             "reportableReady": true,
             "blockedReasons": []
           }

@@ -3,8 +3,8 @@
 This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.
 
 ## Inputs
-- scenario_pack: `configs/warp-shadow-injection-scenarios.qs-primary-typed.v1.json`
-- run_artifact: `artifacts/research/full-solve/shadow-injection-run-qs-primary-typed-2026-03-06.json`
+- scenario_pack: `configs\warp-shadow-injection-scenarios.qs-primary-typed.v1.json`
+- run_artifact: `artifacts\research\full-solve\shadow-injection-run-qs-primary-typed-2026-03-06.json`
 - registry: `docs\specs\casimir-tile-experimental-parameter-registry-2026-03-04.md`
 
 ## Summary

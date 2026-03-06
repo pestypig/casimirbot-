@@ -1,4 +1,4 @@
-# Timing Compatibility Check (2026-03-06T06:59:05.575Z)
+# Timing Compatibility Check (2026-03-06T15:48:31.359Z)
 
 This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.
 
@@ -9,36 +9,35 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 
 ## Summary
 - scenario_count: 12
-- congruent: 3
+- congruent: 9
 - incongruent: 2
-- unknown: 7
+- unknown: 1
 
 ## Profile Summary
 | profile_id | congruent | incongruent | unknown |
 |---|---:|---:|---:|
-| WR-LONGHAUL-EXP | 0 | 0 | 6 |
+| WR-LONGHAUL-EXP | 6 | 0 | 0 |
 | WR-SHORT-PS | 3 | 2 | 1 |
 
 ## Scenario Checks
-| scenario_id | profile_id | sigma_t_ps | u_sigma_t_ps | timestamping_mode | synce_enabled | topology_class | evidence_congruence | run_classification | reasons |
-|---|---|---:|---:|---|---|---|---|---|---|
-| ti_primary_typed_wr_short_ps_sigma_6e0ps | WR-SHORT-PS | 6 | 6 | hardware | true | wr_short_fiber | congruent | compatible | none |
-| ti_primary_typed_wr_short_ps_sigma_1e1ps | WR-SHORT-PS | 12 | 6 | hardware | true | wr_short_fiber | congruent | compatible | none |
-| ti_primary_typed_wr_short_ps_sigma_5e1ps | WR-SHORT-PS | 50 | 6 | hardware | true | wr_short_fiber | congruent | compatible | none |
-| ti_primary_typed_wr_short_ps_sigma_1e2ps | WR-SHORT-PS | 100 | 6 | hardware | true | wr_short_fiber | unknown | compatible | edge_uncertainty_overlap |
-| ti_primary_typed_wr_short_ps_sigma_1e2ps | WR-SHORT-PS | 120 | 6 | hardware | true | wr_short_fiber | incongruent | compatible | sigma_exceeds_profile:WR-SHORT-PS |
-| ti_primary_typed_wr_short_ps_sigma_3e2ps | WR-SHORT-PS | 300 | 6 | hardware | true | wr_short_fiber | incongruent | compatible | sigma_exceeds_profile:WR-SHORT-PS |
-| ti_primary_typed_wr_longhaul_exp_sigma_6e0ps | WR-LONGHAUL-EXP | 6 | 6 | hardware | false | wr_longhaul_unrepeated | unknown | compatible | longhaul_evidence_not_admissible_in_strict_scope |
-| ti_primary_typed_wr_longhaul_exp_sigma_1e1ps | WR-LONGHAUL-EXP | 12 | 6 | hardware | false | wr_longhaul_unrepeated | unknown | compatible | longhaul_evidence_not_admissible_in_strict_scope |
-| ti_primary_typed_wr_longhaul_exp_sigma_5e1ps | WR-LONGHAUL-EXP | 50 | 6 | hardware | false | wr_longhaul_unrepeated | unknown | compatible | longhaul_evidence_not_admissible_in_strict_scope |
-| ti_primary_typed_wr_longhaul_exp_sigma_1e2ps | WR-LONGHAUL-EXP | 100 | 6 | hardware | false | wr_longhaul_unrepeated | unknown | compatible | longhaul_evidence_not_admissible_in_strict_scope |
-| ti_primary_typed_wr_longhaul_exp_sigma_1e2ps | WR-LONGHAUL-EXP | 120 | 6 | hardware | false | wr_longhaul_unrepeated | unknown | compatible | longhaul_evidence_not_admissible_in_strict_scope |
-| ti_primary_typed_wr_longhaul_exp_sigma_3e2ps | WR-LONGHAUL-EXP | 300 | 6 | hardware | false | wr_longhaul_unrepeated | unknown | compatible | longhaul_evidence_not_admissible_in_strict_scope |
+| scenario_id | profile_id | sigma_t_ps | tie_pp_ps | u_sigma_t_ps | timestamping_mode | synce_enabled | topology_class | evidence_congruence | run_classification | reasons |
+|---|---|---:|---:|---:|---|---|---|---|---|---|
+| ti_primary_typed_wr_short_ps_sigma_6ps | WR-SHORT-PS | 6 | 150 | 6 | hardware | true | wr_short_fiber | congruent | compatible | none |
+| ti_primary_typed_wr_short_ps_sigma_12ps | WR-SHORT-PS | 12 | 150 | 6 | hardware | true | wr_short_fiber | congruent | compatible | none |
+| ti_primary_typed_wr_short_ps_sigma_50ps | WR-SHORT-PS | 50 | 150 | 6 | hardware | true | wr_short_fiber | congruent | compatible | none |
+| ti_primary_typed_wr_short_ps_sigma_100ps | WR-SHORT-PS | 100 | 150 | 6 | hardware | true | wr_short_fiber | unknown | compatible | edge_uncertainty_overlap |
+| ti_primary_typed_wr_short_ps_sigma_120ps | WR-SHORT-PS | 120 | 150 | 6 | hardware | true | wr_short_fiber | incongruent | compatible | sigma_exceeds_profile:WR-SHORT-PS |
+| ti_primary_typed_wr_short_ps_sigma_300ps | WR-SHORT-PS | 300 | 150 | 6 | hardware | true | wr_short_fiber | incongruent | compatible | sigma_exceeds_profile:WR-SHORT-PS |
+| ti_primary_typed_wr_longhaul_exp_sigma_6ps | WR-LONGHAUL-EXP | 6 | 375 | 6 | hardware | false | wr_longhaul_unrepeated | congruent | compatible | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_12ps | WR-LONGHAUL-EXP | 12 | 375 | 6 | hardware | false | wr_longhaul_unrepeated | congruent | compatible | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_50ps | WR-LONGHAUL-EXP | 50 | 375 | 6 | hardware | false | wr_longhaul_unrepeated | congruent | compatible | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_100ps | WR-LONGHAUL-EXP | 100 | 375 | 6 | hardware | false | wr_longhaul_unrepeated | congruent | compatible | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_120ps | WR-LONGHAUL-EXP | 120 | 375 | 6 | hardware | false | wr_longhaul_unrepeated | congruent | compatible | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_300ps | WR-LONGHAUL-EXP | 300 | 375 | 6 | hardware | false | wr_longhaul_unrepeated | congruent | compatible | none |
 
 ## Dominant Reasons
 | reason | count |
 |---|---:|
-| longhaul_evidence_not_admissible_in_strict_scope | 6 |
 | sigma_exceeds_profile:WR-SHORT-PS | 2 |
 | edge_uncertainty_overlap | 1 |
 

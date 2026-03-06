@@ -84,11 +84,31 @@ type TimingContext = {
   };
 };
 
+type SemEllipsContext = {
+  profileId?: string;
+  d_sem_corr_nm?: number;
+  u_sem_nm?: number;
+  d_ellip_nm?: number;
+  u_ellip_nm?: number;
+  delta_se_nm?: number;
+  d_fused_nm?: number;
+  u_fused_nm?: number;
+  U_fused_nm?: number;
+  sourceRefs?: string[];
+  uncertainty?: {
+    method?: string;
+    reportableReady?: boolean;
+    blockedReasons?: string[];
+    sourceRefs?: string[];
+  };
+};
+
 type ExperimentalContext = {
   casimirSign?: CasimirSignContext;
   qSpoiling?: QSpoilingContext;
   nanogap?: NanogapContext;
   timing?: TimingContext;
+  semEllips?: SemEllipsContext;
 };
 
 type ShadowScenario = {
@@ -407,6 +427,7 @@ const renderMarkdown = (payload: any): string => {
       const qsContext = row.experimentalContext?.qSpoiling;
       const ngContext = row.experimentalContext?.nanogap;
       const tiContext = row.experimentalContext?.timing;
+      const seContext = row.experimentalContext?.semEllips;
       const contextSummary = csContext
         ? `${csContext.branchHypothesis ?? 'n/a'};${csContext.materialPair ?? 'n/a'};${csContext.interveningMedium ?? 'n/a'}`
         : qsContext
@@ -415,7 +436,9 @@ const renderMarkdown = (payload: any): string => {
             ? `${ngContext.profileId ?? 'n/a'};u_mean=${ngContext.u_g_mean_nm ?? 'n/a'};u_sigma=${ngContext.u_g_sigma_nm ?? 'n/a'}`
             : tiContext
               ? `${tiContext.profileId ?? 'n/a'};sigma=${tiContext.sigma_t_ps ?? 'n/a'};ts=${tiContext.timestamping_mode ?? 'n/a'}`
-            : 'n/a';
+              : seContext
+                ? `${seContext.profileId ?? 'n/a'};delta=${seContext.delta_se_nm ?? 'n/a'};U=${seContext.U_fused_nm ?? 'n/a'}`
+              : 'n/a';
       const failReasons =
         row.guard?.congruentSolveFailReasons && row.guard.congruentSolveFailReasons.length > 0
           ? row.guard.congruentSolveFailReasons.join(', ')

@@ -9,6 +9,10 @@ import type { PromptSpec } from "@shared/prompt-spec";
 import type { ChatSession } from "@shared/agi-chat";
 import type { AgiRefineryRequest } from "@shared/agi-refinery";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
+import type {
+  ContextCapsuleReplayBundle,
+  ContextCapsuleSummary,
+} from "@shared/helix-context-capsule";
 import {
   getDefaultReasoningTheaterConfig,
   parseReasoningTheaterConfigPayload,
@@ -169,6 +173,7 @@ export type HaloBankActionOutput = {
 
 export type LocalAskResponse = {
   text: string;
+  context_capsule?: ContextCapsuleSummary;
   mode?: "read" | "observe" | "act" | "verify";
   action?: { tool?: string; output?: unknown | HaloBankActionOutput };
   proof?: LocalAskProof;
@@ -385,6 +390,7 @@ const reasoningTheaterCongruenceGraphPromiseByKey = new Map<
   string,
   Promise<ReasoningTheaterCongruenceGraphResponse>
 >();
+const contextCapsulePromiseByKey = new Map<string, Promise<ContextCapsuleLookupResponse>>();
 
 export type ReasoningTheaterTopologyResponse = {
   version: string;
@@ -493,6 +499,48 @@ export type ReasoningTheaterCongruenceGraphResponse = {
     requires_cl: string | null;
     weight: number;
   }>;
+};
+
+export type ContextCapsuleLookupResponse = {
+  capsule: ContextCapsuleSummary;
+  replay_active: ContextCapsuleReplayBundle;
+  replay_inactive: ContextCapsuleReplayBundle;
+  convergence: {
+    source: "atlas_exact" | "repo_exact" | "open_world" | "unknown";
+    proofPosture: "confirmed" | "reasoned" | "hypothesis" | "unknown" | "fail_closed";
+    maturity: "exploratory" | "reduced_order" | "diagnostic" | "certified";
+    phase: "observe" | "plan" | "retrieve" | "gate" | "synthesize" | "verify" | "execute" | "debrief";
+    collapseEvent: "arbiter_commit" | "proof_commit" | null;
+  };
+  intent: {
+    intent_domain: string;
+    intent_id: string;
+    goal: string;
+    constraints: string[];
+    key_terms: string[];
+  };
+  provenance: {
+    retrieval_route: string;
+    zone_hint: "mapped_connected" | "owned_frontier" | "uncharted";
+    has_exact_provenance: boolean;
+    exact_paths: string[];
+    primary_path: string | null;
+    atlas_hits: number;
+    channel_hits: Record<string, number>;
+  };
+  epistemic: {
+    arbiter_mode: string;
+    claim_tier: string;
+    provenance_class: string;
+    certifying: boolean;
+    fail_reason: string | null;
+  };
+  commit: {
+    events: Array<"arbiter_commit" | "proof_commit">;
+    proof_verdict: "PASS" | "FAIL" | "UNKNOWN";
+    certificate_hash: string | null;
+    certificate_integrity_ok: boolean | null;
+  };
 };
 
 export type PersonaSummary = {
@@ -1178,6 +1226,7 @@ export async function askLocal(
     durationMs?: number;
     compare?: { place?: HaloBankPlace; timestamp?: string | number; durationMs?: number };
     model?: { includeEnvelope?: boolean; includeCausal?: boolean };
+    capsuleIds?: string[];
   },
 ): Promise<LocalAskResponse> {
   const body: Record<string, unknown> = {};
@@ -1217,6 +1266,9 @@ export async function askLocal(
   if (typeof options?.durationMs === "number") body.durationMs = options.durationMs;
   if (options?.compare) body.compare = options.compare;
   if (options?.model) body.model = options.model;
+  if (Array.isArray(options?.capsuleIds) && options.capsuleIds.length > 0) {
+    body.capsuleIds = options.capsuleIds.slice(0, 3);
+  }
   const signal = options?.signal;
   if (isNavigatorOffline()) {
     await waitForOnline(signal);
@@ -1443,6 +1495,46 @@ export async function getReasoningTheaterCongruenceGraph(options?: {
     throw error;
   });
   reasoningTheaterCongruenceGraphPromiseByKey.set(cacheKey, promise);
+  return promise;
+}
+
+export async function getContextCapsule(
+  capsuleId: string,
+  options?: { sessionId?: string; signal?: AbortSignal; forceRefresh?: boolean },
+): Promise<ContextCapsuleLookupResponse> {
+  const normalized = capsuleId.trim().toUpperCase();
+  if (!normalized) {
+    throw new Error("capsule_id_required");
+  }
+  const cacheKey = `${normalized}|${options?.sessionId ?? ""}`;
+  if (!options?.forceRefresh) {
+    const cached = contextCapsulePromiseByKey.get(cacheKey);
+    if (cached) return cached;
+  }
+  const promise = (async () => {
+    const search = new URLSearchParams();
+    if (options?.sessionId) {
+      search.set("sessionId", options.sessionId);
+    }
+    const query = search.toString();
+    const response = await fetch(
+      query
+        ? `/api/helix/capsule/${encodeURIComponent(normalized)}?${query}`
+        : `/api/helix/capsule/${encodeURIComponent(normalized)}`,
+      {
+        headers: { Accept: "application/json" },
+        signal: options?.signal,
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`context-capsule-http-${response.status}`);
+    }
+    return (await response.json()) as ContextCapsuleLookupResponse;
+  })().catch((error) => {
+    contextCapsulePromiseByKey.delete(cacheKey);
+    throw error;
+  });
+  contextCapsulePromiseByKey.set(cacheKey, promise);
   return promise;
 }
 

@@ -74,6 +74,9 @@ Per-paper equation trace:
 | EXP-T-026 | SRC-068 | WR SoftPLL update bandwidth | 30 | Hz | UNKNOWN | SoftPLL update path in timing architecture | ISPCS 2016 (clock characteristics), timing architecture section | full_text | primary | clock-mode conditions | extracted |
 | EXP-T-027 | SRC-068 | WR max measured frequency offset in G.8262 setup | 4.256 | ppm | UNKNOWN | 24 h run under G.8262 setup | ISPCS 2016 (clock characteristics), G.8262 experiment section | full_text | primary | frequency stability lane | extracted |
 | EXP-T-028 | SRC-068 | WR frequency-offset bound over 1000 s windows | <20 | ppb | UNKNOWN | Same run as EXP-T-027; all windows below bound | ISPCS 2016 (clock characteristics), G.8262 experiment section | full_text | primary | frequency stability lane | extracted |
+| EXP-T-029 | SRC-031 | WR strict-scope long-haul topology/uncertainty anchor | 15 | km | ~6 ps (offset spread over chain run) | Four-switch daisy chain (`3x5 km` fiber); long-haul class anchor for strict timing lane admissibility | NIM A 2013, measurements section (chain + offset histogram) | full_text | primary | long-haul admissibility, `sigma_t_ps` | extracted |
+| EXP-T-030 | SRC-031 | WR strict-scope sigma uncertainty anchor | 6 | ps | k=1 (`1sigma` offset spread from chain histogram) | Same run as `EXP-T-003`; explicit uncertainty anchor for `u_sigma_t_ps` in strict timing packs | NIM A 2013, measurements section, Fig. 6 offset histogram | full_text | primary | `u_sigma_t_ps` | extracted |
+| EXP-T-031 | SRC-031 | WR strict-scope tie uncertainty anchor (conservative from measured spread) | 12 | ps | k=1 conservative (`2x` `EXP-T-030` sigma anchor under same chain conditions) | Same run as `EXP-T-003`; used for `u_tie_pp_ps` when strict-scope tie uncertainty is not directly tabulated | NIM A 2013, measurements section, Fig. 6 offset histogram | full_text | primary | `u_tie_pp_ps` | extracted |
 
 ## Nanogap Extraction
 
@@ -224,7 +227,7 @@ Per-paper equation trace:
 
 | lane | sources attempted | extracted rows | partial rows | blocked rows |
 |---|---:|---:|---:|---:|
-| timing | 7 | 26 | 2 | 0 |
+| timing | 7 | 29 | 2 | 0 |
 | nanogap | 6 | 32 | 0 | 0 |
 | sem_ellipsometry | 5 | 14 | 1 | 0 |
 | q_spoiling | 6 | 20 | 2 | 0 |
@@ -246,7 +249,7 @@ Per-paper equation trace:
 
 ## Traceability
 - `registry_id`: `casimir-tile-experimental-parameter-registry-2026-03-04`
-- `commit_pin`: `e240431948598a964a9042ed929a076f609b90d6`
+- `commit_pin`: `f6d6146d26885aae34ebd8785950df07d6af9731`
 - `owner`: `research-governance`
-- `status`: `draft_v4`
+- `status`: `draft_v5`
 - `extraction_mode`: `text-surface only (abstract/full-text), no figure OCR`

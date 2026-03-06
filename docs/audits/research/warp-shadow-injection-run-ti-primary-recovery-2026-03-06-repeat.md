@@ -11,7 +11,7 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 - incompatible: 0
 - error: 0
 - scenario_pack: `configs/warp-shadow-injection-scenarios.ti-primary-recovery.v1.json`
-- commit_pin: `0b65cb4b7b5dff40b72c032dd6424319fbd5ff41`
+- commit_pin: `f6d6146d26885aae34ebd8785950df07d6af9731`
 
 ## Recovery Contract
 - recovery_goal: timing_compatibility_recovery
@@ -32,18 +32,18 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 ## Scenario Results
 | scenario_id | lane | experimental_context | classification | congruentSolvePass | marginRatioRaw | deltaMarginRatioRaw | fail_or_error |
 |---|---|---|---|---|---:|---:|---|
-| ti_primary_wr_short_ps_sigma_6e0ps | timing | n/a | compatible | true | 0.2698543116036525 | -0.7301456883963475 | none |
-| ti_primary_wr_short_ps_sigma_1e1ps | timing | n/a | compatible | true | 0.23176606739908293 | -0.7682339326009171 | none |
-| ti_primary_wr_short_ps_sigma_5e1ps | timing | n/a | compatible | true | 0.2163729288083322 | -0.7836270711916677 | none |
-| ti_primary_wr_short_ps_sigma_1e2ps | timing | n/a | compatible | true | 0.21146505557529513 | -0.7885349444247048 | none |
-| ti_primary_wr_short_ps_sigma_1e2ps | timing | n/a | compatible | true | 0.2035234136253071 | -0.7964765863746929 | none |
-| ti_primary_wr_short_ps_sigma_3e2ps | timing | n/a | compatible | true | 0.21146505557529513 | -0.7885349444247048 | none |
-| ti_primary_wr_longhaul_exp_sigma_6e0ps | timing | n/a | compatible | true | 0.21146505557529513 | -0.7885349444247048 | none |
-| ti_primary_wr_longhaul_exp_sigma_1e1ps | timing | n/a | compatible | true | 0.21146505557529513 | -0.7885349444247048 | none |
-| ti_primary_wr_longhaul_exp_sigma_5e1ps | timing | n/a | compatible | true | 0.21308893587673397 | -0.7869110641232661 | none |
-| ti_primary_wr_longhaul_exp_sigma_1e2ps | timing | n/a | compatible | true | 0.20042815053284566 | -0.7995718494671543 | none |
-| ti_primary_wr_longhaul_exp_sigma_1e2ps | timing | n/a | compatible | true | 0.2098531385402239 | -0.7901468614597761 | none |
-| ti_primary_wr_longhaul_exp_sigma_3e2ps | timing | n/a | compatible | true | 0.21308893587673397 | -0.7869110641232661 | none |
+| ti_primary_wr_short_ps_sigma_6ps | timing | n/a | compatible | true | 0.24446485107201202 | -0.755535148927988 | none |
+| ti_primary_wr_short_ps_sigma_12ps | timing | n/a | compatible | true | 0.2282565057759659 | -0.7717434942240341 | none |
+| ti_primary_wr_short_ps_sigma_50ps | timing | n/a | compatible | true | 0.2282565057759659 | -0.7717434942240341 | none |
+| ti_primary_wr_short_ps_sigma_100ps | timing | n/a | compatible | true | 0.20508832087663792 | -0.7949116791233621 | none |
+| ti_primary_wr_short_ps_sigma_120ps | timing | n/a | compatible | true | 0.2035234136253071 | -0.7964765863746929 | none |
+| ti_primary_wr_short_ps_sigma_300ps | timing | n/a | compatible | true | 0.20197005086128303 | -0.7980299491387169 | none |
+| ti_primary_wr_longhaul_exp_sigma_6ps | timing | n/a | compatible | true | 0.20825309986725563 | -0.7917469001327444 | none |
+| ti_primary_wr_longhaul_exp_sigma_12ps | timing | n/a | compatible | true | 0.21308893587673397 | -0.7869110641232661 | none |
+| ti_primary_wr_longhaul_exp_sigma_50ps | timing | n/a | compatible | true | 0.2035234136253071 | -0.7964765863746929 | none |
+| ti_primary_wr_longhaul_exp_sigma_100ps | timing | n/a | compatible | true | 0.22308827469892908 | -0.7769117253010709 | none |
+| ti_primary_wr_longhaul_exp_sigma_120ps | timing | n/a | compatible | true | 0.22479832453285556 | -0.7752016754671445 | none |
+| ti_primary_wr_longhaul_exp_sigma_300ps | timing | n/a | compatible | true | 0.2098531385402239 | -0.7901468614597761 | none |
 
 ## Failure Envelope
 

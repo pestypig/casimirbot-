@@ -15,9 +15,36 @@
     "nanogap",
     "q_spoiling",
     "casimir_sign_control",
-    "qei_worldline"
+    "qei_worldline",
+    "sem_ellipsometry"
   ],
   "strictLaneRequirements": {
+    "sem_ellipsometry": {
+      "flag": "strict_sem_ellips",
+      "requiredSourceClasses": ["primary", "standard"],
+      "requiredSignals": [
+        {
+          "id": "sem_calibration_anchor",
+          "anchors": ["EXP-SE-003"],
+          "anyPatterns": ["srm-484", "calibration", "magnification", "d_sem_corr", "u_sem"]
+        },
+        {
+          "id": "ellipsometry_anchor",
+          "anchors": ["EXP-SE-012", "EXP-SE-013"],
+          "anyPatterns": ["ellipsometry", "d_ellip", "thickness", "u_ellip", "u_fused"]
+        },
+        {
+          "id": "uncertainty_reporting_anchor",
+          "anchors": ["EXP-SE-009", "EXP-SE-013"],
+          "anyPatterns": ["expanded uncertainty", "u=2*uc", "k=2", "uncertainty reporting"]
+        },
+        {
+          "id": "traceability_anchor",
+          "anchors": ["EXP-SE-001", "EXP-SE-002"],
+          "anyPatterns": ["iso 19749", "iso 16700", "traceability", "performance verification"]
+        }
+      ]
+    },
     "timing": {
       "flag": "strict_timing",
       "requiredSourceClasses": ["primary", "standard"],
@@ -36,6 +63,11 @@
           "id": "timing_accuracy_anchor",
           "anchors": ["EXP-T-002", "EXP-T-004"],
           "anyPatterns": ["sync target accuracy", "accumulated skew", "< 1", "ns"]
+        },
+        {
+          "id": "timing_longhaul_anchor",
+          "anchors": ["EXP-T-029"],
+          "anyPatterns": ["long-haul", "long haul", "15 km", "daisy chain", "multi-switch"]
         }
       ]
     },
@@ -178,6 +210,11 @@
         "sampler": "gaussian",
         "fieldType": "scalar",
         "tau_s_ms": 0.02
+      }
+    },
+    "sem_ellipsometry": {
+      "params": {
+        "gap_nm": 96
       }
     }
   }

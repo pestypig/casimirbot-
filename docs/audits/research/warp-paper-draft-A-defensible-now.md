@@ -160,26 +160,51 @@ Strict primary/standard pass-1 (`configs/warp-shadow-injection-scenarios.ti-prim
 - pass-1 run summary: `scenarioCount=12`, `compatible=12`, `partial=0`, `incompatible=0`, `error=0`
 - pass-2 run summary: `scenarioCount=12`, `compatible=12`, `partial=0`, `incompatible=0`, `error=0`
 - reportable run summary: `scenarioCount=12`, `compatible=12`, `partial=0`, `incompatible=0`, `error=0`
-- reportable-reference run summary: `scenarioCount=3`, `compatible=3`, `partial=0`, `incompatible=0`, `error=0`
-- frozen reportable prereg profile records `reportableReady=false`, `blockedReasons=[missing_numeric_uncertainty_anchor]`, and stable citation target scenario IDs.
+- reportable-reference run summary: `scenarioCount=2`, `compatible=2`, `partial=0`, `incompatible=0`, `error=0`
+- frozen reportable prereg profile records `reportableReady=true`, `blockedReasons=[]`, and stable citation target scenario IDs.
 
 Lane-specific evidence congruence checks:
-- typed check (`artifacts/research/full-solve/ti-compat-check-2026-03-06.json`): `congruent=0`, `incongruent=0`, `unknown=12`
-- reportable check (`artifacts/research/full-solve/ti-compat-check-reportable-2026-03-06.json`): `congruent=0`, `incongruent=0`, `unknown=12`
-- dominant deterministic reason code: `missing_numeric_uncertainty_anchor`
+- typed check (`artifacts/research/full-solve/ti-compat-check-2026-03-06.json`): `congruent=9`, `incongruent=2`, `unknown=1`
+- reportable check (`artifacts/research/full-solve/ti-compat-check-reportable-2026-03-06.json`): `congruent=9`, `incongruent=2`, `unknown=1`
+- profile detail: `WR-LONGHAUL-EXP` now evaluates `congruent=6`, `incongruent=0`, `unknown=0` under strict long-haul anchor gating (`EXP-T-029`).
+- dominant deterministic reason codes are now bounded to WR-SHORT edge/threshold behavior: `edge_uncertainty_overlap`, `sigma_exceeds_profile:WR-SHORT-PS`.
 
 Repeat-run determinism (`artifacts/research/full-solve/ti-repeat-determinism-2026-03-06.json`) reports `status=PASS` across pass-1/pass-2/reportable/reportable-reference runs and typed/reportable checker summaries.
 
 Interpretation rule:
 - compatibility to the existing full-solve lane and evidence congruence are tracked separately;
-- strict timing scope currently remains non-promotable until numeric uncertainty anchors are present in admissible source classes.
+- strict timing scope remains `reference_only` and non-promotable by policy even though strict-scope long-haul admissibility and numeric uncertainty anchoring are now present.
+- no promotion/canonical override is implied by this envelope mapping alone.
+
+## SEM+Ellipsometry Compatibility Envelope (Non-Blocking)
+This lane is explicitly `reference_only` and does not alter canonical campaign decisions.
+
+Strict primary/standard pass-1 (`configs/warp-shadow-injection-scenarios.se-primary-recovery.v1.json`), pass-2 typed (`configs/warp-shadow-injection-scenarios.se-primary-typed.v1.json`), frozen reportable (`configs/warp-shadow-injection-scenarios.se-primary-reportable.v1.json`), and fixed reportable-reference (`configs/warp-shadow-injection-scenarios.se-primary-reportable-reference.v1.json`) sweeps were executed with deterministic replay:
+- pass-1 run summary: `scenarioCount=18`, `compatible=18`, `partial=0`, `incompatible=0`, `error=0`
+- pass-2 run summary: `scenarioCount=18`, `compatible=18`, `partial=0`, `incompatible=0`, `error=0`
+- reportable run summary: `scenarioCount=18`, `compatible=18`, `partial=0`, `incompatible=0`, `error=0`
+- reportable-reference run summary: `scenarioCount=2`, `compatible=2`, `partial=0`, `incompatible=0`, `error=0`
+- frozen reportable prereg profile records `reportableReady=false` with blocked reasons `missing_paired_dual_instrument_run` and `missing_covariance_uncertainty_anchor`.
+
+Lane-specific evidence congruence checks:
+- typed check (`artifacts/research/full-solve/se-compat-check-2026-03-06.json`): `congruent=8`, `incongruent=0`, `unknown=10`
+- reportable check (`artifacts/research/full-solve/se-compat-check-reportable-2026-03-06.json`): `congruent=0`, `incongruent=0`, `unknown=18`
+- reportable-reference check (`artifacts/research/full-solve/se-compat-check-reportable-reference-2026-03-06.json`): `congruent=0`, `incongruent=0`, `unknown=2`
+- dominant deterministic reason code on typed envelope: `edge_uncertainty_overlap`.
+
+Repeat-run determinism (`artifacts/research/full-solve/se-repeat-determinism-2026-03-06.json`) reports `status=PASS` across pass-1/pass-2/reportable/reportable-reference runs and typed/reportable/reportable-reference checker summaries.
+
+Interpretation rule:
+- compatibility to the existing full-solve lane and evidence congruence are tracked separately;
+- reportable outputs remain fail-closed by design until paired dual-instrument covariance-aware uncertainty anchors are present;
+- paired-run closure path is now commit-tracked via `docs/specs/casimir-tile-sem-ellipsometry-paired-run-artifact-set-v1.md` and `docs/specs/templates/casimir-tile-sem-ellipsometry-paired-run-evidence-template.v1.json`;
 - no promotion/canonical override is implied by this envelope mapping alone.
 
 ## What This Research Improves Now
 1. Adds standards-oriented governance language without changing reduced-order gate semantics.
 2. Provides explicit source-quality hierarchy (primary/standard first) for manuscript claims.
 3. Improves reproducibility framing by adding deterministic staleness/conflict reporting expectations.
-4. Adds per-lane envelope mapping for `casimir_sign_control`, `q_spoiling`, `nanogap`, and `timing` with deterministic two-pass sweep artifacts and congruence reason codes.
+4. Adds per-lane envelope mapping for `casimir_sign_control`, `q_spoiling`, `nanogap`, `timing`, and `sem_ellipsometry` with deterministic two-pass sweep artifacts and congruence reason codes.
 5. Strengthens closure planning by mapping unresolved items to falsifier-driven upgrade steps.
 6. Adds a manufacturing-spec package (`docs/specs/*`) that converts tile novelty claims into measurable requirements, acceptance gates, and falsifiers.
 

@@ -104,6 +104,10 @@ Fail closed if:
 
 Outstanding closure gap:
 - Cross-instrument raw datasets and covariance terms are still required to promote this lane from `partial` to replay-grade `pass`.
+- Use the paired-run artifact set for closure bookkeeping:
+  - `docs/specs/casimir-tile-sem-ellipsometry-paired-run-artifact-set-v1.md`
+  - `docs/specs/casimir-tile-sem-ellipsometry-covariance-budget-template-v1.md`
+  - `docs/specs/templates/casimir-tile-sem-ellipsometry-paired-run-evidence-template.v1.json`
 
 ## Traceability
 - `spec_version`: `casimir-tile-sem-ellipsometry-cross-validation-protocol-v1`

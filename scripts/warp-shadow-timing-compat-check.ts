@@ -22,6 +22,11 @@ const BOUNDARY_STATEMENT =
 
 type ProfileId = 'WR-SHORT-PS' | 'WR-LONGHAUL-EXP';
 type Congruence = 'congruent' | 'incongruent' | 'unknown';
+type TimingProfileThreshold = {
+  sigma_t_ps_max: number | null;
+  tie_pp_ps_max: number | null;
+  pdv_pp_ps_max: number | null;
+};
 
 type RegistryRow = {
   entry_id: string;
@@ -61,7 +66,7 @@ type Scenario = {
 
 type ScenarioPack = {
   boundaryStatement?: string;
-  profileThresholds?: Partial<Record<ProfileId, { sigma_t_ps_max: number | null }>>;
+  profileThresholds?: Partial<Record<ProfileId, TimingProfileThreshold>>;
   scenarios: Scenario[];
 };
 
@@ -74,9 +79,9 @@ type RunPayload = {
   results?: RunResult[];
 };
 
-const profileThresholdDefaults: Record<ProfileId, { sigma_t_ps_max: number | null }> = {
-  'WR-SHORT-PS': { sigma_t_ps_max: 100 },
-  'WR-LONGHAUL-EXP': { sigma_t_ps_max: null },
+const profileThresholdDefaults: Record<ProfileId, TimingProfileThreshold> = {
+  'WR-SHORT-PS': { sigma_t_ps_max: 100, tie_pp_ps_max: 200, pdv_pp_ps_max: null },
+  'WR-LONGHAUL-EXP': { sigma_t_ps_max: null, tie_pp_ps_max: 500, pdv_pp_ps_max: null },
 };
 
 const readArgValue = (name: string, argv = process.argv.slice(2)): string | undefined => {
@@ -123,6 +128,7 @@ const hasAllTimingAnchors = (refs: string[]): { ok: boolean; missing: string[] }
   if (!refs.includes('EXP-T-001')) missing.push('missing_timing_topology_anchor');
   if (!refs.includes('EXP-T-003')) missing.push('missing_timing_precision_anchor');
   if (!refs.includes('EXP-T-002') && !refs.includes('EXP-T-004')) missing.push('missing_timing_accuracy_anchor');
+  if (!refs.includes('EXP-T-029')) missing.push('missing_timing_longhaul_anchor');
   return { ok: missing.length === 0, missing };
 };
 
@@ -132,11 +138,12 @@ const evaluateCongruence = (input: {
   refs: string[];
   profileId: ProfileId | null;
   sigmaPs: number | null;
+  tiePpPs: number | null;
   timestampingMode: string | null;
   synceEnabled: boolean | null;
   topologyClass: string | null;
   uSigmaPs: number | null;
-  thresholds: Record<ProfileId, { sigma_t_ps_max: number | null }>;
+  thresholds: Record<ProfileId, TimingProfileThreshold>;
   strictScopeLonghaulEvidence: boolean;
   reportableReady: boolean | null;
 }): { evidenceCongruence: Congruence; reasonCodes: string[] } => {
@@ -146,6 +153,7 @@ const evaluateCongruence = (input: {
 
   if (!input.profileId) reasons.push('missing_profile_id');
   if (input.sigmaPs == null || input.sigmaPs <= 0) reasons.push('missing_sigma_t_ps');
+  if (input.tiePpPs == null || input.tiePpPs <= 0) reasons.push('missing_tie_pp_ps');
   if (input.timestampingMode == null) reasons.push('missing_timestamping_mode');
   if (input.synceEnabled == null) reasons.push('missing_synce_state');
   if (input.reportableReady === false) reasons.push('missing_numeric_uncertainty_anchor');
@@ -153,6 +161,7 @@ const evaluateCongruence = (input: {
 
   const profile = input.profileId as ProfileId;
   const sigma = input.sigmaPs as number;
+  const tie = input.tiePpPs as number;
   const timestampingMode = String(input.timestampingMode ?? '').toLowerCase();
   const synceEnabled = input.synceEnabled === true;
   const uSigma = Math.max(0, input.uSigmaPs ?? 0.3 * sigma);
@@ -163,6 +172,10 @@ const evaluateCongruence = (input: {
     }
     if (timestampingMode !== 'hardware') {
       return { evidenceCongruence: 'incongruent', reasonCodes: ['timestamping_not_hardware'] };
+    }
+    const tieMaxLonghaul = input.thresholds[profile].tie_pp_ps_max;
+    if (tieMaxLonghaul != null && tie > tieMaxLonghaul) {
+      return { evidenceCongruence: 'incongruent', reasonCodes: ['tie_exceeds_profile:WR-LONGHAUL-EXP'] };
     }
     return { evidenceCongruence: 'congruent', reasonCodes: [] };
   }
@@ -175,6 +188,10 @@ const evaluateCongruence = (input: {
   }
 
   const sigmaMax = input.thresholds[profile].sigma_t_ps_max ?? 100;
+  const tieMax = input.thresholds[profile].tie_pp_ps_max;
+  if (tieMax != null && tie > tieMax) {
+    return { evidenceCongruence: 'incongruent', reasonCodes: ['tie_exceeds_profile:WR-SHORT-PS'] };
+  }
   const strictLimit = sigmaMax - uSigma;
   const expandedLimit = sigmaMax + edgeBand(sigmaMax) + uSigma;
   if (sigma <= strictLimit) return { evidenceCongruence: 'congruent', reasonCodes: [] };
@@ -199,9 +216,9 @@ const renderMarkdown = (payload: any): string => {
     (payload.scenarioChecks as Array<any>)
       .map(
         (row) =>
-          `| ${row.id} | ${row.profileId ?? 'n/a'} | ${row.sigma_t_ps ?? 'n/a'} | ${row.u_sigma_t_ps ?? 'n/a'} | ${row.timestamping_mode ?? 'n/a'} | ${row.synce_enabled ?? 'n/a'} | ${row.topology_class ?? 'n/a'} | ${row.evidenceCongruence} | ${row.runClassification ?? 'n/a'} | ${row.reasonCodes.join(', ') || 'none'} |`,
+          `| ${row.id} | ${row.profileId ?? 'n/a'} | ${row.sigma_t_ps ?? 'n/a'} | ${row.tie_pp_ps ?? 'n/a'} | ${row.u_sigma_t_ps ?? 'n/a'} | ${row.timestamping_mode ?? 'n/a'} | ${row.synce_enabled ?? 'n/a'} | ${row.topology_class ?? 'n/a'} | ${row.evidenceCongruence} | ${row.runClassification ?? 'n/a'} | ${row.reasonCodes.join(', ') || 'none'} |`,
       )
-      .join('\n') || '| n/a | n/a | n/a | n/a | n/a | n/a | n/a | unknown | n/a | n/a |';
+      .join('\n') || '| n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | unknown | n/a | n/a |';
 
   return `# Timing Compatibility Check (${payload.generatedOn})
 
@@ -224,8 +241,8 @@ ${payload.boundaryStatement}
 ${profileRows}
 
 ## Scenario Checks
-| scenario_id | profile_id | sigma_t_ps | u_sigma_t_ps | timestamping_mode | synce_enabled | topology_class | evidence_congruence | run_classification | reasons |
-|---|---|---:|---:|---|---|---|---|---|---|
+| scenario_id | profile_id | sigma_t_ps | tie_pp_ps | u_sigma_t_ps | timestamping_mode | synce_enabled | topology_class | evidence_congruence | run_classification | reasons |
+|---|---|---:|---:|---:|---|---|---|---|---|---|
 ${scenarioRows}
 
 ## Dominant Reasons
@@ -253,7 +270,7 @@ export const runTimingCompatCheck = (options: {
   const registryRows = parseRegistryRows(fs.readFileSync(registryPath, 'utf8'));
   const rowsById = new Map(registryRows.map((row) => [row.entry_id.toUpperCase(), row]));
   const runById = new Map((runPayload.results ?? []).map((row) => [row.id, row]));
-  const thresholds: Record<ProfileId, { sigma_t_ps_max: number | null }> = {
+  const thresholds: Record<ProfileId, TimingProfileThreshold> = {
     ...profileThresholdDefaults,
     ...(scenarioPack.profileThresholds ?? {}),
   };
@@ -266,6 +283,7 @@ export const runTimingCompatCheck = (options: {
     const timing = scenario.experimentalContext?.timing;
     const profileId = (timing?.profileId as ProfileId | undefined) ?? null;
     const sigmaPs = finiteOrNull(timing?.sigma_t_ps);
+    const tiePpPs = finiteOrNull(timing?.tie_pp_ps);
     const uSigmaPs = finiteOrNull(timing?.uncertainty?.u_sigma_t_ps);
     const timestampingMode = String(timing?.timestamping_mode ?? '').trim() || null;
     const synceEnabled =
@@ -284,20 +302,19 @@ export const runTimingCompatCheck = (options: {
       return ['primary', 'standard'].includes(cls) && status === 'extracted' && isKnownUncertainty(row.uncertainty);
     });
 
-    const strictScopeLonghaulEvidence = refs.some((ref) => {
-      const row = rowsById.get(ref);
-      if (!row) return false;
-      const cls = String(row.source_class).toLowerCase();
-      const status = String(row.status).toLowerCase();
-      if (!['primary', 'standard'].includes(cls) || status !== 'extracted') return false;
-      const text = `${row.parameter} ${row.conditions}`.toLowerCase();
-      return /long-haul|long haul|300 km|hundreds of km/.test(text);
-    });
+    const longhaulAnchor = rowsById.get('EXP-T-029');
+    const strictScopeLonghaulEvidence =
+      refs.includes('EXP-T-029') &&
+      !!longhaulAnchor &&
+      ['primary', 'standard'].includes(String(longhaulAnchor.source_class).toLowerCase()) &&
+      String(longhaulAnchor.status).toLowerCase() === 'extracted' &&
+      isKnownUncertainty(longhaulAnchor.uncertainty);
 
     const baseEval = evaluateCongruence({
       refs,
       profileId,
       sigmaPs,
+      tiePpPs,
       timestampingMode,
       synceEnabled,
       topologyClass,
@@ -328,6 +345,7 @@ export const runTimingCompatCheck = (options: {
       lane: scenario.lane,
       profileId,
       sigma_t_ps: sigmaPs,
+      tie_pp_ps: tiePpPs,
       u_sigma_t_ps: uSigmaPs,
       timestamping_mode: timestampingMode,
       synce_enabled: synceEnabled,
@@ -381,4 +399,3 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   });
   console.log(JSON.stringify(result, null, 2));
 }
-

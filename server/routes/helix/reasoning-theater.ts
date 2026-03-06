@@ -3,6 +3,11 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { loadCodeLattice } from "../../services/code-lattice/loader";
+import {
+  getContextCapsule,
+  summarizeContextCapsule,
+  resolveContextCapsuleTenant,
+} from "../../services/helix-ask/context-capsule";
 
 type FrontierAction =
   | "large_gain"
@@ -1878,4 +1883,37 @@ helixReasoningTheaterRouter.get("/reasoning-theater/atlas-graph", async (_req, r
     console.warn("[helix][reasoning-theater] atlas-graph fallback:", error);
   }
   res.status(200).json(buildAtlasGraphFallback(undefined, true));
+});
+
+helixReasoningTheaterRouter.get("/capsule/:capsuleId", (req, res) => {
+  sendNoCache(res);
+  const capsuleId =
+    typeof req.params.capsuleId === "string" ? req.params.capsuleId : "";
+  if (!capsuleId.trim()) {
+    res.status(400).json({ error: "bad_request", message: "capsuleId required" });
+    return;
+  }
+  const sessionId =
+    typeof req.query.sessionId === "string" && req.query.sessionId.trim().length > 0
+      ? req.query.sessionId.trim()
+      : null;
+  const capsule = getContextCapsule({
+    capsuleId,
+    tenantId: resolveContextCapsuleTenant(req),
+    sessionId,
+  });
+  if (!capsule) {
+    res.status(404).json({ error: "not_found", message: "capsule not found" });
+    return;
+  }
+  res.status(200).json({
+    capsule: summarizeContextCapsule(capsule),
+    replay_active: capsule.replay_active,
+    replay_inactive: capsule.replay_inactive,
+    convergence: capsule.convergence,
+    intent: capsule.intent,
+    provenance: capsule.provenance,
+    epistemic: capsule.epistemic,
+    commit: capsule.commit,
+  });
 });

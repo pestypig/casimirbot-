@@ -16,11 +16,16 @@ Define strict, reproducible rules for building and evaluating the `timing` shado
 1. `timing_topology_anchor`
 2. `timing_precision_anchor`
 3. `timing_accuracy_anchor`
+4. `timing_longhaul_anchor`
 
 Signal interpretation:
 1. `timing_topology_anchor`: topology trace anchor (must include `EXP-T-001` class evidence).
 2. `timing_precision_anchor`: measured precision anchor (must include `EXP-T-003` class evidence).
 3. `timing_accuracy_anchor`: measured/declared WR accuracy anchor (must include `EXP-T-002` or `EXP-T-004` class evidence).
+4. `timing_longhaul_anchor`: strict-scope long-haul admissibility anchor (must include `EXP-T-029` with admissible class/status and known uncertainty).
+5. Named uncertainty anchors for reportable readiness should be present when available:
+   - `EXP-T-030` for `u_sigma_t_ps`
+   - `EXP-T-031` for `u_tie_pp_ps`
 
 ## Source Policy
 1. Pass-1, pass-2, and reportable timing packs are filtered to `source_class in {primary,standard}`.
@@ -34,11 +39,13 @@ Profile bounds follow `docs/specs/casimir-tile-timing-precision-test-protocol-v1
 Lane sweep is fixed to:
 1. `sigma_t_ps x profile_id`
 2. `profile_id in {WR-SHORT-PS, WR-LONGHAUL-EXP}`
+3. `tie_pp_ps` is profile-derived from strict primary anchors and treated as a measured-envelope companion metric (not a sweep axis).
 
 ## Dual-Mode Uncertainty Policy
 1. Mapping packs may emit with conservative fallback uncertainty when strict-scope numeric uncertainty anchors are absent.
 2. Reportable profile is always frozen; readiness is conditional:
    - if strict-scope numeric uncertainty anchors are missing, `reportableReady=false` with explicit blocked reasons.
+   - named anchors (`EXP-T-030`,`EXP-T-031`) are preferred over generic strict-row uncertainty parsing.
    - if admissible numeric anchors exist, `reportableReady=true`.
 3. This wave may end with `reportableReady=false`; that is allowed and must be explicit.
 
@@ -72,9 +79,13 @@ Per scenario, checker output must emit:
    - `missing_timing_topology_anchor`
    - `missing_timing_precision_anchor`
    - `missing_timing_accuracy_anchor`
+   - `missing_timing_longhaul_anchor`
+   - `missing_tie_pp_ps`
    - `timestamping_not_hardware`
    - `synce_not_enabled`
    - `sigma_exceeds_profile:WR-SHORT-PS`
+   - `tie_exceeds_profile:WR-SHORT-PS`
+   - `tie_exceeds_profile:WR-LONGHAUL-EXP`
    - `edge_uncertainty_overlap`
    - `missing_numeric_uncertainty_anchor`
    - `longhaul_evidence_not_admissible_in_strict_scope`
@@ -87,6 +98,7 @@ Edge policy:
 ## Determinism Requirements
 1. Re-running identical packs on the same commit produces identical scenario IDs and equivalent summary outcomes.
 2. Repeat-run evidence must include summary stability and reason-count stability.
+3. `reportable-reference` profile must lock interior citation targets and emit a dedicated congruence check artifact.
 
 ## Artifacts
 1. Pass-1 pack: `configs/warp-shadow-injection-scenarios.ti-primary-recovery.v1.json`
@@ -95,7 +107,9 @@ Edge policy:
 4. Reportable reference profile: `configs/warp-shadow-injection-scenarios.ti-primary-reportable-reference.v1.json`
 5. Checker output: `artifacts/research/full-solve/ti-compat-check-YYYY-MM-DD.json`
 6. Checker report: `docs/audits/research/warp-ti-compat-check-YYYY-MM-DD.md`
-7. Repeat determinism: `artifacts/research/full-solve/ti-repeat-determinism-YYYY-MM-DD.json`
+7. Reportable-reference checker output: `artifacts/research/full-solve/ti-compat-check-reportable-reference-YYYY-MM-DD.json`
+8. Reportable-reference checker report: `docs/audits/research/warp-ti-compat-check-reportable-reference-YYYY-MM-DD.md`
+9. Repeat determinism: `artifacts/research/full-solve/ti-repeat-determinism-YYYY-MM-DD.json`
 
 ## Traceability
 - owner: `timing-and-controls`

@@ -1,0 +1,1199 @@
+{
+  "version": 1,
+  "mode": "shadow_non_blocking",
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "recovery_goal": "sem_ellipsometry_compatibility_recovery",
+  "success_bar": "map_only",
+  "baseline_reference": {
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-06.json",
+    "keys": [
+      "marginRatioRaw",
+      "marginRatioRawComputed",
+      "applicabilityStatus",
+      "congruentSolvePass",
+      "congruentSolveFailReasons",
+      "sampler",
+      "fieldType",
+      "tauSelected_s"
+    ]
+  },
+  "notes": [
+    "Primary/standard SEM+ellipsometry evidence only.",
+    "Non-blocking compatibility envelope mapping lane.",
+    "No canonical override or promotion implied.",
+    "Reportable profile is fail-closed blocked until paired-run and covariance uncertainty anchors are present."
+  ],
+  "profileThresholds": {
+    "SE-STD-2": {
+      "delta_se_nm_abs_max": 2,
+      "U_fused_nm_max": 2
+    },
+    "SE-ADV-1": {
+      "delta_se_nm_abs_max": 1,
+      "U_fused_nm_max": 1
+    }
+  },
+  "pass": "pass_2_typed_context",
+  "dimensions": {
+    "profile_id": [
+      "SE-STD-2",
+      "SE-ADV-1"
+    ],
+    "delta_se_nm": [
+      0.5,
+      1,
+      1.2
+    ],
+    "U_fused_nm": [
+      0.5,
+      1,
+      1.2
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "se_primary_typed_se_std_2_delta_1_u_1",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-STD-2, delta_se_nm=1, U_fused_nm=1.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-STD-2",
+          "d_sem_corr_nm": 101,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 1,
+          "d_fused_nm": 100.5,
+          "u_fused_nm": 0.5,
+          "U_fused_nm": 1,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_std_2_delta_1_u_2",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-STD-2, delta_se_nm=1, U_fused_nm=2.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-STD-2",
+          "d_sem_corr_nm": 101,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 1,
+          "d_fused_nm": 100.5,
+          "u_fused_nm": 1,
+          "U_fused_nm": 2,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_std_2_delta_1_u_2p4",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-STD-2, delta_se_nm=1, U_fused_nm=2.4.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-STD-2",
+          "d_sem_corr_nm": 101,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 1,
+          "d_fused_nm": 100.5,
+          "u_fused_nm": 1.2,
+          "U_fused_nm": 2.4,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_std_2_delta_m2_u_1",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-STD-2, delta_se_nm=-2, U_fused_nm=1.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-STD-2",
+          "d_sem_corr_nm": 98,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": -2,
+          "d_fused_nm": 99,
+          "u_fused_nm": 0.5,
+          "U_fused_nm": 1,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_std_2_delta_m2_u_2",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-STD-2, delta_se_nm=-2, U_fused_nm=2.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-STD-2",
+          "d_sem_corr_nm": 98,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": -2,
+          "d_fused_nm": 99,
+          "u_fused_nm": 1,
+          "U_fused_nm": 2,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_std_2_delta_m2_u_2p4",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-STD-2, delta_se_nm=-2, U_fused_nm=2.4.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-STD-2",
+          "d_sem_corr_nm": 98,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": -2,
+          "d_fused_nm": 99,
+          "u_fused_nm": 1.2,
+          "U_fused_nm": 2.4,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_std_2_delta_2p4_u_1",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-STD-2, delta_se_nm=2.4, U_fused_nm=1.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-STD-2",
+          "d_sem_corr_nm": 102.4,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 2.4,
+          "d_fused_nm": 101.2,
+          "u_fused_nm": 0.5,
+          "U_fused_nm": 1,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_std_2_delta_2p4_u_2",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-STD-2, delta_se_nm=2.4, U_fused_nm=2.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-STD-2",
+          "d_sem_corr_nm": 102.4,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 2.4,
+          "d_fused_nm": 101.2,
+          "u_fused_nm": 1,
+          "U_fused_nm": 2,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_std_2_delta_2p4_u_2p4",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-STD-2, delta_se_nm=2.4, U_fused_nm=2.4.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-STD-2",
+          "d_sem_corr_nm": 102.4,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 2.4,
+          "d_fused_nm": 101.2,
+          "u_fused_nm": 1.2,
+          "U_fused_nm": 2.4,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_adv_1_delta_0p5_u_0p5",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-ADV-1, delta_se_nm=0.5, U_fused_nm=0.5.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-ADV-1",
+          "d_sem_corr_nm": 100.5,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 0.5,
+          "d_fused_nm": 100.25,
+          "u_fused_nm": 0.25,
+          "U_fused_nm": 0.5,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_adv_1_delta_0p5_u_1",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-ADV-1, delta_se_nm=0.5, U_fused_nm=1.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-ADV-1",
+          "d_sem_corr_nm": 100.5,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 0.5,
+          "d_fused_nm": 100.25,
+          "u_fused_nm": 0.5,
+          "U_fused_nm": 1,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_adv_1_delta_0p5_u_1p2",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-ADV-1, delta_se_nm=0.5, U_fused_nm=1.2.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-ADV-1",
+          "d_sem_corr_nm": 100.5,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 0.5,
+          "d_fused_nm": 100.25,
+          "u_fused_nm": 0.6,
+          "U_fused_nm": 1.2,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_adv_1_delta_m1_u_0p5",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-ADV-1, delta_se_nm=-1, U_fused_nm=0.5.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-ADV-1",
+          "d_sem_corr_nm": 99,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": -1,
+          "d_fused_nm": 99.5,
+          "u_fused_nm": 0.25,
+          "U_fused_nm": 0.5,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_adv_1_delta_m1_u_1",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-ADV-1, delta_se_nm=-1, U_fused_nm=1.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-ADV-1",
+          "d_sem_corr_nm": 99,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": -1,
+          "d_fused_nm": 99.5,
+          "u_fused_nm": 0.5,
+          "U_fused_nm": 1,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_adv_1_delta_m1_u_1p2",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-ADV-1, delta_se_nm=-1, U_fused_nm=1.2.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-ADV-1",
+          "d_sem_corr_nm": 99,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": -1,
+          "d_fused_nm": 99.5,
+          "u_fused_nm": 0.6,
+          "U_fused_nm": 1.2,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_adv_1_delta_1p2_u_0p5",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-ADV-1, delta_se_nm=1.2, U_fused_nm=0.5.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-ADV-1",
+          "d_sem_corr_nm": 101.2,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 1.2,
+          "d_fused_nm": 100.6,
+          "u_fused_nm": 0.25,
+          "U_fused_nm": 0.5,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_adv_1_delta_1p2_u_1",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-ADV-1, delta_se_nm=1.2, U_fused_nm=1.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-ADV-1",
+          "d_sem_corr_nm": 101.2,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 1.2,
+          "d_fused_nm": 100.6,
+          "u_fused_nm": 0.5,
+          "U_fused_nm": 1,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "se_primary_typed_se_adv_1_delta_1p2_u_1p2",
+      "lane": "sem_ellipsometry",
+      "description": "Pass-2 typed SEM+ellips envelope: profile=SE-ADV-1, delta_se_nm=1.2, U_fused_nm=1.2.",
+      "registryRefs": [
+        "EXP-SE-001",
+        "EXP-SE-002",
+        "EXP-SE-003",
+        "EXP-SE-009",
+        "EXP-SE-012",
+        "EXP-SE-013",
+        "EXP-SE-004"
+      ],
+      "overrides": {
+        "params": {
+          "gap_nm": 96
+        }
+      },
+      "experimentalContext": {
+        "semEllips": {
+          "profileId": "SE-ADV-1",
+          "d_sem_corr_nm": 101.2,
+          "u_sem_nm": 0,
+          "d_ellip_nm": 100,
+          "u_ellip_nm": 0,
+          "delta_se_nm": 1.2,
+          "d_fused_nm": 100.6,
+          "u_fused_nm": 0.6,
+          "U_fused_nm": 1.2,
+          "paired_run_id": null,
+          "rho_sem_ellip": 0,
+          "covariance_sem_ellip_nm2": 0,
+          "sourceRefs": [
+            "EXP-SE-001",
+            "EXP-SE-002",
+            "EXP-SE-003",
+            "EXP-SE-009",
+            "EXP-SE-012",
+            "EXP-SE-013",
+            "EXP-SE-004"
+          ],
+          "uncertainty": {
+            "method": "paired_dual_instrument_covariance_numeric",
+            "reportableReady": false,
+            "blockedReasons": [
+              "missing_paired_dual_instrument_run",
+              "missing_covariance_uncertainty_anchor"
+            ],
+            "sourceRefs": [
+              "EXP-SE-001",
+              "EXP-SE-002",
+              "EXP-SE-003",
+              "EXP-SE-009",
+              "EXP-SE-012",
+              "EXP-SE-013",
+              "EXP-SE-004"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "profile": "se_primary_reportable_v1",
+  "reportableUnlockEvidence": {
+    "evidencePath": "docs/specs/templates/casimir-tile-sem-ellipsometry-paired-run-evidence-template.v1.json",
+    "reportableReady": false,
+    "blockedReasons": [
+      "missing_paired_dual_instrument_run",
+      "missing_covariance_uncertainty_anchor"
+    ]
+  },
+  "preRegistrationProfile": {
+    "profileId": "se-primary-reportable-v1",
+    "lockedOn": "2026-03-06",
+    "lane": "sem_ellipsometry",
+    "sourceClassAllowlist": [
+      "primary",
+      "standard"
+    ],
+    "lockedRegistryRefs": [
+      "EXP-SE-001",
+      "EXP-SE-002",
+      "EXP-SE-003",
+      "EXP-SE-009",
+      "EXP-SE-012",
+      "EXP-SE-013",
+      "EXP-SE-004"
+    ],
+    "lockedProfiles": [
+      "SE-STD-2",
+      "SE-ADV-1"
+    ],
+    "lockedMultipliers": [
+      0.5,
+      1,
+      1.2
+    ],
+    "reportableReady": false,
+    "blockedReasons": [
+      "missing_paired_dual_instrument_run",
+      "missing_covariance_uncertainty_anchor"
+    ],
+    "stableCitationTargetProfileId": "se-primary-reportable-reference-v1",
+    "stableCitationTargetScenarioIds": [
+      "se_primary_typed_se_std_2_delta_1_u_1",
+      "se_primary_typed_se_adv_1_delta_0p5_u_0p5"
+    ]
+  }
+}

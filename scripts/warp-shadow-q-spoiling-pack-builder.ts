@@ -109,11 +109,34 @@ const parseRegistryRows = (markdown: string): RegistryRow[] => {
 };
 
 const parseRelativeCandidate = (raw: string): number | null => {
-  const values = parseNumberCandidates(raw).filter((value) => value > 0);
+  const text = String(raw);
+  const normalized = text.trim().toLowerCase();
+  if (!normalized || ['unknown', 'n/a', 'na', 'none', 'null'].includes(normalized)) return null;
+
+  // Prefer explicit percent tokens when present.
+  const percentMatch = text.match(/(-?\d+(?:\.\d+)?)\s*%/);
+  if (percentMatch) {
+    const value = Number(percentMatch[1]);
+    if (Number.isFinite(value) && value > 0) return Number((value / 100).toFixed(6));
+  }
+
+  const values = parseNumberCandidates(text).filter((value) => value > 0);
   if (!values.length) return null;
+
+  // Avoid treating coverage factors (e.g., "k=1") as relative uncertainty.
+  const hasCoverageFactor = /\bk\s*=/.test(normalized);
+  if (hasCoverageFactor) {
+    const nonUnity = values.filter((value) => Math.abs(value - 1) > 1e-12);
+    if (!nonUnity.length) return null;
+    const best = nonUnity[0];
+    if (best <= 1) return Number(best.toFixed(6));
+    if (best <= 100) return Number((best / 100).toFixed(6));
+    return null;
+  }
+
   const value = values[0];
-  if (value <= 1) return value;
-  if (value <= 100) return value / 100;
+  if (value <= 1) return Number(value.toFixed(6));
+  if (value <= 100) return Number((value / 100).toFixed(6));
   return null;
 };
 

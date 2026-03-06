@@ -5,13 +5,13 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 ## Summary
 - mode: shadow_non_blocking
 - non_blocking: true
-- scenario_count: 3
-- compatible: 3
+- scenario_count: 2
+- compatible: 2
 - partial: 0
 - incompatible: 0
 - error: 0
 - scenario_pack: `configs/warp-shadow-injection-scenarios.ti-primary-reportable-reference.v1.json`
-- commit_pin: `0b65cb4b7b5dff40b72c032dd6424319fbd5ff41`
+- commit_pin: `f6d6146d26885aae34ebd8785950df07d6af9731`
 
 ## Recovery Contract
 - recovery_goal: timing_compatibility_recovery
@@ -32,9 +32,8 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 ## Scenario Results
 | scenario_id | lane | experimental_context | classification | congruentSolvePass | marginRatioRaw | deltaMarginRatioRaw | fail_or_error |
 |---|---|---|---|---|---:|---:|---|
-| ti_primary_typed_wr_short_ps_sigma_1e2ps | timing | WR-SHORT-PS;sigma=100;ts=hardware | compatible | true | 0.2520204203124254 | -0.7479795796875746 | none |
-| ti_primary_typed_wr_short_ps_sigma_1e2ps | timing | WR-SHORT-PS;sigma=120;ts=hardware | compatible | true | 0.23176606739908293 | -0.7682339326009171 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_6e0ps | timing | WR-LONGHAUL-EXP;sigma=6;ts=hardware | compatible | true | 0.2163729288083322 | -0.7836270711916677 | none |
+| ti_primary_typed_wr_short_ps_sigma_50ps | timing | WR-SHORT-PS;sigma=50;ts=hardware | compatible | true | 0.2300048183594453 | -0.7699951816405547 | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_6ps | timing | WR-LONGHAUL-EXP;sigma=6;ts=hardware | compatible | true | 0.21146505557529513 | -0.7885349444247048 | none |
 
 ## Failure Envelope
 

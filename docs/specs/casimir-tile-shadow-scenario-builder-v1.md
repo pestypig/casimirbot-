@@ -31,6 +31,10 @@ This removes manual copy/edit from:
 - Timing typed pack: `configs/warp-shadow-injection-scenarios.ti-primary-typed.v1.json`
 - Timing reportable prereg pack: `configs/warp-shadow-injection-scenarios.ti-primary-reportable.v1.json`
 - Timing reportable reference profile pack: `configs/warp-shadow-injection-scenarios.ti-primary-reportable-reference.v1.json`
+- SEM+ellipsometry primary pack: `configs/warp-shadow-injection-scenarios.se-primary-recovery.v1.json`
+- SEM+ellipsometry typed pack: `configs/warp-shadow-injection-scenarios.se-primary-typed.v1.json`
+- SEM+ellipsometry reportable prereg pack: `configs/warp-shadow-injection-scenarios.se-primary-reportable.v1.json`
+- SEM+ellipsometry reportable reference profile pack: `configs/warp-shadow-injection-scenarios.se-primary-reportable-reference.v1.json`
 
 ## Command
 ```bash
@@ -39,12 +43,12 @@ npm run warp:shadow:build-scenarios
 
 Common filtered run:
 ```bash
-npm run warp:shadow:build-scenarios -- --lane qei_worldline,q_spoiling,timing,nanogap,casimir_sign_control --status extracted --max-per-lane 3 --out configs/warp-shadow-injection-scenarios.generated.v1.json
+npm run warp:shadow:build-scenarios -- --lane qei_worldline,q_spoiling,timing,nanogap,casimir_sign_control,sem_ellipsometry --status extracted --max-per-lane 3 --out configs/warp-shadow-injection-scenarios.generated.v1.json
 ```
 
 Strict QEI mode (fail-closed QEI lane emission):
 ```bash
-npm run warp:shadow:build-scenarios -- --lane qei_worldline,q_spoiling,timing,nanogap,casimir_sign_control --status extracted --max-per-lane 3 --strict-qei --out configs/warp-shadow-injection-scenarios.generated.v1.json
+npm run warp:shadow:build-scenarios -- --lane qei_worldline,q_spoiling,timing,nanogap,casimir_sign_control,sem_ellipsometry --status extracted --max-per-lane 3 --strict-qei --out configs/warp-shadow-injection-scenarios.generated.v1.json
 ```
 
 Strict Casimir sign mode (primary/standard first):
@@ -65,6 +69,11 @@ npm run warp:shadow:build-scenarios -- --lane nanogap --status extracted --sourc
 Strict timing mode (primary/standard first):
 ```bash
 npm run warp:shadow:build-scenarios -- --lane timing --status extracted --source-class primary,standard --max-per-lane 6 --strict-timing --out configs/warp-shadow-injection-scenarios.ti-primary-recovery.v1.json
+```
+
+Strict SEM+ellipsometry mode (primary/standard first):
+```bash
+npm run warp:shadow:build-scenarios -- --lane sem_ellipsometry --status extracted --source-class primary,standard --max-per-lane 6 --strict-sem-ellips --out configs/warp-shadow-injection-scenarios.se-primary-recovery.v1.json
 ```
 
 Two-pass casimir sign pack expansion:
@@ -105,6 +114,21 @@ This expands strict timing anchors into:
 2. pass-2 typed pack (`ti-primary-typed`) with `experimentalContext.timing` passthrough.
 3. frozen reportable prereg pack (`ti-primary-reportable`) with locked refs, sigma grid, profile thresholds, and uncertainty readiness state.
 4. fixed reportable reference profile (`ti-primary-reportable-reference`) with one stable scenario-id set for manuscript citations across reruns.
+
+Two-pass SEM+ellipsometry pack expansion:
+```bash
+npm run warp:shadow:build-se-packs
+```
+This expands strict SEM+ellipsometry anchors into:
+1. pass-1 existing knobs pack (`se-primary-recovery`) with deterministic `profile_id x (delta_se_nm,U_fused_nm)` envelope sweep.
+2. pass-2 typed pack (`se-primary-typed`) with `experimentalContext.semEllips` passthrough.
+3. frozen reportable prereg pack (`se-primary-reportable`) with locked refs/profile thresholds and explicit blocked reportable readiness.
+4. fixed reportable reference profile (`se-primary-reportable-reference`) with one stable scenario-id set for manuscript citations across reruns.
+
+Reportable unlock replay (when paired-run evidence is available):
+```bash
+npm run warp:shadow:build-se-packs -- --paired-evidence docs/specs/templates/casimir-tile-sem-ellipsometry-paired-run-evidence-template.v1.json
+```
 
 Then run:
 ```bash
@@ -147,7 +171,8 @@ If required strict signals are missing (or selected rows violate strict source c
 When `--strict-timing` is enabled, lane `timing` is emitted only if selected rows contain:
 1. `timing_topology_anchor`,
 2. `timing_precision_anchor`,
-3. `timing_accuracy_anchor`.
+3. `timing_accuracy_anchor`,
+4. `timing_longhaul_anchor`.
 
 Source policy in this strict mode:
 1. wave-1 packs should be filtered to `--source-class primary,standard`,
@@ -197,6 +222,26 @@ Profile split in pack expansion (post strict-lane build):
 1. `NG-STD-10`,
 2. `NG-ADV-5`.
 Congruence is evaluated against profile-specific uncertainty bounds with deterministic edge handling.
+
+If required strict signals are missing (or selected rows violate strict source class policy), lane emission is skipped and the generated JSON includes:
+- `summary.strictLaneSkips`
+- `strictLaneSkips[]` entries with `reason`, `missingSignals`, and `registryRefs`
+
+### `--strict-sem-ellips` lane policy
+When `--strict-sem-ellips` is enabled, lane `sem_ellipsometry` is emitted only if selected rows contain:
+1. `sem_calibration_anchor`,
+2. `ellipsometry_anchor`,
+3. `uncertainty_reporting_anchor`,
+4. `traceability_anchor`.
+
+Source policy in this strict mode:
+1. wave-1 packs should be filtered to `--source-class primary,standard`,
+2. preprint rows belong in a separate exploratory overlay pack.
+
+Profile split in pack expansion (post strict-lane build):
+1. `SE-STD-2`,
+2. `SE-ADV-1`.
+Congruence is evaluated against profile-specific `delta_se_nm` and `U_fused_nm` bounds with deterministic edge handling.
 
 If required strict signals are missing (or selected rows violate strict source class policy), lane emission is skipped and the generated JSON includes:
 - `summary.strictLaneSkips`

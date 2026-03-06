@@ -70,6 +70,18 @@ const DEFAULT_COMPAT_REPORTABLE_REPEAT_PATH = path.join(
   'full-solve',
   `ti-compat-check-reportable-${DATE_STAMP}-repeat.json`,
 );
+const DEFAULT_COMPAT_REPORTABLE_REFERENCE_PATH = path.join(
+  'artifacts',
+  'research',
+  'full-solve',
+  `ti-compat-check-reportable-reference-${DATE_STAMP}.json`,
+);
+const DEFAULT_COMPAT_REPORTABLE_REFERENCE_REPEAT_PATH = path.join(
+  'artifacts',
+  'research',
+  'full-solve',
+  `ti-compat-check-reportable-reference-${DATE_STAMP}-repeat.json`,
+);
 const DEFAULT_OUT_PATH = path.join('artifacts', 'research', 'full-solve', `ti-repeat-determinism-${DATE_STAMP}.json`);
 
 const readArgValue = (name: string, argv = process.argv.slice(2)): string | undefined => {
@@ -115,6 +127,8 @@ export const buildTimingRepeatDeterminism = (options: {
   compatRepeatPath?: string;
   compatReportablePath?: string;
   compatReportableRepeatPath?: string;
+  compatReportableReferencePath?: string;
+  compatReportableReferenceRepeatPath?: string;
   outPath?: string;
 }) => {
   const pass1 = readJson(options.pass1Path ?? DEFAULT_PASS1_PATH);
@@ -131,6 +145,12 @@ export const buildTimingRepeatDeterminism = (options: {
   const compatRepeat = readJson(options.compatRepeatPath ?? DEFAULT_COMPAT_REPEAT_PATH);
   const compatReportable = readJson(options.compatReportablePath ?? DEFAULT_COMPAT_REPORTABLE_PATH);
   const compatReportableRepeat = readJson(options.compatReportableRepeatPath ?? DEFAULT_COMPAT_REPORTABLE_REPEAT_PATH);
+  const compatReportableReference = readJson(
+    options.compatReportableReferencePath ?? DEFAULT_COMPAT_REPORTABLE_REFERENCE_PATH,
+  );
+  const compatReportableReferenceRepeat = readJson(
+    options.compatReportableReferenceRepeatPath ?? DEFAULT_COMPAT_REPORTABLE_REFERENCE_REPEAT_PATH,
+  );
 
   const pass1Eval = evaluateRunPair(pass1, pass1Repeat);
   const pass2Eval = evaluateRunPair(pass2, pass2Repeat);
@@ -138,6 +158,7 @@ export const buildTimingRepeatDeterminism = (options: {
   const reportableReferenceEval = evaluateRunPair(reportableReference, reportableReferenceRepeat);
   const compatEval = evaluateCompatPair(compat, compatRepeat);
   const compatReportableEval = evaluateCompatPair(compatReportable, compatReportableRepeat);
+  const compatReportableReferenceEval = evaluateCompatPair(compatReportableReference, compatReportableReferenceRepeat);
 
   const allStable = [
     pass1Eval.summaryStable,
@@ -160,6 +181,8 @@ export const buildTimingRepeatDeterminism = (options: {
     compatEval.reasonCountsStable,
     compatReportableEval.summaryStable,
     compatReportableEval.reasonCountsStable,
+    compatReportableReferenceEval.summaryStable,
+    compatReportableReferenceEval.reasonCountsStable,
   ].every(Boolean);
 
   const payload = {
@@ -170,6 +193,7 @@ export const buildTimingRepeatDeterminism = (options: {
     reportableReference: reportableReferenceEval,
     compatCheck: compatEval,
     reportableCompatCheck: compatReportableEval,
+    reportableReferenceCompatCheck: compatReportableReferenceEval,
     status: allStable ? 'PASS' : 'FAIL',
   };
 
@@ -199,9 +223,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     compatRepeatPath: readArgValue('--compat-repeat') ?? DEFAULT_COMPAT_REPEAT_PATH,
     compatReportablePath: readArgValue('--compat-reportable') ?? DEFAULT_COMPAT_REPORTABLE_PATH,
     compatReportableRepeatPath: readArgValue('--compat-reportable-repeat') ?? DEFAULT_COMPAT_REPORTABLE_REPEAT_PATH,
+    compatReportableReferencePath:
+      readArgValue('--compat-reportable-reference') ?? DEFAULT_COMPAT_REPORTABLE_REFERENCE_PATH,
+    compatReportableReferenceRepeatPath:
+      readArgValue('--compat-reportable-reference-repeat') ?? DEFAULT_COMPAT_REPORTABLE_REFERENCE_REPEAT_PATH,
     outPath: readArgValue('--out') ?? DEFAULT_OUT_PATH,
   });
   console.log(JSON.stringify(result, null, 2));
   if (!result.ok) process.exit(1);
 }
-
